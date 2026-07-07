@@ -6,6 +6,8 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { applyCompactSeasonArchiveSentinelIfNeeded } from "@/lib/foundation/apply-compact-season-archive-sentinel";
+import { invalidatePlayerAttributeSheetCache } from "@/lib/foundation/hydrate-player-attribute-sheet";
+import { invalidatePlayerProfileSessionCache } from "@/lib/foundation/player-profile-session-cache";
 import {
   buildAutoPersistContentSignature,
   buildFoundationPersistPutBody,
@@ -297,6 +299,10 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
 
       if (saveId && saveId !== activeSaveId) {
         clearSaveScopedFeeds();
+        if (activeSaveId && activeSaveId !== "loading-save") {
+          invalidatePlayerProfileSessionCache({ saveId: activeSaveId });
+          invalidatePlayerAttributeSheetCache({ saveId: activeSaveId });
+        }
       }
 
       let response: Response;
@@ -348,6 +354,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         });
       }
       if (payload.save.saveId !== activeSaveId) {
+        invalidatePlayerProfileSessionCache({ saveId: payload.save.saveId });
+        invalidatePlayerAttributeSheetCache({ saveId: payload.save.saveId });
         setSeasonOverviewSeasonId(nextGameState.season.id);
       }
       setActiveSaveId(payload.save.saveId);

@@ -29,6 +29,8 @@ import {
   isUnifiedPickEnabledForMarket,
 } from "@/lib/ai/unified-pick-planner-service";
 import { computeCompositeSellScore, selectCompositeSellCandidates } from "@/lib/ai/ai-composite-sell-score";
+import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
+import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
@@ -457,6 +459,8 @@ function chooseSellCandidates(
   const qualified = scored
     .filter((entry) => entry.score >= effectiveThreshold)
     .sort((left, right) => right.score - left.score || left.candidate.playerName.localeCompare(right.candidate.playerName, "de"));
+  const rosterCount = gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+  const hardMin = getTeamHardMinRequired(gameState, team.teamId);
   return uniqueById(
     selectCompositeSellCandidates({
       candidates: qualified.map((entry) => ({ candidate: entry.candidate, score: entry.score })),
@@ -464,7 +468,11 @@ function chooseSellCandidates(
       teamSalaryTotal: salaryTotal,
       cashPressureScore,
       teamProfile,
-      allowProfitSellsBelowMin: (identity?.boardConfidence ?? 0) < 7,
+      hardMin,
+      rosterCount,
+      allowProfitSellsBelowMin:
+        (identity?.boardConfidence ?? 0) < 7 ||
+        teamHasCashBufferRebuildFocus(gameState, team.teamId),
     }),
     (candidate) => candidate.activePlayerId,
   );

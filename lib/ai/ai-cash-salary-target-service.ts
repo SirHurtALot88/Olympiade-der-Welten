@@ -39,7 +39,7 @@ function getSeasonHardCapBuffer(seasonId: string) {
   return 0.1;
 }
 
-/** S2–S3: planner buffer is 1× salary — hoard/deploy threshold matches that ceiling. */
+/** S2–S3: hoard/deploy threshold uses soft target; hard cap still 1.0× salary. */
 function usesPlannerSalaryBufferCap(seasonId: string) {
   const seasonNumber = parseSeasonNumber(seasonId);
   return seasonNumber >= 2 && seasonNumber <= 3;

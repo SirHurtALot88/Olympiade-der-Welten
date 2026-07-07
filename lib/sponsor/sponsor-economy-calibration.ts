@@ -1,7 +1,7 @@
 import type { GameState, SponsorArchetype, SponsorOffer, SponsorOfferComponent, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { PRIZE_MONEY_NORMALIZED_JSON_PATH } from "@/lib/season/prize-money-paths";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
@@ -149,10 +149,13 @@ export function getLeagueMinimumSalaryTotal(gameState: GameState): number {
   return round1(Math.min(...overviewSalaries));
 }
 
-/** Viertniedrigstes Teamgehalt (4. von unten in der Gehaltsliste). */
+/**
+ * Viertniedrigste Team-Referenz (4. von unten), Basis = Gehalt + Gebäude-Unterhalt.
+ * Gebäude-Kosten schlagen so 1:1 auf die Sponsoren-Basis durch (salary factor 1.0 Anker).
+ */
 export function getLeagueFourthFromLowestSalaryTotal(gameState: GameState): number {
   const salaries = buildTeamSeasonOverviewRows({ gameState })
-    .map((row) => getTeamDisplaySalaryTotal(gameState, row.teamId))
+    .map((row) => getTeamSponsorBaseReferenceTotal(gameState, row.teamId))
     .filter((value) => value > 0)
     .sort((left, right) => left - right);
   if (salaries.length === 0) {

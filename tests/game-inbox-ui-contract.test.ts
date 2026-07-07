@@ -19,6 +19,8 @@ describe("game inbox UI contract", () => {
       readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
       readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8") +
       readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/foundation-game-flow-navigation.ts"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/foundation-global-next-actions.ts"), "utf8") +
       crossTabGameFlowSource +
       commandPaletteSource +
       gameFlowSource;
@@ -102,10 +104,11 @@ describe("game inbox UI contract", () => {
   it("persists inbox done and dismissed status into the local save", () => {
     const source =
       readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
-      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8");
+      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/foundation-global-next-actions.ts"), "utf8");
 
     expect(source).toContain("updateInboxItemStatus");
     expect(source).toContain("persistLocalGameStateImmediately(nextGameState)");
-    expect(source).toContain('gameInboxItems: nextItems');
+    expect(source).toContain("gameInboxItems: nextItems");
   });
 });

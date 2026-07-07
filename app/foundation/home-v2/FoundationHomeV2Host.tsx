@@ -60,6 +60,7 @@ export type FoundationHomeV2HostProps = {
   activeContextMeta: { roomId?: string | null; scenarioType?: string | null } | null;
   homeNextMatchdayStatus: HomeV2NextMatchdayStatus & ManagerOfficeClientProps["homeNextMatchdayStatus"];
   activeManagerLineupSubmitted: boolean;
+  enableTopPlayerForecasts?: boolean;
   leaguePlayerHeatPools: LeaguePlayerHeatPools;
   currentMatchdayDisplayLabel: string;
   activeOwnerLabel: string | null;
@@ -123,6 +124,7 @@ export default function FoundationHomeV2Host({
   activeContextMeta,
   homeNextMatchdayStatus,
   activeManagerLineupSubmitted,
+  enableTopPlayerForecasts = true,
   leaguePlayerHeatPools,
   currentMatchdayDisplayLabel,
   activeOwnerLabel,
@@ -153,6 +155,7 @@ export default function FoundationHomeV2Host({
     activeContextMeta,
     homeNextMatchdayStatus,
     activeManagerLineupSubmitted,
+    enableTopPlayerForecasts,
   });
 
   const homeActiveTeamLogo = selectedTeam ? getTeamLogoModel(selectedTeam, { variant: "thumb" }) : null;

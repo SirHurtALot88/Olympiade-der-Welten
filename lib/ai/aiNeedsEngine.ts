@@ -85,7 +85,7 @@ export function evaluateAiNeeds(gameState: GameState, teamId: string): AiNeedSum
     topNeedDisciplineIds: disciplineScores.slice(0, 2).map((entry) => entry.disciplineId),
     overallNeedScore: clamp(
       rosterGap * 0.35 +
-        disciplineScores[0].needScore / 100 * 0.25 +
+        (disciplineScores[0]?.needScore ?? 0) / 100 * 0.25 +
         budgetPressure * 0.15 +
         upkeepPressure * 0.1 +
         Math.max(axisDeficits.pow, axisDeficits.spe, axisDeficits.men, axisDeficits.soc) * 0.15,

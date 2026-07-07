@@ -21,18 +21,19 @@ const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation home v2 ui contract", () => {
   it("merges home and office into one home v2 view with sub navigation", async () => {
-    const [shellText, navText, routingText, panelText, officeText] = await Promise.all([
+    const [shellText, navText, routingText, panelText, officeText, hostText] = await Promise.all([
       fs.readFile(shellRouterBodyPath, "utf8"),
       fs.readFile(navConfigPath, "utf8"),
       fs.readFile(viewRoutingPath, "utf8"),
       fs.readFile(path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Panel.tsx"), "utf8"),
       fs.readFile(managerOfficePath, "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Host.tsx"), "utf8"),
     ]);
 
     expect(shellText).toContain("FoundationSubNav");
     expect(panelText).toContain('tab === "overview"');
     expect(shellText).toContain("homeV2Tab");
-    expect(shellText).toContain('navigateHomeTab("office")');
+    expect(shellText).toContain("FoundationShellRouterHomeV2");
     expect(panelText).toContain('if (!active)');
     expect(panelText).toContain('id="foundation-home-v2"');
     expect(panelText).toContain("ManagerOfficeClient");
@@ -40,8 +41,8 @@ describe("foundation home v2 ui contract", () => {
     expect(shellText).not.toContain('getViewClass("hq")');
     expect(navText).not.toContain('id: "hq"');
     expect(routingText).toContain('if (view === "hq") return "homeV2"');
-    expect(shellText).toContain("FoundationHomeV2Panel");
-    expect(shellText).toContain("onOpenOffice");
+    expect(shellText).not.toContain("FoundationHomeV2Panel");
+    expect(hostText).toContain("onOpenOffice");
   });
 
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
@@ -68,14 +69,15 @@ describe("foundation home v2 ui contract", () => {
   });
 
   it("shows core axis stats and absolute CA/PO range on top player cards", async () => {
-    const [homeText, typesText, shellText, scopeText] = await Promise.all([
+    const [homeText, typesText, hostText, scopeText, overviewDerivationsText] = await Promise.all([
       fs.readFile(homeV2Path, "utf8"),
       fs.readFile(
         path.join(process.cwd(), "app/foundation/home-v2/home-v2-types.ts"),
         "utf8",
       ),
-      fs.readFile(shellRouterBodyPath, "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Host.tsx"), "utf8"),
       fs.readFile(shellScopePath, "utf8"),
+      fs.readFile(path.join(process.cwd(), "lib/foundation/tabs/use-home-v2-overview-derivations.ts"), "utf8"),
     ]);
 
     expect(homeText).toContain("FoundationPlayerPortraitCard");
@@ -84,7 +86,7 @@ describe("foundation home v2 ui contract", () => {
     expect(homeText).toContain("is-rank-silver");
     expect(homeText).toContain("is-rank-bronze");
     expect(homeText).not.toContain("VeloStarRating");
-    expect(shellText).toContain("leagueHeatPools: leaguePlayerHeatPools");
+    expect(hostText).toContain("leagueHeatPools: leaguePlayerHeatPools");
     expect(scopeText).toContain('activeView !== "homeV2"');
     expect(typesText).toContain("leagueHeatPools");
     expect(typesText).toContain("caRating");
@@ -92,11 +94,11 @@ describe("foundation home v2 ui contract", () => {
     expect(typesText).toContain("poRangeMax");
     expect(typesText).toContain("rosterRank");
     expect(typesText).toContain("pow:");
-    expect(scopeText).toContain("buildPlayerDevelopmentInsight");
-    expect(scopeText).toContain("buildPlayerProgressionForecast");
-    expect(scopeText).toContain("potentialRangeDisplay");
+    expect(overviewDerivationsText).toContain("buildPlayerDevelopmentInsight");
+    expect(overviewDerivationsText).toContain("buildPlayerProgressionForecast");
+    expect(overviewDerivationsText).toContain("potentialRangeDisplay");
     expect(typesText).toContain("HOME_V2_TOP_PLAYER_COUNT");
-    expect(scopeText).toContain("homePlayerCards.slice(0, 6)");
+    expect(overviewDerivationsText).toContain("homePlayerCards.slice(0, 6)");
   });
 
   it("keeps HQ hero lean with captain picker and without duplicate front-office strip", async () => {
@@ -189,10 +191,10 @@ describe("foundation ui v2 roadmap contract", () => {
   });
 
   it("exposes sprint N urgency sort, inbox checkoffs, compact save menu, and quieter mobile nav", async () => {
-    const [homeText, shellText, scopeText, auditText, cssText, crossTabFlowText] = await Promise.all([
+    const [homeText, shellText, overviewDerivationsText, auditText, cssText, crossTabFlowText] = await Promise.all([
       fs.readFile(homeV2Path, "utf8"),
       fs.readFile(shellRouterBodyPath, "utf8"),
-      fs.readFile(shellScopePath, "utf8"),
+      fs.readFile(path.join(root, "lib/foundation/tabs/use-home-v2-overview-derivations.ts"), "utf8"),
       fs.readFile(path.join(root, "scripts/tmp-ux-audit-play.ts"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
       fs.readFile(path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-game-flow.ts"), "utf8"),
@@ -202,13 +204,12 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(homeText).toContain("home-v2-inbox-checkoff");
     expect(homeText).toContain("onCompleteInboxItem");
 
-    expect(scopeText).toContain("homeTodayCards");
-    expect(scopeText).toContain("urgency");
-    expect(scopeText).toContain(".sort((left, right) => left.urgency - right.urgency)");
+    expect(overviewDerivationsText).toContain("homeTodayCards");
+    expect(overviewDerivationsText).toContain("sortTodayCardsByUrgency");
 
     expect(shellText).toContain('data-testid="foundation-save-compact-menu"');
     expect(shellText).toContain("formatShortSaveId(activeSaveId)");
-    expect(shellText).toContain("onCompleteInboxItem");
+    expect(shellText).toContain("FoundationShellRouterHomeV2");
 
     expect(crossTabFlowText).toContain('item.severity === "blocked" || item.severity === "warning"');
 

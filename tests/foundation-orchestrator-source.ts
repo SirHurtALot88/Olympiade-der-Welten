@@ -15,5 +15,6 @@ export async function readFoundationOrchestratorSource(root = defaultRoot): Prom
 export async function readFoundationSurfaceSource(root = defaultRoot): Promise<string> {
   const orchestrator = await readFoundationOrchestratorSource(root);
   const shell = await fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8");
-  return `${orchestrator}\n${shell}`;
+  const router = await fs.readFile(path.join(root, "app/foundation/FoundationShellRouter.tsx"), "utf8");
+  return `${orchestrator}\n${shell}\n${router}`;
 }

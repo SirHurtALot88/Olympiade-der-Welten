@@ -238,7 +238,7 @@ export function applySponsorSettlement(input: {
     const contract = getTeamSponsorContract(input.gameState, team.teamId);
     const teamRows = contract ? preview.rows.filter((row) => row.teamId === team.teamId && row.cashDelta !== 0) : [];
     let delta = roundCash(teamRows.reduce((sum, row) => sum + row.cashDelta, 0));
-    if (input.deductSalary) {
+    if (input.deductSalary && contract) {
       const salaryTotal = getTeamSalaryTotal(input.gameState, team.teamId);
       if (salaryTotal > 0) {
         delta = roundCash(delta - salaryTotal);

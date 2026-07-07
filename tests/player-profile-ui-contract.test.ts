@@ -2,17 +2,18 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { readFoundationOrchestratorSource } from "./foundation-orchestrator-source";
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 describe("player profile ui contract", () => {
   it("provides full-page player profile with tabs and projected classes report", async () => {
-    const [profileText, foundationText, scopeText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
+    const [profileText, foundationText, foundationSurfaceText, scopeText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
       await Promise.all([
         fs.readFile(
           "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerProfileClient.tsx",
           "utf8",
         ),
         readFoundationOrchestratorSource(),
+        readFoundationSurfaceSource(),
         fs.readFile(
           "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
           "utf8",
@@ -40,11 +41,13 @@ describe("player profile ui contract", () => {
     expect(profileText).toContain("PLAYER_PROFILE_TAB_ANCHORS");
     expect(profileText).toContain("trainingRow");
     expect(profileText).toContain("onSetTrainingMode");
-    expect(foundationText).toContain("openPlayerProfileById");
+    expect(scopeText).toContain("player-profile-session-cache");
+    expect(scopeText).toContain("getCachedPlayerProfileData");
+    expect(drawerText).toContain("BudgetedMediaImage");
     expect(foundationText).toContain("shouldLoadSeasonArchive");
     expect(foundationText).toContain("loadedSeasonArchiveSignatureRef");
     expect(foundationText).toContain("setPlayerProfileLoading(true)");
-    expect(foundationText).toContain("PlayerProfileClient");
+    expect(foundationSurfaceText).toContain("PlayerProfileClient");
     expect(foundationText).toContain("onOpenLeagueLeaders");
     expect(foundationText).toContain("league-leaders-${categoryId}");
     expect(foundationText).toContain("playerProfileTrainingRow");

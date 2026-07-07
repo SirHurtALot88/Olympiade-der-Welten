@@ -2,18 +2,20 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { readFoundationOrchestratorSource } from "./foundation-orchestrator-source";
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 describe("foundation panel split ui contract", () => {
   it("routes heavy views through lazy foundation panels", async () => {
     const foundationText = await readFoundationOrchestratorSource(
       "/Users/chrisfalk/Documents/Codex/Olympiade der Welten",
     );
+    const foundationSurfaceText = await readFoundationSurfaceSource(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten",
+    );
     const pageClientText = await fs.readFile(
       "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
       "utf8",
     );
-    const foundationSurfaceText = foundationText + pageClientText;
 
     expect(foundationSurfaceText).toContain("FoundationShellRouterHomeV2");
     expect(foundationSurfaceText).toContain("FoundationShellRouterSeasonV2");

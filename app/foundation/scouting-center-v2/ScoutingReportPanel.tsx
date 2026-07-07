@@ -1,5 +1,6 @@
 "use client";
 
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
@@ -68,8 +69,16 @@ export default function ScoutingReportPanel({
       <header className="scouting-report-header">
         <button type="button" className="scouting-report-portrait" onClick={() => onOpenPlayer(report.playerId)}>
           {previewSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewSrc} alt="" loading="lazy" />
+            <BudgetedMediaImage
+              src={src}
+              placeholderSrc={previewSrc}
+              alt=""
+              width={72}
+              height={72}
+              loading="eager"
+              fetchPriority="high"
+              eager
+            />
           ) : (
             <span className="scouting-report-portrait-fallback">{getInitials(report.playerName)}</span>
           )}

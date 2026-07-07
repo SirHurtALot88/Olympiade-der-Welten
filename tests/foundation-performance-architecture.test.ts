@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readFoundationOrchestratorSource } from "./foundation-orchestrator-source";
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
 import {
   buildLegacyLineupLabContextCacheKey,
@@ -150,7 +150,8 @@ describe("foundation performance architecture helpers", () => {
     expect(shouldBuildFoundationSeasonSetupFlow("marketV2")).toBe(false);
     expect(shouldBuildFoundationSeasonBriefingData("seasonPreview")).toBe(true);
     expect(shouldBuildFoundationSeasonBriefingData("teams")).toBe(false);
-    expect(shouldBuildFoundationSeasonReadinessChecklist("homeV2")).toBe(true);
+    expect(shouldBuildFoundationSeasonReadinessChecklist("homeV2")).toBe(false);
+    expect(shouldBuildFoundationSeasonReadinessChecklist("homeV2", "office")).toBe(true);
     expect(shouldBuildFoundationSeasonReadinessChecklist("teams")).toBe(false);
     expect(shouldBuildFoundationCockpitFlowWarnings("cockpit")).toBe(true);
     expect(shouldBuildFoundationCockpitFlowWarnings("teams")).toBe(false);
@@ -198,7 +199,8 @@ describe("foundation performance architecture helpers", () => {
       }),
     ).toBe(true);
     expect(shouldBuildFoundationHqOfficeDerivations(false)).toBe(false);
-    expect(shouldBuildFoundationHqOfficeDerivations(true)).toBe(true);
+    expect(shouldBuildFoundationHqOfficeDerivations(true)).toBe(false);
+    expect(shouldBuildFoundationHqOfficeDerivations(true, "office")).toBe(true);
     expect(
       shouldBuildFoundationHqGmStory({ shouldBuildHomeV2Overview: false, activeView: "teams" }),
     ).toBe(false);
@@ -223,6 +225,13 @@ describe("foundation performance architecture helpers", () => {
       shouldBuildFoundationTeamPlayerDemands({
         shouldBuildTeamsView: false,
         shouldBuildHomeV2Overview: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldBuildFoundationTeamPlayerDemands({
+        shouldBuildTeamsView: false,
+        shouldBuildHomeV2Overview: true,
+        homeV2Tab: "office",
       }),
     ).toBe(true);
     expect(
@@ -309,8 +318,32 @@ describe("foundation performance architecture helpers", () => {
         activeView: "homeV2",
         showExtendedTeamPanels: false,
         selectedTeamDetailTab: "roster",
+        homeV2OverviewHeavyReady: true,
       }),
     ).toBe(true);
+    expect(
+      shouldBuildFoundationLeagueHeatPools({
+        shouldBuildPlayerDirectory: false,
+        shouldBuildMarketView: false,
+        shouldBuildTeamHistory: false,
+        activeView: "homeV2",
+        showExtendedTeamPanels: false,
+        selectedTeamDetailTab: "roster",
+        homeV2OverviewHeavyReady: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldBuildFoundationLeagueHeatPools({
+        shouldBuildPlayerDirectory: false,
+        shouldBuildMarketView: false,
+        shouldBuildTeamHistory: false,
+        activeView: "homeV2",
+        showExtendedTeamPanels: false,
+        selectedTeamDetailTab: "roster",
+        homeV2Tab: "office",
+        homeV2OverviewHeavyReady: true,
+      }),
+    ).toBe(false);
   });
 
   it("scopes market filter and transfer marker derivations to relevant tabs", () => {
@@ -463,7 +496,7 @@ describe("foundation performance architecture helpers", () => {
       path.join(root, "app/foundation/FoundationShellRouterBody.tsx"),
       "utf8",
     );
-    const foundationSurfaceText = foundationText + shellRouterBodyText;
+    const foundationSurfaceText = await readFoundationSurfaceSource(root);
     const sharedContextText = await fs.readFile(
       path.join(root, "lib/foundation/foundation-shared-context.tsx"),
       "utf8",
@@ -635,6 +668,12 @@ describe("foundation performance architecture helpers", () => {
       "utf8",
     );
     expect(persistenceActionsText).toContain("applyCompactSeasonArchiveSentinelIfNeeded");
+    expect(persistenceActionsText).toContain("invalidatePlayerProfileSessionCache");
+    expect(persistenceActionsText).toContain("invalidatePlayerAttributeSheetCache");
+    expect(foundationText).toContain("homeV2OverviewHeavyReady");
+    expect(foundationText).toContain("player-profile-session-cache");
+    expect(prefetchText).toContain("prefetchMatchdayArenaBase");
+    expect(prefetchText).toContain("matchday-arena-session-cache");
     expect(foundationText).toContain("marketSellBusy,");
     const inboxHostText = await fs.readFile(
       path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"),

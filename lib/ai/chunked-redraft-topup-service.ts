@@ -32,6 +32,11 @@ import {
 } from "@/lib/ai/retool-ai2-pick-engine";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import {
+  recordCashBufferDipIfNeeded,
+  resolveTransferAffordableBudget,
+  teamHasCashBufferRebuildFocus,
+} from "@/lib/ai/ai-team-cash-reserve-service";
+import {
   shouldBlockEmergencyPathAtOpt,
   strategicPoolHasReserveLaneCandidates,
 } from "@/lib/ai/planner-opt-buy-policy";
@@ -863,6 +868,7 @@ function buildPhasePlan(input: {
   teamCash: number;
   strategyProfile: TeamStrategyProfile | null | undefined;
   candidatePool: Candidate[];
+  rebuildFocusActive?: boolean;
 }): PhasePlan {
   const phase = input.targetPlan ? getPlannedPhaseForRoster(input.rosterCount, input.targetPlan) : getPhaseForRoster(input.rosterCount, input.teamTarget);
   const targetRoster =
@@ -887,7 +893,10 @@ function buildPhasePlan(input: {
       : plannedSpendableCash / remainingSlots;
 
   if (phase === "phase_a_minimum") {
-    const reservePct = Math.min(0.13, plannedReservePct ?? 0.07);
+    let reservePct = Math.min(0.13, plannedReservePct ?? 0.07);
+    if (input.rebuildFocusActive) {
+      reservePct = Math.min(reservePct, 0.04);
+    }
     const spendableCash = input.teamCash * (1 - reservePct);
     return {
       phase,
@@ -903,7 +912,10 @@ function buildPhasePlan(input: {
   if (phase === "phase_b_core_optimum") {
     const activeSpendMultiplier = 1.25 + starBias * 0.08 + riskBias * 0.04 - cashBias * 0.025;
     const fallbackReservePct = Math.max(0.04, Math.min(0.16, 0.14 - starBias * 0.008 + cashBias * 0.006));
-    const reservePct = roundValue(Math.max(0.02, Math.min(0.32, plannedReservePct ?? fallbackReservePct)), 3);
+    let reservePct = roundValue(Math.max(0.02, Math.min(0.32, plannedReservePct ?? fallbackReservePct)), 3);
+    if (input.rebuildFocusActive) {
+      reservePct = roundValue(Math.max(0.02, reservePct * 0.45), 3);
+    }
     const shortlistCap = Math.round(56 + starBias * 4 + valueBias * 2);
     return {
       phase,
@@ -2469,25 +2481,6 @@ function getPotentialRange(potential: number | null | undefined) {
   return "unknown";
 }
 
-function resolveTransferAffordableBudget(input: {
-  teamCash: number;
-  cashReservePct: number;
-  spendableBudget?: number | null;
-  gameState?: GameState;
-  teamId?: string;
-}) {
-  if (input.spendableBudget != null && Number.isFinite(input.spendableBudget) && input.spendableBudget > 0) {
-    return input.spendableBudget;
-  }
-  const reservation =
-    input.teamId != null
-      ? input.gameState?.seasonState.aiManagerBudgetReservations?.[input.teamId] ?? null
-      : null;
-  if (reservation?.transferBudget != null && reservation.transferBudget > 0) {
-    return reservation.transferBudget;
-  }
-  return input.teamCash * (1 - input.cashReservePct);
-}
 
 function classifyRejectedCandidate(input: {
   rejected: ScoredCandidate;
@@ -3752,6 +3745,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           teamCash: latestTeam.cash,
           strategyProfile,
           candidatePool,
+          rebuildFocusActive: teamHasCashBufferRebuildFocus(runContext.save.gameState, team.teamId),
         });
         const stage0StartedAt = profiler.start("candidate_stage0", {
           round: teamPicks + 1,
@@ -4725,6 +4719,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         teamCash: latestTeam.cash,
         strategyProfile,
         candidatePool,
+        rebuildFocusActive: teamHasCashBufferRebuildFocus(runContext.save.gameState, team.teamId),
       });
 
       if (rosterCount >= phasePlan.targetRoster) {
@@ -4795,6 +4790,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             spendableBudget: targetPlan?.spendableBudget,
             gameState: runContext.save.gameState,
             teamId: team.teamId,
+            rosterBelowOpt: rosterCount < phasePlan.targetRoster,
           });
           return affordableBudget >= cashCost;
         });
@@ -5064,6 +5060,11 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         }
         counters.successfulBuys += 1;
         counters.selectedCandidates += 1;
+        runContext.save.gameState = recordCashBufferDipIfNeeded(
+          runContext.save.gameState,
+          team.teamId,
+          runContext.save.gameState.season.id,
+        );
         pickedPlayerIds.add(candidate.player.id);
         roundPicks += 1;
         picked = true;

@@ -2789,6 +2789,8 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
         fromTeamId: params.teamId,
         toTeamId: null,
         fee: salePrice,
+        buyoutCost: preview.buyoutCost ?? null,
+        netCashImpact: netProceeds,
         salary: preview.salaryReduction ?? 0,
         marketValue: preview.marketValueReference ?? salePrice,
         remainingContractLength: preview.activePlayer.contractLength,

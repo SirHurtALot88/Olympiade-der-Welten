@@ -62,6 +62,7 @@ export interface UseHomeV2OverviewDerivationsInput {
   activeContextMeta: { roomId?: string | null; scenarioType?: string | null } | null;
   homeNextMatchdayStatus: HomeV2NextMatchdayStatus;
   activeManagerLineupSubmitted: boolean;
+  enableTopPlayerForecasts?: boolean;
 }
 
 /**
@@ -85,6 +86,7 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
     activeContextMeta,
     homeNextMatchdayStatus,
     activeManagerLineupSubmitted,
+    enableTopPlayerForecasts = true,
   } = input;
 
   const hasSeasonResultsForHome = useMemo(
@@ -219,23 +221,27 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
     return homePlayerCards.slice(0, 6).map((row, index) => {
       const rating = playerRatingsById.get(row.player.id) ?? null;
       const seasonPerformance = playerSeasonPerformanceMap.get(row.player.id) ?? null;
-      const forecast = buildPlayerProgressionForecast({
-        gameState,
-        player: row.player,
-        playerRating: rating,
-        seasonPerformance,
-        currentXP: row.player.currentXP ?? 0,
-        spentXP: row.player.spentXP ?? 0,
-        lifetimeXP: row.player.lifetimeXP ?? null,
-      });
-      const developmentInsight = buildPlayerDevelopmentInsight({
-        gameState,
-        player: row.player,
-        currentRating: forecast.currentAbilityRating,
-        performanceRating: rating?.ratingPps ?? rating?.ppsSeason ?? null,
-        scoutingLevel: 5,
-        scoutPotential: forecast.scoutPotential,
-      });
+      const forecast = enableTopPlayerForecasts
+        ? buildPlayerProgressionForecast({
+            gameState,
+            player: row.player,
+            playerRating: rating,
+            seasonPerformance,
+            currentXP: row.player.currentXP ?? 0,
+            spentXP: row.player.spentXP ?? 0,
+            lifetimeXP: row.player.lifetimeXP ?? null,
+          })
+        : null;
+      const developmentInsight = enableTopPlayerForecasts
+        ? buildPlayerDevelopmentInsight({
+            gameState,
+            player: row.player,
+            currentRating: forecast?.currentAbilityRating ?? rating?.ratingPps ?? rating?.ppsSeason ?? null,
+            performanceRating: rating?.ratingPps ?? rating?.ppsSeason ?? null,
+            scoutingLevel: 5,
+            scoutPotential: forecast?.scoutPotential ?? null,
+          })
+        : null;
       return {
         playerId: row.player.id,
         name: row.player.name,
@@ -256,12 +262,12 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         ovrRank: rating?.ovrRank ?? null,
         mvsRank: rating?.mvsRank ?? null,
         ppsRank: rating?.ppsSeasonRank ?? null,
-        caRating: developmentInsight.currentRating,
-        poRangeMin: developmentInsight.potentialRangeDisplay?.min ?? null,
-        poRangeMax: developmentInsight.potentialRangeDisplay?.max ?? null,
+        caRating: developmentInsight?.currentRating ?? null,
+        poRangeMin: developmentInsight?.potentialRangeDisplay?.min ?? null,
+        poRangeMax: developmentInsight?.potentialRangeDisplay?.max ?? null,
       };
     });
-  }, [gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap]);
+  }, [enableTopPlayerForecasts, gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap]);
 
   const homeV2ScheduleItems = useMemo((): HomeV2ScheduleItem[] => {
     const currentIndex = gameState.season.matchdayIds.indexOf(gameState.matchdayState.matchdayId);

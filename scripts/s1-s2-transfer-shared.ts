@@ -20,12 +20,18 @@ import {
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { runPreseasonProactiveCashRecovery } from "@/lib/ai/preseason-cash-recovery-service";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
+import {
+  applySeasonEndContractTick,
+  previewSeasonEndContracts,
+} from "@/lib/contracts/contract-renewal-service";
 import type { GameState, TeamControlSettings } from "@/lib/data/olyDataTypes";
+import { applyFacilitySeasonEndFinance, previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { closeDatabaseForMaintenance } from "@/lib/persistence/sqlite";
 import { previewCashPrizeApply, type CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service";
+import { S2_MANAGER_ACTION_TYPES, applyCanonicalManagerPlan } from "@/lib/season/long-run-canonical";
 import {
   formatPhaseAuditSummaryDe,
   runPhaseAuditDe,
@@ -40,6 +46,10 @@ import {
   buildPreSeasonNextSeasonSetupToken,
 } from "@/lib/season/preseason-workflow-service";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
+import {
+  chooseSponsorOfferForAiTeams,
+  ensureSeasonSponsorOffers,
+} from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -360,7 +370,7 @@ function countSeasonTransfers(gameState: GameState, seasonId: string, type: "buy
   ).length;
 }
 
-function summarizeEngines(perTeam: Array<{ pickEngine?: string | null }>) {
+export function summarizeEngines(perTeam: Array<{ pickEngine?: string | null }>) {
   return perTeam.reduce(
     (counts, entry) => {
       const key = entry.pickEngine ?? "unknown";
@@ -439,18 +449,105 @@ export function summarizeEconomy(rows: EconomyRow[], gameState: GameState) {
   };
 }
 
+export type QuickSimSeasonEndStackResult = {
+  save: PersistedSaveGame;
+  prizePreview: CashPrizeApplyResult;
+  sponsorApplied: boolean;
+  sponsorGrossCashDelta: number;
+  sponsorNetCashDelta: number;
+  sponsorWarnings: string[];
+  contractsReleased: number;
+  contractsRenewed: number;
+  contractExitCashDelta: number;
+  facilityActionsApplied: number;
+  facilityIncomeTotal: number;
+  facilityUpkeepTotal: number;
+};
+
+function hasSeasonEndSponsorComponentPayout(gameState: GameState, seasonId: string) {
+  return (gameState.seasonState.sponsorPayoutLogs ?? []).some(
+    (log) =>
+      log.seasonId === seasonId &&
+      log.phase === "season_end" &&
+      log.componentId !== "salary_deduct" &&
+      log.cashDelta !== 0,
+  );
+}
+
 export async function applyQuickSimSeasonEndStack(
   save: PersistedSaveGame,
   persistence: PersistenceService,
-): Promise<{ save: PersistedSaveGame; prizePreview: CashPrizeApplyResult }> {
+  bootstrapOpts: BootstrapOptions = {},
+): Promise<QuickSimSeasonEndStackResult> {
   const seasonId = save.gameState.season.id;
   const lastMatchdayId = save.gameState.season.matchdayIds.at(-1) ?? save.gameState.matchdayState.matchdayId;
   let current = save;
 
-  const existingSponsorEndPayout = (current.gameState.seasonState.sponsorPayoutLogs ?? []).some(
-    (log) => log.seasonId === seasonId && log.phase === "season_end",
-  );
+  // Transfer-only sims: final standings must exist before sponsor rank payouts (no matchday sim).
+  if ((current.gameState.gamePhase ?? "season_active") !== "season_completed") {
+    current = persistence.saveSingleplayerState(
+      current.saveId,
+      bootstrapFastSeasonOneCompleted(current.gameState, current.saveId, bootstrapOpts),
+    );
+  }
+
+  // Contract-tick BEFORE sponsor settlement: renew/release decisions change the roster's salary
+  // total, which the sponsor salary-deduction step below needs to reflect. Without this, contracts
+  // never naturally expire/renew in the transfer-only pipeline — every AI-initiated exit is forced
+  // through the (buyout-heavy) market-sell path instead, which inflates buyout losses artificially.
+  let contractsReleased = 0;
+  let contractsRenewed = 0;
+  let contractExitCashDelta = 0;
+  const contractPreview = previewSeasonEndContracts(current);
+  if (contractPreview.expiringCount > 0) {
+    const contractApply = applySeasonEndContractTick(current, contractPreview.confirmToken, persistence, contractPreview);
+    if (contractApply.applied) {
+      current = persistence.getSaveById(current.saveId)!;
+      contractsReleased = contractApply.releasedPlayers;
+      contractsRenewed = contractApply.renewedPlayers;
+      contractExitCashDelta = round(
+        (current.gameState.seasonState.contractEvents ?? [])
+          .filter((event) => event.seasonId === seasonId && event.eventType === "contract_expired_exit")
+          .reduce((sum, event) => sum + (event.exitValue ?? 0), 0),
+      );
+    }
+  }
+
+  // Rough facility simulation: let AI teams build/upgrade/maintain facilities (bounded by their
+  // own affordability gates inside the manager plan), then settle upkeep/income for whatever is
+  // actually built — so facility costs show up in the balance instead of always being zero.
+  const managerPlanResult = applyCanonicalManagerPlan(current, persistence, `${seasonId}_facilities`, S2_MANAGER_ACTION_TYPES);
+  current = managerPlanResult.save;
+  const facilityActionsApplied = managerPlanResult.appliedActions;
+
+  let facilityIncomeTotal = 0;
+  let facilityUpkeepTotal = 0;
+  for (const team of current.gameState.teams) {
+    const facilityPreview = previewFacilitySeasonEndFinance(current, team.teamId);
+    if (!facilityPreview.ok || !facilityPreview.confirmToken) continue;
+    const facilityApply = applyFacilitySeasonEndFinance(current, team.teamId, facilityPreview.confirmToken, persistence);
+    if (facilityApply.applied) {
+      current = persistence.getSaveById(current.saveId)!;
+      facilityIncomeTotal += facilityPreview.facilityIncomeTotal;
+      facilityUpkeepTotal += facilityPreview.facilityUpkeepTotal;
+    }
+  }
+  facilityIncomeTotal = round(facilityIncomeTotal);
+  facilityUpkeepTotal = round(facilityUpkeepTotal);
+
+  let sponsorApplied = false;
+  let sponsorGrossCashDelta = 0;
+  let sponsorNetCashDelta = 0;
+  let sponsorWarnings: string[] = [];
+
+  const existingSponsorEndPayout = hasSeasonEndSponsorComponentPayout(current.gameState, seasonId);
   if (!existingSponsorEndPayout) {
+    const withOffers = ensureSeasonSponsorOffers(current.gameState);
+    const withContracts = chooseSponsorOfferForAiTeams(withOffers);
+    if (withContracts !== current.gameState) {
+      current = persistence.saveSingleplayerState(current.saveId, withContracts);
+    }
+
     const sponsorApply = applySponsorSettlement({
       gameState: current.gameState,
       saveId: current.saveId,
@@ -458,8 +555,33 @@ export async function applyQuickSimSeasonEndStack(
       execute: true,
       deductSalary: true,
     });
+    sponsorWarnings = sponsorApply.preview.warnings.slice(0, 12);
+    sponsorGrossCashDelta = round(
+      sponsorApply.preview.rows.reduce((sum, row) => sum + Math.max(0, row.cashDelta), 0),
+    );
+    sponsorNetCashDelta = round(sponsorApply.preview.totalCashDelta);
     if (sponsorApply.applied) {
       current = persistence.saveSingleplayerState(current.saveId, sponsorApply.gameState);
+      sponsorApplied = true;
+      const logs = current.gameState.seasonState.sponsorPayoutLogs ?? [];
+      sponsorNetCashDelta = round(
+        logs
+          .filter((log) => log.seasonId === seasonId && log.phase === "season_end")
+          .reduce((sum, log) => sum + log.cashDelta, 0),
+      );
+      sponsorGrossCashDelta = round(
+        logs
+          .filter(
+            (log) =>
+              log.seasonId === seasonId &&
+              log.phase === "season_end" &&
+              log.componentId !== "salary_deduct" &&
+              log.cashDelta > 0,
+          )
+          .reduce((sum, log) => sum + log.cashDelta, 0),
+      );
+    } else if (sponsorApply.preview.canApply) {
+      sponsorWarnings.push("sponsor_settlement_can_apply_but_not_applied");
     }
   }
 
@@ -474,7 +596,20 @@ export async function applyQuickSimSeasonEndStack(
     persistence,
   );
 
-  return { save: current, prizePreview };
+  return {
+    save: current,
+    prizePreview,
+    sponsorApplied,
+    sponsorGrossCashDelta,
+    sponsorNetCashDelta,
+    sponsorWarnings,
+    contractsReleased,
+    contractsRenewed,
+    contractExitCashDelta,
+    facilityActionsApplied,
+    facilityIncomeTotal,
+    facilityUpkeepTotal,
+  };
 }
 
 /** Deep-copy SQLite via VACUUM INTO — avoids hardlink/WAL pollution between batch runs. */
@@ -528,7 +663,7 @@ export function setAllTeamsAi(save: PersistedSaveGame, persistence: PersistenceS
   });
 }
 
-async function runEmergencyRepairIfNeeded(input: {
+export async function runEmergencyRepairIfNeeded(input: {
   saveId: string;
   seasonId: string;
   persistence: PersistenceService;
@@ -583,19 +718,35 @@ export type RunTransferPipelineInput = {
   logTag?: string;
 };
 
+function filterPreseasonHardBlockers(blockers: string[], finalRows: TeamRow[]): string[] {
+  const atMinTeams = new Set(finalRows.filter((row) => row.atMin).map((row) => row.teamCode));
+  return blockers.filter((blocker) => {
+    if (!blocker.includes("insufficient_cash") && !blocker.includes("preview_execute_drift")) {
+      return true;
+    }
+    const teamMatch = blocker.match(/preseason_batch_team:([^:]+):/);
+    if (teamMatch && atMinTeams.has(teamMatch[1])) {
+      return false;
+    }
+    if (blocker === "insufficient_cash" || blocker === "preview_execute_drift_blocked") {
+      return false;
+    }
+    return true;
+  });
+}
+
 export async function runTransferPipeline(input: RunTransferPipelineInput): Promise<TransferRunResult> {
+  process.env.OLY_TRANSFER_PIPELINE_FAST = "1";
   const tag = input.logTag ?? "s1-s2-transfer";
   let save = input.save;
   const persistence = input.persistence;
 
-  log(`${input.label}: season-end stack (sponsor + prize preview)…`, tag);
-  const seasonEndStack = await applyQuickSimSeasonEndStack(save, persistence);
+  log(`${input.label}: season-end stack (sponsor apply + prize benchmark)…`, tag);
+  const seasonEndStack = await applyQuickSimSeasonEndStack(save, persistence, input.bootstrapOpts ?? {});
   save = seasonEndStack.save;
-
-  log(`${input.label}: fast bootstrap season_completed…`, tag);
-  save = persistence.saveSingleplayerState(
-    save.saveId,
-    bootstrapFastSeasonOneCompleted(save.gameState, save.saveId, input.bootstrapOpts),
+  log(
+    `${input.label}: sponsor gross=${seasonEndStack.sponsorGrossCashDelta} net=${seasonEndStack.sponsorNetCashDelta} applied=${seasonEndStack.sponsorApplied}`,
+    tag,
   );
 
   const rosterBeforeSell = collectTeamRows(save.gameState);
@@ -694,8 +845,9 @@ export async function runTransferPipeline(input: RunTransferPipelineInput): Prom
   if (seasonEndSession.blockingReasons.length > 0) {
     hardFails.push(`season_end_blockers:${seasonEndSession.blockingReasons.slice(0, 5).join("|")}`);
   }
-  if (preseasonSession.blockingReasons.length > 0) {
-    hardFails.push(`preseason_blockers:${preseasonSession.blockingReasons.slice(0, 5).join("|")}`);
+  const preseasonHardBlockers = filterPreseasonHardBlockers(preseasonSession.blockingReasons, finalRows);
+  if (preseasonHardBlockers.length > 0) {
+    hardFails.push(`preseason_blockers:${preseasonHardBlockers.slice(0, 5).join("|")}`);
   }
 
   const result: TransferRunResult = {

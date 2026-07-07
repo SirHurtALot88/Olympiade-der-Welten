@@ -1,7 +1,10 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
+import { getTeamCashSalarySoftTarget, getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+
+/** League-median salary anchor for S2+ buffer (teams with thin salary history). */
+export const PLANNER_LEAGUE_SALARY_BUFFER_RATIO = 0.35;
 
 export const PLANNER_LIQUIDITY_BUFFER_MW_RATIO = 0.1;
 export const PLANNER_LIQUIDITY_BUFFER_MIN = 3;
@@ -27,7 +30,22 @@ export function resolveTeamRosterMarketValue(gameState: GameState, teamId: strin
   );
 }
 
-/** S2+ liquidity buffer: at most 1× team salary (min 3). Forces excess cash into transfer budget. */
+export function getLeagueMedianTeamSalary(gameState: GameState): number {
+  const salaries = gameState.teams
+    .map((team) => getTeamSalarySum(gameState, team.teamId))
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+  if (salaries.length === 0) return 0;
+  const mid = Math.floor(salaries.length / 2);
+  return salaries.length % 2 === 1
+    ? salaries[mid]!
+    : round((salaries[mid - 1]! + salaries[mid]!) / 2);
+}
+
+/**
+ * S2+ liquidity buffer: finance-scaled cash/salary target (0.25–0.75× own salary),
+ * floored by league-median salary anchor. Excess cash above this buffer is spendable.
+ */
 export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: string): number {
   const rosterMw = resolveTeamRosterMarketValue(gameState, teamId);
   const mwBuffer = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_LIQUIDITY_BUFFER_MW_RATIO));
@@ -36,9 +54,15 @@ export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: s
   }
   const salary = getTeamSalarySum(gameState, teamId);
   if (salary <= 0) {
-    return mwBuffer;
+    const leagueMedian = getLeagueMedianTeamSalary(gameState);
+    if (leagueMedian <= 0) return mwBuffer;
+    return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO));
   }
-  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, salary));
+  const softRatio = getTeamCashSalarySoftTarget(gameState, teamId);
+  const ownBuffer = salary * softRatio;
+  const leagueMedian = getLeagueMedianTeamSalary(gameState);
+  const leagueAnchor = leagueMedian > 0 ? leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO : 0;
+  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor));
 }
 
 export function resolveTeamSpendableCashForPlanning(

@@ -52,15 +52,22 @@ export function shouldBuildFoundationLeagueHeatPools(input: {
   activeView: FoundationViewId;
   showExtendedTeamPanels: boolean;
   selectedTeamDetailTab: string;
+  homeV2Tab?: string;
+  homeV2OverviewHeavyReady?: boolean;
 }): boolean {
   if (input.shouldBuildPlayerDirectory || input.shouldBuildMarketView || input.shouldBuildTeamHistory) {
     return true;
   }
+  if (input.activeView === "homeV2") {
+    if ((input.homeV2Tab ?? "overview") !== "overview") {
+      return false;
+    }
+    return input.homeV2OverviewHeavyReady ?? true;
+  }
   if (
     input.activeView === "season" ||
     input.activeView === "seasonPreview" ||
-    input.activeView === "ranks" ||
-    input.activeView === "homeV2"
+    input.activeView === "ranks"
   ) {
     return true;
   }
@@ -74,6 +81,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
   shouldBuildTeamHistory: boolean;
   showExtendedTeamPanels: boolean;
   selectedTeamDetailTab: string;
+  homeV2Tab?: string;
+  homeV2OverviewHeavyReady?: boolean;
   gameState: GameState;
   playerRatingsById: Map<string, PlayerRatingContractRow>;
   playerDirectorySlice: {
@@ -120,6 +129,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     activeView: input.activeView,
     showExtendedTeamPanels: input.showExtendedTeamPanels,
     selectedTeamDetailTab: input.selectedTeamDetailTab,
+    homeV2Tab: input.homeV2Tab,
+    homeV2OverviewHeavyReady: input.homeV2OverviewHeavyReady,
   });
 
   const playerLeagueCareerStatsMap = useMemo(

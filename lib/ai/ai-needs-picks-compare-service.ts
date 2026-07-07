@@ -24,6 +24,7 @@ import {
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 import { resolveTeamLiquidityBufferTarget, usesSingleCashPlanningPolicy } from "@/lib/ai/planner-cash-buffer-policy";
+import { isTeamOverCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewItem } from "@/lib/season/prize-money-preview";
 import { buildRetoolParityMatrix, type RetoolParityRow } from "@/lib/ai/retool-parity-matrix";
 import {
@@ -4866,10 +4867,10 @@ function buildPickPlanner(input: {
   const draftSeed = input.draftSeed?.trim() || null;
   const variance = getDraftVarianceConfig(teamCode);
   const seededLaneBias = (key: string) => (draftSeed ? draftCentered(`${draftSeed}:${teamCode}:planner:${key}`) * variance.laneBias : 0);
-  const coreBias = clamp(lanePhilosophy.coreBias + seededLaneBias("core"), 0.18, 0.45);
+  const coreBias = clamp(lanePhilosophy.coreBias + seededLaneBias("core"), 0.18, 0.58);
   const specialistBias = clamp(lanePhilosophy.specialistBias + seededLaneBias("specialist"), 0.04, 0.25);
-  const depthBias = clamp(lanePhilosophy.depthBias + seededLaneBias("depth"), 0.18, 0.48);
-  const backupBias = clamp(lanePhilosophy.backupBias + seededLaneBias("backup"), 0.04, 0.32);
+  const depthBias = clamp(lanePhilosophy.depthBias + seededLaneBias("depth"), 0.14, 0.58);
+  const backupBias = clamp(lanePhilosophy.backupBias + seededLaneBias("backup"), 0.02, 0.2);
   const existingStars = (input.roleCounts.get("star") ?? 0) + (input.roleCounts.get("superstar") ?? 0);
   const existingCores = input.roleCounts.get("core") ?? 0;
   const existingDepth = (input.roleCounts.get("depth") ?? 0) + (input.roleCounts.get("backup") ?? 0);
@@ -5348,6 +5349,7 @@ function buildCashStrategy(input: {
   const shouldSaveCash =
     !season1OptimumMode &&
     !hasOptHeadroom &&
+    !isTeamOverCashSalarySoftTarget(input.gameState, input.team.teamId, input.gameState.season.id) &&
     missingMinimumSlots === 0 &&
     missingTargetSlots > 0 &&
     (financesValue >= 0.68 || harmonyValue >= 0.68) &&

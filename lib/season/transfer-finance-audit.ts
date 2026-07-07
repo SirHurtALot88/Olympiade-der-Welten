@@ -113,9 +113,11 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
       const contractExits = transfers.filter((entry) => entry.transferType === "contract_exit" && entry.fromTeamId === teamId);
       const buyFeesPaid = round(buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0));
+      // Sells: use the real net cash impact (fee − buyout), not the gross fee, so this
+      // reconciles against the actual team.cash delta caused by the sale.
       const sellProceeds = round(
-        sells.reduce((sum, entry) => sum + (entry.fee ?? 0), 0) +
-          contractExits.reduce((sum, entry) => sum + (entry.fee ?? 0), 0),
+        sells.reduce((sum, entry) => sum + (entry.netCashImpact ?? entry.fee ?? 0), 0) +
+          contractExits.reduce((sum, entry) => sum + (entry.netCashImpact ?? entry.fee ?? 0), 0),
       );
       const netTransferCash = round(sellProceeds - buyFeesPaid);
       const teamSponsorLogs = sponsorLogs.filter((log) => log.teamId === teamId);

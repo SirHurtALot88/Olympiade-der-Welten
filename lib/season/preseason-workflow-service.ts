@@ -419,7 +419,15 @@ function signatureSchedule(entries: NonNullable<SeasonState["disciplineSchedule"
     .join("|");
 }
 
-function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameState; auditLog: PreSeasonWorkflowLogRecord } {
+function isTransferPipelineFastMode() {
+  return process.env.OLY_TRANSFER_PIPELINE_FAST === "1";
+}
+
+function buildNextSeasonGameState(
+  save: PersistedSaveGame,
+  opts?: { transferPipelineFast?: boolean },
+): { gameState: GameState; auditLog: PreSeasonWorkflowLogRecord } {
+  const transferPipelineFast = opts?.transferPipelineFast ?? isTransferPipelineFastMode();
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
@@ -463,21 +471,23 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     scheduleRerollCount > 0 ? `season_schedule_rerolled:${scheduleRerollCount}` : null,
     scheduleSameAsPrevious ? "season_schedule_same_as_previous_after_reroll_warning" : null,
   ].filter((entry): entry is string => Boolean(entry));
-  const nextFormCards = buildGeneratedFormCardRecordsForSeason(
-    {
-      ...save.gameState,
-      season: {
-        ...save.gameState.season,
-        id: nextSeasonId,
-        name: nextSeasonLabel,
-        year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
-        currentMatchday: 1,
-        matchdayIds,
-      },
-    },
-    save.saveId,
-    nextSeasonId,
-  );
+  const nextFormCards = transferPipelineFast
+    ? []
+    : buildGeneratedFormCardRecordsForSeason(
+        {
+          ...save.gameState,
+          season: {
+            ...save.gameState.season,
+            id: nextSeasonId,
+            name: nextSeasonLabel,
+            year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
+            currentMatchday: 1,
+            matchdayIds,
+          },
+        },
+        save.saveId,
+        nextSeasonId,
+      );
   const nextSeasonState: SeasonState = {
     ...save.gameState.seasonState,
     seasonId: nextSeasonId,
@@ -532,6 +542,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
       ...scheduleWarnings,
       `season_economy_factors_advanced:s_plus_4=${economyFactors.rerolledSeasonPlus4.factor}`,
       nextFormCards.length === 0 ? "season_formcards_generation_empty" : null,
+      transferPipelineFast ? "transfer_pipeline_fast_skip_expensive_season_prep" : null,
       "season_mutator_state_reset_lineup_modifiers_cleared",
     ].filter((entry): entry is string => Boolean(entry)),
     affectedEntities: [
@@ -555,52 +566,53 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     timestamp: new Date().toISOString(),
   };
 
-  const nextGameState = refreshTeamObjectiveState(
-    advanceScoutIntelTick({
-      gameState: chooseSponsorOfferForAiTeams(
-        regenerateSponsorOffersForSeason(
-          advanceSponsorContractsForNewSeason(
-          applySeasonBaselineProgression(
-          {
-            ...save.gameState,
-            gamePhase: "season_active",
-            season: {
-              ...save.gameState.season,
-              id: nextSeasonId,
-              name: nextSeasonLabel,
-              year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
-              currentMatchday: 1,
-              matchdayIds,
-            },
-            seasonState: {
-              ...nextSeasonState,
-              preSeasonWorkflowLogs: [auditLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
-            },
-            matchdayState: {
-              matchdayId: firstMatchdayId,
-              status: "planning",
-              pendingTeamIds: save.gameState.teams.map((team) => team.teamId),
-              resolvedFixtureIds: [],
-            },
-            logs: [
-              {
-                id: auditLog.logId,
-                type: "season",
-                message: `${nextSeasonLabel} aktiviert. Pre-Season Workflow abgeschlossen.`,
-                createdAt: auditLog.timestamp,
-              },
-              ...save.gameState.logs,
-            ],
-          },
-          { completedSeasonId: save.gameState.season.id },
-        ),
-          nextSeasonId,
-        ),
-      ),
-    ),
-      phase: "preseason",
-    }),
-  );
+  const baseGameState: GameState = {
+    ...save.gameState,
+    gamePhase: "season_active",
+    season: {
+      ...save.gameState.season,
+      id: nextSeasonId,
+      name: nextSeasonLabel,
+      year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
+      currentMatchday: 1,
+      matchdayIds,
+    },
+    seasonState: {
+      ...nextSeasonState,
+      preSeasonWorkflowLogs: [auditLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
+    },
+    matchdayState: {
+      matchdayId: firstMatchdayId,
+      status: "planning",
+      pendingTeamIds: save.gameState.teams.map((team) => team.teamId),
+      resolvedFixtureIds: [],
+    },
+    logs: [
+      {
+        id: auditLog.logId,
+        type: "season",
+        message: `${nextSeasonLabel} aktiviert. Pre-Season Workflow abgeschlossen.`,
+        createdAt: auditLog.timestamp,
+      },
+      ...save.gameState.logs,
+    ],
+  };
+
+  const nextGameState = transferPipelineFast
+    ? refreshTeamObjectiveState(advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId))
+    : refreshTeamObjectiveState(
+        advanceScoutIntelTick({
+          gameState: chooseSponsorOfferForAiTeams(
+            regenerateSponsorOffersForSeason(
+              advanceSponsorContractsForNewSeason(
+                applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
+                nextSeasonId,
+              ),
+            ),
+          ),
+          phase: "preseason",
+        }),
+      );
 
   return {
     auditLog,
@@ -772,7 +784,19 @@ export function applyPreSeasonNextSeasonSetupLightweight(
   }
 
   const penaltyResult = applyFormCardPenaltyToStandings(save);
-  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(penaltyResult.save, persistence);
+  const transferPipelineFast = isTransferPipelineFastMode();
+  const progressionResult = transferPipelineFast
+    ? {
+        save: penaltyResult.save,
+        blockingReasons: [] as string[],
+        warnings: ["transfer_pipeline_fast_skip_season_end_progression"],
+        teamsApplied: 0,
+        playerEventsCreated: 0,
+        teamsProcessed: 0,
+        humanOrganicTeams: 0,
+        aiOrganicFallbackTeams: 0,
+      }
+    : materializeSeasonEndProgressionBeforeNextSeason(penaltyResult.save, persistence);
   if (progressionResult.blockingReasons.length > 0) {
     return {
       ...basePreview,
@@ -800,7 +824,7 @@ export function applyPreSeasonNextSeasonSetupLightweight(
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
+  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save, { transferPipelineFast });
   persistence.saveSingleplayerState(save.saveId, gameState);
   return {
     ...basePreview,

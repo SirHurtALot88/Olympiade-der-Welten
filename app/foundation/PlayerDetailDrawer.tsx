@@ -27,7 +27,7 @@ import type {
 import { getClassColorClassName } from "./ClassColorChip";
 import ClassIcon from "./ClassIcon";
 import DisciplineIcon from "./DisciplineIcon";
-import OptimizedMediaImage from "./OptimizedMediaImage";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import RaceIcon from "./RaceIcon";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { clampPotentialOverallToCurrent } from "@/lib/scouting/player-potential-ceiling-service";
@@ -1389,7 +1389,7 @@ export default function PlayerDetailDrawer({
           <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.portraitUrl ? (
-              <OptimizedMediaImage
+              <BudgetedMediaImage
                 className="player-drawer-portrait player-drawer-portrait-large"
                 src={data.portraitUrl}
                 alt={data.name}
@@ -1397,6 +1397,7 @@ export default function PlayerDetailDrawer({
                 height={160}
                 loading="eager"
                 fetchPriority="high"
+                eager
               />
             ) : (
               <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder">{buildInitials(data.name)}</div>

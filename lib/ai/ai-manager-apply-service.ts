@@ -857,7 +857,7 @@ export function resolveMarketSpendableCashForPlanner(input: {
     return round(Math.max(0, teamCash - minPad), 2);
   }
 
-  // S2+: single cash pool — soft 10% MW buffer, ignore GM budget buckets entirely.
+  // S2+: single cash pool — soft 0.25–0.75× salary buffer (+ league anchor), ignore GM buckets.
   if (usesSingleCashPlanningPolicy(input.gameState)) {
     return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, teamCash);
   }

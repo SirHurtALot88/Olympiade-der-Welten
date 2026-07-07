@@ -1296,6 +1296,17 @@ export type AiManagerBudgetReservationRecord = {
   updatedAt: string;
 };
 
+/** Tracks when AI teams spend below their liquidity buffer to finish roster rebuilds. */
+export type AiCashBufferDipLedgerEntry = {
+  teamId: string;
+  seasonId: string;
+  dipCount: number;
+  totalDipped: number;
+  lastAt: string;
+  /** After the first dip, AI should bias toward profit sells and cheap-salary picks. */
+  rebuildFocusActive: boolean;
+};
+
 export type AiManagerTrainingSettingRecord = {
   teamId: string;
   seasonId: string;
@@ -1556,6 +1567,10 @@ export type TransferHistoryEntry = {
   fromTeamId: string | null;
   toTeamId: string | null;
   fee: number;
+  /** Buyout-Kosten (Restgehalt-Ablösung), die vom Bruttoerlös (fee) abgezogen wurden. Nur bei transferType "sell". */
+  buyoutCost?: number | null;
+  /** Tatsächlicher Cash-Zufluss/-Abfluss (fee − buyoutCost). Bei "buy"/"contract_exit" i.d.R. gleich fee. */
+  netCashImpact?: number | null;
   salary: number;
   marketValue: number;
   remainingContractLength: number;
@@ -2171,6 +2186,7 @@ export type SeasonState = {
   resultAuditLogs?: ResultAuditLogRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
+  aiCashBufferDipLedger?: Record<string, AiCashBufferDipLedgerEntry>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
   trainingIntensityConfirmations?: Record<string, TrainingIntensityConfirmationRecord>;
   aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;

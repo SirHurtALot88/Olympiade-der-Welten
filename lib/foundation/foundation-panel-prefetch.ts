@@ -7,6 +7,11 @@ import { seedSeasonRatingsSliceCache } from "@/lib/foundation/use-season-ratings
 import { seedSeasonStandingsOverviewCache } from "@/lib/foundation/use-season-standings-overview";
 import { seedTeamOverviewSliceCache } from "@/lib/foundation/use-team-overview-slice";
 import { fetchSeasonSliceJson } from "@/lib/foundation/season-slice-http";
+import {
+  buildMatchdayArenaBaseSessionKey,
+  getMatchdayArenaBaseBundle,
+  setMatchdayArenaBaseBundle,
+} from "@/lib/foundation/matchday-arena-session-cache";
 
 const panelPrefetchByView: Partial<Record<FoundationViewId, () => Promise<unknown>>> = {
   homeV2: () => import("@/app/foundation/home-v2/FoundationHomeV2Panel"),
@@ -29,6 +34,31 @@ const prefetchedViews = new Set<FoundationViewId>();
 let marketBrowseIndexPrefetchScheduled = false;
 const prefetchedSeasonStandingsKeys = new Set<string>();
 const prefetchedPlayerDirectoryKeys = new Set<string>();
+const prefetchedMatchdayArenaBaseKeys = new Set<string>();
+
+export function clearPrefetchedMatchdayArenaBaseKeys(input?: {
+  saveId?: string;
+  seasonId?: string;
+  matchdayId?: string;
+}) {
+  if (!input?.saveId && !input?.seasonId && !input?.matchdayId) {
+    prefetchedMatchdayArenaBaseKeys.clear();
+    return;
+  }
+
+  for (const key of prefetchedMatchdayArenaBaseKeys) {
+    if (input.saveId && !key.startsWith(`${input.saveId}:`)) {
+      continue;
+    }
+    if (input.seasonId && !key.includes(`:${input.seasonId}:`)) {
+      continue;
+    }
+    if (input.matchdayId && !key.includes(`:${input.matchdayId}:`)) {
+      continue;
+    }
+    prefetchedMatchdayArenaBaseKeys.delete(key);
+  }
+}
 
 function scheduleIdleTask(task: () => void) {
   if (typeof globalThis !== "undefined" && "requestIdleCallback" in globalThis) {
@@ -195,6 +225,56 @@ export function prefetchPlayerDirectoryData(input: {
             },
             body,
           );
+        }
+      })
+      .catch(() => undefined);
+  });
+}
+
+export function prefetchMatchdayArenaBase(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  teamId: string;
+  source?: "sqlite" | "prisma";
+}) {
+  if (!input.saveId || !input.seasonId || !input.matchdayId || !input.teamId) {
+    return;
+  }
+  if (input.seasonId === "loading" || input.saveId === "loading-save") {
+    return;
+  }
+
+  const source = input.source ?? "sqlite";
+  const sessionKey = buildMatchdayArenaBaseSessionKey({
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    matchdayId: input.matchdayId,
+    teamId: input.teamId,
+    source,
+  });
+  if (prefetchedMatchdayArenaBaseKeys.has(sessionKey) || getMatchdayArenaBaseBundle(sessionKey)) {
+    return;
+  }
+  prefetchedMatchdayArenaBaseKeys.add(sessionKey);
+
+  scheduleIdleTask(() => {
+    const params = new URLSearchParams({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      teamId: input.teamId,
+      source,
+      includeDetails: "0",
+    });
+    void fetch(`/api/matchday/arena-base?${params.toString()}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        if (payload?.context) {
+          setMatchdayArenaBaseBundle(sessionKey, payload);
         }
       })
       .catch(() => undefined);

@@ -257,9 +257,25 @@ function shouldAiRenewContract(input: {
   morale?: PlayerMoraleAssessment | null;
   contractStrategy?: string | null;
   rosterAfterRelease?: number;
+  playerMin?: number;
   playerOpt?: number;
+  /** Realized profit/loss (vs. purchase price) if the player were released now instead of renewed. */
+  exitProfitLoss?: number | null;
+  exitPurchasePrice?: number | null;
 }) {
-  const { entry, player, rating, renewalSalaryPreview, morale, contractStrategy, rosterAfterRelease, playerOpt } = input;
+  const {
+    entry,
+    player,
+    rating,
+    renewalSalaryPreview,
+    morale,
+    contractStrategy,
+    rosterAfterRelease,
+    playerMin,
+    playerOpt,
+    exitProfitLoss,
+    exitPurchasePrice,
+  } = input;
   if (contractStrategy === "do_not_renew" || contractStrategy === "market_test") {
     return false;
   }
@@ -310,6 +326,20 @@ function shouldAiRenewContract(input: {
     rosterAfterRelease < playerOpt &&
     ratingValue >= 42 &&
     !badValueContract;
+  const hardMinRetentionSignal =
+    playerMin != null &&
+    rosterAfterRelease != null &&
+    rosterAfterRelease < playerMin &&
+    !isForceReleaseCase({ morale, badValueContract });
+
+  // "Nicht verlängern" is functionally a release-now decision, and can realize a big loss vs.
+  // purchase price just like a market sell. Mirror the same loss-gate (>30% relative AND >=5
+  // absolute) so the AI doesn't default into eating a big exit loss just because the heuristic
+  // signals above happen to be weak — unless the player has genuinely no value left (badValueContract
+  // / morale exit) or the team can't afford to renew (handled separately via the cash gate).
+  const exitLossAbs = exitProfitLoss != null && exitProfitLoss < 0 ? Math.abs(exitProfitLoss) : 0;
+  const exitLossRatio = exitLossAbs > 0 && exitPurchasePrice != null && exitPurchasePrice > 0 ? exitLossAbs / exitPurchasePrice : 0;
+  const bigExitLossAvoidance = exitLossRatio > 0.3 && exitLossAbs >= 5 && ratingValue >= 30;
 
   const strategyRenewBias =
     contractStrategy === "extend_core" ||
@@ -325,7 +355,9 @@ function shouldAiRenewContract(input: {
     cheapBridgeSignal ||
     hasRotationSignal ||
     moraleBridgeRenew ||
-    rosterRetentionSignal
+    rosterRetentionSignal ||
+    hardMinRetentionSignal ||
+    bigExitLossAvoidance
   ) && !salaryRisk && !badValueContract && !moraleBlocksLongRenewal && !moraleSalaryRisk;
 }
 
@@ -638,8 +670,12 @@ function buildPreviewRow(input: {
     rosterAfterRelease: save.gameState.rosters.filter(
       (roster) => roster.teamId === entry.teamId && roster.playerId !== entry.playerId,
     ).length,
+    playerMin: deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId))
+      .playerMin,
     playerOpt: deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId))
       .playerOpt,
+    exitProfitLoss: exit.profitLoss,
+    exitPurchasePrice: exit.purchasePrice,
   });
   const marketValueForBad =
     rating?.marketValue ??

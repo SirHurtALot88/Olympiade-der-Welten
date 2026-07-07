@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import {
   buildContextOverlayStats,
@@ -177,7 +177,7 @@ export default function FoundationPlayerPortraitCard({
   ) : null;
 
   const portraitMedia = portraitUrl ? (
-    <OptimizedMediaImage
+    <BudgetedMediaImage
       className="home-v2-player-portrait"
       src={portraitUrl}
       placeholderSrc={portraitPlaceholderUrl}
@@ -186,6 +186,7 @@ export default function FoundationPlayerPortraitCard({
       height={portraitLayout === "rail" ? 108 : 373}
       loading={portraitLoading}
       fetchPriority={portraitFetchPriority}
+      eager={portraitLoading === "eager" || portraitFetchPriority === "high"}
     />
   ) : (
     <span className="home-v2-player-portrait is-placeholder">{portraitInitials}</span>

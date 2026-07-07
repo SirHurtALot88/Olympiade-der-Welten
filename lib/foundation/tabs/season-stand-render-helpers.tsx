@@ -554,3 +554,176 @@ export function buildNullableSharedRankMap(values: Array<{ teamId: string; value
     ]),
   );
 }
+
+export function buildSeasonDisciplineRankMaps<TDiscipline extends string>(
+  activeView: string,
+  disciplineColumns: readonly TDiscipline[],
+  seasonStandRows: Array<{ teamId: string; disciplineValues: Record<string, number | null> }>,
+) {
+  if (activeView !== "seasonV2") {
+    return Object.fromEntries(
+      disciplineColumns.map((disciplineKey) => [disciplineKey, new Map<string, number | null>()]),
+    ) as Record<TDiscipline, Map<string, number | null>>;
+  }
+
+  return Object.fromEntries(
+    disciplineColumns.map((disciplineKey) => [
+      disciplineKey,
+      buildNullableSharedRankMap(
+        seasonStandRows.map((row) => ({
+          teamId: row.teamId,
+          value: row.disciplineValues[disciplineKey] ?? null,
+        })),
+      ),
+    ]),
+  ) as Record<TDiscipline, Map<string, number | null>>;
+}
+
+type AreaRankEntry = { pow: number | null; spe: number | null; men: number | null; soc: number | null };
+
+export function buildCurrentAreaRanksByTeamId(input: {
+  shouldBuildDisciplineRanks: boolean;
+  disciplineRankRows: Array<{
+    team: { teamId: string };
+    scorePack: { pow: number; spe: number; men: number; soc: number };
+    powRank: number;
+    speRank: number;
+    menRank: number;
+    socRank: number;
+  }>;
+  shouldBuildTeamsView: boolean;
+  activeView: string;
+  seasonStandRows: Array<{
+    teamId: string;
+    rosterCount: number;
+    ppsPow?: number | null;
+    ppsSpe?: number | null;
+    ppsMen?: number | null;
+    ppsSoc?: number | null;
+  }>;
+}): Map<string, AreaRankEntry> {
+  if (input.shouldBuildDisciplineRanks && input.disciplineRankRows.length > 0) {
+    return new Map(
+      input.disciplineRankRows.map((row) => [
+        row.team.teamId,
+        {
+          pow: row.scorePack.pow > 0 ? row.powRank || null : null,
+          spe: row.scorePack.spe > 0 ? row.speRank || null : null,
+          men: row.scorePack.men > 0 ? row.menRank || null : null,
+          soc: row.scorePack.soc > 0 ? row.socRank || null : null,
+        },
+      ]),
+    );
+  }
+
+  if (!input.shouldBuildTeamsView && input.activeView !== "teamProfile") {
+    return new Map<string, AreaRankEntry>();
+  }
+
+  const powRankMap = buildSharedRankMap(
+    input.seasonStandRows.map((row) => ({ teamId: row.teamId, value: row.ppsPow ?? 0 })),
+  );
+  const speRankMap = buildSharedRankMap(
+    input.seasonStandRows.map((row) => ({ teamId: row.teamId, value: row.ppsSpe ?? 0 })),
+  );
+  const menRankMap = buildSharedRankMap(
+    input.seasonStandRows.map((row) => ({ teamId: row.teamId, value: row.ppsMen ?? 0 })),
+  );
+  const socRankMap = buildSharedRankMap(
+    input.seasonStandRows.map((row) => ({ teamId: row.teamId, value: row.ppsSoc ?? 0 })),
+  );
+
+  return new Map(
+    input.seasonStandRows.map((row) => {
+      const hasActiveRoster = row.rosterCount > 0;
+      return [
+        row.teamId,
+        {
+          pow: hasActiveRoster && (row.ppsPow ?? 0) > 0 ? powRankMap.get(row.teamId) ?? null : null,
+          spe: hasActiveRoster && (row.ppsSpe ?? 0) > 0 ? speRankMap.get(row.teamId) ?? null : null,
+          men: hasActiveRoster && (row.ppsMen ?? 0) > 0 ? menRankMap.get(row.teamId) ?? null : null,
+          soc: hasActiveRoster && (row.ppsSoc ?? 0) > 0 ? socRankMap.get(row.teamId) ?? null : null,
+        },
+      ] as const;
+    }),
+  );
+}
+
+type ArchivedSeasonPlayerPerformance = {
+  playerId: string;
+  playerName: string;
+  teamCode?: string | null;
+  teamName?: string | null;
+  disciplineBreakdown?: Array<{
+    disciplineId: string;
+    disciplineName: string;
+    appearances: number;
+    totalContribution?: number | null;
+    averageContribution?: number | null;
+    averageFinalScore?: number | null;
+  }>;
+};
+
+export function buildArchivedSeasonDisciplineLeaderboards(
+  selectedSeasonSnapshot: { playerPerformances?: ArchivedSeasonPlayerPerformance[] } | null,
+) {
+  if (!selectedSeasonSnapshot) {
+    return [];
+  }
+
+  const disciplineRows = new Map<
+    string,
+    {
+      disciplineId: string;
+      disciplineName: string;
+      players: Array<{
+        playerId: string;
+        playerName: string;
+        teamCode: string | null;
+        teamName: string | null;
+        appearances: number;
+        totalContribution: number | null;
+        averageContribution: number | null;
+        averageFinalScore: number | null;
+      }>;
+    }
+  >();
+
+  for (const player of selectedSeasonSnapshot.playerPerformances ?? []) {
+    for (const discipline of player.disciplineBreakdown ?? []) {
+      const bucket = disciplineRows.get(discipline.disciplineId) ?? {
+        disciplineId: discipline.disciplineId,
+        disciplineName: discipline.disciplineName,
+        players: [],
+      };
+      bucket.players.push({
+        playerId: player.playerId,
+        playerName: player.playerName,
+        teamCode: player.teamCode ?? null,
+        teamName: player.teamName ?? null,
+        appearances: discipline.appearances,
+        totalContribution: discipline.totalContribution ?? null,
+        averageContribution: discipline.averageContribution ?? null,
+        averageFinalScore: discipline.averageFinalScore ?? null,
+      });
+      disciplineRows.set(discipline.disciplineId, bucket);
+    }
+  }
+
+  return Array.from(disciplineRows.values())
+    .map((entry) => ({
+      ...entry,
+      players: entry.players
+        .sort((left, right) => {
+          const contributionDelta =
+            (right.totalContribution ?? Number.NEGATIVE_INFINITY) -
+            (left.totalContribution ?? Number.NEGATIVE_INFINITY);
+          if (contributionDelta !== 0) {
+            return contributionDelta;
+          }
+          return (right.averageFinalScore ?? Number.NEGATIVE_INFINITY) - (left.averageFinalScore ?? Number.NEGATIVE_INFINITY);
+        })
+        .slice(0, 6),
+    }))
+    .sort((left, right) => left.disciplineName.localeCompare(right.disciplineName, "de"));
+}

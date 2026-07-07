@@ -357,8 +357,26 @@ export function buildRetoolAi2BudgetPlan(input: {
     1,
   );
   const spendPostureScore = clamp(aggression01 - caution01, -1, 1);
-  const reservePolicy = spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
-  const reserveTarget = reservePolicy === "aggressive" ? reserveTargetMin : reservePolicy === "conservative" ? reserveTargetMax : reserveTargetBase;
+  let reservePolicy = spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
+  let reserveTargetMinScaled = reserveTargetMin;
+  let reserveTargetBaseScaled = reserveTargetBase;
+  let reserveTargetMaxScaled = reserveTargetMax;
+  const softCashRatio = clamp(0.25 + (finances / 10) * 0.5, 0.25, 0.75);
+  const cashToKnownSalaryRatio = rosterSalaryKnown > 0 ? cash / rosterSalaryKnown : cashRunwayRatio;
+  if (cashToKnownSalaryRatio > softCashRatio + 0.05 && missingToOptimum > 0) {
+    const hoardExcess = clamp((cashToKnownSalaryRatio - softCashRatio) / Math.max(softCashRatio, 0.01), 0, 1.5);
+    const relief = clamp(0.4 + hoardExcess * 0.45, 0.4, 0.85);
+    reserveTargetMinScaled = clamp(reserveTargetMin * (1 - relief), 3, reserveTargetMin);
+    reserveTargetBaseScaled = clamp(reserveTargetBase * (1 - relief), 4, reserveTargetBase);
+    reserveTargetMaxScaled = clamp(reserveTargetMax * (1 - relief), 5, reserveTargetMax);
+    reservePolicy = "aggressive";
+  }
+  const reserveTarget =
+    reservePolicy === "aggressive"
+      ? reserveTargetMinScaled
+      : reservePolicy === "conservative"
+        ? reserveTargetMaxScaled
+        : reserveTargetBaseScaled;
   const rawBudgetMax = cash;
   const allowedBudgetForSearch = clamp(rawBudgetMax - reserveTarget, 0, cash);
   const spendWindowFloor = clamp(cash - reserveTargetMax, 0, cash);

@@ -44,13 +44,13 @@ function gameState(seasonId: string, teamCash: number, rosterMw: number): GameSt
 }
 
 describe("planner-cash-buffer-policy", () => {
-  it("uses salary cap as S2+ buffer (max 1x salary)", () => {
+  it("uses finance-scaled salary buffer for S2+ (0.25–0.75× salary, min 3)", () => {
     const gs = gameState("season-2", 100, 200);
     gs.rosters[0]!.salary = 5;
     expect(usesSingleCashPlanningPolicy(gs)).toBe(true);
     expect(resolveTeamRosterMarketValue(gs, "T-1")).toBe(200);
-    expect(resolveTeamLiquidityBufferTarget(gs, "T-1")).toBe(5);
-    expect(resolveTeamSpendableCashForPlanning(gs, "T-1", 100)).toBe(95);
+    expect(resolveTeamLiquidityBufferTarget(gs, "T-1")).toBe(3);
+    expect(resolveTeamSpendableCashForPlanning(gs, "T-1", 100)).toBe(97);
   });
 
   it("enforces minimum buffer of 3 when salary is tiny", () => {

@@ -66,8 +66,11 @@ export function shouldBuildFoundationSeasonBriefingData(activeView: string): boo
   );
 }
 
-export function shouldBuildFoundationSeasonReadinessChecklist(activeView: string): boolean {
-  return activeView === "homeV2" || activeView === "cockpit";
+export function shouldBuildFoundationSeasonReadinessChecklist(
+  activeView: string,
+  homeV2Tab: string = "overview",
+): boolean {
+  return activeView === "cockpit" || (activeView === "homeV2" && homeV2Tab === "office");
 }
 
 export function resolveSeasonBriefingMatchdayHighlights(input: {
@@ -139,6 +142,7 @@ const EMPTY_SEASON_BRIEFING_DATA = {
 
 export function useFoundationCrossTabSeasonBriefing(input: {
   activeView: string;
+  homeV2Tab?: string;
   activeSaveId: string;
   activeManagerTeamId: string | null;
   gameState: GameState;
@@ -154,7 +158,10 @@ export function useFoundationCrossTabSeasonBriefing(input: {
   const shouldBuildSeasonTransitionGate = shouldBuildFoundationSeasonTransitionGate(input.activeView);
   const shouldBuildSeasonSetupFlow = shouldBuildFoundationSeasonSetupFlow(input.activeView);
   const shouldBuildSeasonBriefingData = shouldBuildFoundationSeasonBriefingData(input.activeView);
-  const shouldBuildSeasonReadinessChecklist = shouldBuildFoundationSeasonReadinessChecklist(input.activeView);
+  const shouldBuildSeasonReadinessChecklist = shouldBuildFoundationSeasonReadinessChecklist(
+    input.activeView,
+    input.homeV2Tab,
+  );
 
   const localSeasonTransitionGate = useMemo(() => {
     if (!shouldBuildSeasonTransitionGate) {

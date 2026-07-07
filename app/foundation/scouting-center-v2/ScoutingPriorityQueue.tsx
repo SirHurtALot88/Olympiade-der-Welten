@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 
 export type ScoutingQueueRow = {
@@ -130,8 +131,15 @@ export default function ScoutingPriorityQueue({
                 title="Spielerprofil öffnen"
               >
                 {previewSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={previewSrc} alt="" loading="lazy" />
+                  <BudgetedMediaImage
+                    src={src}
+                    placeholderSrc={previewSrc}
+                    alt=""
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    fetchPriority="low"
+                  />
                 ) : (
                   <span className="scouting-queue-portrait-fallback">{getInitials(entry.playerName)}</span>
                 )}

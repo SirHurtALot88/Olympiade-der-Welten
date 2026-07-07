@@ -35,10 +35,39 @@ export function mergePlayerAttributeSheetIntoGameState(
   };
 }
 
+const playerAttributeSheetCache = new Map<string, PlayerAttributeSheetPayload | null>();
+
+function buildPlayerAttributeSheetCacheKey(saveId: string, playerId: string) {
+  return `${saveId}:${playerId}`;
+}
+
+export function invalidatePlayerAttributeSheetCache(input?: { saveId?: string; playerId?: string }) {
+  if (!input?.saveId && !input?.playerId) {
+    playerAttributeSheetCache.clear();
+    return;
+  }
+
+  for (const key of [...playerAttributeSheetCache.keys()]) {
+    const [saveId, playerId] = key.split(":");
+    if (input.saveId && saveId !== input.saveId) {
+      continue;
+    }
+    if (input.playerId && playerId !== input.playerId) {
+      continue;
+    }
+    playerAttributeSheetCache.delete(key);
+  }
+}
+
 export async function fetchPlayerAttributeSheet(input: {
   saveId: string;
   playerId: string;
 }): Promise<PlayerAttributeSheetPayload | null> {
+  const cacheKey = buildPlayerAttributeSheetCacheKey(input.saveId, input.playerId);
+  if (playerAttributeSheetCache.has(cacheKey)) {
+    return playerAttributeSheetCache.get(cacheKey) ?? null;
+  }
+
   const params = new URLSearchParams({
     saveId: input.saveId,
     playerId: input.playerId,
@@ -47,9 +76,12 @@ export async function fetchPlayerAttributeSheet(input: {
     cache: "no-store",
   });
   if (!response.ok) {
+    playerAttributeSheetCache.set(cacheKey, null);
     return null;
   }
-  return (await response.json()) as PlayerAttributeSheetPayload;
+  const payload = (await response.json()) as PlayerAttributeSheetPayload;
+  playerAttributeSheetCache.set(cacheKey, payload);
+  return payload;
 }
 
 export async function hydrateGameStatePlayerAttributeSheet(input: {

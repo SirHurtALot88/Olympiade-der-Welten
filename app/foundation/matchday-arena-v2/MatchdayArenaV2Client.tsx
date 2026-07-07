@@ -50,6 +50,14 @@ import { normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
 import type { CoachRole, OlyRoomState, RoomArenaState } from "@/types/game";
+import {
+  buildMatchdayArenaBaseSessionKey,
+  buildMatchdayArenaResolveSessionKey,
+  getMatchdayArenaBaseBundle,
+  getMatchdayArenaResolvePreview,
+  setMatchdayArenaBaseBundle,
+  setMatchdayArenaResolvePreview,
+} from "@/lib/foundation/matchday-arena-session-cache";
 
 type MatchdayArenaV2ClientProps = {
   initialSource?: "sqlite" | "prisma";
@@ -892,6 +900,19 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     requestId: number,
     signal: AbortSignal,
   ) {
+    const resolveCacheKey = buildMatchdayArenaResolveSessionKey({
+      saveId: canonicalParams.saveId,
+      seasonId: canonicalParams.seasonId,
+      matchdayId: canonicalParams.matchdayId,
+      source: nextSource,
+    });
+    const cachedResolve = getMatchdayArenaResolvePreview<ArenaResolveResponse>(resolveCacheKey);
+    if (cachedResolve && requestSequenceRef.current === requestId && !signal.aborted) {
+      setResolveFeed(cachedResolve);
+      setLoadStage("ready");
+      return;
+    }
+
     const canonicalContextQuery = new URLSearchParams({
       saveId: canonicalParams.saveId,
       seasonId: canonicalParams.seasonId,
@@ -916,6 +937,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
       if (response.ok && !payload.error) {
         setResolveFeed(payload);
+        setMatchdayArenaResolvePreview(resolveCacheKey, payload);
         setWarnings((current) => Array.from(new Set([...current, ...payload.warnings])));
       } else {
         const detail = payload.error ?? "Resolve-Vorschau konnte nicht geladen werden.";
@@ -986,8 +1008,77 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       });
       const scoreCacheKey = `${resolvedParams.saveId}:${resolvedParams.seasonId}:${resolvedParams.matchdayId}:${nextSource}`;
       const cachedScoreFeed = scoreFeedCacheRef.current.get(scoreCacheKey) ?? null;
+      const arenaBaseSessionKey = buildMatchdayArenaBaseSessionKey({
+        saveId: resolvedParams.saveId,
+        seasonId: resolvedParams.seasonId,
+        matchdayId: resolvedParams.matchdayId,
+        teamId: resolvedParams.teamId,
+        source: nextSource,
+      });
 
       if (nextSource === "sqlite") {
+        const cachedBundlePayload = getMatchdayArenaBaseBundle<ArenaBaseResponse>(arenaBaseSessionKey);
+        if (cachedBundlePayload?.context) {
+          const scoreSummary = cachedScoreFeed ?? cachedBundlePayload.scoreSummary ?? null;
+          if (scoreSummary) {
+            const storedRevealSession = props.roomContext
+              ? null
+              : readStoredMatchdayArenaRevealSession(cachedBundlePayload.params);
+            setSource(cachedBundlePayload.source);
+            setParams(cachedBundlePayload.params);
+            setContext(cachedBundlePayload.context);
+            setTeamOptions(cachedBundlePayload.options.teams);
+            setScoreFeed(scoreSummary);
+            scoreFeedCacheRef.current.set(scoreCacheKey, scoreSummary);
+            setStandingsPreviewFeed(cachedBundlePayload.standingsPreview ?? null);
+            setFocusTeamId(cachedBundlePayload.params.teamId);
+            setWarnings(
+              Array.from(
+                new Set([
+                  ...cachedBundlePayload.contextWarnings,
+                  ...cachedBundlePayload.contextErrors,
+                  ...(cachedBundlePayload.scoreWarnings ?? []),
+                  ...(cachedBundlePayload.scoreBlockingReasons ?? []),
+                  ...scoreSummary.warnings,
+                  ...scoreSummary.blockingReasons,
+                  ...(cachedBundlePayload.resolvePreview?.warnings ?? []),
+                ]),
+              ),
+            );
+            if (storedRevealSession) {
+              setActiveDisciplinePhase(storedRevealSession.activeDisciplinePhase);
+              setPhaseIndex(
+                Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === storedRevealSession.phaseId)),
+              );
+              setRevealedSlotCountByDiscipline(storedRevealSession.revealedSlotCountByDiscipline);
+              setCompletedDisciplinePhases(storedRevealSession.completedDisciplinePhases);
+              setRestoredRevealSessionLabel(
+                `Fortgesetzt bei ${storedRevealSession.activeDisciplinePhase.toUpperCase()} · ${
+                  MATCHDAY_ARENA_PHASES.find((phase) => phase.id === storedRevealSession.phaseId)?.label ?? "Slots"
+                }`,
+              );
+            } else {
+              setActiveDisciplinePhase("d1");
+              setPhaseIndex(0);
+              setRevealedSlotCountByDiscipline({ d1: 0, d2: 0 });
+              setCompletedDisciplinePhases({ d1: false, d2: false });
+              setRestoredRevealSessionLabel(null);
+            }
+            setIsPlaying(false);
+            if (cachedBundlePayload.resolvePreview) {
+              setResolveFeed(cachedBundlePayload.resolvePreview);
+              setLoadStage("ready");
+              return;
+            }
+
+            setLoadStage("players");
+            const resolveController = new AbortController();
+            resolveRequestAbortRef.current = resolveController;
+            void loadResolvePreview(cachedBundlePayload.params, cachedBundlePayload.source, requestId, resolveController.signal);
+            return;
+          }
+        }
+
         const bundleResponse = await fetch(`/api/matchday/arena-base?${contextQuery.toString()}`, {
           cache: "no-store",
           signal: baseController.signal,
@@ -1020,6 +1111,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           setLoadStage("idle");
           return;
         }
+
+        setMatchdayArenaBaseBundle(arenaBaseSessionKey, bundlePayload);
 
         const storedRevealSession = props.roomContext ? null : readStoredMatchdayArenaRevealSession(bundlePayload.params);
         setSource(bundlePayload.source);

@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
+import { invalidateMatchdayArenaSessionCache } from "@/lib/foundation/matchday-arena-session-cache";
+import { clearPrefetchedMatchdayArenaBaseKeys } from "@/lib/foundation/foundation-panel-prefetch";
 import type {
   FoundationApplySummary,
   FoundationMatchdayAutoRunSummary,
@@ -305,6 +307,14 @@ export function createCockpitMatchdayApplyHandlers(
       const payload = (await response.json()) as FoundationApplySummary;
       setMatchdayAdvanceFeed(payload);
       if (execute && response.ok && payload.applied) {
+        invalidateMatchdayArenaSessionCache({
+          saveId: activeSaveId,
+          seasonId,
+        });
+        clearPrefetchedMatchdayArenaBaseKeys({
+          saveId: activeSaveId,
+          seasonId,
+        });
         setFoundationActionFeedback({
           tone: "success",
           title: "Spieltag weitergeschaltet",
@@ -356,6 +366,14 @@ export function createCockpitMatchdayApplyHandlers(
         setMatchdayAutoRunFeed(payload.summary);
       }
       if (execute) {
+        invalidateMatchdayArenaSessionCache({
+          saveId: activeSaveId,
+          seasonId,
+        });
+        clearPrefetchedMatchdayArenaBaseKeys({
+          saveId: activeSaveId,
+          seasonId,
+        });
         await Promise.all([loadSave(activeSaveId), reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
         bumpMarketReloadToken();
       }

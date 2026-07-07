@@ -62,19 +62,23 @@ describe("foundation v2-only ui contract", () => {
   });
 
   it("routes inbox through inboxV2 only with decisions and chronicle shell subnav", async () => {
-    const foundationText = await readFoundationSurfaceSource(root);
-    const commandPaletteText = await fs.readFile(
-      `${root}/lib/foundation/tabs/use-foundation-cross-tab-command-palette.ts`,
-      "utf8",
-    );
-    const navText = await fs.readFile(`${root}/lib/foundation/foundation-nav-config.ts`, "utf8");
+    const [foundationText, commandPaletteText, navText, inboxHostText] = await Promise.all([
+      readFoundationSurfaceSource(root),
+      fs.readFile(
+        `${root}/lib/foundation/tabs/use-foundation-cross-tab-command-palette.ts`,
+        "utf8",
+      ),
+      fs.readFile(`${root}/lib/foundation/foundation-nav-config.ts`, "utf8"),
+      fs.readFile(`${root}/app/foundation/inbox-v2/FoundationInboxV2Host.tsx`, "utf8"),
+    ]);
 
     expect(navText).toContain('"inboxV2"');
     expect(navText).toContain("Offene Aufgaben & Warnungen");
     expect(foundationText).toContain('activeView === "inboxV2"');
+    expect(foundationText).toContain("FoundationShellRouterInboxV2");
     expect(commandPaletteText).toContain('label: "Entscheidungen"');
     expect(commandPaletteText).toContain('label: "Chronik"');
-    expect(foundationText).toContain("hideCategoryFilters");
+    expect(inboxHostText).toContain("hideCategoryFilters");
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
 

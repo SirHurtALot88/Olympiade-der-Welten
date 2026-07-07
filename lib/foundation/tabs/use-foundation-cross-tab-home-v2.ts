@@ -38,8 +38,11 @@ export function shouldBuildFoundationTeamObjectiveOverview(input: {
   );
 }
 
-export function shouldBuildFoundationHqOfficeDerivations(shouldBuildHomeV2Overview: boolean): boolean {
-  return shouldBuildHomeV2Overview;
+export function shouldBuildFoundationHqOfficeDerivations(
+  shouldBuildHomeV2Overview: boolean,
+  homeV2Tab: string = "overview",
+): boolean {
+  return shouldBuildHomeV2Overview && homeV2Tab === "office";
 }
 
 export function shouldBuildFoundationHqGmStory(input: {
@@ -60,8 +63,12 @@ export function shouldBuildFoundationTeamGmProfileDerivations(input: {
 export function shouldBuildFoundationTeamPlayerDemands(input: {
   shouldBuildTeamsView: boolean;
   shouldBuildHomeV2Overview: boolean;
+  homeV2Tab?: string;
 }): boolean {
-  return input.shouldBuildTeamsView || input.shouldBuildHomeV2Overview;
+  return (
+    input.shouldBuildTeamsView ||
+    (input.shouldBuildHomeV2Overview && (input.homeV2Tab ?? "overview") === "office")
+  );
 }
 
 export type SelectedHqMoraleSummary = {
@@ -82,6 +89,7 @@ export type SelectedTeamGeneralManagerAssignment = {
 export function useFoundationCrossTabHomeV2(input: {
   activeView: string;
   shouldBuildHomeV2Overview: boolean;
+  homeV2Tab?: string;
   shouldBuildTeamsView: boolean;
   shouldBuildMarketView: boolean;
   teamProfileTeamId: string | null;
@@ -99,7 +107,10 @@ export function useFoundationCrossTabHomeV2(input: {
     activeView: input.activeView,
     teamProfileTeamId: input.teamProfileTeamId,
   });
-  const shouldBuildHqOfficeDerivations = shouldBuildFoundationHqOfficeDerivations(input.shouldBuildHomeV2Overview);
+  const shouldBuildHqOfficeDerivations = shouldBuildFoundationHqOfficeDerivations(
+    input.shouldBuildHomeV2Overview,
+    input.homeV2Tab,
+  );
   const shouldBuildHqGmStory = shouldBuildFoundationHqGmStory({
     shouldBuildHomeV2Overview: input.shouldBuildHomeV2Overview,
     activeView: input.activeView,
@@ -228,6 +239,7 @@ export function useFoundationCrossTabHomeV2(input: {
   const shouldBuildTeamPlayerDemands = shouldBuildFoundationTeamPlayerDemands({
     shouldBuildTeamsView: input.shouldBuildTeamsView,
     shouldBuildHomeV2Overview: input.shouldBuildHomeV2Overview,
+    homeV2Tab: input.homeV2Tab,
   });
 
   const selectedTeamGmAxisShares = useMemo(

@@ -6,6 +6,7 @@ import {
   hasCurrentSeasonSaleFactorRanking,
   isBracketRankPoolEligible,
 } from "@/lib/market/transfermarkt-sale-factor";
+import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
@@ -181,7 +182,8 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
       ? clamp01(profitAbsolute / Math.max(6, input.teamCash * 0.55))
       : 0;
   const profit = round(
-    clamp01(ratioPart * 0.55 + absPart * 0.45) * (1 + input.cashPressureScore * 0.35) * weights.profit,
+    clamp01(ratioPart * 0.55 + absPart * 0.45) * (1 + input.cashPressureScore * 0.35) * weights.profit +
+      (teamHasCashBufferRebuildFocus(input.gameState, input.teamId) ? 8 : 0),
   );
 
   const cashPressure = clamp01(
@@ -230,14 +232,27 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
       ? -round((boardConfidence - 0.55) * weights.performanceKeep * 1.35 * keepMultiplier)
       : 0;
 
+  // Realized loss vs. purchase price (expectedSell is already the NET proceeds, i.e. after buyout).
+  // This used to cap out at a small, *fixed* malus for the worst cases (bottom-tercile / big MW
+  // decline) instead of scaling up with them — meaning the sales that lose the most cash were the
+  // *least* resisted. Fixed so the malus always scales with the realized loss magnitude, and a hard
+  // gate on top blocks/heavily suppresses big-cash losses unless the team is in genuine cash need.
   const sellBelowPurchase =
     purchasePrice != null && expectedSell != null && expectedSell < purchasePrice;
-  const bottomTercile = poolEligible && rank != null && rank >= Math.ceil((pool * 2) / 3);
-  const lossResistance = sellBelowPurchase
-    ? bottomTercile || mwDeclineSell > 0.5
-      ? -round(weights.lossResistance * 0.25)
-      : -round(clamp01(Math.abs(profitRatio ?? relativeLoss) * 0.5) * weights.lossResistance)
-    : 0;
+  const realizedLossAbs = profitAbsolute != null && profitAbsolute < 0 ? -profitAbsolute : 0;
+  const realizedLossRatio = profitRatio != null && profitRatio < 0 ? -profitRatio : 0;
+  const lossMagnitude = clamp01(realizedLossRatio);
+  const baseLossResistance = sellBelowPurchase ? -(0.3 + lossMagnitude * 1.7) * weights.lossResistance : 0;
+
+  const HARD_LOSS_RELATIVE_THRESHOLD = 0.3;
+  const HARD_LOSS_ABSOLUTE_FLOOR_C = 5;
+  const isCashEmergency = input.cashPressureScore >= 0.45;
+  const hardLossGateActive =
+    sellBelowPurchase &&
+    realizedLossRatio > HARD_LOSS_RELATIVE_THRESHOLD &&
+    realizedLossAbs >= HARD_LOSS_ABSOLUTE_FLOOR_C &&
+    !isCashEmergency;
+  const lossResistance = round(hardLossGateActive ? baseLossResistance - 25 : baseLossResistance);
 
   const total = round(
     clamp(
@@ -277,6 +292,9 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
     teamProfile: CompositeSellTeamProfile;
     /** When true (season_end sell pass), keep taking profit-sell candidates even after cash pressure is resolved. */
     allowProfitSellsBelowMin?: boolean;
+    /** Block sells that would drop the roster below hardMin unless cash emergency. */
+    hardMin?: number;
+    rosterCount?: number;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -287,6 +305,9 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
 
   let projectedCash = input.teamCash;
   let projectedSalary = input.teamSalaryTotal;
+  let projectedRoster = input.rosterCount ?? Number.POSITIVE_INFINITY;
+  const hardMin = input.hardMin;
+  const isCashEmergency = input.cashPressureScore >= 0.45;
   const selected: T[] = [];
 
   const isCashPressureResolved = () => {
@@ -301,12 +322,23 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
   };
 
   for (const entry of sorted) {
+    if (
+      hardMin != null &&
+      Number.isFinite(projectedRoster) &&
+      projectedRoster - 1 < hardMin &&
+      !isCashEmergency
+    ) {
+      continue;
+    }
     if (selected.length > 0 && isCashPressureResolved() && !input.allowProfitSellsBelowMin) {
       break;
     }
     selected.push(entry.candidate);
     projectedCash += entry.candidate.expectedSellValue ?? 0;
     projectedSalary = Math.max(0, projectedSalary - (entry.candidate.salary ?? 0));
+    if (Number.isFinite(projectedRoster)) {
+      projectedRoster -= 1;
+    }
   }
 
   return selected;

@@ -9,6 +9,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   resolveTeamLiquidityBufferTarget,
   usesSingleCashPlanningPolicy,
+  PLANNER_LIQUIDITY_BUFFER_MIN,
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { resolvePostOptPlannerRosterTarget } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -257,4 +258,68 @@ export function getTeamPlannerRosterTarget(gameState: GameState, teamId: string)
   }
 
   return Math.max(playerMin, Math.min(playerMax, target));
+}
+
+export function teamHasCashBufferRebuildFocus(gameState: GameState, teamId: string) {
+  return Boolean(gameState.seasonState.aiCashBufferDipLedger?.[teamId]?.rebuildFocusActive);
+}
+
+export function resolveTransferAffordableBudget(input: {
+  teamCash: number;
+  cashReservePct: number;
+  spendableBudget?: number | null;
+  gameState?: GameState;
+  teamId?: string;
+  rosterBelowOpt?: boolean;
+}) {
+  if (input.spendableBudget != null && Number.isFinite(input.spendableBudget) && input.spendableBudget > 0) {
+    return input.spendableBudget;
+  }
+  const reservation =
+    input.teamId != null
+      ? input.gameState?.seasonState.aiManagerBudgetReservations?.[input.teamId] ?? null
+      : null;
+  if (reservation?.transferBudget != null && reservation.transferBudget > 0) {
+    return reservation.transferBudget;
+  }
+  const standardBudget = input.teamCash * (1 - input.cashReservePct);
+  if (!input.gameState || !input.teamId || !input.rosterBelowOpt) {
+    return standardBudget;
+  }
+  const bufferTarget = resolveTeamLiquidityBufferTarget(input.gameState, input.teamId);
+  const bufferFloor = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, bufferTarget * 0.15), 2);
+  const emergencyBudget = round(Math.max(0, input.teamCash - bufferFloor), 2);
+  return Math.max(standardBudget, emergencyBudget);
+}
+
+export function recordCashBufferDipIfNeeded(
+  gameState: GameState,
+  teamId: string,
+  seasonId: string,
+): GameState {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  if (!team) return gameState;
+  const bufferTarget = resolveTeamLiquidityBufferTarget(gameState, teamId);
+  const cashAfter = team.cash ?? 0;
+  if (cashAfter >= bufferTarget - 0.01) return gameState;
+
+  const dipped = round(Math.max(0, bufferTarget - cashAfter), 2);
+  const ledger = { ...(gameState.seasonState.aiCashBufferDipLedger ?? {}) };
+  const previous = ledger[teamId];
+  const dipCount = (previous?.dipCount ?? 0) + 1;
+  ledger[teamId] = {
+    teamId,
+    seasonId,
+    dipCount,
+    totalDipped: round((previous?.totalDipped ?? 0) + dipped, 2),
+    lastAt: new Date().toISOString(),
+    rebuildFocusActive: dipCount >= 1,
+  };
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      aiCashBufferDipLedger: ledger,
+    },
+  };
 }
