@@ -1,7 +1,6 @@
 "use client";
 
 import { FoundationShellRouterBody } from "@/app/foundation/FoundationShellRouterBody";
-import { FoundationStateProvider } from "@/lib/foundation/foundation-state-context";
 import type { FoundationPageClientProps } from "@/lib/foundation/tabs/foundation-page-types";
 import { useFoundationShellRouterBodyScope } from "@/lib/foundation/tabs/use-foundation-shell-router-body-scope";
 
@@ -25,10 +24,6 @@ export type {
 } from "@/app/foundation/foundation-page-client-exports";
 
 export default function FoundationPageClient(props: FoundationPageClientProps) {
-  const { foundationShellRouterBodyProps, foundationStateContextValue } = useFoundationShellRouterBodyScope(props);
-  return (
-    <FoundationStateProvider value={foundationStateContextValue}>
-      <FoundationShellRouterBody {...foundationShellRouterBodyProps} />
-    </FoundationStateProvider>
-  );
+  const foundationShellRouterBodyProps = useFoundationShellRouterBodyScope(props);
+  return <FoundationShellRouterBody {...foundationShellRouterBodyProps} />;
 }

@@ -4,7 +4,7 @@
 // Contains the real Foundation shell UI (previously the monolith return block).
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
-import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterHomeV2, FoundationShellRouterInboxV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterSeasonV2, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
+import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
@@ -20,15 +20,18 @@ import {
   FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
   FOUNDATION_SAVE_MODE_OPTIONS,
   FacilitiesV2Client,
+  FoundationHomeV2Panel,
   FoundationLineupPanel,
   FoundationMatchdayArenaPanel,
   FoundationPlayerPortraitPreview,
+  FoundationSeasonV2Panel,
   FoundationShell,
   FoundationSubNav,
   FoundationTeamsDetailPanel,
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
   HISTORY_ALL_SEASONS_FILTER,
+  InboxV2Client,
   MappingHighlight,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
@@ -168,7 +171,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   activeSaveSummary,
   activeScenarioWarning,
   activeTeamCriticalInboxItems,
-  activeTeamInboxItems,
   activeTeamMatchdaySummaryRow,
   activeTeamOpenInboxItems,
   activeView,
@@ -246,9 +248,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationSeasonPreviewHostProps,
   foundationTeamsViewHostProps,
   foundationTrainingCompactHostProps,
-  foundationInboxV2HostProps,
-  foundationHomeV2HostProps,
-  foundationSeasonV2HostProps,
   foundationWarningInboxItems,
   freshSeasonStartMessage,
   gameFlowActionStep,
@@ -277,8 +276,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   historySourceFilter,
   historyTeamFilter,
   historyTypeFilter,
+  homeActiveTeamLogo,
   homeNextMatchdayStatus,
+  homeTodayCards,
+  homeV2BoardObjectives,
+  homeV2Facilities,
+  homeV2InboxItems,
+  homeV2ScheduleItems,
   homeV2Tab,
+  homeV2TopPlayers,
+  homeWarnings,
   hqContractExpiringCount,
   hqTrainingFocusCount,
   hqTransferSellMarkers,
@@ -286,6 +293,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   inboxCategoryFilter,
   inboxIncludeDismissed,
   inboxIncludeDone,
+  inboxV2Items,
   inboxV2SelectedItemId,
   isFoundationBootstrapState,
   isMarketSellPanelOpen,
@@ -296,6 +304,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   isTeamSwitchPending,
   isTransferHistoryViewActive,
   isTransferMarketViewActive,
+  isViewingArchivedSeason,
   leaguePlayerHeatPools,
   lineupDraftBoardView,
   lineupDraftBoardViewRequest,
@@ -432,6 +441,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonHistorySnapshots,
   seasonOverviewOptions,
   seasonOverviewSeasonId,
+  seasonOverviewSourceLabel,
   seasonSnapshotFeed,
   seasonStandRows,
   seasonStandingsLoading,
@@ -441,6 +451,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonTransitionBusy,
   seasonTransitionError,
   seasonTransitionFeed,
+  seasonV2ArchiveRows,
+  seasonV2DisciplineLeaders,
+  seasonV2GmRows,
+  seasonV2LeaderTeam,
+  seasonV2MomentumTeam,
+  seasonV2PlayerRows,
+  seasonV2PressureTeam,
+  seasonV2SelectedTeamSummary,
+  seasonV2StandingsRows,
+  seasonV2TopPlayers,
   selectTeamSettingsTeam,
   selectedAiTeamId,
   selectedBoardConfidence,
@@ -456,6 +476,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedOpenObjectives,
   selectedRoster,
   selectedRosterTableRows,
+  selectedSeasonOverviewLabel,
   selectedStandingRow,
   selectedTeam,
   selectedTeamAverageAxisStats,
@@ -611,6 +632,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   visibleDisciplineConfigRows,
   visibleDisciplineRanksColumns,
   visibleFoundationCommandItems,
+  visibleInboxItems,
   visiblePlayersTableColumns,
   wholeSeasonDryRunFeed,
   wholeSeasonIncludeWarningLineups,
@@ -1586,11 +1608,107 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
 
-          <FoundationShellRouterHomeV2
-            active={activeView === "homeV2"}
-            placement="content"
-            hostProps={foundationHomeV2HostProps}
+          {activeView === "homeV2" ? (
+          <FoundationHomeV2Panel
+            active
+            tab={homeV2Tab}
+            overview={{
+              teamName: selectedTeam?.name ?? "Kein Team",
+              teamCode: selectedTeam?.shortCode ?? "—",
+              teamLogoUrl: homeActiveTeamLogo?.src ?? null,
+              teamLogoInitials: homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?",
+              seasonName: gameState.season.name,
+              matchdayLabel: currentMatchdayDisplayLabel,
+              managerLabel: activeOwner?.label ?? "—",
+              controlModeLabel: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
+              rank: selectedStandingRow?.rank ?? null,
+              points: selectedStandingRow?.points ?? null,
+              cash: selectedStandingRow?.cash ?? null,
+              salaryTotal: selectedStandingRow?.salaryTotal ?? null,
+              guv: selectedStandingRow?.guv ?? null,
+              rosterCount: selectedRosterTableRows.length,
+              gmStoryLabel: selectedHqGmStory?.label ?? null,
+              gmStoryDetail: selectedHqGmStory?.detail ?? null,
+              gmStoryTone: selectedHqGmStory?.tone ?? null,
+              boardPressure: selectedBoardConfidence?.pressure ?? null,
+              boardRating: selectedBoardConfidence?.value ?? null,
+              boardObjectives: homeV2BoardObjectives,
+              nextStepLabel: globalNextLabel,
+              nextStepStatus: getGameFlowStatusLabel(gameFlowActionStep.status),
+              nextStepDetail:
+                gameFlowActionStep.blockers[0]
+                  ? formatCockpitReason(gameFlowActionStep.blockers[0])
+                  : gameFlowActionStep.warnings[0]
+                    ? formatCockpitReason(gameFlowActionStep.warnings[0])
+                    : "Flow bereit — weiter zum naechsten Schritt.",
+              warnings: homeWarnings.map(formatHomeWarningLabel),
+              topPlayers: homeV2TopPlayers,
+              leagueHeatPools: leaguePlayerHeatPools,
+              facilities: homeV2Facilities,
+              scheduleItems: homeV2ScheduleItems,
+              inboxItems: homeV2InboxItems,
+              todayCards: homeTodayCards,
+              onContinue: triggerGlobalNext,
+              onOpenTeams: () => setFoundationView("teams", setActiveView),
+              onOpenLineup: () => setFoundationView("lineup", setActiveView),
+              onOpenMarket: () => setFoundationView("marketV2", setActiveView),
+              onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
+              onOpenOffice: () => navigateHomeTab("office"),
+              onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
+              onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
+              onCompleteInboxItem: (itemId) => {
+                const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                if (sourceItem) {
+                  updateInboxItemStatus(sourceItem, "done");
+                }
+              },
+              onOpenBoardObjectives: () => {
+                setFoundationView("teams", setActiveView);
+                scrollToFoundationTarget("team-board-objectives");
+              },
+              onOpenPlayer: (playerId) => openPlayerDrawerById(playerId),
+            }}
+            office={{
+              homeNextMatchdayStatus,
+              selectedTeamPlayerDemands,
+              selectedHqFinanceWarnings,
+              selectedStandingRow,
+              activeTeamOpenInboxItems,
+              activeTeamCriticalInboxItems,
+              selectedOpenObjectives,
+              selectedBoardConfidence,
+              hqTrainingFocusCount,
+              selectedTeamGeneralManager,
+              hqTransferWishlistEntries,
+              selectedTeamCaptainProfile,
+              selectedTeamCaptainCandidates,
+              selectedTeamCaptainPlayerId,
+              assignTeamCaptainBusy,
+              onAssignTeamCaptain: assignTeamCaptainForSelectedTeam,
+              captainEffectsTooltip,
+              selectedTeamPowers,
+              hqContractExpiringCount,
+              hqTransferSellMarkers,
+              selectedHqMoraleSummary,
+              selectedRosterTableRows,
+              selectedHqAxisSummary,
+              selectedHqInboxItems,
+              selectedHqGmStory,
+              selectedTeam,
+              selectedTeamControl,
+              homeActiveTeamLogo,
+              gameState,
+              currentMatchdayDisplayLabel,
+              selectedTeamCanManage,
+              isReadOnlyMode: readMeta.readOnly,
+              selectedTeamAverageAxisStats,
+              rosterPlayers,
+              onNavigate: (view) => setFoundationView(view, setActiveView),
+              onOpenTeam: (teamId) => openTeamDrawerById(teamId),
+              onNavigateInboxItem: navigateToInboxItem,
+            }}
           />
+          ) : null}
 
           <FoundationShellRouterTeams
             active={activeView === "teams"}
@@ -1791,10 +1909,49 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             ) : null}
           </section>
 
-          <FoundationShellRouterInboxV2
-            active={activeView === "inboxV2"}
-            hostProps={foundationInboxV2HostProps}
-          />
+          <section className={`panel foundation-inbox-v2-panel${getViewClass("inboxV2")}`}>
+            {activeView === "inboxV2" && selectedTeam ? (
+              <InboxV2Client
+                items={inboxV2Items}
+                selectedItemId={inboxV2SelectedItemId ?? inboxV2Items[0]?.id ?? null}
+                onSelectItem={setInboxV2SelectedItemId}
+                openCount={activeTeamOpenInboxItems.length}
+                criticalCount={activeTeamCriticalInboxItems.length}
+                teamLabel={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
+                categoryFilter={inboxCategoryFilter}
+                onCategoryFilterChange={setInboxCategoryFilter}
+                hideCategoryFilters
+                includeDone={inboxIncludeDone}
+                onIncludeDoneChange={setInboxIncludeDone}
+                includeDismissed={inboxIncludeDismissed}
+                onIncludeDismissedChange={setInboxIncludeDismissed}
+                onRunChoice={(_itemId, choiceId) => {
+                  if (choiceId !== "open-target") {
+                    return;
+                  }
+                  const selected = inboxV2Items.find((item) => item.id === (inboxV2SelectedItemId ?? inboxV2Items[0]?.id));
+                  const sourceItem = visibleInboxItems.find((item) => item.itemId === selected?.id);
+                  if (sourceItem) {
+                    navigateToInboxItem(sourceItem);
+                  }
+                }}
+                onMarkDone={(itemId) => {
+                  const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                  if (sourceItem) {
+                    updateInboxItemStatus(sourceItem, "done");
+                  }
+                }}
+                onDismiss={(itemId) => {
+                  const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                  if (sourceItem) {
+                    updateInboxItemStatus(sourceItem, "dismissed");
+                  }
+                }}
+              />
+            ) : null}
+          </section>
+
+
 
           {activeView === "teamSettings" ? (
             <FoundationTeamSettingsHost {...foundationTeamSettingsHostProps} />
@@ -2207,10 +2364,39 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             hostProps={foundationMatchdayResultHostProps}
           />
 
-          <FoundationShellRouterSeasonV2
-            active={activeView === "seasonV2"}
-            hostProps={foundationSeasonV2HostProps}
-          />
+          {(activeView === "seasonV2") ? (
+            <FoundationSeasonV2Panel
+              active={activeView === "seasonV2"}
+              selectedSeasonId={seasonOverviewSeasonId}
+              selectedSeasonLabel={selectedSeasonOverviewLabel}
+              sourceLabel={seasonOverviewSourceLabel}
+              sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
+              isArchived={isViewingArchivedSeason}
+              seasonOptions={seasonOverviewOptions}
+              selectedTeamSummary={seasonV2SelectedTeamSummary}
+              leaderTeam={seasonV2LeaderTeam}
+              momentumTeam={seasonV2MomentumTeam}
+              pressureTeam={seasonV2PressureTeam}
+              topPlayer={seasonV2TopPlayers[0] ?? null}
+              standingsRows={seasonV2StandingsRows}
+              topPlayers={seasonV2TopPlayers}
+              playerRows={seasonV2PlayerRows}
+              gmRows={seasonV2GmRows}
+              archiveRows={seasonV2ArchiveRows}
+              disciplineLeaders={seasonV2DisciplineLeaders}
+              isLoading={seasonStandingsLoading}
+              onChangeSeason={(seasonId) => {
+                setSeasonOverviewSeasonId(seasonId);
+                void reloadSeasonStandingsOverview(seasonId);
+              }}
+              onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+              onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+              viewMode={seasonStandingsMode}
+              onViewModeChange={setSeasonStandingsMode}
+              onOpenRanks={() => setFoundationView("ranks", setActiveView)}
+              onOpenPrize={() => openPrizeFinanceView({ tab: "prize" })}
+            />
+          ) : null}
 
           <FoundationShellRouterSeasonPreview
             active={activeView === "seasonPreview"}
@@ -2345,14 +2531,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 subMeta={row.team?.name ?? "Free Agent"}
                               >
                                 {portrait.src ? (
-                                  <BudgetedMediaImage
+                                  <img
                                     className="transfermarkt-portrait"
                                     src={portrait.src}
-                                    placeholderSrc={portrait.previewSrc ?? portrait.thumbSrc}
                                     alt={row.player.name}
                                     width={56}
                                     height={56}
                                     loading="lazy"
+                                    decoding="async"
                                     fetchPriority="low"
                                   />
                                 ) : (
@@ -2663,15 +2849,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       <div className="transfer-buy-player-line transfer-sell-hero-line">
                         <div className="transfer-modal-player-hero transfer-sell-hero">
                           {portraitSrc ? (
-                            <BudgetedMediaImage
+                            <img
                               className="transfermarkt-portrait transfer-sell-portrait"
                               src={portraitSrc}
                               alt={playerName}
                               width={72}
                               height={72}
-                              loading="eager"
-                              fetchPriority="high"
-                              eager
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="low"
                             />
                           ) : (
                             <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait" aria-label={`${playerName} placeholder`}>
