@@ -37,6 +37,17 @@ export function useFoundationCrossTabFoundationActivities(input: {
   adminBalancingBusy: boolean;
   cockpitBusyKey: string | null;
   aiTeamsCount: number;
+  marketBuyBusy?: boolean;
+  marketSellBusy?: boolean;
+  contractRenewalBusy?: boolean;
+  sponsorChoiceBusy?: boolean;
+  facilityUpgradeBusy?: boolean;
+  facilityMaintenanceBusy?: boolean;
+  assignTeamCaptainBusy?: boolean;
+  marketAiPreviewBusy?: boolean;
+  liveSyncStatus?: "connected" | "syncing" | "reconnecting" | "disconnected" | "idle";
+  fetchSlowWarning?: boolean;
+  showIdleReady?: boolean;
 }) {
   return useMemo(
     () =>
@@ -72,6 +83,17 @@ export function useFoundationCrossTabFoundationActivities(input: {
         adminBalancingBusy: input.adminBalancingBusy,
         cockpitBusyKey: input.cockpitBusyKey,
         aiTeamsCount: input.aiTeamsCount,
+        marketBuyBusy: input.marketBuyBusy,
+        marketSellBusy: input.marketSellBusy,
+        contractRenewalBusy: input.contractRenewalBusy,
+        sponsorChoiceBusy: input.sponsorChoiceBusy,
+        facilityUpgradeBusy: input.facilityUpgradeBusy,
+        facilityMaintenanceBusy: input.facilityMaintenanceBusy,
+        assignTeamCaptainBusy: input.assignTeamCaptainBusy,
+        marketAiPreviewBusy: input.marketAiPreviewBusy,
+        liveSyncStatus: input.liveSyncStatus,
+        fetchSlowWarning: input.fetchSlowWarning,
+        showIdleReady: input.showIdleReady,
       }),
     [
       input.adminBalancingBusy,
@@ -84,13 +106,24 @@ export function useFoundationCrossTabFoundationActivities(input: {
       input.aiPreseasonBusy,
       input.aiPreseasonDisplayRun,
       input.aiTeamsCount,
+      input.assignTeamCaptainBusy,
       input.cockpitBusyKey,
+      input.contractRenewalBusy,
+      input.facilityMaintenanceBusy,
+      input.facilityUpgradeBusy,
+      input.fetchSlowWarning,
       input.isSaveBusy,
+      input.liveSyncStatus,
+      input.marketAiPreviewBusy,
+      input.marketBuyBusy,
+      input.marketSellBusy,
       input.newGameBusy,
       input.preSeasonWorkflowBusy,
       input.rosterFillBusy,
       input.seasonStartResetBusy,
       input.seasonTransitionBusy,
+      input.showIdleReady,
+      input.sponsorChoiceBusy,
     ],
   );
 }

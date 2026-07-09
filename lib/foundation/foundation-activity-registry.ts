@@ -187,6 +187,67 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     });
   }
 
+  if (input.marketBuyBusy) {
+    activities.push({ id: "market-buy", label: "Transfer-Kauf", detail: "Kauf wird ausgefuehrt", tone: "running" });
+  }
+  if (input.marketSellBusy) {
+    activities.push({ id: "market-sell", label: "Transfer-Verkauf", detail: "Verkauf wird ausgefuehrt", tone: "running" });
+  }
+  if (input.contractRenewalBusy) {
+    activities.push({ id: "contract-renewal", label: "Vertragsverhandlung", detail: "Vertrag wird bearbeitet", tone: "running" });
+  }
+  if (input.sponsorChoiceBusy) {
+    activities.push({ id: "sponsor-choice", label: "Sponsor waehlen", detail: "Sponsor wird gespeichert", tone: "running" });
+  }
+  if (input.facilityUpgradeBusy) {
+    activities.push({ id: "facility-upgrade", label: "Gebaeude-Upgrade", detail: "Upgrade wird ausgefuehrt", tone: "running" });
+  }
+  if (input.facilityMaintenanceBusy) {
+    activities.push({ id: "facility-maintenance", label: "Gebaeude-Wartung", detail: "Wartung wird ausgefuehrt", tone: "running" });
+  }
+  if (input.assignTeamCaptainBusy) {
+    activities.push({ id: "assign-captain", label: "Kapitaen ernennen", detail: "Kapitaen wird gesetzt", tone: "running" });
+  }
+  if (input.marketAiPreviewBusy) {
+    activities.push({ id: "market-ai-preview", label: "AI-Markt-Vorschau", detail: "Vorschau wird berechnet", tone: "running" });
+  }
+
+  if (input.liveSyncStatus === "syncing") {
+    activities.push({ id: "live-sync", label: "Synchronisiert", detail: "Spielstand wird abgeglichen", tone: "running" });
+  } else if (input.liveSyncStatus === "reconnecting") {
+    activities.push({
+      id: "live-reconnect",
+      label: "Verbindung wird wiederhergestellt",
+      detail: "Server-Verbindung unterbrochen",
+      tone: "warning",
+    });
+  } else if (input.liveSyncStatus === "disconnected") {
+    activities.push({
+      id: "live-disconnected",
+      label: "Verbindung getrennt",
+      detail: "Live-Sync pausiert",
+      tone: "blocked",
+    });
+  }
+
+  if (input.fetchSlowWarning) {
+    activities.push({
+      id: "fetch-slow",
+      label: "Laedt laenger als erwartet",
+      detail: "Server antwortet verzoegert",
+      tone: "warning",
+    });
+  }
+
+  if (input.showIdleReady && activities.length === 0) {
+    activities.push({
+      id: "idle-ready",
+      label: "Bereit",
+      detail: "Alle Aktionen abgeschlossen",
+      tone: "success",
+    });
+  }
+
   return activities;
 }
 

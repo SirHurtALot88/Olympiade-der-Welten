@@ -339,7 +339,7 @@ import {
   buildLeagueTrainingLeaderRows,
   type LeagueLeaderCategoryId,
 } from "@/lib/foundation/league-leaders-service";
-import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
+import { resolveShouldBuildTeamsScopedRatings, shouldBuildTeamsView as resolveShouldBuildTeamsView } from "@/lib/foundation/tabs/teams-view-derivations";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
 import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
@@ -347,9 +347,6 @@ import type { FoundationTeamsViewHostProps } from "@/app/foundation/teams-v2/Fou
 import type { FoundationCockpitHostProps } from "@/app/foundation/cockpit-v2/FoundationCockpitHost";
 import type { FoundationPrizeFinanceShellHostProps } from "@/app/foundation/prize-v2/FoundationPrizeFinanceShellHost";
 import type { FoundationPrizeV2PanelProps } from "@/app/foundation/prize-v2/FoundationPrizeV2Panel";
-import {
-  resolveShouldBuildTeamsView as resolveShouldBuildTeamsView,
-} from "@/lib/foundation/tabs/use-teams-view-derivations";
 import { buildFoundationSeasonTableColumns } from "@/lib/foundation/tabs/season-table-column-defs";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
@@ -1545,7 +1542,7 @@ export function useFoundationShellRouterBodyScope({
     marketFeedReloadersRef,
   });
 
-  const { reloadLiveSeasonState } = useFoundationLiveSync({
+  const { reloadLiveSeasonState, liveSyncStatus } = useFoundationLiveSync({
     gameState,
     setGameState,
     activeSaveId,
@@ -8929,6 +8926,16 @@ export function useFoundationShellRouterBodyScope({
     adminBalancingBusy,
     cockpitBusyKey,
     aiTeamsCount: aiTeams.length,
+    marketBuyBusy,
+    marketSellBusy,
+    contractRenewalBusy,
+    sponsorChoiceBusy,
+    facilityUpgradeBusy,
+    facilityMaintenanceBusy,
+    assignTeamCaptainBusy,
+    marketAiPreviewBusy,
+    liveSyncStatus,
+    showIdleReady: gameState.season.id !== "loading",
   });
 
   const isAdminView = activeView === "admin";
@@ -9856,7 +9863,6 @@ export function useFoundationShellRouterBodyScope({
     seasonV2StandingsRows,
     seasonV2TopPlayers,
     selectTeamSettingsTeam,
-    selectedAiTeamId,
     selectedBoardConfidence,
     selectedEncyclopediaEntry,
     selectedHqAxisSummary,

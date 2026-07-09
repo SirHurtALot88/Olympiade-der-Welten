@@ -462,7 +462,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2StandingsRows,
   seasonV2TopPlayers,
   selectTeamSettingsTeam,
-  selectedAiTeamId,
   selectedBoardConfidence,
   selectedEncyclopediaEntry,
   selectedHqAxisSummary,
@@ -617,6 +616,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   toggleTableSort,
   toggleTransferSellMarker,
   toggleTransferWishlist,
+  trainingFacilityEffectPreview,
   trainingFacilityRows,
   trainingFacilitySeasonEndFinance,
   trainingForecastSummary,
@@ -680,12 +680,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     (
     <FoundationSharedProvider>
     <main className="app-shell foundation-shell foundation-app">
-      {bootstrapError && !(gameState?.teams?.length ?? 0) ? (
+      {bootstrapError && gameState?.season?.id === "loading" ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{bootstrapError}</strong>
           <button className="secondary-button inline-button" type="button" onClick={() => window.location.reload()}>
             Neu laden
           </button>
+        </div>
+      ) : null}
+      {gameState?.season?.id === "loading" && !bootstrapError ? (
+        <div className="foundation-bootstrap-overlay" role="status" aria-live="polite">
+          <div className="foundation-bootstrap-overlay-card">
+            <strong>Foundation laedt</strong>
+            <span>Spielstand wird vorbereitet …</span>
+          </div>
         </div>
       ) : null}
       {persistenceError || saveSyncError ? (
@@ -1812,6 +1820,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
                   recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
                 }}
+                trainingFacilityEffectPreview={trainingFacilityEffectPreview}
                 facilityRows={trainingFacilityRows}
                 specialistWingVariant={specialistWingVariantDraft}
                 specialistWingOptions={Object.entries(SPECIALIST_WING_VARIANTS).map(([value, variant]) => ({

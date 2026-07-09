@@ -78,6 +78,23 @@ export type FacilitiesV2ClientProps = {
     netFacilityResult: number;
     recoveryAfterTraining: number;
   };
+  trainingFacilityEffectPreview?: {
+    trainingXp: {
+      before: number;
+      modifierPct: number;
+      after: number;
+    };
+    recovery: {
+      before: number;
+      modifierPct: number;
+      flatBonus: number;
+      after: number;
+    };
+    recoveryAfterTraining: number;
+    scouting: { level: number; label: string };
+    analytics: { level: number; label: string };
+    warnings: string[];
+  } | null;
   facilityRows: FacilityRowView[];
   specialistWingVariant: SpecialistWingVariant;
   specialistWingOptions: Array<{ value: SpecialistWingVariant; label: string }>;

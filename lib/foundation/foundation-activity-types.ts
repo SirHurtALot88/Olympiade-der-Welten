@@ -51,4 +51,15 @@ export type FoundationActivityInput = {
   adminBalancingBusy: boolean;
   cockpitBusyKey: string | null;
   aiTeamsCount: number;
+  marketBuyBusy?: boolean;
+  marketSellBusy?: boolean;
+  contractRenewalBusy?: boolean;
+  sponsorChoiceBusy?: boolean;
+  facilityUpgradeBusy?: boolean;
+  facilityMaintenanceBusy?: boolean;
+  assignTeamCaptainBusy?: boolean;
+  marketAiPreviewBusy?: boolean;
+  liveSyncStatus?: "connected" | "syncing" | "reconnecting" | "disconnected" | "idle";
+  fetchSlowWarning?: boolean;
+  showIdleReady?: boolean;
 };

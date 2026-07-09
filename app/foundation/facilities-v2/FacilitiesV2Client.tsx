@@ -27,6 +27,7 @@ export default function FacilitiesV2Client({
   onOpenFacilityPanel,
   onCloseFacilityPanel,
   summary,
+  trainingFacilityEffectPreview = null,
   facilityRows,
   specialistWingVariant,
   specialistWingOptions,
@@ -189,6 +190,31 @@ export default function FacilitiesV2Client({
           <strong>{formatLocaleNumber(summary.recoveryAfterTraining, 1)}</strong>
         </article>
       </div>
+
+      {trainingFacilityEffectPreview ? (
+        <div className="facilities-v2-kpi-row" aria-label="Trainings-Preview durch Gebaeude">
+          <article className="facilities-v2-kpi">
+            <span>Trainingseffekt</span>
+            <strong>{formatLocaleNumber(trainingFacilityEffectPreview.trainingXp.after, 1)}</strong>
+            <small>
+              {trainingFacilityEffectPreview.trainingXp.modifierPct > 0
+                ? `+${formatLocaleNumber(trainingFacilityEffectPreview.trainingXp.modifierPct, 1)}% · `
+                : ""}
+              Recovery {formatLocaleNumber(trainingFacilityEffectPreview.recoveryAfterTraining, 1)}
+            </small>
+          </article>
+          <article className="facilities-v2-kpi">
+            <span>Scouting</span>
+            <strong>{trainingFacilityEffectPreview.scouting.label}</strong>
+            <small>Level {trainingFacilityEffectPreview.scouting.level}</small>
+          </article>
+          <article className="facilities-v2-kpi">
+            <span>Analytics</span>
+            <strong>{trainingFacilityEffectPreview.analytics.label}</strong>
+            <small>Level {trainingFacilityEffectPreview.analytics.level}</small>
+          </article>
+        </div>
+      ) : null}
 
       <div className="facilities-v2-grid" data-testid="facilities-v2-grid">
         {facilityRows.map((facility) => (
