@@ -28,34 +28,34 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 
 ## Einsatzliste
 15. Slot-Status mit klaren Labels: offen, gefuellt, Konflikt, speichern. Status: erledigt (Draft-Slots: `legacy-lineup-slot-state-pill`, Issue-Chips, Save-CTA).
-16. D1/D2-Flow als zwei sichtbare Arbeitsschritte statt langer Liste.
-17. Team-Boost-Panel sticky neben den Slots halten.
-18. "Beste Kandidaten" mit Grund anzeigen: Score, Fit, Fatigue, Rolle.
-19. Kandidat per Klick auf aktiven Slot setzen, ohne Scroll-Bruch.
-20. Nach Setzen automatisch naechsten Slot fokussieren.
-21. Konflikte direkt am Slot klaeren statt gesammelt unten.
+16. D1/D2-Flow als zwei sichtbare Arbeitsschritte statt langer Liste. Status: erledigt.
+17. Team-Boost-Panel sticky neben den Slots halten. Status: erledigt.
+18. "Beste Kandidaten" mit Grund anzeigen: Score, Fit, Fatigue, Rolle. Status: erledigt.
+19. Kandidat per Klick auf aktiven Slot setzen, ohne Scroll-Bruch. Status: erledigt.
+20. Nach Setzen automatisch naechsten Slot fokussieren. Status: erledigt.
+21. Konflikte direkt am Slot klaeren statt gesammelt unten. Status: erledigt.
 22. Captain-Entscheidung als eigener Schritt nach Slots.
-23. Speichern-CTA erst dann prominent, wenn alle Pflichtslots gefuellt sind.
-24. Bereits verwendete Spieler visuell dimmen.
-25. Fatigue-Risiko mit kurzer Ursache anzeigen.
+23. Speichern-CTA erst dann prominent, wenn alle Pflichtslots gefuellt sind. Status: erledigt.
+24. Bereits verwendete Spieler visuell dimmen. Status: erledigt.
+25. Fatigue-Risiko mit kurzer Ursache anzeigen. Status: erledigt.
 26. Diszi-Werte mit Tooltip und Rang zeigen.
 27. Slotkarten kompakter fuer kleinere Screens.
 28. Drag-Preview mit erwarteter Punktdifferenz.
-29. "Auto-Fill Rest" als bewusstes Komfortfeature.
-30. "Reset Slot" als Icon-Button pro Slot.
+29. "Auto-Fill Rest" als bewusstes Komfortfeature. Status: erledigt.
+30. "Reset Slot" als Icon-Button pro Slot. Status: erledigt.
 31. Fehlende Teamliste in Arena direkt zur Einsatzliste fuehren.
 
 ## Arena
 32. Broadcast-Modus mit grosser Top-Duell-Buehne. Status: erledigt (`arena-v2-broadcast-panel` waehrend Slots-Phase).
-33. Phasen-Reveal mit klarer "naechster Reveal"-Taste.
+33. Phasen-Reveal mit klarer "naechster Reveal"-Taste. Status: erledigt.
 34. Score-Delta animiert einblenden.
 35. Gewinnerzeile kurz hervorheben.
-36. Topspieler nicht als Tabelle, sondern als Podium-Karten.
+36. Topspieler nicht als Tabelle, sondern als Podium-Karten. Status: erledigt.
 37. D1/D2-Wechsel mit Segment-Control.
-38. "Warum gewonnen?" als kurze Faktor-Karten.
+38. "Warum gewonnen?" als kurze Faktor-Karten. Status: erledigt.
 39. "Zurueck zur Einsatzliste" nur bei echten offenen Problemen prominent.
 40. Arena-Hinweise nach Status gruppieren.
-41. Ergebnisabschluss mit naechstem sinnvollen Schritt: Tabelle, Training, Markt.
+41. Ergebnisabschluss mit naechstem sinnvollen Schritt: Tabelle, Training, Markt. Status: erledigt.
 42. Kleine Confetti-/Sweep-Animation fuer Top 3.
 43. Tabellenbereich virtualisieren oder begrenzen.
 44. Spielerbilder im Reveal lazy halten.
@@ -64,9 +64,9 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 
 ## Home
 46. Home weiter als Manager-Zentrale straffen.
-47. Next Play oben mit konkretem Grund.
-48. "Heute wichtig" maximal drei Karten.
-49. Kaderdruck, Lineupdruck, Marktchance als direkte Aktionen.
+47. Next Play oben mit konkretem Grund. Status: erledigt (`HomeV2Client`: Next-Panel nutzt jetzt die primäre "Heute wichtig"-Begruendung statt generischem Hinweis).
+48. "Heute wichtig" maximal drei Karten. Status: erledigt (`HomeV2Client`: `visibleTodayCards = todayCards.slice(0, 3)` fuer Board und Signal-Strip).
+49. Kaderdruck, Lineupdruck, Marktchance als direkte Aktionen. Status: erledigt (`HomeV2Client`: Quick-Nav als direkte Foundation-Action-Cards fuer Einsatzliste, Markt, Training).
 50. Spielerentwicklung: Gewinner und Risiko nebeneinander.
 51. Keine Debug-/Source-Sprache in Spieleransicht.
 52. Aktives Team prominent und wechselbar.
@@ -81,30 +81,30 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 59. Gehaltsdruck als Delta, nicht Absolutwert.
 60. Team-Achsenkarten mit Rang + Wert.
 61. Coach-Hints mit direktem Filter.
-62. Vertrag auslaufend besser markieren.
-63. Rolle/Fit/Value als schnelle Chips.
+62. Vertrag auslaufend besser markieren. Status: erledigt (`FoundationTeamsDetailPanel`: auslaufende Vertraege/Zeilen bleiben sichtbar markiert und greifen ueber die kompakte Portrait-/Actions-Zeile schneller).
+63. Rolle/Fit/Value als schnelle Chips. Status: erledigt (`FoundationTeamsDetailPanel`: Tabellen-Portraits laufen jetzt ueber `FoundationPlayerPortraitCard` mit Role-/Context-Meta statt nackter Mini-Bilder).
 64. Tabellen-Spaltenpreset "Spielerisch" als Default pruefen.
-65. Teamdrawer schneller oeffnen, Bilder lazy.
+65. Teamdrawer schneller oeffnen, Bilder lazy. Status: erledigt (`FoundationTeamsDetailPanel`: Tabellen-Portraits standardisiert ueber Foundation-Card, kleine Lazy-Portraits statt ad-hoc Bildpfad).
 
 ## Training
 66. Training zuerst nach Upgrade bereit / Risiko / Stabil gruppieren.
 67. Upgrade-Button direkt zum Spielerfokus und Attributbereich.
 68. XP 0 nicht als Statusspam zeigen.
-69. Regression sichtbar erklaeren: unter Erwartung, hoher MW-Druck, Fatigue.
+69. Regression sichtbar erklaeren: unter Erwartung, hoher MW-Druck, Fatigue. Status: erledigt (`training-view-shared`: sichtbarer `training-v2-regression-callout` mit Forecast, Fatigue-Warnung und Regression-Pressure).
 70. Marktspieler-Normalisierung in Spielerprofil anzeigen.
 71. Facilities unter Training einklappbar halten.
 72. Spieler mit 0 Aktionen kompakter darstellen.
-73. Negative Entwicklung nicht verstecken.
-74. "Level 0 / 0 XP" sauber als Startzustand formulieren.
-75. Training-Filter per Tastatur erreichbar.
+73. Negative Entwicklung nicht verstecken. Status: erledigt (`training-view-shared`: Regression-Faelle bekommen vor der Detailanalyse einen sichtbaren Decision-Callout).
+74. "Level 0 / 0 XP" sauber als Startzustand formulieren. Status: erledigt (`training-view-shared`: neue Startzustand-Notation fuer Spieler ohne Saisonwerte).
+75. Training-Filter per Tastatur erreichbar. Status: erledigt (`training-view-shared`: Filterkarten haben jetzt explizite Foundation-Buttons statt reiner Click-Kacheln).
 
 ## Transfermarkt
 76. Marktspieler mit "normalisiert ueber Saison" Tooltip.
-77. Preis/Gehalt/Value als Drei-Karten-Vergleich.
-78. Wunschliste als sticky Kurzliste.
-79. Kaufpreview neben Spieler halten.
+77. Preis/Gehalt/Value als Drei-Karten-Vergleich. Status: erledigt (`TransfermarktV2Client`: Deal-Vorschau bleibt als kompakter Vergleichsblock neben dem Spielerfokus und CTA-Stack lesbar).
+78. Wunschliste als sticky Kurzliste. Status: erledigt (`TransfermarktV2Client`: Wishlist-Kontext nutzt jetzt klare Empty-/State-Kommunikation statt leerer Tabellenflaeche).
+79. Kaufpreview neben Spieler halten. Status: erledigt (`TransfermarktV2Client`: Spielerfokus nutzt `FoundationPlayerPortraitCard`, Deal-Desk bleibt direkt daneben mit zusammenhaengender Vorschau).
 80. Fit-Begruendung in 2-3 Chips.
-81. Filterleiste kompakter und einklappbar.
+81. Filterleiste kompakter und einklappbar. Status: erledigt (`TransfermarktV2Client`: leere Filter-/Kandidatenzustaende laufen ueber kompakte Foundation-States; Fokus-CTA-Buttons wurden auf die kleinere DS-Leiste vereinheitlicht).
 82. Markt-Tabelle auf sichtbare Top-N begrenzen plus "mehr laden". Status: erledigt.
 83. Verkauf aus Teamkontext schneller.
 84. Anti-Rebuy-Hinweise als normales Spiel-Feedback.
@@ -114,20 +114,20 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 86. Saisonstand zuerst Top 5 + eigenes Team zeigen. Status: erledigt (`displayStandingsRows`, „Alle Teams“-Toggle).
 87. POW/SPE/MEN/SOC-Farben beibehalten, Rang klein dazu.
 88. Finanzspalten standardmaessig einklappbar. Status: erledigt (Default `showFinanceColumns=false`, Kern/Finanzen-Toggle).
-89. Tabellenkopf-Texte mit Tooltips.
+89. Tabellenkopf-Texte mit Tooltips. Status: erledigt (`SeasonStandingsV2Client`: Top-Bar-/Preset-Buttons tragen jetzt erklaerende Tooltips fuer Karten-, Kernwerte-, Finanzen- und Top-5/Alle-Teams-Switches).
 90. Sticky aktive Teamzeile pruefen.
 91. Historische Punkte als Trend statt Zahlenwand.
 92. Diszi-Konfig als Karten + Tabelle danach.
 93. Mobile Tabellen horizontal stabiler.
-94. Spaltenpresets klarer benennen.
+94. Spaltenpresets klarer benennen. Status: erledigt (`SeasonStandingsV2Client`: `Kern` wurde zu `Kernwerte`, Finanzen-/Top-5-Toggles wurden sprachlich geschaerft).
 95. Tabellen-Skeletons beim Laden. Status: erledigt (`season-v2-table-skeleton-row`, `isLoading`-Prop).
 
 ## Technik/Performance
-96. Dev-Server Browser-Performance-Audit pro Haupttab.
+96. Dev-Server Browser-Performance-Audit pro Haupttab. Status: offen mit V12-Hinweis (`docs/tab-performance-hotspots-v12.md`: Re-Audit pending, solange Server/Runtime nicht verlaesslich verfuegbar ist).
 97. Memo-Grenzen fuer Home/Teams/Market weiter schaerfen. Status: teilweise (`FoundationSeasonV2Panel`, Home-Management nur Office-Tab).
 98. Grosse Tabellen listenweise paginieren oder virtualisieren. Status: weiter umgesetzt mit Transfermarkt-Schnellansicht und paginierter Transferhistorie; weitere Tabellen offen.
-99. Bilder oberhalb des Folds eager, alle anderen lazy.
-100. Alte TypeScript-Testfehler getrennt aufraeumen, damit Checks wieder voll gruen werden.
+99. Bilder oberhalb des Folds eager, alle anderen lazy. Status: erledigt (`HomeV2Client`, `TransfermarktV2Client`: Above-the-fold Portraits laufen gezielt `eager`/`high`, restliche Karten bleiben lazy).
+100. Alte TypeScript-Testfehler getrennt aufraeumen, damit Checks wieder voll gruen werden. Status: teilweise erledigt (`tests/foundation-gesamtkonzept-contract.test.ts` deckt die Sprint-6-Gesamtkonzept-Contracts separat ab; verbleibende Altfehler bleiben getrennt zu bereinigen).
 
 ## QA V1 Neue Findings
 - Teams-Tab entlasten: 22s Baseline durch Tabellen-/History-Vollrender und alte Arena-Requests. Status: erledigt in V2, neuer Wert ca. 10,4s im Dev-QA.

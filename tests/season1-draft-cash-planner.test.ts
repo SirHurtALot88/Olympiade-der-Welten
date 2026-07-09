@@ -6,7 +6,9 @@ import {
   DRAFT_MAX_CASH_TO_SALARY_RATIO,
   distributeSeason1LaneSpendCaps,
   estimateSeason1DraftSalaryTotal,
+  isCashSalaryRatioInSoftBand,
   isDraftCashSalaryRatioOverCap,
+  resolveCashSalaryDraftPickGuidance,
   resolveDraftCashSalaryRatio,
   resolveDraftMaxCashAllowed,
   resolveMinPickPriceForPlan,
@@ -254,6 +256,41 @@ describe("season1 draft cash planner", () => {
       const price = resolveMinPickPriceForPlan(plan, { remainingCash: plan.targetCashLeft - 5, picksLeft: 2 });
       expect(price).toBe(0);
     });
+  });
+
+  it("isCashSalaryRatioInSoftBand accepts finance-scaled targets", () => {
+    expect(isCashSalaryRatioInSoftBand(0.5)).toBe(true);
+    expect(isCashSalaryRatioInSoftBand(0.2)).toBe(false);
+    expect(isCashSalaryRatioInSoftBand(0.8)).toBe(false);
+    expect(isCashSalaryRatioInSoftBand(0.28)).toBe(true);
+  });
+
+  it("resolveCashSalaryDraftPickGuidance pushes spend-down when hoarding", () => {
+    const guide = resolveCashSalaryDraftPickGuidance({
+      cash: 120,
+      salaryTotal: 80,
+      finances: 5,
+      remainingSlots: 2,
+      rosterAtOrAboveMin: true,
+      avgPickPrice: 22,
+    });
+    expect(guide.softRatio).toBe(0.5);
+    expect(guide.needsSpendDown).toBe(true);
+    expect(guide.minSpendPerPick).toBeGreaterThan(20);
+    expect(guide.maxCashReservePct).not.toBeNull();
+  });
+
+  it("resolveSeason1TargetCashLeft honors soft cash/salary over spend corridor", () => {
+    const targetLeft = resolveSeason1TargetCashLeft({
+      startingCash: 300,
+      spendTargetPct: 0.93,
+      finances: 5,
+      estimatedSalaryTotal: 80,
+      softTargetCashSalaryRatio: 0.5,
+      maxCashSalaryRatio: 1.25,
+    });
+    expect(targetLeft).toBe(40);
+    expect(targetLeft).toBeGreaterThan(300 * (1 - 0.93));
   });
 });
 

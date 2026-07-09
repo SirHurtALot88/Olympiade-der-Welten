@@ -613,7 +613,15 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
   const cashReserve = liquidityReserve.cashReserve;
   const rawFreeCash = Math.max(0, cash - salaryReserve - maintenanceBudget - emergencyBudget - cashReserve);
-  const recoveryBuildingNeed = context.injuryCount > 0 || context.fatigueHighCount >= 2 ? 0.08 : 0;
+  const recoveryBuildingNeed =
+    context.injuryCount > 0 || context.fatigueHighCount >= 2 || context.fatigueAvg >= 60 ? 0.12 : 0;
+  const recoveryBudgetReserve =
+    context.fatigueAvg >= 60 ||
+    context.prevSeasonAvgMatchdayFatigue >= 55 ||
+    context.injuryCount >= 3 ||
+    context.prevSeasonInjuryCount >= 8
+      ? round(Math.min(14, Math.max(8, rawFreeCash * 0.12)), 2)
+      : 0;
   const buildingBias =
     0.31 +
     (ambition >= 65 ? 0.08 : 0) +
@@ -629,7 +637,7 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
     (objectiveBias?.buyAggression ?? 0) * 0.12 -
     (objectiveBias?.budgetConservatism ?? 0) * 0.05;
   // Salary / emergency / cash reserves are the only liquidity buffers — do not haircut again.
-  const investableCash = rawFreeCash;
+  const investableCash = Math.max(0, rawFreeCash - recoveryBudgetReserve);
   const totalBias = Math.max(0.01, buildingBias + transferBias);
   // During rebuild, cap facility spend by cash rank — bottom ~8 teams in a soft 0–5 corridor (≤10),
   // richer teams up to 25; grows ~4 % per season so the band can rise over time.
@@ -716,8 +724,10 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
     } else if (facility.facilityId === "recovery_center") {
       score += context.injuryCount * 18 + context.fatigueCriticalCount * 14 + context.fatigueHighCount * 6;
       score += countTeamHardTrainingDemandPressure(gameState, context.team.teamId) * 8;
+      if (context.injuryCount >= 3) score += 22;
       if (context.prevSeasonInjuryCount >= 8) score += 20;
-      if (context.prevSeasonAvgMatchdayFatigue >= 55) score += 15;
+      if (context.prevSeasonAvgMatchdayFatigue >= 55) score += 18;
+      if (context.fatigueAvg >= 60) score += 12;
       if (context.chronicInjuryPlayerCount >= 2) score += 10;
       if (context.rosterCount >= context.identity.playerOpt + 2) score -= 6;
       positive.push("Fatigue/Injury-Druck ist hoch");
@@ -756,11 +766,12 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       !isNetPositiveIncomeFacility;
     const buildScoreThreshold =
       facility.facilityId === "recovery_center" &&
-      (context.fatigueAvg >= 65 ||
+      (context.fatigueAvg >= 60 ||
         context.fatigueHighCount >= 2 ||
+        context.injuryCount >= 3 ||
         context.prevSeasonAvgMatchdayFatigue >= 55 ||
         context.prevSeasonInjuryCount >= 8)
-        ? 32
+        ? 28
         : 45;
     const wantsBuildOrUpgrade =
       score >= buildScoreThreshold && currentLevel < facility.maxLevel && canSpend;

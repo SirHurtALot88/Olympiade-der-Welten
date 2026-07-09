@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -64,6 +64,7 @@ export type UseFoundationLiveSyncInput = {
 };
 
 export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
+  const [liveSyncStatus, setLiveSyncStatus] = useState<"connected" | "syncing" | "reconnecting" | "disconnected" | "idle">("idle");
   const {
     gameState,
     setGameState,
@@ -149,6 +150,43 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     }
     return true;
   }
+
+  useEffect(() => {
+    if (!roomContext) {
+      setLiveSyncStatus("idle");
+      return undefined;
+    }
+
+    const socket = getClientSocket();
+    function handleConnect() {
+      setLiveSyncStatus("connected");
+    }
+    function handleDisconnect() {
+      setLiveSyncStatus("disconnected");
+    }
+    function handleReconnectAttempt() {
+      setLiveSyncStatus("reconnecting");
+    }
+    function handleReconnect() {
+      setLiveSyncStatus("syncing");
+      void reloadLiveSeasonState("room_event", { compactReload: true }).finally(() => {
+        setLiveSyncStatus("connected");
+      });
+    }
+
+    setLiveSyncStatus(socket.connected ? "connected" : "reconnecting");
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.io.on("reconnect_attempt", handleReconnectAttempt);
+    socket.io.on("reconnect", handleReconnect);
+
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.io.off("reconnect_attempt", handleReconnectAttempt);
+      socket.io.off("reconnect", handleReconnect);
+    };
+  }, [roomContext]);
 
   useEffect(() => {
     if (!roomContext) {
@@ -248,6 +286,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
         }
 
         liveSaveRefreshInFlightRef.current = true;
+        setLiveSyncStatus("syncing");
         try {
           const reloaded = await reloadLiveSeasonState("local_save_version", { compactReload: true });
           if (!reloaded) {
@@ -264,6 +303,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
           }
         } finally {
           liveSaveRefreshInFlightRef.current = false;
+          setLiveSyncStatus(roomContext ? "connected" : "idle");
         }
       } catch {
         liveSaveRefreshInFlightRef.current = false;
@@ -293,5 +333,6 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
 
   return {
     reloadLiveSeasonState,
+    liveSyncStatus,
   };
 }

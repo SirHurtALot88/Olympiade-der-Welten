@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { RosterEntry } from "@/lib/data/olyDataTypes";
-import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
+import { buildContractSalarySchedule } from "@/lib/market/contract-negotiation-preview";
+import {
+  resolveOpenBuyoutCostForRoster,
+  resolveTransfermarktSellProceeds,
+} from "@/lib/market/transfermarkt-sell-proceeds";
 
 function makeRoster(overrides: Partial<RosterEntry> = {}): RosterEntry {
   return {
@@ -47,5 +51,24 @@ describe("transfermarkt-sell-proceeds", () => {
     expect(breakdown.buyoutCost).toBe(5);
     expect(breakdown.netProceeds).toBe(35);
     expect(breakdown.netProfitVsPurchase).toBe(15);
+  });
+
+  it("uses stored yearlySalarySchedule for buyout including back_loaded shape", () => {
+    const schedule = buildContractSalarySchedule({
+      annualSalary: 10,
+      contractLength: 5,
+      shape: "back_loaded",
+      seasonLabelBase: "Season 1",
+    }).yearlySalarySchedule;
+    const buyout = resolveOpenBuyoutCostForRoster({
+      rosterEntry: makeRoster({
+        contractLength: 5,
+        contractShape: "back_loaded",
+        salary: 10,
+        yearlySalarySchedule: schedule,
+      }),
+    });
+    expect(buyout).toBe(schedule.reduce((sum, row) => sum + row.salary, 0));
+    expect(schedule[4]!.salary).toBeGreaterThan(schedule[0]!.salary);
   });
 });

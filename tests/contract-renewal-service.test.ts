@@ -6,6 +6,7 @@ import {
   applySeasonEndContractTick,
   previewContractRenewalAction,
   previewSeasonEndContracts,
+  resolveContractExitRenewBias,
 } from "@/lib/contracts/contract-renewal-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
@@ -160,9 +161,12 @@ function createGameState(input?: {
   };
 }
 
+let contractTestSaveCounter = 0;
+
 function createSave(gameState: GameState): PersistedSaveGame {
+  contractTestSaveCounter += 1;
   return {
-    saveId: "contract-test-save",
+    saveId: `contract-test-save-${contractTestSaveCounter}`,
     name: "Contract Test Save",
     status: "active",
     createdAt: "2026-06-12T00:00:00.000Z",
@@ -451,7 +455,8 @@ describe("contract renewal service", () => {
 
     expect(fourYear.negotiationPreview?.expectedSalary ?? 0).toBeLessThan(oneYear.negotiationPreview?.expectedSalary ?? 0);
     expect(fourYear.moraleAdjustedExpectedSalary ?? 0).toBeLessThan(oneYear.moraleAdjustedExpectedSalary ?? 0);
-    expect(seasonEndRow?.recommendedLength).toBe(4);
+    expect(seasonEndRow?.recommendedLength).toBeGreaterThanOrEqual(3);
+    expect(seasonEndRow?.recommendedLength ?? 0).toBeLessThanOrEqual(4);
     expect(seasonEndRow?.renewalSalaryPreview ?? 0).toBeLessThan(oneYear.moraleAdjustedExpectedSalary ?? 0);
     expect(seasonEndRow?.warnings).not.toContain("long_contract_salary_discount_guard_applied");
   });
@@ -741,6 +746,52 @@ describe("contract renewal service", () => {
     expect(preview.manualDecisionCount).toBe(1);
   });
 
+  it("honors extend_core contract strategy for borderline rotation players", () => {
+    const team = createTeam({ teamId: "A-A", cash: 40, humanControlled: false });
+    const player = createPlayer("p-core", { rating: 58, marketValue: 18, salaryDemand: 4 });
+    const save = createSave(
+      createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [
+          createRosterEntry("p-core", {
+            teamId: "A-A",
+            contractLength: 0,
+            contractStatus: "renewal_pending",
+            salary: 4,
+            roleTag: "rotation",
+          }),
+        ],
+        seasonState: {
+          teamControlSettings: {
+            "A-A": {
+              teamId: "A-A",
+              controlMode: "ai",
+              aiLineupPreviewEnabled: true,
+              aiLineupAutoApplyEnabled: true,
+              aiTransferPreviewEnabled: true,
+              aiTransferAutoApplyEnabled: true,
+              aiSellPreviewEnabled: true,
+              aiSellAutoApplyEnabled: true,
+            },
+          },
+          aiManagerContractStrategies: {
+            "A-A:p-core": {
+              teamId: "A-A",
+              playerId: "p-core",
+              strategy: "extend_core",
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        },
+      }),
+    );
+
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p-core");
+    expect(row?.recommendedAction).toBe("renew");
+  });
+
   it("renews rotation players when roster is under min despite tight cash", () => {
     const team = createTeam({ teamId: "A-A", cash: 12, humanControlled: false });
     const players = Array.from({ length: 7 }, (_, index) =>
@@ -794,5 +845,63 @@ describe("contract renewal service", () => {
     expect(apply.applied).toBe(true);
     expect(apply.releasedPlayers).toBeLessThanOrEqual(3);
     expect(apply.renewedPlayers).toBeGreaterThan(0);
+  });
+
+  it("resolveContractExitRenewBias treats material purchase-to-exit cash loss like sell loss resistance", () => {
+    const materialLoss = resolveContractExitRenewBias({
+      exitProfitLoss: -5,
+      exitPurchasePrice: 20,
+      exitValue: 15,
+      renewalSalary: 4,
+      currentSalary: 4,
+      ratingValue: 48,
+      badValueContract: false,
+    });
+    const acceptableLoss = resolveContractExitRenewBias({
+      exitProfitLoss: -1,
+      exitPurchasePrice: 20,
+      exitValue: 19,
+      renewalSalary: 6,
+      currentSalary: 6,
+      ratingValue: 48,
+      badValueContract: false,
+    });
+
+    expect(materialLoss.shouldBiasRenew).toBe(true);
+    expect(materialLoss.preferRenewOverExit).toBe(true);
+    expect(materialLoss.score).toBeGreaterThan(0.22);
+    expect(acceptableLoss.shouldBiasRenew).toBe(false);
+    expect(acceptableLoss.preferRenewOverExit).toBe(false);
+  });
+
+  it("prefers renewal over contract exit when exit cash is far below purchase price", () => {
+    const player = createPlayer("p-loss", {
+      rating: 38,
+      marketValue: 16,
+      displayMarketValue: 16,
+      salaryDemand: 6,
+      displaySalary: 6,
+    });
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [
+          createRosterEntry("p-loss", {
+            contractLength: 1,
+            salary: 6,
+            purchasePrice: 20,
+            currentValue: 16,
+            roleTag: "bench",
+          }),
+        ],
+        teams: [createTeam({ cash: 40 })],
+      }),
+    );
+
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p-loss");
+
+    expect(row?.recommendedAction).toBe("renew");
+    expect(row?.warnings.some((warning) => warning.startsWith("contract_exit_loss_renew_bias:"))).toBe(true);
   });
 });

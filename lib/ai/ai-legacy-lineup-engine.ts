@@ -101,8 +101,8 @@ function getHealthLineupPenalty(strategy: AiLineupStrategy, health: RosterHealth
   let penalty = 0;
 
   if (fatigue >= 85) penalty += 12;
-  else if (fatigue >= 70) penalty += 6;
-  else if (fatigue >= 55) penalty += 2;
+  else if (fatigue >= 70) penalty += 9;
+  else if (fatigue >= 55) penalty += 3;
 
   if (injuryRiskPercent >= 25) penalty += 10;
   else if (injuryRiskPercent >= 12) penalty += 5;
@@ -110,10 +110,11 @@ function getHealthLineupPenalty(strategy: AiLineupStrategy, health: RosterHealth
 
   if (strategy === "avoid_injury") {
     penalty *= 2;
-    if (fatigue >= 65 || injuryRiskPercent >= 10) penalty += 10;
+    if (fatigue >= 65 || injuryRiskPercent >= 10) penalty += 14;
+    if (fatigue >= 80 || injuryRiskPercent >= 20) penalty += 8;
   } else if (strategy === "rotate_depth") {
     penalty *= 1.6;
-    if (fatigue >= 70) penalty += 6;
+    if (fatigue >= 70) penalty += 8;
   } else if (strategy === "protect_stars" || strategy === "captain_safe") {
     if (fatigue >= 60) penalty += 4;
   }

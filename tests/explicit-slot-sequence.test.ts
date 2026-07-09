@@ -26,7 +26,7 @@ describe("explicit-slot-sequence", () => {
     expect(sequence.indexOf("depth")).toBeLessThan(sequence.lastIndexOf("core") + 3);
   });
 
-  it("allows T-T-like 1 superstar plus stars within premium cap", () => {
+  it("allows a high premium-appetite team (1 superstar plus stars) within premium cap", () => {
     const sequence = buildExplicitSlotSequence({
       steps: 12,
       missingToMin: 0,
@@ -64,6 +64,24 @@ describe("explicit-slot-sequence", () => {
     });
     expect(sequence.length).toBe(8);
     expect(sequence.slice(0, 3).every((lane) => lane === "depth")).toBe(true);
+  });
+
+  it("plans a single star slot on small post-opt fills", () => {
+    const sequence = buildExplicitSlotSequence({
+      steps: 1,
+      missingToMin: 0,
+      targetSlotsMissing: 1,
+      superstarAllowed: 0,
+      starAllowed: 1,
+      coreNeeded: 0,
+      specialistNeeded: 0,
+      depthNeeded: 0,
+      backupNeeded: 0,
+      cheapFillNeeded: 0,
+      premiumCap: 1,
+      premiumFirst: true,
+    });
+    expect(sequence).toEqual(["star"]);
   });
 
   it("interleaveLanePyramid alternates expensive and mid lanes", () => {

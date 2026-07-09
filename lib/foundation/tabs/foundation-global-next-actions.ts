@@ -9,9 +9,11 @@ import { getGameFlowStatusClass } from "@/lib/foundation/tabs/cockpit-ui-helpers
 export type FoundationGlobalNextUiInput = {
   primaryInboxItem: GameInboxItem | null;
   gameFlowActionStep: {
+    stepId?: string;
     label: string;
     status: GameFlowStepStatus;
     blockers: string[];
+    optional?: boolean;
   };
   cockpitBusyKey: string | null;
   seasonTransitionBusy: boolean;
@@ -43,7 +45,10 @@ export function deriveGlobalNextUi(input: FoundationGlobalNextUiInput): Foundati
         ) || "Leertaste: zum blockierten Schritt springen"
       : globalNextDisabled
         ? "Aktion laeuft gerade."
-        : input.transferWindowHint.open
+        : input.gameFlowActionStep.status === "optional" &&
+            (input.gameFlowActionStep.stepId === "matchday_facilities" || input.gameFlowActionStep.stepId === "facilities")
+          ? "Leertaste: optional prüfen oder überspringen"
+          : input.transferWindowHint.open
           ? `Leertaste: Weiter · ${input.transferWindowHint.label}`
           : "Leertaste: Weiter";
   const globalNextStatusClass = input.primaryInboxItem

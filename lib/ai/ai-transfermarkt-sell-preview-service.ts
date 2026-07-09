@@ -23,6 +23,7 @@ import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermark
 import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessTeamSellRunwayPressure, estimateBuyoutLikelihood, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
+import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
@@ -68,6 +69,7 @@ export type AiSellPreviewCandidate = {
   mvs: number | null;
   salary: number | null;
   marketValue: number | null;
+  purchasePrice?: number | null;
   expectedSellValue: number | null;
   grossSalePrice?: number | null;
   buyoutCost?: number | null;
@@ -602,7 +604,15 @@ function buildCandidate(
   if (profitDelta != null && profitDelta > 0) {
     pushSell("profit_window", `realisierbarer Netto-Gewinn von ${roundValue(profitDelta, 1)}`);
   } else if (profitDelta != null && profitDelta < 0) {
-    pushKeep("sell_below_purchase", "aktueller Verkauf wuerde unter Einkauf liegen");
+    pushKeep("sell_below_purchase", "aktueller Netto-Verkauf wuerde unter Einkauf liegen");
+    const isFreshPurchase =
+      roster.joinedSeasonId != null && roster.joinedSeasonId === context.gameState.season.id;
+    if (isFreshPurchase && purchasePrice != null && purchasePrice > 0) {
+      pushKeep(
+        "sell_below_purchase",
+        `frisch gekauft (${roster.joinedSeasonId}) — Netto-Verlust ${roundValue(-profitDelta, 1)}M wuerde Teamwert schnell zerstoeren`,
+      );
+    }
   }
 
   if (underperformed) {
@@ -685,7 +695,10 @@ function buildCandidate(
   const buyoutLikelihood =
     roster.contractLength === 1
       ? estimateBuyoutLikelihood({
-          buyoutCost: Math.max(0, salary ?? 0),
+          buyoutCost: resolveOpenBuyoutCostForRoster({
+            rosterEntry: roster,
+            gameState: context.gameState,
+          }),
           teamCash: team.cash,
           baseLikelihood: 0.35 + sellAggression * 0.25,
           pressureOverride: buyoutPressureOverride,
@@ -730,6 +743,15 @@ function buildCandidate(
     strategy.avoidedHits * 6 +
     (hardNoGoHit ? 14 : 0) +
     (expectedSellValue != null && expectedSellValue <= 0 ? -40 : 0) +
+    (() => {
+      const isFreshPurchase =
+        roster.joinedSeasonId != null && roster.joinedSeasonId === context.gameState.season.id;
+      if (!isFreshPurchase || profitDelta == null || profitDelta >= 0 || purchasePrice == null || purchasePrice <= 0) {
+        return 0;
+      }
+      const lossRatio = clamp(-profitDelta / purchasePrice, 0, 1);
+      return -Math.round((12 + lossRatio * 36) * (1 + sellRunway.cashPressureScore * 0.15));
+    })() +
     nonStarterBonus * 50 -
     keepPerformanceScore * 22 -
     strategy.preferredHits * 5 -
@@ -797,6 +819,7 @@ function buildCandidate(
     mvs: playerRating?.mvs ?? null,
     salary,
     marketValue,
+    purchasePrice,
     expectedSellValue,
     grossSalePrice,
     buyoutCost,

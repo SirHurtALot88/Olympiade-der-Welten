@@ -18,6 +18,7 @@ import {
   resolveTeamCashRunwayReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
 import {
+  PLANNER_LIQUIDITY_BUFFER_MIN,
   resolveTeamSpendableCashForPlanning,
   usesSingleCashPlanningPolicy,
 } from "@/lib/ai/planner-cash-buffer-policy";
@@ -295,7 +296,12 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       });
     }
 
-    for (const row of upgradePlans) {
+    for (const row of [...upgradePlans].sort((left, right) => {
+      const leftRecovery = left.buildingType === "recovery_center" && left.currentLevel === 0 ? 1 : 0;
+      const rightRecovery = right.buildingType === "recovery_center" && right.currentLevel === 0 ? 1 : 0;
+      if (leftRecovery !== rightRecovery) return rightRecovery - leftRecovery;
+      return (right.score ?? 0) - (left.score ?? 0);
+    })) {
       const upgrade = getUpgrade(row.teamId, row.buildingType, row.buildingType === "specialist_wing" ? "mind_lab" : undefined);
       const cost = upgrade.upgradeCost ?? row.cost;
       const budgetBlockers = [
@@ -858,7 +864,12 @@ export function resolveMarketSpendableCashForPlanner(input: {
   }
 
   // S2+: single cash pool — soft 0.25–0.75× salary buffer (+ league anchor), ignore GM buckets.
+  // While below Opt (but at/above Min), only keep a tiny liquidity pad so preseason plans can execute.
   if (usesSingleCashPlanningPolicy(input.gameState)) {
+    if (belowOpt || input.forceRosterFill) {
+      const minPad = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, Math.min(12, teamCash * 0.06)), 2);
+      return round(Math.max(0, teamCash - minPad), 2);
+    }
     return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, teamCash);
   }
 

@@ -1234,6 +1234,26 @@ function formatExhaustionPoints(score: number | null | undefined, fatigue: numbe
   return `Erschöpfung F${value} · −${formatScore(penalty)} (−${formatDecimalScore(penaltyPercent, 1)}%)`;
 }
 
+function formatFatigueRiskCauseLabel(
+  fatigue: number | null | undefined,
+  warnings: string[] | null | undefined,
+  additionalFatigue?: number | null,
+) {
+  if (!isElevatedFatigue(fatigue) && !warnings?.length && !(additionalFatigue && additionalFatigue >= 3)) {
+    return "stabil";
+  }
+  if (warnings?.length) {
+    return warnings[0];
+  }
+  if ((fatigue ?? 0) >= FATIGUE_UI_HIGH) {
+    return "hohe Vorbelastung";
+  }
+  if ((additionalFatigue ?? 0) >= 4) {
+    return "Push macht ihn teurer";
+  }
+  return "mehr Last als normal";
+}
+
 function formatFatigueHint(score: number | null | undefined, count: number | null | undefined) {
   return formatExhaustionPoints(score, count);
 }
@@ -4396,6 +4416,39 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     selections,
     slots,
   ]);
+  const disciplineWorkflowSteps = useMemo(() => {
+    return (["d1", "d2"] as const).map((disciplineSide) => {
+      const requiredPlayers =
+        disciplineSide === "d1"
+          ? context?.matchdayContract?.discipline1?.requiredPlayers ?? 0
+          : context?.matchdayContract?.discipline2?.requiredPlayers ?? 0;
+      const selectedPlayers = disciplineSide === "d1" ? lineupMeta.d1Selected : lineupMeta.d2Selected;
+      const openSlots = Math.max(0, requiredPlayers - selectedPlayers);
+      const sideIssues = disciplineIssuesBySide[disciplineSide] ?? [];
+      const status =
+        openSlots === 0 ? "done" : sideIssues.some((issue) => issue.tone === "blocked") ? "blocked" : "current";
+      return {
+        key: disciplineSide,
+        label: disciplineSide === "d1" ? d1Label : d2Label,
+        selectedPlayers,
+        requiredPlayers,
+        openSlots,
+        status,
+        detail:
+          openSlots === 0
+            ? "voll besetzt"
+            : sideIssues[0]?.detail ?? `${openSlots} Slot${openSlots === 1 ? "" : "s"} noch offen`,
+      };
+    });
+  }, [
+    context?.matchdayContract?.discipline1?.requiredPlayers,
+    context?.matchdayContract?.discipline2?.requiredPlayers,
+    d1Label,
+    d2Label,
+    disciplineIssuesBySide,
+    lineupMeta.d1Selected,
+    lineupMeta.d2Selected,
+  ]);
   const lineupSaveCta = useMemo(() => {
     const blockers: string[] = [];
     if (matchdayPreviewCards.openSlots > 0 && !allAvailablePlayersDeployed) {
@@ -5666,6 +5719,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     scrollLineupTarget(`lineup-slot-${nextOpenSlot.key}`);
   }
 
+  function focusDisciplineOpenSlot(disciplineSide: "d1" | "d2") {
+    const nextSlot =
+      slots.find((slot) => slot.disciplineSide === disciplineSide && !selections[slot.key]) ??
+      slots.find((slot) => slot.disciplineSide === disciplineSide) ??
+      null;
+    if (!nextSlot) {
+      return;
+    }
+    setActiveSlotKey(nextSlot.key);
+    setFocusedDisciplineSide(nextSlot.disciplineSide);
+    setHoveredCandidate(null);
+    scrollLineupTarget(`lineup-slot-${nextSlot.key}`);
+  }
+
   function jumpToNextLineupTask() {
     if (matchdayPreviewCards.openSlots > 0) {
       focusNextOpenSlot();
@@ -5711,6 +5778,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return;
     }
     updateSelection(activeSlot.key, "");
+  }
+
+  function clearSlotSelection(slotKey: string) {
+    if (!selections[slotKey]) {
+      return;
+    }
+    updateSelection(slotKey, "");
   }
 
   function updateSelection(
@@ -5930,7 +6004,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setHoveredCandidate(null);
     setMessage(
       filledCount > 0
-        ? `${filledCount} offene Slots mit den besten verfuegbaren Kandidaten gefuellt (Score-Projektion +${projectedScoreGain.toFixed(1)} gesamt). Captain bleibt bewusst manuell, Saisonlimit ${captainSeasonUsedWithDraft}/${captainSeasonLimit}.`
+        ? `${filledCount} offene Slots per Auto-Fill Rest gefuellt (Score-Projektion +${projectedScoreGain.toFixed(1)} gesamt). Undo ist direkt verfuegbar, Captain bleibt bewusst manuell (${captainSeasonUsedWithDraft}/${captainSeasonLimit}).`
         : "Keine offenen Slots oder keine legalen Kandidaten gefunden.",
     );
   }
@@ -6996,14 +7070,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     : "Fuellt offene Slots mit den besten legalen Sofort-Picks."
               }
             >
-              Slots füllen
+              Auto-Fill Rest
             </button>
               <button
               className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`}
               type="button"
               data-testid="lineup-save-button"
               onClick={() => void handleSaveDraft()}
-              disabled={isBusy || isReadOnly}
+              disabled={isBusy || isReadOnly || !lineupReadyToSave}
               title={lineupSaveCta.detail}
             >
               {lineupSaveCta.buttonLabel}
@@ -7083,7 +7157,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             className={`legacy-lineup-flow-card${lineupSaveCta.tone === "ready" ? " is-ready" : lineupSaveCta.tone === "blocked" ? " is-blocked" : " is-warning"}`}
             type="button"
             onClick={() => void handleSaveDraft()}
-            disabled={isBusy || isReadOnly}
+            disabled={isBusy || isReadOnly || !lineupReadyToSave}
             title={lineupSaveCta.detail}
           >
             <span>Abschluss</span>
@@ -7272,14 +7346,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   : "Füllt alle offenen Slots mit den besten legalen Sofort-Picks."
             }
           >
-            Offene Slots füllen
+            Auto-Fill Rest
           </button>
           <button
             className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`}
             type="button"
             data-testid="lineup-save-button"
             onClick={() => void handleSaveDraft()}
-            disabled={isBusy || isReadOnly}
+            disabled={isBusy || isReadOnly || !lineupReadyToSave}
             title={lineupSaveCta.detail}
           >
             {lineupSaveCta.buttonLabel}
@@ -7435,7 +7509,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <button className="secondary-button" type="button" onClick={handleAutoFillOpenSlots} disabled={isBusy || slots.every((slot) => Boolean(selections[slot.key]))}>
                 Auto-Fill
               </button>
-              <button className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`} type="button" data-testid="lineup-save-button" onClick={() => void handleSaveDraft()} disabled={isBusy || isReadOnly}>
+              <button className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`} type="button" data-testid="lineup-save-button" onClick={() => void handleSaveDraft()} disabled={isBusy || isReadOnly || !lineupReadyToSave}>
                 {lineupSaveCta.buttonLabel}
               </button>
             </div>
@@ -8224,16 +8298,30 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                     },
                                   }}
                                   footerSlot={
-                                    <button
-                                      type="button"
-                                      className="secondary-button inline-button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        setActiveSlotKey(slot.key);
-                                      }}
-                                    >
-                                      Tauschen
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="secondary-button inline-button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setActiveSlotKey(slot.key);
+                                        }}
+                                      >
+                                        Tauschen
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="table-icon-button"
+                                        aria-label={`${formatLineupSlotLabel(slot.key)} leeren`}
+                                        title="Reset Slot"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          clearSlotSelection(slot.key);
+                                        }}
+                                      >
+                                        x
+                                      </button>
+                                    </>
                                   }
                                 />,
                                 selectedRosterCard,
@@ -8355,7 +8443,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   type="button"
                   data-testid="lineup-save-button"
                   onClick={() => void handleSaveDraft()}
-                  disabled={isBusy || isReadOnly}
+                  disabled={isBusy || isReadOnly || !lineupReadyToSave}
                   title={lineupSaveCta.detail}
                 >
                   {lineupSaveCta.buttonLabel}
@@ -8494,13 +8582,67 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               ) : null}
             </div>
           </div>
+          <div className="legacy-lineup-discipline-workflow" aria-label="D1 und D2 Arbeitsschritte">
+            {disciplineWorkflowSteps.map((step, index) => (
+              <button
+                key={step.key}
+                type="button"
+                className={`legacy-lineup-discipline-step is-${step.status}${focusedDisciplineSide === step.key ? " is-focused" : ""}`}
+                onClick={() => focusDisciplineOpenSlot(step.key)}
+                title={step.detail}
+              >
+                <span>Schritt {index + 1}</span>
+                <strong>{step.key.toUpperCase()} · {step.label}</strong>
+                <small>
+                  {step.selectedPlayers}/{step.requiredPlayers || "—"} · {step.openSlots === 0 ? "bereit" : `${step.openSlots} offen`}
+                </small>
+              </button>
+            ))}
+          </div>
+          <div className="legacy-lineup-team-boost-panel is-split legacy-lineup-team-boost-sticky" data-testid="legacy-lineup-focus-boost-panel">
+            {(["d1", "d2"] as const).map((disciplineSide) => {
+              const discipline =
+                disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
+              const intensity = getDisciplineIntensity(disciplineSide);
+              const intensityConfig = getMatchdayIntensityConfig(intensity);
+              return (
+                <div key={`focus-discipline-intensity-${disciplineSide}`} className={`legacy-lineup-discipline-intensity is-${intensity}`}>
+                  <div>
+                    <span className="legacy-lineup-team-boost-kicker">Team-Boost</span>
+                    <strong>{disciplineSide.toUpperCase()} · {discipline?.displayName ?? "Diszi"}</strong>
+                    <small>
+                      Score {formatSignedCompactInteger(intensityConfig.scoreModifier)} · Fatigue +{formatScore(intensityConfig.fatigueBase)}
+                    </small>
+                  </div>
+                  <div className="legacy-lineup-team-boost-switch" role="group" aria-label={`${disciplineSide.toUpperCase()} Boost`}>
+                    {([
+                      { value: "conserve" as const, label: "Schonen" },
+                      { value: "normal" as const, label: "Normal" },
+                      { value: "push" as const, label: "Push" },
+                    ]).map((option) => (
+                      <button
+                        key={`${disciplineSide}-focus-${option.value}`}
+                        className={`secondary-button inline-button${intensity === option.value ? " is-selected" : ""}`}
+                        type="button"
+                        disabled={isReadOnly || isBusy}
+                        onClick={() => updateDisciplineIntensityStage(disciplineSide, option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           {activeSlot && activeSlotSpotlightGroups.length ? (
             <div className="legacy-lineup-active-candidate-rail" aria-label="Beste Kandidaten fuer aktiven Slot">
               <div className="legacy-lineup-active-candidate-copy">
-                <span>Direkt spielbar</span>
+                <span>Beste Kandidaten</span>
                 <strong>
                   {activeSlot.disciplineSide.toUpperCase()}-{activeSlot.slotIndex + 1}
                 </strong>
+                <small>Klick setzt direkt und fokussiert den naechsten offenen Slot.</small>
               </div>
               <div className="legacy-lineup-active-candidate-list">
                 {activeSlotSpotlightGroups.map((group) => (
@@ -8509,7 +8651,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     {group.entries.map((candidate, index) => (
                   <button
                     key={`active-slot-candidate-${activeSlot.key}-${candidate.player.activePlayerId}`}
-                    className={`legacy-lineup-active-candidate-button${hoveredCandidate?.slotKey === activeSlot.key && hoveredCandidate.activePlayerId === candidate.player.activePlayerId ? " is-previewed" : ""}`}
+                    className={`legacy-lineup-active-candidate-button${candidate.player.selectedSides.length > 0 ? " is-used-player" : ""}${hoveredCandidate?.slotKey === activeSlot.key && hoveredCandidate.activePlayerId === candidate.player.activePlayerId ? " is-previewed" : ""}`}
                     type="button"
                     onMouseEnter={() => candidate.player.activePlayerId && scheduleHoveredCandidate({ slotKey: activeSlot.key, activePlayerId: candidate.player.activePlayerId })}
                     onMouseLeave={() => setHoveredCandidate(null)}
@@ -8530,6 +8672,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       {candidate.activeSlotCandidate?.scoreDelta != null
                         ? ` · ${candidate.activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.activeSlotCandidate.scoreDelta, 1)}`
                         : ""}
+                    </small>
+                    <small className="legacy-lineup-candidate-detail-row">
+                      Score {formatNullableScore(candidate.activeSlotCandidate?.projectedScore)} · Fit {candidate.activeSlotCandidate?.fitSummary ?? candidate.detail} · Fatigue{" "}
+                      {formatFatigueRiskCauseLabel(
+                        candidate.player.fatigueCount,
+                        candidate.activeSlotCandidate?.warnings ?? [],
+                        candidate.activeSlotCandidate?.additionalFatigue,
+                      )} · Rolle {(slotRoleByKey.get(activeSlot.key) ?? null)?.label ?? "Standard"}
                     </small>
                     <LegacyLineupCandidateReasonChips
                       chips={buildCandidateAxisReasonChips(slotRoleByKey.get(activeSlot.key) ?? null, candidate.player)}
@@ -8652,7 +8802,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     return (
                       <article
                         key={`card-${player.id}`}
-                        className={`legacy-matchday-player-card is-portrait-card${player.selectedSides.length > 0 ? " is-selected" : ""}${activeSlotCandidate && !activeSlotCandidate.blockReason ? " is-active-slot-fit" : ""}${isPreviewedCandidate ? " is-previewed" : ""}`}
+                        className={`legacy-matchday-player-card is-portrait-card${player.selectedSides.length > 0 ? " is-selected is-used-player" : ""}${activeSlotCandidate && !activeSlotCandidate.blockReason ? " is-active-slot-fit" : ""}${isPreviewedCandidate ? " is-previewed" : ""}`}
                         draggable={Boolean(player.activePlayerId)}
                         title={[
                           `${player.discipline1Label}: ${player.topAttributesD1.map((attribute) => `${attribute.shortLabel} ${attribute.ratingLabel ?? "—"}`).join(" · ")}`,
@@ -9380,6 +9530,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                     </small>
                                   </div>
                                   <div className="legacy-lineup-slot-summary-card">
+                                    <span>Fatigue-Risiko</span>
+                                    <strong>{formatFatigueRiskCauseLabel(selectedOption?.fatigueCount, slotPreview?.projected.warnings ?? [], slotPreview?.projected.additionalFatigue)}</strong>
+                                    <small>
+                                      {selectedRosterCard
+                                        ? `${formatFatigueImpactDetail(selectedOption?.fatigueCount)} · Extra +${slotPreview?.projected.additionalFatigue ?? 0}`
+                                        : "Spieler fehlt"}
+                                    </small>
+                                  </div>
+                                  <div className="legacy-lineup-slot-summary-card">
                                     <span>Slot-Signale</span>
                                     <strong>
                                       {formatIntensityStageLabel(intensity)}
@@ -9443,7 +9602,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                         <small>{candidate.scoreDelta >= 0 ? "+" : ""}{formatDecimalScore(candidate.scoreDelta, 1)}</small>
                                       ) : null}
                                       <LegacyLineupCandidateReasonChips chips={candidate.reasonChips} />
-                                      <small>{candidate.fitSummary}</small>
+                                      <small>
+                                        {candidate.fitSummary} · Risiko{" "}
+                                        {formatFatigueRiskCauseLabel(
+                                          rosterCardByActivePlayerId.get(candidate.activePlayerId)?.fatigueCount ?? null,
+                                          candidate.warnings,
+                                          null,
+                                        )}
+                                      </small>
                                     </button>
                                   ))}
                                 </div>
@@ -9562,6 +9728,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                         Rivalen
                                       </span>
                                     ) : null}
+                                    <span className="legacy-lineup-slot-attribute-pill is-fatigue-risk" title={formatFatigueImpactDetail(selectedOption?.fatigueCount)}>
+                                      Risiko {formatFatigueRiskCauseLabel(selectedOption?.fatigueCount, slotPreview?.projected.warnings ?? [], slotPreview?.projected.additionalFatigue)}
+                                    </span>
                                     {selectedRosterCard.demands
                                       .filter((demand) => !demand.targetDisciplineId || demand.targetDisciplineId === slot.disciplineId)
                                       .slice(0, 1)

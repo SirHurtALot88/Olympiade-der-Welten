@@ -37,6 +37,9 @@ import {
   teamHasCashBufferRebuildFocus,
 } from "@/lib/ai/ai-team-cash-reserve-service";
 import {
+  resolveCashSalaryDraftPickGuidance,
+} from "@/lib/ai/season1-draft-cash-planner";
+import {
   shouldBlockEmergencyPathAtOpt,
   strategicPoolHasReserveLaneCandidates,
 } from "@/lib/ai/planner-opt-buy-policy";
@@ -866,6 +869,8 @@ function buildPhasePlan(input: {
   teamTarget: ReturnType<typeof getTeamTarget>;
   targetPlan?: RosterTargetPlan | null;
   teamCash: number;
+  teamSalarySum?: number;
+  teamFinances?: number | null;
   strategyProfile: TeamStrategyProfile | null | undefined;
   candidatePool: Candidate[];
   rebuildFocusActive?: boolean;
@@ -891,6 +896,17 @@ function buildPhasePlan(input: {
     input.targetPlan?.softSlotBudget && input.targetPlan.softSlotBudget > 0
       ? input.targetPlan.softSlotBudget
       : plannedSpendableCash / remainingSlots;
+  const cashSalaryGuide =
+    input.teamSalarySum != null && input.teamSalarySum > 0
+      ? resolveCashSalaryDraftPickGuidance({
+          cash: input.teamCash,
+          salaryTotal: input.teamSalarySum,
+          finances: input.teamFinances,
+          remainingSlots,
+          rosterAtOrAboveMin: input.rosterCount >= input.teamTarget.playerMin,
+          avgPickPrice: plannedSoftSlotBudget,
+        })
+      : null;
 
   if (phase === "phase_a_minimum") {
     let reservePct = Math.min(0.13, plannedReservePct ?? 0.07);
@@ -916,28 +932,42 @@ function buildPhasePlan(input: {
     if (input.rebuildFocusActive) {
       reservePct = roundValue(Math.max(0.02, reservePct * 0.45), 3);
     }
+    if (cashSalaryGuide?.maxCashReservePct != null) {
+      reservePct = roundValue(Math.min(reservePct, cashSalaryGuide.maxCashReservePct), 3);
+    }
     const shortlistCap = Math.round(56 + starBias * 4 + valueBias * 2);
+    let maxRecommendedSpend = Math.max(1, plannedSoftSlotBudget * activeSpendMultiplier);
+    if (cashSalaryGuide != null && cashSalaryGuide.minSpendPerPick > 0) {
+      maxRecommendedSpend = Math.max(maxRecommendedSpend, cashSalaryGuide.minSpendPerPick * 1.12);
+    }
     return {
       phase,
       targetRoster,
       cashReservePct: reservePct,
       shortlistCap,
-      maxRecommendedSpend: Math.max(1, plannedSoftSlotBudget * activeSpendMultiplier),
+      maxRecommendedSpend,
       qualityFloor: 0,
-      description: `Core/Optimum: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; Teamfit, Qualitaet und Needs.`,
+      description: `Core/Optimum: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; cash/salary=${cashSalaryGuide?.cashSalaryRatio ?? "?"}; Teamfit, Qualitaet und Needs.`,
     };
   }
 
   const fallbackReservePct = Math.max(0.14, Math.min(0.28, 0.25 + cashBias * 0.006 - depthBias * 0.01));
-  const reservePct = roundValue(Math.max(0.08, Math.min(0.42, plannedReservePct ?? fallbackReservePct)), 3);
+  let reservePct = roundValue(Math.max(0.08, Math.min(0.42, plannedReservePct ?? fallbackReservePct)), 3);
+  if (cashSalaryGuide?.maxCashReservePct != null) {
+    reservePct = roundValue(Math.min(reservePct, cashSalaryGuide.maxCashReservePct), 3);
+  }
+  let maxRecommendedSpend = Math.max(1, plannedSoftSlotBudget * 0.9);
+  if (cashSalaryGuide != null && cashSalaryGuide.minSpendPerPick > 0) {
+    maxRecommendedSpend = Math.max(maxRecommendedSpend, cashSalaryGuide.minSpendPerPick);
+  }
   return {
     phase,
     targetRoster,
     cashReservePct: reservePct,
     shortlistCap: Math.round(32 + depthBias * 3),
-    maxRecommendedSpend: Math.max(1, plannedSoftSlotBudget * 0.9),
+    maxRecommendedSpend,
     qualityFloor: 0,
-    description: `Depth/Luxus: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; Rotation und Cash-Absicherung.`,
+    description: `Depth/Luxus: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; cash/salary=${cashSalaryGuide?.cashSalaryRatio ?? "?"}; Rotation und Cash-Absicherung.`,
   };
 }
 
@@ -2333,6 +2363,7 @@ function scoreCandidateForTeam(input: {
   teamNeedState?: TeamNeedState | null;
   rosterClassCounts?: Map<string, number>;
   counters?: RedraftCandidateCounters;
+  cashSalarySpendBoost?: number;
 }): ScoredCandidate {
   const identityFit = getIdentityFit(input.candidate, input.teamIdentity);
   const premiumAxisFit = computePreferredAxisFit(input.candidate, input.teamIdentity);
@@ -2421,7 +2452,8 @@ function scoreCandidateForTeam(input: {
     playerId: input.candidate.player.id,
     phase: input.phase,
   });
-  const selectedScore = roundValue(phaseScore + draftVariance, 4);
+  const cashSalarySpendBoost = input.cashSalarySpendBoost ?? 0;
+  const selectedScore = roundValue(phaseScore + draftVariance + cashSalarySpendBoost, 4);
   const strongestAxis = marginalNeedGain?.bestAxis?.toUpperCase() ?? [
     ["POW", input.candidate.pow],
     ["SPE", input.candidate.spe],
@@ -4711,18 +4743,39 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       const managerProfile = managerProfiles.get(team.teamId) ?? null;
       const seasonStrategy = seasonStrategies.get(team.teamId) ?? null;
       const rosterBlueprint = rosterBlueprints.get(team.teamId) ?? null;
+      const teamSalarySum = getRosterSalary(teamRoster);
+      const cashSalaryGuide = resolveCashSalaryDraftPickGuidance({
+        cash: latestTeam.cash,
+        salaryTotal: teamSalarySum,
+        finances: teamIdentity?.finances,
+        remainingSlots: Math.max(1, teamTarget.playerOpt - rosterCount),
+        rosterAtOrAboveMin: rosterCount >= teamTarget.playerMin,
+      });
       const phasePlan = buildPhasePlan({
         target,
         rosterCount,
         teamTarget,
         targetPlan,
         teamCash: latestTeam.cash,
+        teamSalarySum,
+        teamFinances: teamIdentity?.finances,
         strategyProfile,
         candidatePool,
         rebuildFocusActive: teamHasCashBufferRebuildFocus(runContext.save.gameState, team.teamId),
       });
+      let effectiveTargetRoster = phasePlan.targetRoster;
+      if (
+        rosterCount >= effectiveTargetRoster &&
+        (cashSalaryGuide.needsSpendDown || cashSalaryGuide.mustSpendDown) &&
+        rosterCount < teamTarget.playerMax
+      ) {
+        effectiveTargetRoster = Math.min(
+          teamTarget.playerMax,
+          rosterCount + cashSalaryGuide.extraRosterSlotsForSpendDown,
+        );
+      }
 
-      if (rosterCount >= phasePlan.targetRoster) {
+      if (rosterCount >= effectiveTargetRoster) {
         warningRows.push({
           round,
           teamId: team.teamId,
@@ -4883,8 +4936,15 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         needState: teamNeedState,
       });
       const baseScoredCandidates = strategicPool.pool
-        .map((candidate) =>
-          scoreCandidateForTeam({
+        .map((candidate) => {
+          const price = candidate.marketValue ?? 0;
+          const spendBoost =
+            cashSalaryGuide.minSpendPerPick > 0 && price >= cashSalaryGuide.minSpendPerPick * 0.82
+              ? Math.min(28, (price / Math.max(cashSalaryGuide.minSpendPerPick, 1)) * 8)
+              : cashSalaryGuide.needsSpendDown && price + 0.01 < cashSalaryGuide.minSpendPerPick * 0.55
+                ? -Math.min(18, cashSalaryGuide.minSpendPerPick - price)
+                : 0;
+          return scoreCandidateForTeam({
             candidate,
             roster: teamRoster,
             gameState: runContext.save.gameState,
@@ -4896,8 +4956,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             draftSalt: `${save.saveId}:${params.mode}`,
             teamNeedState,
             counters,
-          }),
-        )
+            cashSalarySpendBoost: spendBoost,
+          });
+        })
         .sort((left, right) => {
           if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
           return compareScoredCandidateTie(left, right, `round:${round}:${team.teamId}`);

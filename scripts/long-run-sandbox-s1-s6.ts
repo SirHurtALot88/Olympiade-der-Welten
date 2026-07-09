@@ -11,6 +11,7 @@ import {
   runCompareRescueBeforeEmergencyRepair,
   runEmergencyRosterRepairForTeams,
 } from "@/lib/ai/ai-market-plan-convergence-service";
+import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
@@ -676,6 +677,25 @@ async function runCanonicalPreseasonStart(saveId: string, seasonId: string, pers
     save = classBackfill.save;
   }
 
+  save = persistence.getSaveById(saveId) ?? save;
+  const belowMinAfterPreseason = getAllTeamsBelowMinIds(save.gameState);
+  if (belowMinAfterPreseason.length > 0) {
+    const finalRosterRepair = emergencyRepairRosterMinimumBeforeSeasonStart(
+      saveId,
+      seasonId,
+      persistence,
+      belowMinAfterPreseason,
+    );
+    performanceRows.push(...finalRosterRepair.performanceRows);
+    if (finalRosterRepair.blockers.length > 0) {
+      rosterRepair.blockers.push(...finalRosterRepair.blockers);
+    }
+    if (finalRosterRepair.warnings.length > 0) {
+      rosterRepair.warnings.push(...finalRosterRepair.warnings);
+    }
+    rosterRepair.purchases.push(...finalRosterRepair.purchases);
+  }
+
   return {
     performanceRows,
     blockers: [...manager.blockers, ...rosterRepair.blockers],
@@ -832,6 +852,17 @@ function emergencyRepairRosterMinimumBeforeSeasonStart(
   const uniqueTeamIds = resolveEmergencyRepairTeamIds(save.gameState, teamIds);
   if (uniqueTeamIds.length === 0) {
     return { performanceRows, blockers: [] as string[], warnings: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
+  }
+  if (!isEmergencyRosterRepairEnabled()) {
+    recordPhase(performanceRows, {
+      seasonId: effectiveSeasonId,
+      phase: "season start emergency roster repair",
+      startedAt: Date.now(),
+      itemCount: 0,
+      status: "skipped",
+      note: "emergency_repair_disabled_default",
+    });
+    return { performanceRows, blockers: [] as string[], warnings: ["emergency_repair_disabled_default"], purchases: [] as Array<Record<string, unknown>>, repaired: false };
   }
   if (!isTransferActionAllowed(effectiveSeasonId, "preseason_roster_repair")) {
     const belowMinIds = getAllTeamsBelowMinIds(save.gameState);

@@ -110,8 +110,13 @@ describe("ai budget deploy service", () => {
     expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-3")).toBe(true);
   });
 
+  it("flags at-opt teams over soft cash/salary target for deploy", () => {
+    const gameState = buildRichOptTeamGameState(80);
+    expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-2")).toBe(true);
+  });
+
   it("stops deploy demand once cash is at hoard cap", () => {
-    const gameState = buildRichOptTeamGameState(54);
+    const gameState = buildRichOptTeamGameState(39);
     expect(isCashHoardingTeam(gameState, "T-1", "season-3")).toBe(false);
     expect(teamNeedsPostOptUpgradeDeploy(gameState, "T-1", "season-3")).toBe(false);
   });

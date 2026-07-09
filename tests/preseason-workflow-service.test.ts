@@ -411,6 +411,24 @@ describe("pre-season workflow service", () => {
     expect(Object.keys(savedState.seasonState.boardConfidence ?? {})).toHaveLength(savedState.teams.length);
   });
 
+  it("resets rostered player fatigue to 0 on lightweight next-season setup", () => {
+    const sourceSave = save();
+    sourceSave.gameState.players = sourceSave.gameState.players.map((player) => ({ ...player, fatigue: 88 }));
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+
+    const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!savedState) throw new Error("Expected lightweight next season setup to persist state.");
+    const rosterPlayerIds = new Set(savedState.rosters.map((entry) => entry.playerId));
+    for (const player of savedState.players) {
+      if (!rosterPlayerIds.has(player.id)) continue;
+      expect(player.fatigue ?? 0).toBe(0);
+    }
+  });
+
   it("pulls free agents gradually back toward their original baseline next season", () => {
     const sourceSave = save();
     const freeAgent = createPlayer({

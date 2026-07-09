@@ -241,6 +241,9 @@ export function getTeamPlannerRosterTarget(gameState: GameState, teamId: string)
   let target = playerOpt;
   target = resolvePostOptPlannerRosterTarget(gameState, teamId, playerOpt);
   const { fatigued, injured } = countTeamFatigueStress(gameState, teamId);
+  if (fatigued >= 1 || injured >= 1) {
+    target = Math.min(playerMax, Math.max(target, playerOpt));
+  }
   if (fatigued >= 2 || injured >= 2) {
     target = Math.min(playerMax, target + 1);
   }
@@ -253,7 +256,7 @@ export function getTeamPlannerRosterTarget(gameState: GameState, teamId: string)
   if (rosterCount < playerOpt) {
     return Math.max(playerMin, Math.min(playerMax, playerOpt));
   }
-  if (cashTight && rosterCount >= playerMin && spendable < 6) {
+  if (cashTight && rosterCount >= playerMin && spendable < 6 && fatigued < 2 && injured < 2) {
     target = Math.max(playerMin, target - 1);
   }
 

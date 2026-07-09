@@ -18,6 +18,7 @@ import {
   TrainingAttributeForecastGrid,
   TrainingBudgetBreakdownDisclosure,
 } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import type {
   TrainingClassOption,
   TrainingModeOption,
@@ -124,7 +125,12 @@ export default function PlayerTrainingControls({
 
       <div className="training-v2-rider-forecast-row player-training-controls-forecast">
         <div title={statForecastTooltip}>
-          <span>Stat Forecast</span>
+          <TooltipHeading
+            as="span"
+            tooltip="Trainingsplan zeigt die laufende Saison-Prognose aus Training, Performance und Regression. Das Entwicklungsziel bleibt die Saisonende-Sicht auf Attribute, Klasse und Potential."
+          >
+            Trainingsplan (laufende Saison)
+          </TooltipHeading>
           <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
             {row.organicForecast.netSetpoints > 0 ? "+" : ""}
             {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
@@ -164,9 +170,16 @@ export default function PlayerTrainingControls({
 
       <TrainingBudgetBreakdownDisclosure row={row} />
 
+      {row.trainingIntensityLockWarning && !trainingIntensityLocked && !readOnly ? (
+        <p className="muted training-v2-intensity-lock-note" role="status">
+          Vorsaisonfenster laeuft noch: Trainingsmodus bleibt bis zum ersten Result offen und sperrt danach fuer den Rest der Saison.
+          Trainingsklasse bleibt weiter anpassbar.
+        </p>
+      ) : null}
+
       {trainingIntensityLocked && !readOnly ? (
         <p className="muted training-v2-intensity-lock-note" role="status">
-          Trainingsintensitaet fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich.
+          Trainingsmodus fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich. Trainingsklasse bleibt weiter anpassbar.
         </p>
       ) : null}
 

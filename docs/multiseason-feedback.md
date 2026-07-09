@@ -5,7 +5,27 @@
 **Save:** `fresh-season-1-1782677167840` (S1-Draft-Start nach Spend-Policy-Fix)
 **Output:** `outputs/realistic-5y/fresh-season-1-1782677167840-20260628-223008/`
 
-## Lauf-Setup & Nachvollziehbarkeit
+## Pre-Fatigue-Fix Baseline (Buy/Sell abgeschlossen, Juli 2026)
+
+Referenz für den nächsten Balancing-Block (Audit + Fatigue/Reha/Training):
+
+| Metrik | Wert | Quelle |
+| --- | ---: | --- |
+| Save (Ende S2) | `fresh-season-1-1783539770321` | `outputs/s1-s2-transfer-smoke-2026-07-08T19-42-49/` |
+| S2→S3 W-L Markt-P/L (vor Fix) | −60,5M (7 Verkäufe) | `outputs/next-season-2026-07-08T20-24-29/` |
+| S2→S3 W-L Markt-P/L (nach Fresh-Buy-Tendenz) | −23,1M (4 Verkäufe) | `outputs/next-season-2026-07-08T21-20-05/` |
+| Reha L1+ (Fix-Run S2 Preseason) | 2/32 | Fix-Run 29.06.2026 unten |
+| Ø Fatigue S1–S5 | ~81 | v1 Realistic-Run |
+| trainingMode none (S5 Ende) | 43 | v1 Realistic-Run |
+
+Audit-Befehle:
+
+```bash
+npx tsx scripts/multiseason-final-audit.ts --save-id <save-id>
+npx tsx scripts/export-fatigue-injury-audit.ts --save-id <save-id>
+npx tsx scripts/dump-facility-levels.ts --save-id <save-id>
+```
+
 
 | Phase | Wie | Status |
 | --- | --- | --- |
@@ -335,4 +355,129 @@ node --import tsx scripts/pick-audit-preseason-fast.ts
 ```
 
 Artefakte: `pick-audit-teams.csv`, `pick-audit-slots.csv`, `pick-audit-picks.csv`, `pick-audit-rejected.csv`, `pick-audit-summary.md`
+
+---
+
+## Audit v2 — Implementierung (Juli 2026)
+
+**Status:** Balancing-Block implementiert (Audit-Instrumentierung, Reha/Training/Fatigue, Verträge). **Full S1→S5 Resilient-Run** steht als manueller Follow-up aus (~1–2h Laufzeit).
+
+### Umgesetzt
+
+| Bereich | Änderung |
+| --- | --- |
+| Audit | `multiseason-final-audit.ts`: `leagueKpis` (Reha, Fatigue, trainingMode none, deploy %) |
+| Audit | `export-fatigue-injury-audit.ts`: `--save-id`, `--output-dir` |
+| P0 | Facility-Gate RED bei `events=0 && teams<4`; Preseason-API `set_player_training_classes` |
+| Reha | Stärkerer Score/Threshold, Budget-Reserve, Reha-first Deploy-Sort |
+| Fatigue | Recovery 20→24, Load 12→11, Reha-Bonus L1 +3, Lineup-Rotation stärker |
+| Training | Backfill bei Buy; differenzierter Modus bei hoher Fatigue |
+| Verträge | `extend_core` → Renew auch bei Grenzfällen |
+
+### Baseline KPI (Save Ende S2, vor neuem Lauf)
+
+Save: `fresh-season-1-1783539770321` · `outputs/s1-s2-transfer-smoke-2026-07-08T19-42-49/`
+
+| KPI | Baseline |
+| --- | ---: |
+| Reha L1+ | 0/32 |
+| trainingMode none | 53 |
+| Ø Fatigue (Preseason) | 0 |
+| Facility events | 39 |
+| Teams mit Gebäuden | 23/32 |
+
+### Ziel KPI v2 (nach Resilient-Run)
+
+| KPI | Ziel |
+| --- | ---: |
+| Reha L1+ | ≥ 8/32 |
+| Ø Fatigue Saisonende | < 65 |
+| trainingMode none | 0 |
+| Contract-Exits S1–S5 | < 250 |
+
+```bash
+npx tsx scripts/run-resilient-multiseason.ts --fresh --seasons 5 --output-dir outputs/resilient-s1s5-<timestamp>
+npx tsx scripts/multiseason-final-audit.ts --save-id <new-save> --history
+npx tsx scripts/export-multiseason-rebuy-report.ts --save-id <new-save> --output-dir outputs/resilient-s1s5-<timestamp>
+```
+
+---
+
+## Audit v3 — Fresh S1→S5 (Juli 2026)
+
+**Status:** **SUCCESS** — Save `fresh-season-1-1783576078834`, Output [`outputs/resilient-s1s5-2026-07-09T07-50-00/`](outputs/resilient-s1s5-2026-07-09T07-50-00/), Audit [`outputs/multiseason-final-audit-fresh-season-1-1783576078834.json`](outputs/multiseason-final-audit-fresh-season-1-1783576078834.json).
+
+S1–S5 `season_completed`. S5 pausierte einmal bei `roster_min_before_md1` (P-C 7/8) → Fix + Resume erfolgreich.
+
+### KPI v3 vs. Ziel
+
+| KPI | Ziel v2 | Ergebnis v3 | Urteil |
+| --- | ---: | ---: | --- |
+| Reha L1+ | ≥ 8/32 | **12/32** | PASS |
+| Ø Fatigue (S5 Ende) | < 65 | **70.3** | WARN (v1: ~81) |
+| trainingMode none | 0 | **0** | PASS |
+| Contract-Exits S1–S5 | < 250 | **365** | WARN |
+| Teams mit Gebäuden | ≥ 4 | **31/32** | PASS |
+| Facility events | > 0 | **317** | PASS |
+| Rebuy-Paare (cross-season) | messen | **39** (20 Teams) | dokumentiert |
+| Same-Season-Rebuy | 0 erwartet | **0** | PASS |
+
+### Rebuy-Highlights (Top 3)
+
+| Team | Spieler | Saisons gekauft |
+| --- | --- | --- |
+| L-K | Grossmutter Igid | S1, S3, S4, S5 (4×) |
+| U-A | Cpt Sleepers | S1, S3, S4, S5 (4×) |
+| C-C | Kyras | S3, S4, S5 (3×) |
+
+Vollständiger Report: `outputs/resilient-s1s5-2026-07-09T07-50-00/multiseason-rebuy-report.json`
+
+Resume bei Pause:
+```bash
+NODE_OPTIONS="--max-old-space-size=8192" OLY_LONG_RUN_ALLOW_DEV_SERVER=1 \
+  npx tsx scripts/run-resilient-multiseason.ts \
+  --save-id fresh-season-1-1783576078834 --seasons 5 \
+  --output-dir outputs/resilient-s1s5-2026-07-09T07-50-00
+```
+
+### Speicher-Cleanup (Retention)
+
+| Behalten | Grund |
+| --- | --- |
+| `outputs/s1-s2-transfer-smoke-2026-07-08T19-42-49/` | Letzter Buy/Sell-Smoke |
+| `outputs/next-season-2026-07-08T21-20-05/` | Letzter S2→S3-Lauf |
+| `outputs/multiseason-final-audit-fresh-season-1-1783539770321.json` | Referenz-Audit |
+| `outputs/s1-draft-baseline.sqlite` | Draft-Baseline |
+| Neuer Run `outputs/resilient-s1s5-*` | Aktueller v3-Lauf |
+
+~18 GB alte `outputs/` gelöscht via `scripts/prune-old-outputs.ts --apply`.
+
+### Neue Features in v3
+
+| Feature | Datei | Kurz |
+| --- | --- | --- |
+| Rebuy-Report | `lib/season/multiseason-rebuy-report.ts` | Zählt `(team, player)`-Mehrfachkäufe über Saisons |
+| Morale Memory v1 | `lib/morale/player-morale-service.ts` | Free Agents: früheres Team → block / +18% Gehalt / −6% bei Loyalität |
+| `--fresh` Bootstrap | `scripts/run-resilient-multiseason.ts` | S1-Draft via `long-run-sandbox` STOP_AFTER=draft |
+
+### Morale Memory v1 (bewusst MVP)
+
+- **Gilt nur:** Free Agent kauft zurück bei **demselben** Team (`playerMoraleState.teamId === buyer`)
+- **Block:** Morale <22 (ohne `loyal`-Trait) → `morale_refuses_former_team`
+- **Premium:** Morale <34 → Gehalt ×1.18
+- **Rabatt:** Morale ≥75 → Gehalt ×0.94
+- **Offen:** Cross-Team-Groll, AI-Pick-Scoring, Verhandlungs-UI
+
+### RED-Fix-Tabelle v3
+
+| Audit-RED | Fix-Strategie | Status |
+| --- | --- | --- |
+| `facilities_active` | Reha-Score + Deploy (Phase 2) | implementiert, nach Run prüfen |
+| `training_manager_applied` | Backfill bei Buy + Preseason-API | implementiert |
+| `roster_min_before_md1` | Post-Preseason Emergency-Repair + `OLY_ENABLE_EMERGENCY_REPAIR=1` | **fix v3** (S5 P-C) |
+| `organic_peak_net_corridor` | Auto-Tune organic (iterate profile) | S4 auto-tuned, continued |
+| `identity_coherence` (V-D) | Season-end repair | long-run-canonical |
+| Sonstige RED | Code-Fix + `RUN-PAUSED.json` | S5 P-C: emergency repair + resume OK |
+
+*(KPI-Ergebnisse oben — Feintuning Fatigue/Contracts/Rebuy-Rate als Follow-up.)*
 

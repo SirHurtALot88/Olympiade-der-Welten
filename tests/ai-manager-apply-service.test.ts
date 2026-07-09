@@ -391,7 +391,11 @@ describe("ai manager apply service", () => {
     ).toBe(18);
   });
 
-  it("S2+ ignores stale budget buckets and uses 10% MW buffer", () => {
+  it("S2+ at Opt ignores stale budget buckets and uses liquidity buffer", () => {
+    const playersAtOpt = [
+      player("p1", { marketValue: 200, displayMarketValue: 200 }),
+      ...Array.from({ length: 5 }, (_, index) => player(`p-${index + 2}`, { marketValue: 1, displayMarketValue: 1 })),
+    ];
     const state = gameState({
       cash: 154,
       budgetReservations: {
@@ -411,8 +415,18 @@ describe("ai manager apply service", () => {
     });
     state.season = { ...state.season, id: "season-2", name: "Season 2" };
     state.seasonState.seasonId = "season-2";
-    state.players = [player("p1", { marketValue: 200, displayMarketValue: 200 })];
-    state.rosters = [{ id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 2, contractLength: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-2" }];
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      slot: index,
+      salary: 2,
+      contractLength: 2,
+      upkeep: 2,
+      roleTag: "starter",
+      joinedSeasonId: "season-2",
+    }));
 
     const spendable = resolveMarketSpendableCashForPlanner({
       gameState: state,
@@ -421,7 +435,9 @@ describe("ai manager apply service", () => {
       rosterBelowMin: false,
     });
 
-    expect(spendable).toBe(134);
+    expect(spendable).toBeGreaterThan(120);
+    expect(spendable).toBeLessThan(154);
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 154)).toBe(0);
   });
 
   it("unlocks current cash for hard-min fill even when stale budget reservations exist", () => {
@@ -501,6 +517,37 @@ describe("ai manager apply service", () => {
 
     expect(spendable).toBeGreaterThan(35);
     expect(spendable).toBeLessThan(50);
+  });
+
+  it("S2+ below Opt uses only a tiny liquidity pad so preseason plans can execute", () => {
+    const state = gameState({
+      cash: 116,
+      rosters: Array.from({ length: 8 }, (_, index) => ({
+        id: `r-${index + 1}`,
+        teamId: "T-1",
+        playerId: `p-${index + 1}`,
+        slot: index,
+        salary: 5,
+        contractLength: 2,
+        upkeep: 5,
+        roleTag: "starter",
+        joinedSeasonId: "season-2",
+      })),
+      players: Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`)),
+    });
+    state.season = { ...state.season, id: "season-2", name: "Season 2" };
+    state.seasonState.seasonId = "season-2";
+    state.teamIdentities = [identity({ playerOpt: 13, playerMin: 8 })];
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 116,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(108);
+    expect(spendable).toBeLessThan(116);
   });
 
   it("applies maintenance through the facility service and restores condition", () => {

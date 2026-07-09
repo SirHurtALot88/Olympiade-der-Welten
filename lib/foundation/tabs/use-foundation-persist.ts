@@ -40,14 +40,29 @@ export function buildFoundationPersistPutBody(input: {
   };
 }
 
+import type { FoundationFetchRetryOptions } from "@/lib/foundation/foundation-fetch-with-retry";
+import { foundationFetchWithRetryResponse } from "@/lib/foundation/foundation-fetch-with-retry";
+
 export async function putFoundationGameState(
   body: FoundationPersistPutBody,
+  options?: FoundationFetchRetryOptions,
 ): Promise<Response> {
-  return fetch("/api/singleplayer-state", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
+  const result = await foundationFetchWithRetryResponse(
+    "/api/singleplayer-state",
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    options,
+  );
+  if (!result.ok) {
+    if (result.response) {
+      return result.response;
+    }
+    throw result.cause instanceof Error ? result.cause : new Error("Save konnte nicht gespeichert werden.");
+  }
+  return result.response;
 }

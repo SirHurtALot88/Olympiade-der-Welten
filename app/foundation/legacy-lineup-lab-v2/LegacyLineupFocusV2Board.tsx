@@ -1442,7 +1442,7 @@ export default function LegacyLineupFocusV2Board({
                               disabled={!candidate.activePlayerId}
                               onClick={() => toggleFocusedPlayer(candidate.activePlayerId)}
                             >
-                              🎯
+                              Fokus
                             </button>
                             {compareMode ? (
                               <label className="legacy-lineup-v2-compare-check" title="Zum Vergleich markieren">
@@ -1463,7 +1463,7 @@ export default function LegacyLineupFocusV2Board({
                                 disabled={!candidate.activePlayerId}
                                 onClick={() => candidate.activePlayerId && togglePinnedCandidate(candidate.activePlayerId)}
                               >
-                                📌
+                                Merken
                               </button>
                             )}
                           </span>

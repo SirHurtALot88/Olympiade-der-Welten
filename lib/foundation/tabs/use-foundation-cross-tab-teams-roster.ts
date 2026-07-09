@@ -33,6 +33,11 @@ import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player
 import { getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
 import {
+  buildTeamProfileSessionKey,
+  getCachedTeamProfileData,
+  setCachedTeamProfileData,
+} from "@/lib/foundation/team-profile-session-cache";
+import {
   buildTeamHistoryDisciplineValuesFromRecord,
   buildTeamHistoryDisciplineValuesFromSnapshot,
   resolveSeasonDisciplineAreaTotal,
@@ -87,6 +92,30 @@ type SeasonPointsLedger = {
     }
   >;
 } | null;
+
+function buildTeamProfileContentSignature(input: {
+  saveId: string;
+  gameState: GameState;
+  teamId: string;
+  playerRatingsById: Map<string, FoundationPlayerRatingSnapshot>;
+}) {
+  const rosterSize = input.gameState.activeRoster.filter((entry) => entry.teamId === input.teamId).length;
+  const seasonSnapshotCount = input.gameState.seasonState.seasonSnapshots?.length ?? 0;
+  const transferCount = input.gameState.transferHistory.filter(
+    (entry) => entry.toTeamId === input.teamId || entry.fromTeamId === input.teamId,
+  ).length;
+  const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId) ?? null;
+  return [
+    input.saveId,
+    input.gameState.season.id,
+    team?.cash ?? "cash",
+    team?.salaryCap ?? "cap",
+    rosterSize,
+    seasonSnapshotCount,
+    transferCount,
+    input.playerRatingsById.size,
+  ].join("|");
+}
 
 const EMPTY_SELECTED_ROSTER_TABLE_ROWS: FoundationRosterTableRow[] = [];
 
@@ -196,6 +225,21 @@ export function useFoundationCrossTabTeamsRoster(input: {
     ): TeamDetailDrawerData | null => {
       if (!resolvedTeamId) {
         return null;
+      }
+
+      const saveId = input.gameState.saveMeta?.saveId ?? "default";
+      const contentSignature = buildTeamProfileContentSignature({
+        saveId,
+        gameState: input.gameState,
+        teamId: resolvedTeamId,
+        playerRatingsById: input.playerRatingsById,
+      });
+      const cacheKey = buildTeamProfileSessionKey(saveId, input.gameState.season.id, resolvedTeamId);
+      if (scope === "full") {
+        const cached = getCachedTeamProfileData(cacheKey, contentSignature);
+        if (cached) {
+          return cached;
+        }
       }
 
       const team = input.gameState.teams.find((entry) => entry.teamId === resolvedTeamId) ?? null;
@@ -510,7 +554,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
           return left.name.localeCompare(right.name, "de");
         });
 
-      return {
+      const result = {
         teamId: team.teamId,
         teamName: team.name,
         shortCode: team.shortCode,
@@ -574,6 +618,10 @@ export function useFoundationCrossTabTeamsRoster(input: {
         history,
         players: rosterCards,
       };
+      if (scope === "full") {
+        setCachedTeamProfileData(cacheKey, contentSignature, result);
+      }
+      return result;
     },
     [
       input.canonicalSeasonLabel,

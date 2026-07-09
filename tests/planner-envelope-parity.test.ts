@@ -103,6 +103,97 @@ describe("planner-envelope-parity", () => {
     expect(capped.starAllowed).toBeLessThan(2);
   });
 
+  it("capExplicitCountsByBudget keeps one star slot for star chasers at 120 MW on small fills", () => {
+    const brackets = buildLeagueMarketBrackets([12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110]);
+    const capped = capExplicitCountsByBudget({
+      counts: {
+        superstarAllowed: 0,
+        starAllowed: 1,
+        coreNeeded: 1,
+        specialistNeeded: 0,
+        depthNeeded: 1,
+        backupNeeded: 1,
+        cheapFillNeeded: 0,
+        premiumCap: 1,
+      },
+      spendable: 120,
+      steps: 1,
+      rosterGap: 1,
+      brackets,
+      starChaser: true,
+    });
+    expect(capped.starAllowed).toBe(1);
+  });
+
+  it("buildPlannerEnvelope plans a star slot for star chaser post-opt upgrade at 150 MW", () => {
+    const envelope = buildPlannerEnvelope({
+      spendable: 150,
+      rosterGap: 1,
+      missingToMin: 0,
+      steps: 1,
+      profile: profile({ optFlexSlots: 1, pickPhase: "post_opt_upgrade" }),
+      faPrices: [12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110],
+      explicitCounts: {
+        superstarAllowed: 0,
+        starAllowed: 1,
+        coreNeeded: 0,
+        specialistNeeded: 0,
+        depthNeeded: 0,
+        backupNeeded: 0,
+        cheapFillNeeded: 0,
+        premiumCap: 1,
+      },
+    });
+    expect(envelope.slotSequence).toContain("star");
+  });
+
+  it("buildPlannerEnvelope plans superstar + star for 150 MW and 2 roster slots", () => {
+    const envelope = buildPlannerEnvelope({
+      spendable: 150,
+      rosterGap: 2,
+      missingToMin: 0,
+      steps: 2,
+      profile: profile({ starChaser: true, premiumFirst: true }),
+      faPrices: [12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110],
+      explicitCounts: {
+        superstarAllowed: 1,
+        starAllowed: 1,
+        coreNeeded: 0,
+        specialistNeeded: 0,
+        depthNeeded: 0,
+        backupNeeded: 0,
+        cheapFillNeeded: 0,
+        premiumCap: 2,
+      },
+      superstarCap: 1,
+    });
+    expect(envelope.slotSequence).toContain("superstar");
+    expect(envelope.slotSequence).toContain("star");
+  });
+
+  it("capExplicitCountsByBudget keeps star on organic 1-slot fill at 120 MW", () => {
+    const brackets = buildLeagueMarketBrackets([12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110]);
+    const capped = capExplicitCountsByBudget({
+      counts: {
+        superstarAllowed: 0,
+        starAllowed: 1,
+        coreNeeded: 0,
+        specialistNeeded: 0,
+        depthNeeded: 0,
+        backupNeeded: 0,
+        cheapFillNeeded: 0,
+        premiumCap: 1,
+      },
+      spendable: 120,
+      steps: 1,
+      rosterGap: 1,
+      missingToMin: 0,
+      brackets,
+    });
+    expect(capped.starAllowed).toBe(1);
+    expect(capped.depthNeeded).toBe(0);
+  });
+
   it("capExplicitCountsByBudget shifts excess core into depth on tight budgets", () => {
     const brackets = buildLeagueMarketBrackets([12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110]);
     const capped = capExplicitCountsByBudget({
@@ -116,12 +207,12 @@ describe("planner-envelope-parity", () => {
         cheapFillNeeded: 0,
         premiumCap: 3,
       },
-      spendable: 180,
+      spendable: 130,
       steps: 10,
       rosterGap: 10,
       brackets,
     });
-    expect(capped.coreNeeded).toBeLessThan(6);
+    expect(capped.superstarAllowed + capped.starAllowed).toBeLessThan(3);
     expect(capped.depthNeeded + capped.backupNeeded).toBeGreaterThanOrEqual(3);
   });
 });

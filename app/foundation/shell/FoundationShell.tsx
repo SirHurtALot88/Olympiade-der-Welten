@@ -65,7 +65,7 @@ export default function FoundationShell({
         attentionByViewId={attentionByViewId}
         seasonContextLabel={seasonContextLabel}
       />
-      <div className="foundation-shell-main">
+      <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         <FoundationActivityStrip activities={activities} />
         <header className="foundation-shell-header">
           <div className="foundation-shell-header-actions">{headerActions}</div>

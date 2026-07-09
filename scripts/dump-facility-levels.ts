@@ -90,6 +90,11 @@ async function main() {
     console.log(`${facilityId}: ${levelTotals[facilityId]} (avg ${(levelTotals[facilityId] / teams.length).toFixed(2)}/team)`);
   }
   console.log(`\nTeams with ALL buildings level 0: ${allZeroTeams} / ${teams.length}`);
+  const rehaL1Plus = teams.filter((team) => {
+    const facilities = getTeamFacilityState(gs, team.teamId);
+    return (facilities.facilities.recovery_center?.level ?? 0) >= 1;
+  }).length;
+  console.log(`Reha L1+ teams: ${rehaL1Plus} / ${teams.length}`);
 
   const countBySeason = (rows: typeof events) => {
     const map = new Map<string, number>();

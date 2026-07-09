@@ -23,6 +23,8 @@ import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modif
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
+import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 
 export type GameInboxTargetView =
   | "home"
@@ -513,6 +515,32 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
+    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, (team.rosterOptTarget ?? team.rosterLimit ?? 12) - 2);
+    if (
+      controlMode === "manual" &&
+      rosterCount >= rosterMinTarget &&
+      lineupComplete &&
+      !hasPersistedTeamCaptain(input.gameState, team.teamId)
+    ) {
+      items.push(
+        createItem({
+          itemId: `captain_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "task",
+          severity: team.teamId === input.activeTeamId ? "warning" : "info",
+          title: "Kapitän ernennen",
+          description: `${team.shortCode}: Kader ist vollständig — wähle einen Saison-Kapitän für Moral-Bonus.`,
+          targetView: "home",
+          targetParams: { team: team.teamId, panel: "captain-picker" },
+          ctaLabel: "Kapitän wählen",
+          source: "team_captain_missing",
+          createdAt,
+        }),
+      );
+    }
+
     const formCardUsageAudit = buildFormCardSeasonUsageAudit(input.gameState, input.gameState.season.id).rows.find(
       (row) => row.teamId === team.teamId,
     );
@@ -647,6 +675,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
+    const transferWindowOpen = getTransferWindowStatus(input.gameState).open;
     const sellCandidates: Array<{ entry: typeof roster[number]; player: NonNullable<ReturnType<typeof playerById.get>>; profit: number; isExpiring: boolean }> = [];
     for (const entry of roster) {
         const player = playerById.get(entry.playerId);
@@ -661,7 +690,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         }
     }
     const sellCandidate = sellCandidates.sort((left, right) => right.profit - left.profit)[0];
-    if (sellCandidate) {
+    if (transferWindowOpen && sellCandidate) {
       items.push(
         createItem({
           itemId: `transfer_candidate:${input.saveId}:${input.gameState.season.id}:${team.teamId}:${sellCandidate.entry.playerId}`,
@@ -677,6 +706,28 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           targetParams: { team: team.teamId, player: sellCandidate.entry.playerId, panel: "roster" },
           ctaLabel: "Spieler prüfen",
           source: "roster_value_contract_cash",
+          createdAt,
+        }),
+      );
+    }
+
+    const rosterOptTarget = team.rosterOptTarget ?? team.rosterLimit ?? 12;
+    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, rosterOptTarget - 2);
+    if (transferWindowOpen && rosterCount > 0 && rosterCount < rosterOptTarget && team.cash >= 8) {
+      items.push(
+        createItem({
+          itemId: `transfer_buy_candidate:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "transfer",
+          severity: rosterCount < rosterMinTarget ? "warning" : "info",
+          title: "Spieler kaufen",
+          description: `${team.shortCode}: Kader ${rosterCount}/${rosterOptTarget}, Cash ${team.cash.toFixed(1)} — Transfermarkt prüfen.`,
+          targetView: "market",
+          targetParams: { team: team.teamId },
+          ctaLabel: "Transfermarkt öffnen",
+          source: "roster_cash_transfer_window",
           createdAt,
         }),
       );
@@ -1259,6 +1310,10 @@ export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMat
     lineup_drafts: 4,
     game_flow_controller: 5,
     team_season_objectives: 6,
+    roster_value_contract_cash: 7,
+    roster_cash_transfer_window: 8,
+    facility_condition_forecast: 9,
+    facility_finance_forecast: 10,
   };
 
   const candidates = items.filter(
@@ -1268,6 +1323,8 @@ export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMat
         item.category === "warning" ||
         item.category === "sponsor" ||
         item.category === "training" ||
+        (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
+        (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
         (!options?.focusMatchdayLoop && item.category === "contract") ||
         item.severity === "critical"),
   );

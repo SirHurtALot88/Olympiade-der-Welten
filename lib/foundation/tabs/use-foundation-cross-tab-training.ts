@@ -16,7 +16,10 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
-import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
+import {
+  evaluateGamePhaseAction,
+  isTrainingIntensityLockedForSeason,
+} from "@/lib/foundation/game-phase-action-policy";
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
@@ -300,6 +303,13 @@ export function useFoundationCrossTabTraining(input: {
     () => isTrainingIntensityLockedForSeason(input.gameState),
     [input.gameState],
   );
+  const trainingIntensityLockWarning = useMemo(
+    () =>
+      evaluateGamePhaseAction(input.gameState, "set_training").warnings.includes(
+        "early_season_setup_allowed_before_first_result",
+      ),
+    [input.gameState],
+  );
 
   const trainingPlayerRowViews = useMemo(() => {
     if (!shouldBuildTrainingCompactDerivations) {
@@ -309,7 +319,7 @@ export function useFoundationCrossTabTraining(input: {
       const view = buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS);
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
-        return { ...view, trainingIntensityLocked };
+        return { ...view, trainingIntensityLocked, trainingIntensityLockWarning };
       }
       return {
         ...view,
@@ -317,17 +327,30 @@ export function useFoundationCrossTabTraining(input: {
         recommendedTrainingDetail: plan.reasons[0] ?? null,
         recommendedTrainingMatchesCurrent: plan.selectedMode === row.mode,
         trainingIntensityLocked,
+        trainingIntensityLockWarning,
       };
     });
-  }, [filteredTrainingPlayerForecastRows, shouldBuildTrainingCompactDerivations, trainingLoadPlanByPlayerId, trainingIntensityLocked]);
+  }, [
+    filteredTrainingPlayerForecastRows,
+    shouldBuildTrainingCompactDerivations,
+    trainingLoadPlanByPlayerId,
+    trainingIntensityLocked,
+    trainingIntensityLockWarning,
+  ]);
 
   const playerProfileTrainingRow = useMemo(() => {
     if (!input.playerProfileData) {
       return null;
     }
     const row = trainingPlayerForecastRows.find((entry) => entry.player.id === input.playerProfileData?.playerId);
-    return row ? { ...buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS), trainingIntensityLocked } : null;
-  }, [input.playerProfileData, trainingPlayerForecastRows, trainingIntensityLocked]);
+    return row
+      ? {
+          ...buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS),
+          trainingIntensityLocked,
+          trainingIntensityLockWarning,
+        }
+      : null;
+  }, [input.playerProfileData, trainingPlayerForecastRows, trainingIntensityLocked, trainingIntensityLockWarning]);
 
   const trainingFacilityRows = useMemo(() => {
     if (!shouldBuildTrainingFacilitiesDerivations) {

@@ -3,6 +3,7 @@
  *
  * Usage:
  *   tsx scripts/run-resilient-multiseason.ts --save-id <id> [--seasons 5] [--output-dir outputs/...]
+ *   tsx scripts/run-resilient-multiseason.ts --fresh [--seasons 5] [--output-dir outputs/...]
  */
 
 import { spawnSync } from "node:child_process";
@@ -179,6 +180,37 @@ function runAutoTuneOrganic(saveId: string, seasonId: string) {
   });
 }
 
+async function bootstrapFreshSeasonOneSave(outputDir: string) {
+  const scriptPath = path.join(PROJECT_ROOT, "scripts", "long-run-sandbox-s1-s6.ts");
+  const nodeOptions = process.env.NODE_OPTIONS?.includes("max-old-space-size")
+    ? process.env.NODE_OPTIONS
+    : "--max-old-space-size=8192";
+  const result = spawnSync(process.execPath, ["--import", "tsx", scriptPath], {
+    cwd: PROJECT_ROOT,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      NODE_OPTIONS: nodeOptions,
+      OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: process.env.OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER ?? "1",
+      OLY_LONG_RUN_ALLOW_DEV_SERVER: process.env.OLY_LONG_RUN_ALLOW_DEV_SERVER ?? "0",
+      OLY_ENABLE_EMERGENCY_REPAIR: process.env.OLY_ENABLE_EMERGENCY_REPAIR ?? "1",
+      OLY_LONG_RUN_STOP_AFTER: "draft",
+      OLY_LONG_RUN_OUTPUT_DIR: outputDir,
+      OLY_LONG_RUN_LABEL: "Resilient Multi S1-S5 Fresh Draft",
+    },
+  });
+  const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  const saveMatch =
+    combined.match(/STOP_AFTER=draft — Save `([^`]+)` bereit/) ??
+    combined.match(/\[long-run\] created (fresh-season-1-\d+)/);
+  if (result.status !== 0 || !saveMatch) {
+    throw new Error(
+      `Fresh S1 draft bootstrap failed (exit ${result.status ?? "?"}): ${combined.split("\n").slice(-8).join(" | ")}`,
+    );
+  }
+  return saveMatch[1];
+}
+
 function runFinalExports(saveId: string, outputDir: string, targetSeasons: number) {
   const scripts = [
     {
@@ -189,6 +221,11 @@ function runFinalExports(saveId: string, outputDir: string, targetSeasons: numbe
       name: "multiseason-final-audit",
       args: ["--import", "tsx", path.join(PROJECT_ROOT, "scripts", "multiseason-final-audit.ts"), "--save-id", saveId, "--history"],
       outFile: "multiseason-final-audit-history.txt",
+    },
+    {
+      name: "multiseason-rebuy-report",
+      args: ["--import", "tsx", path.join(PROJECT_ROOT, "scripts", "export-multiseason-rebuy-report.ts"), "--save-id", saveId, "--output-dir", outputDir],
+      outFile: "multiseason-rebuy-report.txt",
     },
     {
       name: "facility-levels",
@@ -232,6 +269,7 @@ function runLongRunSeason(input: {
       NODE_OPTIONS: nodeOptions,
       OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: process.env.OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER ?? "1",
       OLY_LONG_RUN_ALLOW_DEV_SERVER: process.env.OLY_LONG_RUN_ALLOW_DEV_SERVER ?? "0",
+      OLY_ENABLE_EMERGENCY_REPAIR: process.env.OLY_ENABLE_EMERGENCY_REPAIR ?? "1",
       OLY_LONG_RUN_SAVE_ID: input.saveId,
       OLY_LONG_RUN_FINAL_SEASON: String(input.finalSeason),
       OLY_LONG_RUN_STOP_AFTER: "season_end",
@@ -243,22 +281,29 @@ function runLongRunSeason(input: {
 
 async function main() {
   loadEnvConfig(PROJECT_ROOT);
-  const saveId = argValue("--save-id");
-  if (!saveId) throw new Error("Missing --save-id");
+  log("Resilient multiseason orchestrator starting…");
+  const fresh = process.argv.includes("--fresh");
+  let saveId = argValue("--save-id");
 
   const targetSeasons = Number(argValue("--seasons") ?? "5");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const outputDir =
     argValue("--output-dir") ??
-    path.join(PROJECT_ROOT, "outputs", "realistic-5y", `${saveId}-${Date.now()}`);
+    (fresh
+      ? path.join(PROJECT_ROOT, "outputs", `resilient-s1s5-${timestamp}`)
+      : path.join(PROJECT_ROOT, "outputs", "realistic-5y", `${saveId ?? "unknown"}-${Date.now()}`));
   fs.mkdirSync(outputDir, { recursive: true });
 
-  // See lib/season/long-run-db-isolation.ts: gives this run (and every long-run-sandbox-s1-s6.ts
-  // child process it spawns below, via env inheritance) its own private SQLite file so it never
-  // shares/hijacks the app's default DB + "active save" pointer that the live dev-server UI reads.
   const dbIsolation = ensureIsolatedLongRunDatabase({ outputDir, projectRoot: PROJECT_ROOT });
   log(`DB: ${dbIsolation.sqlitePath} (isolated=${dbIsolation.isolated}${dbIsolation.clonedFromShared ? ", cloned-from-shared" : ""})`);
 
   const persistence = createPersistenceService();
+  if (fresh) {
+    saveId = await bootstrapFreshSeasonOneSave(outputDir);
+    log(`Fresh save bootstrapped: ${saveId}`);
+  }
+  if (!saveId) throw new Error("Missing --save-id (or pass --fresh)");
+
   let save = persistence.getSaveById(saveId);
   if (!save) throw new Error(`Save not found: ${saveId}`);
 

@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamCashSalarySoftTarget, getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 
 /** League-median salary anchor for S2+ buffer (teams with thin salary history). */
 export const PLANNER_LEAGUE_SALARY_BUFFER_RATIO = 0.35;
@@ -58,8 +59,29 @@ export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: s
     if (leagueMedian <= 0) return mwBuffer;
     return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO));
   }
-  const softRatio = getTeamCashSalarySoftTarget(gameState, teamId);
-  const ownBuffer = salary * softRatio;
+  const teamCash = gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? 0;
+  const baseSoftRatio = getTeamCashSalarySoftTarget(gameState, teamId);
+
+  // Hysteresis: build buffer up to `high`, but once above it, lower the effective buffer target
+  // back down toward `low` so cash is deterministically spendable again (no infinite hoarding).
+  const factorWindow = getSeasonEconomyFactorWindow({
+    saveId: gameState.season.id,
+    seasonId: gameState.season.id,
+    seasonState: gameState.seasonState,
+  }).map((entry) => entry.factor);
+  const next2Min = Math.min(factorWindow[0] ?? 1, factorWindow[1] ?? 1, factorWindow[2] ?? 1);
+  const next2Max = Math.max(factorWindow[0] ?? 1, factorWindow[1] ?? 1, factorWindow[2] ?? 1);
+
+  // If upcoming salary factors look worse (<1), be a bit more cautious; if clearly better (>1),
+  // allow a bit more risk (smaller buffer).
+  const cautionBump =
+    next2Min < 1 ? (1 - next2Min) * 0.35 + (next2Min < 0.85 ? 0.06 : 0) : 0;
+  const riskRelief = next2Max > 1.05 ? (next2Max - 1.05) * 0.12 : 0;
+  const lowRatio = Math.max(0.18, Math.min(0.95, baseSoftRatio + cautionBump - riskRelief));
+  const highRatio = Math.max(lowRatio + 0.08, Math.min(1.0, lowRatio + 0.18));
+
+  const cashRatio = salary > 0 ? teamCash / salary : 0;
+  const ownBuffer = salary * (cashRatio + 0.01 >= highRatio ? lowRatio : highRatio);
   const leagueMedian = getLeagueMedianTeamSalary(gameState);
   const leagueAnchor = leagueMedian > 0 ? leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO : 0;
   return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor));

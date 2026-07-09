@@ -46,6 +46,8 @@ export type TransferWindowSessionInput = {
   allowBuys?: boolean;
   skipIfExistingMarketTransfers?: boolean;
   progressLog?: boolean;
+  /** Optional: scripts can pass their run outputDir for extra debug files. */
+  outputDir?: string;
   /**
    * Preseason buy orchestration. Production/default: same path as the S1 draft (batch plan + apply).
    * `convergence_loop` keeps the legacy incremental applyAiMarketPlanLocally cycles — only for
@@ -359,9 +361,9 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();
     if (batchSave) {
-      const batchTeamIds = scopeTeam(
-        getTeamsNeedingConvergence(batchSave.gameState).map((entry) => entry.teamId),
-      );
+      // Feed all teams into batch; the batch planner decides who buys (below Opt OR cash-deploy).
+      // This avoids excluding cash hoarders that already sit at Opt.
+      const batchTeamIds = scopeTeam(batchSave.gameState.teams.map((team) => team.teamId));
       if (batchTeamIds.length > 0) {
         if (input.progressLog) {
           console.error(
@@ -375,6 +377,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           persistence,
           stepsPerTeam: 14,
           draftSeedSuffix: "preseason-batch",
+          outputDir: input.outputDir,
         });
         totalAppliedBuys += batchResult.appliedPicks + batchResult.topupAppliedPicks;
         leagueRoundsCompleted = 1;

@@ -7,12 +7,34 @@ export function useFoundationCrossTabFlowCoach(input: {
   homeV2Tab: string;
   globalNextLabel: string;
   globalNextTitle: string;
+  gameFlowPhase?: string;
+  preseasonWizardStepId?: string | null;
 }) {
   const activeFlowCoach = useMemo<FoundationFlowCoachModel>(() => {
     const base = {
       nextLabel: input.globalNextLabel,
       nextTitle: input.globalNextTitle,
     };
+    if (input.gameFlowPhase === "preseason_management" || input.gameFlowPhase === "transfer_sell_phase" || input.gameFlowPhase === "transfer_buy_phase") {
+      const stepHint = input.preseasonWizardStepId
+        ? `Aktueller Schritt: ${input.preseasonWizardStepId.replaceAll("_", " ")}`
+        : "Sell → Buy → Facilities (optional) → Training → Saisonstart";
+      return {
+        ...base,
+        kicker: "Preseason-Wizard",
+        title: "Saisonende durchspielen: Transfers, optionale Gebäude, Training, dann Start.",
+        detail: `${stepHint}. Leertaste führt Schritt für Schritt — Gebäude und überspringbare Schritte können acknowledged werden.`,
+        terms: ["Sell", "Buy", "Facilities", "Training"],
+        progressLabel: "Saisonvorbereitung",
+        progressPct: 52,
+        shortcut: "Space = nächster Preseason-Schritt",
+        actions: [
+          { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen", tone: "primary" },
+          { label: "Training", targetView: "trainingV2", detail: "Plan setzen" },
+          { label: "Office", targetView: "hq", detail: "Captain & Board" },
+        ],
+      };
+    }
     switch (input.activeView) {
       case "home":
         return {
@@ -258,7 +280,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           ],
         };
     }
-  }, [input.activeView, input.globalNextLabel, input.globalNextTitle, input.homeV2Tab]);
+  }, [input.activeView, input.gameFlowPhase, input.globalNextLabel, input.globalNextTitle, input.homeV2Tab, input.preseasonWizardStepId]);
 
   const foundationFlowLoopStages = useMemo<FoundationFlowLoopStage[]>(
     () => [

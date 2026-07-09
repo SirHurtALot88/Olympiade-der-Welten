@@ -197,7 +197,7 @@ function resolveModeForPlayer(input: {
   });
   const reasons: string[] = [];
 
-  if (fatigue >= 85 || currentRisk >= 25) {
+  if ((fatigue >= 85 || currentRisk >= 25) && (heavyStarter || likelyStarter || fatigue >= 92)) {
     reasons.push("kritische Fatigue/Verletzungsgefahr → leicht + Pause");
     return {
       selectedMode: "leicht",

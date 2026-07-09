@@ -13,6 +13,16 @@ import {
   runCompareRescueBeforeEmergencyRepair,
   runEmergencyRosterRepairForTeams,
 } from "@/lib/ai/ai-market-plan-convergence-service";
+import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
+import {
+  isTeamOverCashSalaryHardCap,
+  isTeamOverCashSalarySoftTarget,
+} from "@/lib/ai/ai-cash-salary-target-service";
+import {
+  buildLeagueMarketBrackets,
+  classifyMarketBracket,
+  type MarketBracketTierLabel,
+} from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   PLANNER_LIQUIDITY_BUFFER_MW_RATIO,
   resolveTeamLiquidityBufferTarget,
@@ -120,6 +130,7 @@ export type TransferRunResult = {
     blockingReasons: string[];
     warnings: string[];
     emergencyRepairTeams: number;
+    auditWarnings?: string[];
   };
   economy: {
     rows: EconomyRow[];
@@ -669,6 +680,10 @@ export async function runEmergencyRepairIfNeeded(input: {
   persistence: PersistenceService;
   outputDir: string;
 }) {
+  if (!isEmergencyRosterRepairEnabled()) {
+    log("Emergency repair skipped (default: planner-only; set OLY_ENABLE_EMERGENCY_REPAIR=1 to enable)");
+    return 0;
+  }
   let save = input.persistence.getSaveById(input.saveId);
   if (!save) return 0;
 
@@ -720,7 +735,11 @@ export type RunTransferPipelineInput = {
 
 function filterPreseasonHardBlockers(blockers: string[], finalRows: TeamRow[]): string[] {
   const atMinTeams = new Set(finalRows.filter((row) => row.atMin).map((row) => row.teamCode));
+  const allAtMin = finalRows.length > 0 && finalRows.every((row) => row.atMin);
   return blockers.filter((blocker) => {
+    if (allAtMin && blocker.includes("player_not_free_agent_in_scope")) {
+      return false;
+    }
     if (!blocker.includes("insufficient_cash") && !blocker.includes("preview_execute_drift")) {
       return true;
     }
@@ -818,6 +837,7 @@ export async function runTransferPipeline(input: RunTransferPipelineInput): Prom
     allowBuys: true,
     skipIfExistingMarketTransfers: false,
     progressLog: true,
+    outputDir: input.outputDir,
   });
 
   const emergencyRepairTeams = await runEmergencyRepairIfNeeded({
@@ -849,6 +869,10 @@ export async function runTransferPipeline(input: RunTransferPipelineInput): Prom
   if (preseasonHardBlockers.length > 0) {
     hardFails.push(`preseason_blockers:${preseasonHardBlockers.slice(0, 5).join("|")}`);
   }
+  const auditWarnings = collectS2PreseasonAuditWarnings(save.gameState);
+  if (auditWarnings.length > 0) {
+    log(`${input.label}: S2 audit → ${auditWarnings.join(" | ")}`);
+  }
 
   const result: TransferRunResult = {
     label: input.label,
@@ -876,6 +900,7 @@ export async function runTransferPipeline(input: RunTransferPipelineInput): Prom
       blockingReasons: preseasonSession.blockingReasons,
       warnings: preseasonSession.warnings.slice(0, 20),
       emergencyRepairTeams,
+      auditWarnings,
     },
     economy: economySummary,
     audits: { seasonEnd: seasonEndAudit, preseason: preseasonAudit },
@@ -1037,6 +1062,58 @@ export type RunKpiSnapshot = {
   s2BuyCount: number;
   hardFails: string[];
 };
+
+export function collectS2PreseasonAuditWarnings(gameState: GameState): string[] {
+  const warnings: string[] = [];
+  const rows = collectTeamRows(gameState);
+  const avgCash = round(rows.reduce((sum, row) => sum + row.cash, 0) / Math.max(1, rows.length));
+  const teamsAtOpt = rows.filter((row) => row.atOpt).length;
+  const seasonId = gameState.season.id;
+
+  if (avgCash > 35) warnings.push(`cash_hoarding_avg:${avgCash}`);
+  if (teamsAtOpt < 24) warnings.push(`opt_below_target:${teamsAtOpt}/32`);
+
+  const overSoft = gameState.teams.filter((team) => isTeamOverCashSalarySoftTarget(gameState, team.teamId, seasonId));
+  if (overSoft.length > 0) {
+    warnings.push(`teams_over_soft_cap:${overSoft.length}`);
+  }
+  const overHard = gameState.teams.filter((team) => isTeamOverCashSalaryHardCap(gameState, team.teamId, seasonId));
+  if (overHard.length > 0) {
+    warnings.push(`teams_over_hard_cap:${overHard.length}`);
+  }
+
+  const s2Buys = gameState.transferHistory.filter(
+    (entry) => entry.seasonId === "season-2" && entry.transferType === "buy",
+  );
+  const buyPrices = s2Buys.map((entry) => entry.fee ?? entry.marketValue ?? 0).filter((value) => value > 0);
+  if (buyPrices.length > 0) {
+    const brackets = buildLeagueMarketBrackets(buyPrices);
+    const counts = { Superstar: 0, Star: 0, Core: 0, Depth: 0, Backup: 0, Reserve: 0 } as Record<
+      MarketBracketTierLabel,
+      number
+    >;
+    for (const price of buyPrices) {
+      counts[classifyMarketBracket(price, brackets)] += 1;
+    }
+    const reserveRate = round(((counts.Depth + counts.Backup + counts.Reserve) / buyPrices.length) * 100, 1);
+    if (reserveRate > 60) warnings.push(`reserve_buy_dominant:${reserveRate}%`);
+    if (counts.Superstar + counts.Star < Math.max(4, Math.floor(buyPrices.length * 0.08))) {
+      warnings.push(`premium_buy_low:SS=${counts.Superstar},Star=${counts.Star}`);
+    }
+  }
+
+  const zeroBuyTeams = gameState.teams.filter(
+    (team) =>
+      !s2Buys.some((entry) => entry.toTeamId === team.teamId) &&
+      (team.cash ?? 0) >= 45 &&
+      rows.find((row) => row.teamCode === (team.shortCode ?? team.teamId))?.atOpt === false,
+  );
+  if (zeroBuyTeams.length > 0) {
+    warnings.push(`cashy_teams_no_s2_buy:${zeroBuyTeams.map((team) => team.shortCode ?? team.teamId).join(",")}`);
+  }
+
+  return warnings;
+}
 
 export function validatePostS2PreseasonCheckpoint(gameState: GameState): string[] {
   const fails: string[] = [];

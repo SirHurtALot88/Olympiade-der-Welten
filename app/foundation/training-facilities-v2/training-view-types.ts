@@ -126,6 +126,12 @@ export type TrainingPlayerRowView = {
    * docs/training-intensity-season-lock.md.
    */
   trainingIntensityLocked?: boolean;
+  /**
+   * True during the short early-season grace window before the first result is
+   * recorded. Training mode can still be changed now, but the lock will snap
+   * shut as soon as the first matchday result exists.
+   */
+  trainingIntensityLockWarning?: boolean;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

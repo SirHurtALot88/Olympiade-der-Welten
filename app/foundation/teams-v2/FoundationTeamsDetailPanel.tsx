@@ -538,43 +538,30 @@ function FoundationTeamsDetailPanel({
                                     );
                                     return (
                                       <td key={column.id}>
-                                        {showLeagueLogos ? (
-                                          <FoundationPlayerPortraitPreview
-                                            playerId={player.id}
-                                            name={player.name}
-                                            portraitUrl={portrait.thumbSrc ?? portrait.src}
-                                            portraitInitials={portrait.initials}
-                                            playerOvr={playerOvr}
-                                            playerMvs={playerMvs}
-                                            playerPps={playerPps}
-                                            pow={player.coreStats.pow ?? null}
-                                            spe={player.coreStats.spe ?? null}
-                                            men={player.coreStats.men ?? null}
-                                            soc={player.coreStats.soc ?? null}
-                                            leagueHeatPools={leaguePlayerHeatPools}
-                                            variant="team"
-                                            context="teamGrid"
-                                            roleTag={entry.roleTag}
-                                            playerClassName={player.className}
-                                          >
-                                            <PlayerPortrait
-                                              src={portrait.thumbSrc ?? portrait.src}
-                                              initials={portrait.initials}
-                                              alt={player.name}
-                                              className="transfermarkt-portrait"
-                                              style={{ width: imageSize, height: imageSize }}
-                                              {...TEAM_ROSTER_PORTRAIT_LOADING}
-                                            />
-                                          </FoundationPlayerPortraitPreview>
-                                        ) : (
-                                          <PlayerPortrait
-                                            src={null}
-                                            initials={portrait.initials}
-                                            alt={player.name}
-                                            className="transfermarkt-portrait"
-                                            style={{ width: imageSize, height: imageSize }}
-                                          />
-                                        )}
+                                        <FoundationPlayerPortraitCard
+                                          playerId={player.id}
+                                          name={player.name}
+                                          portraitUrl={showLeagueLogos ? portrait.thumbSrc ?? portrait.src : null}
+                                          portraitInitials={portrait.initials}
+                                          playerOvr={playerOvr}
+                                          playerMvs={playerMvs}
+                                          playerPps={playerPps}
+                                          pow={player.coreStats.pow ?? null}
+                                          spe={player.coreStats.spe ?? null}
+                                          men={player.coreStats.men ?? null}
+                                          soc={player.coreStats.soc ?? null}
+                                          leagueHeatPools={leaguePlayerHeatPools}
+                                          variant="team"
+                                          context="teamGrid"
+                                          roleTag={entry.roleTag}
+                                          playerClassName={player.className}
+                                          density="mini"
+                                          interactive={false}
+                                          portraitLoading={TEAM_ROSTER_PORTRAIT_LOADING.loading}
+                                          portraitFetchPriority={TEAM_ROSTER_PORTRAIT_LOADING.fetchPriority}
+                                          className="teams-v2-table-portrait-card"
+                                          style={{ width: imageSize, minWidth: imageSize }}
+                                        />
                                       </td>
                                     );
                                   }

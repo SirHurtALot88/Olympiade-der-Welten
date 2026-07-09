@@ -393,9 +393,10 @@ function chooseSellCandidates(
         roster,
         gameState,
         saveId: gameState.season.id,
-        expectedSellValue: preview?.expectedSellValue ?? economy.marketValue,
+        expectedSellValue: preview?.expectedSellValue ?? null,
         marketValue: preview?.marketValue ?? economy.marketValue,
         salary: preview?.salary ?? economy.salary,
+        purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
         teamCash: teamState.cash ?? 0,
         teamSalaryTotal: salaryTotal,
         cashPressureScore,
@@ -439,6 +440,7 @@ function chooseSellCandidates(
       return {
         candidate: {
           ...candidate,
+          purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
           strategicSellScore: composite.total,
           sellPriority: composite.total,
           sellPriorityScore: composite.total,

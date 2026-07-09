@@ -26,10 +26,7 @@ import {
   isInboxItemOwnedByTeam,
   normalizeInboxTargetView,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
-import {
-  shouldBuildFoundationGameFlow,
-  useFoundationGameInboxItems,
-} from "@/lib/foundation/tabs/use-foundation-game-flow";
+import { resolveGameFlowActionStep } from "@/lib/foundation/resolve-game-flow-action-step";
 
 export function shouldBuildFoundationGameInboxDerivations(activeView: string, homeV2Tab?: string): boolean {
   return shouldBuildFoundationGameFlow(activeView, homeV2Tab);
@@ -216,16 +213,11 @@ export function useFoundationCrossTabGameFlow(input: {
         stepEntry.status !== "completed" &&
         !(stepEntry.status !== "blocked" && acknowledgedFlowStepIds.has(stepEntry.stepId)),
     );
-    return (
-      actionableSteps.find(
-        (stepEntry) =>
-          stepEntry.status === "ready" || stepEntry.status === "warning" || stepEntry.status === "blocked",
-      ) ??
-      actionableSteps.find((stepEntry) => stepEntry.status === "optional") ??
-      (gameFlowState.currentStep.status === "completed"
+    const fallbackStep =
+      gameFlowState.currentStep.status === "completed"
         ? (gameFlowState.nextStep ?? gameFlowState.currentStep)
-        : gameFlowState.currentStep)
-    );
+        : gameFlowState.currentStep;
+    return resolveGameFlowActionStep(actionableSteps, fallbackStep, acknowledgedFlowStepIds);
   }, [acknowledgedFlowStepIds, gameFlowState]);
 
   const matchdayArenaReadiness = useMemo(
@@ -274,6 +266,10 @@ export function useFoundationCrossTabGameFlow(input: {
       gameFlowActionStep.stepId === "scouting_facilities" ||
       gameFlowActionStep.stepId === "choose_sponsor" ||
       gameFlowActionStep.stepId === "buy_players" ||
+      gameFlowActionStep.stepId === "sell_players" ||
+      gameFlowActionStep.stepId === "appoint_captain" ||
+      gameFlowActionStep.stepId === "matchday_facilities" ||
+      gameFlowActionStep.stepId === "facilities" ||
       gameFlowActionStep.targetView === "market");
 
   const flowOverrideInboxItem = useMemo(() => {

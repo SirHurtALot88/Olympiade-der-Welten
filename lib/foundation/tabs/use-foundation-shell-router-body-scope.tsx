@@ -1150,6 +1150,18 @@ export function useFoundationShellRouterBodyScope({
 
     socket.on("roomJoined", handleRoomJoined);
     socket.on("roomState", handleRoomState);
+    function handleRoomError(payload: { roomCode?: string; message?: string }) {
+      if (payload.roomCode && payload.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
+        return;
+      }
+      setRoomLiveState(null);
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Room-Session abgelaufen",
+        detail: payload.message ?? "Der gespeicherte Sitzplatz ist ungueltig. Bitte Room neu oeffnen oder Save neu laden.",
+      });
+    }
+    socket.on("roomError", handleRoomError);
     socket.emit("rejoinRoom", {
       roomCode: currentRoomContext.roomCode,
       seatToken: currentRoomContext.seatToken,
@@ -1158,6 +1170,7 @@ export function useFoundationShellRouterBodyScope({
     return () => {
       socket.off("roomJoined", handleRoomJoined);
       socket.off("roomState", handleRoomState);
+      socket.off("roomError", handleRoomError);
     };
   }, [roomContext]);
 
@@ -1352,8 +1365,16 @@ export function useFoundationShellRouterBodyScope({
   const playerProfileDataRef = useRef<PlayerDetailDrawerData | null>(null);
   playerProfileDataRef.current = playerProfileData;
 
+  const [fetchSlowWarning, setFetchSlowWarning] = useState(false);
+  const handleFetchSlow = useCallback(() => setFetchSlowWarning(true), []);
+  const handleFetchSlowClear = useCallback(() => setFetchSlowWarning(false), []);
+
   function showReadOnlyNotice() {
-    window.alert("Prisma/Supabase mode is read-only in this build. Switch to SQLite mode to edit local saves.");
+    setFoundationActionFeedback({
+      tone: "blocked",
+      title: "Nur Lesen",
+      detail: "Prisma/Supabase-Modus ist schreibgeschützt. Für lokale Saves auf SQLite-Modus wechseln.",
+    });
   }
 
   const {
@@ -1484,6 +1505,8 @@ export function useFoundationShellRouterBodyScope({
     showReadOnlyNotice,
     syncFoundationViewInUrl,
     setFreshSeasonStartMessage,
+    onFetchSlow: handleFetchSlow,
+    onFetchSlowClear: handleFetchSlowClear,
   });
 
   const {
@@ -1720,7 +1743,11 @@ export function useFoundationShellRouterBodyScope({
   }
 
   function showTeamManagementLockedNotice(teamName = selectedTeam?.name ?? "dieses Team") {
-    window.alert(`${teamName} gehoert nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`);
+    setFoundationActionFeedback({
+      tone: "warning",
+      title: "Team gesperrt",
+      detail: `${teamName} gehoert nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`,
+    });
   }
 
   async function refreshOpenPlayerProfileAfterTrainingChange(nextGameState: GameState, playerId: string) {
@@ -1804,9 +1831,11 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (isTrainingIntensityLockedForSeason(gameState)) {
-      window.alert(
-        "Trainingsintensitaet ist fuer diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Aenderung erst zum naechsten Saisonstart moeglich.",
-      );
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Training gesperrt",
+        detail: "Trainingsintensitaet ist fuer diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Aenderung erst zum naechsten Saisonstart moeglich.",
+      });
       return;
     }
 
@@ -1840,7 +1869,11 @@ export function useFoundationShellRouterBodyScope({
     try {
       await persistLocalGameStateImmediately(nextGameState);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.");
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Training nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.",
+      });
     }
   }
 
@@ -1865,7 +1898,11 @@ export function useFoundationShellRouterBodyScope({
     try {
       await persistLocalGameStateImmediately(nextGameState);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Trainingsklasse konnte nicht gespeichert werden.");
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Trainingsklasse nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Trainingsklasse konnte nicht gespeichert werden.",
+      });
     }
   }
 
@@ -2185,7 +2222,11 @@ export function useFoundationShellRouterBodyScope({
   function showScoutingWishlistSlotNotice(teamId: string, playerId?: string | null) {
     const message = getScoutingWishlistSlotMessage(canAddPlayerToTransferWishlist(gameState, teamId, playerId));
     if (message) {
-      window.alert(message);
+      setFoundationActionFeedback({
+        tone: "warning",
+        title: "Wunschliste voll",
+        detail: message,
+      });
     }
   }
 
@@ -5354,7 +5395,10 @@ export function useFoundationShellRouterBodyScope({
         ) || "Leertaste: zum blockierten Schritt springen"
       : globalNextDisabled
         ? "Aktion laeuft gerade."
-        : transferWindowHint.open
+        : gameFlowActionStep.status === "optional" &&
+            (gameFlowActionStep.stepId === "matchday_facilities" || gameFlowActionStep.stepId === "facilities")
+          ? "Leertaste: optional prüfen oder überspringen"
+          : transferWindowHint.open
           ? `Leertaste: Weiter · ${transferWindowHint.label}`
           : "Leertaste: Weiter";
   const globalNextStatusClass = primaryInboxItem
@@ -5462,6 +5506,8 @@ export function useFoundationShellRouterBodyScope({
     homeV2Tab,
     globalNextLabel,
     globalNextTitle,
+    gameFlowPhase: gameFlowState.phase,
+    preseasonWizardStepId: gameFlowActionStep.stepId,
   });
 
   const selectedEncyclopediaEntry =
@@ -8936,6 +8982,7 @@ export function useFoundationShellRouterBodyScope({
     marketAiPreviewBusy,
     liveSyncStatus,
     showIdleReady: gameState.season.id !== "loading",
+    fetchSlowWarning,
   });
 
   const isAdminView = activeView === "admin";

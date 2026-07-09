@@ -2,6 +2,9 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { FoundationCard } from "@/components/foundation/FoundationCard";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
@@ -793,6 +796,17 @@ function getRatioTone(value: number | null | undefined) {
   if (value >= 2.5) return "neutral" as const;
   if (value >= 1.5) return "warning" as const;
   return "negative" as const;
+}
+
+function getFitReasonChips(item: TransfermarktFreeAgentItem): string[] {
+  const chips: string[] = [];
+  const fit = item.fit ?? -99;
+  if (fit >= 18) chips.push("Rolle passt");
+  else if (fit >= 10) chips.push("Solider Fit");
+  if ((item.pow ?? 0) >= 70 || (item.spe ?? 0) >= 70) chips.push("Achse stark");
+  if ((item.marketValueSalaryRatio ?? 0) >= 4) chips.push("Value-Deal");
+  if (item.doubleLoadWarnings?.length) chips.push("Doppelbelastung");
+  return chips.slice(0, 3);
 }
 
 function getFitSignal(item: TransfermarktFreeAgentItem) {
@@ -1740,6 +1754,7 @@ export default function TransfermarktV2Client({
   }, [selectedPlayer, selectedTeamRosterRows, topSixCount]);
   const selectedPortrait = selectedPlayer ? getTransfermarktPortraitModel(selectedPlayer) : null;
   const fitSignal = selectedPlayer ? getFitSignal(selectedPlayer) : null;
+  const fitReasonChips = selectedPlayer ? getFitReasonChips(selectedPlayer) : [];
   const growthSignal = selectedPlayer ? getGrowthSignal(selectedPlayer) : null;
   const selectedScoutingLevel = normalizeTransfermarktScoutingLevel(selectedPlayer?.scoutingLevel ?? 0);
   const selectedAttributeRows = useMemo(
@@ -3009,10 +3024,7 @@ export default function TransfermarktV2Client({
               </div>
             ) : null}
             {!marketBusy && visibleItems.length === 0 ? (
-              <div className="market-v2-empty">
-                <strong>Keine Kandidaten im aktuellen Filter.</strong>
-                <p>Suchbegriff, MW-Limit oder Fit etwas weiter stellen.</p>
-              </div>
+              <EmptyState title="Keine Kandidaten im aktuellen Filter" text="Suchbegriff, MW-Limit oder Fit etwas weiter stellen." />
             ) : null}
           </div>
           {renderedVisibleItems.length < visibleItems.length ? (
@@ -3029,33 +3041,30 @@ export default function TransfermarktV2Client({
           {selectedPlayer ? (
             <>
               <div className="market-v2-player-hero">
-                <div
-                  className="market-v2-player-media"
-                  role={onOpenPlayerDetails ? "button" : undefined}
-                  tabIndex={onOpenPlayerDetails ? 0 : undefined}
-                  onClick={
-                    onOpenPlayerDetails
-                      ? () => onOpenPlayerDetails({ playerId: selectedPlayer.playerId })
-                      : undefined
-                  }
-                  onKeyDown={
-                    onOpenPlayerDetails
-                      ? (event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            onOpenPlayerDetails({ playerId: selectedPlayer.playerId });
-                          }
-                        }
-                      : undefined
-                  }
+                <FoundationPlayerPortraitCard
+                  playerId={selectedPlayer.playerId}
+                  name={selectedPlayer.name}
+                  portraitUrl={selectedPortrait?.src ?? null}
+                  portraitInitials={selectedPortrait?.initials ?? "FA"}
+                  playerOvr={selectedPlayer.ovr ?? null}
+                  playerMvs={selectedPlayer.mvs ?? null}
+                  playerPps={selectedPlayer.pps ?? null}
+                  pow={selectedPlayer.pow ?? null}
+                  spe={selectedPlayer.spe ?? null}
+                  men={selectedPlayer.men ?? null}
+                  soc={selectedPlayer.soc ?? null}
+                  leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                  variant="team"
+                  context="market"
+                  playerClassName={selectedPlayer.className}
+                  subMeta={`${selectedPlayer.race} · ${selectedPlayer.alignment}`}
+                  interactive={Boolean(onOpenPlayerDetails)}
+                  portraitLoading="eager"
+                  portraitFetchPriority="high"
+                  onOpen={onOpenPlayerDetails ? () => onOpenPlayerDetails({ playerId: selectedPlayer.playerId }) : undefined}
                   title={onOpenPlayerDetails ? `${selectedPlayer.name} Profil öffnen` : undefined}
-                >
-                  {selectedPortrait?.src ? (
-                    <OptimizedMediaImage src={selectedPortrait.src} alt={selectedPlayer.name} width={240} height={240} className="market-v2-player-image" />
-                  ) : (
-                    <div className="market-v2-player-placeholder">{selectedPortrait?.initials ?? "FA"}</div>
-                  )}
-                </div>
+                  className="market-v2-selected-portrait-card"
+                />
                 <div className="market-v2-player-copy">
                   <span className="market-v2-kicker" title={scoutingProfileTooltip}>
                     Scouting-Profil
@@ -3091,6 +3100,15 @@ export default function TransfermarktV2Client({
                       </span>
                     ) : null}
                   </div>
+                  {fitReasonChips.length > 0 ? (
+                    <div className="market-v2-fit-chip-row" aria-label="Fit-Begründung">
+                      {fitReasonChips.map((chip) => (
+                        <span key={chip} className="pill is-info">
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {selectedPlayer.axisStarsDisplay ? (
                     <p className="market-v2-star-row muted" title="Achsen-Sterne (aktuell) — je nach Scouting-Level unscharf bis exakt.">
                       Aktuell: {selectedPlayer.axisStarsDisplay}
@@ -3324,19 +3342,17 @@ export default function TransfermarktV2Client({
               </div>
 
               <div className="market-v2-focus-actions">
-                <button
-                  className="primary-button"
-                  type="button"
+                <FoundationButton
                   data-testid="transfer-deal-open-button"
                   disabled={!selectedPlayer || !selectedTeamId || !selectedTeamCanManage}
                   onClick={openBuyModal}
                   title={dealOpenDisabledReason ?? "Öffnet das Kaufmodal mit Vertragsrahmen, Forderung und Teamwirkung."}
                 >
                   {buyBusy ? "kauft..." : "Deal prüfen"}
-                </button>
-                <button
-                  className={`secondary-button${selectedPlayerWishlisted ? " is-active" : ""}`}
-                  type="button"
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={selectedPlayerWishlisted ? "is-active" : ""}
                   disabled={!selectedPlayer || Boolean(wishlistDisabledReason && !selectedPlayerWishlisted)}
                   onClick={() => {
                     if (selectedPlayer) {
@@ -3355,10 +3371,10 @@ export default function TransfermarktV2Client({
                   }
                 >
                   {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
-                </button>
-                <button
-                  className={`secondary-button${selectedPlayerScoutingWatched ? " is-active" : ""}`}
-                  type="button"
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={selectedPlayerScoutingWatched ? "is-active" : ""}
                   disabled={!selectedPlayer || Boolean(scoutingWatchDisabledReason && !selectedPlayerScoutingWatched)}
                   onClick={() => {
                     if (selectedPlayer) {
@@ -3372,7 +3388,7 @@ export default function TransfermarktV2Client({
                   }
                 >
                   {selectedPlayerScoutingWatched ? "Nicht mehr beobachten" : "Beobachten"}
-                </button>
+                </FoundationButton>
               </div>
               {selectedPlayerScoutCertainty != null ? (
                 <div className="market-v2-scout-certainty" title="Fortschritt der aktiven Beobachtung — höhere Certainty verbessert die Scouting-Disclosure.">
@@ -3389,7 +3405,8 @@ export default function TransfermarktV2Client({
                 <p className="foundation-screen-action-reason market-v2-focus-action-reason">Warum nicht: {dealOpenDisabledReason}</p>
               ) : null}
 
-              <div
+              <FoundationCard
+                variant="panel"
                 className="market-v2-traits-card"
                 title={
                   selectedPlayer.scoutingWarnings.length
@@ -3431,13 +3448,13 @@ export default function TransfermarktV2Client({
                     </span>
                   ) : null}
                 </div>
-              </div>
+              </FoundationCard>
             </>
           ) : (
-            <div className="market-v2-empty">
-              <strong>Wähle links einen Kandidaten.</strong>
-              <p>Dann bekommst du Scouting-Profil, Achsen, Top-Diszis und Vertragsvorschau an einer Stelle.</p>
-            </div>
+            <EmptyState
+              title="Wähle links einen Kandidaten"
+              text="Dann bekommst du Scouting-Profil, Achsen, Top-Diszis und Vertragsvorschau an einer Stelle."
+            />
           )}
         </section>
 
@@ -3843,16 +3860,16 @@ export default function TransfermarktV2Client({
               </tbody>
             </table>
             {selectedWishlistEntries.length === 0 ? (
-              <div className="market-v2-empty">
-                <strong>Wishlist leer.</strong>
-                <p>
-                  {scoutingPipelineCapacity?.draftSuspended
+              <EmptyState
+                title="Wishlist leer"
+                text={
+                  scoutingPipelineCapacity?.draftSuspended
                     ? "Im Setup-Draft kannst du unbegrenzt merken und vergleichen. Nach dem Draft gelten 4 Wishlist-Slots (+3 pro Scouting-Stufe)."
                     : scoutingPipelineCapacity && scoutingPipelineCapacity.max != null
                       ? `Bis zu ${scoutingPipelineCapacity.max} Spieler auf die Wishlist — bevorzugt gescoutet und Stück für Stück aufgedeckt.`
-                      : "Merke Kandidaten im Markt, um sie später gezielt zu scouten."}
-                </p>
-              </div>
+                      : "Merke Kandidaten im Markt, um sie später gezielt zu scouten."
+                }
+              />
             ) : null}
               </div>
             </div>

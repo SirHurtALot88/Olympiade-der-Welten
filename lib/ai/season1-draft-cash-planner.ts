@@ -7,8 +7,14 @@ import {
   normalizeTeamCode,
 } from "@/lib/ai/season1-draft-spend-policy";
 
-/** Absolute max cash after draft: 1.25× roster salary sum (unless min-roster blocked). */
+/** Absolute max cash after S1 draft: 1.25× roster salary sum (unless min-roster blocked). */
 export const DRAFT_MAX_CASH_TO_SALARY_RATIO = 1.25;
+
+/**
+ * Hard ceiling for S2+ preseason / market buys (planner buffer): never hold more than 1.0×
+ * actual roster salary. Soft objective is team-aware 0.25–0.75× (soft target).
+ */
+export const POSTSEASON_MAX_CASH_TO_SALARY_RATIO = 1.0;
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -18,11 +24,18 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-export function resolveDraftMaxCashAllowed(salaryTotal: number) {
+export function resolveDraftMaxCashAllowed(
+  salaryTotal: number,
+  maxCashSalaryRatio: number = DRAFT_MAX_CASH_TO_SALARY_RATIO,
+) {
   if (salaryTotal <= 0) {
     return null;
   }
-  return roundValue(salaryTotal * DRAFT_MAX_CASH_TO_SALARY_RATIO, 2);
+  const ratio =
+    Number.isFinite(maxCashSalaryRatio) && maxCashSalaryRatio > 0
+      ? maxCashSalaryRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  return roundValue(salaryTotal * ratio, 2);
 }
 
 export function resolveDraftCashSalaryRatio(cash: number, salaryTotal: number) {
@@ -32,18 +45,42 @@ export function resolveDraftCashSalaryRatio(cash: number, salaryTotal: number) {
   return roundValue(cash / salaryTotal, 3);
 }
 
-export function isDraftCashSalaryRatioOverCap(cash: number, salaryTotal: number) {
+export function isDraftCashSalaryRatioOverCap(
+  cash: number,
+  salaryTotal: number,
+  maxCashSalaryRatio: number = DRAFT_MAX_CASH_TO_SALARY_RATIO,
+) {
   const ratio = resolveDraftCashSalaryRatio(cash, salaryTotal);
-  return ratio != null && ratio > DRAFT_MAX_CASH_TO_SALARY_RATIO + 0.001;
+  const cap =
+    Number.isFinite(maxCashSalaryRatio) && maxCashSalaryRatio > 0
+      ? maxCashSalaryRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  return ratio != null && ratio > cap + 0.001;
 }
 
-/** Spend pressure when cash/salary exceeds cap: 0 at cap, up to 1 well above. */
-export function resolveDraftCashSalarySpendPressure(cash: number, salaryTotal: number) {
+/**
+ * Spend pressure when cash/salary exceeds the soft target (or hard cap when no soft is set):
+ * 0 at soft, approaches 1 near/above the hard ceiling.
+ */
+export function resolveDraftCashSalarySpendPressure(
+  cash: number,
+  salaryTotal: number,
+  options?: { softRatio?: number | null; hardRatio?: number | null },
+) {
   const ratio = resolveDraftCashSalaryRatio(cash, salaryTotal);
-  if (ratio == null || ratio <= DRAFT_MAX_CASH_TO_SALARY_RATIO) {
+  const hard =
+    options?.hardRatio != null && options.hardRatio > 0
+      ? options.hardRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  const soft =
+    options?.softRatio != null && options.softRatio > 0
+      ? options.softRatio
+      : hard;
+  if (ratio == null || ratio <= soft) {
     return 0;
   }
-  return roundValue(clamp((ratio - DRAFT_MAX_CASH_TO_SALARY_RATIO) / 0.25, 0, 1), 3);
+  const span = Math.max(hard - soft, 0.25);
+  return roundValue(clamp((ratio - soft) / span, 0, 1), 3);
 }
 
 export function resolveSeason1DraftSalaryForRatio(
@@ -73,20 +110,34 @@ export function estimateSeason1DraftSalaryTotal(input: { anchorsQ50Price: number
 /**
  * End-of-draft cash buffer: corridor target (e.g. 7% left at 93% spend) capped by salary float.
  * Prevents top-budget teams from hoarding 100+ when finances are strong.
+ *
+ * S2+ preseason: pass `softTargetCashSalaryRatio` (0.25–0.75) so remaining cash aims at
+ * salary × softTarget, and `maxCashSalaryRatio` (1.0) as the absolute ceiling.
  */
 export function resolveSeason1TargetCashLeft(input: {
   startingCash: number;
   spendTargetPct: number;
   finances?: number | null;
   estimatedSalaryTotal?: number | null;
+  softTargetCashSalaryRatio?: number | null;
+  maxCashSalaryRatio?: number | null;
 }) {
   const corridorLeft = input.startingCash * (1 - input.spendTargetPct);
   const salaryTotal = input.estimatedSalaryTotal ?? 0;
   if (salaryTotal <= 0) {
     return roundValue(corridorLeft, 2);
   }
+  const maxRatio =
+    input.maxCashSalaryRatio != null && input.maxCashSalaryRatio > 0
+      ? input.maxCashSalaryRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  const maxCashLeft = salaryTotal * maxRatio;
+  if (input.softTargetCashSalaryRatio != null && input.softTargetCashSalaryRatio > 0) {
+    const softCashLeft = salaryTotal * input.softTargetCashSalaryRatio;
+    const softFloor = salaryTotal * Math.max(0.22, input.softTargetCashSalaryRatio - 0.03);
+    return roundValue(clamp(softCashLeft, softFloor, maxCashLeft), 2);
+  }
   const salaryBuffered = salaryTotal * resolveSeason1SalaryBufferMultiplier(input.finances);
-  const maxCashLeft = salaryTotal * DRAFT_MAX_CASH_TO_SALARY_RATIO;
   return roundValue(Math.min(corridorLeft, salaryBuffered, maxCashLeft), 2);
 }
 
@@ -114,13 +165,17 @@ export type Season1DraftSpendPlan = {
   startingCash: number;
   spendTargetPct: number;
   estimatedSalaryTotal: number | null;
-  /** End-of-draft cash floor (salary-buffer + 1.25x-cap aware). */
+  /** End-of-draft cash floor (salary-buffer + soft/hard cash-salary aware). */
   targetCashLeft: number;
   /** startingCash - targetCashLeft; total transfer spend the plan expects across all lanes. */
   totalSpendBudget: number;
   maxCashAllowed: number | null;
   cashSalaryRatio: number | null;
-  /** True once remaining cash sits meaningfully above target (over 1.25x cap, or corridor slack). */
+  /** Soft cash/salary objective (S2+: 0.25–0.75); null for S1 draft. */
+  softTargetCashSalaryRatio: number | null;
+  /** Hard cash/salary ceiling (S1: 1.25, S2+: 1.0). */
+  maxCashSalaryRatio: number;
+  /** True once remaining cash sits meaningfully above soft target / corridor / hard cap. */
   mustSpendDown: boolean;
 };
 
@@ -130,26 +185,49 @@ export function buildSeason1DraftSpendPlan(input: {
   finances?: number | null;
   estimatedSalaryTotal?: number | null;
   remainingCash?: number | null;
+  softTargetCashSalaryRatio?: number | null;
+  maxCashSalaryRatio?: number | null;
 }): Season1DraftSpendPlan {
   const estimatedSalaryTotal =
     input.estimatedSalaryTotal != null && input.estimatedSalaryTotal > 0 ? input.estimatedSalaryTotal : null;
+  const maxCashSalaryRatio =
+    input.maxCashSalaryRatio != null && input.maxCashSalaryRatio > 0
+      ? input.maxCashSalaryRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  const softTargetCashSalaryRatio =
+    input.softTargetCashSalaryRatio != null && input.softTargetCashSalaryRatio > 0
+      ? input.softTargetCashSalaryRatio
+      : null;
   const targetCashLeft = resolveSeason1TargetCashLeft({
     startingCash: input.startingCash,
     spendTargetPct: input.spendTargetPct,
     finances: input.finances,
     estimatedSalaryTotal,
+    softTargetCashSalaryRatio,
+    maxCashSalaryRatio,
   });
   const totalSpendBudget = resolveSeason1DraftSpendBudget({ startingCash: input.startingCash, targetCashLeft });
-  const maxCashAllowed = estimatedSalaryTotal != null ? resolveDraftMaxCashAllowed(estimatedSalaryTotal) : null;
+  const maxCashAllowed =
+    estimatedSalaryTotal != null ? resolveDraftMaxCashAllowed(estimatedSalaryTotal, maxCashSalaryRatio) : null;
   const remainingCash = input.remainingCash ?? null;
   const cashSalaryRatio =
     remainingCash != null && estimatedSalaryTotal != null
       ? resolveDraftCashSalaryRatio(remainingCash, estimatedSalaryTotal)
       : null;
-  const overCap = remainingCash != null && estimatedSalaryTotal != null && isDraftCashSalaryRatioOverCap(remainingCash, estimatedSalaryTotal);
+  const overHardCap =
+    remainingCash != null &&
+    estimatedSalaryTotal != null &&
+    isDraftCashSalaryRatioOverCap(remainingCash, estimatedSalaryTotal, maxCashSalaryRatio);
+  const overSoftTarget =
+    remainingCash != null &&
+    estimatedSalaryTotal != null &&
+    softTargetCashSalaryRatio != null &&
+    remainingCash > estimatedSalaryTotal * softTargetCashSalaryRatio + Math.max(input.startingCash * 0.01, 4);
   const mustSpendDown =
     remainingCash != null &&
-    (overCap || remainingCash > targetCashLeft + Math.max(input.startingCash * 0.015, 6));
+    (overHardCap ||
+      overSoftTarget ||
+      remainingCash > targetCashLeft + Math.max(input.startingCash * 0.015, 6));
   return {
     startingCash: input.startingCash,
     spendTargetPct: input.spendTargetPct,
@@ -158,6 +236,8 @@ export function buildSeason1DraftSpendPlan(input: {
     totalSpendBudget,
     maxCashAllowed,
     cashSalaryRatio,
+    softTargetCashSalaryRatio,
+    maxCashSalaryRatio,
     mustSpendDown,
   };
 }
@@ -303,7 +383,7 @@ export type Season1DraftCashSalaryCapAdjustments = {
   cashSalaryRatio: number | null;
 };
 
-/** Boost spend appetite when cash/salary exceeds DRAFT_MAX_CASH_TO_SALARY_RATIO. */
+/** Boost spend appetite when cash/salary exceeds the soft target / hard ceiling. */
 export function applySeason1DraftCashSalaryCapAdjustments(input: {
   remainingCash: number | null;
   salaryForRatio: number | null;
@@ -316,13 +396,28 @@ export function applySeason1DraftCashSalaryCapAdjustments(input: {
   maxSpendPerPick: number | null;
   availableCashForCurrentPick: number | null;
   anchorsQ50Price?: number | null;
+  softTargetCashSalaryRatio?: number | null;
+  maxCashSalaryRatio?: number | null;
 }): Season1DraftCashSalaryCapAdjustments {
   const cash = input.remainingCash ?? 0;
   const salary = input.salaryForRatio ?? 0;
+  const maxCashSalaryRatio =
+    input.maxCashSalaryRatio != null && input.maxCashSalaryRatio > 0
+      ? input.maxCashSalaryRatio
+      : DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  const softTargetCashSalaryRatio =
+    input.softTargetCashSalaryRatio != null && input.softTargetCashSalaryRatio > 0
+      ? input.softTargetCashSalaryRatio
+      : null;
   const cashSalaryRatio = resolveDraftCashSalaryRatio(cash, salary);
   const cashSalarySpendPressure =
-    cash > 0 && salary > 0 ? resolveDraftCashSalarySpendPressure(cash, salary) : 0;
-  const maxCashAllowed = resolveDraftMaxCashAllowed(salary);
+    cash > 0 && salary > 0
+      ? resolveDraftCashSalarySpendPressure(cash, salary, {
+          softRatio: softTargetCashSalaryRatio,
+          hardRatio: maxCashSalaryRatio,
+        })
+      : 0;
+  const maxCashAllowed = resolveDraftMaxCashAllowed(salary, maxCashSalaryRatio);
 
   let shouldSaveCash = input.shouldSaveCash;
   let spendFactor = input.spendFactor;
@@ -337,9 +432,18 @@ export function applySeason1DraftCashSalaryCapAdjustments(input: {
       season1TargetCashLeft == null
         ? maxCashAllowed
         : roundValue(Math.min(season1TargetCashLeft, maxCashAllowed), 2);
-    if (minCashBuffer != null) {
-      minCashBuffer = roundValue(Math.min(minCashBuffer, maxCashAllowed), 2);
-    }
+  }
+  if (softTargetCashSalaryRatio != null && salary > 0) {
+    const softCashLeft = salary * softTargetCashSalaryRatio;
+    const softFloor = salary * Math.max(0.22, softTargetCashSalaryRatio - 0.03);
+    season1TargetCashLeft =
+      season1TargetCashLeft == null
+        ? roundValue(softCashLeft, 2)
+        : roundValue(Math.max(season1TargetCashLeft, softFloor), 2);
+    minCashBuffer =
+      minCashBuffer == null
+        ? roundValue(softFloor, 2)
+        : roundValue(Math.max(minCashBuffer, softFloor), 2);
   }
 
   if (cashSalarySpendPressure > 0) {
@@ -382,4 +486,78 @@ export function applySeason1DraftCashSalaryCapAdjustments(input: {
     cashSalarySpendPressure,
     cashSalaryRatio,
   };
+}
+
+/** Finance-scaled soft cash/salary target (0.25–0.75), mirrors ai-cash-salary-target-service. */
+export function resolveCashSalarySoftRatioFromFinances(finances?: number | null) {
+  const financesValue = normalizeManagementValue(finances ?? 55);
+  return roundValue(clamp(0.25 + financesValue * 0.5, 0.25, 0.75), 3);
+}
+
+export type CashSalaryDraftPickGuidance = {
+  softRatio: number;
+  hardRatio: number;
+  cashSalaryRatio: number | null;
+  softCash: number;
+  hardCash: number;
+  needsSpendDown: boolean;
+  mustSpendDown: boolean;
+  minSpendPerPick: number;
+  maxCashReservePct: number | null;
+  extraRosterSlotsForSpendDown: number;
+};
+
+/** Guides S1 redraft picks toward finance-scaled cash/salary band (soft 0.25–0.75, hard max 1.25). */
+export function resolveCashSalaryDraftPickGuidance(input: {
+  cash: number;
+  salaryTotal: number;
+  finances?: number | null;
+  remainingSlots: number;
+  rosterAtOrAboveMin: boolean;
+  avgPickPrice?: number | null;
+}): CashSalaryDraftPickGuidance {
+  const softRatio = resolveCashSalarySoftRatioFromFinances(input.finances);
+  const hardRatio = DRAFT_MAX_CASH_TO_SALARY_RATIO;
+  const salary = Math.max(input.salaryTotal, 0);
+  const ratio = salary > 0 && input.cash > 0 ? input.cash / salary : null;
+  const softCash = salary * softRatio;
+  const hardCash = salary * hardRatio;
+  const needsSpendDown =
+    input.rosterAtOrAboveMin && ratio != null && ratio > softRatio + 0.04;
+  const mustSpendDown = ratio != null && ratio > hardRatio + 0.02;
+  const slots = Math.max(1, input.remainingSlots);
+  const excessOverSoft = Math.max(0, input.cash - softCash);
+  const avgPick = Math.max(input.avgPickPrice ?? 22, 8);
+  const minSpendPerPick = mustSpendDown
+    ? Math.max(avgPick * 0.85, excessOverSoft / slots)
+    : needsSpendDown
+      ? Math.max(avgPick * 0.55, (excessOverSoft / slots) * 0.8)
+      : 0;
+  const maxCashReservePct =
+    mustSpendDown || needsSpendDown
+      ? roundValue(clamp((softRatio / Math.max(ratio ?? softRatio, 0.01)) * 0.15, 0.02, 0.12), 3)
+      : null;
+  const extraRosterSlotsForSpendDown =
+    mustSpendDown || needsSpendDown
+      ? Math.min(4, Math.ceil(excessOverSoft / Math.max(avgPick, minSpendPerPick || avgPick)))
+      : 0;
+
+  return {
+    softRatio,
+    hardRatio,
+    cashSalaryRatio: ratio != null ? roundValue(ratio, 3) : null,
+    softCash: roundValue(softCash, 2),
+    hardCash: roundValue(hardCash, 2),
+    needsSpendDown,
+    mustSpendDown,
+    minSpendPerPick: roundValue(minSpendPerPick, 2),
+    maxCashReservePct,
+    extraRosterSlotsForSpendDown,
+  };
+}
+
+/** True when cash/salary sits in the league soft band (0.25–0.75). */
+export function isCashSalaryRatioInSoftBand(ratio: number | null | undefined, tolerance = 0.04) {
+  if (ratio == null || !Number.isFinite(ratio)) return false;
+  return ratio + tolerance >= 0.25 && ratio - tolerance <= 0.75;
 }

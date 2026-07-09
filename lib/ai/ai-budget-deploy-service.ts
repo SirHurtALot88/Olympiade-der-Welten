@@ -181,22 +181,19 @@ export function teamNeedsTransferBudgetDeploy(gameState: GameState, teamId: stri
   const expectedSalary = projectExpectedSalaryAtPlannerTarget(gameState, teamId, plannerTarget);
   const reserve = resolveTeamCashRunwayReserve(gameState, teamId, { expectedSalaryAfterPlan: expectedSalary });
   const spendable = round(Math.max(0, cash - reserve), 2);
-  const hardCap = getTeamCashSalaryHardCap(gameState, teamId, seasonId);
   const softTarget = getTeamCashSalarySoftTarget(gameState, teamId);
-  const targetCashCeiling = round(Math.max(reserve, salary * hardCap), 2);
   const softCashCeiling = round(Math.max(reserve, salary * softTarget), 2);
 
-  if (cash <= softCashCeiling + DEPLOY_MIN_TRANSFER_BUDGET && !isTeamOverCashSalaryHardCap(gameState, teamId, seasonId)) {
+  if (cash <= softCashCeiling + DEPLOY_MIN_TRANSFER_BUDGET && !isTeamOverCashSalarySoftTarget(gameState, teamId, seasonId) && !isTeamOverCashSalaryHardCap(gameState, teamId, seasonId)) {
     return false;
   }
-  if (cash <= targetCashCeiling + DEPLOY_MIN_TRANSFER_BUDGET) return false;
   if (spendable < DEPLOY_MIN_TRANSFER_BUDGET) return false;
 
   const rosterCount = getRosterCount(gameState, teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const { playerOpt } = deriveRosterTargets(team, identity);
   const cashSalaryRatio = salary > 0 ? cash / salary : 0;
-  if (rosterCount < playerOpt && cashSalaryRatio + 0.01 < 1.15) return false;
+  if (rosterCount < playerOpt && (cashSalaryRatio + 0.01 < 1.15 || cash < 45)) return false;
   if (teamNeedsPostOptUpgradeDeploy(gameState, teamId, seasonId)) return true;
   const optTarget = getTeamOptTarget(gameState, teamId);
   const teamMw = getTeamMarketValueSum(gameState, teamId);
@@ -211,7 +208,7 @@ export function teamNeedsTransferBudgetDeploy(gameState: GameState, teamId: stri
     .filter((player) => (player.fatigue ?? 0) >= 65).length;
   if (fatigued >= 2 && rosterCount <= optTarget + 1 && spendable >= DEPLOY_MIN_TRANSFER_BUDGET * 2) return true;
 
-  if (isTeamOverCashSalarySoftTarget(gameState, teamId, seasonId)) return true;
+  if (isTeamOverCashSalarySoftTarget(gameState, teamId, seasonId) && rosterCount >= playerOpt) return true;
 
   return isCashHoardingTeam(gameState, teamId, seasonId);
 }

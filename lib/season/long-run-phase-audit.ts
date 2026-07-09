@@ -350,9 +350,11 @@ function auditPreseasonPackage(save: PersistedSaveGame, context: LongRunPhaseAud
     checks.push(
       teamsWithAnyBuilding === 0 && facilityEvents === 0
         ? check("facilities_active", "RED", "Keine Gebäude gebaut/upgraded (Liga still)")
-        : teamsWithAnyBuilding < 4
-          ? check("facilities_active", "WARN", `${teamsWithAnyBuilding}/32 Teams mit Gebäuden, events=${facilityEvents}`)
-          : check("facilities_active", "PASS", `${teamsWithAnyBuilding}/32 Teams mit Gebäuden, events=${facilityEvents}`),
+        : facilityEvents === 0 && teamsWithAnyBuilding < 4
+          ? check("facilities_active", "RED", `${teamsWithAnyBuilding}/32 Teams mit Gebäuden, events=0 (Gebäude-Stillstand)`)
+          : teamsWithAnyBuilding < 4
+            ? check("facilities_active", "WARN", `${teamsWithAnyBuilding}/32 Teams mit Gebäuden, events=${facilityEvents}`)
+            : check("facilities_active", "PASS", `${teamsWithAnyBuilding}/32 Teams mit Gebäuden, events=${facilityEvents}`),
     );
   }
 

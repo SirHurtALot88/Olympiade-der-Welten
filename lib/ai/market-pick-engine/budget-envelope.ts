@@ -12,6 +12,8 @@ import {
   buildExplicitSlotSequence,
   type ExplicitSlotSequenceInput,
 } from "@/lib/ai/market-pick-engine/explicit-slot-sequence";
+import { planSlotsFromBudget } from "@/lib/ai/market-pick-engine/budget-slot-allocator";
+export { canAffordPremiumMix, planSlotsFromBudget, resolveTailReserveMw } from "@/lib/ai/market-pick-engine/budget-slot-allocator";
 
 export type PlannerExplicitCounts = Pick<
   ExplicitSlotSequenceInput,
@@ -65,112 +67,23 @@ function reassignSlotLane(slot: BudgetEnvelopeSlot, lane: MarketPickLane, bracke
   slot.ceilingMw = next.ceilingMw;
 }
 
-/** Cap premium/core counts so budget reserves room for depth/backup mid-tier picks. */
+/** Cap premium/core counts — unified budget allocator (S1 + S2). Uses rosterGap, not steps. */
 export function capExplicitCountsByBudget(input: {
   counts: PlannerExplicitCounts;
   spendable: number;
   steps: number;
   rosterGap: number;
   brackets: LeagueMarketBrackets;
+  missingToMin?: number;
+  superstarCap?: number;
 }): PlannerExplicitCounts {
-  const cashBufferMw = resolveCashBufferMw(input.spendable);
-  const budget = Math.max(0, input.spendable - cashBufferMw);
-  const totalSlots = Math.max(input.steps, input.rosterGap, 1);
-  const minMidSlots = Math.max(2, Math.ceil(totalSlots * 0.35));
-  const midTierReserve = round(minMidSlots * input.brackets.depth.targetMw, 2);
-
-  let superstarAllowed = input.counts.superstarAllowed;
-  let starAllowed = input.counts.starAllowed;
-  let coreNeeded = input.counts.coreNeeded;
-  let specialistNeeded = input.counts.specialistNeeded;
-  let depthNeeded = input.counts.depthNeeded;
-  let backupNeeded = input.counts.backupNeeded;
-  let cheapFillNeeded = input.counts.cheapFillNeeded;
-  let premiumCap = input.counts.premiumCap ?? 2;
-
-  const premiumUnitCost = input.brackets.superstar.targetMw;
-  const starUnitCost = input.brackets.star.targetMw;
-  const coreUnitCost = input.brackets.core.targetMw;
-
-  if (budget + 0.01 < premiumUnitCost + midTierReserve) {
-    superstarAllowed = 0;
-  }
-  if (budget + 0.01 < starUnitCost + midTierReserve) {
-    starAllowed = 0;
-  }
-
-  const maxPremiumAffordable = Math.max(
-    0,
-    Math.min(
-      premiumCap,
-      superstarAllowed > 0 && budget + 0.01 >= premiumUnitCost + midTierReserve ? 1 : 0,
-      starAllowed + superstarAllowed,
-    ) +
-      (budget + 0.01 >= starUnitCost + midTierReserve
-        ? Math.min(starAllowed, Math.max(premiumCap - (superstarAllowed > 0 ? 1 : 0), 0))
-        : 0),
-  );
-  const currentPremium = superstarAllowed + starAllowed;
-  if (currentPremium > maxPremiumAffordable) {
-    const cut = currentPremium - maxPremiumAffordable;
-    const starCut = Math.min(starAllowed, cut);
-    starAllowed -= starCut;
-    if (cut - starCut > 0 && superstarAllowed > 0) {
-      superstarAllowed = 0;
-    }
-    depthNeeded += cut;
-  }
-
-  const maxExpensiveSlots = Math.max(
-    1,
-    Math.floor((budget - midTierReserve) / Math.max(coreUnitCost, input.brackets.depth.floorMw)),
-  );
-  let expensiveSlots = superstarAllowed + starAllowed + coreNeeded + specialistNeeded;
-  if (expensiveSlots > maxExpensiveSlots) {
-    let excess = expensiveSlots - maxExpensiveSlots;
-    const specialistCut = Math.min(specialistNeeded, excess);
-    specialistNeeded -= specialistCut;
-    excess -= specialistCut;
-    depthNeeded += specialistCut;
-
-    const coreCut = Math.min(coreNeeded, excess);
-    coreNeeded -= coreCut;
-    excess -= coreCut;
-    depthNeeded += coreCut;
-
-    const starCut = Math.min(starAllowed, excess);
-    starAllowed -= starCut;
-    excess -= starCut;
-    depthNeeded += starCut;
-
-    if (excess > 0 && superstarAllowed > 0) {
-      superstarAllowed = 0;
-      depthNeeded += 1;
-    }
-  }
-
-  const minDepthBackup = Math.max(2, Math.ceil(totalSlots * 0.3));
-  const currentMid = depthNeeded + backupNeeded;
-  if (currentMid < minDepthBackup) {
-    const deficit = minDepthBackup - currentMid;
-    const coreShift = Math.min(coreNeeded, deficit);
-    coreNeeded -= coreShift;
-    depthNeeded += coreShift;
-    backupNeeded += deficit - coreShift;
-  }
-
-  premiumCap = Math.min(premiumCap, superstarAllowed + starAllowed);
-
-  return {
-    superstarAllowed,
-    starAllowed,
-    coreNeeded,
-    specialistNeeded,
-    depthNeeded,
-    backupNeeded,
-    cheapFillNeeded,
-    premiumCap,
-  };
+  return planSlotsFromBudget({
+    counts: input.counts,
+    spendable: input.spendable,
+    slotsToFill: Math.max(input.rosterGap, 0),
+    brackets: input.brackets,
+    superstarCap: input.superstarCap,
+  });
 }
 
 /** Prevent cliff rosters: ensure enough depth/backup lanes and downgrade excess core. */
@@ -186,15 +99,32 @@ function enforceMidTierPyramid(input: {
   const isExpensive = (lane: MarketPickLane) =>
     lane === "superstar" || lane === "star" || lane === "core";
 
-  const minMid = Math.max(2, Math.ceil(total * 0.3));
+  // Small fills (≤4) only reserve 1 mid slot so star+core stays viable.
+  const minMid = Math.max(total <= 4 ? 1 : 2, Math.ceil(total * 0.3));
   let midCount = input.slots.filter((slot) => isMidTier(slot.lane)).length;
+  let coreCount = input.slots.filter((slot) => slot.lane === "core").length;
+  const premiumCount = input.slots.filter(
+    (slot) => slot.lane === "star" || slot.lane === "superstar",
+  ).length;
+
+  // Single-slot premium upgrade (post-opt star chase) — do not demote to backup-only.
+  if (total <= 1 && premiumCount > 0) return;
+  if (total <= 4 && premiumCount > 0 && midCount === 0 && total - premiumCount <= 1) return;
 
   if (midCount >= minMid) return;
 
-  for (const slot of input.slots) {
+  const demoteCandidates = [
+    ...input.slots.filter((slot) => slot.lane === "core"),
+    ...input.slots.filter((slot) => slot.lane === "star"),
+  ];
+  for (const slot of demoteCandidates) {
     if (midCount >= minMid) break;
     if (!isExpensive(slot.lane) || slot.lane === "superstar") continue;
-    reassignSlotLane(slot, slot.lane === "core" ? "depth" : "backup", input.brackets);
+    // Keep at least one core slot so every roster can land a Core-bracket buy.
+    if (slot.lane === "core" && coreCount <= 1) continue;
+    const wasCore = slot.lane === "core";
+    reassignSlotLane(slot, wasCore ? "depth" : "backup", input.brackets);
+    if (wasCore) coreCount -= 1;
     midCount += 1;
   }
 }
@@ -231,11 +161,14 @@ function reconcileBudget(input: {
       for (let index = input.slots.length - 1; index >= 0; index -= 1) {
         if (totalAfter <= budget + 0.01) break;
         const slot = input.slots[index];
+        const remainingCores = input.slots.filter((entry) => entry.lane === "core").length;
         if (slot.lane === "superstar") {
           reassignSlotLane(slot, "star", input.brackets);
         } else if (slot.lane === "star") {
           reassignSlotLane(slot, "core", input.brackets);
-        } else if (slot.lane === "core" || slot.lane === "specialist") {
+        } else if (slot.lane === "core" && remainingCores > 1) {
+          reassignSlotLane(slot, "depth", input.brackets);
+        } else if (slot.lane === "specialist") {
           reassignSlotLane(slot, "depth", input.brackets);
         }
         totalAfter = input.slots.reduce((sum, entry) => sum + entry.targetMw, 0);
@@ -335,20 +268,24 @@ export function buildPlannerEnvelope(input: {
   superstarAllowed?: number;
   coreNeeded?: number;
   specialistNeeded?: number;
+  superstarCap?: number;
   templateId?: string;
 }): BudgetEnvelope {
   if (input.explicitCounts) {
     const brackets = buildLeagueMarketBrackets(input.faPrices ?? []);
     const cashBufferMw = resolveCashBufferMw(input.spendable);
+    const planSteps = Math.max(input.rosterGap, input.missingToMin, 1);
     const counts = capExplicitCountsByBudget({
       counts: input.explicitCounts,
       spendable: input.spendable,
       steps: input.steps,
       rosterGap: input.rosterGap,
+      missingToMin: input.missingToMin,
       brackets,
+      superstarCap: input.superstarCap ?? input.profile.superstarAllowed,
     });
     const slotSequence = buildExplicitSlotSequence({
-      steps: input.steps,
+      steps: planSteps,
       missingToMin: input.missingToMin,
       targetSlotsMissing: input.rosterGap,
       superstarAllowed: counts.superstarAllowed,

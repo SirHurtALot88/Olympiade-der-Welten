@@ -193,9 +193,9 @@ describe("ai-composite-sell-score", () => {
 
   it("stops taking sells once cash pressure is resolved", () => {
     const candidates = [
-      { candidate: { expectedSellValue: 20, salary: 5 }, score: 55 },
-      { candidate: { expectedSellValue: 18, salary: 4 }, score: 52 },
-      { candidate: { expectedSellValue: 15, salary: 3 }, score: 48 },
+      { candidate: { expectedSellValue: 20, salary: 5, purchasePrice: 10 }, score: 55 },
+      { candidate: { expectedSellValue: 18, salary: 4, purchasePrice: 10 }, score: 52 },
+      { candidate: { expectedSellValue: 15, salary: 3, purchasePrice: 10 }, score: 48 },
     ];
     const selected = selectCompositeSellCandidates({
       candidates,
@@ -206,6 +206,45 @@ describe("ai-composite-sell-score", () => {
     });
     expect(selected.length).toBeLessThan(candidates.length);
     expect(selected.length).toBeGreaterThan(0);
+  });
+
+  it("applies extra loss resistance for fresh same-season net-loss sells", () => {
+    const older = computeCompositeSellScore({
+      teamId: "W-L",
+      team: team({ teamId: "W-L", cash: 80 }),
+      identity: null,
+      player: player("older", { marketValue: 20 }),
+      roster: rosterEntry("r1", "older", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-0" }),
+      gameState: gameState({
+        players: [player("older", { marketValue: 20 })],
+        rosters: [rosterEntry("r1", "older", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-0" })],
+      }),
+      expectedSellValue: 6,
+      marketValue: 20,
+      salary: 6,
+      teamCash: 80,
+      teamSalaryTotal: 40,
+      cashPressureScore: 0.1,
+    });
+    const fresh = computeCompositeSellScore({
+      teamId: "W-L",
+      team: team({ teamId: "W-L", cash: 80 }),
+      identity: null,
+      player: player("fresh", { marketValue: 20 }),
+      roster: rosterEntry("r2", "fresh", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-1" }),
+      gameState: gameState({
+        players: [player("fresh", { marketValue: 20 })],
+        rosters: [rosterEntry("r2", "fresh", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-1" })],
+      }),
+      expectedSellValue: 6,
+      marketValue: 20,
+      salary: 6,
+      teamCash: 80,
+      teamSalaryTotal: 40,
+      cashPressureScore: 0.1,
+    });
+    expect(fresh.components.lossResistance).toBeLessThan(older.components.lossResistance);
+    expect(fresh.total).toBeLessThanOrEqual(older.total);
   });
 
   it("can keep profit-selling below hardMin when allowProfitSellsBelowMin is set", () => {

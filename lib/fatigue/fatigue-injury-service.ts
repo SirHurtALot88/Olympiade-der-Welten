@@ -25,8 +25,8 @@ import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
 export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as const;
-export const MATCHDAY_FATIGUE_LOAD = 12;
-export const BASE_MATCHDAY_RECOVERY = 20;
+export const MATCHDAY_FATIGUE_LOAD = 11;
+export const BASE_MATCHDAY_RECOVERY = 24;
 
 export { getInjuryRiskBand, getInjuryRiskPercent, injuryRiskBands, type InjuryRiskBand };
 export const FATIGUE_INJURY_RISK_CURVE = FATIGUE_INJURY_RISK_ANCHORS;

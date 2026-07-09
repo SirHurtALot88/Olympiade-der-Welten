@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
+import { useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { FoundationCard } from "@/components/foundation/FoundationCard";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
@@ -53,6 +55,9 @@ function getTeamLogoModel(team: Pick<Team, "teamId" | "name" | "logoPath">) {
 function formatPps(value: number | null | undefined) {
   return formatLocaleNumber(value, 1);
 }
+
+const TRAINING_FORECAST_EXPLANATION =
+  "Trainingsplan zeigt die laufende Saison-Prognose aus Training, Performance und Regression. Entwicklungsziel beschreibt die Saisonende-Sicht auf Klasse, Potential und erwartete Richtung.";
 
 export default function TrainingCompactClient({
   selectedTeam,
@@ -121,7 +126,7 @@ export default function TrainingCompactClient({
         </div>
 
         <div className="training-v2-stat-strip" id="training-compact-forecast">
-          <article className="training-v2-stat-chip">
+          <FoundationCard variant="metric" className="training-v2-stat-chip">
             <span>Regeneration</span>
             <strong>
               {formatPps(summary.recoveryBeforeTraining)} → {formatPps(summary.recoveryAfterTraining)}
@@ -129,25 +134,29 @@ export default function TrainingCompactClient({
             <small>
               Leicht {summary.lightModeCount} · Hart {summary.hardModeCount}
             </small>
-          </article>
-          <article className="training-v2-stat-chip">
-            <span>Trainingsbudget</span>
+          </FoundationCard>
+          <FoundationCard variant="metric" className="training-v2-stat-chip">
+            <span title={TRAINING_FORECAST_EXPLANATION}>Trainingsplan (laufende Saison)</span>
             <strong>{formatLocaleNumber(summary.trainingXpAfter, 1)}</strong>
             <small>Facility {formatSignedPercent(summary.trainingXpModifierPct)}</small>
-          </article>
-          <article className="training-v2-stat-chip">
+          </FoundationCard>
+          <FoundationCard variant="metric" className="training-v2-stat-chip">
             <span>Performance</span>
             <strong>{formatLocaleNumber(summary.performanceXp, 1)}</strong>
             <small>Netto {formatLocaleNumber(summary.totalXp, 1)} Setpoints</small>
-          </article>
-          <article className="training-v2-stat-chip">
-            <span>Entwicklung</span>
+          </FoundationCard>
+          <FoundationCard variant="metric" className="training-v2-stat-chip">
+            <span title={TRAINING_FORECAST_EXPLANATION}>Entwicklungsziel (Saisonende)</span>
             <strong>{developmentSummary.growth} steigt</strong>
             <small>
               {developmentSummary.stable} stabil · {developmentSummary.regression} Risiko
             </small>
-          </article>
+          </FoundationCard>
         </div>
+
+        <TooltipHeading as="p" className="muted" tooltip={TRAINING_FORECAST_EXPLANATION}>
+          Trainingsmodus sperrt pro Saison nach dem ersten Result, Trainingsklasse bleibt waehrend der Saison weiter aenderbar.
+        </TooltipHeading>
 
         <p className="muted training-v2-top-risk-line">
           Top: <strong>{topGrowth?.player.name ?? "—"}</strong>
@@ -159,17 +168,17 @@ export default function TrainingCompactClient({
         {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
         <div className="training-v2-global-mode-chips" data-testid="training-global-mode-chips" aria-label="Trainingsmodus für alle Spieler">
           {trainingModeOptions.map((option) => (
-            <button
+            <FoundationButton
               key={`global-mode-${option.value}`}
-              type="button"
-              className="secondary-button inline-button"
+              variant="secondary"
+              className="inline-button"
               disabled={trainingModeReadOnly}
               onClick={() => {
                 playerRows.forEach((row) => onSetTrainingMode(row.player.id, option.value as PlayerTrainingMode));
               }}
             >
               Alle auf {option.label}
-            </button>
+            </FoundationButton>
           ))}
         </div>
         <TrainingModeComparePanel options={trainingModeOptions} activeMode={compareActiveMode} />
@@ -177,21 +186,30 @@ export default function TrainingCompactClient({
       </header>
 
       <section className="training-compact-workspace training-v2-lane training-v2-lane-training">
-        <TrainingPlayerLane
-          playerRows={playerRows}
-          allPlayerCount={allPlayerCount}
-          developmentFilter={developmentFilter}
-          developmentSummary={developmentSummary}
-          onSetDevelopmentFilter={onSetDevelopmentFilter}
-          trainingModeOptions={trainingModeOptions}
-          trainingClassOptions={trainingClassOptions}
-          onSetTrainingMode={onSetTrainingMode}
-          onSetTrainingClass={onSetTrainingClass}
-          onOpenPlayerDetails={onOpenPlayerDetails}
-          trainingModeReadOnly={trainingModeReadOnly}
-          onActivePlayerChange={setCompareActivePlayerId}
-          activeComparePlayerId={compareActivePlayerId}
-        />
+        {playerRows.length === 0 ? (
+          <EmptyState
+            title="Keine Trainingsdaten"
+            text="Für dieses Team liegen aktuell keine Spieler oder kein passender Entwicklungsfilter vor."
+            actionLabel={onOpenTeams ? "Teams öffnen" : undefined}
+            onAction={onOpenTeams}
+          />
+        ) : (
+          <TrainingPlayerLane
+            playerRows={playerRows}
+            allPlayerCount={allPlayerCount}
+            developmentFilter={developmentFilter}
+            developmentSummary={developmentSummary}
+            onSetDevelopmentFilter={onSetDevelopmentFilter}
+            trainingModeOptions={trainingModeOptions}
+            trainingClassOptions={trainingClassOptions}
+            onSetTrainingMode={onSetTrainingMode}
+            onSetTrainingClass={onSetTrainingClass}
+            onOpenPlayerDetails={onOpenPlayerDetails}
+            trainingModeReadOnly={trainingModeReadOnly}
+            onActivePlayerChange={setCompareActivePlayerId}
+            activeComparePlayerId={compareActivePlayerId}
+          />
+        )}
       </section>
     </section>
   );

@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { FoundationCard } from "@/components/foundation/FoundationCard";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   buildTrainingImpactItems,
@@ -232,6 +235,13 @@ function getDemandStatusLabel(status: PlayerDemandStatus) {
     default:
       return "offen";
   }
+}
+
+function getTrainingStartStateLabel(row: TrainingPlayerRowView) {
+  if ((row.playerPps ?? 0) <= 0 && (row.playerMvs ?? 0) <= 0) {
+    return "Startzustand · erste Saisonwerte bauen sich noch auf";
+  }
+  return null;
 }
 
 function TrainingTraitBoostRow({ row }: { row: TrainingPlayerRowView }) {
@@ -502,7 +512,12 @@ export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowV
   return (
     <div className="training-v2-attribute-forecast">
       <div className="training-v2-attribute-forecast-head">
-        <strong>Stat Forecast</strong>
+        <TooltipHeading
+          as="strong"
+          tooltip="Trainingsplan zeigt die laufende Saison-Prognose aus Training, Performance und Regression. Das Entwicklungsziel darunter bleibt die Saisonende-Sicht auf Attribute und Klassen."
+        >
+          Trainingsplan (laufende Saison)
+        </TooltipHeading>
         {sorted.length > 5 ? (
           <button className="secondary-button inline-button" type="button" onClick={() => setExpanded((current) => !current)}>
             {expanded ? "Weniger" : `Alle ${sorted.length} Stats`}
@@ -677,20 +692,23 @@ export function TrainingPlayerLane({
 
       <div className="training-v2-filter-row">
         {([
-          { id: "all" as const, label: "Alle" },
-          { id: "growth" as const, label: "Steigt" },
-          { id: "stable" as const, label: "Stabil" },
+          { id: "growth" as const, label: "Upgrade bereit" },
           { id: "regression" as const, label: "Risiko" },
+          { id: "stable" as const, label: "Stabil" },
+          { id: "all" as const, label: "Alle" },
         ]).map((filter) => (
-          <button
+          <FoundationCard
             key={filter.id}
+            as="div"
+            variant="metric"
             className={`training-v2-filter-card${developmentFilter === filter.id ? " is-active" : ""}`}
-            type="button"
-            onClick={() => onSetDevelopmentFilter(filter.id)}
           >
             <span>{filter.label}</span>
             <strong>{developmentSummary[filter.id]}</strong>
-          </button>
+            <FoundationButton variant="secondary" className="inline-button" onClick={() => onSetDevelopmentFilter(filter.id)}>
+              {developmentFilter === filter.id ? "Aktiv" : "Filtern"}
+            </FoundationButton>
+          </FoundationCard>
         ))}
       </div>
 
@@ -740,6 +758,9 @@ export function TrainingPlayerLane({
                 onOpen={() => onActivePlayerChange?.(row.player.id)}
                 footerSlot={
                   <>
+                    {getTrainingStartStateLabel(row) ? (
+                      <small className="muted training-v2-start-state">{getTrainingStartStateLabel(row)}</small>
+                    ) : null}
                     {onOpenPlayerDetails ? (
                       <button
                         type="button"
@@ -783,16 +804,26 @@ export function TrainingPlayerLane({
               />
 
               <TrainingCardCompactBadges row={row} />
+              {tone === "regression" ? (
+                <FoundationCard variant="decision" className="training-v2-regression-callout">
+                  <span className="eyebrow">Rueckschritt sichtbar</span>
+                  <strong>
+                    {row.organicForecast.netSetpoints < 0
+                      ? `Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)}`
+                      : `Risiko ${row.forecast.regressionRisk}`}
+                  </strong>
+                  <p className="muted">
+                    {row.fatigueWarning} · Marktwert-Druck {formatVeloNumber(row.forecast.regressionPressure, 0)}
+                  </p>
+                </FoundationCard>
+              ) : null}
               <TrainingAttributeUpgradeStrip row={row} />
               <TrainingCardDetails row={row} />
             </article>
           );
         })}
         {playerRows.length === 0 ? (
-          <div className="training-v2-empty">
-            <strong>Keine Spieler im aktuellen Filter.</strong>
-            <p>Wechsle den Entwicklungsfokus oder waehle ein anderes Team.</p>
-          </div>
+          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder waehle ein anderes Team." />
         ) : null}
       </div>
     </>

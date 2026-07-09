@@ -43,14 +43,21 @@ function resolvePremiumCounts(input: ExplicitSlotSequenceInput, plannedSlots: nu
   if (!input.premiumFirst) {
     return counts;
   }
+  const slotsForPremium = Math.max(input.targetSlotsMissing, input.missingToMin, 1);
+  const smallFill = slotsForPremium <= 4;
+  const premiumBudget = smallFill
+    ? input.superstarAllowed + input.starAllowed
+    : Math.max(slotsForPremium - 7, 0);
   const premiumSlots = Math.min(
     input.superstarAllowed + input.starAllowed,
-    Math.max(plannedSlots - 7, 0),
+    premiumBudget,
     Math.max(input.premiumCap ?? 2, 0),
   );
-  counts.star = Math.min(input.starAllowed, premiumSlots);
-  if (input.superstarAllowed > 0 && premiumSlots > counts.star) {
+  if (input.superstarAllowed > 0 && premiumSlots > 0) {
     counts.superstar = 1;
+    counts.star = Math.min(input.starAllowed, Math.max(premiumSlots - 1, 0));
+  } else {
+    counts.star = Math.min(input.starAllowed, premiumSlots);
   }
   return counts;
 }

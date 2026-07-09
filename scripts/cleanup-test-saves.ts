@@ -70,6 +70,11 @@ function classifyTestSave(row: SaveRowLite): { isTest: boolean; reason: string }
 function main() {
   loadEnvConfig(PROJECT_ROOT);
   const apply = process.argv.includes("--apply");
+  const keepSaveIds = new Set(
+    process.argv
+      .filter((entry, index, array) => array[index - 1] === "--keep-save-id")
+      .concat(["save-singleplayer-dev", "fresh-season-1-1783539770321"]),
+  );
   const persistence = createPersistenceService();
   const database = getDatabase();
 
@@ -91,14 +96,14 @@ function main() {
 
   for (const row of rows) {
     const { isTest, reason } = classifyTestSave(row);
-    // Never delete the singleplayer dev save (real working save) even if it
-    // matched nothing; and protect the currently active save unless it is an
-    // obvious throwaway audit save.
     const isSingleplayerDev = row.save_id === "save-singleplayer-dev";
-    if (isTest && !isSingleplayerDev) {
+    const isExplicitKeep = keepSaveIds.has(row.save_id);
+    if (isExplicitKeep) {
+      toKeep.push({ ...row, reason: isSingleplayerDev ? "singleplayer-dev (protected)" : "explicit keep" });
+    } else if (isTest && !isSingleplayerDev) {
       toDelete.push({ ...row, reason });
     } else {
-      toKeep.push({ ...row, reason: isSingleplayerDev ? "singleplayer-dev (protected)" : "not-a-test-save" });
+      toKeep.push({ ...row, reason: "not-a-test-save" });
     }
   }
 

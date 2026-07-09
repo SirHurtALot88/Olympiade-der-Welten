@@ -1,14 +1,19 @@
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
+import { isTeamOverCashSalarySoftTarget } from "@/lib/ai/ai-cash-salary-target-service";
+import { teamNeedsTransferBudgetDeploy } from "@/lib/ai/ai-budget-deploy-service";
 import {
   getTeamHardMinRequired,
   getTeamOptTarget,
-  getTeamsNeedingConvergence,
 } from "@/lib/ai/ai-market-plan-convergence-service";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import fs from "node:fs";
+import path from "node:path";
 import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import type { PersistenceService } from "@/lib/persistence/types";
 
 export type PreseasonBatchPickRebuildResult = {
@@ -39,19 +44,31 @@ export async function runPreseasonBatchPickRebuild(input: {
   persistence: PersistenceService;
   stepsPerTeam?: number;
   draftSeedSuffix?: string;
+  /** Optional: write plan-vs-execute diagnostics into this directory. */
+  outputDir?: string;
 }): Promise<PreseasonBatchPickRebuildResult> {
   const save = input.persistence.getSaveById(input.saveId);
   if (!save) throw new Error("Save missing before preseason batch pick rebuild.");
 
-  const scoped =
+  const candidateTeamIds =
     input.teamIds && input.teamIds.length > 0
       ? unique(input.teamIds)
-      : getTeamsNeedingConvergence(save.gameState).map((entry) => entry.teamId);
+      : save.gameState.teams.map((team) => team.teamId);
 
-  const batchTeamIds = scoped.filter((teamId) => {
+  const batchTeamIds = candidateTeamIds.filter((teamId) => {
     const roster = rosterCount(save.gameState, teamId);
     const optTarget = getTeamOptTarget(save.gameState, teamId);
-    return roster < optTarget;
+    if (roster < optTarget) return true;
+
+    const team = save.gameState.teams.find((entry) => entry.teamId === teamId);
+    const identity = save.gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+    const { playerMax } = deriveRosterTargets(team, identity);
+    if (roster >= playerMax) return false;
+
+    return (
+      isTeamOverCashSalarySoftTarget(save.gameState, teamId, input.seasonId) ||
+      teamNeedsTransferBudgetDeploy(save.gameState, teamId, input.seasonId)
+    );
   });
 
   const warnings: string[] = [];
@@ -92,7 +109,8 @@ export async function runPreseasonBatchPickRebuild(input: {
   }
 
   let topupAppliedPicks = 0;
-  const maxTopupPasses = 3;
+  const skipRepairTopup = !isEmergencyRosterRepairEnabled();
+  const maxTopupPasses = skipRepairTopup ? 0 : 3;
   for (let pass = 0; pass < maxTopupPasses; pass += 1) {
     const latest = input.persistence.getSaveById(input.saveId);
     if (!latest) break;
@@ -117,6 +135,43 @@ export async function runPreseasonBatchPickRebuild(input: {
     topupAppliedPicks += topup.picks.length;
     warnings.push(...topup.warnings.slice(0, 6));
     if (topup.picks.length === 0) break;
+  }
+
+  if (input.outputDir) {
+    try {
+      const outPath = path.join(input.outputDir, `preseason-batch-plan-vs-execute-${input.seasonId}.json`);
+      fs.writeFileSync(
+        outPath,
+        JSON.stringify(
+          {
+            seasonId: input.seasonId,
+            generatedAt: new Date().toISOString(),
+            teamCount: result.teams.length,
+            globalPreview: result.globalPreview,
+            globalExecution: result.globalExecution,
+            teams: result.teams.map((team) => ({
+              teamId: team.teamId,
+              teamCode: team.teamCode,
+              rosterBefore: team.rosterBefore,
+              rosterAfter: team.rosterAfter,
+              cashBefore: team.cashBefore,
+              cashAfter: team.cashAfter,
+              planner: team.planner,
+              cashStrategy: team.cashStrategy,
+              budgetLanes: team.budgetLanes,
+              plannedPicks: team.plannedPicks,
+              warnings: team.warnings,
+              blockingReasons: team.blockingReasons,
+            })),
+          },
+          null,
+          2,
+        ),
+      );
+      warnings.push(`preseason_batch_diag_written:${path.basename(outPath)}`);
+    } catch {
+      warnings.push("preseason_batch_diag_write_failed");
+    }
   }
 
   return {

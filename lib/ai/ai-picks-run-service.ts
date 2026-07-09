@@ -605,6 +605,16 @@ function isFocusTeam(teamCode: string) {
   return FOCUS_TEAM_CODES.has(teamCode);
 }
 
+function classifyActualPickLaneFromMarketValue(marketValue: number | null) {
+  const mv = marketValue ?? 0;
+  if (mv + 0.01 >= 65) return { pickLane: "superstar_pick", isSuperstar: true, isStar: true };
+  if (mv + 0.01 >= 45) return { pickLane: "star_pick", isSuperstar: false, isStar: true };
+  if (mv + 0.01 >= 30) return { pickLane: "core_investment", isSuperstar: false, isStar: false };
+  if (mv + 0.01 >= 20) return { pickLane: "depth_value", isSuperstar: false, isStar: false };
+  if (mv + 0.01 >= 12) return { pickLane: "backup", isSuperstar: false, isStar: false };
+  return { pickLane: "cheap_fill", isSuperstar: false, isStar: false };
+}
+
 function normalizeActualPickLane(lane: string | null | undefined) {
   const normalized = normalizeToken(lane);
   if (normalized === "core_investment") return "core";
@@ -1263,7 +1273,7 @@ function buildGlobalSummary(picks: GlobalPickRow[]): AiPicksRunGlobalSummary {
 function buildQualityGate(
   teams: AiPicksRunTeamResult[],
   picks: GlobalPickRow[],
-  options: { runMode?: AiNeedsPicksRunMode | null } = {},
+  options: { runMode?: AiNeedsPicksRunMode | null; seasonId?: string | null } = {},
 ): AiPicksRunQualityGate {
   const season1OptimumMode = options.runMode === "season1_optimum_execute";
   const planned = picks.filter((pick) => pick.status === "planned");
@@ -1792,18 +1802,10 @@ function buildQualityGate(
   if ((starSharePct ?? 0) > 42 && plannedPickCount >= 4) {
     blockingReasons.push("ai_pick_quality_gate_failed:star_share_too_high");
   }
-  const classSpamCanStayWarningOnly =
-    season1OptimumMode &&
-    plannedPickCount > 0 &&
-    (offThemeSharePct ?? 0) <= 0 &&
-    teams.every((team) => teamExpectedMinimumReached(team));
-  const classSpamHardBlockPct = season1OptimumMode ? 65 : 55;
-  if ((classSpamSharePct ?? 0) > classSpamHardBlockPct) {
-    if (classSpamCanStayWarningOnly) {
-      warnings.push("Klassenhaeufung bleibt im Season-1-Setup erlaubt, weil Minimum erreicht wird und kein Off-Theme-Pick geplant ist.");
-    } else {
-      blockingReasons.push("ai_pick_quality_gate_failed:class_spam_share_too_high");
-    }
+  if ((classSpamSharePct ?? 0) > 35) {
+    warnings.push(
+      "Mehrere Picks tragen Classspam-Malus — Duplikate ab dem 4. Spieler derselben Klasse werden im Scoring automatisch abgewertet.",
+    );
   }
   if (starPressureCount > 0) {
     warnings.push(`AI-Picks mit Star-Druck gefunden: ${starPressureCount}`);
@@ -2014,9 +2016,6 @@ function buildQualityGate(
     warnings.push("Viele Picks weichen sichtbar vom Kernthema ab, bleiben aber als strategische Ausnahmen erlaubt.");
   } else if ((offThemeSharePct ?? 0) > 20) {
     warnings.push("Mehrere Picks tragen noch einen deutlichen Off-Theme-Malus.");
-  }
-  if ((classSpamSharePct ?? 0) > 35 && (classSpamSharePct ?? 0) <= 55) {
-    warnings.push("Mehrere Picks ballen sich noch zu stark auf denselben Klassentyp.");
   }
   if ((offThemeSharePct ?? 0) > 20 && planned.some((pick) => pick.scoreBreakdown.needMatchScore >= 5 || pick.scoreBreakdown.disciplineCoverageScore >= 5)) {
     warnings.push("Off-Theme-Picks bleiben aktiv, weil Need-, Diszi- oder Kaderbalance-Signale sie strategisch tragen.");
@@ -2568,6 +2567,7 @@ function buildSeason1ExecuteSubstitutePick(
   substitute: Season1LiveSubstituteCandidate,
   originalPlayerId: string,
 ): AiPicksRunPick {
+  const actualLane = classifyActualPickLaneFromMarketValue(substitute.marketValue ?? frozenPick.marketValue);
   return {
     ...frozenPick,
     playerId: substitute.playerId,
@@ -2578,12 +2578,18 @@ function buildSeason1ExecuteSubstitutePick(
     salary: substitute.salary ?? frozenPick.salary,
     ovr: substitute.ovr ?? frozenPick.ovr,
     mvs: substitute.mvs ?? frozenPick.mvs,
+    pickLane: actualLane.pickLane,
+    isSuperstar: actualLane.isSuperstar,
+    isStar: actualLane.isStar,
     primaryReason: "season1_execute_live_substitute",
     laneReason: `season1_execute_live_substitute:${originalPlayerId}`,
     reasons: unique([...frozenPick.reasons, `season1_execute_live_substitute:${originalPlayerId}→${substitute.playerId}`]),
     warnings: unique([
       ...frozenPick.warnings,
       `season1_execute_live_substitute:${originalPlayerId}→${substitute.playerId}`,
+      normalizeToken(frozenPick.pickLane) !== normalizeToken(actualLane.pickLane)
+        ? `season1_execute_live_substitute_lane_reclassified:${frozenPick.pickLane}→${actualLane.pickLane}`
+        : null,
     ]),
   };
 }
@@ -3156,7 +3162,7 @@ export async function runAiPicksExecutePreview(
     previewTeams,
     localRunContext,
   });
-  const qualityGate = buildQualityGate(previewTeams, previewGlobalRows, { runMode });
+  const qualityGate = buildQualityGate(previewTeams, previewGlobalRows, { runMode, seasonId });
   const preflightBlockingReasons = preflightAudit.checks
     .filter((check) => check.status === "blocked")
     .map((check) => `preflight_blocked:${check.key}`);

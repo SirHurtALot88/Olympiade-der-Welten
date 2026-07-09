@@ -232,27 +232,21 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
       ? -round((boardConfidence - 0.55) * weights.performanceKeep * 1.35 * keepMultiplier)
       : 0;
 
-  // Realized loss vs. purchase price (expectedSell is already the NET proceeds, i.e. after buyout).
-  // This used to cap out at a small, *fixed* malus for the worst cases (bottom-tercile / big MW
-  // decline) instead of scaling up with them — meaning the sales that lose the most cash were the
-  // *least* resisted. Fixed so the malus always scales with the realized loss magnitude, and a hard
-  // gate on top blocks/heavily suppresses big-cash losses unless the team is in genuine cash need.
+  // Realized net loss vs purchase (expectedSell is net after buyout). Scale resistance with loss size;
+  // extra penalty when the player was bought in the current season (avoids buy-then-dump spirals).
   const sellBelowPurchase =
     purchasePrice != null && expectedSell != null && expectedSell < purchasePrice;
   const realizedLossAbs = profitAbsolute != null && profitAbsolute < 0 ? -profitAbsolute : 0;
   const realizedLossRatio = profitRatio != null && profitRatio < 0 ? -profitRatio : 0;
   const lossMagnitude = clamp01(realizedLossRatio);
   const baseLossResistance = sellBelowPurchase ? -(0.3 + lossMagnitude * 1.7) * weights.lossResistance : 0;
-
-  const HARD_LOSS_RELATIVE_THRESHOLD = 0.3;
-  const HARD_LOSS_ABSOLUTE_FLOOR_C = 5;
-  const isCashEmergency = input.cashPressureScore >= 0.45;
-  const hardLossGateActive =
-    sellBelowPurchase &&
-    realizedLossRatio > HARD_LOSS_RELATIVE_THRESHOLD &&
-    realizedLossAbs >= HARD_LOSS_ABSOLUTE_FLOOR_C &&
-    !isCashEmergency;
-  const lossResistance = round(hardLossGateActive ? baseLossResistance - 25 : baseLossResistance);
+  const isFreshPurchase =
+    input.roster.joinedSeasonId != null && input.roster.joinedSeasonId === input.gameState.season.id;
+  const freshBuyLossResistance =
+    isFreshPurchase && sellBelowPurchase
+      ? -round((0.25 + lossMagnitude * 2.4) * weights.lossResistance * (1 + clamp01(realizedLossAbs / 20)))
+      : 0;
+  const lossResistance = round(baseLossResistance + freshBuyLossResistance);
 
   const total = round(
     clamp(
@@ -283,7 +277,7 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
   };
 }
 
-export function selectCompositeSellCandidates<T extends { expectedSellValue?: number | null; salary?: number | null }>(
+export function selectCompositeSellCandidates<T extends { expectedSellValue?: number | null; salary?: number | null; purchasePrice?: number | null }>(
   input: {
     candidates: Array<{ candidate: T; score: number }>;
     teamCash: number;

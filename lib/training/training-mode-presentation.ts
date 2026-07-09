@@ -5,9 +5,9 @@ import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 /** Base training budget per mode (season-end organic progression).
  *  Calibrated for peak P90 ~4.5–8 and league Ø Δ within ±0.4. */
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
-  leicht: 3.39,
-  mittel: 4.29,
-  hart: 6.1,
+  leicht: 2.88,
+  mittel: 3.65,
+  hart: 5.18,
 };
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {

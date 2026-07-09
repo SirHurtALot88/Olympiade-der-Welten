@@ -13,6 +13,8 @@ import {
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
+import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
+import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 
@@ -187,10 +189,15 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       stepId: "facilities",
       label: "Facilities prüfen",
       cta: "Weiter: Facilities prüfen",
-      status: "optional",
+      status: !hasActiveTeam
+        ? "blocked"
+        : teamHasAffordableFacilityUpgrade(gameState, activeTeamId)
+          ? "optional"
+          : "completed",
       targetView: "trainingV2",
       targetPanel: "facilities",
       teamId: activeTeamId,
+      optional: teamHasAffordableFacilityUpgrade(gameState, activeTeamId),
     }),
     step({
       stepId: "player_development",
@@ -342,6 +349,22 @@ function buildTransferStepGate(gameState: GameState, action: "buy_players" | "se
     blockers: gate.allowed || !gate.reason ? [] : [gate.reason],
     warnings: gate.warnings,
   };
+}
+
+function teamHasAffordableFacilityUpgrade(gameState: GameState, teamId: string | null) {
+  if (!teamId) {
+    return false;
+  }
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  if (!team) {
+    return false;
+  }
+  const facilities = getTeamFacilityState(gameState, teamId);
+  return FACILITY_CATALOG.some((facility) => {
+    const current = facilities.facilities[facility.facilityId]?.level ?? 0;
+    const next = facility.levels.find((level) => level.level === current + 1);
+    return next != null && team.cash >= next.upgradeCost;
+  });
 }
 
 function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | null): GameFlowStep[] {
@@ -656,6 +679,23 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       status: hasResults ? "ready" : "optional",
       targetView: "season",
       teamId: activeTeamId,
+    }),
+    step({
+      stepId: "matchday_facilities",
+      label: "Gebäude prüfen (optional)",
+      cta: "Optional: Gebäude prüfen",
+      status: !hasActiveTeam
+        ? "blocked"
+        : !hasResults
+          ? "blocked"
+          : teamHasAffordableFacilityUpgrade(gameState, activeTeamId)
+            ? "optional"
+            : "completed",
+      targetView: "trainingV2",
+      targetPanel: "facilities",
+      teamId: activeTeamId,
+      optional: hasResults && teamHasAffordableFacilityUpgrade(gameState, activeTeamId),
+      warnings: teamHasAffordableFacilityUpgrade(gameState, activeTeamId) ? ["facility_upgrade_optional"] : [],
     }),
     step({
       stepId: "advance_to_next_matchday",

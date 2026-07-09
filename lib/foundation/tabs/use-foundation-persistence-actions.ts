@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -8,6 +8,7 @@ import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-se
 import { applyCompactSeasonArchiveSentinelIfNeeded } from "@/lib/foundation/apply-compact-season-archive-sentinel";
 import { invalidatePlayerAttributeSheetCache } from "@/lib/foundation/hydrate-player-attribute-sheet";
 import { invalidatePlayerProfileSessionCache } from "@/lib/foundation/player-profile-session-cache";
+import { invalidateTeamProfileSessionCache } from "@/lib/foundation/team-profile-session-cache";
 import {
   buildAutoPersistContentSignature,
   buildFoundationPersistPutBody,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import type { TrainingClassDraft, TrainingModeDraft } from "@/lib/foundation/tabs/foundation-page-types";
+import { foundationFetchWithRetry } from "@/lib/foundation/foundation-fetch-with-retry";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
 export type FoundationSaveScopedFeedSetters = {
@@ -130,6 +132,8 @@ export type UseFoundationPersistenceActionsInput = {
   showReadOnlyNotice: () => void;
   syncFoundationViewInUrl: (view: string) => void;
   setFreshSeasonStartMessage: Dispatch<SetStateAction<string | null>>;
+  onFetchSlow?: () => void;
+  onFetchSlowClear?: () => void;
 };
 
 export function useFoundationPersistenceActions(input: UseFoundationPersistenceActionsInput) {
@@ -168,7 +172,16 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     showReadOnlyNotice,
     syncFoundationViewInUrl,
     setFreshSeasonStartMessage,
+    onFetchSlow,
+    onFetchSlowClear,
   } = input;
+
+  const fetchRetryOptions = useMemo(
+    () => ({
+      onSlow: onFetchSlow,
+    }),
+    [onFetchSlow],
+  );
 
   const hasPersistedInitialState = useRef(false);
   const hasLoadedPersistentState = useRef(Boolean(initialPersistedSave));
@@ -301,96 +314,106 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         clearSaveScopedFeeds();
         if (activeSaveId && activeSaveId !== "loading-save") {
           invalidatePlayerProfileSessionCache({ saveId: activeSaveId });
+          invalidateTeamProfileSessionCache({ saveId: activeSaveId });
           invalidatePlayerAttributeSheetCache({ saveId: activeSaveId });
         }
       }
 
-      let response: Response;
       try {
-        response = await fetch(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {
-          cache: "no-store",
-        });
+        const fetchResult = await foundationFetchWithRetry<{
+          save?: { saveId: string; name?: string; gameState: GameState };
+          saves?: SaveSummary[];
+          _meta?: FoundationReadMeta;
+        }>(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {}, fetchRetryOptions);
+        if (!fetchResult.ok) {
+          console.warn("Save konnte gerade nicht geladen werden.", fetchResult.error, fetchResult.cause);
+          if (saveId || !hasLoadedPersistentState.current) {
+            setPersistenceError("Der Spielstand konnte nicht geladen werden.");
+          }
+          return null;
+        }
+        const payload = fetchResult.data;
+
+        if (!payload.save?.gameState) {
+          if (saveId || !hasLoadedPersistentState.current) {
+            setPersistenceError("Der Spielstand konnte nicht geladen werden.");
+          }
+          return null;
+        }
+
+        const normalizedGameState =
+          payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
+        const sponsorOffersBefore = JSON.stringify(normalizedGameState.seasonState.sponsorOffersByTeamId ?? {});
+        const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), options);
+        const sponsorOffersHydrated = sponsorOffersBefore !== JSON.stringify(nextGameState.seasonState.sponsorOffersByTeamId ?? {});
+
+        if (requestVersion !== loadSaveRequestVersion.current) {
+          return null;
+        }
+
+        hasPersistedInitialState.current = false;
+        hasLoadedPersistentState.current = true;
+        loadedWithCompactInitialRef.current = options.compactInitial ?? true;
+        autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
+        setGameState(nextGameState);
+        setPersistenceError(null);
+        onFetchSlowClear?.();
+        if (
+          sponsorOffersHydrated &&
+          payload._meta?.source !== "prisma" &&
+          !payload._meta?.readOnly &&
+          payload.save.saveId
+        ) {
+          void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+            console.warn("Sponsor-Hydration konnte nicht persistiert werden.", error);
+          });
+        }
+        if (payload.save.saveId !== activeSaveId) {
+          invalidatePlayerProfileSessionCache({ saveId: payload.save.saveId });
+          invalidateTeamProfileSessionCache({ saveId: payload.save.saveId });
+          invalidatePlayerAttributeSheetCache({ saveId: payload.save.saveId });
+          setSeasonOverviewSeasonId(nextGameState.season.id);
+        }
+        setActiveSaveId(payload.save.saveId);
+        setActiveSaveName(payload.save.name ?? "Oly Save");
+        setSaveSummaries(payload.saves ?? []);
+        if (payload._meta?.saveMode) {
+          setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
+        }
+        if (payload._meta) {
+          setReadMeta(payload._meta);
+        }
+        const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+        const nextTeamContext = saveSelectedTeamId
+          ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+          : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+              currentTeamId: selectedTeamId,
+              currentSource: activeManagerTeamSource,
+              initialTeamId: initialSelectedTeamId,
+              settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
+            });
+        setSelectedTeamId(nextTeamContext.teamId);
+        setActiveManagerTeamSource(nextTeamContext.source);
+        setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
+        if (nextTeamContext.teamId) {
+          setMarketTeamId(nextTeamContext.teamId);
+          persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
+        }
+
+        if (payload._meta?.source !== "prisma" && payload.save.saveId) {
+          void fetch(`/api/season/warmup-derivations?saveId=${encodeURIComponent(payload.save.saveId)}`, {
+            method: "POST",
+          }).catch(() => null);
+        }
+
+        return nextGameState;
       } catch (error) {
         console.warn("Save konnte gerade nicht geladen werden.", error);
+        if (saveId || !hasLoadedPersistentState.current) {
+          setPersistenceError("Der Spielstand konnte nicht geladen werden.");
+        }
         return null;
       }
-      if (!response.ok) {
-        return null;
-      }
-
-      const payload = (await response.json()) as {
-        save?: { saveId: string; name?: string; gameState: GameState };
-        saves?: SaveSummary[];
-        _meta?: FoundationReadMeta;
-      };
-
-      if (!payload.save?.gameState) {
-        return null;
-      }
-
-      const normalizedGameState =
-        payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
-      const sponsorOffersBefore = JSON.stringify(normalizedGameState.seasonState.sponsorOffersByTeamId ?? {});
-      const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), options);
-      const sponsorOffersHydrated = sponsorOffersBefore !== JSON.stringify(nextGameState.seasonState.sponsorOffersByTeamId ?? {});
-
-      if (requestVersion !== loadSaveRequestVersion.current) {
-        return null;
-      }
-
-      hasPersistedInitialState.current = false;
-      hasLoadedPersistentState.current = true;
-      loadedWithCompactInitialRef.current = options.compactInitial ?? true;
-      autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
-      setGameState(nextGameState);
-      if (
-        sponsorOffersHydrated &&
-        payload._meta?.source !== "prisma" &&
-        !payload._meta?.readOnly &&
-        payload.save.saveId
-      ) {
-        void persistLocalGameStateImmediately(nextGameState).catch((error) => {
-          console.warn("Sponsor-Hydration konnte nicht persistiert werden.", error);
-        });
-      }
-      if (payload.save.saveId !== activeSaveId) {
-        invalidatePlayerProfileSessionCache({ saveId: payload.save.saveId });
-        invalidatePlayerAttributeSheetCache({ saveId: payload.save.saveId });
-        setSeasonOverviewSeasonId(nextGameState.season.id);
-      }
-      setActiveSaveId(payload.save.saveId);
-      setActiveSaveName(payload.save.name ?? "Oly Save");
-      setSaveSummaries(payload.saves ?? []);
-      if (payload._meta?.saveMode) {
-        setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
-      }
-      if (payload._meta) {
-        setReadMeta(payload._meta);
-      }
-      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
-      const nextTeamContext = saveSelectedTeamId
-        ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
-        : resolvePreferredFoundationTeamContext(nextGameState.teams, {
-            currentTeamId: selectedTeamId,
-            currentSource: activeManagerTeamSource,
-            initialTeamId: initialSelectedTeamId,
-            settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
-          });
-      setSelectedTeamId(nextTeamContext.teamId);
-      setActiveManagerTeamSource(nextTeamContext.source);
-      setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
-      if (nextTeamContext.teamId) {
-        setMarketTeamId(nextTeamContext.teamId);
-        persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
-      }
-
-      if (payload._meta?.source !== "prisma" && payload.save.saveId) {
-        void fetch(`/api/season/warmup-derivations?saveId=${encodeURIComponent(payload.save.saveId)}`, {
-          method: "POST",
-        }).catch(() => null);
-      }
-
-      return nextGameState;
   }
 
   async function persistLocalGameStateImmediately(
@@ -407,6 +430,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         compactPut: loadedWithCompactInitialRef.current,
         materializeSeasonDerivations: options?.materializeSeasonDerivations,
       }),
+      fetchRetryOptions,
     );
 
     if (response.status === 409) {
@@ -433,6 +457,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       setSaveSummaries(payload.saves);
     }
     if (payload.save?.saveVersion != null) {
+      onFetchSlowClear?.();
       const newSaveVersion = payload.save.saveVersion;
       autoPersistContentSignatureRef.current = buildAutoPersistContentSignature({
         ...nextGameState,
@@ -494,26 +519,28 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       try {
-        const response = await fetch(buildStateApiPath(undefined, foundationSaveMode), {
+        const response = await foundationFetchWithRetry<{
+          save?: { saveId: string };
+          saves?: SaveSummary[];
+        }>(buildStateApiPath(undefined, foundationSaveMode), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
-        });
+        }, fetchRetryOptions);
 
         if (!response.ok) {
+          setPersistenceError("Save-Aktion fehlgeschlagen. Bitte erneut versuchen.");
           return;
         }
 
-        const payload = (await response.json()) as {
-          save?: { saveId: string };
-          saves?: SaveSummary[];
-        };
+        const payload = response.data;
 
         setSaveSummaries(payload.saves ?? []);
 
         if (payload.save?.saveId) {
+          onFetchSlowClear?.();
           if (requestVersion !== saveActionRequestVersion.current) {
             return;
           }
@@ -572,38 +599,30 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     let cancelled = false;
 
     async function loadPersistentState() {
-      let response: Response;
-      try {
-        response = await fetch(buildStateApiPath(initialSaveId ?? undefined, foundationSaveMode, { compactInitial: true }), {
-          cache: "no-store",
-        });
-      } catch (error) {
-        console.warn("Initialer Spielstand konnte gerade nicht geladen werden.", error);
-        if (!cancelled) {
-          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
-        }
-        return;
-      }
-      if (!response.ok || cancelled) {
-        if (!cancelled) {
-          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
-        }
-        return;
-      }
-
-      const payload = (await response.json()) as {
+      const fetchResult = await foundationFetchWithRetry<{
         save?: { saveId: string; name?: string; gameState: GameState };
         saves?: SaveSummary[];
         _meta?: FoundationReadMeta;
-      };
-      if (!payload.save?.gameState || cancelled) {
-        if (!cancelled) {
-          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
-        }
+      }>(buildStateApiPath(initialSaveId ?? undefined, foundationSaveMode, { compactInitial: true }), {}, fetchRetryOptions);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!fetchResult.ok) {
+        console.warn("Initialer Spielstand konnte gerade nicht geladen werden.", fetchResult.error, fetchResult.cause);
+        setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        return;
+      }
+
+      const payload = fetchResult.data;
+      if (!payload.save?.gameState) {
+        setBootstrapError("Der Spielstand konnte nicht geladen werden.");
         return;
       }
 
       setBootstrapError(null);
+      onFetchSlowClear?.();
 
       const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(
         payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState),

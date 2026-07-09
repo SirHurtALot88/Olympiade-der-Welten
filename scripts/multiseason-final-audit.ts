@@ -235,7 +235,36 @@ async function main() {
     };
   });
   const allFacilitiesZeroTeams = facilityTeamRows.filter((row) => row.levelSum === 0).length;
+  const rehaL1PlusCount = facilityTeamRows.filter((row) => (row.levels.recovery_center ?? 0) >= 1).length;
+  const teamsWithAnyBuilding = facilityTeamRows.filter((row) => row.levelSum > 0).length;
+  const trainingModeNoneCount = trainingModeCounts.none ?? 0;
   const budgetDeploy = summarizeBudgetDeploy(gs, seasonId);
+  const reservations = gs.seasonState.aiManagerBudgetReservations ?? {};
+  const buildingReservedTotal = Object.values(reservations).reduce((sum, row) => sum + (row.buildingBudget ?? 0), 0);
+  const transferReservedTotal = Object.values(reservations).reduce((sum, row) => sum + (row.transferBudget ?? 0), 0);
+  const seasonFacilitySpend = facilityEvents
+    .filter((event) => event.seasonId === seasonId && event.cost > 0)
+    .reduce((sum, event) => sum + event.cost, 0);
+  const seasonTransferSpend = gs.transferHistory
+    .filter(
+      (entry) =>
+        entry.seasonId === seasonId &&
+        entry.transferType === "buy" &&
+        entry.toTeamId &&
+        (entry.source === "ai_preseason_market_buy" ||
+          entry.source === "preseason_roster_repair_buy" ||
+          entry.source === "ai_preseason_market_apply" ||
+          entry.source === "ai_roster_fill"),
+    )
+    .reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
+  const buildingDeployPct =
+    buildingReservedTotal + seasonFacilitySpend > 0
+      ? round(pct(seasonFacilitySpend, buildingReservedTotal + seasonFacilitySpend))
+      : null;
+  const transferDeployPct =
+    transferReservedTotal + seasonTransferSpend > 0
+      ? round(pct(seasonTransferSpend, transferReservedTotal + seasonTransferSpend))
+      : null;
 
   const report = {
     saveId,
@@ -267,7 +296,20 @@ async function main() {
       organicEver: orgAny.length,
       organicWithNetGain: orgWithGains.length,
       avgFatigue: round(avgFatigue),
+      avgFatigueRostered: round(avgFatigue),
       trainingModeCounts,
+      trainingModeNoneCount,
+    },
+    leagueKpis: {
+      rehaL1PlusCount,
+      teamsWithAnyBuilding,
+      facilityEventsTotal: facilityEvents.length,
+      avgFatigueRostered: round(avgFatigue),
+      trainingModeNoneCount,
+      buildingBucketDeployPct: buildingDeployPct,
+      transferBucketDeployPct: transferDeployPct,
+      seasonFacilitySpend: round(seasonFacilitySpend),
+      seasonTransferSpend: round(seasonTransferSpend),
     },
     transfers: {
       total: gs.transferHistory.length,

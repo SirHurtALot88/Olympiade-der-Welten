@@ -6,7 +6,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { buildGameStateContentSignature, getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import { applyDefaultTrainingFieldsToRosteredPlayers } from "@/lib/training/player-training-backfill";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
@@ -22,6 +22,7 @@ import {
   RECENTLY_SOLD_SAME_PRESEASON_BLOCKER,
   RECENTLY_SOLD_SAME_PRESEASON_OVERRIDE_WARNING,
 } from "@/lib/market/anti-rebuy-guard";
+import { assessFreeAgentDispositionTowardTeam } from "@/lib/morale/player-morale-service";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { buildTransfermarktSellCoachingView } from "@/lib/market/transfermarkt-sell-coaching-service";
 import { applySellBoardReactionToGameState } from "@/lib/market/transfermarkt-sell-board-reaction";
@@ -1020,7 +1021,19 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
       ? Math.max(0, roundValue(params.purchasePriceOverride))
       : null;
   const purchasePrice = purchasePriceOverride ?? marketValueReference;
-  const salary = player ? getPlayerSalary(player) : null;
+  const baseSalary = player ? getPlayerSalary(player) : null;
+  const formerTeamDisposition =
+    player && team && !playerAlreadyOwned
+      ? assessFreeAgentDispositionTowardTeam({
+          gameState,
+          playerId: player.id,
+          teamId: params.teamId,
+        })
+      : null;
+  const salary =
+    baseSalary != null && formerTeamDisposition?.applies
+      ? roundValue(baseSalary * formerTeamDisposition.salaryMultiplier, 2)
+      : baseSalary;
   const cashBefore = teamContext?.cash ?? null;
   const salaryBefore = teamContext?.salaryTotal ?? 0;
   const marketValueBefore = teamContext?.marketValueTotal ?? 0;
@@ -1112,6 +1125,12 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   }
   if (recentlySoldBySameTeam && params.allowRecentlySoldRebuyOverride) {
     warnings.push(RECENTLY_SOLD_SAME_PRESEASON_OVERRIDE_WARNING);
+  }
+  if (formerTeamDisposition?.blockingReason) {
+    blockingReasons.push(formerTeamDisposition.blockingReason);
+  }
+  if (formerTeamDisposition?.warnings.length) {
+    warnings.push(...formerTeamDisposition.warnings);
   }
   const seasonOneMarketBlocker = resolveSeasonOneMarketBuyBlocker(gameState.season.id, params.transferSource);
   if (seasonOneMarketBlocker) {
@@ -2327,7 +2346,9 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
       ...gameState.transferHistory,
     ],
   };
-  const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, purchasePrice);
+  const nextState = applyDefaultTrainingFieldsToRosteredPlayers(
+    applyTransferBudgetSpend(nextStateBase, params.teamId, purchasePrice),
+  );
 
   runContext.save = {
     ...runContext.save,

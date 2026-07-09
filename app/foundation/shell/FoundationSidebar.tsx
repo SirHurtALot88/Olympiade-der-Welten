@@ -129,6 +129,9 @@ export default function FoundationSidebar({
 
   return (
     <aside className="foundation-sidebar" data-testid="foundation-sidebar" aria-label="Foundation Navigation">
+      <a className="foundation-skip-link" href="#foundation-main-content">
+        Zum Hauptinhalt springen
+      </a>
       <div className="foundation-sidebar-brand">
         <Link className="foundation-sidebar-save-link" href="/">
           Spielstände
@@ -171,7 +174,14 @@ export default function FoundationSidebar({
                     title="Reihenfolge ändern"
                     {...getHandleDragProps(group.id, item.id)}
                   >
-                    ⋮⋮
+                    <svg viewBox="0 0 12 12" width="12" height="12" focusable="false" aria-hidden="true">
+                      <circle cx="3" cy="2" r="1" />
+                      <circle cx="9" cy="2" r="1" />
+                      <circle cx="3" cy="6" r="1" />
+                      <circle cx="9" cy="6" r="1" />
+                      <circle cx="3" cy="10" r="1" />
+                      <circle cx="9" cy="10" r="1" />
+                    </svg>
                   </span>
                   {item.icon ? <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span> : null}
                   <span>{item.label}</span>

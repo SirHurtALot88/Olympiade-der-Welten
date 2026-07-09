@@ -988,3 +988,63 @@ describe("colorspam penalty", () => {
     expect(computeColorspamPenalty(7, { identityPrimaryColor: true })).toBe(-12);
   });
 });
+
+describe("classspam penalty", () => {
+  it("ramps linearly −4 per player from the 4th onward", async () => {
+    const { computeClassspamPenalty } = await import("@/lib/ai/ai-needs-picks-compare-service");
+    expect(computeClassspamPenalty(0)).toBe(0);
+    expect(computeClassspamPenalty(1)).toBe(0);
+    expect(computeClassspamPenalty(2)).toBe(0);
+    expect(computeClassspamPenalty(3)).toBe(-4);
+    expect(computeClassspamPenalty(4)).toBe(-8);
+    expect(computeClassspamPenalty(5)).toBe(-12);
+    expect(computeClassspamPenalty(6)).toBe(-16);
+  });
+});
+
+describe("season1 single-pick spend cap", () => {
+  const anchors = {
+    q25Price: 8,
+    q50Price: 18,
+    q75Price: 32,
+    q85Price: 42,
+    q90Price: 48,
+    q95Price: 62,
+  };
+
+  it("keeps bargain_hunter premium picks far below mega-fees when many slots remain", async () => {
+    const { resolveSeason1SinglePickSpendCap } = await import("@/lib/ai/ai-needs-picks-compare-service");
+    const cap = resolveSeason1SinglePickSpendCap({
+      remainingCash: 220,
+      targetCashLeft: 40,
+      slotsRemaining: 8,
+      lane: "star",
+      gmArchetype: "bargain_hunter",
+      premiumAppetite: 0.4,
+      anchors,
+    });
+    expect(cap).not.toBeNull();
+    expect(cap!).toBeLessThan(70);
+    expect(cap!).toBeGreaterThan(20);
+  });
+
+  it("downgrades an over-cap superstar pick to a legal cheaper alternative", async () => {
+    const { enforceSeason1SinglePickSpendCapForStep } = await import("@/lib/ai/ai-needs-picks-compare-service");
+    const result = enforceSeason1SinglePickSpendCapForStep({
+      season1OptimumMode: true,
+      top: { playerId: "p-expensive", price: 112, finalScore: 120, focusTeamStatus: "ok" },
+      lane: "superstar",
+      singlePickCap: 45,
+      rankedSelectionCandidates: [
+        { playerId: "p-expensive", price: 112, finalScore: 120, focusTeamStatus: "ok" },
+        { playerId: "p-core", price: 38, finalScore: 105, focusTeamStatus: "ok" },
+      ],
+      rankedTargetAwareCandidates: [],
+      pickAffordableCash: 200,
+      stepIndex: 4,
+    });
+    expect(result.top?.playerId).toBe("p-core");
+    expect(result.breakLoop).toBe(false);
+    expect(result.warning).toContain("Einzel-Pick-Cap");
+  });
+});

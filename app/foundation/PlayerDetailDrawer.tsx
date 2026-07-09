@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
@@ -40,6 +40,7 @@ import { getTrainingModePresentation } from "@/lib/training/training-mode-presen
 import { resolveOrganicRegressionCombinedTotal } from "@/lib/training/organic-season-progression";
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
+import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -1159,6 +1160,7 @@ export default function PlayerDetailDrawer({
   layerClassName?: string;
   variant?: "drawer" | "page";
 }) {
+  const dialogRef = useRef<HTMLElement | null>(null);
   const [selectedAxisId, setSelectedAxisId] = useState<string | null>(null);
   const [topDisciplineColumnOrder, setTopDisciplineColumnOrder] = useState<TopDisciplineColumnId[]>(TOP_DISCIPLINE_COLUMN_ORDER);
   const [topDisciplineSort, setTopDisciplineSort] = useState<{
@@ -1185,6 +1187,8 @@ export default function PlayerDetailDrawer({
   useEffect(() => {
     setSelectedAxisId(null);
   }, [data?.playerId]);
+
+  useFocusTrap(Boolean(data) && variant !== "page", dialogRef);
 
   const trainingAttributeColumns = useMemo(
     () =>
@@ -1234,6 +1238,7 @@ export default function PlayerDetailDrawer({
   const seasonSnapshotInjuries = activeHistoryRow?.injuriesCount ?? 0;
   const careerSnapshotInjuries = data.injurySummary.totalInjuries;
   const seasonSnapshotTopGains = trainingRow?.organicForecast.topGains ?? [];
+  const marketValueHistoryRows = data.historyRows.filter((row) => row.marketValue != null);
   const handleTopDisciplineSort = (columnId: TopDisciplineColumnId) => {
     setTopDisciplineSort((current) => ({
       columnId,
@@ -1829,6 +1834,9 @@ export default function PlayerDetailDrawer({
                           <th
                             key={`top-discipline-header-${columnId}`}
                             className={`player-drawer-draggable-header${draggedTopDisciplineColumnId === columnId ? " is-dragging" : ""}`}
+                            aria-sort={
+                              isActiveSort ? (topDisciplineSort.direction === "asc" ? "ascending" : "descending") : "none"
+                            }
                             draggable
                             onDragStart={(event) => handleTopDisciplineColumnDragStart(columnId, event)}
                             onDragOver={(event) => {
@@ -2534,6 +2542,33 @@ export default function PlayerDetailDrawer({
                   Alte Seasons kommen aus gespeicherten Season-Snapshots. Fehlende Felder bedeuten: der damalige Snapshot
                   wurde noch vor der vollstaendigen Spieler-Metric-Archivierung erstellt.
                 </p>
+                {marketValueHistoryRows.length > 0 ? (
+                  <div className="player-drawer-injury-history" data-testid="player-drawer-market-value-history">
+                    <h4>Marktwert-Verlauf</h4>
+                    <div className="table-shell player-drawer-injury-history-shell">
+                      <table className="team-table player-drawer-injury-history-table">
+                        <thead>
+                          <tr>
+                            <th>Saison</th>
+                            <th>Marktwert</th>
+                            <th>Delta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketValueHistoryRows.map((row) => (
+                            <tr key={`market-value-history-${row.seasonId}`}>
+                              <td>{row.seasonName}</td>
+                              <td>{formatMoney(row.marketValue)}</td>
+                              <td className={getMoneyDeltaToneClass(row.marketValueBaselineDelta, "higher")}>
+                                {row.marketValueBaselineDelta != null ? formatSignedMoney(row.marketValueBaselineDelta) : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="player-drawer-callout">
@@ -2707,6 +2742,7 @@ export default function PlayerDetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={`${data.name} Details`}
+        ref={dialogRef}
         onClick={(event) => event.stopPropagation()}
       >
         {profileContent}

@@ -107,7 +107,7 @@ export function applyTrainingXpFacilityModifiers(
 }
 
 /** Cumulative flat recovery bonus by REHA level (Basis 20 → L1=22, L2=24, L3=26, L4=29, L5=32 at 100% condition). */
-export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 2, 4, 6, 9, 12] as const;
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 3, 5, 7, 10, 13] as const;
 
 export function getRecoveryFlatBonusAtLevel(level: number) {
   return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;

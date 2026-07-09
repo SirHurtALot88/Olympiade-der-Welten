@@ -13,6 +13,8 @@ import {
 } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   formatGmDismissalReason,
@@ -1228,44 +1230,48 @@ export default function SeasonStandingsV2Client({
                 Tabelle
               </TooltipHeading>
               <div className="season-v2-inline-sort-row" aria-label="Schnellsortierung Saisonstand">
-                <button
-                  className={`secondary-button inline-button${mobileCardsView ? " is-active" : ""}`}
-                  type="button"
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${mobileCardsView ? " is-active" : ""}`}
                   data-testid="season-v2-mobile-cards-toggle"
                   onClick={() => setMobileCardsView((current) => !current)}
+                  title="Wechselt zwischen Tabellen- und Kartenansicht auf kleineren Screens."
                 >
                   {mobileCardsView ? "Tabelle" : "Karten"}
-                </button>
-                <button
-                  className={`secondary-button inline-button${showFinanceColumns ? "" : " is-active"}`}
-                  type="button"
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${showFinanceColumns ? "" : " is-active"}`}
                   onClick={() => setShowFinanceColumns(false)}
+                  title="Kernwerte mit Punkten und Bereichs-PPs."
                 >
-                  Kern
-                </button>
-                <button
-                  className={`secondary-button inline-button${showFinanceColumns ? " is-active" : ""}`}
-                  type="button"
+                  Kernwerte
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${showFinanceColumns ? " is-active" : ""}`}
                   onClick={() => setShowFinanceColumns(true)}
+                  title="Cash, Gehalt, GuV, Sponsor und Marktwert."
                 >
                   Finanzen
-                </button>
+                </FoundationButton>
                 {!showFullStandingsTable && sortedStandingsRows.length > 6 ? (
-                  <button className="secondary-button inline-button" type="button" onClick={() => setShowFullStandingsTable(true)}>
+                  <FoundationButton variant="secondary" className="inline-button" onClick={() => setShowFullStandingsTable(true)} title="Zeigt die komplette Tabelle statt Top 5 plus Fokus-Team.">
                     Alle {sortedStandingsRows.length} Teams
-                  </button>
+                  </FoundationButton>
                 ) : showFullStandingsTable && sortedStandingsRows.length > 6 ? (
-                  <button className="secondary-button inline-button" type="button" onClick={() => setShowFullStandingsTable(false)}>
+                  <FoundationButton variant="secondary" className="inline-button" onClick={() => setShowFullStandingsTable(false)} title="Reduziert die Ansicht auf Top 5 plus dein Team.">
                     Top 5
-                  </button>
+                  </FoundationButton>
                 ) : null}
-                <button
-                  className={`secondary-button inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
-                  type="button"
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
                   onClick={() => toggleStandingsSort("points")}
+                  title="Sortiert die Tabelle direkt nach Punkten."
                 >
                   Punkte
-                </button>
+                </FoundationButton>
               </div>
             </div>
           </div>
@@ -1683,7 +1689,7 @@ export default function SeasonStandingsV2Client({
                 </article>
               ))
             ) : (
-              <p className="muted">Noch kein Archiv gespeichert.</p>
+              <EmptyState title="Noch kein Archiv gespeichert" text="Sobald die erste Saison abgeschlossen ist, erscheinen hier die Snapshots." />
             )}
           </div>
         </section>
@@ -1708,7 +1714,7 @@ export default function SeasonStandingsV2Client({
                 </button>
               ))
             ) : (
-              <p className="muted">Kein extra Archiv-Diszi-Board für diese Auswahl vorhanden.</p>
+              <EmptyState title="Keine Diszi-Leader" text="Für diese Auswahl ist noch kein Archiv-Diszi-Board vorhanden." />
             )}
           </div>
         </section>

@@ -3232,7 +3232,13 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                     handleAdvanceArenaStep();
                   }}
                 >
-                  Weiter
+                  {phaseIndex === slotsPhaseIndex && revealedSlotCount < maxSlotRevealCount
+                    ? "Naechster Reveal"
+                    : !canShowResultLayer && activeDisciplinePhase === "d1" && activeDisciplineRevealComplete
+                      ? `${d2Label} freischalten`
+                      : !canShowResultLayer && activeDisciplinePhase === "d2" && activeDisciplineRevealComplete
+                        ? "Result freischalten"
+                        : "Naechster Reveal"}
                 </button>
               )}
             </div>
@@ -3502,6 +3508,21 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             </div>
           ) : (
             <>
+              {canShowResultLayer ? (
+                <div className="arena-v2-podium-grid" data-testid="arena-v2-top-player-podium" aria-label="Topspieler Podium">
+                  {ppWinnerCards.slice(0, 3).map((player, index) => (
+                    <article key={`arena-v2-podium-${player.playerId}`} className={`arena-v2-podium-card is-rank-${index + 1}`}>
+                      <span className="arena-v2-podium-kicker">#{index + 1} Top Player</span>
+                      <strong>{player.playerName}</strong>
+                      <small>{player.teamName} · {player.disciplineName}</small>
+                      <div className="arena-v2-podium-stats">
+                        <span>{formatDecimalScore(player.finalPlayerScore, 1)} Score</span>
+                        <span>{player.pointsAwarded != null ? `${formatDecimalScore(player.pointsAwarded, 1)} PPs` : "PPs —"}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
               {mvpSpotlightActive && mvpSpotlightPlayer ? (
                 <article
                   className="arena-v2-mvp-spotlight"
@@ -3646,14 +3667,43 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   sourceRow?.fatigueAdjustedScore != null && sourceRow.score != null
                     ? formatSignedDelta(Number((sourceRow.fatigueAdjustedScore - sourceRow.score).toFixed(1)))
                     : "—";
+                const mutatorLabel =
+                  sourceRow?.totalMutatorScore != null ? formatSignedDelta(sourceRow.totalMutatorScore) : "—";
+                const leadFactor = [
+                  {
+                    label: "Taktik",
+                    value:
+                      sourceRow?.pushScore != null
+                        ? formatSignedDelta(sourceRow.pushScore)
+                        : taktikLabel,
+                    weight: Math.abs(sourceRow?.pushScore ?? 0),
+                  },
+                  {
+                    label: "Form",
+                    value: formLabel,
+                    weight: Math.abs(sourceRow?.formCardModifier ?? 0),
+                  },
+                  {
+                    label: "Mutator",
+                    value: mutatorLabel,
+                    weight: Math.abs(sourceRow?.totalMutatorScore ?? 0),
+                  },
+                ].sort((left, right) => right.weight - left.weight)[0];
                 return (
                   <article key={`arena-result-reason-${row.teamId}`} className="arena-v2-result-reason-card">
                     <strong>{row.teamName}</strong>
+                    <span className="arena-v2-result-reason-headline">
+                      Warum vorn? {leadFactor?.label ?? "Gesamtpaket"} {leadFactor?.value ?? "—"}
+                    </span>
                     <div className="arena-v2-result-reason-chips">
                       <span className="arena-v2-result-reason-chip is-taktik">Taktik {taktikLabel}</span>
                       <span className="arena-v2-result-reason-chip is-form">Form {formLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-mutator">Mutator {mutatorLabel}</span>
                       <span className="arena-v2-result-reason-chip is-fatigue">Erschöpfung {fatigueLabel}</span>
                     </div>
+                    <small>
+                      Score {formatDecimalScore(row.score, 1)} · PPs {formatDecimalScore(row.points, 1)}
+                    </small>
                   </article>
                 );
               })}
@@ -3681,6 +3731,33 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   Zum Training
                 </button>
               ) : null}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer ? (
+            <div className="arena-v2-next-step-links" data-testid="arena-v2-next-steps">
+              <strong>Naechster sinnvoller Schritt</strong>
+              <div className="arena-v2-next-step-actions">
+                {props.onOpenMatchdayResult ? (
+                  <button type="button" className="secondary-button inline-button" onClick={props.onOpenMatchdayResult}>
+                    Zur Tabelle des Spieltags
+                  </button>
+                ) : null}
+                {props.onOpenTraining ? (
+                  <button type="button" className="secondary-button inline-button" onClick={props.onOpenTraining}>
+                    Zum Training
+                  </button>
+                ) : null}
+                {props.onOpenSeason ? (
+                  <button type="button" className="primary-button inline-button" onClick={props.onOpenSeason}>
+                    Zum Saisonstand
+                  </button>
+                ) : null}
+                {props.onBackToLineup ? (
+                  <button type="button" className="ghost-button inline-button" onClick={handleBackToLineup}>
+                    Zur Einsatzliste
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </section>

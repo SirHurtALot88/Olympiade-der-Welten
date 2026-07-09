@@ -40,3 +40,13 @@ Wenn in kuenftigen Chats nach DB-Setup oder Supabase-Zugang gefragt wird:
 - fachliche Referenz: dieser Ordner `Olympiade der Welten`
 - kanonische Env-Datei: `Olympiade der Welten/.env.local`
 - technische Root-Datei: nur noch Symlink auf diese Datei
+
+## Projektroot-Guard
+
+Fuer lokale Spezialfaelle kann der Projektroot-Guard abgeschaltet werden:
+
+```env
+OLY_APP_DISABLE_PROJECT_ROOT_GUARD=1
+```
+
+Nur fuer Debug-/Migrationssituationen verwenden, wenn der App-Start bewusst ausserhalb der normalen Projektroot-Pruefung laufen soll.

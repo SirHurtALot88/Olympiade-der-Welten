@@ -114,6 +114,7 @@ async function executeAiPreseasonBackgroundWork(input: {
         "set_training_focus",
         "set_training_intensity",
         "set_player_training_modes",
+        "set_player_training_classes",
         "mark_contract_strategy",
         "mark_sell_strategy",
       ],
