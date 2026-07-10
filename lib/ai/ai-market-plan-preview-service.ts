@@ -375,6 +375,28 @@ function chooseSellCandidates(
         return preview ? { candidate: preview, score: preview.strategicSellScore ?? preview.sellPriority ?? 0, threshold: 30, teamProfile: "default" as const } : null;
       }
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
+
+      // Canonical path: the preview already computed the composite sell score once inside
+      // buildAiTransfermarktSellPreview (2026-07-10 sell-score consolidation) and carries it as
+      // strategicSellScore/compositeThreshold/compositeTeamProfile. Re-scoring here would just
+      // recompute the same number (or diverge from doctrine adjustments layered onto `preview`
+      // by applyDoctrineToSellCandidates) — reuse it instead of calling computeCompositeSellScore
+      // again. market-plan calls the preview with fullRosterCandidates:true, so `preview` should be
+      // present for every roster player; the branch below is a rare fallback for the case a roster
+      // player genuinely has no preview entry (verified: not expected to trigger under this call site).
+      if (preview) {
+        const score = preview.strategicSellScore ?? preview.sellPriority ?? preview.sellPriorityScore ?? 0;
+        return {
+          candidate: {
+            ...preview,
+            purchasePrice: preview.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
+          },
+          score,
+          threshold: preview.compositeThreshold,
+          teamProfile: preview.compositeTeamProfile,
+        };
+      }
+
       const composite = computeCompositeSellScore({
         teamId: team.teamId,
         team: teamState,
@@ -383,17 +405,16 @@ function chooseSellCandidates(
         roster,
         gameState,
         saveId: gameState.season.id,
-        expectedSellValue: preview?.expectedSellValue ?? null,
-        marketValue: preview?.marketValue ?? economy.marketValue,
-        salary: preview?.salary ?? economy.salary,
-        purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
+        expectedSellValue: economy.marketValue ?? null,
+        marketValue: economy.marketValue,
+        salary: economy.salary,
         teamCash: teamState.cash ?? 0,
         teamSalaryTotal: salaryTotal,
         cashPressureScore,
         explanation: team.explanation,
         sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
       });
-      const candidate = preview ?? ({
+      const candidate = {
         activePlayerId: roster.id,
         playerId: player.id,
         playerName: player.name,
@@ -404,6 +425,7 @@ function chooseSellCandidates(
         mvs: null,
         salary: economy.salary ?? null,
         marketValue: economy.marketValue ?? null,
+        purchasePrice: economy.purchasePrice ?? roster.purchasePrice ?? null,
         expectedSellValue: economy.marketValue ?? null,
         contractLength: roster.contractLength,
         rosterAfter: null,
@@ -426,15 +448,11 @@ function chooseSellCandidates(
         sellPriority: composite.total,
         sellPriorityScore: composite.total,
         strategicSellScore: composite.total,
-      } satisfies AiSellPreviewCandidate);
+        compositeThreshold: composite.threshold,
+        compositeTeamProfile: composite.teamProfile,
+      } satisfies AiSellPreviewCandidate;
       return {
-        candidate: {
-          ...candidate,
-          purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
-          strategicSellScore: composite.total,
-          sellPriority: composite.total,
-          sellPriorityScore: composite.total,
-        },
+        candidate,
         score: composite.total,
         threshold: composite.threshold,
         teamProfile: composite.teamProfile,

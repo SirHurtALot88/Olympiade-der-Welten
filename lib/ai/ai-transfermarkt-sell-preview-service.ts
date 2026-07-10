@@ -26,6 +26,7 @@ import { assessTeamSellRunwayPressure, estimateBuyoutLikelihood, isAttractivePro
 import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
+import { computeCompositeSellScore, type CompositeSellTeamProfile } from "@/lib/ai/ai-composite-sell-score";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
@@ -100,6 +101,8 @@ export type AiSellPreviewCandidate = {
   strategicSellScore?: number | null;
   sellDecisionLabel?: string | null;
   productiveElite?: boolean;
+  compositeThreshold: number;
+  compositeTeamProfile: CompositeSellTeamProfile;
 };
 
 export type AiSellPreviewTeamEntry = {
@@ -808,6 +811,31 @@ function buildCandidate(
     doctrine,
   });
 
+  // Canonical final rank: the composite sell score is the single source of truth for
+  // sellPriority/sellPriorityScore/strategicSellScore (2026-07-10 sell-score consolidation).
+  // evaluateAiSellDecision above still uses the decision-engine `sellPriority` internally to
+  // derive its reason codes / intent scores — only the FINAL score fields are overridden here.
+  const composite = computeCompositeSellScore({
+    teamId: team.teamId,
+    team,
+    identity,
+    player,
+    roster,
+    gameState: context.gameState,
+    saveId: context.gameState.season.id,
+    expectedSellValue,
+    marketValue,
+    salary,
+    teamCash: team.cash ?? 0,
+    teamSalaryTotal: salaryTotal,
+    cashPressureScore: sellRunway.cashPressureScore,
+    // Same team-strategy signal the market-plan path previously fed the composite (team.explanation):
+    // drives the identityLoyalty term in performanceKeep. Passing "" would silently drop it.
+    explanation: strategy.summary,
+    sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
+  });
+  const compositeSellPriority = Math.round(clamp(composite.total, 0, 100));
+
   return {
     activePlayerId: roster.id,
     playerId: player.id,
@@ -843,13 +871,15 @@ function buildCandidate(
     boardTrustReasons: boardTrust.reasons,
     boardTrustWarnings: boardTrust.warnings,
     salaryCapMultiplier: boardTrust.salaryCapMultiplier,
-    sellPriority,
-    sellPriorityScore: sellPriority,
+    sellPriority: compositeSellPriority,
+    sellPriorityScore: compositeSellPriority,
     sellIntentScore: sellDecision.sellIntentScore,
     keepIntentScore: sellDecision.keepIntentScore,
-    strategicSellScore: sellDecision.strategicSellScore,
+    strategicSellScore: compositeSellPriority,
     sellDecisionLabel: sellDecision.sellDecisionLabel,
     productiveElite: sellDecision.productiveElite,
+    compositeThreshold: composite.threshold,
+    compositeTeamProfile: composite.teamProfile,
   } satisfies AiSellPreviewCandidate;
 }
 
