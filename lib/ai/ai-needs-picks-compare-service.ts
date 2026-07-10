@@ -852,17 +852,17 @@ type SuperstarCapPickCandidate = {
 };
 
 /** Block/downgrade 65+ MW picks once a team hit its S1 superstar cap (after all lane fallbacks). */
-export function enforceSeason1SuperstarPickCapForStep(input: {
+export function enforceSeason1SuperstarPickCapForStep<T extends SuperstarCapPickCandidate>(input: {
   season1OptimumMode: boolean;
   gameState: GameState;
   teamId: string;
   themeSimGameState: GameState;
-  top: SuperstarCapPickCandidate | null;
-  rankedSelectionCandidates: SuperstarCapPickCandidate[];
-  rankedTargetAwareCandidates: SuperstarCapPickCandidate[];
+  top: T | null;
+  rankedSelectionCandidates: T[];
+  rankedTargetAwareCandidates: T[];
   pickAffordableCash: number;
   stepIndex: number;
-}): { top: SuperstarCapPickCandidate | null; warning: string | null; breakLoop: boolean } {
+}): { top: T | null; warning: string | null; breakLoop: boolean } {
   const superstarFloor = resolveMarketBracketFloorMw("superstar");
   if (
     !input.season1OptimumMode ||
@@ -998,12 +998,14 @@ export function enforceSeason1SinglePickSpendCapForStep(input: {
   ) {
     return { top: input.top, warning: null, breakLoop: false };
   }
+  // Narrowed to number by the guard above; capture locally so the closures keep the non-null type.
+  const singlePickCap = input.singlePickCap;
   const cappedAlternative =
     input.rankedSelectionCandidates.find(
       (entry) =>
         entry.playerId !== input.top?.playerId &&
         entry.price != null &&
-        entry.price <= input.singlePickCap + 0.01 &&
+        entry.price <= singlePickCap + 0.01 &&
         entry.focusTeamStatus !== "blocked" &&
         canAffordWithoutNegativeCash(entry.price, input.pickAffordableCash) &&
         (entry.finalScore ?? 0) >= (input.top?.finalScore ?? 0) - 22,
@@ -1012,7 +1014,7 @@ export function enforceSeason1SinglePickSpendCapForStep(input: {
       (entry) =>
         entry.playerId !== input.top?.playerId &&
         entry.price != null &&
-        entry.price <= input.singlePickCap + 0.01 &&
+        entry.price <= singlePickCap + 0.01 &&
         entry.focusTeamStatus !== "blocked" &&
         canAffordWithoutNegativeCash(entry.price, input.pickAffordableCash),
     ) ??
@@ -1390,6 +1392,8 @@ const MINIMUM_TOP_UP_SCORE_BREAKDOWN: AiNeedsPicksCandidateScore["scoreBreakdown
   mercenaryNegativeFitPenalty: 0,
   replacementFitScore: 0,
   reserveTierPenalty: 0,
+  slotPurposeMatchScore: 0,
+  envelopeSpreadFitScore: 0,
 };
 
 function buildMinimumTopUpPlannedPick(input: {
@@ -4402,9 +4406,7 @@ function filterIdentityEligibleCandidates(input: {
         return false;
       }
       if (input.preserveMinimumPool) {
-        if (entry.eligibility.status === "eligible") {
-          return true;
-        }
+        // status is already narrowed to non-"eligible" here (handled above at line ~4398)
         return !hasBetterFocusAlternative({
           entries: evaluated,
           current: entry.candidate,
@@ -5874,10 +5876,12 @@ function buildBudgetLanes(input: {
       ? (["cheap_fill", "backup", "depth", "specialist", "core", "star", "superstar"] as AiNeedsPickLane[]).reduce(
           (acc, lane) => {
             const laneSlots = envelopeSlots.filter((slot) => slot.lane === lane);
+            // specialist is a lane but not a distinct cost band — it tracks the core band (see line ~807).
+            const costBand: AiNeedsPickCostBand = lane === "specialist" ? "core" : lane;
             if (laneSlots.length === 0) {
-              acc.perPickCap[lane] = sharedCostBandCaps[lane];
+              acc.perPickCap[lane] = sharedCostBandCaps[costBand];
               acc.laneSpendTotals[lane] = 0;
-              acc.priceCaps[lane] = sharedCostBandCaps[lane];
+              acc.priceCaps[lane] = sharedCostBandCaps[costBand];
               return acc;
             }
             const targetSum = roundValue(laneSlots.reduce((sum, slot) => sum + slot.targetMw, 0), 2);
@@ -6107,12 +6111,16 @@ function buildSimulatedThemeGameState(input: {
       );
       return (
         existing ?? {
+          id: `synthetic-${input.teamId}-${playerId}`,
           teamId: input.teamId,
           playerId,
           activePlayerId: playerId,
           salary: 0,
+          upkeep: 0,
           currentValue: 0,
           contractLength: 1,
+          roleTag: "bench" as const,
+          joinedSeasonId: input.gameState.season.id,
         }
       );
     });
@@ -6337,8 +6345,6 @@ function getBudgetStretchEnvelope(input: {
     ((input.pickPhase === "minimum_skeleton" || input.pickPhase === "early_core") &&
       eliteFit &&
       input.lane === "core");
-  const healthyEliteStretch =
-    posture === "healthy" && eliteFit && input.lane === "core" && (input.cashStrategy.spendFactor ?? 1) >= 0.98;
   const eliteCoreLaneStretch =
     eliteFit &&
     input.lane === "core" &&
@@ -6347,7 +6353,7 @@ function getBudgetStretchEnvelope(input: {
   const canStretch =
     eliteCoreLaneStretch ||
     ((highFit || eliteFit) &&
-      (aggressivePosture || balancedAttack || cashRichAttack || healthyEliteStretch) &&
+      (aggressivePosture || balancedAttack || cashRichAttack) &&
       phaseAllowsStretch);
   if (!canStretch) {
     return {
@@ -8379,7 +8385,7 @@ function buildTeamEntry(input: {
       );
     }
 
-    let top = relativeMarketCandidates[0] ?? null;
+    let top: AiNeedsPicksCandidateScore | null = relativeMarketCandidates[0] ?? null;
     if (mustContinueTowardOptimum && top && rankedSelectionCandidates.length === 0) {
       warnings.push(`Schritt ${stepIndex + 1}: optimum_minus_2_depth_pick`);
     }
@@ -8465,14 +8471,15 @@ function buildTeamEntry(input: {
       }
 
       if (top && normalizeTeamCode(team.shortCode || team.teamId) === "C-S" && isColdSteelThemeBreaker(top.className, top.race)) {
+        const currentTop = top;
         const existingThemeBreakers = plannedPicks.filter((pick) => isColdSteelThemeBreaker(pick.className, pick.race)).length;
         const cleanAlternative = rankedSelectionCandidates.find(
           (entry) =>
-            entry.playerId !== top?.playerId &&
+            entry.playerId !== currentTop.playerId &&
             !isColdSteelThemeBreaker(entry.className, entry.race) &&
             entry.focusTeamStatus !== "blocked" &&
-            (entry.price == null || top?.price == null || entry.price <= top.price * 1.45 || entry.price <= (top.price ?? 0) + 12) &&
-            entry.finalScore >= top.finalScore - (existingThemeBreakers > 0 ? 16 : 10) &&
+            (entry.price == null || currentTop.price == null || entry.price <= currentTop.price * 1.45 || entry.price <= (currentTop.price ?? 0) + 12) &&
+            entry.finalScore >= currentTop.finalScore - (existingThemeBreakers > 0 ? 16 : 10) &&
             (entry.scoreBreakdown.teamIdentityScore >= 2 || entry.scoreBreakdown.needMatchScore >= 4),
         );
         if (cleanAlternative && (existingThemeBreakers > 0 || cleanAlternative.finalScore >= top.finalScore - 6)) {
@@ -8482,13 +8489,14 @@ function buildTeamEntry(input: {
       }
 
       if (top && slotBrief && (lane.lane === "star" || lane.lane === "superstar" || lane.lane === "core" || lane.lane === "specialist")) {
+        const currentTop = top;
         const purposeUpgrade = rankedSelectionCandidates.find(
           (entry) =>
-            entry.playerId !== top?.playerId &&
+            entry.playerId !== currentTop.playerId &&
             canAffordWithoutNegativeCash(entry.price, pickAffordableCash) &&
             entry.focusTeamStatus !== "blocked" &&
-            (entry.scoreBreakdown.slotPurposeMatchScore ?? 0) >= (top.scoreBreakdown.slotPurposeMatchScore ?? 0) + 5 &&
-            entry.finalScore >= top.finalScore - 10,
+            (entry.scoreBreakdown.slotPurposeMatchScore ?? 0) >= (currentTop.scoreBreakdown.slotPurposeMatchScore ?? 0) + 5 &&
+            entry.finalScore >= currentTop.finalScore - 10,
         );
         if (purposeUpgrade) {
           top = purposeUpgrade;
@@ -9240,7 +9248,7 @@ function buildTeamEntry(input: {
       draftSeed: input.draftSeed ?? null,
     });
     simulatedRosterCount = topUp.simulatedRosterCount;
-    remainingCash = topUp.remainingCash;
+    remainingCash = topUp.remainingCash ?? remainingCash;
   }
 
   const finalMissingToMin = Math.max(playerMin - (simulatedRosterCount ?? 0), 0);
