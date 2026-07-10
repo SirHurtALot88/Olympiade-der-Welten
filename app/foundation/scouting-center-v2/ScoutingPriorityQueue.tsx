@@ -132,6 +132,7 @@ export default function ScoutingPriorityQueue({
               >
                 {previewSrc ? (
                   <BudgetedMediaImage
+                    className=""
                     src={src}
                     placeholderSrc={previewSrc}
                     alt=""

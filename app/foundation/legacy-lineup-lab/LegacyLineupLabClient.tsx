@@ -321,7 +321,7 @@ type LegacyLineupLabClientProps = {
   defaultSaveName?: string;
   defaultSeasonId?: string;
   defaultMatchdayId?: string;
-  defaultTeamId?: string;
+  defaultTeamId?: string | null;
   highlightMissingSlots?: boolean;
   focusMissingRequestKey?: string | null;
   initialDraftBoardView?: "lineup" | "formBoard";

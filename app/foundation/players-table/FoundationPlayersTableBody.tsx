@@ -219,33 +219,7 @@ export default function FoundationPlayersTableBody({
                           variant="team"
                           context="roster"
                           playerClassName={row.player.className}
-                        >
-                          {portrait.src ? (
-                            <BudgetedMediaImage
-                              className="transfermarkt-portrait"
-                              src={portrait.src}
-                              placeholderSrc={portrait.previewSrc ?? portrait.thumbSrc}
-                              alt={row.player.name}
-                              width={56}
-                              height={56}
-                              fallback={
-                                <div
-                                  className="transfermarkt-portrait transfermarkt-portrait-placeholder"
-                                  aria-label={`${row.player.name} placeholder`}
-                                >
-                                  {portrait.initials}
-                                </div>
-                              }
-                            />
-                          ) : (
-                            <div
-                              className="transfermarkt-portrait transfermarkt-portrait-placeholder"
-                              aria-label={`${row.player.name} placeholder`}
-                            >
-                              {portrait.initials}
-                            </div>
-                          )}
-                        </FoundationPlayerPortraitPreview>
+                        />
                       </td>
                     );
                   }

@@ -152,7 +152,7 @@ function FoundationShellRouterTeamsContent({
   return (
     <>
       {!hostMounted ? (
-        <FoundationTeamsViewPanel active teamTab={hostProps.selectedTeamDetailTab}>
+        <FoundationTeamsViewPanel active teamTab={hostProps.selectedTeamDetailTab as string | undefined}>
           <FoundationPanelSkeleton variant="default" label="Teams werden geladen…" />
         </FoundationTeamsViewPanel>
       ) : null}

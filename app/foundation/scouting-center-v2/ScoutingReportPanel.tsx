@@ -70,6 +70,7 @@ export default function ScoutingReportPanel({
         <button type="button" className="scouting-report-portrait" onClick={() => onOpenPlayer(report.playerId)}>
           {previewSrc ? (
             <BudgetedMediaImage
+              className=""
               src={src}
               placeholderSrc={previewSrc}
               alt=""

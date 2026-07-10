@@ -10,7 +10,7 @@ import type {
   SortState,
 } from "@/lib/foundation/tabs/cockpit-types";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
-import { getCockpitStatusPillClass } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { getCockpitStatusPillClass, type CockpitStepStatus } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import type { PrizeV2Row } from "@/lib/foundation/tabs/use-prize-v2-panel-model";
 import { clampValue } from "@/lib/foundation/tabs/prize-v2-ui-helpers";
 
@@ -20,7 +20,7 @@ export interface FoundationPrizeV2PanelProps {
   prizePreviewFeed: FoundationPrizePreviewResponse | null;
   prizePreviewHardBlocked: string[];
   prizePreviewGlobalWarnings: string[];
-  prizeApplyState: { status: string; label: string };
+  prizeApplyState: { status: CockpitStepStatus; label: string };
   seasonEndChampionRow: TeamManagementSnapshotRow | null;
   selectedTeam: Team | null;
   prizeForecastRank: number;
