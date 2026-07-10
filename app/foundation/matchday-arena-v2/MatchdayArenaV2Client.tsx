@@ -39,6 +39,7 @@ import {
   ARENA_SCORE_TRACK_SEGMENT_LABELS,
   type MatchdayArenaScoreboardRowView,
   type MatchdayArenaPhaseBreakdownItem,
+  type ArenaScoreTrackSegment,
 } from "@/lib/season/matchday-arena-presenter";
 import type {
   MatchdayMvpScoringResult,
@@ -312,6 +313,38 @@ type ArenaMatchdayWinnerRow = {
   d1Mutators: string[];
   d2Mutators: string[];
 };
+
+// Shared shape for a rendered scoreboard row, produced either from the discipline-level
+// scoreboard views (d1/d2 board modes) or from the aggregated matchday winner rows (total
+// board mode). Declaring this explicitly (instead of letting it be inferred separately per
+// branch) keeps both branches structurally identical so consumers like
+// `buildFocusedArenaBoardRows` receive a single, consistent element type.
+type ArenaBoardRow = {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  rank: number;
+  stepRankDelta: number | null;
+  score: number;
+  points: number | null;
+  baseRank: number;
+  rankDelta: number;
+  projectedRank: number | null;
+  tone: ReturnType<typeof getToneForTeam>;
+  detailChips: string[];
+  breakdown: MatchdayArenaPhaseBreakdownItem[];
+  trackSegments: ArenaScoreTrackSegment[];
+  sideKey?: "d1" | "d2";
+};
+
+// Narrows the "why is this team leading" source row (used only when the board is showing the
+// total/aggregated matchday view) down to the discipline-level scoreboard shape, which is the
+// only one of the two candidate types that carries push/form/mutator/fatigue detail fields.
+function isMatchdayArenaScoreboardRowView(
+  value: MatchdayArenaScoreboardRowView | ArenaMatchdayWinnerRow | undefined,
+): value is MatchdayArenaScoreboardRowView {
+  return value != null && "intensity" in value;
+}
 
 function formatDecimalScore(value: number | null | undefined, fractionDigits = 1) {
   if (value == null || !Number.isFinite(value)) {
@@ -2057,7 +2090,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     [focusTeamDetail, d1Id, d1Label, d1Required, d2Id, d2Label, d2Required, resolvePlayerCatalogById, foundationPlayerById, arenaRankContextBySide],
   );
 
-  const boardRows = useMemo(() => {
+  const boardRows = useMemo<ArenaBoardRow[]>(() => {
     if (effectiveBoardMode === "total") {
       return matchdayWinnerRows.map((row) => ({
         teamId: row.teamId,
@@ -3272,14 +3305,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
               const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
               const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+              // Note: `effectiveBoardMode` can never be "total" in this branch — the focused
+              // board list is only rendered when `isFocusedBoardMode` is true, which itself
+              // requires `effectiveBoardMode !== "total"` (see `isFocusedBoardMode` above; the
+              // total-mode board always renders via the virtualized list further below, where
+              // the equivalent "Saison ..." label is shown).
               const statSecondaryLabel =
                 row.points != null
                   ? `${formatDecimalScore(row.points, 1)} PPs`
-                  : effectiveBoardMode === "total"
-                    ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
-                    : slotDelta != null
-                      ? `+${formatDecimalScore(slotDelta, 1)}`
-                      : null;
+                  : slotDelta != null
+                    ? `+${formatDecimalScore(slotDelta, 1)}`
+                    : null;
               return (
                 <ArenaBoardRow
                   key={`arena-v2-focused-row-${row.teamId}`}
@@ -3651,42 +3687,49 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                     : effectiveBoardMode === "d1"
                       ? d1ScoreboardView.find((entry) => entry.teamId === row.teamId)
                       : matchdayWinnerRows.find((entry) => entry.teamId === row.teamId) ?? d1ScoreboardView.find((entry) => entry.teamId === row.teamId);
+                // In "total" board mode `sourceRow` can resolve to an `ArenaMatchdayWinnerRow`,
+                // which only carries aggregated d1/d2/total scores — none of the per-discipline
+                // push/form/mutator/fatigue breakdown fields below. Narrow to the discipline
+                // scoreboard shape and fall back to "—" placeholders otherwise.
+                const disciplineSourceRow = isMatchdayArenaScoreboardRowView(sourceRow) ? sourceRow : null;
                 const taktikLabel =
-                  sourceRow?.intensity === "push"
+                  disciplineSourceRow?.intensity === "push"
                     ? "Push"
-                    : sourceRow?.intensity === "conserve"
+                    : disciplineSourceRow?.intensity === "conserve"
                       ? "Schonen"
-                      : sourceRow?.intensity
+                      : disciplineSourceRow?.intensity
                         ? "Normal"
                         : "—";
                 const formLabel =
-                  sourceRow?.formCardStatus === "ready" && sourceRow.formCardModifier != null
-                    ? formatSignedDelta(sourceRow.formCardModifier)
+                  disciplineSourceRow?.formCardStatus === "ready" && disciplineSourceRow.formCardModifier != null
+                    ? formatSignedDelta(disciplineSourceRow.formCardModifier)
                     : "—";
                 const fatigueLabel =
-                  sourceRow?.fatigueAdjustedScore != null && sourceRow.score != null
-                    ? formatSignedDelta(Number((sourceRow.fatigueAdjustedScore - sourceRow.score).toFixed(1)))
+                  disciplineSourceRow?.fatigueStatus === "mapped"
+                    ? formatSignedDelta(disciplineSourceRow.fatigueModifier)
                     : "—";
                 const mutatorLabel =
-                  sourceRow?.totalMutatorScore != null ? formatSignedDelta(sourceRow.totalMutatorScore) : "—";
+                  disciplineSourceRow?.totalMutatorScore != null
+                    ? formatSignedDelta(disciplineSourceRow.totalMutatorScore)
+                    : "—";
                 const leadFactor = [
                   {
                     label: "Taktik",
                     value:
-                      sourceRow?.pushScore != null
-                        ? formatSignedDelta(sourceRow.pushScore)
+                      disciplineSourceRow?.pushScore != null
+                        ? formatSignedDelta(disciplineSourceRow.pushScore)
                         : taktikLabel,
-                    weight: Math.abs(sourceRow?.pushScore ?? 0),
+                    weight: Math.abs(disciplineSourceRow?.pushScore ?? 0),
                   },
                   {
                     label: "Form",
                     value: formLabel,
-                    weight: Math.abs(sourceRow?.formCardModifier ?? 0),
+                    weight: Math.abs(disciplineSourceRow?.formCardModifier ?? 0),
                   },
                   {
                     label: "Mutator",
                     value: mutatorLabel,
-                    weight: Math.abs(sourceRow?.totalMutatorScore ?? 0),
+                    weight: Math.abs(disciplineSourceRow?.totalMutatorScore ?? 0),
                   },
                 ].sort((left, right) => right.weight - left.weight)[0];
                 return (
