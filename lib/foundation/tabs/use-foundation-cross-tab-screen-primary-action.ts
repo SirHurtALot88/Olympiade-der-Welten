@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 import type { GameInboxItem, GameState, Team } from "@/lib/data/olyDataTypes";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
@@ -25,8 +26,8 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
   isSelectedTeamManagementLocked: boolean;
   inboxPrimaryTeamItem: GameInboxItem | null;
   canManageTeamId: (teamId: string | null | undefined) => boolean;
-  setFoundationView: (view: FoundationView, setActiveView: (view: FoundationView) => void) => void;
-  setActiveView: (view: FoundationView) => void;
+  setFoundationView: (view: FoundationView, setActiveView: Dispatch<SetStateAction<FoundationView>>) => void;
+  setActiveView: Dispatch<SetStateAction<FoundationView>>;
   navigateHomeTab: (tab: "overview" | "office") => void;
   navigateToInboxItem: (item: GameInboxItem) => void;
   openMarketOfferPanel: (playerId: string) => void;

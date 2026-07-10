@@ -13,7 +13,7 @@ import { getClientSocket } from "@/lib/socket/client";
 import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
-type LiveSeasonReloadReason = "manual_apply" | "room_event" | "local_save_version";
+export type LiveSeasonReloadReason = "manual_apply" | "room_event" | "local_save_version";
 
 export type FoundationSeasonFeedReloaders = {
   reloadSeasonStandingsOverview: (seasonIdOverride?: string) => Promise<unknown>;

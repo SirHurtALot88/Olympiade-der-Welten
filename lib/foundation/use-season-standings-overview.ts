@@ -21,7 +21,7 @@ export type SeasonStandingsOverviewResponse = {
     kind: string;
     access?: string;
     detectedColumns?: string[];
-    disciplineColumns?: string[];
+    disciplineColumns?: Array<{ normalizedKey: string; sheetColumn: string }>;
   };
   scope: SeasonStandingsOverviewScope | null;
   error?: string;

@@ -276,7 +276,9 @@ export function buildTeamDisciplineRankRowsFromSnapshotRecords(
   return [...snapshotRecords]
     .map((record) => {
       const team = teamsById.get(record.teamId);
-      const scorePack = record.scorePack ?? buildEmptyScorePack(orderedDisciplines);
+      const scorePack: TeamDisciplineRankScorePack = record.scorePack
+        ? { ...record.scorePack, disciplines: record.scorePack.disciplines ?? {} }
+        : buildEmptyScorePack(orderedDisciplines);
       const disciplineRanks =
         record.disciplineRanks ??
         Object.fromEntries(orderedDisciplines.map((discipline) => [discipline.id, 0] as const));

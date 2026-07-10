@@ -1,4 +1,5 @@
 import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
+import type { LiveSeasonReloadReason } from "@/lib/foundation/tabs/use-foundation-live-sync";
 import type { Dispatch, SetStateAction } from "react";
 
 import { invalidateMatchdayArenaSessionCache } from "@/lib/foundation/matchday-arena-session-cache";
@@ -39,7 +40,7 @@ export type CockpitMatchdayApplyHandlersDeps = {
   reloadResolvePreview: (signal?: AbortSignal) => Promise<unknown>;
   reloadStandingsPreviewFeed: (signal?: AbortSignal) => Promise<unknown>;
   reloadPrizePreviewFeed: () => Promise<unknown>;
-  reloadLiveSeasonState: (reason: string) => Promise<unknown>;
+  reloadLiveSeasonState: (reason?: LiveSeasonReloadReason) => Promise<unknown>;
   loadSave: (saveId: string) => Promise<unknown>;
   reloadSeasonStandingsOverview: () => Promise<unknown>;
   reloadSeasonManagementOverview: () => Promise<unknown>;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
+import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
 import {
   getLineupDraftSideCounts,
@@ -144,16 +145,16 @@ export function useFoundationCrossTabMatchdayLineup(input: {
   activeSaveId: string;
   readMetaSource: string;
   readMetaReadOnly: boolean;
-  roomContext: FoundationRoomContext;
-  foundationSaveMode: string;
+  roomContext: FoundationRoomContext | null;
+  foundationSaveMode: FoundationSaveMode;
   aiLineupEnsureBusy: boolean;
   setAiLineupEnsureBusy: (busy: boolean) => void;
   setAiLineupEnsureFeed: (feed: FoundationAiLineupBatchApplyResponse | null) => void;
   loadSave: (
-    saveId: string,
-    mode: string,
+    saveId?: string,
+    saveMode?: FoundationSaveMode,
     options?: { compactInitial?: boolean },
-  ) => Promise<unknown>;
+  ) => Promise<GameState | null>;
 }) {
   const shouldBuildMatchdayDerivations = shouldBuildFoundationMatchdayFlowDerivations(input.activeView);
   const shouldBuildMatchdaySummary = shouldBuildFoundationMatchdaySummaryDerivations(input.activeView);
