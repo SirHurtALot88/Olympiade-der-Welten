@@ -572,10 +572,22 @@ function normalizeToken(value: string | null | undefined) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function getSeason1SpendTargetPctForTeamCode(teamCode: string | null | undefined) {
-  const code = String(teamCode ?? "").trim().toUpperCase();
-  if (["M-M", "H-R", "R-R", "V-V"].includes(code)) return 0.975;
-  if (["C-C", "T-T", "N-W", "R-C"].includes(code)) return 0.88;
+/**
+ * Season-1 spend-floor fallback used only when `cashStrategy.season1SpendMinPct` itself is
+ * missing (cashStrategy present but its real corridor calc — getSeason1SpendCorridor in
+ * ai-needs-picks-compare-service.ts — didn't run/populate). Trait-derived from the same
+ * ambition/finances/harmony identity axes already carried on cashStrategy — no team-code gate.
+ * High-ambition teams get a higher spend floor (push the budget in); finance- or harmony-rich
+ * teams get a lower floor (keep more slack). Balanced teams land on the 0.93 default.
+ */
+function getSeason1SpendTargetPctFromTraits(
+  cashStrategy: Pick<AiPickCashStrategyRef, "ambitionValue" | "financesValue" | "harmonyValue"> | null | undefined,
+) {
+  const ambition = (cashStrategy?.ambitionValue ?? 50) / 100;
+  const finances = (cashStrategy?.financesValue ?? 55) / 100;
+  const harmony = (cashStrategy?.harmonyValue ?? 50) / 100;
+  if (ambition >= 0.78) return 0.975;
+  if (finances >= 0.72 || harmony >= 0.74) return 0.88;
   return 0.93;
 }
 
@@ -636,6 +648,14 @@ function normalizeAxisNeed(axis: string | null | undefined): "pow" | "spe" | "me
   return null;
 }
 
+// NOT de-hardcoded (Task #8 de-hardcode sweep, Agent C): this is a curated audit watch-list
+// (extra pick-quality scrutiny only — off-theme/lane-mismatch/too-expensive checks below), not a
+// simulated economic behavior. Checked every identity axis (ambition/finances/harmony/
+// boardConfidence, 0-10) across all 32 teams for a trait threshold or combination that reproduces
+// exactly this 10-team set: none exists — these codes span the full range on every axis (e.g.
+// ambition alone runs from 2 [C-C] to 8.5 [M-M/A-A], covering nearly the whole distribution).
+// Any formula "fitted" to reproduce this exact list would just be a repackaged hardcode.
+// Reported to Opus as a design decision rather than silently guessing a formula; left as-is.
 const FOCUS_TEAM_CODES = new Set(["C-C", "W-W", "T-T", "A-A", "N-W", "C-S", "R-R", "M-M", "H-R", "G-G"]);
 
 function isFocusTeam(teamCode: string) {
@@ -1771,6 +1791,14 @@ function buildQualityGate(
         (pick.teamFit ?? 0) >= 3,
     );
   });
+  // NOT de-hardcoded (Task #8 de-hardcode sweep, Agent C): isColdSteelThemeBreaker's
+  // demon/monster/chaos/undead token list isn't sourced from this team's own strategy-profile
+  // avoidedRaces/avoidedClasses (its profile in lib/foundation/team-strategy-profiles.ts leaves
+  // those empty for "C-S" today) — that profile file is outside this agent's file partition, so a
+  // trait-only replacement here would silently stop auditing this team's theme breaks entirely
+  // (a real bucket change) rather than de-hardcode it. Reported to Opus: the correct fix is to add
+  // this team's avoided races/classes to its strategy profile, then generalize this check to read
+  // `team's own avoidedRaces/avoidedClasses` for every team instead of gating on teamCode. Left as-is.
   const coldSteelIdentityBreak = season1OptimumMode
     ? teams.filter((team) => {
         if (team.teamCode !== "C-S") {
@@ -1793,7 +1821,7 @@ function buildQualityGate(
         if (team.targetRosterMin != null && plannedRoster < team.targetRosterMin) {
           return false;
         }
-        const spendFloorPct = team.cashStrategy?.season1SpendMinPct ?? getSeason1SpendTargetPctForTeamCode(team.teamCode);
+        const spendFloorPct = team.cashStrategy?.season1SpendMinPct ?? getSeason1SpendTargetPctFromTraits(team.cashStrategy);
         const targetCashLeft = startingCash * (1 - spendFloorPct);
         const allowedSlack = Math.max(8, startingCash * 0.03);
         return cashAfter > targetCashLeft + allowedSlack;
@@ -1819,7 +1847,7 @@ function buildQualityGate(
   );
   const formatSeason1SpendFloorMiss = (team: AiPicksRunTeamResult) => {
     const startingCash = team.previewSummary.startingCash ?? 0;
-    const spendFloorPct = team.cashStrategy?.season1SpendMinPct ?? getSeason1SpendTargetPctForTeamCode(team.teamCode);
+    const spendFloorPct = team.cashStrategy?.season1SpendMinPct ?? getSeason1SpendTargetPctFromTraits(team.cashStrategy);
     const targetCashLeft = startingCash * (1 - spendFloorPct);
     return `${team.teamCode}:cash_after=${team.previewSummary.cashAfterPlannedBuys != null ? roundValue(team.previewSummary.cashAfterPlannedBuys, 2) : "na"}:floor_left=${roundValue(targetCashLeft, 2)}:archetype=${team.cashStrategy?.season1SpendArchetype ?? "unknown"}:target_gap=${teamTargetGap(team) ?? "na"}`;
   };

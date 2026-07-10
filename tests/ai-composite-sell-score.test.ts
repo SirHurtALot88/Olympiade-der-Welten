@@ -161,11 +161,29 @@ describe("ai-composite-sell-score", () => {
     expect(star.components.mwDecline).toBeGreaterThan(cheap.components.mwDecline);
   });
 
-  it("uses flip-shop profile for C-C with lower threshold", () => {
-    expect(resolveCompositeSellTeamProfile("C-C", 5)).toBe("flip_shop");
+  it("uses flip-shop profile for high finances + profit-sell aggression + low harmony (Cash Creators traits), regardless of teamId", () => {
+    // Real Cash Creators (C-C) traits: finances 10, harmony 7.5, sellForProfitAggression 10.
+    const cashCreatorsTraits = { identity: { finances: 10, harmony: 7.5, ambition: 2 } as TeamIdentity };
+    expect(resolveCompositeSellTeamProfile("C-C", 10, cashCreatorsTraits)).toBe("flip_shop");
+    // Same traits under a different teamId still resolve to flip_shop — proves no per-team gate.
+    expect(resolveCompositeSellTeamProfile("Z-Z", 10, cashCreatorsTraits)).toBe("flip_shop");
     expect(
       resolveEffectiveSellThreshold({ teamProfile: "flip_shop", cashPressureScore: 0 }),
     ).toBe(22);
+  });
+
+  it("uses harmony profile for high-harmony/low-ambition identity (Mystic Souls traits), regardless of teamId", () => {
+    // Real Mystic Souls (M-S) traits: harmony 10, ambition 3, finances 7.5, sellForProfitAggression 4.
+    const mysticSoulsTraits = { identity: { finances: 7.5, harmony: 10, ambition: 3 } as TeamIdentity };
+    expect(resolveCompositeSellTeamProfile("M-S", 4, mysticSoulsTraits)).toBe("harmony");
+    expect(resolveCompositeSellTeamProfile("Q-Q", 4, mysticSoulsTraits)).toBe("harmony");
+  });
+
+  it("uses development profile for high development-tendency score, regardless of teamId", () => {
+    // Real Terrible Teachers (T-T) development tendency score is well above the 0.4 threshold
+    // (mentor/teacher archetype fit + lean roster + low win-now bias) — see acceptance script.
+    expect(resolveCompositeSellTeamProfile("T-T", 4, { developmentTendencyScore: 0.7 })).toBe("development");
+    expect(resolveCompositeSellTeamProfile("Q-Q", 4, { developmentTendencyScore: 0.7 })).toBe("development");
   });
 
   it("scores profitable sells above default threshold", () => {

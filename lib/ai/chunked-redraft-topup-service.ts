@@ -1378,7 +1378,32 @@ function isAllowedByStandardFit(input: {
 }
 
 function isMercenaryMarketTeam(team: GameState["teams"][number]) {
-  return team.teamId === "W-L" || team.shortCode === "W-L" || /wrecking legionnaires/i.test(team.name ?? "");
+  // Name-text-derived (same narrative signal the manager archetype resolver uses for "mercenary_market",
+  // see compileTeamManagerProfile) rather than a literal teamId/shortCode shortcut.
+  return /wrecking legionnaires/i.test(team.name ?? "");
+}
+
+// Non-default manager archetypes (i.e. anything other than the generic "rebuild"/"theme_collector"
+// fallbacks) mark a team whose trait profile produced a distinctive identity worth spotlighting in
+// debug/audit reports. Used to derive a "focus teams" subset for readability instead of a fixed
+// per-team code list.
+const DISTINCTIVE_MANAGER_ARCHETYPES = new Set<string>([
+  "win_now",
+  "small_elite",
+  "value_builder",
+  "chaotic_aggressive",
+  "conservative_finance",
+  "harmony_builder",
+  "mercenary_market",
+]);
+
+function deriveFocusTeamIds(managerProfiles: Map<string, TeamManagerProfile> | undefined, limit = 6): string[] {
+  if (!managerProfiles) return [];
+  return Array.from(managerProfiles.entries())
+    .filter(([, profile]) => DISTINCTIVE_MANAGER_ARCHETYPES.has(profile.managerArchetype))
+    .map(([teamId]) => teamId)
+    .sort()
+    .slice(0, limit);
 }
 
 function selectFitLegalCandidates(input: {
@@ -1951,8 +1976,11 @@ function buildRosterTargetPlan(input: {
   let targetReason = "default_playerOpt";
   let ecoRound = false;
 
-  const winNow = starPriority >= 8 || (identity?.ambition ?? 0) >= 8 || ["M-M", "Z-H"].includes(input.teamId);
-  const smallEliteCandidate = eliteSmallRosterPreference >= 8 && rosterDepthPreference <= 5 && input.teamId === "B-P";
+  const winNow = starPriority >= 8 || (identity?.ambition ?? 0) >= 8;
+  // Extreme small-elite identity: near-max elite preference combined with near-min depth tolerance.
+  // Thresholds (9/3) are tighter than the generic eliteSmallRosterPreference>=8 signal used elsewhere so that
+  // only teams whose *combination* of traits is extreme enough qualify for the small-roster target mode.
+  const smallEliteCandidate = eliteSmallRosterPreference >= 9 && rosterDepthPreference <= 3;
   const cashRecovery = cashStart < target.playerMin * 12 || salaryStart > cashStart * 0.6;
   const ecoConditions = [
     (identity?.finances ?? 0) >= 8,
@@ -2121,17 +2149,21 @@ function compileTeamManagerProfile(input: {
     managerArchetype = "theme_collector";
   }
 
-  if (input.team.teamId === "R-R") {
-    managerArchetype = "value_builder";
-  } else if (input.team.teamId === "C-C" || text.includes("cash creators") || text.includes("value") || text.includes("bank der olympiade")) {
-    managerArchetype = "value_builder";
-  } else if (input.team.teamId === "W-L" || text.includes("wrecking legionnaires") || text.includes("soeldner") || text.includes("mercenary")) {
+  // A strong trait-derived value_builder identity (from strategyScores above) is protected from being
+  // trampled by the generic secondary signals below (eliteSmallHigh/theme/harmony can otherwise also be
+  // true for a value-first team and would hijack its primary identity). No teamId involved: any team
+  // whose traits already resolved to value_builder keeps it.
+  if (managerArchetype === "value_builder") {
+    // keep trait-derived value_builder identity
+  } else if (text.includes("wrecking legionnaires") || text.includes("soeldner") || text.includes("mercenary")) {
     managerArchetype = "mercenary_market";
-  } else if (input.team.teamId === "T-T" || text.includes("terrible teachers") || text.includes("teacher")) {
+  } else if (text.includes("terrible teachers") || text.includes("teacher")) {
     managerArchetype = "harmony_builder";
-  } else if (["M-M", "Z-H"].includes(input.team.teamId) || text.includes("topteam") || text.includes("underground")) {
-    managerArchetype = input.team.teamId === "Z-H" ? "chaotic_aggressive" : "win_now";
-  } else if (input.team.teamId === "B-P" || eliteSmallHigh || text.includes("kleine elite")) {
+  } else if (text.includes("topteam") || text.includes("underground")) {
+    // Distinguish "measured championship push" from "unstable high-variance climb" via the risk-appetite
+    // score itself (same threshold the shared classify() uses for opportunistic_risk_taker), not teamId.
+    managerArchetype = strategyScores.riskAppetite >= 85 ? "chaotic_aggressive" : "win_now";
+  } else if (eliteSmallHigh || text.includes("kleine elite")) {
     managerArchetype = "small_elite";
   } else if (getTeamThemeCompositionTarget(input.team) || text.includes("royal") || text.includes("aqua") || text.includes("magier")) {
     managerArchetype = "theme_collector";
@@ -2150,9 +2182,9 @@ function compileTeamManagerProfile(input: {
         ? "small_elite"
       : managerArchetype === "value_builder"
         ? "budget_squad"
-        : managerArchetype === "harmony_builder" && input.team.teamId === "T-T"
+        : managerArchetype === "harmony_builder"
           ? "wide_depth"
-          : depthHigh || input.team.teamId === "T-T"
+          : depthHigh
             ? "wide_depth"
             : valueHigh
               ? "prospect_pool"
@@ -2167,15 +2199,19 @@ function compileTeamManagerProfile(input: {
         : managerArchetype === "value_builder" || managerArchetype === "conservative_finance"
           ? "eco_allowed"
           : "market_wait_allowed";
+  // Within the value_builder/conservative_finance bucket, teams that still keep at least a
+  // neutral-or-above star appetite (starPriority bias >= 5, the neutral midpoint) mix occasional
+  // star/theme picks into their value-first draft instead of pursuing pure value/prospect picks.
+  const valueBucketKeepsStarSlot = (bias?.starPriority ?? 5) >= 5;
   const draftDoctrine: DraftDoctrine =
-    input.team.teamId === "R-R"
-      ? "salary_value"
-      : managerArchetype === "win_now" || managerArchetype === "chaotic_aggressive"
-        ? "all_in_star_push"
-        : managerArchetype === "small_elite"
-          ? "star_core"
-          : managerArchetype === "theme_collector"
-            ? "theme_specialist"
+    managerArchetype === "win_now" || managerArchetype === "chaotic_aggressive"
+      ? "all_in_star_push"
+      : managerArchetype === "small_elite"
+        ? "star_core"
+        : managerArchetype === "theme_collector"
+          ? "theme_specialist"
+          : (managerArchetype === "value_builder" || managerArchetype === "conservative_finance") && valueBucketKeepsStarSlot
+            ? "salary_value"
             : managerArchetype === "value_builder" || managerArchetype === "conservative_finance"
               ? "pure_value"
               : managerArchetype === "harmony_builder" || rosterStyle === "wide_depth"
@@ -3265,7 +3301,7 @@ function writeReports(input: {
       `- Stop Yellow: ${managerStopRows.filter((row) => row.stopSeverity === "yellow").length}`,
       "",
       "## Fokus Teams",
-      ...["M-M", "B-P", "C-C", "W-W", "Z-H", "T-T"].map((teamId) => {
+      ...deriveFocusTeamIds(input.managerProfiles).map((teamId) => {
         const profile = input.managerProfiles?.get(teamId);
         const stop = managerStopRows.find((row) => row.teamId === teamId);
         const blueprint = input.rosterBlueprints?.get(teamId);
@@ -3347,7 +3383,7 @@ function writeReports(input: {
       `- Hard-Fail Cash/Opt Audits: ${phaseBHardFails.length}`,
       "",
       "## Fokus",
-      ...["M-M", "Z-H", "B-P", "C-C", "W-W", "T-T"].map((teamId) => {
+      ...deriveFocusTeamIds(input.managerProfiles).map((teamId) => {
         const row = phaseBCashAudit.find((entry) => entry.teamId === teamId);
         return row
           ? `- ${teamId}: OptGap ${row.playerOptGapAfter}, Cash ${row.cashAfterPhaseB}, Stop ${row.whyStopped}`

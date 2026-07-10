@@ -7,6 +7,8 @@ import {
   isBracketRankPoolEligible,
 } from "@/lib/market/transfermarkt-sale-factor";
 import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
+import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
@@ -91,13 +93,58 @@ const BASE_THRESHOLD: Record<CompositeSellTeamProfile, number> = {
   development: 30,
 };
 
+// Thresholds are trait-derived, not team-keyed — every team is evaluated by the same rules.
+const FLIP_SHOP_MIN_AGGRESSION = 8;
+const FLIP_SHOP_STRONG_FINANCE_MIN_AGGRESSION = 5;
+const FLIP_SHOP_FINANCE_THRESHOLD = 0.85;
+const FLIP_SHOP_HARMONY_CEILING = 0.6;
+const DEVELOPMENT_TENDENCY_THRESHOLD = 0.4;
+const HARMONY_MIN_TRAIT = 0.65;
+const HARMONY_AMBITION_CEILING = 0.45;
+
+export type CompositeSellTeamProfileTraits = {
+  identity?: TeamIdentity | null;
+  /** From getTeamDevelopmentTendency(...).score — trait/text derived, no team gates. */
+  developmentTendencyScore?: number | null;
+};
+
+/**
+ * Resolves the sell-behavior bucket purely from traits (finances/harmony/ambition identity
+ * axes, sellForProfitAggression bias, development tendency). `teamId` is retained only as a
+ * label for logging/tests — it must never gate the branches below.
+ */
 export function resolveCompositeSellTeamProfile(
   teamId: string,
   sellForProfitAggression: number | null | undefined,
+  traits?: CompositeSellTeamProfileTraits | null,
 ): CompositeSellTeamProfile {
-  if (teamId === "C-C" || (sellForProfitAggression ?? 0) >= 8) return "flip_shop";
-  if (teamId === "T-T") return "development";
-  if (teamId === "M-S") return "harmony";
+  void teamId;
+  const aggression = sellForProfitAggression ?? 0;
+  const finances = normalizeManagementValue(traits?.identity?.finances);
+  const harmony = normalizeManagementValue(traits?.identity?.harmony);
+  const ambition = normalizeManagementValue(traits?.identity?.ambition);
+
+  // flip_shop: dominant profit-sell aggression, or strong finances backing an active
+  // profit-sell posture that isn't held back by harmony-dependence.
+  if (
+    aggression >= FLIP_SHOP_MIN_AGGRESSION ||
+    (finances >= FLIP_SHOP_FINANCE_THRESHOLD &&
+      aggression >= FLIP_SHOP_STRONG_FINANCE_MIN_AGGRESSION &&
+      harmony <= FLIP_SHOP_HARMONY_CEILING)
+  ) {
+    return "flip_shop";
+  }
+
+  // development: youth/mentor archetype fit + low win-now bias (see team-development-tendency.ts).
+  if ((traits?.developmentTendencyScore ?? 0) >= DEVELOPMENT_TENDENCY_THRESHOLD) {
+    return "development";
+  }
+
+  // harmony: chemistry-first identity with modest ambition — protect keepers, avoid churn.
+  if (harmony >= HARMONY_MIN_TRAIT && ambition <= HARMONY_AMBITION_CEILING) {
+    return "harmony";
+  }
+
   return "default";
 }
 
@@ -158,7 +205,16 @@ export function resolveEffectiveSellThreshold(input: {
 }
 
 export function computeCompositeSellScore(input: CompositeSellScoreInput): CompositeSellScoreResult {
-  const teamProfile = resolveCompositeSellTeamProfile(input.teamId, input.sellForProfitAggression);
+  const strategyProfile = getTeamStrategyProfile(input.gameState, input.teamId);
+  const developmentTendencyScore = getTeamDevelopmentTendency({
+    team: input.team,
+    identity: input.identity,
+    profile: strategyProfile,
+  }).score;
+  const teamProfile = resolveCompositeSellTeamProfile(input.teamId, input.sellForProfitAggression, {
+    identity: input.identity,
+    developmentTendencyScore,
+  });
   const weights = WEIGHTS[teamProfile];
   const purchasePrice = input.roster.purchasePrice ?? null;
   const currentMw = input.marketValue;

@@ -10,12 +10,71 @@ export const PLANNER_LEAGUE_SALARY_BUFFER_RATIO = 0.35;
 export const PLANNER_LIQUIDITY_BUFFER_MW_RATIO = 0.1;
 export const PLANNER_LIQUIDITY_BUFFER_MIN = 3;
 
+/**
+ * Counter-cyclical cash buffer (Task #8): the buffer floor can be discounted (never below
+ * PLANNER_LIQUIDITY_BUFFER_MIN) by up to this fraction — a ceiling so a bad season never
+ * fully empties the reserve, only makes more of it spendable.
+ */
+export const COUNTER_CYCLICAL_MAX_RELIEF_FRACTION = 0.5;
+
+/** Board pressure (0–10, from missed/at-risk season objectives) below which a season isn't
+ * "adverse" enough to unlock any counter-cyclical relief — a mid-table-or-better season keeps
+ * the normal cautious buffer. */
+export const SEASON_ADVERSITY_PRESSURE_FLOOR = 5;
+
 function round(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+/** Identity axes (finances/ambition/...) are authored on a 0–10 scale; normalize to 0–1. */
+function normalizeIdentityAxis(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return 0.5;
+  return clamp01(value <= 10 ? value / 10 : value / 100);
+}
+
 export function usesSingleCashPlanningPolicy(gameState: GameState): boolean {
   return !isSeasonOne(gameState.season.id);
+}
+
+/**
+ * Counter-cyclical buffer relief (Task #8): how much of the buffer floor a team is willing to
+ * release right now, universal and trait-driven — no team-code branches, no hard caps beyond
+ * COUNTER_CYCLICAL_MAX_RELIEF_FRACTION.
+ *
+ * willingness = (finances trait strength) x (season adversity: board pressure from
+ * below-expectation objectives/rank) x (ambition trait strength)
+ *
+ * A financially strong team having a bad season (high pressure) leans INTO spending its buffer
+ * (lower effective floor, more cash becomes available to spend on real upgrades) — but only if it
+ * is also ambitious enough to want to fix the season; a low-ambition team just sits on the cash.
+ * Financially weak teams get ~0 relief regardless of season or ambition and stay cautious. This
+ * never removes the buffer entirely (capped at COUNTER_CYCLICAL_MAX_RELIEF_FRACTION) and never
+ * pushes spendable cash above the team's actual current cash (enforced by the max(0, cash -
+ * buffer) clamp in resolveTeamSpendableCashForPlanning below) — so no team can end up negative
+ * from this policy, and nothing here forces a purchase, it only raises the ceiling of what's
+ * structurally available.
+ *
+ * Reads the already-stored board-pressure record (gameState.seasonState.boardConfidence, kept
+ * current by lib/board/team-season-objectives-service.ts at season transitions) directly — an O(1)
+ * lookup — rather than recomputing the full season-objective overview here; this function runs
+ * inside hot per-pick planning loops, so it must stay cheap. No stored record yet (e.g. very early
+ * in a save before any season transition has run) reads as "at the adversity floor" -> 0 relief,
+ * i.e. the pre-existing cautious behavior, never a more aggressive one.
+ */
+export function resolveCounterCyclicalBufferRelief(gameState: GameState, teamId: string): number {
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const financesStrength = normalizeIdentityAxis(identity?.finances);
+  const ambitionStrength = normalizeIdentityAxis(identity?.ambition);
+  const pressure = gameState.seasonState.boardConfidence?.[teamId]?.pressure ?? SEASON_ADVERSITY_PRESSURE_FLOOR;
+  const seasonAdversity = clamp01(
+    (pressure - SEASON_ADVERSITY_PRESSURE_FLOOR) / (10 - SEASON_ADVERSITY_PRESSURE_FLOOR),
+  );
+  const willingness = clamp01(financesStrength * seasonAdversity * ambitionStrength);
+  return round(willingness * COUNTER_CYCLICAL_MAX_RELIEF_FRACTION);
 }
 
 export function resolveTeamRosterMarketValue(gameState: GameState, teamId: string): number {
@@ -84,7 +143,13 @@ export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: s
   const ownBuffer = salary * (cashRatio + 0.01 >= highRatio ? lowRatio : highRatio);
   const leagueMedian = getLeagueMedianTeamSalary(gameState);
   const leagueAnchor = leagueMedian > 0 ? leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO : 0;
-  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor));
+  const baseBuffer = Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor);
+
+  // Counter-cyclical relief: a financially strong, ambitious team having a below-expectation
+  // season discounts its own buffer floor (never below PLANNER_LIQUIDITY_BUFFER_MIN) so it can
+  // actually spend into a slump instead of hoarding. See resolveCounterCyclicalBufferRelief.
+  const relief = resolveCounterCyclicalBufferRelief(gameState, teamId);
+  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, baseBuffer * (1 - relief)));
 }
 
 export function resolveTeamSpendableCashForPlanning(

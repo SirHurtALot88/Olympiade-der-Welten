@@ -186,16 +186,10 @@ function levelFromScore(score: number): "low" | "medium" | "high" {
 }
 
 function doctrineNameFor(teamRow: Team, profile: TeamStrategyProfile, identityRow: TeamIdentity | null): string {
-  const overrides: Record<string, string> = {
-    "M-M": "Mayhem Star Dominion",
-    "B-P": "Small Elite Panther Core",
-    "C-C": "Cash-Value Trading Desk",
-    "W-W": "Arcane Mental Supremacy",
-    "Z-H": "Zero-to-Hero Risk Engine",
-    "D-L": "Human Legion Order",
-    "T-T": "Teacher Mentor Academy",
-  };
-  return overrides[teamRow.teamId] ?? profile.fantasyTheme ?? `${teamRow.name} Doctrine ${identityRow?.playerType ?? "Core"}`;
+  // Pure cosmetic display label, never gates behavior. Derived from the team's own strategy-profile
+  // flavor text (fantasyTheme, itself sourced from strategySummary) rather than a per-teamId string
+  // map, so every team gets an on-brand doctrine name without a hardcoded lookup table.
+  return profile.fantasyTheme ?? `${teamRow.name} Doctrine ${identityRow?.playerType ?? "Core"}`;
 }
 
 function buildIdentityPillars(teamId: string, profile: TeamStrategyProfile, identityRow: TeamIdentity | null) {
@@ -399,6 +393,13 @@ export function evaluateIdentityGuard(input: IdentityGuardInput): AiIdentityGuar
   const cash = teamRow?.cash ?? 0;
   const candidateScore = candidateDoctrineScore(profile, input.candidate);
   const hardFails: string[] = [];
+  // Dual-locked theme identity: a team whose strategy profile pins BOTH a preferred class list AND a
+  // preferred race list (not just one axis) has a doubly-narrow identity and is treated as theme-strict
+  // even when its overall identityStrictness score lands on "medium". Trait/profile-derived, not teamId.
+  const hasDualThemeLock = (profile?.preferredClasses?.length ?? 0) > 0 && (profile?.preferredRaces?.length ?? 0) > 0;
+  // Maximum simultaneous cash+value obsession (both bias axes at the top of the 1-10 scale): overpaying
+  // for a "core" player without demonstrated value is a doctrine violation for this identity extreme.
+  const isMaxCashValueIdentity = (profile?.bias.cashPriority ?? 5) >= 10 && (profile?.bias.valuePriority ?? 5) >= 10;
 
   if (input.context?.cheapProspectOnly && cash > 50 && (profile?.bias.starPriority ?? 5) >= 8) {
     hardFails.push("topteam_cheap_players_despite_cash");
@@ -406,11 +407,11 @@ export function evaluateIdentityGuard(input: IdentityGuardInput): AiIdentityGuar
   if (input.context?.broadCheapRoster && (profile?.bias.eliteSmallRosterPreference ?? 5) >= 8) {
     hardFails.push("small_elite_broad_cheap_roster");
   }
-  if ((doctrine?.identityStrictness === "high" || input.teamId === "W-W") && input.candidate && candidateScore < 45 && !input.context?.cashCrisis) {
+  if ((doctrine?.identityStrictness === "high" || hasDualThemeLock) && input.candidate && candidateScore < 45 && !input.context?.cashCrisis) {
     hardFails.push("theme_strict_off_theme_pick");
   }
   if (
-    input.teamId === "W-W" &&
+    hasDualThemeLock &&
     input.candidate &&
     !hasTokenMatch(profile?.preferredClasses, [input.candidate.className, ...input.candidate.subclasses]) &&
     !hasTokenMatch(profile?.preferredRaces, [input.candidate.race]) &&
@@ -421,7 +422,7 @@ export function evaluateIdentityGuard(input: IdentityGuardInput): AiIdentityGuar
   if ((identityRow?.harmony ?? 5) >= 8 && hasToxicTraits(input.candidate) && !input.context?.overpayForCore) {
     hardFails.push("harmony_team_toxic_player_blocked");
   }
-  if (input.teamId === "C-C" && input.context?.overpayForCore && candidateScore < 60) {
+  if (isMaxCashValueIdentity && input.context?.overpayForCore && candidateScore < 60) {
     hardFails.push("cash_team_overpay_without_value");
   }
   if ((profile?.bias.riskTolerance ?? 5) >= 8 && cash > 80 && input.context?.cheapProspectOnly && !input.context?.cashCrisis) {
@@ -710,25 +711,43 @@ export function buildManagerDecisionJournalPreview(gameState: GameState): AiMana
 
 export function buildIdentityGuardAudit(gameState: GameState): AiIdentityGuardResult[] {
   const result: AiIdentityGuardResult[] = [];
-  const candidateByTeam: Record<string, Player | null> = {
-    "M-M": gameState.players.find((player) => (player.marketValue ?? 0) < 10 && (player.potential ?? 0) > (player.rating ?? 0)) ?? null,
-    "W-W": gameState.players.find((player) => player.className !== "Mage" && player.race !== "Construct" && (player.rating ?? 0) > 70) ?? null,
-    "C-C": gameState.players.find((player) => (player.marketValue ?? 0) > 80) ?? null,
-  };
 
   for (const teamRow of gameState.teams) {
     const state = seasonStrategyFor(gameState, teamRow.teamId);
+    const profile = profileFor(gameState, teamRow.teamId);
+    // Same trait-derived identity signals used inside evaluateIdentityGuard, applied here to pick a
+    // representative stress-test candidate/context per team instead of a fixed per-teamId lookup.
+    const isWinNowIdentity = (profile?.bias.starPriority ?? 5) >= 8;
+    const isSmallEliteIdentity = (profile?.bias.eliteSmallRosterPreference ?? 5) >= 8;
+    const hasDualThemeLock = (profile?.preferredClasses?.length ?? 0) > 0 && (profile?.preferredRaces?.length ?? 0) > 0;
+    const isMaxCashValueIdentity = (profile?.bias.cashPriority ?? 5) >= 10 && (profile?.bias.valuePriority ?? 5) >= 10;
+
+    let candidate: Player | null = null;
+    if (isWinNowIdentity) {
+      candidate = gameState.players.find((player) => (player.marketValue ?? 0) < 10 && (player.potential ?? 0) > (player.rating ?? 0)) ?? null;
+    } else if (hasDualThemeLock) {
+      candidate =
+        gameState.players.find(
+          (player) =>
+            !hasTokenMatch(profile?.preferredClasses, [player.className, ...player.subclasses]) &&
+            !hasTokenMatch(profile?.preferredRaces, [player.race]) &&
+            (player.rating ?? 0) > 70,
+        ) ?? null;
+    } else if (isMaxCashValueIdentity) {
+      candidate = gameState.players.find((player) => (player.marketValue ?? 0) > 80) ?? null;
+    }
+
     result.push(
       evaluateIdentityGuard({
         gameState,
         teamId: teamRow.teamId,
         decisionType: "strategy_state",
-        candidate: candidateByTeam[teamRow.teamId] ?? null,
+        candidate,
         context: {
           seasonStrategy: state.seasonStrategy,
-          cheapProspectOnly: teamRow.teamId === "M-M",
-          broadCheapRoster: teamRow.teamId === "B-P",
-          unplayableRoster: teamRow.teamId === "C-C" && rosterCount(gameState, teamRow.teamId) < 8,
+          cheapProspectOnly: isWinNowIdentity,
+          broadCheapRoster: isSmallEliteIdentity,
+          unplayableRoster: isMaxCashValueIdentity && rosterCount(gameState, teamRow.teamId) < 8,
         },
       }),
     );

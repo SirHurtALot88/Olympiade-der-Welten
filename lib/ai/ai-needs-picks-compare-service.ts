@@ -712,6 +712,15 @@ type ResolvedCompareContext = {
 
 type ComparePrizeSignal = AiNeedsPicksCashStrategy["expectedPrizeSignal"];
 
+// NOT de-hardcoded (Task #8 de-hardcode sweep, Agent C): this is only the fallback sample shown
+// by the compare/preview API when a caller passes neither teamId nor teamIds — never used by any
+// simulated economic decision path (real runs always pass an explicit scope). Checked whether any
+// identity/strategy-trait combination reproduces exactly this 4-team illustrative set: none does
+// (e.g. ambition alone: C-C=2, T-T=5, W-W=6.5, A-A=8.5 — spans nearly the whole range with no
+// shared threshold). The exact literal set/order is also pinned by existing tests
+// (tests/ai-needs-picks-compare-service.test.ts:612, tests/ai-needs-picks-compare-api.test.ts:23),
+// so replacing it with a derived predicate would need a coordinated test-contract change. Reported
+// to Opus as a design decision; left as-is.
 const DEFAULT_COMPARE_SET = ["C-C", "W-W", "T-T", "A-A"];
 const RETOOL_REFERENCE_FILES = [
   "references/retool-ai-golden-master/aiTeamNeedsQuery.js",
@@ -1748,31 +1757,6 @@ function buildPlayerThemeTokens(player: Player) {
   ].filter((entry) => entry.trim().length > 0);
 }
 
-const STRICT_IDENTITY_FOCUS_TEAM_CODES = new Set([
-  "C-C",
-  "W-W",
-  "T-T",
-  "A-A",
-  "N-W",
-  "C-S",
-  "M-M",
-  "G-G",
-  "N-N",
-  "D-P",
-  "H-R",
-  "T-G",
-  "V-D",
-  "P-C",
-  "L-R",
-  "L-K",
-  "S-C",
-  "T-C",
-  "W-L",
-  "R-L",
-  "R-R",
-  "P-S",
-]);
-
 type V4FocusTeamProfile = {
   code: string;
   preferredAxes: Array<"pow" | "spe" | "men" | "soc">;
@@ -1960,6 +1944,11 @@ const V4_FOCUS_TEAM_PROFILES: Record<string, V4FocusTeamProfile> = {
     namedMetricKeys: ["fishAlienFit", "riptideFit"],
   },
 };
+
+// Derived from the (content, not behavior) V4_FOCUS_TEAM_PROFILES map above, instead of a
+// second hand-maintained team-code list — the set of teams that get the identity theme-fit
+// scrutiny below is now defined in exactly one place (the profile map itself).
+const STRICT_IDENTITY_FOCUS_TEAM_CODES = new Set(Object.keys(V4_FOCUS_TEAM_PROFILES));
 
 function buildNormalizedPlayerTokenSet(player: Player) {
   return new Set(buildPlayerThemeTokens(player).flatMap((entry) => tokenizeThemeText(entry)));
