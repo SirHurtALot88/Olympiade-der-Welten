@@ -1081,10 +1081,14 @@ function selectBoardObjectiveDrafts(input: {
     pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-axis-allround-tophalf" && objective.status !== "completed") ??
       pickFirstObjective(
         input.objectives,
+        // A team's signature identity axis goal always surfaces, even when currently
+        // completed — it's the team's defining ambition, not a disposable to-do, so the
+        // board keeps showing it (mirrors the ungated allround fallback below). Without
+        // this a specialist already #1 in its axis would have its identity goal replaced
+        // by a generic medal target.
         (objective) =>
           objective.objectiveId.startsWith("sport-axis-rank-") &&
-          objective.source === "team_signature_axis_rank_goal" &&
-          objective.status !== "completed",
+          objective.source === "team_signature_axis_rank_goal",
       ) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-axis-allround-tophalf") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top20-breakthrough") ??
@@ -1094,10 +1098,6 @@ function selectBoardObjectiveDrafts(input: {
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top50-season") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top5-discipline-star") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("rivalry-")) ??
-      pickFirstObjective(
-        input.objectives,
-        (objective) => objective.objectiveId.startsWith("sport-axis-rank-") && objective.source === "team_signature_axis_rank_goal",
-      ) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-axis-")) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-next-matchday-top10") ??
       pickUrgentObjective(input.objectives, "morale") ??
@@ -1427,22 +1427,26 @@ function buildAiBias(input: {
   const hasPlayerPeakNeed = input.objectives.some((objective) => objective.category === "player" && objective.status !== "completed");
   const hasMedalPushNeed = input.objectives.some((objective) => objective.objectiveId === "sport-matchday-medals" && objective.status !== "completed");
   const axisPriorities: Partial<Record<AxisKey, number>> = {};
+  // A completed axis/identity goal keeps a low maintenance tilt rather than dropping to zero:
+  // the team stays invested in its defining axis to hold the lead, but the weight stays well
+  // below the urgency threshold (see hasAxisPushNeed) so success never reads as a push need.
   for (const objective of input.objectives) {
-    if (objective.status === "completed") continue;
+    const completed = objective.status === "completed";
+    const failed = objective.status === "failed";
     const axisRankMatch = /^sport-axis-rank-(pow|spe|men|soc)-top-\d+$/.exec(objective.objectiveId);
     if (axisRankMatch?.[1]) {
       const axis = axisRankMatch[1] as AxisKey;
-      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.95 : 0.75);
+      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, failed ? 0.95 : completed ? 0.2 : 0.75);
     }
     if (objective.objectiveId === "sport-axis-allround-tophalf") {
       for (const axis of Object.keys(AXIS_OBJECTIVE_META) as AxisKey[]) {
-        axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.45 : 0.32);
+        axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, failed ? 0.45 : completed ? 0.15 : 0.32);
       }
     }
     const preferredAxisMatch = /^sport-axis-(pow|spe|men|soc)$/.exec(objective.objectiveId);
     if (preferredAxisMatch?.[1]) {
       const axis = preferredAxisMatch[1] as AxisKey;
-      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.35 : 0.22);
+      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, failed ? 0.35 : completed ? 0.12 : 0.22);
     }
   }
   const hasAxisPushNeed = Object.values(axisPriorities).some((value) => (value ?? 0) >= 0.7);
