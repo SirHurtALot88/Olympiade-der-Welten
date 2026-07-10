@@ -133,6 +133,68 @@ describe("matchday slot roles", () => {
     expect(projected.warnings).toContain("Push bei stark belastetem Spieler");
   });
 
+  it("warns when this matchday's own fatigue load crosses the injury-risk threshold (7c)", () => {
+    const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
+    const attributeStats = {
+      power: 70,
+      health: 78,
+      stamina: 44,
+      intelligence: 40,
+      awareness: 45,
+      determination: 51,
+      speed: 38,
+      dexterity: 42,
+      charisma: 30,
+      will: 35,
+      spirit: 32,
+      torment: 50,
+    } as const;
+
+    // Fresh-ish (28) but pushing hard adds enough additional fatigue to cross the 30
+    // threshold this very matchday -- that's the newly-active-risk moment we want flagged.
+    const crossing = calculateMatchdayProjectedPreview({
+      baseScore: 60,
+      role,
+      attributeStats,
+      currentFatigueCount: 28,
+      intensity: "push",
+      knownModifierBonus: 0,
+      revealVariance: 2,
+    });
+
+    expect(crossing.projectedFatigueAfterMatchday).toBeGreaterThan(30);
+    expect(crossing.crossesInjuryRiskThreshold).toBe(true);
+    expect(crossing.warnings.some((warning) => warning.includes("Verletzungsrisiko wird aktiv"))).toBe(true);
+
+    // Already well past the threshold before this matchday -- risk was already active, so
+    // this isn't a new "crossing" moment.
+    const alreadyAtRisk = calculateMatchdayProjectedPreview({
+      baseScore: 60,
+      role,
+      attributeStats,
+      currentFatigueCount: 45,
+      intensity: "push",
+      knownModifierBonus: 0,
+      revealVariance: 2,
+    });
+
+    expect(alreadyAtRisk.crossesInjuryRiskThreshold).toBe(false);
+
+    // Conserve intensity with low starting fatigue stays comfortably under the threshold.
+    const staysSafe = calculateMatchdayProjectedPreview({
+      baseScore: 60,
+      role,
+      attributeStats,
+      currentFatigueCount: 5,
+      intensity: "conserve",
+      knownModifierBonus: 0,
+      revealVariance: 2,
+    });
+
+    expect(staysSafe.projectedFatigueAfterMatchday).toBeLessThanOrEqual(30);
+    expect(staysSafe.crossesInjuryRiskThreshold).toBe(false);
+  });
+
   it("maps fatigue 16 to -5 percent performance", () => {
     const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
     const projected = calculateMatchdayProjectedPreview({

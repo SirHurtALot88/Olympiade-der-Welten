@@ -1,5 +1,5 @@
 import type { PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
-import { getFatiguePerformancePenaltyPercent, getFatigueRiskLevel } from "@/lib/fatigue/fatigue-calibration";
+import { getFatiguePerformancePenaltyPercent, getFatigueRiskLevel, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightMatrix,
@@ -62,10 +62,21 @@ export type MatchdayProjectedPreview = {
   fatigueRisk: "niedrig" | "mittel" | "hoch";
   slotStrainLoad: "niedrig" | "mittel" | "hoch";
   strainRiskScore: number;
+  /** Fatigue this player is projected to carry immediately after this matchday. */
+  projectedFatigueAfterMatchday: number;
+  /**
+   * True when this matchday's own additional fatigue is what pushes the player from "no
+   * injury risk" (fatigue <= 30) into the injury-risk zone (getInjuryRiskPercent > 0).
+   * Surfaced as a dedicated warning below (7c).
+   */
+  crossesInjuryRiskThreshold: boolean;
   warnings: string[];
 };
 
 const SLOT_PROFILE_MODIFIER_SCALE = 2.2;
+
+/** Fatigue value where injuryRiskBands moves from "none" (0-29) into "minimal" (30-49). */
+const INJURY_RISK_THRESHOLD_FATIGUE = 30;
 
 const INTENSITY_CONFIG: Record<
   MatchdayIntensityStage,
@@ -730,6 +741,8 @@ export function calculateMatchdayProjectedPreview(input: {
       fatigueRisk: "niedrig",
       slotStrainLoad: "niedrig",
       strainRiskScore: 0,
+      projectedFatigueAfterMatchday: clampNumber(currentFatigueCount, 0, 100),
+      crossesInjuryRiskThreshold: false,
       warnings: baseScore == null ? ["Projected Range ohne Base Score nicht moeglich"] : ["Slotrolle fehlt"],
     };
   }
@@ -762,10 +775,25 @@ export function calculateMatchdayProjectedPreview(input: {
   const rivalryPressureModifier = input.intensity === "push" ? rivalryPressure : 0;
   const totalProjected = Number((fatigueAdjustedScore + intensityConfig.scoreModifier + knownModifierBonus).toFixed(1));
   const fatigueRisk = getFatigueRiskLevel(currentFatigueCount);
+  const projectedFatigueAfterMatchday = clampNumber(currentFatigueCount + additionalFatigue, 0, 100);
+  // 7c: surface it when THIS matchday's own fatigue load is what pushes the player from
+  // the "none" injury-risk band into an active one (fatigue crossing 30 -- the same
+  // boundary `injuryRiskBands`/`getInjuryRiskBand` use for "none" vs "minimal"). Note
+  // getInjuryRiskPercent itself interpolates continuously from fatigue 0, so ">0" alone
+  // would fire on almost any fatigue; the 30-point band boundary is what actually matters
+  // for the player (it's the first band with a materially real injury chance). Both sides
+  // are derived purely from fatigue -- no team/player hardcodes.
+  const crossesInjuryRiskThreshold =
+    currentFatigueCount <= INJURY_RISK_THRESHOLD_FATIGUE && projectedFatigueAfterMatchday > INJURY_RISK_THRESHOLD_FATIGUE;
   const warnings: string[] = [];
 
   if (input.intensity === "push" && (currentFatigueCount >= 65 || strainRiskScore >= 4)) {
     warnings.push("Push bei stark belastetem Spieler");
+  }
+  if (crossesInjuryRiskThreshold) {
+    warnings.push(
+      `Fatigue steigt nach diesem Spieltag auf ${Math.round(projectedFatigueAfterMatchday)} - Verletzungsrisiko wird aktiv (${getInjuryRiskPercent(projectedFatigueAfterMatchday).toFixed(1)}%)`,
+    );
   }
   if (rivalryPressureModifier > 0) {
     warnings.push(`Rivalitaetsdruck: Push-Streuung +${rivalryPressureModifier}`);
@@ -819,6 +847,8 @@ export function calculateMatchdayProjectedPreview(input: {
     fatigueRisk,
     slotStrainLoad,
     strainRiskScore,
+    projectedFatigueAfterMatchday,
+    crossesInjuryRiskThreshold,
     warnings,
   };
 }

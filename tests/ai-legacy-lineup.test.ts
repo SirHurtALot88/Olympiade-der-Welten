@@ -244,6 +244,59 @@ describe("legacy ai lineup suggestion", () => {
     expect(d1Players).not.toContain("p2");
   });
 
+  it("rests a fatigued star (7b) when the marginal opportunity cost over the bench is low", () => {
+    const context = createContext();
+    context.disciplineScores = context.disciplineScores.map((score) => {
+      if (score.disciplineId !== "tdm") return score;
+      if (score.playerId === "p1") return { ...score, score: 88 };
+      if (score.playerId === "p2") return { ...score, score: 54 };
+      if (score.playerId === "p3") return { ...score, score: 80 };
+      if (score.playerId === "p4") return { ...score, score: 52 };
+      if (score.playerId === "p5") return { ...score, score: 20 };
+      return score;
+    });
+    // Only p1 is fatigued (>=70 floor); everyone else is fresh. p1's raw score still
+    // ranks 2nd overall (ahead of p2/p4/p5), so the old flat health penalty alone would
+    // still start them -- the opportunity-cost rotation should bench them here because the
+    // best bench replacement (p2) is close enough that resting p1 is worth it.
+    context.rosterPlayers = context.rosterPlayers.map((player) => ({
+      ...player,
+      fatigue: player.id === "p1" ? 70 : 0,
+    }));
+
+    const suggestion = buildAiLegacyLineupSuggestion(context);
+    const d1Players = suggestion.entries.filter((entry) => entry.disciplineSide === "d1").map((entry) => entry.playerId);
+
+    expect(d1Players).toContain("p3");
+    expect(d1Players).toContain("p2");
+    expect(d1Players).not.toContain("p1");
+  });
+
+  it("keeps a fatigued star (7b) in a decisive slot where no bench replacement comes close", () => {
+    const context = createContext();
+    context.disciplineScores = context.disciplineScores.map((score) => {
+      if (score.disciplineId !== "tdm") return score;
+      if (score.playerId === "p1") return { ...score, score: 90 };
+      if (score.playerId === "p2") return { ...score, score: 20 };
+      if (score.playerId === "p3") return { ...score, score: 80 };
+      if (score.playerId === "p4") return { ...score, score: 15 };
+      if (score.playerId === "p5") return { ...score, score: 10 };
+      return score;
+    });
+    // Same fatigue level as above (p1 at 70), but now every bench alternative is far
+    // weaker -- resting p1 would cost far more than the rest benefit, so they must play.
+    context.rosterPlayers = context.rosterPlayers.map((player) => ({
+      ...player,
+      fatigue: player.id === "p1" ? 70 : 0,
+    }));
+
+    const suggestion = buildAiLegacyLineupSuggestion(context);
+    const d1Players = suggestion.entries.filter((entry) => entry.disciplineSide === "d1").map((entry) => entry.playerId);
+
+    expect(d1Players).toContain("p1");
+    expect(d1Players).toContain("p3");
+  });
+
   it("avoids injured roster players because they are not selectable active players", () => {
     const context = createContext();
     context.activePlayers = context.activePlayers.filter((player) => player.playerId !== "p1");

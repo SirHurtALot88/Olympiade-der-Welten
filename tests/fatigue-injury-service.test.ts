@@ -425,10 +425,64 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(31);
+    // Intensity-scaled load (7a): the draft has no explicit modifiers, so intensity defaults
+    // to "normal" (fatigueBase 3, additionalFatigueCap 8). At fatigue 20 the load scales to
+    // 3 + (8 - 3) * (20 / 100) = 4, so 20 + 4 = 24 (previously a flat +11 regardless of
+    // intensity, which was the coherence bug this task fixes).
+    expect(usedPlayer?.fatigue).toBe(24);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
+  });
+
+  it("scales persisted post-matchday fatigue by lineup intensity, identically for preview and apply (7a)", () => {
+    const buildResultForIntensity = (intensity: "conserve" | "normal" | "push") => {
+      const gameState = createGameState("player-1", 40);
+      const draft = gameState.seasonState.lineupDrafts?.[0];
+      if (draft) {
+        draft.modifiers = { d1: { intensity }, d2: {} };
+      }
+
+      const rollMap = buildMatchdayInjuryRollMap({
+        gameState,
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-1",
+      });
+      const result = applyFatigueAndInjuryAfterMatchday({
+        gameState,
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-1",
+        matchdayResultId: "result-1",
+        timestamp: "2026-06-13T00:00:00.000Z",
+        precomputedInjuryRolls: rollMap,
+      });
+
+      return {
+        appliedFatigue: result.gameState.players.find((player) => player.id === "player-1")?.fatigue ?? null,
+        previewFatigueBefore: rollMap.get("A-A::player-1")?.fatigueBefore ?? null,
+      };
+    };
+
+    const conserve = buildResultForIntensity("conserve");
+    const normal = buildResultForIntensity("normal");
+    const push = buildResultForIntensity("push");
+
+    // Preview (roll map) and apply MUST agree exactly -- same formula, same inputs.
+    expect(conserve.appliedFatigue).toBe(conserve.previewFatigueBefore);
+    expect(normal.appliedFatigue).toBe(normal.previewFatigueBefore);
+    expect(push.appliedFatigue).toBe(push.previewFatigueBefore);
+
+    // Intensity coherence: starting from fatigue 40, conserve/normal/push now scale
+    // fatigueBase..additionalFatigueCap from lib/lineups/matchday-slot-roles.ts by how
+    // fatigued the player already is (40% of the way to max here). Previously all three
+    // intensities produced an identical flat +11 regardless of the chosen intensity.
+    expect(conserve.appliedFatigue).toBe(42.6);
+    expect(normal.appliedFatigue).toBe(45);
+    expect(push.appliedFatigue).toBe(46.8);
+    expect(conserve.appliedFatigue!).toBeLessThan(normal.appliedFatigue!);
+    expect(normal.appliedFatigue!).toBeLessThan(push.appliedFatigue!);
   });
 
   it("blocks human lineups that still reference an injured player", () => {

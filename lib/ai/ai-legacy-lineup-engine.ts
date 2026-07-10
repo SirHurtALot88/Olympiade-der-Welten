@@ -152,6 +152,90 @@ function getSelectionScore(
   return score;
 }
 
+/**
+ * Opportunity-cost-aware rest rotation (7b).
+ *
+ * `getHealthLineupPenalty` above is a flat, context-blind penalty: it doesn't know whether
+ * the replacement sitting on the bench is nearly as good (so resting is basically free) or
+ * far worse (so resting is expensive). That's the actual gap the user flagged: a
+ * high-fatigue star with only a small margin over the next-best bench option should be
+ * benched, but the same fatigue level on a slot where nobody else comes close should not.
+ *
+ * We model this explicitly as benefit-vs-cost, purely from data already on hand:
+ *  - "rest benefit" grows with how far past the fatigue floor (70) the player is, and with
+ *    their injuryRiskPercent (both universal, trait-derived signals -- never team/player ID).
+ *  - "rest cost" is the marginal fatigue-adjusted score the player is worth over the best
+ *    remaining bench candidate for that same slot -- i.e. how much this specific matchday
+ *    would actually lose by resting them here.
+ * Rest only when benefit > cost.
+ */
+const REST_BENEFIT_FATIGUE_FLOOR = 70;
+const REST_BENEFIT_FATIGUE_WEIGHT = 0.6;
+const REST_BENEFIT_INJURY_RISK_WEIGHT = 1.1;
+
+function getRestBenefit(health: RosterHealthSnapshot): number {
+  if (health.fatigue < REST_BENEFIT_FATIGUE_FLOOR) {
+    return 0;
+  }
+  const fatigueOverFloor = health.fatigue - REST_BENEFIT_FATIGUE_FLOOR;
+  return fatigueOverFloor * REST_BENEFIT_FATIGUE_WEIGHT + health.injuryRiskPercent * REST_BENEFIT_INJURY_RISK_WEIGHT;
+}
+
+type DisciplineSideCandidate = {
+  activePlayerId: string;
+  playerId: string;
+  score: number;
+  selectionScore: number;
+  fatigueAdjustedScore: number;
+  hasScore: boolean;
+  tieBreak: number;
+  health: RosterHealthSnapshot;
+};
+
+/**
+ * Reviews the initially-picked starters (weakest selectionScore first, since a marginal
+ * starter is the cheapest one to hand off) and swaps out any elevated-fatigue starter whose
+ * rest benefit exceeds the marginal cost of playing their best available bench replacement
+ * instead. A starter with no viable bench replacement (nobody else has a discipline score)
+ * is never rested -- there is no one to rest them for.
+ */
+function applyOpportunityCostRotation(
+  picked: DisciplineSideCandidate[],
+  bench: DisciplineSideCandidate[],
+): DisciplineSideCandidate[] {
+  const result = [...picked];
+  const benchPool = [...bench];
+  const reviewOrder = result
+    .map((entry, index) => ({ entry, index }))
+    .sort((left, right) => left.entry.selectionScore - right.entry.selectionScore);
+
+  for (const { index } of reviewOrder) {
+    const starter = result[index];
+    if (!starter) continue;
+    const restBenefit = getRestBenefit(starter.health);
+    if (restBenefit <= 0) continue;
+
+    let bestBenchIndex = -1;
+    for (let candidateIndex = 0; candidateIndex < benchPool.length; candidateIndex += 1) {
+      const candidate = benchPool[candidateIndex]!;
+      if (!candidate.hasScore) continue;
+      if (bestBenchIndex === -1 || candidate.selectionScore > benchPool[bestBenchIndex]!.selectionScore) {
+        bestBenchIndex = candidateIndex;
+      }
+    }
+    if (bestBenchIndex === -1) continue;
+
+    const replacement = benchPool[bestBenchIndex]!;
+    const restCost = Math.max(starter.fatigueAdjustedScore - replacement.fatigueAdjustedScore, 0);
+    if (restBenefit > restCost) {
+      result[index] = replacement;
+      benchPool.splice(bestBenchIndex, 1, starter);
+    }
+  }
+
+  return result;
+}
+
 function buildEntriesForDisciplineSide(
   context: LegacyLineupLoadedContext,
   disciplineId: string | null,
@@ -172,7 +256,7 @@ function buildEntriesForDisciplineSide(
     context.disciplinePlayerCounts[disciplineId] ??
     0;
   const lineupStrategy = resolveLineupStrategy(context);
-  const candidates = context.activePlayers
+  const candidates: DisciplineSideCandidate[] = context.activePlayers
     .filter((player) => !usedPlayerIds.has(player.playerId))
     .map((player) => {
       const disciplineScore = context.disciplineScores.find(
@@ -182,12 +266,14 @@ function buildEntriesForDisciplineSide(
       const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
       const health = getRosterHealth(context, player.playerId);
       const selectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
+      const fatigueAdjustedScore = disciplineScore != null ? score * getFatiguePerformanceMultiplier(health.fatigue) : Number.NEGATIVE_INFINITY;
 
       return {
         activePlayerId: player.id,
         playerId: player.playerId,
         score,
         selectionScore,
+        fatigueAdjustedScore,
         hasScore: disciplineScore != null,
         tieBreak,
         health,
@@ -206,7 +292,9 @@ function buildEntriesForDisciplineSide(
       return left.playerId.localeCompare(right.playerId);
     });
 
-  const picked = candidates.slice(0, playerCount);
+  const initialPicked = candidates.slice(0, playerCount);
+  const bench = candidates.slice(playerCount);
+  const picked = applyOpportunityCostRotation(initialPicked, bench);
   picked.forEach((player) => usedPlayerIds.add(player.playerId));
 
   return {
