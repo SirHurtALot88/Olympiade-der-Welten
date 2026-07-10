@@ -7,7 +7,7 @@ import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import type { ContractShape, GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 

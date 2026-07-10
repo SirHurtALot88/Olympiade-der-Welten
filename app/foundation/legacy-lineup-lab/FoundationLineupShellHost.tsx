@@ -112,7 +112,7 @@ export default function FoundationLineupShellHost({
         defaultSaveName: activeSaveName,
         defaultSeasonId: gameState.season.id,
         defaultMatchdayId: gameState.matchdayState.matchdayId,
-        defaultTeamId: activeManagerTeamId,
+        defaultTeamId: activeManagerTeamId ?? undefined,
         highlightMissingSlots,
         focusMissingRequestKey: lineupFocusRequestKey,
         draftBoardView: effectiveDraftBoardView,

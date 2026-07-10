@@ -7,25 +7,15 @@ import {
   readSeasonSliceClientCache,
   writeSeasonSliceClientCache,
 } from "@/lib/foundation/season-slice-http";
+// The real season-standings-overview payload shape (items/source/scope) is defined once as
+// FoundationSeasonStandingsOverviewResponse and used by every other consumer in the app —
+// reuse it here instead of a second, looser duplicate (source.disciplineColumns in particular
+// had drifted to the wrong shape: string[] instead of the real {normalizedKey, sheetColumn}[]).
+import type { FoundationSeasonStandingsOverviewResponse } from "@/lib/foundation/tabs/foundation-page-types";
 
-export type SeasonStandingsOverviewScope = {
-  saveId: string;
-  seasonId: string;
-};
+export type SeasonStandingsOverviewScope = NonNullable<FoundationSeasonStandingsOverviewResponse["scope"]>;
 
-export type SeasonStandingsOverviewResponse = {
-  items: unknown[];
-  missingMappings: unknown[];
-  mappingWarnings: string[];
-  source: {
-    kind: string;
-    access?: string;
-    detectedColumns?: string[];
-    disciplineColumns?: string[];
-  };
-  scope: SeasonStandingsOverviewScope | null;
-  error?: string;
-};
+export type SeasonStandingsOverviewResponse = FoundationSeasonStandingsOverviewResponse;
 
 function buildStandingsOverviewCacheKey(input: {
   saveId: string;

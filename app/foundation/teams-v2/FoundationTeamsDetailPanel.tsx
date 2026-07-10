@@ -116,7 +116,7 @@ export type FoundationTeamsDetailPanelProps = {
   selectedTeamContractShapeMix: unknown;
   renderMetricBar: unknown;
   leaguePlayerHeatPools: unknown;
-  selectedTeamDetailTab: unknown;
+  selectedTeamDetailTab: "roster" | "contracts" | "portraits" | "transfer";
   teamRosterRoleFilter: unknown;
   setTeamRosterRoleFilter: unknown;
   teamRosterFocusMode: unknown;

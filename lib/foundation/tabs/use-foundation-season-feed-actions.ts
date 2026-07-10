@@ -16,7 +16,7 @@ import type {
   FoundationView,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import { isAbortError } from "@/lib/foundation/tabs/foundation-page-module-helpers";
-import { appendRoomContextToParams } from "@/lib/room/foundation-room-context-client";
+import { appendRoomContextToParams, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import type { FoundationSeasonFeedReloaders } from "@/lib/foundation/tabs/use-foundation-live-sync";
 import type { SeasonOverviewOption } from "@/lib/foundation/tabs/use-season-v2-panel-derivations";
 import { seedSeasonStandingsOverviewCache } from "@/lib/foundation/use-season-standings-overview";
@@ -28,7 +28,7 @@ export type UseFoundationSeasonFeedActionsInput = {
   gameStateMatchdayId: string;
   readMeta: FoundationReadMeta;
   isFoundationBootstrapState: boolean;
-  roomContext: unknown;
+  roomContext: FoundationRoomContext | null;
   seasonOverviewSeasonId: string | null;
   seasonContentSignature: string;
   marketReloadToken: number;

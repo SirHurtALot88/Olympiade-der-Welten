@@ -45,7 +45,7 @@ function wrapLineupV2PortraitPreview(
       name={player.name}
       portraitUrl={player.portraitUrl}
       portraitInitials={player.name.slice(0, 2).toUpperCase()}
-      playerOvr={player.playerOvr}
+      playerOvr={player.playerOvr ?? null}
       playerMvs={null}
       playerPps={player.playerPps}
       pow={player.coreStats.pow}
