@@ -38648,6 +38648,56 @@ button.foundation-team-portrait-card {
   color: rgba(120, 170, 255, 0.9);
 }
 
+/* --- v1 decision-clarity: Vorsprungs-Signal (Feature B) ---
+   Tier word + number is the primary, glanceable element; the bar underneath is a thin, muted
+   secondary hint of the gap — never louder than the label. */
+.legacy-lineup-v2-slot-lead {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 8px;
+  font-size: 0.68rem;
+}
+
+.legacy-lineup-v2-slot-lead-tag {
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.legacy-lineup-v2-slot-lead-tag strong {
+  font-weight: 600;
+}
+
+.legacy-lineup-v2-slot-lead.is-positive .legacy-lineup-v2-slot-lead-tag { color: rgba(120, 210, 145, 0.95); }
+.legacy-lineup-v2-slot-lead.is-info .legacy-lineup-v2-slot-lead-tag { color: rgba(120, 170, 255, 0.95); }
+.legacy-lineup-v2-slot-lead.is-neutral .legacy-lineup-v2-slot-lead-tag { color: rgba(240, 190, 90, 0.95); }
+.legacy-lineup-v2-slot-lead.is-risk .legacy-lineup-v2-slot-lead-tag { color: rgba(255, 140, 140, 0.95); }
+
+.legacy-lineup-v2-slot-lead-bar {
+  position: relative;
+  flex: 1 1 auto;
+  max-width: 96px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legacy-lineup-v2-slot-lead-bar-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.legacy-lineup-v2-slot-lead.is-positive .legacy-lineup-v2-slot-lead-bar-marker { color: rgba(120, 210, 145, 0.95); }
+.legacy-lineup-v2-slot-lead.is-info .legacy-lineup-v2-slot-lead-bar-marker { color: rgba(120, 170, 255, 0.95); }
+.legacy-lineup-v2-slot-lead.is-neutral .legacy-lineup-v2-slot-lead-bar-marker { color: rgba(240, 190, 90, 0.95); }
+.legacy-lineup-v2-slot-lead.is-risk .legacy-lineup-v2-slot-lead-bar-marker { color: rgba(255, 140, 140, 0.95); }
+
 .legacy-lineup-v2-focus {
   display: grid;
   gap: 10px;
@@ -38930,6 +38980,67 @@ button.foundation-team-portrait-card {
   color: rgba(180, 235, 195, 0.92);
   font-size: 0.64rem;
   white-space: nowrap;
+}
+
+/* --- v1 decision-clarity: Lane-Meter (Feature C) ---
+   Default state is a single quiet verdict chip ("D2-Typ · +9,9" / "Flexibel"). The full D1/D2
+   two-row meter is progressive disclosure: hidden by default, revealed on hover/focus of the
+   candidate row so the rail stays uncluttered. */
+.legacy-lineup-v2-lane {
+  display: block;
+  margin-top: 2px;
+}
+
+.legacy-lineup-v2-lane-chip {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+
+.legacy-lineup-v2-lane-detail {
+  display: grid;
+  gap: 2px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 140ms ease, opacity 140ms ease;
+}
+
+.legacy-lineup-v2-candidate-row:hover .legacy-lineup-v2-lane-detail,
+.legacy-lineup-v2-candidate-row:focus-within .legacy-lineup-v2-lane-detail {
+  max-height: 40px;
+  opacity: 1;
+  margin-top: 3px;
+}
+
+.legacy-lineup-v2-lane-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.legacy-lineup-v2-lane-row-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legacy-lineup-v2-lane-row-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(120, 170, 255, 0.55);
+}
+
+.legacy-lineup-v2-lane-row-value {
+  font-variant-numeric: tabular-nums;
 }
 
 .legacy-lineup-v2-candidate-rank-badge {

@@ -1965,7 +1965,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
   const [focusV2CandidateTab, setFocusV2CandidateTab] = useState<LegacyLineupCandidateTab>("all");
-  const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("all");
+  // v1 decision-clarity default: land on "Frei" (undeployed players) so the rail leads with the
+  // players who still need a slot — each already carries its "Bester Slot"-Empfehlung. Users can
+  // still switch back to "Alle"/"Eingesetzt"/"Blockiert" via the Teamdeck-Filter buttons.
+  const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("free");
   const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("fit");
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
   const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(false);
