@@ -672,12 +672,27 @@ function resolveStrictLocalSave(persistence: PersistenceService, saveId: string)
   return requestedSave;
 }
 
+const rosterPlayerIndexCache = new WeakMap<GameState["players"], Map<string, GameState["players"][number]>>();
+
+function getPlayerIndexForRoster(players: GameState["players"]) {
+  let index = rosterPlayerIndexCache.get(players);
+  if (!index) {
+    index = new Map();
+    for (const player of players) {
+      index.set(player.id, player);
+    }
+    rosterPlayerIndexCache.set(players, index);
+  }
+  return index;
+}
+
 function getTeamRosterPlayers(gameState: GameState, teamId: string) {
+  const playerIndex = getPlayerIndexForRoster(gameState.players);
   return gameState.rosters
     .filter((entry) => entry.teamId === teamId)
     .map((entry) => ({
       entry,
-      player: gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null,
+      player: playerIndex.get(entry.playerId) ?? null,
     }))
     .filter((item): item is { entry: GameState["rosters"][number]; player: GameState["players"][number] } => Boolean(item.player));
 }
@@ -1729,28 +1744,6 @@ function buildQualityGate(
         (pick.teamFit ?? 0) >= 3,
     );
   });
-  const mayhemUnderinvested = season1OptimumMode
-    ? teams.filter((team) => {
-        if (team.teamCode !== "M-M") {
-          return false;
-        }
-        const cashAfter = team.previewSummary.cashAfterPlannedBuys;
-        const plannedRoster = team.previewSummary.plannedRosterCount ?? team.rosterAfter;
-        const targetOpt = team.targetRosterOpt ?? team.targetRosterSize;
-        const impactPicks = team.plannedPicks.filter(
-          (pick) =>
-            pick.status !== "blocked" &&
-            ((pick.marketValue ?? 0) >= 25 ||
-              ["core_investment", "specialist_investment", "star_pick", "superstar_pick"].includes(normalizeToken(pick.pickLane))) &&
-            ((pick.teamFit ?? 0) >= 4 || pick.scoreBreakdown.needMatchScore >= 4),
-        ).length;
-        return (
-          cashAfter != null &&
-          cashAfter > 50 &&
-          (targetOpt == null || plannedRoster < targetOpt || impactPicks < 2)
-        );
-      })
-    : [];
   const coldSteelIdentityBreak = season1OptimumMode
     ? teams.filter((team) => {
         if (team.teamCode !== "C-S") {
@@ -2024,12 +2017,6 @@ function buildQualityGate(
   }
   if (focusTeamNoCoreIdentity.length > 0) {
     blockingReasons.push(...focusTeamNoCoreIdentity.map((team) => `focus_team_no_core_identity_built:${team.teamCode}`));
-  }
-  if (mayhemUnderinvested.length > 0) {
-    // Under-investment is a planner-quality/tuning signal ("this top team should have bought more
-    // impact"), never a reason to execute zero picks. Kept as a warning so it can't be promoted to
-    // a full team exclusion downstream (resolveSeason1PartialExecutionPlan) and zero out the draft.
-    warnings.push(...mayhemUnderinvested.map((team) => `top_team_underinvested_warning:${team.teamCode}`));
   }
   if (coldSteelIdentityBreak.length > 0) {
     blockingReasons.push(...coldSteelIdentityBreak.map((team) => `cold_steel_identity_break:${team.teamCode}`));

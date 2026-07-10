@@ -60,6 +60,7 @@ import {
   buildLeagueMarketBrackets,
   getBracketBandForPickLane,
   resolvePickLaneBracket,
+  bracketsToLegacyAnchors,
   type LeagueMarketBrackets,
 } from "@/lib/ai/market-pick-engine/market-brackets";
 import { canAffordPremiumMix } from "@/lib/ai/market-pick-engine/budget-slot-allocator";
@@ -748,25 +749,6 @@ function formatLaneReserve(value: number | null) {
   return value == null ? "—" : roundValue(value, 2).toFixed(2);
 }
 
-function quantile(values: Array<number | null | undefined>, q: number) {
-  const normalized = values
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((left, right) => left - right);
-  if (normalized.length === 0) {
-    return 0;
-  }
-  if (normalized.length === 1) {
-    return normalized[0]!;
-  }
-  const position = clamp(q, 0, 1) * (normalized.length - 1);
-  const base = Math.floor(position);
-  const rest = position - base;
-  const current = normalized[base]!;
-  const next = normalized[Math.min(base + 1, normalized.length - 1)]!;
-  return current + (next - current) * rest;
-}
-
 type LaneMarketAnchors = {
   q25Price: number;
   q50Price: number;
@@ -777,31 +759,20 @@ type LaneMarketAnchors = {
 };
 
 function buildLaneMarketAnchors(candidates: AiTransferPreviewRecommendation[]): LaneMarketAnchors {
+  // Absolute Brackets statt Pool-Quantile: der Planner nutzt dieselbe Definition wie Audit/Design
+  // (Superstar >=65, Star >=45, Core >=30 ...). Die Legacy-Anker-Form (q25..q95) wird aus den
+  // absoluten Bracket-Grenzen abgeleitet, nicht aus der Preisverteilung des Kandidatenpools.
+  const brackets = buildLeagueMarketBrackets(
+    candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
+  );
+  const legacy = bracketsToLegacyAnchors(brackets);
   return {
-    q25Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.25,
-    ),
-    q50Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.5,
-    ),
-    q75Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.75,
-    ),
-    q85Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.85,
-    ),
-    q90Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.9,
-    ),
-    q95Price: quantile(
-      candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
-      0.95,
-    ),
+    q25Price: legacy.q25Price,
+    q50Price: legacy.q50Price,
+    q75Price: legacy.q75Price,
+    q85Price: legacy.q85Price,
+    q90Price: legacy.q90Price,
+    q95Price: legacy.q95Price,
   };
 }
 
@@ -2032,11 +2003,6 @@ function getV4FocusTeamProfile(team: Team) {
   return V4_FOCUS_TEAM_PROFILES[normalizedTeamId] ?? V4_FOCUS_TEAM_PROFILES[normalizedShortCode] ?? null;
 }
 
-function isSeason1OptimumImpactTeam(team: Team) {
-  const code = normalizeTeamCode(team.shortCode || team.teamId);
-  return code === "M-M" || code === "H-R" || code === "R-R" || code === "C-S" || code === "G-G" || code === "Z-H";
-}
-
 export type Season1LanePhilosophy = {
   premiumAppetite: number;
   premiumCap: number;
@@ -2422,8 +2388,9 @@ function findSeason1OptimumImpactCandidate(input: {
   minimumSlotsBefore: number;
   targetRosterSize: number | null;
   simulatedRosterCount: number | null;
+  premiumAppetite: number;
 }) {
-  if (!isSeason1OptimumImpactTeam(input.team)) {
+  if (input.premiumAppetite < 0.32) {
     return null;
   }
   const remainingCash = input.remainingCash;
@@ -2454,7 +2421,7 @@ function findSeason1OptimumImpactCandidate(input: {
             ? 1.65
             : 1.85;
   const maxTargetAwareImpactPrice = targetAwareSlotBudget * impactMultiplier;
-  const minFit = normalizeTeamCode(input.team.shortCode || input.team.teamId) === "M-M" ? 6 : 4;
+  const minFit = 4;
   const affordable = input.candidates.filter((candidate) => {
     if (candidate.price == null || !canAffordWithoutNegativeCash(candidate.price, pickAffordableCash)) {
       return false;
@@ -8490,6 +8457,7 @@ function buildTeamEntry(input: {
         minimumSlotsBefore,
         targetRosterSize,
         simulatedRosterCount,
+        premiumAppetite: lanePhilosophyForPickLoop.premiumAppetite,
       });
       if (impactCandidate) {
         top = impactCandidate;
