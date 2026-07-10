@@ -926,8 +926,14 @@ export function applySeasonEndXpSpend(
     const player = save.gameState.players.find((entry) => entry.id === playerId);
     if (!player) continue;
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
-    attributeOverridesAfter[playerId] = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
-    attributeOverridesBefore[playerId] = normalizeAttributes(player);
+    const normalizedAttributesAfter = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
+    if (normalizedAttributesAfter) {
+      attributeOverridesAfter[playerId] = normalizedAttributesAfter;
+    }
+    const normalizedAttributesBefore = normalizeAttributes(player);
+    if (normalizedAttributesBefore) {
+      attributeOverridesBefore[playerId] = normalizedAttributesBefore;
+    }
   }
   let disciplineRatingsAfterByPlayerId: Map<string, Record<string, number>>;
   let disciplineRatingsBeforeByPlayerId: Map<string, Record<string, number>>;

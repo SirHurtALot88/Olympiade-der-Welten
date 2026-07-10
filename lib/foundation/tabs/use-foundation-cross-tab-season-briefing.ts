@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel } from "@/lib/facilities/facility-effects";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
@@ -26,13 +26,13 @@ type SeasonDisciplineScheduleRow = {
     disciplineId?: string | null;
     displayName?: string | null;
     playerCount?: number | null;
-    category?: string | null;
+    category?: DisciplineCategory | null;
   } | null;
   discipline2?: {
     disciplineId?: string | null;
     displayName?: string | null;
     playerCount?: number | null;
-    category?: string | null;
+    category?: DisciplineCategory | null;
   } | null;
 };
 
@@ -202,6 +202,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
     if (!shouldBuildSeasonSetupFlow || !input.selectedTeam) {
       return null;
     }
+    const selectedTeam = input.selectedTeam;
 
     const storedFlow = input.gameState.seasonState.newGameFlow ?? null;
     const currentSeasonText = `${input.gameState.season.id} ${input.gameState.season.name}`.toLowerCase();
@@ -319,7 +320,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
           "appoint_captain",
           Boolean(
             input.gameState.teamCaptains?.some(
-              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === input.selectedTeam.teamId,
+              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === selectedTeam.teamId,
             ),
           ),
         ),

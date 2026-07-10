@@ -96,16 +96,16 @@ export function useFoundationCrossTabSeasonPrize(input: {
       })
       .sort((left, right) => {
         if (right.pps.total !== left.pps.total) {
-          return right.pps.total - left.pps.total;
+          return (right.pps.total ?? 0) - (left.pps.total ?? 0);
         }
         return left.team.name.localeCompare(right.team.name, "de");
       })
       .map((row, index, sortedRows) => {
-        const buildAreaRank = (selector: (entry: (typeof sortedRows)[number]) => number) =>
+        const buildAreaRank = (selector: (entry: (typeof sortedRows)[number]) => number | null) =>
           buildSharedRankMap(
             sortedRows.map((entry) => ({
               teamId: entry.team.teamId,
-              value: selector(entry),
+              value: selector(entry) ?? 0,
             })),
           ).get(row.team.teamId) ?? 0;
 
@@ -149,11 +149,11 @@ export function useFoundationCrossTabSeasonPrize(input: {
         ? sortRows(ppAreaRows, input.tableSorts.ppArea, {
             rank: (row) => row.rank,
             team: (row) => row.team.name,
-            pps: (row) => row.pps.total,
-            pow: (row) => row.pps.pow,
-            spe: (row) => row.pps.spe,
-            men: (row) => row.pps.men,
-            soc: (row) => row.pps.soc,
+            pps: (row) => row.pps.total ?? 0,
+            pow: (row) => row.pps.pow ?? 0,
+            spe: (row) => row.pps.spe ?? 0,
+            men: (row) => row.pps.men ?? 0,
+            soc: (row) => row.pps.soc ?? 0,
           })
         : [],
     [input.tableSorts.ppArea, ppAreaRows, shouldBuildPpAreaTableDerivations],

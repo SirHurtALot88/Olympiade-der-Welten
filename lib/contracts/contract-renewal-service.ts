@@ -272,9 +272,9 @@ function resolveExpectedReplacementFeeMw(input?: { leagueDepthFloorMw?: number |
  * Total cost of ownership: exit path (fee + replacement + P/L + min risk) vs renew path (salary × years).
  */
 export function resolveContractRenewalTco(input: {
-  exitProfitLoss: number | null;
-  exitPurchasePrice: number | null;
-  exitValue: number | null;
+  exitProfitLoss: number | null | undefined;
+  exitPurchasePrice: number | null | undefined;
+  exitValue: number | null | undefined;
   renewalSalary: number | null;
   currentSalary: number | null;
   renewLength: number;
@@ -342,9 +342,9 @@ export function resolveContractRenewalTco(input: {
  * worse than bridging one more season — same spirit as lossResistance on market sells, no hard gate.
  */
 export function resolveContractExitRenewBias(input: {
-  exitProfitLoss: number | null;
-  exitPurchasePrice: number | null;
-  exitValue: number | null;
+  exitProfitLoss: number | null | undefined;
+  exitPurchasePrice: number | null | undefined;
+  exitValue: number | null | undefined;
   renewalSalary: number | null;
   currentSalary: number | null;
   ratingValue: number;
@@ -777,6 +777,8 @@ function buildPreviewRow(input: {
       recommendedContractShape: "balanced",
       recommendedAction: "no_action",
       renewalBlockReason: null,
+      canRenewEffective: true,
+      decisionReason: null,
       marketValue: roundMoney(marketValue),
       ovr: rating?.ovrNormalized ?? null,
       mvs: rating?.mvs ?? null,

@@ -311,6 +311,11 @@ type ArenaMatchdayWinnerRow = {
   seasonRankDelta: number | null;
   d1Mutators: string[];
   d2Mutators: string[];
+  intensity: "conserve" | "normal" | "push" | null;
+  formCardStatus: "ready" | "missing_source";
+  formCardModifier: number | null;
+  totalMutatorScore: number | null;
+  pushScore: number | null;
 };
 
 function formatDecimalScore(value: number | null | undefined, fractionDigits = 1) {
@@ -1544,6 +1549,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           formatMutatorChip(d2?.mutator1Label, d2?.mutator1Modifier),
           formatMutatorChip(d2?.mutator2Label, d2?.mutator2Modifier),
         ].filter((entry): entry is string => Boolean(entry)),
+        intensity: null,
+        formCardStatus: "missing_source",
+        formCardModifier: null,
+        totalMutatorScore: null,
+        pushScore: null,
       } satisfies ArenaMatchdayWinnerRow;
     });
 
@@ -2064,7 +2074,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         teamName: row.teamName,
         teamLogoUrl: row.teamLogoUrl,
         rank: row.rank,
-        stepRankDelta: null,
+        stepRankDelta: null as number | null,
         score: row.totalScore,
         points: row.totalPoints,
         baseRank: row.rank,
@@ -2077,6 +2087,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         ],
         breakdown: [] as ReturnType<typeof getMatchdayArenaPhaseBreakdown>,
         trackSegments: [],
+        sideKey: "d1",
       }));
     }
 
@@ -3272,10 +3283,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
               const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
               const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+              const boardModeForSecondaryLabel = effectiveBoardMode as ArenaDisciplinePhase;
               const statSecondaryLabel =
                 row.points != null
                   ? `${formatDecimalScore(row.points, 1)} PPs`
-                  : effectiveBoardMode === "total"
+                  : boardModeForSecondaryLabel === "total"
                     ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
                     : slotDelta != null
                       ? `+${formatDecimalScore(slotDelta, 1)}`
