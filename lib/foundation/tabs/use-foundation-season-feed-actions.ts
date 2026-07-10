@@ -444,7 +444,7 @@ export type UseFoundationSeasonOverviewFeedEffectInput = {
   gameStateSeasonId: string;
   isFoundationBootstrapState: boolean;
   seasonOverviewSeasonId: string | null;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   seasonStandingsFeed: FoundationSeasonStandingsOverviewResponse | null;
   seasonOverviewOptions: SeasonOverviewOption[];
   shouldLoadSeasonOverviewFeed: boolean;

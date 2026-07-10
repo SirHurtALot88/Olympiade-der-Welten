@@ -130,7 +130,7 @@ export type UseFoundationPersistenceActionsInput = {
   feedSetters: FoundationSaveScopedFeedSetters;
   onSaveConflictReload: (reloaded: GameState) => Promise<void>;
   showReadOnlyNotice: () => void;
-  syncFoundationViewInUrl: (view: string) => void;
+  syncFoundationViewInUrl: (view: FoundationView) => void;
   setFreshSeasonStartMessage: Dispatch<SetStateAction<string | null>>;
   onFetchSlow?: () => void;
   onFetchSlowClear?: () => void;

@@ -11,7 +11,7 @@ import { useSeasonPreviewDerivations } from "@/lib/foundation/tabs/use-season-pr
 type ColumnVisibilityManagerProps = {
   title: string;
   columns: FoundationTableColumn[];
-  isVisible: (columnId: string, visibleByDefault: boolean) => boolean;
+  isVisible: (columnId: string, visibleByDefault?: boolean) => boolean;
   onToggle: (columnId: string, nextVisible: boolean) => void;
 };
 
@@ -90,7 +90,7 @@ export default function FoundationSeasonPreviewShellHost({
           title="Spalten"
           columns={standingsPreviewColumns}
           isVisible={(columnId, visibleByDefault) =>
-            isTableColumnVisible("standingsPreviewTable", columnId, visibleByDefault)
+            isTableColumnVisible("standingsPreviewTable", columnId, visibleByDefault ?? false)
           }
           onToggle={(columnId, nextVisible) => setTableColumnVisible("standingsPreviewTable", columnId, nextVisible)}
         />

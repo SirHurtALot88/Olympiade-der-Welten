@@ -37,7 +37,7 @@ export type UseFoundationLiveSyncInput = {
   readMeta: FoundationReadMeta;
   activeView: FoundationView;
   seasonOverviewSeasonId: string | null;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   roomContext: unknown;
   roomLiveState: OlyRoomState | null;
   setRoomActivityNotice: Dispatch<

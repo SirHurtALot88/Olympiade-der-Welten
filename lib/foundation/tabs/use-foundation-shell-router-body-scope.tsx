@@ -8991,8 +8991,8 @@ export function useFoundationShellRouterBodyScope({
     aiTeamsCount: aiTeams.length,
     marketBuyBusy,
     marketSellBusy,
-    contractRenewalBusy,
-    sponsorChoiceBusy,
+    contractRenewalBusy: contractRenewalBusy != null,
+    sponsorChoiceBusy: sponsorChoiceBusy != null,
     facilityUpgradeBusy,
     facilityMaintenanceBusy,
     assignTeamCaptainBusy,
@@ -9134,6 +9134,7 @@ export function useFoundationShellRouterBodyScope({
 
 
   const foundationTeamsViewHostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam"> = {
+    active: true,
     activeView,
     selectedTeamId,
     gameState,
@@ -9151,7 +9152,11 @@ export function useFoundationShellRouterBodyScope({
     getTablePinnedRightIds,
     buildTeamDetailDrawerData,
     formatMoney,
-    getRosterEntrySalarySortValue,
+    // Forwarded as-is; the host re-casts it to the roster-table-derivation signature.
+    getRosterEntrySalarySortValue: getRosterEntrySalarySortValue as (
+      entry: { salary?: number | null },
+      player?: unknown,
+    ) => number | null,
     selectedRosterTableRows,
     shouldBuildTeamContracts,
     showExtendedTeamPanels,
@@ -9161,7 +9166,6 @@ export function useFoundationShellRouterBodyScope({
     getRosterEntryCurrentSeasonSalary,
     getRosterEntrySalaryDelta,
     playerRatingsById,
-    getViewClass,
     getRankHeatClass,
     SortableHeader,
     getTableColumnWidth,
