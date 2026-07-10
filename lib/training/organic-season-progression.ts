@@ -13,7 +13,7 @@ import {
   getAttributeAffinityKind,
   type AttributeAffinityKind,
   type AttributeAffinityProfile,
-} from "@/lib/training/training-levelup-service";
+} from "@/lib/training/attribute-affinity-service";
 import {
   getCombinedAttributeTrainingMultiplier,
   getPotentialGapXpFactor,

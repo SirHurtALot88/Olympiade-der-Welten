@@ -7,7 +7,7 @@ import {
   type ProgressionClassName,
   normalizeProgressionClassName,
 } from "@/lib/training/class-progression-config";
-import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
+import { deriveAttributeAffinityProfile } from "@/lib/training/attribute-affinity-service";
 
 export type AiPlayerTrainingClassPlan = {
   playerId: string;

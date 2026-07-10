@@ -27,7 +27,7 @@ import { buildPlayerProgressionForecast } from "@/lib/training/player-progressio
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import { getAllTrainingModePresentations } from "@/lib/training/training-mode-presentation";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
-import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
+import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/attribute-affinity-service";
 import type {
   FoundationReadMeta,
   TrainingClassDraft,

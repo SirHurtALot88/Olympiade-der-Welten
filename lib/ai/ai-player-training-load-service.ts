@@ -5,7 +5,7 @@ import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacili
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { MATCHDAY_FATIGUE_LOAD, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
-import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
+import { deriveAttributeAffinityProfile } from "@/lib/training/attribute-affinity-service";
 import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/training/class-progression-config";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";

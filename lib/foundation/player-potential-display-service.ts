@@ -17,7 +17,7 @@ import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-s
 import { clampPotentialCeilingToCurrentStars, reconcilePlayerPotentialRecordToCurrentAbility } from "@/lib/scouting/player-potential-ceiling-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
-import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
+import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/attribute-affinity-service";
 
 const AXIS_LABELS: Record<PlayerAxisKey, string> = {
   pow: "POW",
