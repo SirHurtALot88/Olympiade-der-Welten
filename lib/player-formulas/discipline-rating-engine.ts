@@ -84,7 +84,8 @@ function readPlayerAttributes(player: Player): PlayerGeneratorAttributes | null 
     spirit: stats.spirit,
     torment: stats.torment,
   };
-  return Object.values(attributes).every(isFiniteNumber) ? attributes : null;
+  // Verified at runtime immediately above: every value is a finite number, satisfying PlayerGeneratorAttributes.
+  return Object.values(attributes).every(isFiniteNumber) ? (attributes as PlayerGeneratorAttributes) : null;
 }
 
 export function buildLeagueDisciplineRatingsWithAttributeOverrides(

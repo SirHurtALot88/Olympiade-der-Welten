@@ -109,7 +109,8 @@ function buildTeamProfileContentSignature(input: {
     input.saveId,
     input.gameState.season.id,
     team?.cash ?? "cash",
-    team?.salaryCap ?? "cap",
+    // salaryCap is not a Team field (stale cache-key component; always resolves to "cap").
+    (team as { salaryCap?: number | null } | undefined)?.salaryCap ?? "cap",
     rosterSize,
     seasonSnapshotCount,
     transferCount,
@@ -227,7 +228,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
         return null;
       }
 
-      const saveId = input.gameState.saveMeta?.saveId ?? "default";
+      // saveMeta is not a GameState field (stale read; resolves to "default").
+      const saveId = (input.gameState as { saveMeta?: { saveId?: string } }).saveMeta?.saveId ?? "default";
       const contentSignature = buildTeamProfileContentSignature({
         saveId,
         gameState: input.gameState,

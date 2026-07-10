@@ -89,7 +89,7 @@ export function useSeasonPreviewDerivations(input: UseSeasonPreviewDerivationsIn
         tableColumnPreferences.standingsPreviewTable?.columnOrder,
         getTablePinnedLeftIds("standingsPreviewTable"),
         getTablePinnedRightIds("standingsPreviewTable"),
-      ).filter((column) => isTableColumnVisible("standingsPreviewTable", column.id, column.visibleByDefault)),
+      ).filter((column) => isTableColumnVisible("standingsPreviewTable", column.id, column.visibleByDefault !== false)),
     [getTablePinnedLeftIds, getTablePinnedRightIds, isTableColumnVisible, standingsPreviewColumns, tableColumnPreferences],
   );
 

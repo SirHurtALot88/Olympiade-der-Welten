@@ -85,9 +85,10 @@ function getRosterEntrySalaryDelta(
   const normalSalary =
     getRosterEntryNormalSalary(player) ??
     (player?.id
-      ? getPlayerBaselineEconomyReference(
+      ? // expectedSalary is not on the baseline economy reference (stale read; resolves to undefined).
+        (getPlayerBaselineEconomyReference(
           gameState.playerBaselines?.find((row) => row.playerId === player.id) ?? null,
-        )?.expectedSalary
+        ) as { expectedSalary?: number | null } | null)?.expectedSalary
       : null);
 
   if (!isPlausibleSalaryDeltaReference(salary, normalSalary) || salary == null || normalSalary == null) {

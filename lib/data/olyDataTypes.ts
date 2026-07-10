@@ -1453,6 +1453,7 @@ export type RosterEntry = {
   upkeep: number;
   purchasePrice?: number | null;
   currentValue?: number | null;
+  marketValue?: number | null;
   roleTag: "starter" | "bench" | "prospect";
   promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;

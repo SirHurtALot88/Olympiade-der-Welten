@@ -30,12 +30,16 @@ export function reconstructDraftRostersFromHistory(gameState: GameState): Roster
     const existing = gameState.rosters.find((entry) => entry.playerId === buy.playerId && entry.teamId === buy.toTeamId);
     rosterByKey.set(`${buy.playerId}:${buy.toTeamId}`, {
       ...(existing ?? {
+        id: `${buy.playerId}:${buy.toTeamId}`,
         teamId: buy.toTeamId,
         playerId: buy.playerId,
         activePlayerId: buy.playerId,
         salary: buy.salary ?? 0,
+        upkeep: 0,
         currentValue: buy.marketValue ?? buy.fee ?? 0,
         contractLength: buy.remainingContractLength ?? 1,
+        roleTag: "bench" as const,
+        joinedSeasonId: "season-1",
       }),
     });
   }

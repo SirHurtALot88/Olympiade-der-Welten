@@ -1,4 +1,4 @@
-import type { ContractShape, GameState, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { ContractShape, ContractYearSalary, GameState, RosterEntry } from "@/lib/data/olyDataTypes";
 import {
   buildContractSalarySchedule,
   calculateOpenBuyoutCost,
@@ -32,7 +32,7 @@ export function resolveRemainingSalaryScheduleForBuyout(input: {
 }) {
   const contractLength = normalizeContractLength(input.rosterEntry.contractLength);
   if (contractLength <= 0) {
-    return [] as Array<{ salary: number }>;
+    return [] as ContractYearSalary[];
   }
 
   const stored = input.rosterEntry.yearlySalarySchedule ?? [];

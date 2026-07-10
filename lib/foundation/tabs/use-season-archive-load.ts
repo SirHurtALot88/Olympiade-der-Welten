@@ -38,7 +38,7 @@ export function isSeasonArchivePendingFetch(input: {
     return false;
   }
 
-  if (input.seasonSnapshots === undefined) {
+  if (input.seasonSnapshots == null) {
     return true;
   }
 

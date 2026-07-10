@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 
-import type { GameState, Team } from "@/lib/data/olyDataTypes";
-import type { TeamFacilityCollection } from "@/lib/facilities/facility-effects";
+import type { GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   getPlayerDisplayMarketValue,
