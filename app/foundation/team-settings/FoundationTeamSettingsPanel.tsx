@@ -38,6 +38,7 @@ import {
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
 import type { NewGamePresetId } from "@/app/foundation/foundation-page-client-exports";
+import type { TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
 /** Dumb Team Settings panel (Strangler Phase 3). */
 export type FoundationTeamSettingsPanelProps = FoundationShellRouterBodyProps;
@@ -438,7 +439,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           Kein Save in diesem Bereich
                         </option>
                       ) : null}
-                      {saveSummaries.map((save) => (
+                      {saveSummaries.map((save: any) => (
                         <option key={save.saveId} value={save.saveId}>
                           {save.name} · {formatFoundationSaveModeLabel(save.saveMode ?? resolveFoundationSaveMode(save))} ({save.status})
                         </option>
@@ -662,7 +663,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               : !newGamePreview
                                 ? "Bitte zuerst das Setup pruefen."
                                 : newGamePreview.blockers.length > 0
-                                  ? `Noch offen: ${newGamePreview.blockers.map((reason) => formatCockpitReason(reason)).join(" · ")}`
+                                  ? `Noch offen: ${newGamePreview.blockers.map((reason: any) => formatCockpitReason(reason)).join(" · ")}`
                                   : "Erstellt den neuen lokalen Spielstand mit dem geprueften Setup."
                         }
                         onClick={() => void runNewGameSetup(false)}
@@ -716,9 +717,9 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             </thead>
                             <tbody>
                               {newGamePreview.teams
-                                .filter((team) => team.ownerLabel !== "AI" || team.startRank <= 5 || team.teamId === "R-R")
-                                .sort((a, b) => a.startRank - b.startRank)
-                                .map((team) => (
+                                .filter((team: any) => team.ownerLabel !== "AI" || team.startRank <= 5 || team.teamId === "R-R")
+                                .sort((a: any, b: any) => a.startRank - b.startRank)
+                                .map((team: any) => (
                                   <tr key={`new-game-preview-${team.teamId}`} onClick={() => openTeamProfileById(team.teamId)}>
                                     <td>{team.startRank}</td>
                                     <td>{team.shortCode} · {team.name}</td>
@@ -922,7 +923,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             </tr>
                           </thead>
                           <tbody>
-                            {seasonStartResetFeed.teams.map((team) => (
+                            {seasonStartResetFeed.teams.map((team: any) => (
                               <tr key={`season-start-reset-${team.teamId}`} onClick={() => openTeamProfileById(team.teamId)}>
                                 <td>{team.teamCode} · {team.teamName}</td>
                                 <td>{formatTransfermarktCurrency(team.currentCash)}</td>
@@ -945,7 +946,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         <span>Wechsle den Save-Bereich oder starte ein neues Spiel in diesem Modus.</span>
                       </div>
                     ) : null}
-                    {saveSummaries.map((save) => {
+                    {saveSummaries.map((save: any) => {
                       const meta = save.scenarioMeta;
                       const warning = buildScenarioWarning(meta);
                       const resolvedSaveMode = save.saveMode ?? resolveFoundationSaveMode(save);
@@ -1137,7 +1138,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       <span>Wie er tickt</span>
                       <strong>dominante Hebel</strong>
                       <div className="team-drawer-gm-bias-grid">
-                        {selectedTeamGmBiasHighlights.map((entry) => (
+                        {selectedTeamGmBiasHighlights.map((entry: any) => (
                           <div className="team-drawer-gm-bias-row" key={`gm-bias-${entry.key}`}>
                             <span>{entry.label}</span>
                             <strong>
@@ -1153,7 +1154,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       <strong>{selectedTeamGeneralManager.profile.marketDoctrine}</strong>
                       <small>{selectedTeamGeneralManager.profile.lineupDoctrine}</small>
                       <div className="foundation-pill-row">
-                        {selectedTeamGeneralManager.profile.facilityPriorities.slice(0, 3).map((facility) => (
+                        {selectedTeamGeneralManager.profile.facilityPriorities.slice(0, 3).map((facility: any) => (
                           <span className="pill" key={`gm-facility-${facility}`}>
                             {facility}
                           </span>
@@ -1197,7 +1198,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       value={selectedTeamId}
                       onChange={(event) => selectTeamSettingsTeam(event.target.value)}
                     >
-                      {gameState.teams.map((team) => (
+                      {gameState.teams.map((team: any) => (
                         <option key={team.teamId} value={team.teamId}>
                           {team.name} ({team.shortCode})
                         </option>
@@ -1258,8 +1259,8 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                   <span className="pill">{selectedTeamHasUnsavedChanges ? "Nicht gespeichert" : "Synchron"}</span>
                 </div>
                 <div className="team-selector">
-                  {filteredTeamSettingsTeams.map((team) => {
-                    const rosterCount = gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+                  {filteredTeamSettingsTeams.map((team: any) => {
+                    const rosterCount = gameState.rosters.filter((entry: any) => entry.teamId === team.teamId).length;
                     const isActive = selectedTeam?.teamId === team.teamId;
                     const controlMode = resolvedTeamControlSettings[team.teamId]?.controlMode ?? "manual";
 
@@ -1377,7 +1378,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         <option value="" disabled>
                           Team waehlen
                         </option>
-                        {gameState.teams.map((team) => (
+                        {gameState.teams.map((team: any) => (
                           <option key={`solo-team-${team.teamId}`} value={team.teamId}>
                             {team.name} ({team.shortCode})
                           </option>
@@ -1469,8 +1470,8 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       </thead>
                       <tbody>
                         {gameState.teams
-                          .filter((team) => (teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId])?.controlMode === "ai")
-                          .map((team) => {
+                          .filter((team: any) => (teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId])?.controlMode === "ai")
+                          .map((team: any) => {
                             const settings = teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId];
                             if (!settings) return null;
                             return (
@@ -1485,7 +1486,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                     checked={settings.aiLineupPreviewEnabled}
                                     disabled={readMeta.readOnly}
                                     onChange={(event) => {
-                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                      updateTeamControlDraft(team.teamId, (current: any) => ({
                                         ...current,
                                         aiLineupPreviewEnabled: event.target.checked,
                                       }));
@@ -1498,7 +1499,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                     checked={settings.aiLineupApplyEnabled ?? settings.aiLineupAutoApplyEnabled}
                                     disabled={readMeta.readOnly}
                                     onChange={(event) => {
-                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                      updateTeamControlDraft(team.teamId, (current: any) => ({
                                         ...current,
                                         aiLineupApplyEnabled: event.target.checked,
                                       }));
@@ -1511,7 +1512,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                     checked={settings.aiTransferPreviewEnabled}
                                     disabled={readMeta.readOnly}
                                     onChange={(event) => {
-                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                      updateTeamControlDraft(team.teamId, (current: any) => ({
                                         ...current,
                                         aiTransferPreviewEnabled: event.target.checked,
                                       }));
@@ -1524,7 +1525,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                     checked={settings.aiSellPreviewEnabled}
                                     disabled={readMeta.readOnly}
                                     onChange={(event) => {
-                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                      updateTeamControlDraft(team.teamId, (current: any) => ({
                                         ...current,
                                         aiSellPreviewEnabled: event.target.checked,
                                       }));
@@ -1663,7 +1664,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               value={selectedIdentityDraft.playerType ?? ""}
                               onChange={(event) => {
                                 const value = event.target.value;
-                                updateTeamIdentityDraft(selectedTeam.teamId, (current) => ({
+                                updateTeamIdentityDraft(selectedTeam.teamId, (current: any) => ({
                                   ...current,
                                   playerType: value || null,
                                 }));
@@ -1674,7 +1675,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               <option value="C">C</option>
                             </select>
                           </label>
-                          {teamIdentityFieldLabels.map((field) => (
+                          {teamIdentityFieldLabels.map((field: any) => (
                             <label key={field.key} className="stack">
                               <span>{field.label}</span>
                               <input
@@ -1687,7 +1688,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                 value={selectedIdentityDraft[field.key]}
                                 onChange={(event) => {
                                   const nextValue = clampIdentityValue(Number(event.target.value), field.key);
-                                  updateTeamIdentityDraft(selectedTeam.teamId, (current) => ({
+                                  updateTeamIdentityDraft(selectedTeam.teamId, (current: any) => ({
                                     ...current,
                                     [field.key]: nextValue,
                                   }));
@@ -1741,11 +1742,11 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             title={readMeta.readOnly ? getReadOnlyActionReason("die Team-Identity") : "Setzt die Team-Identity fuer dieses Team auf den Default zurueck."}
                             onClick={() => {
                               const resetIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, {});
-                              const resetIdentity = resetIdentities.find((identity) => identity.teamId === selectedTeam.teamId);
+                              const resetIdentity = resetIdentities.find((identity: any) => identity.teamId === selectedTeam.teamId);
                               if (!resetIdentity) {
                                 return;
                               }
-                              setTeamIdentityDraft((current) => ({
+                              setTeamIdentityDraft((current: any) => ({
                                 ...current,
                                 [selectedTeam.teamId]: resetIdentity,
                               }));
@@ -1775,7 +1776,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.fantasyTheme ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 fantasyTheme: value || null,
                               }),
@@ -1792,7 +1793,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.loreTheme ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 loreTheme: value || null,
                               }),
@@ -1809,7 +1810,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.strategySummary}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 strategySummary: value,
                               }),
@@ -1826,7 +1827,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.buyStyle}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 buyStyle: value,
                                 transferStyleNote: current.transferStyleNote === current.buyStyle ? value : current.transferStyleNote,
@@ -1844,7 +1845,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.sellStyle}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 sellStyle: value,
                                 sellStyleNote: current.sellStyleNote === current.sellStyle ? value : current.sellStyleNote,
@@ -1862,7 +1863,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.contractStyle}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 contractStyle: value,
                               }),
@@ -1879,7 +1880,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.rosterStyle}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 rosterStyle: value,
                                 lineupStyleNote: current.lineupStyleNote === current.rosterStyle ? value : current.lineupStyleNote,
@@ -1897,7 +1898,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.notes ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 notes: value || null,
                               }),
@@ -1915,7 +1916,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         marginTop: 16,
                       }}
                     >
-                      {teamStrategyIdentityListFieldLabels.map((field) => (
+                      {teamStrategyIdentityListFieldLabels.map((field: any) => (
                         <label key={field.key} className="stack">
                           <span>{field.label}</span>
                           <textarea
@@ -1926,7 +1927,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             placeholder="comma, separated, values"
                             onChange={(event) => {
                               const next = parseCsvList(event.target.value);
-                              updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                              updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                                 withSynchronizedStrategyAliases(current, {
                                   [field.key]: next,
                                 } as Partial<TeamStrategyProfile>),
@@ -1957,7 +1958,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.rosterMinTarget ?? ""}
                           onChange={(event) => {
                             const nextValue = event.target.value === "" ? null : Math.max(0, Math.min(32, Math.round(Number(event.target.value))));
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 rosterMinTarget: nextValue,
                               }),
@@ -1977,7 +1978,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.rosterOptTarget ?? ""}
                           onChange={(event) => {
                             const nextValue = event.target.value === "" ? null : Math.max(0, Math.min(32, Math.round(Number(event.target.value))));
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 rosterOptTarget: nextValue,
                               }),
@@ -1985,7 +1986,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           }}
                         />
                       </label>
-                      {teamStrategyLevelFieldLabels.map((field) => (
+                      {teamStrategyLevelFieldLabels.map((field: any) => (
                         <label key={field.key} className="stack">
                           <span>{field.label}</span>
                           <select
@@ -1993,7 +1994,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             disabled={readMeta.readOnly}
                             value={selectedTeamStrategyDraft[field.key] ?? "medium"}
                             onChange={(event) => {
-                              updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                              updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                                 withSynchronizedStrategyAliases(current, {
                                   [field.key]: normalizeTeamStrategyLevel(event.target.value),
                                 } as Partial<TeamStrategyProfile>),
@@ -2016,7 +2017,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         marginTop: 16,
                       }}
                     >
-                      {teamStrategySportsBiasFieldLabels.map((field) => (
+                      {teamStrategySportsBiasFieldLabels.map((field: any) => (
                         <article key={field.key} className="metric-card">
                           <span>{field.label}</span>
                           <strong>{formatIdentityWeight(selectedIdentityAxisBias?.[teamStrategySportsBiasAxisMap[field.key]] ?? null)}</strong>
@@ -2032,7 +2033,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.lineupStyleNote ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 lineupStyleNote: value || null,
                               }),
@@ -2049,7 +2050,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.transferStyleNote ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 transferStyleNote: value || null,
                               }),
@@ -2066,7 +2067,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           value={selectedTeamStrategyDraft.sellStyleNote ?? ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                            updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                               withSynchronizedStrategyAliases(current, {
                                 sellStyleNote: value || null,
                               }),
@@ -2089,7 +2090,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           marginTop: 12,
                         }}
                       >
-                        {teamStrategyListFieldLabels.map((field) => (
+                        {teamStrategyListFieldLabels.map((field: any) => (
                           <label key={field.key} className="stack">
                             <span>{field.label}</span>
                             <textarea
@@ -2100,7 +2101,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               placeholder="comma, separated, values"
                               onChange={(event) => {
                                 const next = parseCsvList(event.target.value);
-                                updateTeamStrategyDraft(selectedTeam.teamId, (current) =>
+                                updateTeamStrategyDraft(selectedTeam.teamId, (current: any) =>
                                   withSynchronizedStrategyAliases(current, {
                                     [field.key]: next,
                                   } as Partial<TeamStrategyProfile>),
@@ -2120,7 +2121,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         marginTop: 16,
                       }}
                     >
-                      {teamStrategyBiasFieldLabels.map((field) => (
+                      {teamStrategyBiasFieldLabels.map((field: any) => (
                         <label key={field.key} className="stack">
                           <span>{field.label}</span>
                           <input
@@ -2133,7 +2134,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             value={selectedTeamStrategyDraft.bias[field.key]}
                             onChange={(event) => {
                               const nextValue = clampBiasValue(Number(event.target.value));
-                              updateTeamStrategyDraft(selectedTeam.teamId, (current) => ({
+                              updateTeamStrategyDraft(selectedTeam.teamId, (current: any) => ({
                                 ...current,
                                 bias: {
                                   ...current.bias,
@@ -2185,7 +2186,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           if (!resetProfile) {
                             return;
                           }
-                          setTeamStrategyDraft((current) => ({
+                          setTeamStrategyDraft((current: any) => ({
                             ...current,
                             [selectedTeam.teamId]: resetProfile,
                           }));
