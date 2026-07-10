@@ -1,9 +1,15 @@
 "use client";
 
 import type * as React from "react";
+import type { ComponentProps, ComponentType } from "react";
 
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
-import type { FoundationTableColumn, SortState } from "@/lib/foundation/tabs/cockpit-types";
+import type { FoundationTableColumn, FoundationTablePresetId, SortState } from "@/lib/foundation/tabs/cockpit-types";
+import type { ColumnVisibilityManager as ColumnVisibilityManagerComponent, SortableHeader as SortableHeaderComponent } from "@/components/foundation/FoundationTableUi";
+
+type ColumnVisibilityManagerProps = ComponentProps<typeof ColumnVisibilityManagerComponent>;
+
+type SortableHeaderProps = ComponentProps<typeof SortableHeaderComponent>;
 
 export type DisciplineCategoryFilter = "all" | "power" | "speed" | "mental" | "social";
 
@@ -15,7 +21,7 @@ export interface FoundationDiszisPanelProps {
   visibleDisciplineConfigRows: Array<Record<string, unknown>>;
   seasonDisciplineScheduleRows: Array<Record<string, unknown>>;
   currentMatchdayId: string;
-  getTableActivePreset: (tableId: string) => string | null;
+  getTableActivePreset: (tableId: string) => FoundationTablePresetId;
   isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
   setTableColumnVisible: (tableId: string, columnId: string, nextVisible: boolean) => void;
   moveTableColumn: (tableId: string, columnId: string, direction: "left" | "right", columns: FoundationTableColumn[]) => void;
@@ -27,8 +33,8 @@ export interface FoundationDiszisPanelProps {
   startTableColumnResize: (tableId: string, column: FoundationTableColumn, event: React.MouseEvent<HTMLSpanElement>) => void;
   tableSorts: { disciplineConfig: SortState };
   toggleTableSort: (tableId: string, columnKey: string) => void;
-  ColumnVisibilityManager: React.ComponentType<Record<string, unknown>>;
-  SortableHeader: React.ComponentType<Record<string, unknown>>;
+  ColumnVisibilityManager: ComponentType<ColumnVisibilityManagerProps>;
+  SortableHeader: ComponentType<SortableHeaderProps>;
 }
 
 export default function FoundationDiszisPanel(props: FoundationDiszisPanelProps) {

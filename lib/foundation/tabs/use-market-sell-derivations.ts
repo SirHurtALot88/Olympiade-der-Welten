@@ -1,87 +1,13 @@
 import { useMemo } from "react";
 
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+// `TransfermarktSellSummary` is the shared shape returned by the sell-preview API
+// (see `TransfermarktSellPreview` in lib/market/transfermarkt-sell-service.ts, which
+// includes `buyoutCost`/`netProceeds`) — reuse the canonical definition instead of
+// keeping a second, drifting copy here.
+import type { TransfermarktSellSummary } from "@/lib/foundation/tabs/foundation-page-types";
 
-export type TransfermarktSellSummary = {
-  canSell: boolean;
-  blockingReasons: string[];
-  warnings: string[];
-  player: {
-    id: string;
-    name: string;
-    className: string;
-    race: string;
-  } | null;
-  team: {
-    id: string;
-    name: string;
-    shortCode: string;
-  } | null;
-  activePlayer: {
-    id: string;
-    playerId: string;
-    status: string;
-    roleTag: string;
-    contractLength: number;
-    salary: number;
-    purchasePrice: number | null;
-    currentValue: number | null;
-    joinedSeasonId: string;
-  } | null;
-  cashBefore: number | null;
-  cashAfter: number | null;
-  rosterBefore: number | null;
-  rosterAfter: number | null;
-  teamSalaryBefore: number | null;
-  teamSalaryAfter: number | null;
-  marketValueReference: number | null;
-  saleFactor: number | null;
-  salePrice: number | null;
-  profit: number | null;
-  salaryReduction: number | null;
-  projectedReadinessAfterSell: string | null;
-  activePlayerRemoved?: boolean;
-  transferCreated?: boolean;
-  teamSeasonStateUpdated?: boolean;
-  transferId?: string | null;
-  pricingPolicyMultiplier?: number | null;
-  coaching?: {
-    doctrinePersona: string;
-    doctrineHint: string;
-    strategyFitSummary: string;
-    sellDecisionLabel: string | null;
-    sellPriority: number | null;
-    sellIntentScore: number | null;
-    keepIntentScore: number | null;
-    reasonsToSell: string[];
-    reasonsToKeep: string[];
-    coachingWarnings: string[];
-    boardTrustPolicy: string | null;
-    boardTrustSmiley: string | null;
-    boardReaction: {
-      confidenceDelta: number;
-      severity: string;
-      title: string;
-      description: string;
-      gmNote: string | null;
-      requiresStrongAcknowledgment: boolean;
-    };
-    gmName: string | null;
-    gmArchetype: string | null;
-    gmPressureLevel: string;
-    gmWarning: string | null;
-    gmDetail: string | null;
-    gmSoftBlockStarSell: boolean;
-    replacementSlot: {
-      slotLabel: string;
-      maxBuyPrice: number | null;
-      minOvrBand: number | null;
-      urgency: string;
-    } | null;
-    pricingPolicyNotes: string[];
-    soldPlayerSeasonBanNote: string;
-  } | null;
-};
+export type { TransfermarktSellSummary } from "@/lib/foundation/tabs/foundation-page-types";
 
 export type TransfermarktSellPreviewSubject = {
   activePlayerId: string;

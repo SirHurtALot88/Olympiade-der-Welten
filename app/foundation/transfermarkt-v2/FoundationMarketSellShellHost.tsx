@@ -472,7 +472,7 @@ export default function FoundationMarketSellShellHost({
                 {(marketSellPreview.buyoutCost ?? 0) > 0 ? (
                   <article className="metric-card">
                     <span>Buyout</span>
-                    <strong>{formatTransfermarktCurrency(marketSellPreview.buyoutCost)}</strong>
+                    <strong>{formatTransfermarktCurrency(marketSellPreview.buyoutCost ?? null)}</strong>
                     <small className="text-negative">Offener Vertrag wird abgezogen</small>
                   </article>
                 ) : null}

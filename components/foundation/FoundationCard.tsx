@@ -8,6 +8,8 @@ type FoundationCardProps = {
   children: ReactNode;
   as?: "article" | "div" | "section";
   "data-testid"?: string;
+  /** Rendered as the native HTML `title` attribute (hover tooltip) on the card element. */
+  title?: string;
 };
 
 const VARIANT_CLASS: Record<FoundationCardVariant, string> = {
@@ -23,9 +25,10 @@ export function FoundationCard({
   children,
   as: Tag = "article",
   "data-testid": testId,
+  title,
 }: FoundationCardProps) {
   return (
-    <Tag className={`${VARIANT_CLASS[variant]}${className ? ` ${className}` : ""}`} data-testid={testId}>
+    <Tag className={`${VARIANT_CLASS[variant]}${className ? ` ${className}` : ""}`} data-testid={testId} title={title}>
       {children}
     </Tag>
   );

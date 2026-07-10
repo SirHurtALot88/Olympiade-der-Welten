@@ -1255,11 +1255,11 @@ function buildPlayerRatingWithSeasonFallback(
     return playerRating;
   }
 
-  const mergeAxisValue = (ratingValue: number | null | undefined, performanceValue: number) => {
+  const mergeAxisValue = (ratingValue: number | null | undefined, performanceValue: number | null) => {
     if (ratingValue != null && Number.isFinite(ratingValue) && ratingValue > 0) {
       return ratingValue;
     }
-    return performanceValue > 0 ? roundValue(performanceValue, 1) : ratingValue ?? null;
+    return performanceValue != null && performanceValue > 0 ? roundValue(performanceValue, 1) : ratingValue ?? null;
   };
 
   const ppsRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.totalPoints ?? null })));
@@ -1601,7 +1601,7 @@ function mergeSeasonHistoryWithTransferFallback(
       seasonName: getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: transfer.seasonLabel }),
       teamName: team?.name ?? null,
       teamCode: team?.shortCode ?? null,
-      appearances: null,
+      appearances: 0,
       totalPoints: null,
       averageContribution: null,
       averageFinalScore: null,
@@ -1634,8 +1634,8 @@ function mergeSeasonHistoryWithTransferFallback(
       saleFactorBracketSize: saleProjection.saleFactorBracketSize ?? null,
       salary: transfer.salary,
       contractLength: transfer.remainingContractLength,
-      top10Count: null,
-      mvpCount: null,
+      top10Count: 0,
+      mvpCount: 0,
       bestDisciplineLabel: null,
       bestDisciplineScore: null,
       warnings: ["transfer_fallback_without_snapshot_performance"],
@@ -2453,7 +2453,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     purchasePriceSource: economy.purchasePriceSource,
     contractLength: economy.contractLength,
     contractLengthSource: economy.contractLengthSource,
-    contractShape: input.rosterEntry?.contractShape ?? "balanced",
+    contractShape: rosterEntry?.contractShape ?? "balanced",
     isImportedEconomy: economy.isImportedEconomy,
     economyStatus: economy.economyStatus,
     economyCompare,
