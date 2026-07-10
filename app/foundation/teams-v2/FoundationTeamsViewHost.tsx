@@ -6,6 +6,10 @@ import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import FoundationTeamsDetailPanel, {
   type FoundationTeamsDetailPanelProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsDetailPanel";
+import FoundationTeamsNewLook, {
+  type FoundationTeamsNewLookProps,
+} from "@/app/foundation/teams-v2/FoundationTeamsNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { GameState, Player, RosterEntry, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { FoundationTableSortState } from "@/lib/foundation/foundation-table-sort";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
@@ -133,6 +137,10 @@ export default function FoundationTeamsViewHost({
   showTeamDisciplines,
   ...panelProps
 }: FoundationTeamsViewHostProps) {
+  // "Neuer Look" Flag (additiv): entscheidet erst ganz unten am Return,
+  // welche Ansicht gerendert wird — alle Hooks laufen unverändert.
+  const [newLook] = useNewLook();
+
   const {
     shouldBuildTeamsOverviewTable,
     teamsHydrationPhase,
@@ -264,6 +272,64 @@ export default function FoundationTeamsViewHost({
     showSelectedRosterPpsBreakdown,
     showTeamDisciplines,
   });
+
+  // "Neuer Look" Gate: nur für die Sub-Tabs "roster"/"portraits" — Verträge
+  // und Transfer laufen weiterhin über das bestehende Panel. Flag aus =>
+  // exakt der bisherige Render-Pfad (Zeilen darunter unverändert).
+  if (newLook && (selectedTeamDetailTab === "roster" || selectedTeamDetailTab === "portraits")) {
+    return (
+      <FoundationTeamsNewLook
+        selectedTeam={selectedTeam}
+        gameState={gameState}
+        sortedTeamsViewRows={sortedTeamsViewRows}
+        filteredSelectedRosterTableRows={
+          rosterDerivations.filteredSelectedRosterTableRows as unknown as FoundationTeamsNewLookProps["filteredSelectedRosterTableRows"]
+        }
+        teamRosterRoleFilter={teamRosterRoleFilter}
+        setTeamRosterRoleFilter={panelProps.setTeamRosterRoleFilter as FoundationTeamsNewLookProps["setTeamRosterRoleFilter"]}
+        teamRosterRoleFilterOptions={
+          rosterDerivations.teamRosterRoleFilterOptions as FoundationTeamsNewLookProps["teamRosterRoleFilterOptions"]
+        }
+        teamRosterFocusMode={teamRosterFocusMode}
+        setTeamRosterFocusMode={panelProps.setTeamRosterFocusMode as FoundationTeamsNewLookProps["setTeamRosterFocusMode"]}
+        teamRosterFocusOptions={
+          rosterDerivations.teamRosterFocusOptions as FoundationTeamsNewLookProps["teamRosterFocusOptions"]
+        }
+        leaguePlayerHeatPools={panelProps.leaguePlayerHeatPools as FoundationTeamsNewLookProps["leaguePlayerHeatPools"]}
+        openTeamProfileById={panelProps.openTeamProfileById as FoundationTeamsNewLookProps["openTeamProfileById"]}
+        openPlayerDrawerById={panelProps.openPlayerDrawerById as FoundationTeamsNewLookProps["openPlayerDrawerById"]}
+        scheduleActiveManagerTeam={
+          panelProps.scheduleActiveManagerTeam as FoundationTeamsNewLookProps["scheduleActiveManagerTeam"]
+        }
+        getPlayerPortraitModel={panelProps.getPlayerPortraitModel as FoundationTeamsNewLookProps["getPlayerPortraitModel"]}
+        getRosterEntryDisplayMarketValue={
+          getRosterEntryDisplayMarketValue as FoundationTeamsNewLookProps["getRosterEntryDisplayMarketValue"]
+        }
+        getRosterEntryDisplaySalary={
+          getRosterEntryDisplaySalary as FoundationTeamsNewLookProps["getRosterEntryDisplaySalary"]
+        }
+        getRosterEntryCurrentSeasonSalary={
+          getRosterEntryCurrentSeasonSalary as FoundationTeamsNewLookProps["getRosterEntryCurrentSeasonSalary"]
+        }
+        getPlayerDisplayMarketValueDelta={
+          panelProps.getPlayerDisplayMarketValueDelta as FoundationTeamsNewLookProps["getPlayerDisplayMarketValueDelta"]
+        }
+        getRosterEntrySalaryDelta={getRosterEntrySalaryDelta as FoundationTeamsNewLookProps["getRosterEntrySalaryDelta"]}
+        formatMoney={formatMoney}
+        formatDisplayMoney={panelProps.formatDisplayMoney as FoundationTeamsNewLookProps["formatDisplayMoney"]}
+        selectedTeamRosterActionsAvailable={Boolean(panelProps.selectedTeamRosterActionsAvailable)}
+        selectedTeamRosterActionHint={
+          panelProps.selectedTeamRosterActionHint as FoundationTeamsNewLookProps["selectedTeamRosterActionHint"]
+        }
+        marketSellBusy={panelProps.marketSellBusy ?? false}
+        contractRenewalBusy={panelProps.contractRenewalBusy as FoundationTeamsNewLookProps["contractRenewalBusy"]}
+        openMarketSellModal={panelProps.openMarketSellModal as FoundationTeamsNewLookProps["openMarketSellModal"]}
+        openContractRenewalNegotiation={
+          panelProps.openContractRenewalNegotiation as FoundationTeamsNewLookProps["openContractRenewalNegotiation"]
+        }
+      />
+    );
+  }
 
   return (
     <FoundationTeamsDetailPanel
