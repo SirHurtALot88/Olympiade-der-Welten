@@ -1,6 +1,6 @@
 import type { GameState, SponsorArchetype, SponsorOffer, SponsorOfferComponent, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { PRIZE_MONEY_NORMALIZED_JSON_PATH } from "@/lib/season/prize-money-paths";
+import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
 export const SPONSOR_BASE_FLOOR_C = 32;
@@ -34,19 +34,12 @@ function loadPrizeMoneyByRank(): Map<number, number> {
   if (prizeMoneyByRankCache) {
     return prizeMoneyByRankCache;
   }
-  try {
-    const fs = require("node:fs") as typeof import("node:fs");
-    const raw = JSON.parse(fs.readFileSync(PRIZE_MONEY_NORMALIZED_JSON_PATH, "utf8")) as {
-      rows: Array<{ rank: number | null; prizeMoney: number | null }>;
-    };
-    prizeMoneyByRankCache = new Map(
-      raw.rows
-        .filter((row) => row.rank != null && row.prizeMoney != null)
-        .map((row) => [row.rank as number, row.prizeMoney as number]),
-    );
-  } catch {
-    prizeMoneyByRankCache = new Map();
-  }
+  const rows = (prizeMoneyNormalized as { rows: Array<{ rank: number | null; prizeMoney: number | null }> }).rows;
+  prizeMoneyByRankCache = new Map(
+    rows
+      .filter((row) => row.rank != null && row.prizeMoney != null)
+      .map((row) => [row.rank as number, row.prizeMoney as number]),
+  );
   return prizeMoneyByRankCache;
 }
 
