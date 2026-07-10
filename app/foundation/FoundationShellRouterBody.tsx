@@ -139,6 +139,7 @@ import {
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
+import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
   DisciplineCategoryFilter,
   FacilityId,
@@ -223,6 +224,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   aiTeams,
   applyNewGamePreset,
   bootstrapError,
+  buildTeamDetailDrawerData,
   canonicalSeasonLabel,
   cashApplyFeed,
   changeFoundationSaveMode,
@@ -2618,33 +2620,66 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         }
                         if (column.id === "team") {
                           const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
+                          const teamButton = (
+                            <button
+                              className="players-table-team-cell players-table-team-button"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (row.team) {
+                                  openTeamProfileById(row.team.teamId);
+                                }
+                              }}
+                            >
+                              {teamLogo?.src ? (
+                                <BudgetedMediaImage
+                                  className="players-table-team-logo"
+                                  src={teamLogo.src}
+                                  alt={`${row.team?.name ?? "Team"} Logo`}
+                                  loading="lazy"
+                                  decoding="async"
+                                  fetchPriority="low"
+                                />
+                              ) : (
+                                <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
+                                  {teamLogo?.initials ?? "FA"}
+                                </span>
+                              )}
+                              <span>{row.team?.name ?? "Free Agent"}</span>
+                            </button>
+                          );
+                          const rowTeamId = row.team?.teamId ?? null;
                           return (
                             <td key={column.id}>
-                              <button
-                                className="players-table-team-cell players-table-team-button"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (row.team) {
-                                    openTeamProfileById(row.team.teamId);
-                                  }
-                                }}
-                              >
-                                {teamLogo?.src ? (
-                                  <BudgetedMediaImage
-                                    className="players-table-team-logo"
-                                    src={teamLogo.src}
-                                    alt={`${row.team?.name ?? "Team"} Logo`}
-                                    loading="lazy"
-                                    fetchPriority="low"
-                                  />
-                                ) : (
-                                  <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
-                                    {teamLogo?.initials ?? "FA"}
-                                  </span>
-                                )}
-                                <span>{row.team?.name ?? "Free Agent"}</span>
-                              </button>
+                              {rowTeamId ? (
+                                <FoundationTeamPortraitPreview
+                                  resolveCardData={() => {
+                                    const teamDetail = buildTeamDetailDrawerData(rowTeamId, "full");
+                                    if (!teamDetail) return null;
+                                    return {
+                                      teamId: teamDetail.teamId,
+                                      teamName: teamDetail.teamName,
+                                      shortCode: teamDetail.shortCode,
+                                      logoUrl: teamDetail.logoUrl,
+                                      logoInitials: teamDetail.logoInitials,
+                                      rosterSize: teamDetail.rosterSize,
+                                      cash: teamDetail.cash,
+                                      salaryTotal: teamDetail.salaryTotal,
+                                      marketValueTotal: teamDetail.marketValueTotal,
+                                      powRank: teamDetail.powRank,
+                                      speRank: teamDetail.speRank,
+                                      menRank: teamDetail.menRank,
+                                      socRank: teamDetail.socRank,
+                                      generalManagerName: teamDetail.generalManager?.name ?? null,
+                                      boardConfidence: teamDetail.boardConfidence?.value ?? null,
+                                    };
+                                  }}
+                                >
+                                  {teamButton}
+                                </FoundationTeamPortraitPreview>
+                              ) : (
+                                teamButton
+                              )}
                             </td>
                           );
                         }

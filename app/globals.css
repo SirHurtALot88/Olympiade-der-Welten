@@ -35893,6 +35893,153 @@ button.market-v2-bucket-card.is-selected {
   pointer-events: none;
 }
 
+.foundation-team-portrait-preview-anchor {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.foundation-team-portrait-preview-panel {
+  position: fixed;
+  z-index: 1200;
+  width: 240px;
+  pointer-events: auto;
+}
+
+.foundation-team-portrait-preview-panel .foundation-team-portrait-card {
+  width: 100%;
+  pointer-events: none;
+}
+
+.foundation-team-portrait-card {
+  display: grid;
+  gap: 10px;
+  width: 240px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(17, 22, 32, 0.92), rgba(12, 16, 24, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  color: rgba(235, 239, 247, 0.92);
+  text-align: left;
+}
+
+button.foundation-team-portrait-card {
+  cursor: pointer;
+}
+
+.foundation-team-portrait-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.foundation-team-portrait-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.foundation-team-portrait-logo-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.foundation-team-portrait-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.foundation-team-portrait-name {
+  font-size: 0.95rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundation-team-portrait-shortcode {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(235, 239, 247, 0.6);
+  text-transform: uppercase;
+}
+
+.foundation-team-portrait-roster-line {
+  font-size: 0.78rem;
+  color: rgba(235, 239, 247, 0.7);
+  display: flex;
+  gap: 6px;
+}
+
+.foundation-team-portrait-roster-line strong {
+  color: rgba(235, 239, 247, 0.95);
+}
+
+.foundation-team-portrait-rank-grid {
+  gap: 6px;
+}
+
+.foundation-team-portrait-rank-grid .team-drawer-rank-card {
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.foundation-team-portrait-rank-grid .team-drawer-rank-card strong {
+  font-size: 1.05rem;
+}
+
+.foundation-team-portrait-economy {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.foundation-team-portrait-economy span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.foundation-team-portrait-economy small {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(235, 239, 247, 0.55);
+}
+
+.foundation-team-portrait-economy strong {
+  font-size: 0.8rem;
+}
+
+.foundation-team-portrait-gm-line {
+  font-size: 0.74rem;
+  color: rgba(235, 239, 247, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.foundation-team-portrait-gm-line strong {
+  color: rgba(235, 239, 247, 0.95);
+}
+
+.foundation-team-portrait-gm-line em {
+  font-style: normal;
+  color: rgba(235, 239, 247, 0.55);
+}
+
 .training-v2-rider-grid.team-portraits-grid {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;

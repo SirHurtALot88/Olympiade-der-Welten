@@ -37,6 +37,11 @@ const FoundationPlayerPortraitCard = dynamic(
   { ssr: false },
 );
 
+const FoundationPlayerPortraitPreview = dynamic(
+  () => import("@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview"),
+  { ssr: false },
+);
+
 function PlayerPortrait({
   src,
   initials,
@@ -537,12 +542,13 @@ function FoundationTeamsDetailPanel({
                                     const imageSize = getResponsiveTableImageSize(
                                       getTableColumnWidth("selectedRosterTable", column),
                                     );
+                                    const thumbSrc = showLeagueLogos ? portrait.thumbSrc ?? portrait.src : null;
                                     return (
                                       <td key={column.id}>
-                                        <FoundationPlayerPortraitCard
+                                        <FoundationPlayerPortraitPreview
                                           playerId={player.id}
                                           name={player.name}
-                                          portraitUrl={showLeagueLogos ? portrait.thumbSrc ?? portrait.src : null}
+                                          portraitUrl={portrait.src}
                                           portraitInitials={portrait.initials}
                                           playerOvr={playerOvr}
                                           playerMvs={playerMvs}
@@ -556,13 +562,29 @@ function FoundationTeamsDetailPanel({
                                           context="teamGrid"
                                           roleTag={entry.roleTag}
                                           playerClassName={player.className}
-                                          density="mini"
-                                          interactive={false}
-                                          portraitLoading={TEAM_ROSTER_PORTRAIT_LOADING.loading}
-                                          portraitFetchPriority={TEAM_ROSTER_PORTRAIT_LOADING.fetchPriority}
-                                          className="teams-v2-table-portrait-card"
-                                          style={{ width: imageSize, minWidth: imageSize }}
-                                        />
+                                        >
+                                          {thumbSrc ? (
+                                            <img
+                                              className="transfermarkt-portrait"
+                                              src={thumbSrc}
+                                              alt={player.name}
+                                              width={imageSize}
+                                              height={imageSize}
+                                              loading={TEAM_ROSTER_PORTRAIT_LOADING.loading}
+                                              decoding="async"
+                                              fetchPriority={TEAM_ROSTER_PORTRAIT_LOADING.fetchPriority}
+                                              style={{ width: imageSize, minWidth: imageSize }}
+                                            />
+                                          ) : (
+                                            <div
+                                              className="transfermarkt-portrait transfermarkt-portrait-placeholder"
+                                              aria-label={`${player.name} placeholder`}
+                                              style={{ width: imageSize, minWidth: imageSize }}
+                                            >
+                                              {portrait.initials}
+                                            </div>
+                                          )}
+                                        </FoundationPlayerPortraitPreview>
                                       </td>
                                     );
                                   }
