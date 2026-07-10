@@ -13,6 +13,8 @@ import {
   type PlayerLeagueCareerStats,
 } from "@/lib/foundation/player-league-career-stats";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
+import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { PlayerTableScope } from "@/lib/foundation/tabs/foundation-page-types";
 import {
   getPlayerDisplayMarketValue,
@@ -100,15 +102,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
     careerStatsByPlayerId: Record<string, PlayerLeagueCareerStats>;
   };
   playerScope: PlayerTableScope;
-  playerSeasonPerformanceMap: Map<
-    string,
-    {
-      appearances: number;
-      totalPoints: number | null;
-      bestDisciplineLabel: string | null;
-    }
-  >;
-  seasonPointsLedger: unknown;
+  playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
+  seasonPointsLedger: SeasonPointsLedger | null | undefined;
   deferredPlayerTeamFilter: string;
   deferredPlayerClassFilter: string;
   deferredPlayerBracketFilter: string;

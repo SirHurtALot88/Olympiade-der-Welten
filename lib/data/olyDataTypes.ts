@@ -464,7 +464,7 @@ export type TeamGeneralManagerAssignment = {
   gmId: string;
   assignedSeasonId: string;
   influencePct: number;
-  source: "auto_generated" | "auto_wildcard" | "human_slot" | "board_replacement";
+  source: "auto_generated" | "auto_wildcard" | "human_slot" | "board_replacement" | "audit_override";
   previousGmId?: string | null;
   dismissalReason?: "low_board_confidence" | "high_board_pressure" | null;
 };

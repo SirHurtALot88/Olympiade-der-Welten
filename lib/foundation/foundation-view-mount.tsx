@@ -2,7 +2,7 @@
 
 import { Suspense, type ReactNode } from "react";
 
-import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
+import FoundationPanelSkeleton, { type FoundationPanelSkeletonVariant } from "@/components/foundation/FoundationPanelSkeleton";
 import { isFoundationViewActive } from "@/lib/foundation/foundation-view-active";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
@@ -14,7 +14,7 @@ type FoundationViewMountProps = {
   testId?: string;
   children: ReactNode;
   skeletonLabel?: string;
-  skeletonVariant?: FoundationViewId | "default";
+  skeletonVariant?: FoundationPanelSkeletonVariant;
   suspend?: boolean;
   when?: boolean;
 };

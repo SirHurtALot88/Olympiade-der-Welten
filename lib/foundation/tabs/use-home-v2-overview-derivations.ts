@@ -7,6 +7,8 @@ import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modif
 import { buildPlayerDevelopmentInsight } from "@/lib/progression/player-potential-service";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import {
   buildHomePlayerCardsFromRoster,
   formatLocalePoints,
@@ -43,21 +45,8 @@ export interface UseHomeV2OverviewDerivationsInput {
   gameState: GameState;
   seasonStandRows: TeamManagementSnapshotRow[];
   selectedRosterTableRows: HomeV2RosterTableRow[];
-  playerRatingsById: Map<
-    string,
-    {
-      ppPow?: number | null;
-      ppSpe?: number | null;
-      ppMen?: number | null;
-      ppSoc?: number | null;
-      ratingPps?: number | null;
-      ppsSeason?: number | null;
-    }
-  >;
-  playerSeasonPerformanceMap: Map<
-    string,
-    { pointsByArea: { pow?: number | null; spe?: number | null; men?: number | null; soc?: number | null } }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
+  playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
   selectedStandingRow: { rank?: number | null; points?: number | null } | null;
   selectedTeam: { teamId: string } | null;
   selectedTeamFacilityState: Parameters<typeof getFacilityLevel>[0];

@@ -4,6 +4,8 @@ import type { GameInboxItem, GameState, Team, TeamControlSettings } from "@/lib/
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { formatCockpitReason, formatHomeWarningLabel, getGameFlowStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import {
   formatTeamControlModeLabel,
@@ -33,21 +35,8 @@ export type FoundationHomeV2HostProps = {
   gameState: GameState;
   seasonStandRows: TeamManagementSnapshotRow[];
   selectedRosterTableRows: HomeV2RosterTableRow[];
-  playerRatingsById: Map<
-    string,
-    {
-      ppPow?: number | null;
-      ppSpe?: number | null;
-      ppMen?: number | null;
-      ppSoc?: number | null;
-      ratingPps?: number | null;
-      ppsSeason?: number | null;
-    }
-  >;
-  playerSeasonPerformanceMap: Map<
-    string,
-    { pointsByArea: { pow?: number | null; spe?: number | null; men?: number | null; soc?: number | null } }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
+  playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary>;
   selectedStandingRow: TeamManagementSnapshotRow | null;
   selectedTeam: Team | null;
   selectedTeamControl: TeamControlSettings | null;

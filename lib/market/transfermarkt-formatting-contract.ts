@@ -47,7 +47,7 @@ export const TRANSFERMARKT_UNKNOWN_COLOR_RULES: TransfermarktColorRule[] = [
   },
 ];
 
-export function formatTransfermarktCurrency(value: number | null) {
+export function formatTransfermarktCurrency(value: number | null | undefined) {
   if (value == null) {
     return "—";
   }

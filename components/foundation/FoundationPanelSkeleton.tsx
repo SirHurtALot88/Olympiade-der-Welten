@@ -1,5 +1,14 @@
+export type FoundationPanelSkeletonVariant =
+  | "default"
+  | "homeV2"
+  | "marketV2"
+  | "lineup"
+  | "teams"
+  | "seasonV2"
+  | "trainingCompact";
+
 type FoundationPanelSkeletonProps = {
-  variant?: "default" | "homeV2" | "marketV2" | "lineup" | "teams" | "seasonV2" | "trainingCompact";
+  variant?: FoundationPanelSkeletonVariant;
   label?: string;
   testId?: string;
   id?: string;
