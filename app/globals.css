@@ -40231,3 +40231,460 @@ button.foundation-team-portrait-card {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 }
+
+/* ============================================================
+   Werdegang (Neuer Look) — career panel + flag toggle.
+   Every selector is namespaced under .werdegang / .werdegang-new-look-toggle;
+   nothing here can leak into existing screens (flag OFF renders none of it).
+   ============================================================ */
+
+.werdegang-new-look-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px 3px 4px;
+  border: 1px solid rgba(120, 108, 92, 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.werdegang-new-look-toggle:hover {
+  border-color: rgba(120, 108, 92, 0.8);
+}
+.werdegang-new-look-toggle .werdegang-new-look-track {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(120, 108, 92, 0.35);
+  transition: background-color 160ms ease;
+  flex: none;
+}
+.werdegang-new-look-toggle .werdegang-new-look-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fffaf3;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 160ms ease;
+}
+.werdegang-new-look-toggle.is-on {
+  border-color: rgba(194, 65, 12, 0.65);
+}
+.werdegang-new-look-toggle.is-on .werdegang-new-look-track {
+  background: #c2410c;
+}
+.werdegang-new-look-toggle.is-on .werdegang-new-look-thumb {
+  transform: translateX(12px);
+}
+.werdegang-new-look-toggle .werdegang-new-look-label {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Panel shell: self-contained dark premium surface --- */
+
+.werdegang {
+  --wg-bg: #14161b;
+  --wg-panel: #1b1e25;
+  --wg-panel-soft: #20242d;
+  --wg-line: rgba(255, 255, 255, 0.08);
+  --wg-line-strong: rgba(255, 255, 255, 0.14);
+  --wg-ink: #e8e6e1;
+  --wg-muted: #9aa0ab;
+  --wg-accent: #e8b04b;
+  --wg-up: #6fbf8f;
+  --wg-down: #d97a6c;
+  --wg-gold: #e3b34c;
+  --wg-silver: #b9c0cc;
+  --wg-bronze: #c78a5a;
+  --wg-serif: Georgia, "Times New Roman", serif;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--wg-line);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(232, 176, 75, 0.07), transparent 55%),
+    linear-gradient(165deg, #191c22 0%, var(--wg-bg) 60%, #101217 100%);
+  color: var(--wg-ink);
+  font-variant-numeric: tabular-nums;
+  animation: werdegang-enter 360ms ease both;
+}
+
+@keyframes werdegang-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.werdegang-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.werdegang-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.werdegang-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wg-accent);
+}
+.werdegang-title {
+  margin: 0;
+  font-family: var(--wg-serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--wg-ink);
+}
+.werdegang-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wg-muted);
+}
+
+/* Recurring stat vocabulary chips (OVR · PPs · MVS · MW / Rang · Punkte · MW · Titel) */
+.werdegang-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.werdegang-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 64px;
+  padding: 7px 12px;
+  border: 1px solid var(--wg-line);
+  border-radius: 10px;
+  background: var(--wg-panel);
+  color: var(--wg-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+.werdegang-chip:hover {
+  border-color: var(--wg-line-strong);
+  background: var(--wg-panel-soft);
+  transform: translateY(-1px);
+}
+.werdegang-chip small {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-chip strong {
+  font-family: var(--wg-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-chip span {
+  font-size: 10px;
+  color: var(--wg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Career curves --- */
+
+.werdegang-curves {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.werdegang-curve-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 8px;
+  border: 1px solid var(--wg-line);
+  border-radius: 12px;
+  background: var(--wg-panel);
+}
+.werdegang-curve-card.is-ovr { --wg-curve: #7aa0ff; }
+.werdegang-curve-card.is-mvs { --wg-curve: #b58cff; }
+.werdegang-curve-card.is-mw { --wg-curve: #6fbf8f; }
+.werdegang-curve-card.is-rank { --wg-curve: #e8b04b; }
+.werdegang-curve-card.is-points { --wg-curve: #57c7ff; }
+.werdegang-curve-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.werdegang-curve-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-curve-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.werdegang-curve-axis {
+  stroke: var(--wg-line-strong);
+  stroke-width: 1;
+}
+.werdegang-curve-line {
+  fill: none;
+  stroke: var(--wg-curve, var(--wg-accent));
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.werdegang-curve-area {
+  fill: var(--wg-curve, var(--wg-accent));
+  opacity: 0.1;
+}
+.werdegang-curve-dot {
+  fill: var(--wg-curve, var(--wg-accent));
+  stroke: var(--wg-bg);
+  stroke-width: 1.5;
+}
+.werdegang-curve-value {
+  font-family: var(--wg-serif);
+  font-size: 11px;
+  fill: var(--wg-ink);
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-curve-season {
+  font-size: 9px;
+  fill: var(--wg-muted);
+}
+.werdegang-single-note,
+.werdegang-empty {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--wg-line-strong);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--wg-muted);
+}
+
+/* --- Medaillen-Vitrine + Superlative --- */
+
+.werdegang-vitrine-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+}
+.werdegang-vitrine {
+  display: flex;
+  gap: 8px;
+}
+.werdegang-medal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 62px;
+  padding: 8px 12px;
+  border: 1px solid var(--wg-line);
+  border-radius: 12px;
+  background: var(--wg-panel);
+}
+.werdegang-medal strong {
+  font-family: var(--wg-serif);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-medal small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-medal.is-gold strong { color: var(--wg-gold); }
+.werdegang-medal.is-silver strong { color: var(--wg-silver); }
+.werdegang-medal.is-bronze strong { color: var(--wg-bronze); }
+.werdegang-medal.is-mvp strong { color: var(--wg-accent); }
+.werdegang-medal.is-empty strong { color: var(--wg-muted); opacity: 0.6; }
+
+.werdegang-superlatives {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.werdegang-superlative-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 12px;
+  border: 1px solid rgba(232, 176, 75, 0.25);
+  border-radius: 10px;
+  background: rgba(232, 176, 75, 0.06);
+}
+.werdegang-superlative-chip small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-superlative-chip strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wg-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Saison für Saison --- */
+
+.werdegang-section-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-season-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.werdegang-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--wg-line);
+  border-radius: 12px;
+  background: var(--wg-panel);
+  animation: werdegang-enter 320ms ease both;
+  animation-delay: calc(var(--werdegang-i, 0) * 40ms);
+}
+.werdegang-season-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.werdegang-season-name {
+  font-family: var(--wg-serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+.werdegang-season-rank {
+  font-size: 12px;
+  color: var(--wg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-season-medal {
+  font-size: 12px;
+  line-height: 1;
+}
+.werdegang-season-medal.is-gold { color: var(--wg-gold); }
+.werdegang-season-medal.is-silver { color: var(--wg-silver); }
+.werdegang-season-medal.is-bronze { color: var(--wg-bronze); }
+.werdegang-season-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 176, 75, 0.35);
+  font-size: 10px;
+  color: var(--wg-accent);
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-season-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.werdegang-season-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.werdegang-season-stat small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wg-muted);
+}
+.werdegang-season-stat strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.werdegang-season-stat.is-area small { color: var(--wg-muted); }
+.werdegang-season-stat.is-pow strong { color: #e08a80; }
+.werdegang-season-stat.is-spe strong { color: #7db4e8; }
+.werdegang-season-stat.is-men strong { color: #d9bc6a; }
+.werdegang-season-stat.is-soc strong { color: #94c58c; }
+.werdegang-season-foot {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--wg-muted);
+}
+
+.werdegang-delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wg-muted);
+}
+.werdegang-delta-chip.is-up {
+  background: rgba(111, 191, 143, 0.14);
+  color: var(--wg-up);
+}
+.werdegang-delta-chip.is-down {
+  background: rgba(217, 122, 108, 0.14);
+  color: var(--wg-down);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .werdegang,
+  .werdegang-season-card {
+    animation: none;
+  }
+  .werdegang-chip,
+  .werdegang-chip:hover {
+    transform: none;
+    transition: none;
+  }
+  .werdegang-new-look-toggle .werdegang-new-look-thumb,
+  .werdegang-new-look-toggle .werdegang-new-look-track {
+    transition: none;
+  }
+}

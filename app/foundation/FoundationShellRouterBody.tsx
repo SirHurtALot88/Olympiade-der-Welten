@@ -6,6 +6,7 @@ import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMoun
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -1481,6 +1482,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </div>
         ) : null}
         <div className="foundation-context-chips" aria-label="Spielstand- und Saisonkontext">
+          <NewLookToggle />
           <span className="pill foundation-context-tag">{resolveScenarioMetaLabel(activeContextMeta)}</span>
           <span className="pill">{formatScenarioTypeLabel(activeContextMeta?.scenarioType)}</span>
           {readMeta.readOnly ? (

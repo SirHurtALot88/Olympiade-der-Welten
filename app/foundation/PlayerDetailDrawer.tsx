@@ -42,6 +42,10 @@ import { resolveOrganicRegressionCombinedTotal } from "@/lib/training/organic-se
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
+import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
+import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -1199,6 +1203,20 @@ export default function PlayerDetailDrawer({
         ),
       ].sort((left, right) => left.localeCompare(right, "de")),
     [data?.trainingHistoryRows],
+  );
+
+  // "Neuer Look" (flag-gated, additive): career series for the Werdegang panel.
+  // With the flag OFF this stays null and nothing new is rendered.
+  const [newLookEnabled] = useNewLook();
+  const foundationState = useFoundationStateOptional();
+  const werdegangGameState = foundationState?.gameState ?? null;
+  const werdegangPlayerId = data?.playerId ?? null;
+  const werdegangSeries = useMemo(
+    () =>
+      newLookEnabled && werdegangGameState && werdegangPlayerId
+        ? buildPlayerCareerSeries(werdegangGameState, werdegangPlayerId)
+        : null,
+    [newLookEnabled, werdegangGameState, werdegangPlayerId],
   );
 
   if (!data) {
@@ -2418,6 +2436,12 @@ export default function PlayerDetailDrawer({
                 {(!isScoutedProfile || scoutingLevel >= 4) && data.developmentInsight?.recommendation ? (
                   <p className="muted">{data.developmentInsight.recommendation}</p>
                 ) : null}
+            </section>
+          ) : null}
+
+          {werdegangSeries ? (
+            <section className="player-drawer-section player-drawer-panel" id="player-drawer-werdegang">
+              <WerdegangPanel variant="player" entityName={data.name} series={werdegangSeries} />
             </section>
           ) : null}
 
