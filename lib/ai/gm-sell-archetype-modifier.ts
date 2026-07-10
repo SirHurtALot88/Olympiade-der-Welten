@@ -69,11 +69,3 @@ export function applyGmArchetypeSellScoreModifier(input: {
 
   return round(clamp(adjusted, 0, 100));
 }
-
-export function gmArchetypeLowersSellThreshold(archetype: string | null | undefined, sellReasonCodes: AiSellReasonCode[]) {
-  if (!archetype) return 0;
-  if (archetype === "elite_curator" && hasSellReason(sellReasonCodes, "roster_quality_floor")) return 8;
-  if (archetype === "star_chaser" && hasSellReason(sellReasonCodes, "roster_quality_floor")) return 6;
-  if (PREMIUM_QUALITY_ARCHETYPES.has(archetype) && hasSellReason(sellReasonCodes, "weak_contribution")) return 5;
-  return 0;
-}

@@ -54,12 +54,6 @@ function round(value: number, digits = 3) {
   return Number(value.toFixed(digits));
 }
 
-export function getProfitWindowSellThreshold(cashPressureScore: number) {
-  if (cashPressureScore >= 0.65) return 28;
-  if (cashPressureScore >= 0.45) return 32;
-  return 36;
-}
-
 /**
  * Cost-dependent probability that a team proactively cashes out a player entering his last
  * contract year (contractLength === 1) instead of carrying him to natural expiry.

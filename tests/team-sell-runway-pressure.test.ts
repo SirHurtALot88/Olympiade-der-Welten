@@ -8,7 +8,6 @@ import {
   assessTeamSellRunwayPressure,
   countTeamSeasonSells,
   estimateBuyoutLikelihood,
-  getProfitWindowSellThreshold,
   isAttractiveProfitSell,
 } from "@/lib/ai/team-sell-runway-pressure";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -42,10 +41,6 @@ describe("team sell runway pressure", () => {
     expect(result.cashPressureScore).toBeGreaterThan(0.5);
     expect(result.lowCashBuffer).toBe(true);
     expect("needsProactiveSell" in result).toBe(false);
-  });
-
-  it("lowers profit-window threshold when cash pressure is high", () => {
-    expect(getProfitWindowSellThreshold(0.7)).toBeLessThan(getProfitWindowSellThreshold(0.1));
   });
 
   it("treats sell value above market value as attractive under cash pressure", () => {
