@@ -512,18 +512,12 @@ function getAffinityLabel(value: string | null | undefined) {
 
 function resolveAttributeCardAffinity(
   attributeKey: string,
-  developmentLevelup: PlayerDetailDrawerData["developmentLevelup"],
-  previewAffinity?: string | null,
+  attributeAffinity: PlayerDetailDrawerData["attributeAffinity"],
 ) {
-  if (previewAffinity && previewAffinity !== "neutral") return previewAffinity;
-  if (!developmentLevelup) return "neutral";
-  if (developmentLevelup.affinity.signatureAttributes.includes(attributeKey as never)) return "signature";
-  if (developmentLevelup.affinity.weakAttribute === attributeKey) return "weak";
+  if (!attributeAffinity) return "neutral";
+  if (attributeAffinity.signatureAttributes.includes(attributeKey as never)) return "signature";
+  if (attributeAffinity.weakAttribute === attributeKey) return "weak";
   return "neutral";
-}
-
-function getAffinityChipText(cost: number | null | undefined) {
-  return cost != null ? `${cost} TP` : "—";
 }
 
 function formatDisciplineTier(value: number | null | undefined) {
@@ -1271,7 +1265,7 @@ export default function PlayerDetailDrawer({
     ? data.disciplineValues.filter((entry) => entry.category === selectedAxisCard.tone).slice(0, 5)
     : [];
   const baselineAttributeDeltas = data.baselineAttributeDeltas.filter((entry) => entry.delta != null && entry.delta !== 0);
-  const developmentLevelup = data.developmentLevelup;
+  const attributeAffinity = data.attributeAffinity;
   const marketValueBenchmark = transferContext.currentValue ?? transferContext.purchasePrice ?? null;
   const marketValueDelta =
     marketValueBenchmark != null && data.marketValue != null && Math.abs(data.marketValue - marketValueBenchmark) >= 0.01
@@ -1281,22 +1275,8 @@ export default function PlayerDetailDrawer({
     isPlausibleSalaryDeltaReference(data.salary, data.normalSalary) && Math.abs(data.salary! - data.normalSalary!) >= 0.01
       ? data.salary! - data.normalSalary!
       : null;
-  const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
-    (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
-  );
   const attributeCeilingByKey = new Map(data.attributeCeilingPreview.map((entry) => [entry.attribute, entry] as const));
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
-  const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
-  if (data.teamHumanControlled === false) {
-    for (const row of developmentLevelup?.aiAllocation.spendPlan ?? []) {
-      const existing = aiDevelopmentPlanByAttribute.get(row.attribute) ?? { steps: 0, cost: 0, reasons: [] };
-      aiDevelopmentPlanByAttribute.set(row.attribute, {
-        steps: existing.steps + 1,
-        cost: existing.cost + row.cost,
-        reasons: [...new Set([...existing.reasons, row.reason])],
-      });
-    }
-  }
   const headlineMetrics = [
     {
       key: "ovr",
@@ -1811,7 +1791,7 @@ export default function PlayerDetailDrawer({
             <a href="#player-drawer-profile">Profil</a>
             {!isScoutedProfile ? <a href="#player-drawer-axis">Achsen</a> : null}
             <a href="#player-drawer-disciplines">Diszis</a>
-            {developmentLevelup || (showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast)) ? (
+            {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast) ? (
               <a href="#player-drawer-potential">Entwicklung</a>
             ) : null}
             {isFreeAgent && onOpenBuyPreview ? <a href="#player-drawer-market">Transfer</a> : null}
@@ -1930,35 +1910,19 @@ export default function PlayerDetailDrawer({
             ) : null}
             <div className={`player-drawer-attribute-grid${variant === "page" ? " is-compact" : ""}`}>
               {data.attributeStats.map((entry) => {
-                const preview = data.attributeVisibility === "exact" ? developmentPreviewByAttribute.get(entry.key) : null;
                 const ceilingPreview = data.attributeVisibility === "exact" ? attributeCeilingByKey.get(entry.key as never) : null;
-                const aiPlan = data.attributeVisibility === "exact" ? aiDevelopmentPlanByAttribute.get(entry.key) : null;
-                const cardAffinity = resolveAttributeCardAffinity(entry.key, developmentLevelup, preview?.affinity);
+                const cardAffinity = resolveAttributeCardAffinity(entry.key, attributeAffinity);
                 const affinityReason =
-                  preview?.reason ??
-                  (cardAffinity === "signature"
+                  cardAffinity === "signature"
                     ? "Signature-Attribut: +15% organisches Wachstum"
                     : cardAffinity === "weak"
                       ? "Weak-Attribut: -20% organisches Wachstum"
-                      : null);
+                      : null;
                 const showExactAttribute = entry.value != null;
                 const showRangeAttribute = data.attributeVisibility === "scouted" && entry.revealed && entry.rangeLabel;
                 const attributePrimaryLabel = showExactAttribute
                   ? formatValue(entry.value, 0)
                   : entry.ratingLabel ?? entry.rangeLabel ?? "?";
-                const plannedAttributeDelta = data.teamHumanControlled === false ? (aiPlan?.steps ?? 0) : (preview?.attributeDelta ?? 0);
-                const plannedNextValue =
-                  entry.value != null && plannedAttributeDelta > 0 ? Math.min(99, entry.value + plannedAttributeDelta) : entry.value;
-                const visibleDisciplineDeltas =
-                  preview?.topDisciplineDeltas && plannedAttributeDelta > 0
-                    ? preview.topDisciplineDeltas.map((delta) => ({
-                        ...delta,
-                        delta: delta.delta * plannedAttributeDelta,
-                      }))
-                    : data.teamHumanControlled === false
-                      ? []
-                      : preview?.topDisciplineDeltas ?? [];
-                const showCostChip = data.teamHumanControlled === false ? Boolean(aiPlan) : Boolean(preview);
                 return (
                   <article
                     key={entry.key}
@@ -1987,10 +1951,7 @@ export default function PlayerDetailDrawer({
                         </span>
                       ) : null}
                     </span>
-                    <strong className={getDeltaToneClass(plannedAttributeDelta)}>
-                      {attributePrimaryLabel}
-                      {showExactAttribute && plannedAttributeDelta ? ` → ${formatValue(plannedNextValue, 0)}` : ""}
-                    </strong>
+                    <strong>{attributePrimaryLabel}</strong>
                     {variant !== "page" ? (
                     <div className="player-drawer-chip-row">
                       {showExactAttribute ? (
@@ -2006,17 +1967,6 @@ export default function PlayerDetailDrawer({
                           🔒 ab L{entry.revealLevel}
                         </span>
                       ) : null}
-                      {showCostChip && preview ? (
-                        <span
-                          className={`player-drawer-chip is-affinity-${preview.affinity}`}
-                          title={data.teamHumanControlled === false && aiPlan ? aiPlan.reasons.join(" · ") : preview.reason}
-                          aria-label={`${entry.label} ${getAffinityLabel(preview.affinity)}: ${
-                            data.teamHumanControlled === false && aiPlan ? `${aiPlan.cost} TP Auto` : getAffinityChipText(preview.finalCost)
-                          }. ${data.teamHumanControlled === false && aiPlan ? aiPlan.reasons.join(" · ") : preview.reason}`}
-                        >
-                          {data.teamHumanControlled === false && aiPlan ? `${aiPlan.cost} TP Auto` : getAffinityChipText(preview.finalCost)}
-                        </span>
-                      ) : null}
                       {ceilingPreview && ceilingPreview.state !== "open" ? (
                         <span
                           className={`player-drawer-chip${getCeilingStateChipClass(ceilingPreview.state)}`}
@@ -2025,20 +1975,7 @@ export default function PlayerDetailDrawer({
                           {ceilingPreview.headroomLabel}
                         </span>
                       ) : null}
-                      {preview?.ceilingState === "capped" && preview.blocked ? (
-                        <span className="player-drawer-chip is-negative" title={preview.reason}>
-                          Limit
-                        </span>
-                      ) : null}
                     </div>
-                    ) : null}
-                    {variant !== "page" && visibleDisciplineDeltas.length ? (
-                      <small className="player-drawer-delta-line is-positive">
-                        {visibleDisciplineDeltas
-                          .slice(0, 2)
-                          .map((delta) => `${delta.label} +${formatValue(delta.delta, 2)}`)
-                          .join(" · ")}
-                      </small>
                     ) : null}
                   </article>
                 );
@@ -2206,11 +2143,11 @@ export default function PlayerDetailDrawer({
                     </span>
                     <span title="Signature-Attribute bekommen +15% organisches Wachstum.">
                       <strong>Signature</strong>
-                      <small>{developmentLevelup?.affinity.signatureAttributes.join(" / ") || data.seasonOrganicForecast?.attributeAffinity.signatureAttributes.join(" / ") || "Spielerprofil"}</small>
+                      <small>{attributeAffinity?.signatureAttributes.join(" / ") || "Spielerprofil"}</small>
                     </span>
                     <span title="Weak-Attribut entwickelt sich mit -20% langsamer.">
                       <strong>Weak</strong>
-                      <small>{developmentLevelup?.affinity.weakAttribute ?? data.seasonOrganicForecast?.attributeAffinity.weakAttribute ?? "Profil offen"}</small>
+                      <small>{attributeAffinity?.weakAttribute ?? "Profil offen"}</small>
                     </span>
                     <span title="Matchday-Leistung zahlt Setpoints ein. Nahe der Attribut-Decke nur leicht gedrosselt, deutlich milder als Training.">
                       <strong>Performance +{formatValue(data.organicProgression.performanceSetpoints, 1)}</strong>

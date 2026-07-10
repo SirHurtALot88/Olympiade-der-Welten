@@ -10,7 +10,7 @@ import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/te
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
-import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { applyRecoveryFacilityModifiers, applyTrainingFacilityGrowthModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { countTeamInjuredPlayers, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
@@ -926,7 +926,7 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
   const mode = normalizeMode(selectedTrainingIntensity);
   const baseXp = PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode[mode];
   const facilities = getTeamFacilityState(gameState, context.team.teamId);
-  const facilityXp = applyTrainingXpFacilityModifiers(baseXp, facilities);
+  const facilityXp = applyTrainingFacilityGrowthModifiers(baseXp, facilities);
   const recoveryBase = applyRecoveryFacilityModifiers(100, facilities);
   const recoveryAdjusted = applyTrainingRecoveryImpact(recoveryBase.after, mode);
   const reasons: string[] = [];

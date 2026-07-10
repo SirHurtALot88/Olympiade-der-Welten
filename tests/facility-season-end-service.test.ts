@@ -5,7 +5,7 @@ import {
   applyFacilitySeasonEndFinance,
   previewFacilitySeasonEndFinance,
 } from "@/lib/facilities/facility-season-end-service";
-import { applyTrainingXpFacilityModifiers, calculateFacilityIncome } from "@/lib/facilities/facility-effects";
+import { applyTrainingFacilityGrowthModifiers, calculateFacilityIncome } from "@/lib/facilities/facility-effects";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 function facilities(entries: TeamFacilityCollection["facilities"]): TeamFacilityCollection {
@@ -135,7 +135,7 @@ describe("facility season-end finance service", () => {
       disabledReason: "facility_upkeep_unpaid",
     });
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_unpaid")).toBe(true);
-    expect(applyTrainingXpFacilityModifiers(100, savedState.seasonState.teamFacilities?.["team-1"]).after).toBe(100);
+    expect(applyTrainingFacilityGrowthModifiers(100, savedState.seasonState.teamFacilities?.["team-1"]).after).toBe(100);
   });
 
   it("sets lastPaidSeasonId and deducts paid upkeep while collecting income", () => {

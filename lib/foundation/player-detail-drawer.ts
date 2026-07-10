@@ -1,5 +1,5 @@
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { DisciplineCategory, GameState, Player, RosterEntry, SeasonSnapshotTransferRecord, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, GameState, Player, PlayerGeneratorAttributeName, RosterEntry, SeasonSnapshotTransferRecord, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import {
   assessPlayerBoardTrust,
   type PlayerBoardTrustMood,
@@ -82,10 +82,7 @@ import {
 } from "@/lib/training/organic-season-progression";
 import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
-import {
-  buildPlayerDevelopmentLevelupModel,
-  type PlayerDevelopmentLevelupModel,
-} from "@/lib/training/training-levelup-service";
+import { deriveAttributeAffinityProfile } from "@/lib/training/attribute-affinity-service";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
 
 type PlayerDrawerAxisCard = {
@@ -348,7 +345,10 @@ export type PlayerDetailDrawerData = {
     projectedPrimaryClass: string;
     reclassRecommended: boolean;
   } | null;
-  developmentLevelup: PlayerDevelopmentLevelupModel | null;
+  attributeAffinity: {
+    signatureAttributes: [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+    weakAttribute: PlayerGeneratorAttributeName;
+  } | null;
   progressionEvents: Array<{
     eventId: string;
     seasonId: string;
@@ -2297,14 +2297,12 @@ export function buildPlayerDrawerDataFromGameState(input: {
           facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
         })
       : null;
-  const developmentLevelup = buildPlayerDevelopmentLevelupModel({
-    gameState: input.gameState,
-    player,
-    forecast: progressionForecast,
-    teamId: team?.teamId ?? null,
-    profile: team?.teamId ? getTeamStrategyProfile(input.gameState, team.teamId) : null,
-    potentialRecord: input.gameState.playerPotential?.find((entry) => entry.playerId === player.id) ?? null,
-  });
+  const attributeAffinity: PlayerDetailDrawerData["attributeAffinity"] = seasonOrganicForecast
+    ? {
+        signatureAttributes: seasonOrganicForecast.attributeAffinity.signatureAttributes,
+        weakAttribute: seasonOrganicForecast.attributeAffinity.weakAttribute,
+      }
+    : deriveAttributeAffinityProfile(player);
   const normalizedAttributes = normalizePlayerAttributes(player);
   const projectedClassPreview = normalizedAttributes
     ? buildProjectedClassPreview(normalizedAttributes, player.className, input.gameState.seasonState.adminBalancingConfig)
@@ -2573,7 +2571,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     progressionForecast,
     projectedClassPreview,
     seasonOrganicForecast,
-    developmentLevelup,
+    attributeAffinity,
     progressionEvents,
     trainingHistoryRows,
     attributeHistoryRows,
@@ -2900,14 +2898,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         )
       : null,
     seasonOrganicForecast: null,
-    developmentLevelup: detailPlayer
-      ? buildPlayerDevelopmentLevelupModel({
-          player: detailPlayer,
-          forecast: null,
-          teamId: null,
-          profile: null,
-        })
-      : null,
+    attributeAffinity: detailPlayer ? deriveAttributeAffinityProfile(detailPlayer) : null,
     progressionEvents: [],
     trainingHistoryRows: [],
     attributeHistoryRows: [],

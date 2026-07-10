@@ -89,7 +89,7 @@ export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection |
   );
 }
 
-export function applyTrainingXpFacilityModifiers(
+export function applyTrainingFacilityGrowthModifiers(
   baseTrainingXp: number,
   facilities: TeamFacilityCollection | null | undefined,
   options?: { developmentTrainingBonusPct?: number },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
-import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
+import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/attribute-affinity-service";
 
 describe("buildTrainingPlayerRowView", () => {
   it("maps class focus, attribute forecast and modifiers", () => {

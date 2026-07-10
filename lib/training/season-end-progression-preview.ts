@@ -1,6 +1,6 @@
 import type { GameState, Player, PlayerGeneratorAttributeName, PlayerGeneratorAttributes, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
-  applyTrainingXpFacilityModifiers,
+  applyTrainingFacilityGrowthModifiers,
   applyUpgradeCostFacilityModifiers,
   getAnalyticsForecastQuality,
   getFacilityLevel,
@@ -536,7 +536,7 @@ export function buildSeasonEndProgressionPreview(input: {
     const tierAfter = getProgressionRatingTier(attributeAfter);
     const baseTrainingXP = forecast?.baseTrainingXP ?? 0;
     const performanceXP = forecast?.performanceXP ?? 0;
-    const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities, {
+    const trainingFacilityXp = applyTrainingFacilityGrowthModifiers(baseTrainingXP, normalizedFacilities, {
       developmentTrainingBonusPct: team ? getTeamDevelopmentTrainingBonusPct(input.gameState, team.teamId) : 0,
     });
     const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;

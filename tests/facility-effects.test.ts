@@ -4,7 +4,7 @@ import type { GameState, TeamFacilityCollection } from "@/lib/data/olyDataTypes"
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import {
   applyRecoveryFacilityModifiers,
-  applyTrainingXpFacilityModifiers,
+  applyTrainingFacilityGrowthModifiers,
   applyUpgradeCostFacilityModifiers,
   calculateFacilityIncome,
   calculateFacilityUpkeep,
@@ -69,7 +69,7 @@ describe("facility effects", () => {
   it("level 0 creates no effects and missing save facility source does not crash", () => {
     const teamFacilities = getTeamFacilityState(gameStateWithFacilities(), "T-O");
 
-    expect(applyTrainingXpFacilityModifiers(100, teamFacilities).after).toBe(100);
+    expect(applyTrainingFacilityGrowthModifiers(100, teamFacilities).after).toBe(100);
     expect(calculateFacilityUpkeep(teamFacilities)).toBe(0);
     expect(calculateFacilityIncome(teamFacilities)).toBe(0);
     expect(teamFacilities.facilities.training_center.conditionPct).toBe(100);
@@ -83,7 +83,7 @@ describe("facility effects", () => {
       academy: { level: 3, enabled: false, disabledReason: "facility_upkeep_unpaid" },
     });
 
-    expect(applyTrainingXpFacilityModifiers(100, teamFacilities).after).toBe(100);
+    expect(applyTrainingFacilityGrowthModifiers(100, teamFacilities).after).toBe(100);
     expect(calculateFacilityUpkeep(teamFacilities)).toBe(0);
     expect(calculateFacilityIncome(teamFacilities)).toBe(0);
     expect(applyUpgradeCostFacilityModifiers("power", "D", 100, teamFacilities).costAfterFacility).toBe(100);
@@ -91,7 +91,7 @@ describe("facility effects", () => {
 
   it("training center increases only Base Training XP", () => {
     const teamFacilities = facilities({ training_center: { level: 2, enabled: true } });
-    const base = applyTrainingXpFacilityModifiers(100, teamFacilities);
+    const base = applyTrainingFacilityGrowthModifiers(100, teamFacilities);
     const performanceXp = 50;
 
     expect(base.modifierPct).toBe(9);
@@ -103,9 +103,9 @@ describe("facility effects", () => {
     const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 35 } });
     const brokenFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 0 } });
 
-    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(4.5);
-    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(105);
-    expect(applyTrainingXpFacilityModifiers(100, brokenFacilities).after).toBe(100);
+    expect(applyTrainingFacilityGrowthModifiers(100, wornFacilities).modifierPct).toBe(4.5);
+    expect(applyTrainingFacilityGrowthModifiers(100, wornFacilities).after).toBe(105);
+    expect(applyTrainingFacilityGrowthModifiers(100, brokenFacilities).after).toBe(100);
   });
 
   it("recovery center adds flat bonus on top of base recovery", () => {
@@ -185,7 +185,7 @@ describe("facility effects", () => {
 
     expect(getScoutingConfidence(teamFacilities).level).toBe(3);
     expect(getAnalyticsForecastQuality(teamFacilities).level).toBe(4);
-    expect(applyTrainingXpFacilityModifiers(100, teamFacilities).after).toBe(100);
+    expect(applyTrainingFacilityGrowthModifiers(100, teamFacilities).after).toBe(100);
   });
 
   it("facilities provide no direct attribute bonuses", () => {

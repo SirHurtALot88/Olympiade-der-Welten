@@ -5,7 +5,7 @@ import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { GameState, LineupDraft, LineupDraftModifiers, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
-import { getTeamFacilityState, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
+import { getTeamFacilityState, applyTrainingFacilityGrowthModifiers } from "@/lib/facilities/facility-effects";
 import {
   buildGeneratedFormCardRecordsForSeason,
   getFormCardColorForDisciplineCategory,
@@ -235,7 +235,7 @@ function applyTrainingModes(gameState: GameState): { gameState: GameState; rows:
         seasonPerformance: null,
         trainingModeByPlayerId: { [player.id]: decision.mode },
       });
-      const facilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, facilities);
+      const facilityXp = applyTrainingFacilityGrowthModifiers(forecast.baseTrainingXP, facilities);
       rows.push({
         teamId: team.teamId,
         teamName: team.name,

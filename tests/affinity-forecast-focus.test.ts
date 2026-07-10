@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAffinityAlignedTopGains, buildAffinityForecastFocus } from "@/lib/training/affinity-forecast-focus";
-import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
+import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/attribute-affinity-service";
 
 describe("affinity-forecast-focus", () => {
   it("prioritizes signature attributes in top gains and forecast chips", () => {

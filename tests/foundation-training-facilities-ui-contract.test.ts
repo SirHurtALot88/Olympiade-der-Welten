@@ -93,7 +93,7 @@ describe("foundation training and facilities ui contract", () => {
     expect(scopeText).toContain("getTeamFacilityState");
     expect(crossTabTrainingText).toContain("calculateFacilityUpkeep");
     expect(crossTabTrainingText).toContain("calculateFacilityIncome");
-    expect(crossTabTrainingText).toContain("applyTrainingXpFacilityModifiers");
+    expect(crossTabTrainingText).toContain("applyTrainingFacilityGrowthModifiers");
     expect(crossTabTrainingText).toContain("applyRecoveryFacilityModifiers");
     expect(facilityEffectsText).toContain("applyUpgradeCostFacilityModifiers");
     expect(scopeText).toContain("/api/facilities/upgrade");

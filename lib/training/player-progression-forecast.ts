@@ -1,7 +1,7 @@
 import type { GameState, Player, PlayerDisciplinePerformanceRecord, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
-import { applyTrainingXpFacilityModifiers, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { applyTrainingFacilityGrowthModifiers, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { getCombinedAttributeTrainingMultiplier, getPotentialGapXpFactor } from "@/lib/foundation/player-potential-display-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
@@ -672,7 +672,7 @@ export function buildPlayerProgressionForecast(input: {
   const developmentTrainingBonusPct = rosterEntry
     ? getTeamDevelopmentTrainingBonusPct(input.gameState, rosterEntry.teamId)
     : 0;
-  const facilityTrainingXp = applyTrainingXpFacilityModifiers(baseTrainingXP, facilities, {
+  const facilityTrainingXp = applyTrainingFacilityGrowthModifiers(baseTrainingXP, facilities, {
     developmentTrainingBonusPct,
   });
   const facilityTrainingDelta = facilityTrainingXp.after - facilityTrainingXp.before;
