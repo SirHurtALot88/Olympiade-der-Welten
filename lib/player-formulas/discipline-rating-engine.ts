@@ -84,7 +84,11 @@ function readPlayerAttributes(player: Player): PlayerGeneratorAttributes | null 
     spirit: stats.spirit,
     torment: stats.torment,
   };
-  return Object.values(attributes).every(isFiniteNumber) ? attributes : null;
+  // `Object.values(...).every(isFiniteNumber)` verifies every field is a finite number at
+  // runtime, but TS can't propagate that narrowing back onto the individual properties of
+  // `attributes` (a known limitation of array-based validation) — the cast below is safe
+  // because the check above already guarantees the shape.
+  return Object.values(attributes).every(isFiniteNumber) ? (attributes as PlayerGeneratorAttributes) : null;
 }
 
 export function buildLeagueDisciplineRatingsWithAttributeOverrides(

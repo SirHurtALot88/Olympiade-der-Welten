@@ -172,6 +172,8 @@ function materializeStatsPlayerFromBrief(
       will: attributeRow.will,
       spirit: attributeRow.spirit,
       torment: attributeRow.torment,
+    },
+    attributeSheetRatings: {
       powerRating: attributeRow.powerRating,
       healthRating: attributeRow.healthRating,
       staminaRating: attributeRow.staminaRating,

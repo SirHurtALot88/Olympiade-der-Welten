@@ -12,6 +12,7 @@ import {
   getScoutedTraitView,
   isScoutedImpactExact,
 } from "@/lib/market/transfermarkt-scouting";
+import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import {
   getEffectiveScoutingLevel,
   getFullRevealCertaintyThreshold,
@@ -26,7 +27,7 @@ export type ScoutingReportDisciplineTier = {
   disciplineId: string;
   disciplineName: string;
   displayedScore: number;
-  scoreTier: string;
+  scoreTier: TransfermarktRatingTier | null;
 };
 
 export type ScoutingReportData = {

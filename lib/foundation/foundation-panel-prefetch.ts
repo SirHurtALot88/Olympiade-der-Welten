@@ -100,7 +100,7 @@ export function prefetchSeasonStandingsData(input: {
   saveId: string;
   seasonId: string;
   contentSignature: string;
-  source?: string;
+  source?: "sqlite" | "prisma";
 }) {
   if (!input.saveId || input.seasonId === "loading") {
     return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
+import { Suspense, type ComponentProps, type ReactNode } from "react";
 
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { isFoundationViewActive } from "@/lib/foundation/foundation-view-active";
@@ -14,7 +14,7 @@ type FoundationViewMountProps = {
   testId?: string;
   children: ReactNode;
   skeletonLabel?: string;
-  skeletonVariant?: FoundationViewId | "default";
+  skeletonVariant?: ComponentProps<typeof FoundationPanelSkeleton>["variant"];
   suspend?: boolean;
   when?: boolean;
 };

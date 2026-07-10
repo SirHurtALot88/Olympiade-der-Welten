@@ -278,7 +278,7 @@ export function formatWealthSnapshotLogLine(snapshot: SeasonWealthSnapshot): str
   const delta =
     snapshot.deltaFromPrior == null
       ? ""
-      : ` Δwealth=${pct(snapshot.deltaFromPrior.wealthPct)} Δmw=${pct(snapshot.deltaFromPrior.mwPct)}`;
+      : ` Δwealth=${snapshot.deltaFromPrior.wealthPct != null ? pct(snapshot.deltaFromPrior.wealthPct) : "—"} Δmw=${snapshot.deltaFromPrior.mwPct != null ? pct(snapshot.deltaFromPrior.mwPct) : "—"}`;
   const salary = snapshot.salaryFactor != null ? ` salaryF=${snapshot.salaryFactor}` : "";
   return (
     `${snapshot.seasonId} ${snapshot.phase}: ` +

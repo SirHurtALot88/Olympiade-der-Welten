@@ -1,14 +1,15 @@
 import { useMemo } from "react";
 
 import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-registry";
-import type { FoundationAiPreseasonAutomationRun } from "@/lib/foundation/tabs/foundation-page-types";
+import type {
+  AdminSeasonSimulationRunSummary,
+  FoundationAiPreseasonAutomationRun,
+} from "@/lib/foundation/tabs/foundation-page-types";
 
-type AdminSimulationRunSnapshot = {
-  status: string;
-  currentOperation?: string | null;
-  progressPct?: number | null;
-  activePhase?: string | null;
-} | null;
+type AdminSimulationRunSnapshot = Pick<
+  AdminSeasonSimulationRunSummary,
+  "status" | "currentOperation" | "progressPct" | "activePhase"
+> | null;
 
 type AiLineupEnsureFeedSnapshot = {
   summary?: {
