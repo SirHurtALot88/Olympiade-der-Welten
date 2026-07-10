@@ -229,6 +229,33 @@ type AiPickScoreBreakdown = {
   mercenaryNegativeFitPenalty: number;
 };
 
+const EMPTY_AI_PICK_SCORE_BREAKDOWN: AiPickScoreBreakdown = {
+  playerQualityScore: 0,
+  needMatchScore: 0,
+  disciplineCoverageScore: 0,
+  teamAxisFitScore: 0,
+  teamThemeFitScore: 0,
+  classFitScore: 0,
+  raceOrArchetypeFitScore: 0,
+  teamIdentityScore: 0,
+  formColorCoverageScore: 0,
+  formColorFlexScore: 0,
+  classDisciplineFitScore: 0,
+  rosterBalanceScore: 0,
+  budgetFitScore: 0,
+  laneFitScore: 0,
+  valueScore: 0,
+  harmonyFitScore: 0,
+  harmonyPenalty: 0,
+  riskPenalty: 0,
+  duplicateProfilePenalty: 0,
+  offThemePenalty: 0,
+  classSpamPenalty: 0,
+  colorspamPenalty: 0,
+  evenSpreadPenalty: 0,
+  mercenaryNegativeFitPenalty: 0,
+};
+
 export type AiPicksRunPick = {
   step: number;
   playerId: string;
@@ -2844,14 +2871,7 @@ function runSeason1ExecuteEmergencyMinFill(input: {
         strategicExceptionReason: "season1_execute_emergency_min_fill",
         pickedForFormColor: false,
         formColorReason: null,
-        scoreBreakdown: {
-          finalScore: 0,
-          needMatchScore: 0,
-          teamIdentityScore: 0,
-          valueScore: 0,
-          disciplineCoverageScore: 0,
-          formColorCoverageScore: 0,
-        },
+        scoreBreakdown: { ...EMPTY_AI_PICK_SCORE_BREAKDOWN },
         reasons: ["season1_execute_emergency_min_fill"],
         warnings: [...buyResult.warnings, "season1_execute_emergency_min_fill"],
         expectedCashAfter: buyResult.cashAfter ?? null,
@@ -3035,14 +3055,7 @@ function runSeason1ExecuteSpendDownTopUp(input: {
         strategicExceptionReason: "season1_execute_spend_down_topup",
         pickedForFormColor: false,
         formColorReason: null,
-        scoreBreakdown: {
-          finalScore: 0,
-          needMatchScore: 0,
-          teamIdentityScore: 0,
-          valueScore: 0,
-          disciplineCoverageScore: 0,
-          formColorCoverageScore: 0,
-        },
+        scoreBreakdown: { ...EMPTY_AI_PICK_SCORE_BREAKDOWN },
         reasons: ["season1_execute_spend_down_topup"],
         warnings: [...buyResult.warnings, "season1_execute_spend_down_topup"],
         expectedCashAfter: buyResult.cashAfter ?? null,
