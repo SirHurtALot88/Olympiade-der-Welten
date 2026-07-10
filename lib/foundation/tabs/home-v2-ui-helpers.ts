@@ -2,6 +2,8 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getPlayerDisplayMarketValueDelta } from "@/lib/foundation/player-display-market-value";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
@@ -122,11 +124,8 @@ export type HomeV2PlayerCardRow = HomeV2RosterTableRow & {
 export function buildHomePlayerCardsFromRoster(input: {
   gameState: GameState;
   selectedRosterTableRows: HomeV2RosterTableRow[];
-  playerRatingsById: Map<string, { ppPow?: number | null; ppSpe?: number | null; ppMen?: number | null; ppSoc?: number | null; ratingPps?: number | null; ppsSeason?: number | null }>;
-  playerSeasonPerformanceMap: Map<
-    string,
-    { pointsByArea: { pow?: number | null; spe?: number | null; men?: number | null; soc?: number | null } }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
+  playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary | null>;
 }): HomeV2PlayerCardRow[] {
   const { gameState, selectedRosterTableRows, playerRatingsById, playerSeasonPerformanceMap } = input;
 
