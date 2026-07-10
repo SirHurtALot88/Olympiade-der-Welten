@@ -43972,3 +43972,1653 @@ button.foundation-team-portrait-card {
     transition: none;
   }
 }
+
+/* ============================================================
+   "Neuer Look" — Seite: Transfermarkt V2 (.nl-market)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+.is-new-look .nl-market {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-market-eyebrow,
+.is-new-look .nl-scout-eyebrow,
+.is-new-look .nl-thist-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-muted,
+.is-new-look .nl-scout-muted,
+.is-new-look .nl-thist-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-error {
+  margin: var(--nl-s2) 0 0;
+  font-size: 13px;
+  color: var(--nl-risk);
+}
+
+/* Signing-Moment: "VERPFLICHTET" */
+.is-new-look .nl-market-signed {
+  position: sticky;
+  top: var(--nl-s3);
+  z-index: 30;
+}
+
+.is-new-look .nl-market-signed-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s5);
+  text-align: center;
+  border-radius: var(--nl-r-lg);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 55%, var(--nl-line));
+  background:
+    radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--nl-good) 22%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  box-shadow: var(--nl-e3);
+  animation: nl-market-signed-pop 320ms var(--nl-ease);
+}
+
+@keyframes nl-market-signed-pop {
+  from {
+    transform: translateY(-8px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.is-new-look .nl-market-signed-burst {
+  font-size: 26px;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-market-signed-title {
+  font-family: var(--nl-display);
+  font-size: 30px;
+  letter-spacing: 0.14em;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-market-signed-copy {
+  margin: 0;
+  max-width: 560px;
+  font-size: 14px;
+  color: var(--nl-ink);
+}
+
+/* Aktionen */
+.is-new-look .nl-market-primary-action,
+.is-new-look .nl-scout-primary-action {
+  padding: 8px 16px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-primary-action:hover:not(:disabled),
+.is-new-look .nl-scout-primary-action:hover {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-market-primary-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-market-secondary-action,
+.is-new-look .nl-market-inline-action,
+.is-new-look .nl-scout-inline-action,
+.is-new-look .nl-thist-inline-action {
+  padding: 5px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-secondary-action:hover:not(:disabled),
+.is-new-look .nl-market-inline-action:hover,
+.is-new-look .nl-scout-inline-action:hover,
+.is-new-look .nl-thist-inline-action:hover:not(:disabled) {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-secondary-action.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-secondary-action:disabled,
+.is-new-look .nl-thist-inline-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-market-inline-action.is-danger {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-market-action-reason {
+  margin: var(--nl-s1) 0 0;
+  font-size: 12px;
+  color: var(--nl-warn);
+}
+
+/* Kopf & Board */
+.is-new-look .nl-market-live-pill {
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-market-live-pill.is-busy {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-market-live-pill.is-ready {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-board {
+  flex-wrap: wrap;
+}
+
+/* Controls: Suche + Pill-Toggles */
+.is-new-look .nl-market-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-market-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.is-new-look .nl-market-search > span,
+.is-new-look .nl-thist-filter-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-search input,
+.is-new-look .nl-thist-filter-field input,
+.is-new-look .nl-thist-filter-field select {
+  padding: 7px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+}
+
+.is-new-look .nl-market-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-market-pill {
+  --nl-tone: var(--nl-accent);
+  padding: 5px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease),
+    background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-pill:hover {
+  border-color: var(--nl-tone);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-pill.is-active {
+  border-color: var(--nl-tone);
+  background: color-mix(in srgb, var(--nl-tone) 18%, transparent);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-pill.is-reset {
+  color: var(--nl-warn);
+}
+
+/* Hauptraster */
+.is-new-look .nl-market-main-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(340px, 1.25fr) minmax(280px, 0.9fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-market-focus-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+/* Kandidaten-Rail */
+.is-new-look .nl-market-rail-meta {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 720px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.is-new-look .nl-market-candidate {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: var(--nl-s3);
+  align-items: center;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-candidate:hover {
+  border-color: var(--nl-line-2);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-market-candidate.is-selected {
+  border-color: var(--nl-accent);
+  background: linear-gradient(180deg, var(--nl-accent-soft), var(--nl-panel-2));
+}
+
+.is-new-look .nl-market-candidate-portrait,
+.is-new-look .nl-market-focus-portrait {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--nl-r-md);
+  overflow: hidden;
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  flex: none;
+}
+
+.is-new-look .nl-market-focus-portrait {
+  width: 72px;
+  height: 72px;
+}
+
+.is-new-look .nl-market-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-market-portrait-initials {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-candidate-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-candidate-copy strong {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-market-candidate-copy small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-candidate-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-signal-chip {
+  --nl-tone: var(--nl-mut);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 12%, transparent);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-candidate-numbers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-candidate-numbers strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+/* Fokus-Panel */
+.is-new-look .nl-market-focus-head {
+  display: flex;
+  gap: var(--nl-s3);
+  align-items: flex-start;
+}
+
+.is-new-look .nl-market-focus-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-market-focus-copy > small {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-focus-stats,
+.is-new-look .nl-market-roster-stats {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-market-axis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s2) var(--nl-s3);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-market-focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-market-intel-bar {
+  margin-top: var(--nl-s2);
+}
+
+/* Team-Impact */
+.is-new-look .nl-market-estimate-pill {
+  padding: 2px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px dashed color-mix(in srgb, var(--nl-warn) 60%, var(--nl-line-2));
+  color: var(--nl-warn);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-market-impact-summary {
+  margin: 0 0 var(--nl-s1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-impact-summary strong {
+  font-size: 16px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-estimate-note {
+  display: block;
+  margin-bottom: var(--nl-s2);
+  font-size: 11px;
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-market-impact-axes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-market-impact-axis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 7%, transparent);
+}
+
+.is-new-look .nl-market-impact-axis-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-impact-axis-head strong {
+  font-size: 13px;
+  color: var(--nl-tone);
+}
+
+.is-new-look .nl-market-need-tag {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone) 22%, transparent);
+  color: var(--nl-ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-market-impact-axis-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-impact-bar.is-before {
+  opacity: 0.55;
+}
+
+.is-new-look .nl-market-rank-estimate {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-impact-disciplines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+  padding-top: var(--nl-s3);
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-market-impact-discipline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.is-new-look .nl-market-impact-discipline-row strong {
+  min-width: 110px;
+}
+
+.is-new-look .nl-market-impact-discipline-row small {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+/* Deal-Desk */
+.is-new-look .nl-market-deal-topline {
+  margin: var(--nl-s3) 0;
+}
+
+.is-new-look .nl-market-deal-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-deal-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-market-deal-row-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-deal-arrow {
+  color: var(--nl-mut-2);
+  margin: 0 4px;
+}
+
+.is-new-look .nl-market-deal-flat {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-warning-box {
+  margin-top: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-warning-box.is-blocking {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-market-warning-box strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-market-warning-box p {
+  margin: 0;
+}
+
+/* Wishlist + Kader Kontext */
+.is-new-look .nl-market-context-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.4fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-market-wishlist-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-market-wishlist-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-wishlist-main {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-wishlist-main .nl-market-candidate-portrait {
+  width: 40px;
+  height: 40px;
+}
+
+.is-new-look .nl-market-wishlist-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-wishlist-copy strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-market-wishlist-copy small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-wishlist-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+
+.is-new-look .nl-market-need-summary {
+  margin-bottom: var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-market-need-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-market-roster-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.1fr) auto auto auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-roster-main {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-roster-main .nl-market-candidate-portrait {
+  width: 36px;
+  height: 36px;
+}
+
+.is-new-look .nl-market-roster-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-roster-copy strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-market-roster-copy small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-roster-axes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-market-axis-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 7px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 40%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 10%, transparent);
+  font-size: 11px;
+}
+
+.is-new-look .nl-market-axis-chip b {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--nl-tone);
+}
+
+/* Letzte Deals */
+.is-new-look .nl-market-history-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-history-row:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-history-copy,
+.is-new-look .nl-market-history-numbers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-history-numbers {
+  align-items: flex-end;
+  flex: none;
+}
+
+.is-new-look .nl-market-history-copy small,
+.is-new-look .nl-market-history-numbers small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 1280px) {
+  .is-new-look .nl-market-main-grid {
+    grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.4fr);
+  }
+
+  .is-new-look .nl-market-deal-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .is-new-look .nl-market-main-grid,
+  .is-new-look .nl-market-context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .nl-market-roster-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   "Neuer Look" — Seite: Scouting-Center V2 (.nl-scout)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+.is-new-look .nl-scout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-scout-header-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-scout-stats {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-scout-rate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-scout-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-status-pill.is-ready {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-status-pill.is-focus {
+  border-color: color-mix(in srgb, var(--nl-accent) 50%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+/* Reveal-Ladder mit Stufen-Highlight */
+.is-new-look .nl-scout-reveal-ladder {
+  display: flex;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-scout-reveal-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 58px;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut-2);
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-reveal-step small {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-scout-reveal-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-reveal-step.is-reached {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-accent) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-scout-reveal-step.is-reached .nl-scout-reveal-dot {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-reveal-step.is-current {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  box-shadow: 0 0 0 1px var(--nl-accent), var(--nl-e1);
+}
+
+.is-new-look .nl-scout-reveal-step.is-current .nl-scout-reveal-dot {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-scout-reveal-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-scout-reveal-pill {
+  padding: 2px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-reveal-pill.is-base {
+  border-color: color-mix(in srgb, var(--nl-good) 40%, var(--nl-line));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-reveal-pill.is-visible {
+  border-color: color-mix(in srgb, var(--nl-accent) 40%, var(--nl-line));
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-scout-reveal-pill.is-hidden {
+  opacity: 0.6;
+}
+
+/* Empfehlungs-/Portrait-Karten mit Intel-Ring */
+.is-new-look .nl-scout-focus-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin: var(--nl-s3) 0;
+}
+
+.is-new-look .nl-scout-ready-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-scout-player-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-scout-player-card.is-ready {
+  border-color: color-mix(in srgb, var(--nl-good) 40%, var(--nl-line));
+}
+
+.is-new-look .nl-scout-player-card-top {
+  display: flex;
+  gap: var(--nl-s3);
+  align-items: center;
+}
+
+.is-new-look .nl-scout-player-portrait {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  overflow: visible;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+
+.is-new-look .nl-scout-player-portrait img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-scout-player-portrait-fallback {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-intel-ring {
+  position: absolute;
+  inset: -14px;
+  pointer-events: none;
+}
+
+.is-new-look .nl-scout-intel-gauge {
+  width: 100%;
+}
+
+.is-new-look .nl-scout-intel-gauge .nl-gauge-copy {
+  display: none;
+}
+
+.is-new-look .nl-scout-player-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.is-new-look .nl-scout-player-copy strong {
+  font-size: 14px;
+}
+
+.is-new-look .nl-scout-player-copy small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-player-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-scout-report-picker {
+  margin-top: var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-scout-report-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-scout-picker-chip {
+  padding: 4px 11px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-scout-picker-chip:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-footer-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.is-new-look .nl-scout-recommend-empty {
+  margin-top: var(--nl-s2);
+}
+
+/* ============================================================
+   "Neuer Look" — Seite: Transfer-Historie V2 (.nl-thist)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+.is-new-look .nl-thist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-thist-header-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-source-pill {
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .nl-thist-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-thist-filter-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  flex-wrap: wrap;
+  margin-top: var(--nl-s3);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-callout {
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.is-new-look .nl-thist-callout.is-warning {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, var(--nl-line-2));
+}
+
+.is-new-look .nl-thist-callout.is-error {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, var(--nl-line-2));
+}
+
+.is-new-look .nl-thist-summary {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-thist-story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-thist-story-card {
+  border-left: 3px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-thist-story-card.is-buy {
+  border-left-color: var(--nl-risk);
+}
+
+.is-new-look .nl-thist-story-card.is-sell {
+  border-left-color: var(--nl-good);
+}
+
+.is-new-look .nl-thist-story-card.is-profit {
+  border-left-color: var(--nl-soc);
+}
+
+.is-new-look .nl-thist-story-card.is-activity {
+  border-left-color: var(--nl-accent);
+}
+
+.is-new-look .nl-thist-story-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.3fr) minmax(280px, 1fr) minmax(260px, 0.9fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+/* Timeline */
+.is-new-look .nl-thist-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 640px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.is-new-look .nl-thist-timeline-card {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  border-left-width: 3px;
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-thist-timeline-card:hover {
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-thist-timeline-card.is-buy {
+  border-left-color: var(--nl-risk);
+}
+
+.is-new-look .nl-thist-timeline-card.is-sell {
+  border-left-color: var(--nl-good);
+}
+
+.is-new-look .nl-thist-timeline-card.is-exit {
+  border-left-color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-thist-timeline-card.is-selected {
+  border-color: var(--nl-accent);
+  background: linear-gradient(180deg, var(--nl-accent-soft), var(--nl-panel-2));
+}
+
+.is-new-look .nl-thist-portrait {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel);
+  flex: none;
+}
+
+.is-new-look .nl-thist-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-thist-portrait-initials {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-timeline-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-thist-timeline-copy strong {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-thist-timeline-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-timeline-target {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-timeline-numbers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-timeline-numbers strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-thist-type-pill {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-thist-type-pill.is-buy {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-thist-type-pill.is-sell {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line-2));
+}
+
+.is-new-look .nl-thist-type-pill.is-exit {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nl-s4);
+  border-radius: var(--nl-r-md);
+  border: 1px dashed var(--nl-line-2);
+  color: var(--nl-mut);
+  font-size: 13px;
+}
+
+/* Tabelle (in-place Wechsel) */
+.is-new-look .nl-thist-table-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-thist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.is-new-look .nl-thist-table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  border-bottom: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-thist-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--nl-line);
+  vertical-align: middle;
+}
+
+.is-new-look .nl-thist-table tbody tr {
+  cursor: pointer;
+}
+
+.is-new-look .nl-thist-table tbody tr:hover {
+  background: color-mix(in srgb, var(--nl-accent) 6%, transparent);
+}
+
+.is-new-look .nl-thist-table tbody tr.is-selected {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-thist-table-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-thist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-accent);
+  font-size: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-thist-link:hover {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-thist-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-thist-pager-label {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* Spotlight */
+.is-new-look .nl-thist-spotlight-hero {
+  display: flex;
+  gap: var(--nl-s3);
+  align-items: flex-start;
+}
+
+.is-new-look .nl-thist-spotlight-portrait {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+}
+
+.is-new-look .nl-thist-spotlight-portrait .nl-thist-portrait {
+  width: 72px;
+  height: 72px;
+}
+
+.is-new-look .nl-thist-spotlight-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-thist-spotlight-icons {
+  display: flex;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-thist-team-route {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.is-new-look .nl-thist-spotlight-meta {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-spotlight-season {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-spotlight-stats {
+  margin-top: var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-thist-spotlight-trend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  margin-top: var(--nl-s3);
+  padding-top: var(--nl-s3);
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-thist-mw-sparkline {
+  width: 100%;
+  max-width: 260px;
+  height: 44px;
+}
+
+/* Teambewegung + Season-Verteilung */
+.is-new-look .nl-thist-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-thist-team-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-thist-team-row:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-thist-team-code {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 28px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-thist-team-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-thist-team-copy strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-thist-team-copy small {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-thist-team-numbers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.is-new-look .nl-thist-team-numbers strong.is-positive {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-thist-season-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+  padding-top: var(--nl-s3);
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-thist-season-chart {
+  width: 100%;
+  max-width: 420px;
+}
+
+.is-new-look .nl-thist-season-mw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+@media (max-width: 1200px) {
+  .is-new-look .nl-thist-layout {
+    grid-template-columns: minmax(300px, 1.3fr) minmax(260px, 1fr);
+  }
+
+  .is-new-look .nl-thist-teams-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-thist-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-market-signed-card {
+    animation: none;
+  }
+
+  .is-new-look .nl-market-candidate,
+  .is-new-look .nl-thist-timeline-card {
+    transition: none;
+  }
+}

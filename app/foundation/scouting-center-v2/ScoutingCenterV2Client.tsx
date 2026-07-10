@@ -2,8 +2,10 @@
 
 import type { ScoutingHubV2ClientProps } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
+import ScoutingCenterV2NewLook from "@/app/foundation/scouting-center-v2/ScoutingCenterV2NewLook";
 import ScoutingPriorityQueue from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
 import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingReportPanel";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import { useState } from "react";
 
 function renderStars(level: number) {
@@ -34,36 +36,42 @@ function renderRevealLadder(disclosureLevel: number) {
   );
 }
 
-export default function ScoutingCenterV2Client({
-  teamName,
-  scoutingFacilityLevel,
-  scoutingFacilityLabel,
-  recruitmentBudget,
-  rosterCount,
-  rosterMinimum,
-  rosterOptimum,
-  draftContextNote,
-  disclosureLevel,
-  visibleAtTier,
-  hiddenAtTier,
-  baseInfoAlwaysVisible,
-  scoutPipeline = null,
-  activeTab: controlledActiveTab,
-  onActiveTabChange,
-  hideSubNav = false,
-  onOpenMarket,
-  onOpenFacilities,
-  onOpenPlayer,
-  queueEntries = [],
-  focusEtaLabel = null,
-  wishlistSlotLimit = null,
-  onReorderQueue,
-  onRemoveFromQueue,
-  report = null,
-  selectedReportPlayerId = null,
-  onSelectReportPlayer,
-}: ScoutingHubV2ClientProps) {
+export default function ScoutingCenterV2Client(props: ScoutingHubV2ClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Hooks laufen unverändert vor dem Gate
+  // (stabile Hook-Reihenfolge beim Umschalten des Flags); Flag aus =>
+  // bestehende Ansicht unverändert.
+  const [newLook] = useNewLook();
   const [internalActiveTab, setInternalActiveTab] = useState<"overview" | "reports" | "recommended">("overview");
+  if (newLook) return <ScoutingCenterV2NewLook {...props} />;
+  const {
+    teamName,
+    scoutingFacilityLevel,
+    scoutingFacilityLabel,
+    recruitmentBudget,
+    rosterCount,
+    rosterMinimum,
+    rosterOptimum,
+    draftContextNote,
+    disclosureLevel,
+    visibleAtTier,
+    hiddenAtTier,
+    baseInfoAlwaysVisible,
+    scoutPipeline = null,
+    activeTab: controlledActiveTab,
+    onActiveTabChange,
+    hideSubNav = false,
+    onOpenMarket,
+    onOpenFacilities,
+    onOpenPlayer,
+    queueEntries = [],
+    focusEtaLabel = null,
+    wishlistSlotLimit = null,
+    onReorderQueue,
+    onRemoveFromQueue,
+    report = null,
+    selectedReportPlayerId = null,
+    onSelectReportPlayer,
+  } = props;
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const setActiveTab = (tab: "overview" | "reports" | "recommended") => {
     onActiveTabChange?.(tab);
