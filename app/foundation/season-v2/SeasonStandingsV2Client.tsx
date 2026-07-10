@@ -13,6 +13,8 @@ import {
 } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import { FoundationButton } from "@/components/foundation/FoundationButton";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
@@ -65,7 +67,7 @@ type SeasonV2TeamSummary = {
   marketValueTotal: number | null;
 };
 
-type SeasonV2StandingsRow = {
+export type SeasonV2StandingsRow = {
   teamId: string;
   teamName: string;
   teamCode: string;
@@ -91,6 +93,17 @@ type SeasonV2StandingsRow = {
   rosterCount: number;
   avgContractLength: number | null;
   isSelected: boolean;
+  /**
+   * Saisonübergreifende Snapshot-Historie (Rang/Punkte pro archivierter
+   * Saison) — optional durchgereicht für den "Neuer Look"-Saisonstand.
+   * Der bestehende Render liest dieses Feld nicht.
+   */
+  historicalPointsBySeason?: Array<{
+    seasonId: string;
+    seasonName: string;
+    points: number | null;
+    rank: number | null;
+  }>;
 };
 
 type SeasonV2PpRow = {
@@ -465,7 +478,7 @@ function hashSeasonV2TeamColorSeed(value: string) {
   return hash;
 }
 
-function getSeasonV2TeamTagStyle(teamCode: string | null | undefined): CSSProperties | undefined {
+export function getSeasonV2TeamTagStyle(teamCode: string | null | undefined): CSSProperties | undefined {
   const code = String(teamCode ?? "").trim().toUpperCase();
   if (!code) return undefined;
   const mapped = seasonV2TeamTagColorMap[code];
@@ -529,33 +542,39 @@ type SeasonV2ViewMode = "table" | "gms";
 
 const SEASON_V2_DEFAULT_MODE: SeasonV2ViewMode = "table";
 
-export default function SeasonStandingsV2Client({
-  selectedSeasonId,
-  selectedSeasonLabel,
-  sourceLabel,
-  sourceBadgeLabel,
-  isArchived,
-  seasonOptions,
-  selectedTeamSummary,
-  leaderTeam,
-  momentumTeam,
-  pressureTeam,
-  topPlayer,
-  standingsRows,
-  topPlayers,
-  playerRows,
-  gmRows,
-  archiveRows,
-  disciplineLeaders,
-  onChangeSeason,
-  onOpenTeam,
-  onOpenPlayer,
-  viewMode,
-  onViewModeChange,
-  onOpenRanks,
-  onOpenPrize,
-  isLoading = false,
-}: SeasonStandingsV2ClientProps) {
+export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neues Liga-Board mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <SeasonStandingsNewLook {...props} />;
+
+  const {
+    selectedSeasonId,
+    selectedSeasonLabel,
+    sourceLabel,
+    sourceBadgeLabel,
+    isArchived,
+    seasonOptions,
+    selectedTeamSummary,
+    leaderTeam,
+    momentumTeam,
+    pressureTeam,
+    topPlayer,
+    standingsRows,
+    topPlayers,
+    playerRows,
+    gmRows,
+    archiveRows,
+    disciplineLeaders,
+    onChangeSeason,
+    onOpenTeam,
+    onOpenPlayer,
+    viewMode,
+    onViewModeChange,
+    onOpenRanks,
+    onOpenPrize,
+    isLoading = false,
+  } = props;
   const resolvedStandingsRows = useMemo(
     () =>
       standingsRows.map((row) => ({

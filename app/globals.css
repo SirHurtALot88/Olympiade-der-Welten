@@ -41971,6 +41971,549 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* ============================================================
+   NEUER LOOK — Saisonstand / Liga-Board (nl-standings-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-standings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-standings-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-season-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-season-select select {
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+}
+
+/* --- Liga-Board --------------------------------------------------- */
+.is-new-look .nl-standings-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-row {
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-standings-row.is-podium {
+  border-color: var(--nl-line-2);
+  border-left-color: var(--team-tag-border, var(--nl-line-2));
+  background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+}
+
+.is-new-look .nl-standings-row.is-selected {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-standings-rowmain {
+  display: grid;
+  grid-template-columns: 64px minmax(170px, 1.2fr) minmax(130px, 0.9fr) minmax(260px, 1.5fr) auto 18px;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: inherit;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-rowmain:hover,
+.is-new-look .nl-standings-rowmain:focus-visible {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-rowmain:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
+.is-new-look .nl-standings-rank {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.is-new-look .nl-standings-ranknum {
+  min-width: 26px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-rankdiff {
+  font-size: 10px;
+}
+
+.is-new-look .nl-standings-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-standings-team:hover .nl-standings-teamname,
+.is-new-look .nl-standings-team:focus-visible .nl-standings-teamname {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-standings-crest {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-standings-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-team-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-standings-teamname {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-standings-teamcode {
+  font-size: 11px;
+  color: var(--team-tag-text, var(--nl-mut));
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-standings-points {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.is-new-look .nl-standings-points-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-points-bar .nl-progress-track {
+  height: 6px;
+}
+
+/* --- Bereichs-Mini-Bars (POW/SPE/MEN/SOC) -------------------------- */
+.is-new-look .nl-standings-areas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px var(--nl-s3);
+  min-width: 0;
+}
+
+.is-new-look .nl-standings-area {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-standings-area-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-standings-area-track {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-standings-area-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-standings-area-value {
+  font-size: 11px;
+  color: var(--nl-mut);
+  text-align: right;
+}
+
+.is-new-look .nl-standings-chips {
+  justify-self: end;
+}
+
+.is-new-look .nl-standings-caret {
+  color: var(--nl-mut-2);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* --- Expand: 20 Disziplinen in 4 Bereichsgruppen ------------------- */
+.is-new-look .nl-standings-expand {
+  border-top: 1px solid var(--nl-line);
+  padding: var(--nl-s3) var(--nl-s4) var(--nl-s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-expand-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-expand-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-expand-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-group {
+  border: 1px solid var(--nl-line);
+  border-top: 2px solid var(--nl-tone, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .nl-standings-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-standings-group-total {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-disc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-standings-disc {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-standings-disc-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-disc-track {
+  height: 5px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  overflow: hidden;
+}
+
+.is-new-look .nl-standings-disc-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+  opacity: 0.85;
+}
+
+.is-new-look .nl-standings-disc-value {
+  font-size: 11px;
+  color: var(--nl-mut);
+  text-align: right;
+}
+
+/* --- Saisonübergreifender Rang-Verlauf ----------------------------- */
+.is-new-look .nl-standings-history {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+  border-top: 1px dashed var(--nl-line);
+  padding-top: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-history-label {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-history-spark {
+  width: 120px;
+  height: 32px;
+}
+
+.is-new-look .nl-standings-history-values {
+  font-size: 11px;
+  color: var(--nl-mut-2);
+}
+
+/* --- Daten-Ansicht: dichte Tabelle inkl. Disziplin-Spalten --------- */
+.is-new-look .nl-standings-table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-standings-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-standings-table th,
+.is-new-look .nl-standings-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.is-new-look .nl-standings-th-area {
+  text-align: center;
+  color: var(--nl-tone, var(--nl-mut));
+  border-left: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-standings-th-area-total {
+  color: var(--nl-tone, var(--nl-mut));
+  border-left: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-standings-td-area-total {
+  font-weight: 700;
+  color: var(--nl-tone, var(--nl-ink));
+  border-left: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-standings-th-rank,
+.is-new-look .nl-standings-td-rank {
+  text-align: left;
+}
+
+.is-new-look .nl-standings-td-rank .nl-delta-chip {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+.is-new-look .nl-standings-th-team,
+.is-new-look .nl-standings-td-team {
+  text-align: left;
+}
+
+.is-new-look .nl-standings-td-points {
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-table-row {
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-table-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-table-row.is-selected {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-standings-table-teamlink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nl-ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.is-new-look .nl-standings-table-teamlink:hover .nl-standings-teamname,
+.is-new-look .nl-standings-table-teamlink:focus-visible .nl-standings-teamname {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-standings-table .nl-standings-teamname {
+  font-size: 12px;
+}
+
+.is-new-look .nl-standings-table .nl-standings-teamcode {
+  color: var(--nl-mut-2);
+}
+
+/* --- Skeleton / Empty ---------------------------------------------- */
+.is-new-look .nl-standings-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-skeleton-row {
+  height: 54px;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  opacity: 0.6;
+}
+
+.is-new-look .nl-standings-empty-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* --- Mobile: Board-Zeilen werden zu Karten ------------------------- */
+@media (max-width: 900px) {
+  .is-new-look .nl-standings-rowmain {
+    grid-template-columns: 56px minmax(0, 1fr) 18px;
+    grid-template-areas:
+      "rank team caret"
+      "points points points"
+      "areas areas areas"
+      "chips chips chips";
+    row-gap: var(--nl-s2);
+  }
+
+  .is-new-look .nl-standings-rank {
+    grid-area: rank;
+  }
+
+  .is-new-look .nl-standings-team {
+    grid-area: team;
+  }
+
+  .is-new-look .nl-standings-caret {
+    grid-area: caret;
+  }
+
+  .is-new-look .nl-standings-points {
+    grid-area: points;
+  }
+
+  .is-new-look .nl-standings-areas {
+    grid-area: areas;
+  }
+
+  .is-new-look .nl-standings-chips {
+    grid-area: chips;
+    justify-self: start;
+  }
+
+  .is-new-look .nl-standings-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Reduced Motion (nl-standings) --------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-standings-rowmain,
+  .is-new-look .nl-standings-table-row {
+    transition: none;
+  }
+}
+
 /* --- Reduced Motion: alle nl-Transitions/-Animationen aus --------- */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-stat-chip,
