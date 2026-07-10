@@ -273,6 +273,11 @@ export default function FoundationTeamsViewHost({
       active
       gameState={gameState}
       selectedTeam={selectedTeam}
+      playerRatingsById={playerRatingsById}
+      selectedTeamControl={selectedTeamControl}
+      showTeamContractPreviewRows={showTeamContractPreviewRows}
+      showSelectedRosterPpsBreakdown={showSelectedRosterPpsBreakdown}
+      showTeamDisciplines={showTeamDisciplines}
       shouldBuildTeamContracts={shouldBuildTeamContracts}
       showExtendedTeamPanels={showExtendedTeamPanels}
       selectedTeamDetailTab={selectedTeamDetailTab}

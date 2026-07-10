@@ -164,6 +164,7 @@ export type PlayerDetailDrawerData = {
   name: string;
   portraitUrl: string | null;
   flavorDe: string | null;
+  teamId: string | null;
   teamName: string | null;
   teamCode: string | null;
   teamHumanControlled: boolean | null;
@@ -2369,6 +2370,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     name: player.name,
     portraitUrl: getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null),
     flavorDe: resolvePlayerFlavorDe(player),
+    teamId: team?.teamId ?? null,
     teamName: team?.name ?? null,
     teamCode: team?.shortCode ?? null,
     teamHumanControlled: team ? team.humanControlled !== false : null,
@@ -2449,7 +2451,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     purchasePriceSource: economy.purchasePriceSource,
     contractLength: economy.contractLength,
     contractLengthSource: economy.contractLengthSource,
-    contractShape: input.rosterEntry?.contractShape ?? "balanced",
+    contractShape: rosterEntry?.contractShape ?? "balanced",
     isImportedEconomy: economy.isImportedEconomy,
     economyStatus: economy.economyStatus,
     economyCompare,
@@ -2794,6 +2796,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         )
       : getPlayerPortraitBrowserUrl(input.playerId, rosterPlayer?.portraitUrl ?? null, null),
     flavorDe: catalogPlayer ? resolvePlayerFlavorDe(catalogPlayer) : null,
+    teamId: input.context.team.id,
     teamName: input.context.team.name,
     teamCode: input.context.team.shortCode,
     teamHumanControlled: (input.context.team as { humanControlled?: boolean }).humanControlled === false ? false : true,

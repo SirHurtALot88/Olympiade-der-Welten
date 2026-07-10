@@ -441,7 +441,27 @@ export function useFoundationPageState({
   const [seasonTableMode, setSeasonTableMode] = useState<SeasonTableMode>("expert");
   const [teamsHydrationPhase, setTeamsHydrationPhase] = useState<"shell" | "full">("shell");
   const [showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas] = useState<boolean>(false);
-  const [tableSorts, setTableSorts] = useState<Record<string, SortState>>({
+  const [tableSorts, setTableSorts] = useState<
+    Record<
+      | "teamTable"
+      | "playersTable"
+      | "teamsView"
+      | "disciplineRanks"
+      | "disciplineConfig"
+      | "ppArea"
+      | "seasonTopPlayers"
+      | "prizeMoney"
+      | "sponsorPlacement"
+      | "teamPrize"
+      | "prizePreview"
+      | "selectedRoster"
+      | "transferMarket"
+      | "transferHistory"
+      | "standingsPreview",
+      SortState
+    > &
+      Record<string, SortState>
+  >({
     teamTable: { key: "punkte", direction: "desc" },
     playersTable: { key: "ovr", direction: "desc" },
     teamsView: { key: "overallRank", direction: "asc" },
