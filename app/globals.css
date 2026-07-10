@@ -41225,6 +41225,752 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   "Neuer Look" — Seite: Home V2 Manager-Cockpit (.nl-home)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+.is-new-look .nl-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-home-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s5);
+  padding: var(--nl-s5);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e2);
+}
+
+.is-new-look .nl-home-hero-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  min-width: 220px;
+}
+
+.is-new-look .nl-home-hero-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--nl-r-md);
+  object-fit: contain;
+}
+
+.is-new-look .nl-home-hero-logo-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-home-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-hero-title {
+  margin: 2px 0 0;
+  font-family: var(--nl-display);
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-home-hero-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-hero-kpis {
+  display: flex;
+  gap: var(--nl-s5);
+}
+
+.is-new-look .nl-home-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-home-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-kpi-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-home-hero-chips {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+.is-new-look .nl-home-hero-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nl-s2);
+  margin-left: auto;
+}
+
+.is-new-look .nl-home-continue {
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: filter var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-home-continue:hover,
+.is-new-look .nl-home-continue:focus-visible {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-home-next-status {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-warning-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-warning-chip {
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, transparent);
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone) 14%, transparent);
+  color: var(--nl-ink);
+  font-size: 12px;
+}
+
+.is-new-look .nl-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-home-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-section-icon,
+.is-new-look .nl-home-card-eyebrow-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-home-card-eyebrow-icon svg {
+  flex: none;
+}
+
+.is-new-look .nl-home-section-title {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 18px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-home-today-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-home-today-card {
+  border-left: 3px solid var(--nl-tone);
+  cursor: pointer;
+}
+
+.is-new-look .nl-home-today-card.is-primary {
+  box-shadow: var(--nl-e2), 0 0 0 1px color-mix(in srgb, var(--nl-tone) 35%, transparent);
+}
+
+.is-new-look .nl-home-today-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nl-tone);
+}
+
+.is-new-look .nl-home-today-detail {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-home-board-meta {
+  font-size: 12px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-home-objective-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-home-objective-row {
+  display: block;
+  width: 100%;
+  padding: var(--nl-s2);
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-home-objective-row:hover,
+.is-new-look .nl-home-objective-row:focus-visible {
+  border-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-home-objective-fallback {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-home-objective-label {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-home-objective-status {
+  font-size: 12px;
+  color: var(--nl-tone);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-home-league-body {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s5);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-home-card-link {
+  font-size: 12px;
+  color: var(--nl-accent);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-home-card-link-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  color: var(--nl-accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-home-card-link-button:hover,
+.is-new-look .nl-home-card-link-button:focus-visible {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-home-inbox-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-critical-pill {
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone) 18%, transparent);
+  color: var(--nl-tone);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .nl-home-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-inbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-inbox-item {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2);
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-home-inbox-item:hover,
+.is-new-look .nl-home-inbox-item:focus-visible {
+  border-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-home-inbox-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--nl-tone);
+}
+
+.is-new-look .nl-home-inbox-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-home-inbox-copy strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-home-inbox-copy small {
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-inbox-checkoff {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--nl-mut);
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-home-inbox-checkoff:hover,
+.is-new-look .nl-home-inbox-checkoff:focus-visible {
+  border-color: var(--nl-good);
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-home-player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-home-player-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  width: 100%;
+  padding: var(--nl-s2);
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-home-player-row:hover,
+.is-new-look .nl-home-player-row:focus-visible {
+  border-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-home-player-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-home-player-chips {
+  display: inline-flex;
+  gap: var(--nl-s1);
+  flex: none;
+}
+
+.is-new-look .nl-home-empty-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+/* ============================================================
+   "Neuer Look" — Seite: Inbox V2 Entscheidungs-Triage (.nl-inbox)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+.is-new-look .nl-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-inbox-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-inbox-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-title {
+  margin: 2px 0 0;
+  font-family: var(--nl-display);
+  font-size: 24px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-team {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-inbox-open-pill {
+  padding: 4px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-critical-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 50%, transparent);
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone) 16%, transparent);
+  color: var(--nl-tone);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-inbox-critical-alert:hover,
+.is-new-look .nl-inbox-critical-alert:focus-visible {
+  filter: brightness(1.15);
+}
+
+.is-new-look .nl-inbox-critical-alert:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.is-new-look .nl-inbox-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-inbox-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-inbox-filter-chip:hover,
+.is-new-look .nl-inbox-filter-chip:focus-visible {
+  border-color: var(--nl-line-2);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-filter-chip.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-filter-count {
+  padding: 0 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-filter-chip.is-active .nl-inbox-filter-count {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-inbox-toggle-row {
+  display: flex;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-inbox-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+  cursor: pointer;
+}
+
+.is-new-look .nl-inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  max-width: 960px;
+}
+
+.is-new-look .nl-inbox-card {
+  border-left: 4px solid var(--nl-tone);
+  cursor: pointer;
+}
+
+.is-new-look .nl-inbox-card.is-selected {
+  box-shadow: var(--nl-e2), 0 0 0 1px color-mix(in srgb, var(--nl-accent) 55%, transparent);
+}
+
+.is-new-look .nl-inbox-card.is-resolved {
+  opacity: 0.7;
+}
+
+.is-new-look .nl-inbox-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-inbox-card-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone) 14%, transparent);
+  color: var(--nl-tone);
+}
+
+.is-new-look .nl-inbox-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  min-width: 0;
+}
+
+.is-new-look .nl-inbox-card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-inbox-card-category {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-tone);
+}
+
+.is-new-look .nl-inbox-card-status {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-card-title {
+  font-size: 14.5px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-card-detail {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-card-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s1);
+}
+
+.is-new-look .nl-inbox-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-inbox-choice:hover,
+.is-new-look .nl-inbox-choice:focus-visible {
+  border-color: var(--nl-accent);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-inbox-choice.is-recommended {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, transparent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-inbox-choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-inbox-choice-tag {
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
+  color: var(--nl-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-inbox-choice-hint {
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-inbox-card-actions {
+  display: flex;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s1);
+}
+
+.is-new-look .nl-inbox-card-action {
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-inbox-card-action:hover,
+.is-new-look .nl-inbox-card-action:focus-visible {
+  border-color: var(--nl-ink);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-inbox-empty-card {
+  max-width: 520px;
+}
+
+.is-new-look .nl-inbox-empty-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
 /* --- Reduced Motion: alle nl-Transitions/-Animationen aus --------- */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-stat-chip,
@@ -41234,7 +41980,10 @@ button.foundation-team-portrait-card {
   .is-new-look .nl-card.is-interactive,
   .is-new-look .nl-card.is-interactive:hover,
   .is-new-look .nl-subtab,
-  .is-new-look .nl-progress-fill {
+  .is-new-look .nl-progress-fill,
+  .is-new-look .nl-home-continue,
+  .is-new-look .nl-home-today-card,
+  .is-new-look .nl-inbox-choice {
     transition: none;
     animation: none;
     transform: none;
