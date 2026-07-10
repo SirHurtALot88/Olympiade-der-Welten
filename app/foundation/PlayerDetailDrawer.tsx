@@ -43,6 +43,7 @@ import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
+import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import { useNewLook } from "@/lib/ui/new-look-preference";
@@ -1300,6 +1301,9 @@ export default function PlayerDetailDrawer({
     isPlausibleSalaryDeltaReference(data.salary, data.normalSalary) && Math.abs(data.salary! - data.normalSalary!) >= 0.01
       ? data.salary! - data.normalSalary!
       : null;
+  // "Neuer Look" (flag-gated, additiv): echte CA/PO-Sterne für das Hero-Gauge
+  // nur bei aktivem Flag auflösen — mit Flag OFF bleibt alles unverändert.
+  const newLookCaPo = newLookEnabled ? resolveCaPoDisplay(data) : null;
   const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
     (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
   );
@@ -1410,6 +1414,19 @@ export default function PlayerDetailDrawer({
   const profileContent = (
     <>
           {renderInjuryStatusBanner(data)}
+          {/* "Neuer Look" (flag-gated): ersetzt nur den Identitäts-/Ratings-Header.
+              Mit Flag OFF rendert exakt der bisherige Header — byte-identisch. */}
+          {newLookEnabled ? (
+            <PlayerHeroNewLook
+              data={data}
+              roleLabel={formatRoleTag(transferContext.roleTag)}
+              caStars={newLookCaPo?.caStars ?? null}
+              poStars={newLookCaPo?.poStars ?? null}
+              isFreeAgent={isFreeAgent}
+              onClose={onClose}
+              onOpenLeagueLeaders={onOpenLeagueLeaders}
+            />
+          ) : (
           <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.portraitUrl ? (
@@ -1545,6 +1562,7 @@ export default function PlayerDetailDrawer({
             Schliessen
           </button>
         </div>
+          )}
 
         <div className="player-drawer-body">
           <section className="player-drawer-section player-drawer-hero-surface" id="player-drawer-profile">

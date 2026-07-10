@@ -43272,3 +43272,155 @@ button.foundation-team-portrait-card {
     transition: none;
   }
 }
+
+/* ===================================================================
+   "Neuer Look" — Spieler-Hero (PlayerHeroNewLook, flag-gated)
+   Ersetzt bei aktivem Flag nur den Identitäts-/Ratings-Header im
+   Spieler-Drawer / auf der Spielerprofil-Seite. Der Root trägt selbst
+   `.is-new-look`, damit die --nl-Tokens auch außerhalb der Shell greifen.
+   =================================================================== */
+
+.is-new-look.nl-player-hero,
+.is-new-look .nl-player-hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s5);
+  padding: var(--nl-s5);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e2);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-player-hero-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  flex: 1 1 340px;
+  min-width: 260px;
+}
+
+.is-new-look .nl-player-hero-portrait {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  object-fit: cover;
+  background: var(--nl-bg-2);
+}
+
+.is-new-look .nl-player-hero-portrait-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-player-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-player-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-player-hero-name {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-player-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-player-hero-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  padding: 2px 8px;
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  background: var(--nl-bg-2);
+}
+
+.is-new-look .nl-player-hero-class-icon,
+.is-new-look .nl-player-hero-race-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.is-new-look .nl-player-hero-chips {
+  margin-top: var(--nl-s1);
+}
+
+.is-new-look .nl-player-hero-charts {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  margin-left: auto;
+}
+
+.is-new-look .nl-player-hero-radar {
+  width: 170px;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-player-hero-gauge {
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-player-hero-close {
+  position: absolute;
+  top: var(--nl-s3);
+  right: var(--nl-s3);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-player-hero-close:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-player-hero-charts {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-player-hero-close {
+    transition: none;
+  }
+}
