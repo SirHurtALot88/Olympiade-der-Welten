@@ -50,7 +50,7 @@ export type FoundationSaveScopedFeedSetters = {
   setMarketBuyError: Dispatch<SetStateAction<string | null>>;
   setMarketBuySuccess: Dispatch<SetStateAction<string | null>>;
   setMarketBuySubject: Dispatch<SetStateAction<any>>;
-  setFoundationPanel: Dispatch<SetStateAction<string | null>>;
+  setFoundationPanel: Dispatch<SetStateAction<any>>;
   setMarketSellPreview: Dispatch<SetStateAction<any>>;
   setMarketSellError: Dispatch<SetStateAction<string | null>>;
   setMarketSellSuccess: Dispatch<SetStateAction<string | null>>;
@@ -85,7 +85,7 @@ export type FoundationSaveScopedFeedSetters = {
   setSeasonCompletionFeed: Dispatch<SetStateAction<any>>;
   setSeasonTransitionError: Dispatch<SetStateAction<string | null>>;
   setSeasonStandingsFeed: Dispatch<SetStateAction<any>>;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   setPrizePreviewFeed: Dispatch<SetStateAction<any>>;
   setCashApplyFeed: Dispatch<SetStateAction<any>>;
   setMatchdayAdvanceFeed: Dispatch<SetStateAction<any>>;
