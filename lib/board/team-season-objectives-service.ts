@@ -1083,8 +1083,7 @@ function selectBoardObjectiveDrafts(input: {
         input.objectives,
         (objective) =>
           objective.objectiveId.startsWith("sport-axis-rank-") &&
-          objective.source === "team_signature_axis_rank_goal" &&
-          objective.status !== "completed",
+          objective.source === "team_signature_axis_rank_goal",
       ) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-axis-allround-tophalf") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top20-breakthrough") ??
@@ -1094,10 +1093,6 @@ function selectBoardObjectiveDrafts(input: {
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top50-season") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top5-discipline-star") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("rivalry-")) ??
-      pickFirstObjective(
-        input.objectives,
-        (objective) => objective.objectiveId.startsWith("sport-axis-rank-") && objective.source === "team_signature_axis_rank_goal",
-      ) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-axis-")) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-next-matchday-top10") ??
       pickUrgentObjective(input.objectives, "morale") ??
@@ -1427,22 +1422,27 @@ function buildAiBias(input: {
   const hasPlayerPeakNeed = input.objectives.some((objective) => objective.category === "player" && objective.status !== "completed");
   const hasMedalPushNeed = input.objectives.some((objective) => objective.objectiveId === "sport-matchday-medals" && objective.status !== "completed");
   const axisPriorities: Partial<Record<AxisKey, number>> = {};
+  // Note: a "completed" axis objective still contributes a low, non-zero maintenance
+  // priority (rather than being skipped entirely) so a team's identity-defining axis
+  // remains visible in its AI bias even after the goal has been achieved.
   for (const objective of input.objectives) {
-    if (objective.status === "completed") continue;
     const axisRankMatch = /^sport-axis-rank-(pow|spe|men|soc)-top-\d+$/.exec(objective.objectiveId);
     if (axisRankMatch?.[1]) {
       const axis = axisRankMatch[1] as AxisKey;
-      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.95 : 0.75);
+      const weight = objective.status === "failed" ? 0.95 : objective.status === "completed" ? 0.2 : 0.75;
+      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, weight);
     }
     if (objective.objectiveId === "sport-axis-allround-tophalf") {
+      const weight = objective.status === "failed" ? 0.45 : objective.status === "completed" ? 0.15 : 0.32;
       for (const axis of Object.keys(AXIS_OBJECTIVE_META) as AxisKey[]) {
-        axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.45 : 0.32);
+        axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, weight);
       }
     }
     const preferredAxisMatch = /^sport-axis-(pow|spe|men|soc)$/.exec(objective.objectiveId);
     if (preferredAxisMatch?.[1]) {
       const axis = preferredAxisMatch[1] as AxisKey;
-      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, objective.status === "failed" ? 0.35 : 0.22);
+      const weight = objective.status === "failed" ? 0.35 : objective.status === "completed" ? 0.1 : 0.22;
+      axisPriorities[axis] = Math.max(axisPriorities[axis] ?? 0, weight);
     }
   }
   const hasAxisPushNeed = Object.values(axisPriorities).some((value) => (value ?? 0) >= 0.7);
