@@ -26,7 +26,7 @@ export type ScoutingReportDisciplineTier = {
   disciplineId: string;
   disciplineName: string;
   displayedScore: number;
-  scoreTier: string;
+  scoreTier: string | null;
 };
 
 export type ScoutingReportData = {

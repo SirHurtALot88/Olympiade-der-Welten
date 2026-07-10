@@ -485,6 +485,21 @@ export type PlayerAttributeSheetStats = {
   torment?: number | null;
 };
 
+export type PlayerAttributeSheetRatings = {
+  powerRating?: string | null;
+  healthRating?: string | null;
+  staminaRating?: string | null;
+  intelligenceRating?: string | null;
+  awarenessRating?: string | null;
+  determinationRating?: string | null;
+  speedRating?: string | null;
+  dexterityRating?: string | null;
+  charismaRating?: string | null;
+  willRating?: string | null;
+  spiritRating?: string | null;
+  tormentRating?: string | null;
+};
+
 export type PlayerGeneratorRoleIntent = "offense" | "defense" | "support" | "allround" | "specialist" | "chaos";
 
 export type PlayerGeneratorStrengthTier = "very_weak" | "weak" | "normal" | "strong" | "elite" | "legendary";
@@ -753,20 +768,7 @@ export type Player = {
     soc: number;
   };
   attributeSheetStats?: PlayerAttributeSheetStats;
-  attributeSheetRatings?: {
-    powerRating?: string | null;
-    healthRating?: string | null;
-    staminaRating?: string | null;
-    intelligenceRating?: string | null;
-    awarenessRating?: string | null;
-    determinationRating?: string | null;
-    speedRating?: string | null;
-    dexterityRating?: string | null;
-    charismaRating?: string | null;
-    willRating?: string | null;
-    spiritRating?: string | null;
-    tormentRating?: string | null;
-  };
+  attributeSheetRatings?: PlayerAttributeSheetRatings;
   preferredDisciplineIds: string[];
   disciplineRatings: Record<string, number>;
   previousDisciplineRatings?: Record<string, number>;

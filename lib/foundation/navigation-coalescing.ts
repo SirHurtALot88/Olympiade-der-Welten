@@ -19,7 +19,7 @@ function scheduleAutoPersistUnpause(
     autoPersistUnpauseTimeoutRef.current = null;
   }
   const delayMs = Math.max(0, foundationViewTransitionUntilRef.current - Date.now());
-  autoPersistUnpauseTimeoutRef.current = window.setTimeout(() => {
+  autoPersistUnpauseTimeoutRef.current = setTimeout(() => {
     autoPersistUnpauseTimeoutRef.current = null;
     if (!isFoundationNavigationQuiet(foundationViewTransitionUntilRef)) {
       autoPersistPausedRef.current = false;
