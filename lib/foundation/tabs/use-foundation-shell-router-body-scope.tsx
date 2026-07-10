@@ -61,8 +61,10 @@ import {
   formatTransfermarktCurrency,
   formatTransfermarktPoints,
   formatTransfermarktRatio,
+  type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { pickRatingsForPlayerIds } from "@/lib/foundation/get-season-derivations";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import {
   getTransfermarktScoutingDisclosure,
@@ -230,12 +232,14 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
 import {
-  buildTeamHistoryDisciplineValuesFromRecord,
-  buildTeamHistoryDisciplineValuesFromSnapshot,
   CANONICAL_PROGRESS_TRAITS,
   PROGRESSION_ATTRIBUTE_ORDER,
   PROGRESSION_CLASS_ORDER,
 } from "@/lib/training/class-progression-config";
+import {
+  buildTeamHistoryDisciplineValuesFromRecord,
+  buildTeamHistoryDisciplineValuesFromSnapshot,
+} from "@/lib/season/season-discipline-area-groups";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
@@ -5321,13 +5325,13 @@ export function useFoundationShellRouterBodyScope({
     if (navigationTeamId && navigationTeamId !== activeManagerTeamId) {
       setActiveManagerTeam(navigationTeamId, "manual_select");
     }
+    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
     if (targetView === "lineup") {
       setLineupFocusRequestKey(`lineup-${navigationTeamId ?? activeManagerTeamId ?? "team"}-${Date.now()}`);
-      if (targetPanel === "form-board") {
+      if (panel === "form-board") {
         setLineupDraftBoardViewRequest("formBoard");
       }
     }
-    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
     const focusPlayerId =
       item.playerId ??
       (typeof item.targetParams.player === "string" ? item.targetParams.player : null);

@@ -7,6 +7,11 @@ import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modif
 import { buildPlayerDevelopmentInsight } from "@/lib/progression/player-potential-service";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import {
+  buildHomePlayerCardsFromRoster,
+  formatLocalePoints,
+  type HomeV2RosterTableRow,
+} from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import type {
   HomeV2BoardObjective,
   HomeV2FacilitySnapshot,

@@ -1,4 +1,5 @@
-import type { GameState, Player, PlayerDemandRecord, PlayerTrainingMode, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerDemandRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
 import type { PlayerTrainingMode as TrainingMode } from "@/lib/training/training-plan-types";

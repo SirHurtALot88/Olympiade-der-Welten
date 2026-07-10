@@ -16,7 +16,7 @@ import { clampValue } from "@/lib/foundation/tabs/prize-v2-ui-helpers";
 
 export interface FoundationPrizeV2PanelProps {
   gameState: GameState;
-  activeContextMeta: Parameters<typeof import("@/lib/foundation/foundation-view-source").getViewSourceBadgeLabel>[1];
+  activeContextMeta: Parameters<typeof import("@/lib/foundation/tabs/foundation-format-render-helpers").getViewSourceBadgeLabel>[1];
   prizePreviewFeed: FoundationPrizePreviewResponse | null;
   prizePreviewHardBlocked: string[];
   prizePreviewGlobalWarnings: string[];

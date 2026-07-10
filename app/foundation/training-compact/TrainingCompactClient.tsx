@@ -18,7 +18,12 @@ import type {
   TrainingPlayerRowView,
   TrainingSummaryView,
 } from "@/app/foundation/training-facilities-v2/training-view-types";
-import { formatLocaleNumber } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import {
+  formatLocaleNumber,
+  TrainingModeGuideDisclosure,
+  TrainingPlayerLane,
+} from "@/app/foundation/training-facilities-v2/training-view-shared";
+import { formatSignedPercent } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 
 type TrainingCompactClientProps = {
   selectedTeam: Team;

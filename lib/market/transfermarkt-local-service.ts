@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildGameStateContentSignature, getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
