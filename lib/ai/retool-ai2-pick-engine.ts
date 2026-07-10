@@ -357,7 +357,8 @@ export function buildRetoolAi2BudgetPlan(input: {
     1,
   );
   const spendPostureScore = clamp(aggression01 - caution01, -1, 1);
-  let reservePolicy = spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
+  let reservePolicy: "aggressive" | "balanced" | "conservative" =
+    spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
   let reserveTargetMinScaled = reserveTargetMin;
   let reserveTargetBaseScaled = reserveTargetBase;
   let reserveTargetMaxScaled = reserveTargetMax;

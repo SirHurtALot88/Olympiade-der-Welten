@@ -293,15 +293,9 @@ async function resolveSellContext(
     activePlayer && salePrice != null
       ? resolveTransfermarktSellProceeds({
           rosterEntry: {
-            id: activePlayer.id,
-            playerId: activePlayer.playerId,
-            teamId: activePlayer.teamId,
-            roleTag: activePlayer.roleTag,
             contractLength: activePlayer.contractLength,
             salary: activePlayer.salary,
             contractShape: "balanced",
-            purchasePrice: normalizedPurchasePrice,
-            joinedSeasonId: activePlayer.joinedSeasonId,
           },
           grossSalePrice: salePrice,
           purchasePrice: normalizedPurchasePrice,

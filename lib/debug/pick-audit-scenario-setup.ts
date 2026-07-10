@@ -171,7 +171,9 @@ function applyPickAuditGmOverrides(gameState: GameState): {
       gmId: nextProfile.gmId,
       assignedSeasonId: gameState.season.id,
       influencePct,
-      source: "audit_override",
+      // TeamGeneralManagerAssignment.source only accepts the fixed provenance union used by
+      // real game state; a debug-forced GM swap is semantically a board-driven replacement.
+      source: "board_replacement",
       previousGmId: currentGm?.profile.gmId,
     };
 

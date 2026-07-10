@@ -386,7 +386,6 @@ function chooseSellCandidates(
         expectedSellValue: preview?.expectedSellValue ?? null,
         marketValue: preview?.marketValue ?? economy.marketValue,
         salary: preview?.salary ?? economy.salary,
-        purchasePrice: preview?.purchasePrice ?? economy.purchasePrice ?? roster.purchasePrice ?? null,
         teamCash: teamState.cash ?? 0,
         teamSalaryTotal: salaryTotal,
         cashPressureScore,

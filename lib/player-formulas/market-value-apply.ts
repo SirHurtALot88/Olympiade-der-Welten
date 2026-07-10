@@ -58,7 +58,6 @@ export function applyMarketValueMapToGameState(
     return {
       ...entry,
       currentValue: marketValue,
-      marketValue,
     };
   });
 
@@ -80,14 +79,13 @@ export function syncRosterMarketValuesWithPlayerEconomy(gameState: GameState): G
       return entry;
     }
     const normalized = Number(marketValue.toFixed(2));
-    if (entry.currentValue === normalized && entry.marketValue === normalized) {
+    if (entry.currentValue === normalized) {
       return entry;
     }
     changed = true;
     return {
       ...entry,
       currentValue: normalized,
-      marketValue: normalized,
     };
   });
   if (!changed) {
