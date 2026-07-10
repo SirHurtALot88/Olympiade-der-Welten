@@ -3675,10 +3675,10 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   sourceRow?.formCardStatus === "ready" && sourceRow.formCardModifier != null
                     ? formatSignedDelta(sourceRow.formCardModifier)
                     : "—";
-                const fatigueLabel =
-                  sourceRow?.fatigueAdjustedScore != null && sourceRow.score != null
-                    ? formatSignedDelta(Number((sourceRow.fatigueAdjustedScore - sourceRow.score).toFixed(1)))
-                    : "—";
+                // Team-level fatigue delta was never wired onto the scoreboard row type
+                // (fatigueAdjustedScore/score exist only on player-level entries), so this
+                // chip has always rendered "—". Kept as-is; wiring it is a separate feature.
+                const fatigueLabel = "—";
                 const mutatorLabel =
                   sourceRow?.totalMutatorScore != null ? formatSignedDelta(sourceRow.totalMutatorScore) : "—";
                 const leadFactor = [

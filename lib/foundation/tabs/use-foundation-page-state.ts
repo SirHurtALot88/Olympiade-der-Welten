@@ -317,7 +317,7 @@ import {
   withNormalizedLocalTeamSettings,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 
-import type { FoundationActionFeedback, FoundationPageClientProps } from "@/lib/foundation/tabs/foundation-page-types";
+import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
 
 export function useFoundationPageState({
   initialReadSource,

@@ -61,7 +61,7 @@ export async function planUnifiedTeamPicks(input: UnifiedTeamPickPlanInput): Pro
     teamId: team.teamId,
     plannedPicks: team.plannedPicks ?? [],
     warnings: team.warnings ?? [],
-    blockingReasons: team.blockingReasons ?? [],
+    blockingReasons: team.planner.blockingReasons ?? [],
     compareStatus: team.compareStatus ?? null,
   };
 }
