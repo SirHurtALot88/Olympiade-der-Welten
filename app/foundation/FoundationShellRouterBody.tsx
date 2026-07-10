@@ -152,6 +152,41 @@ import type {
   TeamControlFilter,
   TeamStrategyProfile,
 } from "@/app/foundation/foundation-page-client-exports";
+import type {
+  AdminSeasonSimulationRunSummary,
+  FoundationCommandItem,
+  FoundationFlowCoachAction,
+  FoundationFlowLoopStage,
+} from "@/lib/foundation/tabs/foundation-page-types";
+import type { FoundationWarningInboxItem } from "@/lib/foundation/tabs/use-foundation-cross-tab-game-flow";
+import type { useFoundationCrossTabSeasonBriefing } from "@/lib/foundation/tabs/use-foundation-cross-tab-season-briefing";
+import type {
+  FoundationDisciplineLeaderEntry,
+  FoundationDisciplineRankRow,
+} from "@/lib/foundation/tabs/use-foundation-cross-tab-discipline-ranks";
+import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
+import type { SeasonOverviewOption } from "@/lib/foundation/tabs/use-season-v2-panel-derivations";
+import type { buildContextStatusChips } from "@/lib/foundation/tabs/foundation-format-render-helpers";
+import type { TeamOwner } from "@/lib/foundation/team-control-settings";
+import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
+import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
+import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
+import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+
+// Derived render-only types for callback params below. These mirror the real
+// producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
+// props destructured into this component are typed as `Record<string, any>`
+// by design (see foundation-shell-router-body-props.ts, Phase 5.8 boundary).
+type SeasonBriefingScope = ReturnType<typeof useFoundationCrossTabSeasonBriefing>;
+type SeasonBriefingData = SeasonBriefingScope["seasonBriefingData"];
+type SeasonBriefingMatchdayEntry = SeasonBriefingData["firstMatchdays"][number];
+type SeasonBriefingDisciplineEntry = SeasonBriefingMatchdayEntry["disciplines"][number];
+type SeasonBriefingBigDisciplineSlot = SeasonBriefingData["bigDisciplines"][number];
+type SeasonBriefingFactorEntry = SeasonBriefingData["futureFactors"][number];
+type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
+// Matches the inline `areaRows` literal built for marketSellPlayerContext in
+// use-foundation-shell-router-body-scope.tsx (not a separately exported type).
+type MarketSellAreaRow = { key: string; value: number | null; tone: string };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
   const {
@@ -941,12 +976,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         </div>
         <div className="foundation-flow-coach-right">
           <div className="foundation-flow-coach-terms" aria-label="Erklaerte Begriffe">
-            {activeFlowCoach.terms.map((term) => (
+            {activeFlowCoach.terms.map((term: string) => (
               <GameTerm key={`flow-term-${activeView}-${term}`} term={term} />
             ))}
           </div>
           <div className="foundation-flow-coach-actions" aria-label="Direkte Flow-Aktionen">
-            {activeFlowCoach.actions.map((action) => (
+            {activeFlowCoach.actions.map((action: FoundationFlowCoachAction) => (
               <button
                 key={`flow-action-${activeView}-${action.targetView}-${action.label}`}
                 className={`foundation-flow-coach-action${action.tone === "primary" ? " is-primary" : ""}`}
@@ -971,7 +1006,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </small>
         </div>
         <div className="foundation-flow-loop" aria-label="Gameplay Loop">
-          {foundationFlowLoopStages.map((stage, index) => (
+          {foundationFlowLoopStages.map((stage: FoundationFlowLoopStage, index: number) => (
             <button
               key={`foundation-flow-loop-${stage.id}`}
               className={`foundation-flow-loop-step${index === activeFlowLoopIndex ? " is-active" : ""}${index < activeFlowLoopIndex ? " is-done" : ""}`}
@@ -997,12 +1032,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </div>
           <div className="foundation-flow-coach-right">
             <div className="foundation-flow-coach-terms" aria-label="Erklärte Begriffe">
-              {activeFlowCoach.terms.map((term) => (
+              {activeFlowCoach.terms.map((term: string) => (
                 <GameTerm key={`compact-flow-term-${activeView}-${term}`} term={term} />
               ))}
             </div>
             <div className="foundation-flow-coach-actions" aria-label="Direkte Flow-Aktionen">
-              {activeFlowCoach.actions.map((action) => (
+              {activeFlowCoach.actions.map((action: FoundationFlowCoachAction) => (
                 <button
                   key={`compact-flow-action-${activeView}-${action.targetView}-${action.label}`}
                   className={`foundation-flow-coach-action${action.tone === "primary" ? " is-primary" : ""}`}
@@ -1024,7 +1059,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </small>
           </div>
           <div className="foundation-flow-loop foundation-flow-loop-compact" aria-label="Gameplay Loop">
-            {foundationFlowLoopStages.map((stage, index) => (
+            {foundationFlowLoopStages.map((stage: FoundationFlowLoopStage, index: number) => (
               <button
                 key={`compact-foundation-flow-loop-${stage.id}`}
                 className={`foundation-flow-loop-step${index === activeFlowLoopIndex ? " is-active" : ""}${index < activeFlowLoopIndex ? " is-done" : ""}`}
@@ -1070,7 +1105,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               />
             </div>
             <div className="foundation-command-list">
-              {visibleFoundationCommandItems.map((command) => (
+              {visibleFoundationCommandItems.map((command: FoundationCommandItem) => (
                 <button
                   key={command.id}
                   className={`foundation-command-item${command.tone ? ` is-${command.tone}` : ""}`}
@@ -1157,7 +1192,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 </div>
                 <div className="season-briefing-matchday-grid">
                   {seasonBriefingScheduleReady ? (
-                    seasonBriefingData.firstMatchdays.map((entry) => (
+                    seasonBriefingData.firstMatchdays.map((entry: SeasonBriefingMatchdayEntry) => (
                       <article
                         key={`season-briefing-md-${entry.matchdayId}`}
                         className={joinClassNames(
@@ -1168,7 +1203,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       >
                         <span className="eyebrow">{entry.label}</span>
                         <div className="season-briefing-discipline-row">
-                          {entry.disciplines.map((discipline) => (
+                          {entry.disciplines.map((discipline: SeasonBriefingDisciplineEntry) => (
                             <span
                               key={`season-briefing-md-${entry.matchdayId}-${discipline.name}`}
                               className={`season-briefing-discipline-chip is-${discipline.color}`}
@@ -1203,7 +1238,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   <p className="muted">Nach Slotgröße sortiert; die Spieltags-Reihenfolge steht oben.</p>
                   <div className="season-briefing-chip-list">
                     {seasonBriefingScheduleReady ? (
-                      seasonBriefingData.bigDisciplines.map((slot) => (
+                      seasonBriefingData.bigDisciplines.map((slot: SeasonBriefingBigDisciplineSlot) => (
                         <span key={`season-briefing-big-${slot.matchdayId}-${slot.disciplineId}`} className={`season-briefing-discipline-chip is-${slot.color}`}>
                           <b>{slot.displayName}</b>
                           <small>{slot.matchdayLabel} · {slot.playerCount ?? "—"} Slots</small>
@@ -1220,10 +1255,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <p className="muted">Farb-Kollisionen werden nach dem Laden des Diszi-Plans angezeigt.</p>
                   ) : seasonBriefingData.sameColorMatchdays.length > 0 ? (
                     <div className="season-briefing-chip-list">
-                      {seasonBriefingData.sameColorMatchdays.map((entry) => (
+                      {seasonBriefingData.sameColorMatchdays.map((entry: SeasonBriefingMatchdayEntry) => (
                         <span key={`season-briefing-double-${entry.matchdayId}`} className="season-briefing-warning-chip">
                           <b>{entry.label}</b>
-                          <small>{entry.disciplines.map((discipline) => discipline.name).join(" / ")}</small>
+                          <small>{entry.disciplines.map((discipline: SeasonBriefingDisciplineEntry) => discipline.name).join(" / ")}</small>
                         </span>
                       ))}
                     </div>
@@ -1231,7 +1266,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <p className="muted">In dieser Season keine gleiche Farbe doppelt am selben Spieltag. Breiter Kader wird etwas entspannter.</p>
                   )}
                   <div className="season-briefing-factor-row">
-                    {seasonBriefingData.futureFactors.map((entry) => (
+                    {seasonBriefingData.futureFactors.map((entry: SeasonBriefingFactorEntry) => (
                       <span key={`season-briefing-factor-${entry.label}`} className="pill">
                         {entry.label}: {formatLocalePoints(entry.factor, 2)}x
                       </span>
@@ -1354,7 +1389,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onChange={(event) => handleManagerTeamSelect(event.target.value)}
               >
                 <option value="__all_teams__">Alle 32 Teams anzeigen</option>
-                {managerTeamOptions.map((team) => (
+                {managerTeamOptions.map((team: Team) => (
                   <option key={team.teamId} value={team.teamId}>
                     {team.shortCode} · {team.name}
                   </option>
@@ -1396,7 +1431,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     }
                   }}
                 >
-                  {teamOwners.map((owner) => (
+                  {teamOwners.map((owner: TeamOwner) => (
                     <option key={owner.ownerId} value={owner.ownerId}>
                       {owner.label} · {owner.controlledTeamIds.length}
                     </option>
@@ -1417,8 +1452,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   <option value="passive">Beobachtete Teams</option>
                   <option value="all">Alle Teams</option>
                   {teamOwners
-                    .filter((owner) => owner.ownerId !== "ai")
-                    .map((owner) => (
+                    .filter((owner: TeamOwner) => owner.ownerId !== "ai")
+                    .map((owner: TeamOwner) => (
                       <option key={`owner-filter-${owner.ownerId}`} value={`owner:${owner.ownerId}`}>
                         Manager: {owner.label}
                       </option>
@@ -1429,7 +1464,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             ) : null}
             {!showCompactHeader ? (
             <div className="foundation-manager-team-switch" data-testid="human-team-quick-switch">
-              {ownerQuickSwitchTeams.slice(0, 8).map((team) => (
+              {ownerQuickSwitchTeams.slice(0, 8).map((team: Team) => (
                 <button
                   key={`quick-team-${team.teamId}`}
                   className={`table-link-button${team.teamId === selectedTeam.teamId ? " is-active" : ""}`}
@@ -1449,7 +1484,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {readMeta.readOnly ? (
             <span className="pill foundation-source-pill is-readonly">{activeViewSourceBadge}</span>
           ) : null}
-          {activeContextStatusChips.map((chip) => (
+          {activeContextStatusChips.map((chip: ContextStatusChip) => (
             <span
               key={chip.label}
               className={`transfer-status-pill${chip.warning ? " is-warning" : chip.ready ? " is-ready" : ""}`}
@@ -1499,13 +1534,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         </section>
       ) : null}
 
-      {activeView === "homeV2" && foundationWarningInboxItems.some((item) => item.severity === "error" || item.severity === "blocked") ? (
+      {activeView === "homeV2" && foundationWarningInboxItems.some((item: FoundationWarningInboxItem) => item.severity === "blocked") ? (
         <section className="foundation-warning-inbox" aria-label="Offene Hinweise">
           <div className="foundation-warning-inbox-summary">
             <span className="eyebrow">Hinweise</span>
             <strong>
               {
-                foundationWarningInboxItems.filter((item) => item.severity === "error" || item.severity === "blocked")
+                foundationWarningInboxItems.filter((item: FoundationWarningInboxItem) => item.severity === "blocked")
                   .length
               }{" "}
               kritisch
@@ -1513,8 +1548,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </div>
           <div className="foundation-warning-inbox-list">
             {foundationWarningInboxItems
-              .filter((item) => item.severity === "error" || item.severity === "blocked")
-              .map((item) => (
+              .filter((item: FoundationWarningInboxItem) => item.severity === "blocked")
+              .map((item: FoundationWarningInboxItem) => (
               <button
                 key={item.id}
                 className={`foundation-warning-inbox-item is-${item.severity}`}
@@ -1593,7 +1628,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <section>
                       <span className="eyebrow">Faktoren</span>
                       <ul>
-                        {selectedEncyclopediaEntry.factors.map((factor) => (
+                        {selectedEncyclopediaEntry.factors.map((factor: string) => (
                           <li key={`${selectedEncyclopediaEntry.id}-${factor}`}>{factor}</li>
                         ))}
                       </ul>
@@ -1608,7 +1643,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </div>
 
                   <div className="foundation-encyclopedia-aliases">
-                    {selectedEncyclopediaEntry.aliases.slice(0, 8).map((alias) => (
+                    {selectedEncyclopediaEntry.aliases.slice(0, 8).map((alias: string) => (
                       <span key={`${selectedEncyclopediaEntry.id}-${alias}`}>{alias}</span>
                     ))}
                   </div>
@@ -1668,7 +1703,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
               onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
               onCompleteInboxItem: (itemId) => {
-                const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
                 if (sourceItem) {
                   updateInboxItemStatus(sourceItem, "done");
                 }
@@ -1891,8 +1926,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         wishlistTickGain: selectedTeamScoutPipeline.wishlistTickGain,
                         passiveTickGain: selectedTeamScoutPipeline.passiveTickGain,
                         draftSuspended: isTeamSetupDraftWishlistPhase(gameState, selectedTeam.teamId),
-                        records: selectedTeamScoutPipeline.records.map((record) => {
-                          const player = gameState.players.find((entry) => entry.id === record.playerId);
+                        records: selectedTeamScoutPipeline.records.map((record: PlayerScoutIntelRecord) => {
+                          const player = gameState.players.find((entry: Player) => entry.id === record.playerId);
                           return {
                             playerId: record.playerId,
                             playerName: player?.name ?? record.playerId,
@@ -1941,20 +1976,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   if (choiceId !== "open-target") {
                     return;
                   }
-                  const selected = inboxV2Items.find((item) => item.id === (inboxV2SelectedItemId ?? inboxV2Items[0]?.id));
-                  const sourceItem = visibleInboxItems.find((item) => item.itemId === selected?.id);
+                  const selected = inboxV2Items.find((item: InboxV2Item) => item.id === (inboxV2SelectedItemId ?? inboxV2Items[0]?.id));
+                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === selected?.id);
                   if (sourceItem) {
                     navigateToInboxItem(sourceItem);
                   }
                 }}
                 onMarkDone={(itemId) => {
-                  const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
                   if (sourceItem) {
                     updateInboxItemStatus(sourceItem, "done");
                   }
                 }}
                 onDismiss={(itemId) => {
-                  const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                  const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
                   if (sourceItem) {
                     updateInboxItemStatus(sourceItem, "dismissed");
                   }
@@ -2151,7 +2186,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <div>
                   <strong>Issues</strong>
                   <ul className="warning-list compact-list cockpit-detail-list">
-                    {adminSimulationRun?.issues.slice(-8).map((issue) => (
+                    {adminSimulationRun?.issues.slice(-8).map((issue: AdminSeasonSimulationRunSummary["issues"][number]) => (
                       <li key={`${issue.at}-${issue.code}-${issue.message}`} className={issue.level === "red" ? "text-negative" : issue.level === "yellow" ? "text-warning" : undefined}>
                         [{issue.level.toUpperCase()}] {issue.phase}: {issue.message}
                       </li>
@@ -2162,7 +2197,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <div>
                   <strong>Letzte Logs</strong>
                   <ul className="warning-list compact-list cockpit-detail-list">
-                    {adminSimulationRun?.logs.slice(-20).map((entry) => (
+                    {adminSimulationRun?.logs.slice(-20).map((entry: AdminSeasonSimulationRunSummary["logs"][number]) => (
                       <li key={`${entry.at}-${entry.phase}-${entry.message}`}>
                         {new Date(entry.at).toLocaleTimeString("de-DE")} · {entry.phase} · {entry.message}
                       </li>
@@ -2441,7 +2476,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   onChange={(event) => setPlayerTeamFilter(event.target.value)}
                 >
                   <option value="ALL">Alle</option>
-                  {gameState.teams.map((team) => (
+                  {gameState.teams.map((team: Team) => (
                     <option key={team.teamId} value={team.teamId}>
                       {team.name}
                     </option>
@@ -2456,7 +2491,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   onChange={(event) => setPlayerClassFilter(event.target.value)}
                 >
                   <option value="ALL">Alle</option>
-                  {playerClassOptions.map((className) => (
+                  {playerClassOptions.map((className: string) => (
                     <option key={className} value={className}>
                       {className}
                     </option>
@@ -2492,13 +2527,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <div className="table-shell">
               <table className="team-table players-table">
                 <colgroup>
-                  {visiblePlayersTableColumns.map((column) => (
+                  {visiblePlayersTableColumns.map((column: FoundationTableColumn) => (
                     <col key={column.id} style={{ width: `${getTableColumnWidth("playersTable", column)}px` }} />
                   ))}
                 </colgroup>
                 <thead>
                   <tr>
-                    {visiblePlayersTableColumns.map((column) => (
+                    {visiblePlayersTableColumns.map((column: FoundationTableColumn) => (
                       <th
                         key={column.id}
                         {...getTableHeaderDragProps("playersTable", column, visiblePlayersTableColumns)}
@@ -2517,9 +2552,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPlayersTableRows.slice(0, 160).map((row) => (
+                  {sortedPlayersTableRows.slice(0, 160).map((row: FoundationPlayerScopeRow) => (
                     <tr key={row.player.id} onClick={() => void openPlayerDrawerById(row.player.id, row.roster?.id)}>
-                      {visiblePlayersTableColumns.map((column) => {
+                      {visiblePlayersTableColumns.map((column: FoundationTableColumn) => {
                         if (column.id === "image") {
                           const portrait = getPlayerPortraitModel(row.player);
                           return (
@@ -2576,7 +2611,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 >
                                   {row.player.name}
                                 </button>
-                                <span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span>
+                                <span>{row.transferStatus}</span>
                               </div>
                             </td>
                           );
@@ -2601,7 +2636,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                     src={teamLogo.src}
                                     alt={`${row.team?.name ?? "Team"} Logo`}
                                     loading="lazy"
-                                    decoding="async"
                                     fetchPriority="low"
                                   />
                                 ) : (
@@ -2713,7 +2747,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       value={seasonOverviewSeasonId}
                       onChange={(event) => setSeasonOverviewSeasonId(event.target.value)}
                     >
-                      {(seasonOverviewOptions ?? []).map((option) => (
+                      {(seasonOverviewOptions ?? []).map((option: SeasonOverviewOption) => (
                         <option key={option.seasonId} value={option.seasonId}>
                           {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
                         </option>
@@ -2745,7 +2779,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               />
             </div>
             <section className="ranks-leader-grid" aria-label="Aktuelle Teamstaerke Leader">
-              {rankLeaderCards.map((entry) => (
+              {rankLeaderCards.map((entry: FoundationDisciplineLeaderEntry) => (
                 <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
                   <span>{entry.label}</span>
                   <strong>{entry.row?.team.name ?? "—"}</strong>
@@ -2758,17 +2792,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <div className="table-shell">
               <table className="team-table ranks-table">
                 <colgroup>
-                  {visibleDisciplineRanksColumns.map((column) => (
+                  {visibleDisciplineRanksColumns.map((column: FoundationTableColumn) => (
                     <col key={column.id} style={{ width: `${getTableColumnWidth("disciplineRanksTable", column)}px` }} />
                   ))}
                 </colgroup>
                 <thead>
                   <tr>
-                    {visibleDisciplineRanksColumns.map((column, columnIndex) => {
-                      const discipline = orderedDisciplines.find((entry) => entry.id === column.id);
+                    {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
+                      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
                       const previousDiscipline = [...visibleDisciplineRanksColumns.slice(0, columnIndex)]
                         .reverse()
-                        .map((entry) => orderedDisciplines.find((disciplineEntry) => disciplineEntry.id === entry.id))
+                        .map((entry: FoundationTableColumn) => orderedDisciplines.find((disciplineEntry: Discipline) => disciplineEntry.id === entry.id))
                         .find(Boolean);
                       const startsDisciplineGroup = Boolean(discipline && previousDiscipline?.category !== discipline.category);
                       return (
@@ -2793,7 +2827,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDisciplineRankRows.map((row) => (
+                  {sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => (
                     <tr
                       key={row.team.teamId}
                       className={joinClassNames(
@@ -2802,7 +2836,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       )}
                       onClick={() => openTeamProfileById(row.team.teamId)}
                     >
-                      {visibleDisciplineRanksColumns.map((column, columnIndex) => {
+                      {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
                         if (column.id === "team") {
                           return <td key={column.id} className="ranks-sticky-team">{row.team.name}</td>;
                         }
@@ -2842,10 +2876,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           );
                         }
                         const rank = row.disciplineRanks[column.id] ?? 0;
-                        const discipline = orderedDisciplines.find((entry) => entry.id === column.id);
+                        const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
                         const previousDiscipline = [...visibleDisciplineRanksColumns.slice(0, columnIndex)]
                           .reverse()
-                          .map((entry) => orderedDisciplines.find((disciplineEntry) => disciplineEntry.id === entry.id))
+                          .map((entry: FoundationTableColumn) => orderedDisciplines.find((disciplineEntry: Discipline) => disciplineEntry.id === entry.id))
                           .find(Boolean);
                         const startsDisciplineGroup = Boolean(discipline && previousDiscipline?.category !== discipline.category);
                         return (
@@ -3035,7 +3069,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           <span className="muted">aktive Season</span>
                         </div>
                         <div className="transfer-sell-area-grid">
-                          {(marketSellPlayerContext?.areaRows ?? []).map((area) => (
+                          {(marketSellPlayerContext?.areaRows ?? []).map((area: MarketSellAreaRow) => (
                             <article className={`transfer-sell-area-card is-${area.tone}`} key={area.key}>
                               <span>{area.key}</span>
                               <strong>{formatPpsValue(area.value)}</strong>
@@ -3277,7 +3311,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                               <strong>Gruende fuer Verkauf</strong>
                               {marketSellPreview.coaching.reasonsToSell.length ? (
                                 <ul className="warning-list">
-                                  {marketSellPreview.coaching.reasonsToSell.map((reason) => (
+                                  {marketSellPreview.coaching.reasonsToSell.map((reason: string) => (
                                     <li key={`sell-${reason}`}>{reason}</li>
                                   ))}
                                 </ul>
@@ -3289,7 +3323,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                               <strong>Gruende dagegen</strong>
                               {marketSellPreview.coaching.reasonsToKeep.length ? (
                                 <ul className="warning-list">
-                                  {marketSellPreview.coaching.reasonsToKeep.map((reason) => (
+                                  {marketSellPreview.coaching.reasonsToKeep.map((reason: string) => (
                                     <li key={`keep-${reason}`}>{reason}</li>
                                   ))}
                                 </ul>
@@ -3323,7 +3357,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           </div>
                           {marketSellPreview.blockingReasons.length ? (
                             <ul className="warning-list">
-                              {marketSellPreview.blockingReasons.map((reason) => (
+                              {marketSellPreview.blockingReasons.map((reason: string) => (
                                 <li key={reason}>{reason}</li>
                               ))}
                             </ul>
@@ -3338,7 +3372,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           </div>
                           {marketSellPreview.warnings.length ? (
                             <ul className="warning-list">
-                              {marketSellPreview.warnings.map((warning) => (
+                              {marketSellPreview.warnings.map((warning: string) => (
                                 <li key={warning}>{warning}</li>
                               ))}
                             </ul>
@@ -3425,7 +3459,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </p>
             </div>
             <ul className="mapping-highlight-list">
-              {gameState.mappingReport.warnings.slice(0, 18).map((warning, index) => (
+              {gameState.mappingReport.warnings.slice(0, 18).map((warning: MappingWarning, index: number) => (
                 <MappingHighlight key={`${warning.type}-${index}`} warning={warning} />
               ))}
             </ul>

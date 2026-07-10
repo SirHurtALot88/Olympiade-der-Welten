@@ -121,6 +121,7 @@ const EMPTY_SEASON_BRIEFING_DATA = {
     matchdayIndex: number;
     slotIndex: number;
     color: string;
+    disciplineId?: string | null;
     displayName?: string | null;
     playerCount?: number | null;
     category?: string | null;
