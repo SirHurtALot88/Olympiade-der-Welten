@@ -1,5 +1,7 @@
 "use client";
 
+import FacilitiesOverviewV2NewLook from "@/app/foundation/facilities-overview-v2/FacilitiesOverviewV2NewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { FacilitiesOverviewV2ClientProps } from "@/app/foundation/facilities-overview-v2/facilities-overview-v2-types";
 
 function renderStars(level: number, maxLevel: number) {
@@ -15,14 +17,14 @@ function formatMoney(value: number | null) {
   return value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function FacilitiesOverviewV2Client({
-  teamName,
-  teamCode,
-  balance,
-  facilityBudget,
-  facilities,
-  boardMessage,
-}: FacilitiesOverviewV2ClientProps) {
+export default function FacilitiesOverviewV2Client(props: FacilitiesOverviewV2ClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neue Gebäude-Übersicht mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <FacilitiesOverviewV2NewLook {...props} />;
+
+  const { teamName, teamCode, balance, facilityBudget, facilities, boardMessage } = props;
+
   return (
     <div className="facilities-overview-v2-shell" data-testid="foundation-facilities-overview-v2" id="foundation-facilities-overview-v2">
       <header className="facilities-overview-v2-header">

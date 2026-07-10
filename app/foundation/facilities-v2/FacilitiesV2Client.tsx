@@ -7,6 +7,8 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 
 import FacilityGridCard from "@/app/foundation/facilities-v2/FacilityGridCard";
+import FacilitiesV2NewLook from "@/app/foundation/facilities-v2/FacilitiesV2NewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { FacilitiesV2ClientProps, FacilityDialogState } from "@/app/foundation/facilities-v2/facilities-v2-types";
 import {
   FacilityDecisionModal,
@@ -14,37 +16,41 @@ import {
   formatLocaleNumber,
 } from "@/app/foundation/facilities-v2/facility-ui-shared";
 
-export default function FacilitiesV2Client({
-  source,
-  managementLocked = false,
-  managementLockedReason = null,
-  selectedTeam,
-  selectedTeamControlMode,
-  seasonLabel,
-  onOpenTraining,
-  onOpenTeams,
-  facilityPanelTarget = null,
-  onOpenFacilityPanel,
-  onCloseFacilityPanel,
-  summary,
-  trainingFacilityEffectPreview = null,
-  facilityRows,
-  specialistWingVariant,
-  specialistWingOptions,
-  onSetSpecialistWingVariant,
-  facilityUpgradeBusy,
-  facilityUpgradePreview,
-  facilityUpgradeError,
-  facilityUpgradeSuccess,
-  facilityMaintenanceBusy,
-  facilityMaintenancePreview,
-  facilityMaintenanceError,
-  facilityMaintenanceSuccess,
-  onRunFacilityUpgradePreview,
-  onConfirmFacilityUpgrade,
-  onRunFacilityMaintenancePreview,
-  onConfirmFacilityMaintenance,
-}: FacilitiesV2ClientProps) {
+export default function FacilitiesV2Client(props: FacilitiesV2ClientProps) {
+  const {
+    source,
+    managementLocked = false,
+    managementLockedReason = null,
+    selectedTeam,
+    selectedTeamControlMode,
+    seasonLabel,
+    onOpenTraining,
+    onOpenTeams,
+    facilityPanelTarget = null,
+    onOpenFacilityPanel,
+    onCloseFacilityPanel,
+    summary,
+    trainingFacilityEffectPreview = null,
+    facilityRows,
+    specialistWingVariant,
+    specialistWingOptions,
+    onSetSpecialistWingVariant,
+    facilityUpgradeBusy,
+    facilityUpgradePreview,
+    facilityUpgradeError,
+    facilityUpgradeSuccess,
+    facilityMaintenanceBusy,
+    facilityMaintenancePreview,
+    facilityMaintenanceError,
+    facilityMaintenanceSuccess,
+    onRunFacilityUpgradePreview,
+    onConfirmFacilityUpgrade,
+    onRunFacilityMaintenancePreview,
+    onConfirmFacilityMaintenance,
+  } = props;
+  // "Neuer Look" Flag-Gate (additiv): Hook läuft immer (stabile Hook-Reihenfolge),
+  // der Early-Return sitzt nach dem letzten Hook (useEffect unten).
+  const [newLook] = useNewLook();
   const readOnly = source === "prisma" || managementLocked;
   const [selectedFacilityId, setSelectedFacilityId] = useState<FacilityId | null>(() => facilityRows[0]?.id ?? null);
   const [facilityDialog, setFacilityDialog] = useState<FacilityDialogState>(null);
@@ -116,6 +122,11 @@ export default function FacilitiesV2Client({
   }
 
   useEffect(() => {
+    // "Neuer Look" übernimmt Panel-Target + Preview-Aufrufe selbst — sonst
+    // würden beide Effekte doppelt previewen. Flag aus => Verhalten unverändert.
+    if (newLook) {
+      return;
+    }
     if (!facilityPanelTarget) {
       setFacilityDialog(null);
       return;
@@ -132,7 +143,9 @@ export default function FacilitiesV2Client({
     }
     onRunFacilityUpgradePreview(facilityPanelTarget.facilityId, facilityPanelTarget.action);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preview handlers are stable enough for panel transitions
-  }, [facilityPanelTarget?.facilityId, facilityPanelTarget?.action]);
+  }, [facilityPanelTarget?.facilityId, facilityPanelTarget?.action, newLook]);
+
+  if (newLook) return <FacilitiesV2NewLook {...props} />;
 
   function closeFacilityDialog() {
     if (onCloseFacilityPanel) {

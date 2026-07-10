@@ -11,6 +11,8 @@ import type { Team } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 import TrainingModeComparePanel from "@/components/foundation/modern-game/TrainingModeComparePanel";
+import TrainingCompactNewLook from "@/app/foundation/training-compact/TrainingCompactNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type {
   TrainingClassOption,
   TrainingDevelopmentFilter,
@@ -25,7 +27,7 @@ import {
   TrainingPlayerLane,
 } from "@/app/foundation/training-facilities-v2/training-view-shared";
 
-type TrainingCompactClientProps = {
+export type TrainingCompactClientProps = {
   selectedTeam: Team;
   selectedTeamControlMode?: string | null;
   seasonLabel: string;
@@ -65,26 +67,30 @@ function formatPps(value: number | null | undefined) {
 const TRAINING_FORECAST_EXPLANATION =
   "Trainingsplan zeigt die laufende Saison-Prognose aus Training, Performance und Regression. Entwicklungsziel beschreibt die Saisonende-Sicht auf Klasse, Potential und erwartete Richtung.";
 
-export default function TrainingCompactClient({
-  selectedTeam,
-  selectedTeamControlMode,
-  seasonLabel,
-  managementLocked = false,
-  managementLockedReason = null,
-  summary,
-  developmentFilter,
-  developmentSummary,
-  onSetDevelopmentFilter,
-  trainingModeOptions,
-  trainingClassOptions,
-  playerRows,
-  allPlayerCount,
-  onSetTrainingMode,
-  onSetTrainingClass,
-  onOpenPlayerDetails,
-  onOpenFacilities,
-  onOpenTeams,
-}: TrainingCompactClientProps) {
+export default function TrainingCompactClient(props: TrainingCompactClientProps) {
+  const {
+    selectedTeam,
+    selectedTeamControlMode,
+    seasonLabel,
+    managementLocked = false,
+    managementLockedReason = null,
+    summary,
+    developmentFilter,
+    developmentSummary,
+    onSetDevelopmentFilter,
+    trainingModeOptions,
+    trainingClassOptions,
+    playerRows,
+    allPlayerCount,
+    onSetTrainingMode,
+    onSetTrainingClass,
+    onOpenPlayerDetails,
+    onOpenFacilities,
+    onOpenTeams,
+  } = props;
+  // "Neuer Look" Flag-Gate (additiv): Hook läuft immer (stabile Hook-Reihenfolge),
+  // der Early-Return sitzt nach dem letzten Hook. Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
   const teamLogo = getTeamLogoModel(selectedTeam);
   const trainingModeReadOnly = managementLocked;
   const topGrowth = [...playerRows].sort((left, right) => right.organicForecast.netSetpoints - left.organicForecast.netSetpoints)[0] ?? null;
@@ -96,6 +102,8 @@ export default function TrainingCompactClient({
     )[0] ?? null;
   const [compareActivePlayerId, setCompareActivePlayerId] = useState<string | null>(playerRows[0]?.player.id ?? null);
   const compareActiveMode = playerRows.find((row) => row.player.id === compareActivePlayerId)?.mode ?? null;
+
+  if (newLook) return <TrainingCompactNewLook {...props} />;
 
   return (
     <section
