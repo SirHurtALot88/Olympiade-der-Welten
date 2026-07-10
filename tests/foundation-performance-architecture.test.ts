@@ -728,4 +728,13 @@ describe("foundation performance architecture helpers", () => {
     expect(sliceText).toMatch(/useMemo\(\s*\(\)\s*=>\s*\(payload \? hydrateSeasonRatingsSliceMap\(payload\.ratingsByPlayerId\) : EMPTY_RATINGS_MAP\),\s*\[payload\],\s*\)/);
     expect(sliceText).not.toMatch(/const ratingsById = payload\s*\n?\s*\?\s*hydrateSeasonRatingsSliceMap/);
   });
+
+  it("builds team profile content signature from gameState.rosters", async () => {
+    const fileText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts"),
+      "utf8",
+    );
+    expect(fileText).not.toContain("gameState.activeRoster");
+    expect(fileText).toContain("(input.gameState.rosters ?? [])");
+  });
 });

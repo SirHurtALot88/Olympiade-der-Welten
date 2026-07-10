@@ -218,10 +218,10 @@ function auditDraftPackage(save: PersistedSaveGame, context: LongRunPhaseAuditCo
 
   checks.push(
     underMin.length > 0
-      ? check("draft_roster_targets", "RED", `${underMin.length} Teams unter Min`, underMin)
+      ? check("draft_roster_targets", "RED", `${underMin.length} Teams unter Min (post-buy)`, underMin)
       : underOpt.length > 0
-        ? check("draft_roster_targets", "WARN", `${underOpt.length} Teams unter Opt`, underOpt)
-        : check("draft_roster_targets", "PASS", "32/32 ≥ Min und Opt"),
+        ? check("draft_roster_targets", "WARN", `${underOpt.length} Teams unter Opt (post-buy)`, underOpt)
+        : check("draft_roster_targets", "PASS", "32/32 ≥ Min und Opt (post-buy)"),
   );
 
   checks.push(
@@ -244,7 +244,13 @@ function auditDraftPackage(save: PersistedSaveGame, context: LongRunPhaseAuditCo
 
   checks.push(
     spendRed.length > 0
-      ? check("draft_spend_plausible", "RED", `Unterinvestiert: ${spendRed.slice(0, 6).join(" | ")}`)
+      ? underMin.length > 0
+        ? check("draft_spend_plausible", "RED", `Unterinvestiert: ${spendRed.slice(0, 6).join(" | ")}`)
+        : check(
+            "draft_spend_plausible",
+            "WARN",
+            `Reserve hoch (Min ok): ${[...spendRed, ...spendWarn].slice(0, 6).join(" | ")}`,
+          )
       : spendWarn.length > 0
         ? check("draft_spend_plausible", "WARN", `Reserve hoch: ${spendWarn.slice(0, 6).join(" | ")}`)
         : check("draft_spend_plausible", "PASS", "Spend-Profil plausibel"),
@@ -296,8 +302,8 @@ function auditPreseasonPackage(save: PersistedSaveGame, context: LongRunPhaseAud
   const belowMin = getTeamsBelowRosterMin(gameState).map((row) => row.team.shortCode);
   checks.push(
     belowMin.length > 0
-      ? check("roster_min_before_md1", "RED", `${belowMin.length} Teams unter Min vor MD1`, belowMin)
-      : check("roster_min_before_md1", "PASS", "Alle Teams ≥ Min"),
+      ? check("roster_post_buy", "RED", `${belowMin.length} Teams unter Min nach Käufen`, belowMin)
+      : check("roster_post_buy", "PASS", "Alle Teams ≥ Min nach Käufen"),
   );
 
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
@@ -387,18 +393,6 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
     phaseOk
       ? check("season_flow_complete", "PASS", `${seasonId} abgeschlossen MD${md}`)
       : check("season_flow_complete", "RED", `phase=${gameState.gamePhase} MD=${md} standings=${standingsCount}`),
-  );
-
-  const belowMin = getTeamsBelowRosterMin(gameState).map((row) => row.team.shortCode);
-  checks.push(
-    belowMin.length > 0
-      ? check(
-          "roster_after_exits",
-          "WARN",
-          `${belowMin.length} Teams unter Min nach Season-End-Verkauf (Rebuild in Preseason; kein Sell-Floor)`,
-          belowMin,
-        )
-      : check("roster_after_exits", "PASS", "Alle Teams ≥ Min"),
   );
 
   const finance = buildTransferFinanceAudit(gameState);

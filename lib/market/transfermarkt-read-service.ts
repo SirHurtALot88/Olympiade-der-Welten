@@ -186,6 +186,8 @@ export type TransfermarktReadParams = {
   minSalary?: number | null;
   maxSalary?: number | null;
   mode?: "full" | "ai_preview" | null;
+  /** When true (ai_preview), return every filtered free agent — no slice/limit cap. */
+  fullPool?: boolean | null;
   compactList?: boolean | null;
   scoutingLevel?: number | null;
   localRunContext?: unknown;

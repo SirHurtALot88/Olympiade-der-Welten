@@ -43,9 +43,11 @@ export function planSlotsFromBudget(input: {
   slotsToFill: number;
   brackets: LeagueMarketBrackets;
   superstarCap?: number;
+  /** When true, `spendable` already has MW buffer deducted upstream. */
+  spendableIsNet?: boolean;
 }): PlannerExplicitCounts {
   const slotsToFill = Math.max(input.slotsToFill, 0);
-  const cashBufferMw = resolveCashBufferMw(input.spendable);
+  const cashBufferMw = input.spendableIsNet ? 0 : resolveCashBufferMw(input.spendable);
   const budget = Math.max(0, input.spendable - cashBufferMw);
   const premiumCap = Math.max(0, input.counts.premiumCap ?? 0);
   const superstarCap = Math.max(0, input.superstarCap ?? 1);

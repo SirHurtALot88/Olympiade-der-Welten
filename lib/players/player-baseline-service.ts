@@ -464,12 +464,16 @@ export function ensurePlayerBaselines(
   options?: {
     sourcePlayers?: Player[];
     createdAt?: string;
+    /** When set, only recompute baselines for these players; others keep existing records. */
+    playerIds?: Iterable<string>;
   },
 ) {
   const existingByPlayerId = new Map((gameState.playerBaselines ?? []).map((baseline) => [baseline.playerId, baseline]));
   const sourceByPlayerId = new Map((options?.sourcePlayers ?? []).map((player) => [player.id, player]));
+  const scope = options?.playerIds ? new Set(options.playerIds) : null;
+  const playersToProcess = scope ? gameState.players.filter((player) => scope.has(player.id)) : gameState.players;
   const warnings: string[] = [];
-  const baselines = gameState.players.map((player) => {
+  const resolveBaseline = (player: Player) => {
     const existing = existingByPlayerId.get(player.id);
     const sourcePlayer = sourceByPlayerId.get(player.id);
     if (existing) {
@@ -547,7 +551,22 @@ export function ensurePlayerBaselines(
       createdAt: options?.createdAt,
       reconstructionWarning: "baseline_reconstructed_from_mutated_state",
     });
-  });
+  };
+
+  const baselines: PlayerBaselineRecord[] = [];
+  const processedIds = new Set<string>();
+  for (const player of playersToProcess) {
+    processedIds.add(player.id);
+    baselines.push(resolveBaseline(player));
+  }
+  if (scope) {
+    for (const [playerId, baseline] of existingByPlayerId) {
+      if (!processedIds.has(playerId)) {
+        baselines.push(baseline);
+      }
+    }
+    baselines.sort((left, right) => left.playerId.localeCompare(right.playerId));
+  }
 
   return {
     gameState: {

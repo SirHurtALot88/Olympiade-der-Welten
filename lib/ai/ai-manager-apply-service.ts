@@ -863,11 +863,10 @@ export function resolveMarketSpendableCashForPlanner(input: {
     return round(Math.max(0, teamCash - minPad), 2);
   }
 
-  // S2+: single cash pool — soft 0.25–0.75× salary buffer (+ league anchor), ignore GM buckets.
-  // While below Opt (but at/above Min), only keep a tiny liquidity pad so preseason plans can execute.
+  // S2+: single cash pool — soft liquidity pad only while rebuilding toward Opt/Min.
   if (usesSingleCashPlanningPolicy(input.gameState)) {
-    if (belowOpt || input.forceRosterFill) {
-      const minPad = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, Math.min(12, teamCash * 0.06)), 2);
+    const minPad = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, Math.min(8, teamCash * 0.04)), 2);
+    if (belowOpt || input.forceRosterFill || input.rosterBelowMin) {
       return round(Math.max(0, teamCash - minPad), 2);
     }
     return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, teamCash);

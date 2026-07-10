@@ -8,6 +8,7 @@ import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, Foundatio
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
+import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   BudgetedMediaImage,
@@ -390,6 +391,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   preSeasonWorkflowFeed,
   prizeFinanceTab,
   rankLeaderCards,
+  ranksArchiveMissing,
+  isViewingArchivedRanksSeason,
   readMeta,
   readOnlyBannerMessage,
   readSourceLabel,
@@ -2694,13 +2697,38 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "ranks" ? (
           <>
           <section className="panel" id="discipline-ranks">
-            <div className="panel-header">
-              <TooltipHeading
-                as="h2"
-                tooltip="Retool-Logik: Pro Team zaehlen je Disziplin die Top 6 aktiven Spieler, ihre Werte werden summiert und ligaweit gerankt. TOT / POW / SPE / MEN / SOC zeigen die aggregierten Teamranks derselben Quelle."
-              >
-                Ranks - Teamstaerke pro Diszi
-              </TooltipHeading>
+            <div className="panel-header ranks-panel-header">
+              <div className="ranks-panel-heading">
+                <TooltipHeading
+                  as="h2"
+                  tooltip="Retool-Logik: Pro Team zaehlen je Disziplin die Top 6 aktiven Spieler, ihre Werte werden summiert und ligaweit gerankt. TOT / POW / SPE / MEN / SOC zeigen die aggregierten Teamranks derselben Quelle."
+                >
+                  Ranks - Teamstaerke pro Diszi
+                </TooltipHeading>
+                <div className="ranks-season-toolbar">
+                  <label className="filter-field ranks-season-select">
+                    <span>Saison</span>
+                    <select
+                      className="input"
+                      value={seasonOverviewSeasonId}
+                      onChange={(event) => setSeasonOverviewSeasonId(event.target.value)}
+                    >
+                      {(seasonOverviewOptions ?? []).map((option) => (
+                        <option key={option.seasonId} value={option.seasonId}>
+                          {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}>
+                    {isViewingArchivedRanksSeason ? "Archiv" : "Live"}
+                  </span>
+                  {ranksArchiveMissing ? (
+                    <span className="pill is-warning">Rank-Archiv fehlt · Live-Fallback</span>
+                  ) : null}
+                  <span className="muted ranks-season-source">{seasonOverviewSourceLabel}</span>
+                </div>
+              </div>
               <ColumnVisibilityManager
                 title="Spalten"
                 columns={disciplineRanksColumns}
@@ -2778,11 +2806,41 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         if (column.id === "team") {
                           return <td key={column.id} className="ranks-sticky-team">{row.team.name}</td>;
                         }
-                        if (column.id === "totalRank") return <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.total > 0 ? getRankHeatClass(row.totalRank, gameState.teams.length) : "")}>{row.totalRank}</td>;
-                        if (column.id === "powRank") return <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.pow > 0 ? getRankHeatClass(row.powRank, gameState.teams.length) : "")}>{row.powRank}</td>;
-                        if (column.id === "speRank") return <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.spe > 0 ? getRankHeatClass(row.speRank, gameState.teams.length) : "")}>{row.speRank}</td>;
-                        if (column.id === "menRank") return <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.men > 0 ? getRankHeatClass(row.menRank, gameState.teams.length) : "")}>{row.menRank}</td>;
-                        if (column.id === "socRank") return <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.soc > 0 ? getRankHeatClass(row.socRank, gameState.teams.length) : "")}>{row.socRank}</td>;
+                        if (column.id === "totalRank") {
+                          return (
+                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.total > 0 ? getRankHeatClass(row.totalRank, gameState.teams.length) : "")}>
+                              <RanksRankCell rank={row.totalRank} delta={row.rankDeltas?.total} />
+                            </td>
+                          );
+                        }
+                        if (column.id === "powRank") {
+                          return (
+                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.pow > 0 ? getRankHeatClass(row.powRank, gameState.teams.length) : "")}>
+                              <RanksRankCell rank={row.powRank} delta={row.rankDeltas?.pow} />
+                            </td>
+                          );
+                        }
+                        if (column.id === "speRank") {
+                          return (
+                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.spe > 0 ? getRankHeatClass(row.speRank, gameState.teams.length) : "")}>
+                              <RanksRankCell rank={row.speRank} delta={row.rankDeltas?.spe} />
+                            </td>
+                          );
+                        }
+                        if (column.id === "menRank") {
+                          return (
+                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.men > 0 ? getRankHeatClass(row.menRank, gameState.teams.length) : "")}>
+                              <RanksRankCell rank={row.menRank} delta={row.rankDeltas?.men} />
+                            </td>
+                          );
+                        }
+                        if (column.id === "socRank") {
+                          return (
+                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.soc > 0 ? getRankHeatClass(row.socRank, gameState.teams.length) : "")}>
+                              <RanksRankCell rank={row.socRank} delta={row.rankDeltas?.soc} />
+                            </td>
+                          );
+                        }
                         const rank = row.disciplineRanks[column.id] ?? 0;
                         const discipline = orderedDisciplines.find((entry) => entry.id === column.id);
                         const previousDiscipline = [...visibleDisciplineRanksColumns.slice(0, columnIndex)]

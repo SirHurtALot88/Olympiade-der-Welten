@@ -975,7 +975,8 @@ function resolveTeamMarketBuySpendableCash(input: {
   });
 }
 
-function resolveTransferBuyAffordabilityCash(input: {
+/** Shared buy affordability ceiling for planner preview, live execute, and buy gate. */
+export function resolveTransferBuyAffordabilityCash(input: {
   gameState: GameState;
   teamId: string;
   teamCash: number;
@@ -1942,9 +1943,6 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const recentlySoldBySelectedTeam = selectedTeam
     ? buildRecentlySoldByTeam(gameState, gameState.season.id).get(selectedTeam.teamId) ?? null
     : null;
-  const itemLimit = input.limit ?? 250;
-  const offset = input.offset != null ? Math.max(0, Math.floor(input.offset)) : 0;
-  const boundedLimit = Math.max(1, Math.min(itemLimit, 5000));
 
   const matchesFreeAgentFilters = (item: TransfermarktFreeAgentBrowseIndexEntry) => {
     const searchHaystack = [
@@ -1973,13 +1971,22 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     throw new Error("Transfermarkt free-agent base cache miss.");
   }
 
+  const useFullPool = input.fullPool === true;
+  const hasMwBandFilter = input.minMarketValue != null || input.maxMarketValue != null;
   const filtered = baseItems.filter((item) => matchesFreeAgentFilters(item));
+  const useUnboundedFilteredPool = useFullPool || (aiPreviewMode && hasMwBandFilter);
+  const itemLimit = useUnboundedFilteredPool ? filtered.length : (input.limit ?? 250);
+  const offset = input.offset != null ? Math.max(0, Math.floor(input.offset)) : 0;
+  const boundedLimit = useUnboundedFilteredPool
+    ? Math.max(filtered.length, 1)
+    : Math.max(1, Math.min(itemLimit, 5000));
+
   const teamAvailableTotal = selectedTeam
     ? baseItems.filter((item) => !(recentlySoldBySelectedTeam?.has(item.playerId) ?? false)).length
     : baseItems.length;
 
   const orderedItems =
-    aiPreviewMode && boundedLimit + offset >= filtered.length
+    useUnboundedFilteredPool || (aiPreviewMode && boundedLimit + offset >= filtered.length)
       ? filtered
       : aiPreviewMode
         ? buildAiPreviewFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset))

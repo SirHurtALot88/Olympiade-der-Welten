@@ -99,9 +99,9 @@ function buildTeamProfileContentSignature(input: {
   teamId: string;
   playerRatingsById: Map<string, FoundationPlayerRatingSnapshot>;
 }) {
-  const rosterSize = input.gameState.activeRoster.filter((entry) => entry.teamId === input.teamId).length;
+  const rosterSize = (input.gameState.rosters ?? []).filter((entry) => entry.teamId === input.teamId).length;
   const seasonSnapshotCount = input.gameState.seasonState.seasonSnapshots?.length ?? 0;
-  const transferCount = input.gameState.transferHistory.filter(
+  const transferCount = (input.gameState.transferHistory ?? []).filter(
     (entry) => entry.toTeamId === input.teamId || entry.fromTeamId === input.teamId,
   ).length;
   const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId) ?? null;

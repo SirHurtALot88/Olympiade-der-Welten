@@ -22,12 +22,23 @@ export function buildRankTableMarketValueMap(gameState: GameState): Map<string, 
 }
 
 export function applyRankTableMarketValuesToGameState(gameState: GameState): GameState {
-  const marketValueByPlayerId = buildRankTableMarketValueMap(gameState);
+  return applyMarketValueMapToGameState(gameState, buildRankTableMarketValueMap(gameState));
+}
+
+export function applyMarketValueMapToGameState(
+  gameState: GameState,
+  marketValueByPlayerId: Map<string, number>,
+  playerIds?: Iterable<string>,
+): GameState {
   if (marketValueByPlayerId.size === 0) {
     return gameState;
   }
+  const targetIds = playerIds ? new Set(playerIds) : null;
 
   const nextPlayers = gameState.players.map((player) => {
+    if (targetIds && !targetIds.has(player.id)) {
+      return player;
+    }
     const marketValue = marketValueByPlayerId.get(player.id);
     if (marketValue == null) {
       return player;
@@ -92,8 +103,9 @@ export function patchSeasonProgressionEventMarketValues(input: {
   gameState: GameState;
   seasonId: string;
   playerIds?: Iterable<string>;
+  marketValueByPlayerId?: Map<string, number>;
 }): GameState {
-  const marketValueByPlayerId = buildRankTableMarketValueMap(input.gameState);
+  const marketValueByPlayerId = input.marketValueByPlayerId ?? buildRankTableMarketValueMap(input.gameState);
   if (marketValueByPlayerId.size === 0) {
     return input.gameState;
   }

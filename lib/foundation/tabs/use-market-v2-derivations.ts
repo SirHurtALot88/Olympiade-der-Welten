@@ -7,6 +7,7 @@ import {
   resolvePlayerDisplayPps,
 } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildMarketRosterPreviousSeasonAxisByPlayerId } from "@/lib/market/transfermarkt-roster-previous-season-axis";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getActiveScoutingWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
@@ -32,6 +33,17 @@ export type TransferMarketV2RosterRow = {
   men: number | null;
   soc: number | null;
   disciplineRatings: Player["disciplineRatings"];
+  previousSeasonAxis: {
+    seasonId: string;
+    ppPow: number | null;
+    ppSpe: number | null;
+    ppMen: number | null;
+    ppSoc: number | null;
+    ppPowRank: number | null;
+    ppSpeRank: number | null;
+    ppMenRank: number | null;
+    ppSocRank: number | null;
+  } | null;
 };
 
 export function buildMarketV2ClientKey(activeSaveId: string, seasonId: string): string {
@@ -51,6 +63,7 @@ export function buildTransferMarketV2RosterRows(input: {
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
   const seasonPointsLedger =
     input.seasonPointsLedger === undefined ? buildSeasonPointsLedger(input.gameState) : input.seasonPointsLedger;
+  const previousSeasonAxisByPlayerId = buildMarketRosterPreviousSeasonAxisByPlayerId(input.gameState);
 
   return input.gameState.rosters
     .map((entry) => {
@@ -87,6 +100,7 @@ export function buildTransferMarketV2RosterRows(input: {
         men: player.coreStats.men ?? null,
         soc: player.coreStats.soc ?? null,
         disciplineRatings: player.disciplineRatings,
+        previousSeasonAxis: previousSeasonAxisByPlayerId.get(player.id) ?? null,
       };
     })
     .filter((row): row is TransferMarketV2RosterRow => Boolean(row));

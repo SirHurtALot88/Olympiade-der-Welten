@@ -14,6 +14,7 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { buildTeamDisciplineRankSnapshotRecords } from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
@@ -560,6 +561,7 @@ function buildSeasonSnapshotRecord(
       ? "partial"
       : "missing_source";
   const archivedAt = new Date().toISOString();
+  const teamDisciplineRankSnapshots = buildTeamDisciplineRankSnapshotRecords(gameState);
 
   return {
     snapshotId: buildSnapshotId(seasonId),
@@ -580,6 +582,7 @@ function buildSeasonSnapshotRecord(
     playerPerformanceSnapshots: playerPerformances,
     transferSnapshots,
     gmAssignments,
+    teamDisciplineRankSnapshots,
     warnings,
   };
 }

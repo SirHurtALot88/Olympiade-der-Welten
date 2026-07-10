@@ -7,6 +7,7 @@ import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
+import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
@@ -267,7 +268,7 @@ export async function runSeasonOnePicksDraft(
   }
 
   let latest = persistence.getSaveById(saveId) ?? save;
-  if (result.executed) {
+  if (result.executed && isEmergencyRosterRepairEnabled()) {
     const maxTopupPasses = 3;
     for (let topupPass = 0; topupPass < maxTopupPasses; topupPass += 1) {
       const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
@@ -306,6 +307,13 @@ export async function runSeasonOnePicksDraft(
       if (stillBelowMin.length === 0) {
         break;
       }
+    }
+  } else if (result.executed) {
+    const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
+    if (belowMinAfterDraft.length > 0) {
+      console.error(
+        `[long-run] S1 post-draft min topup skipped (OLY_ENABLE_EMERGENCY_REPAIR!=1): ${belowMinAfterDraft.length} teams below min`,
+      );
     }
   }
 

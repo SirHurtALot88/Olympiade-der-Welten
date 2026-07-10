@@ -4,6 +4,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   classifyTeamDraftQuality,
   formatPhaseAuditSummaryDe,
+  isRosterBenchmarkPhase,
   type PhaseAuditResult,
   type LongRunPhaseAuditPhase,
 } from "@/lib/season/long-run-phase-audit";
@@ -13,6 +14,10 @@ import type { PersistedSaveGame } from "@/lib/persistence/types";
 
 function round(value: number, digits = 1) {
   return Number(value.toFixed(digits));
+}
+
+export function isRosterBenchmarkPhase(phase: LongRunPhaseAuditPhase) {
+  return phase === "draft" || phase === "preseason";
 }
 
 export function buildPhaseFeedbackMarkdownDe(input: {
@@ -84,14 +89,22 @@ export function buildPhaseFeedbackMarkdownDe(input: {
     "## Liga-Kurz",
     "",
     `- Cash Σ **${totalCash}** · MW Σ **${totalMw}**`,
-    `- Kader ≥Min **${atMin}/${teamRows.length}** · ≥Opt **${atOpt}/${teamRows.length}**`,
+  ];
+
+  if (isRosterBenchmarkPhase(phase)) {
+    lines.push(`- Kader ≥Min **${atMin}/${teamRows.length}** · ≥Opt **${atOpt}/${teamRows.length}** (Benchmark: nach Käufen)`);
+  } else {
+    lines.push("- Kader Min/Opt: *kein Benchmark in dieser Phase* (nur post-buy in draft/preseason)");
+  }
+
+  lines.push(
     `- Salary-Factor-Fenster: ${factorWindow.map((row) => `${row.seasonLabel}=${row.factor}`).join(" · ")}`,
     "",
     "## Audit",
     "",
     `- PASS **${audit.passCount}** · WARN **${audit.warnCount}** · RED **${audit.redCount}**`,
     "",
-  ];
+  );
 
   for (const entry of audit.checks) {
     lines.push(`- **${entry.status}** \`${entry.id}\`: ${entry.detail}`);

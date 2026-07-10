@@ -53,12 +53,11 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain("home-v2-player-grid");
     expect(fileText).toContain("home-v2-hero-stats");
     expect(fileText).toContain("home-v2-signal-strip");
-    expect(fileText).toContain("home-v2-quick-nav");
+    expect(fileText).not.toContain("home-v2-quick-nav");
     expect(fileText).toContain("onContinue");
     expect(fileText).toContain("onOpenBoardObjectives");
     expect(fileText).toContain("home-v2-objective-card");
-    expect(fileText).toContain("onOpenOffice");
-    expect(fileText).toContain("Office");
+    expect(fileText).toContain("home-v2-development-panel");
     expect(fileText).not.toContain("Manager Overview V2");
     expect(fileText).not.toContain("HQ öffnen");
     expect(fileText).toContain("FoundationGameDecisionBoard");

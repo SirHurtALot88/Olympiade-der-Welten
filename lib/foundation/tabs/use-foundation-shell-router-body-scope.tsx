@@ -6540,6 +6540,8 @@ export function useFoundationShellRouterBodyScope({
     seasonBriefingScheduleReady,
     currentMatchdayDisciplineSchedule,
     visibleDisciplineConfigRows,
+    isViewingArchivedRanksSeason,
+    ranksArchiveMissing,
   } = useFoundationCrossTabDisciplineRanks({
     activeView: activeView as FoundationViewId,
     shouldBuildTeamsHeavyComparison,
@@ -6549,6 +6551,8 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     orderedDisciplines,
     disciplineCategoryFilter,
+    ranksSeasonId: seasonOverviewSeasonId || gameState.season.id,
+    seasonHistorySnapshots,
     tableSorts,
   });
   const rankLeaderCards = disciplineLeaderEntries;
@@ -9836,6 +9840,8 @@ export function useFoundationShellRouterBodyScope({
     preSeasonWorkflowFeed,
     prizeFinanceTab,
     rankLeaderCards,
+    ranksArchiveMissing,
+    isViewingArchivedRanksSeason,
     readMeta,
     readOnlyBannerMessage,
     readSourceLabel,

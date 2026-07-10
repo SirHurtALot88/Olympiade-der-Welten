@@ -50,3 +50,12 @@ export {
   type PickStepCandidate,
   type PickStepResult,
 } from "@/lib/ai/market-pick-engine/pick-step";
+export {
+  canExecuteAffordPick,
+  listExecuteFreeAgentsForSlot,
+  resolveExecutePoolMwBounds,
+  resolveExecuteLivePickForSlot,
+  resolveSlotLaneFromPick,
+  type ExecuteLivePickCandidate,
+  type ExecutePoolMwBounds,
+} from "@/lib/ai/market-pick-engine/execute-live-pick";

@@ -1,0 +1,83 @@
+Der Spielstand konnte nicht geladen werden.
+Neu laden
+Spielstände
+Oly Manager
+FOUNDATION LAEDT · MD 1
+SPIELTAG
+⋮⋮
+⌂
+Home
+⋮⋮
+✉
+Inbox
+⋮⋮
+▣
+Einsatzliste
+⋮⋮
+◉
+Arena
+⋮⋮
+▤
+Saisonstand
+TEAM
+⋮⋮
+◈
+Teams
+⋮⋮
+◎
+Spieler
+⋮⋮
+↑
+Training
+⋮⋮
+▦
+Gebäude
+MARKT
+⋮⋮
+⇄
+Transfermarkt
+⋮⋮
+◐
+Scouting
+⋮⋮
+↺
+Historie
+WELT
+⋮⋮
+▥
+Ranks
+⋮⋮
+◫
+Diszis
+⋮⋮
+€
+Sponsoren
+⋮⋮
+?
+Lexikon
+ADMIN
+⋮⋮
+⏵
+Spieltag
+⋮⋮
++
+Generator
+⋮⋮
+⚙
+Settings
+⋮⋮
+⚒
+Admin
+Weiter
+Scouting prüfen
+Leertaste
+Suchen
+SPIELSTAND
+Singleplayer Foundation
+LOAD
+AKTIVES TEAM
+Alle 32 Teams anzeigen
+LOAD · Foundation laedt
+Zur Einsatzliste
+
+Arena-Kontext fehlt — Save und Team wählen.

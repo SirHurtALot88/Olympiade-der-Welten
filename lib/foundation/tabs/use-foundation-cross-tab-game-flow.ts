@@ -27,6 +27,10 @@ import {
   normalizeInboxTargetView,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { resolveGameFlowActionStep } from "@/lib/foundation/resolve-game-flow-action-step";
+import {
+  shouldBuildFoundationGameFlow,
+  useFoundationGameInboxItems,
+} from "@/lib/foundation/tabs/use-foundation-game-flow";
 
 export function shouldBuildFoundationGameInboxDerivations(activeView: string, homeV2Tab?: string): boolean {
   return shouldBuildFoundationGameFlow(activeView, homeV2Tab);

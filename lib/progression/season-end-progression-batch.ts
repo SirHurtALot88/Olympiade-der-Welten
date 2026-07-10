@@ -1,10 +1,11 @@
 import {
-  applySeasonEndXpSpend,
+  applySeasonEndProgressionMutations,
   buildEconomyPreviewContext,
   buildPreComputedSeasonXpMap,
+  finalizeSeasonEndProgressionLeagueEconomy,
   previewSeasonEndXpSpend,
+  type SeasonEndProgressionTeamApply,
 } from "@/lib/progression/season-end-xp-apply-service";
-import { syncRosterMarketValuesWithPlayerEconomy, applyRankTableMarketValuesToGameState, patchSeasonProgressionEventMarketValues } from "@/lib/player-formulas/market-value-apply";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 export type SeasonEndProgressionBatchResult = {
@@ -27,16 +28,18 @@ function createProgressionCapturePersistence(input: {
   skipDelegateWrites?: boolean;
 }): { persistence: PersistenceService; getSave: () => PersistedSaveGame } {
   let currentSave = structuredClone(input.save);
+  const cloneOnRead = !input.skipDelegateWrites;
+  const readSave = () => (cloneOnRead ? structuredClone(currentSave) : currentSave);
   const persistence: PersistenceService = {
     ...input.delegate,
     bootstrapSingleplayerSave() {
-      return { save: structuredClone(currentSave), createdFromSeed: false };
+      return { save: readSave(), createdFromSeed: false };
     },
     getActiveSave() {
-      return structuredClone(currentSave);
+      return readSave();
     },
     getSaveById(saveId) {
-      return saveId === currentSave.saveId ? structuredClone(currentSave) : input.delegate.getSaveById(saveId);
+      return saveId === currentSave.saveId ? readSave() : input.delegate.getSaveById(saveId);
     },
     saveSingleplayerState(saveId, nextGameState) {
       if (input.skipDelegateWrites) {
@@ -44,10 +47,10 @@ function createProgressionCapturePersistence(input: {
           currentSave = {
             ...currentSave,
             updatedAt: new Date().toISOString(),
-            gameState: structuredClone(nextGameState),
+            gameState: nextGameState,
           };
         }
-        return structuredClone(currentSave);
+        return currentSave;
       }
       const saved = input.delegate.saveSingleplayerState(saveId, nextGameState);
       if (saveId === currentSave.saveId) {
@@ -57,12 +60,12 @@ function createProgressionCapturePersistence(input: {
           gameState: structuredClone(nextGameState),
         };
       }
-      return structuredClone(currentSave);
+      return readSave();
     },
   };
   return {
     persistence,
-    getSave: () => structuredClone(currentSave),
+    getSave: readSave,
   };
 }
 
@@ -89,23 +92,30 @@ export function runSeasonEndProgressionBatch(input: {
   let teamsApplied = 0;
   let humanOrganicTeams = 0;
   let aiOrganicFallbackTeams = 0;
-  let playerEventsCreated = 0;
 
   const sharedEconomyContext = buildEconomyPreviewContext(materializationSave.gameState);
   const sharedPreComputedSeasonXp = buildPreComputedSeasonXpMap(materializationSave);
+  const teamApplies: SeasonEndProgressionTeamApply[] = [];
+
+  console.error(
+    `[season-end-xp] ${completedSeasonId}: preview ${materializationSave.gameState.teams.length} teams…`,
+  );
 
   for (const team of materializationSave.gameState.teams) {
     const currentSave = capture.getSave();
     const rosterCount = currentSave.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
     if (rosterCount === 0) continue;
     teamsProcessed += 1;
+    if (teamsProcessed === 1 || teamsProcessed % 8 === 0 || teamsProcessed === materializationSave.gameState.teams.length) {
+      console.error(`[season-end-xp] ${completedSeasonId}: preview team ${teamsProcessed}/${materializationSave.gameState.teams.length} (${team.shortCode})`);
+    }
     const controlMode = teamControlSettings[team.teamId]?.controlMode ?? (team.humanControlled === false ? "ai" : "manual");
 
     const preview = previewSeasonEndXpSpend(
       currentSave,
       team.teamId,
       sharedEconomyContext,
-      { skipAfterEconomyAudit: true },
+      { skipAfterEconomyAudit: true, fastDisciplineLeague: true },
       sharedPreComputedSeasonXp,
     );
     if (!preview.confirmToken || !preview.ok) {
@@ -114,53 +124,51 @@ export function runSeasonEndProgressionBatch(input: {
       warnings.push(...softReasons.map((reason) => `${team.shortCode}:${reason}`));
       continue;
     }
-    const result = applySeasonEndXpSpend(
-      currentSave,
-      team.teamId,
-      preview.confirmToken,
-      capture.persistence,
-      {
-        allowAiTeams: true,
-        skipAfterEconomyAudit: true,
-        deferLeagueWideMarketValueRecalc: true,
-      },
-      sharedEconomyContext,
-      preview,
-      sharedPreComputedSeasonXp,
-    );
-    warnings.push(...result.warnings.map((warning) => `${team.shortCode}:${warning}`));
-    if (result.applied) {
-      teamsApplied += 1;
-      playerEventsCreated += result.eventIds.length;
-      if (controlMode === "ai") aiOrganicFallbackTeams += 1;
-      else humanOrganicTeams += 1;
-    } else {
-      blockingReasons.push(...result.blockingReasons.map((reason) => `${team.shortCode}:${reason}`));
-    }
-  }
 
-  const finalSeasonEventCount = (capture.getSave().gameState.playerProgressionEvents ?? []).filter(
-    (event) => event.seasonId === completedSeasonId,
-  ).length;
-  if (teamsProcessed > 0 && finalSeasonEventCount === 0) {
-    blockingReasons.push("season_end_progression_no_player_events");
+    teamApplies.push({ teamId: team.teamId, preview });
+    teamsApplied += 1;
+    if (controlMode === "ai") aiOrganicFallbackTeams += 1;
+    else humanOrganicTeams += 1;
   }
 
   const beforeBatchSave = capture.getSave();
-  const progressedPlayerIds = (beforeBatchSave.gameState.playerProgressionEvents ?? [])
-    .filter((event) => event.seasonId === completedSeasonId)
-    .map((event) => event.playerId);
-  const batchedGameState = syncRosterMarketValuesWithPlayerEconomy(
-    patchSeasonProgressionEventMarketValues({
-      gameState: applyRankTableMarketValuesToGameState(beforeBatchSave.gameState),
-      seasonId: completedSeasonId,
-      playerIds: progressedPlayerIds,
-    }),
-  );
+  let batchedGameState = beforeBatchSave.gameState;
 
+  if (teamApplies.length > 0) {
+    console.error(
+      `[season-end-xp] ${completedSeasonId}: apply progression mutations once (${teamApplies.length} teams)…`,
+    );
+    const mutations = applySeasonEndProgressionMutations({
+      gameState: beforeBatchSave.gameState,
+      teamApplies,
+    });
+    console.error(
+      `[season-end-xp] ${completedSeasonId}: league discipline + market value recalc once (${batchedGameState.players.length} players)…`,
+    );
+    const leagueRecalcStartedAt = Date.now();
+    batchedGameState = finalizeSeasonEndProgressionLeagueEconomy({
+      gameState: mutations.gameState,
+      seasonId: completedSeasonId,
+      progressedPlayerIds: mutations.progressedPlayerIds,
+      disciplineBaselinesBefore: mutations.disciplineBaselinesBefore,
+    });
+    console.error(
+      `[season-end-xp] ${completedSeasonId}: league recalc done in ${Date.now() - leagueRecalcStartedAt}ms`,
+    );
+  }
+
+  const playerEventsCreated = (batchedGameState.playerProgressionEvents ?? []).filter(
+    (event) => event.seasonId === completedSeasonId,
+  ).length;
+  if (teamsProcessed > 0 && playerEventsCreated === 0) {
+    blockingReasons.push("season_end_progression_no_player_events");
+  }
+
+  console.error(`[season-end-xp] ${completedSeasonId}: persist batch state once…`);
   const persistFinalState = input.persistFinalState !== false;
   if (persistFinalState) {
     input.persistence.saveSingleplayerState(beforeBatchSave.saveId, batchedGameState);
+    console.error(`[season-end-xp] ${completedSeasonId}: persist done`);
   } else {
     capture.persistence.saveSingleplayerState(beforeBatchSave.saveId, batchedGameState);
   }

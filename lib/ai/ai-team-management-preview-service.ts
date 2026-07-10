@@ -566,6 +566,21 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
   };
 }
 
+function resolveTeamSeasonSponsorSurplus(gameState: GameState, teamId: string, seasonId: string) {
+  return round(
+    (gameState.seasonState.sponsorPayoutLogs ?? [])
+      .filter(
+        (log) =>
+          log.teamId === teamId &&
+          log.seasonId === seasonId &&
+          log.componentId !== "salary_deduct" &&
+          (log.cashDelta ?? 0) > 0,
+      )
+      .reduce((sum, log) => sum + (log.cashDelta ?? 0), 0),
+    2,
+  );
+}
+
 function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudgetPlanPreview {
   const facilityPreview = previewFacilitySeasonEndFinance({
     saveId: "preview",
@@ -642,9 +657,13 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   // During rebuild, cap facility spend by cash rank — bottom ~8 teams in a soft 0–5 corridor (≤10),
   // richer teams up to 25; grows ~4 % per season so the band can rise over time.
   const rebuildBuildingCap = resolveRebuildBuildingCap(gameState, context.team.teamId);
-  const buildingBudget = rosterBelowOpt
+  let buildingBudget = rosterBelowOpt
     ? round(Math.min(rebuildBuildingCap, investableCash), 2)
     : round(investableCash * (buildingBias / totalBias), 2);
+  const sponsorSurplus = resolveTeamSeasonSponsorSurplus(gameState, context.team.teamId, gameState.season.id);
+  if (!rosterBelowOpt && sponsorSurplus > 0) {
+    buildingBudget = round(Math.min(buildingBudget, sponsorSurplus), 2);
+  }
   const transferBudget = round(Math.max(0, investableCash - buildingBudget), 2);
   const warnings: string[] = [];
   if (maintenanceBudget > 0 && maintenanceBudget > buildingBudget && rawFreeCash < maintenanceBudget + 5) {
@@ -739,6 +758,10 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (context.team.cash < 15) negative.push("Cash ist für Scouts/Forecasts knapp");
     } else if (facility.facilityId === "fan_shop" || facility.facilityId === "arena_upgrade") {
       score += finances * 0.25 + (context.team.cash < 20 ? 8 : 0);
+      if (currentLevel === 0) {
+        score += facility.facilityId === "fan_shop" ? 24 : 16;
+        positive.push("Income-Gebäude fehlt komplett");
+      }
       if (profile.strategicIntent === "roster_repair") score -= 10;
       positive.push("langfristiger Cashflow hilft Reserven");
       if (profile.strategicIntent === "roster_repair") negative.push("akute Kaderbaustellen sind wichtiger");

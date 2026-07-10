@@ -75,6 +75,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("title={scoutingProfileTooltip}");
     expect(fileText).toContain("Scouting L");
     expect(fileText).toContain("marketValueBrackets");
+    expect(fileText).toContain("market-v2-pool-bracket-panel");
+    expect(fileText).toContain("togglePoolBracketPanel");
     expect(fileText).toContain("Board-Fokus");
     expect(fileText).toContain("Kaufdialog");
     expect(buyHostText).toContain("Kauf final abschließen");

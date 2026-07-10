@@ -1,7 +1,11 @@
 /**
- * Transfer-only S1→S5 pipeline: draft + season_end sells + preseason buys (no matchdays).
+ * Transfer-only multi-season pipeline: draft + season_end sells + preseason buys (no matchdays).
  *
- * Usage: node --import tsx scripts/run-s1-s5-transfer-pipeline.ts
+ * Benchmark KPIs:
+ * - season_end: roster Min/Opt **before** market sells (pre-sell)
+ * - draft / preseason: roster Min/Opt **after** buys (post-buy)
+ *
+ * Usage: node --import tsx scripts/run-s1-s5-transfer-pipeline.ts [--seasons 10]
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -29,6 +33,16 @@ import {
   applyPreSeasonNextSeasonSetupLightweight,
   buildPreSeasonNextSeasonSetupToken,
 } from "@/lib/season/preseason-workflow-service";
+import {
+  collectSeasonTransferPipelineGuv,
+  formatTransferPipelineGuvMarkdown,
+} from "@/lib/season/transfer-pipeline-guv";
+import {
+  collectSeasonWealthSnapshot,
+  formatWealthSnapshotLogLine,
+  formatWealthTrackMarkdown,
+  type SeasonWealthSnapshot,
+} from "@/lib/season/transfer-pipeline-wealth-tracker";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -45,8 +59,22 @@ import {
   summarizeEngines,
 } from "./s1-s2-transfer-shared";
 
-const TAG = "s1-s5-transfer";
-const FINAL_SEASON = 5;
+let FINAL_SEASON = 10;
+let TAG = "s1-s10-transfer";
+
+function parseSeasonsArg() {
+  const idx = process.argv.indexOf("--seasons");
+  if (idx >= 0) {
+    const parsed = Number(process.argv[idx + 1]);
+    if (Number.isFinite(parsed) && parsed >= 1) return Math.floor(parsed);
+  }
+  return 10;
+}
+
+function configurePipelineScope() {
+  FINAL_SEASON = parseSeasonsArg();
+  TAG = `s1-s${FINAL_SEASON}-transfer`;
+}
 
 const S1_QUOTA_REF = {
   Superstar: 3,
@@ -81,6 +109,9 @@ type PhaseRecord = {
   emergencyRepairTeams: number;
   cashBefore?: number;
   cashAfter?: number;
+  /** Informational only — season_end post-sell counts must not drive acceptance gates. */
+  teamsAtMinAfterSells?: number;
+  teamsAtOptAfterSells?: number;
   timingGate: "pass" | "warn" | "fail";
   quotaGate: "pass" | "warn" | "fail" | "n/a";
   minOptGate: "pass" | "fail";
@@ -93,6 +124,7 @@ type PipelineResult = {
   sqlitePath: string;
   totalDurationMs: number;
   phases: PhaseRecord[];
+  wealthSnapshots: SeasonWealthSnapshot[];
   hardFails: string[];
   allGatesGreen: boolean;
 };
@@ -129,7 +161,7 @@ function reconstructPhasesFromLog(logPath: string, draftRecord: PhaseRecord): Ph
   const phases: PhaseRecord[] = [draftRecord];
 
   const endMatch = logText.matchAll(
-    /\[s1-s5-transfer\] (season-\d+) season_end: sells=(\d+) \((\d+)s\)/g,
+    /\[s1-s\d+-transfer\] (season-\d+) season_end: benchmark\(pre-sell\) min=(\d+)\/32 opt=(\d+)\/32 sells=(\d+)(?: post-sell min=(\d+)\/32)? \((\d+)s\)/g,
   );
   for (const match of endMatch) {
     const seasonId = match[1];
@@ -137,25 +169,26 @@ function reconstructPhasesFromLog(logPath: string, draftRecord: PhaseRecord): Ph
       seasonNumber: parseSeasonNumber(seasonId),
       seasonId,
       phase: "season_end",
-      durationMs: Number(match[3]) * 1000,
+      durationMs: Number(match[6]) * 1000,
       buys: 0,
-      sells: Number(match[2]),
-      teamsAtMin: 32,
-      teamsAtOpt: 32,
+      sells: Number(match[4]),
+      teamsAtMin: Number(match[2]),
+      teamsAtOpt: Number(match[3]),
+      teamsAtMinAfterSells: match[5] ? Number(match[5]) : undefined,
       avgCash: 0,
       brackets: emptyBrackets(),
       engineSummary: {},
       blockingReasons: [],
       warnings: [],
       emergencyRepairTeams: 0,
-      timingGate: Number(match[3]) > 120 ? "fail" : "pass",
+      timingGate: Number(match[6]) > 120 ? "fail" : "pass",
       quotaGate: "n/a",
       minOptGate: "pass",
     });
   }
 
   const preMatch = logText.matchAll(
-    /\[s1-s5-transfer\] (season-\d+) preseason: buys=(\d+) min=(\d+)\/32 opt=(\d+)\/32 Star=(\d+) Backup=(\d+) \((\d+)s\)/g,
+    /\[s1-s\d+-transfer\] (season-\d+) preseason: buys=(\d+) benchmark\(post-buy\) min=(\d+)\/32 opt=(\d+)\/32 Star=(\d+) Backup=(\d+) \((\d+)s\)/g,
   );
   for (const match of preMatch) {
     const seasonId = match[1];
@@ -233,6 +266,7 @@ async function continueTransferLoop(input: {
   persistence: PersistenceService;
   outputDir: string;
   phases: PhaseRecord[];
+  wealthSnapshots: SeasonWealthSnapshot[];
 }) {
   let save = input.save;
 
@@ -247,6 +281,7 @@ async function continueTransferLoop(input: {
         persistence: input.persistence,
         seasonNumber: seasonNumber + 1,
         outputDir: input.outputDir,
+        wealthSnapshots: input.wealthSnapshots,
       });
       save = preseason.save;
       pushPhase(input.outputDir, input.phases, preseason.record);
@@ -345,9 +380,10 @@ function checkEngineWarnings(engineSummary: Record<string, number>, warnings: st
 async function runS1Draft(input: {
   persistence: PersistenceService;
   outputDir: string;
+  wealthSnapshots: SeasonWealthSnapshot[];
 }): Promise<{ save: PersistedSaveGame; record: PhaseRecord }> {
   let save = input.persistence.createFreshSeasonOneSave({
-    name: `S1-S5 Transfer Pipeline ${new Date().toISOString()}`,
+    name: `S1-S${FINAL_SEASON} Transfer Pipeline ${new Date().toISOString()}`,
   });
   save = setAllTeamsAi(save, input.persistence);
 
@@ -388,9 +424,10 @@ async function runS1Draft(input: {
   fs.writeFileSync(path.join(input.outputDir, "s1-draft-checkpoint.json"), JSON.stringify(record, null, 2));
   writePhaseCheckpoint(input.outputDir, record);
   log(
-    `S1 draft: picks=${record.buys} min=${teamsAtMin}/32 opt=${teamsAtOpt}/32 SS=${brackets.Superstar} Star=${brackets.Star} (${Math.round(durationMs / 1000)}s)`,
+    `S1 draft: benchmark(post-buy) picks=${record.buys} min=${teamsAtMin}/32 opt=${teamsAtOpt}/32 SS=${brackets.Superstar} Star=${brackets.Star} (${Math.round(durationMs / 1000)}s)`,
     TAG,
   );
+  pushWealthSnapshot(input.wealthSnapshots, save.gameState, save.saveId, "season-1", "draft", TAG);
   return { save, record };
 }
 
@@ -418,6 +455,8 @@ async function runSeasonEndPhase(input: {
     TAG,
   );
 
+  const preSellBenchmark = summarizeTeamMinOpt(save.gameState);
+
   log(`${seasonId} season_end sell…`, TAG);
   const session = await runTransferWindowSession({
     saveId: save.saveId,
@@ -437,7 +476,7 @@ async function runSeasonEndPhase(input: {
   const durationMs = Date.now() - started;
   save = input.persistence.getSaveById(save.saveId)!;
 
-  const { teamsAtMin, teamsAtOpt, avgCash } = summarizeTeamMinOpt(save.gameState);
+  const postSellRoster = summarizeTeamMinOpt(save.gameState);
   const record: PhaseRecord = {
     seasonNumber: input.seasonNumber,
     seasonId,
@@ -445,9 +484,11 @@ async function runSeasonEndPhase(input: {
     durationMs,
     buys: session.appliedBuys,
     sells: session.appliedSells,
-    teamsAtMin,
-    teamsAtOpt,
-    avgCash,
+    teamsAtMin: preSellBenchmark.teamsAtMin,
+    teamsAtOpt: preSellBenchmark.teamsAtOpt,
+    teamsAtMinAfterSells: postSellRoster.teamsAtMin,
+    teamsAtOptAfterSells: postSellRoster.teamsAtOpt,
+    avgCash: postSellRoster.avgCash,
     brackets: emptyBrackets(),
     engineSummary: summarizeEngines(session.perTeam),
     blockingReasons: session.blockingReasons.slice(0, 10),
@@ -457,11 +498,40 @@ async function runSeasonEndPhase(input: {
     cashAfter: leagueCashSum(save.gameState),
     timingGate: evaluateTimingGate("season_end", durationMs),
     quotaGate: "n/a",
-    minOptGate: evaluateMinOptGate("season_end", teamsAtMin),
+    minOptGate: evaluateMinOptGate("season_end", preSellBenchmark.teamsAtMin),
   };
 
-  log(`${seasonId} season_end: sells=${record.sells} (${Math.round(durationMs / 1000)}s)`, TAG);
+  log(
+    `${seasonId} season_end: benchmark(pre-sell) min=${preSellBenchmark.teamsAtMin}/32 opt=${preSellBenchmark.teamsAtOpt}/32 sells=${record.sells} post-sell min=${postSellRoster.teamsAtMin}/32 (${Math.round(durationMs / 1000)}s)`,
+    TAG,
+  );
   return { save, record };
+}
+
+function pushWealthSnapshot(
+  snapshots: SeasonWealthSnapshot[],
+  gameState: GameState,
+  saveId: string,
+  seasonId: string,
+  phase: "draft" | "preseason",
+  tag: string,
+) {
+  const prior = snapshots.at(-1) ?? null;
+  const salaryFactorsThroughSeason = snapshots
+    .map((entry) => entry.salaryFactor)
+    .filter((value): value is number => value != null);
+  const snapshot = collectSeasonWealthSnapshot({
+    gameState,
+    saveId,
+    seasonId,
+    phase,
+    priorSnapshot: prior,
+    salaryFactorsThroughSeason:
+      salaryFactorsThroughSeason.length > 0 ? salaryFactorsThroughSeason : undefined,
+  });
+  snapshots.push(snapshot);
+  log(formatWealthSnapshotLogLine(snapshot), tag);
+  return snapshot;
 }
 
 function pushPhase(outputDir: string, phases: PhaseRecord[], record: PhaseRecord) {
@@ -474,6 +544,7 @@ async function runPreseasonPhase(input: {
   persistence: PersistenceService;
   seasonNumber: number;
   outputDir: string;
+  wealthSnapshots: SeasonWealthSnapshot[];
 }): Promise<{ save: PersistedSaveGame; record: PhaseRecord }> {
   const seasonId = seasonIdForNumber(input.seasonNumber);
   if (input.save.gameState.season.id !== seasonId) {
@@ -546,9 +617,10 @@ async function runPreseasonPhase(input: {
   };
 
   log(
-    `${seasonId} preseason: buys=${record.buys} min=${teamsAtMin}/32 opt=${teamsAtOpt}/32 Star=${brackets.Star} Backup=${brackets.Backup} (${Math.round(durationMs / 1000)}s)`,
+    `${seasonId} preseason: buys=${record.buys} benchmark(post-buy) min=${teamsAtMin}/32 opt=${teamsAtOpt}/32 Star=${brackets.Star} Backup=${brackets.Backup} (${Math.round(durationMs / 1000)}s)`,
     TAG,
   );
+  pushWealthSnapshot(input.wealthSnapshots, save.gameState, save.saveId, seasonId, "preseason", TAG);
   return { save, record };
 }
 
@@ -577,7 +649,8 @@ function collectHardFails(phases: PhaseRecord[]): string[] {
     if (phase.minOptGate === "fail") {
       fails.push(`${phase.seasonId}_${phase.phase}_min=${phase.teamsAtMin}/32`);
     }
-    if (phase.quotaGate === "warn") {
+    // Quota warn is informational when min/opt gates are green (plan 4.3).
+    if (phase.quotaGate === "warn" && phase.minOptGate === "fail") {
       fails.push(`${phase.seasonId}_${phase.phase}_quota_warn`);
     }
     fails.push(...checkEngineWarnings(phase.engineSummary, phase.warnings));
@@ -589,8 +662,9 @@ function collectHardFails(phases: PhaseRecord[]): string[] {
 }
 
 function buildPipelineReport(result: PipelineResult): string {
+  const maxSeason = result.phases.reduce((max, phase) => Math.max(max, phase.seasonNumber), FINAL_SEASON);
   const lines = [
-    "# S1–S5 Transfer Pipeline",
+    `# S1–S${maxSeason} Transfer Pipeline (Finance / no matchdays)`,
     "",
     `Generated: ${result.timestamp}`,
     `Save: \`${result.saveId}\``,
@@ -598,16 +672,20 @@ function buildPipelineReport(result: PipelineResult): string {
     `Total duration: ${Math.round(result.totalDurationMs / 1000)}s`,
     `Gates: **${result.allGatesGreen ? "GRÜN" : "ROT"}**`,
     "",
+    "Benchmark-Regel: **season_end = Min/Opt vor Verkäufen** · **draft/preseason = Min/Opt nach Käufen** (post-sell nur informativ).",
+    "",
     "## Phase Summary",
     "",
-    "| Season | Phase | Duration | Buys | Sells | Min | Opt | SS | Star | Core | Depth | Backup | Timing | Quota | Min/Opt |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
+    "| Season | Phase | Duration | Buys | Sells | Benchmark Min | Benchmark Opt | Post-Sell Min | SS | Star | Core | Depth | Backup | Timing | Quota | Min/Opt |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
   ];
 
   for (const phase of result.phases) {
     const b = phase.brackets;
+    const postSellMin =
+      phase.phase === "season_end" && phase.teamsAtMinAfterSells != null ? `${phase.teamsAtMinAfterSells}/32` : "—";
     lines.push(
-      `| ${phase.seasonId} | ${phase.phase} | ${Math.round(phase.durationMs / 1000)}s | ${phase.buys} | ${phase.sells} | ${phase.teamsAtMin}/32 | ${phase.teamsAtOpt}/32 | ${b.Superstar} | ${b.Star} | ${b.Core} | ${b.Depth} | ${b.Backup} | ${phase.timingGate} | ${phase.quotaGate} | ${phase.minOptGate} |`,
+      `| ${phase.seasonId} | ${phase.phase} | ${Math.round(phase.durationMs / 1000)}s | ${phase.buys} | ${phase.sells} | ${phase.teamsAtMin}/32 | ${phase.teamsAtOpt}/32 | ${postSellMin} | ${b.Superstar} | ${b.Star} | ${b.Core} | ${b.Depth} | ${b.Backup} | ${phase.timingGate} | ${phase.quotaGate} | ${phase.minOptGate} |`,
     );
   }
 
@@ -616,16 +694,16 @@ function buildPipelineReport(result: PipelineResult): string {
     "## Timing Gates",
     "",
     `- S1 Draft: target ≤${TIMING_MS.draft.target / 1000}s, alarm >${TIMING_MS.draft.alarm / 1000}s`,
-    `- S2–S5 Preseason: target ≤${TIMING_MS.preseason.target / 1000}s, alarm >${TIMING_MS.preseason.alarm / 1000}s`,
+    `- S2–S${maxSeason} Preseason: target ≤${TIMING_MS.preseason.target / 1000}s, alarm >${TIMING_MS.preseason.alarm / 1000}s`,
     `- season_end: alarm >${TIMING_MS.seasonEnd.alarm / 1000}s`,
     "",
     "## Quota Reference (S1 Draft)",
     "",
     `SS ~${S1_QUOTA_REF.Superstar}, Star ~${S1_QUOTA_REF.Star}, Core ~${S1_QUOTA_REF.Core}, Depth ~${S1_QUOTA_REF.Depth}, Backup ~${S1_QUOTA_REF.Backup}`,
     "",
-    "## S2–S5 Preseason Quota",
+    `## S2–S${maxSeason} Preseason Quota`,
     "",
-    "Star 4–12 (±50% of ~8), Backup ≤220, Min 32/32 after preseason.",
+    "Star 4–12 (±50% of ~8), Backup ≤220, Min 32/32 **nach Käufen** (post-buy benchmark).",
     "",
   );
 
@@ -646,6 +724,27 @@ function buildPipelineReport(result: PipelineResult): string {
   }
 
   return lines.join("\n");
+}
+
+function buildPipelineGuvReport(gameState: GameState, maxSeason: number): { markdown: string; rows: ReturnType<typeof collectSeasonTransferPipelineGuv>[] } {
+  const rows = Array.from({ length: maxSeason }, (_, index) =>
+    collectSeasonTransferPipelineGuv(gameState, `season-${index + 1}`),
+  );
+  return {
+    rows,
+    markdown: formatTransferPipelineGuvMarkdown(rows),
+  };
+}
+
+function buildPipelineReportWithGuv(result: PipelineResult, gameState: GameState): string {
+  const maxSeason = result.phases.reduce((max, phase) => Math.max(max, phase.seasonNumber), FINAL_SEASON);
+  const base = buildPipelineReport(result);
+  const guv = buildPipelineGuvReport(gameState, maxSeason);
+  const wealth =
+    result.wealthSnapshots.length > 0
+      ? `\n\n${formatWealthTrackMarkdown(result.wealthSnapshots)}\n`
+      : "";
+  return `${base}\n\n${guv.markdown}${wealth}`;
 }
 
 type SellSeasonRow = {
@@ -717,7 +816,7 @@ function buildSellAnalysis(
     }));
 
   const mdLines = [
-    "# Sell Analysis (S1–S5 Transfer Pipeline)",
+    `# Sell Analysis (S1–S${FINAL_SEASON} Transfer Pipeline)`,
     "",
     "## Per Season",
     "",
@@ -762,6 +861,7 @@ async function finalizePipeline(input: {
   save: PersistedSaveGame;
   sqlitePath: string;
   phases: PhaseRecord[];
+  wealthSnapshots: SeasonWealthSnapshot[];
   pipelineStarted: number;
   timestamp: string;
 }) {
@@ -777,12 +877,30 @@ async function finalizePipeline(input: {
     sqlitePath: input.sqlitePath,
     totalDurationMs: Date.now() - input.pipelineStarted,
     phases: input.phases,
+    wealthSnapshots: input.wealthSnapshots,
     hardFails,
     allGatesGreen,
   };
 
   fs.writeFileSync(path.join(input.outputDir, "pipeline-result.json"), JSON.stringify(result, null, 2));
-  fs.writeFileSync(path.join(input.outputDir, "pipeline-report.md"), buildPipelineReport(result));
+  fs.writeFileSync(
+    path.join(input.outputDir, "pipeline-wealth-track.json"),
+    JSON.stringify(input.wealthSnapshots, null, 2),
+  );
+  fs.writeFileSync(
+    path.join(input.outputDir, "pipeline-wealth-track.md"),
+    formatWealthTrackMarkdown(input.wealthSnapshots),
+  );
+  const maxSeason = input.phases.reduce((max, phase) => Math.max(max, phase.seasonNumber), FINAL_SEASON);
+  const guv = buildPipelineGuvReport(input.save.gameState, maxSeason);
+  fs.writeFileSync(path.join(input.outputDir, "pipeline-guv.json"), JSON.stringify(guv.rows, null, 2));
+  fs.writeFileSync(path.join(input.outputDir, "pipeline-report.md"), buildPipelineReportWithGuv(result, input.save.gameState));
+
+  const wealthGreens = input.wealthSnapshots.filter((row) => row.corridor.overallStatus === "green").length;
+  log(
+    `Wealth track: ${wealthGreens}/${input.wealthSnapshots.length} snapshots GREEN → pipeline-wealth-track.md`,
+    TAG,
+  );
 
   const sellAnalysis = buildSellAnalysis(input.save.gameState, input.phases);
   fs.writeFileSync(path.join(input.outputDir, "sell-analysis.md"), sellAnalysis.markdown);
@@ -796,6 +914,9 @@ async function finalizePipeline(input: {
 
 async function main() {
   loadEnvConfig(PROJECT_ROOT);
+  configurePipelineScope();
+  process.env.OLY_TRANSFER_PIPELINE_FAST = "1";
+  process.env.OLY_ENABLE_EMERGENCY_REPAIR = "0";
   const resume = parseResumeArgs();
   const pipelineStarted = Date.now();
 
@@ -805,11 +926,12 @@ async function main() {
   let persistence: PersistenceService;
   let save: PersistedSaveGame;
   const phases: PhaseRecord[] = [];
+  const wealthSnapshots: SeasonWealthSnapshot[] = [];
 
   if (resume?.sqlitePath && resume.outputDir) {
     outputDir = resume.outputDir;
     sqlitePath = resume.sqlitePath;
-    timestamp = path.basename(outputDir).replace("s1-s5-transfer-", "");
+    timestamp = path.basename(outputDir).replace(/^s1-s\d+-transfer-/, "");
     process.env.OLY_APP_SQLITE_PATH = sqlitePath;
     persistence = createPersistenceService();
     if (!resume.saveId) {
@@ -833,25 +955,25 @@ async function main() {
     log(`Resume from ${save.gameState.season.id} (${save.gameState.gamePhase}), ${phases.length} prior phases`, TAG);
   } else {
     timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    outputDir = path.join(PROJECT_ROOT, "outputs", `s1-s5-transfer-${timestamp}`);
+    outputDir = path.join(PROJECT_ROOT, "outputs", `s1-s${FINAL_SEASON}-transfer-${timestamp}`);
     fs.mkdirSync(outputDir, { recursive: true });
     ({ sqlitePath } = ensureIsolatedLongRunDatabase({ outputDir, projectRoot: PROJECT_ROOT }));
     persistence = createPersistenceService();
 
-    const draft = await runS1Draft({ persistence, outputDir });
+    const draft = await runS1Draft({ persistence, outputDir, wealthSnapshots });
     save = draft.save;
     pushPhase(outputDir, phases, draft.record);
-    save = await continueTransferLoop({ save, persistence, outputDir, phases });
+    save = await continueTransferLoop({ save, persistence, outputDir, phases, wealthSnapshots });
 
-    await finalizePipeline({ outputDir, save, sqlitePath, phases, pipelineStarted, timestamp });
+    await finalizePipeline({ outputDir, save, sqlitePath, phases, wealthSnapshots, pipelineStarted, timestamp });
     return;
   }
 
-  save = await continueTransferLoop({ save, persistence, outputDir, phases });
-  await finalizePipeline({ outputDir, save, sqlitePath, phases, pipelineStarted, timestamp });
+  save = await continueTransferLoop({ save, persistence, outputDir, phases, wealthSnapshots });
+  await finalizePipeline({ outputDir, save, sqlitePath, phases, wealthSnapshots, pipelineStarted, timestamp });
 }
 
 main().catch((error) => {
-  console.error("[s1-s5-transfer] fatal:", error);
+  console.error(`[${TAG}] fatal:`, error);
   process.exit(1);
 });

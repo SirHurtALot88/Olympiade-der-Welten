@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import ClassIcon from "@/app/foundation/ClassIcon";
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
-import { formatTransfermarktCurrency, formatTransfermarktPoints } from "@/lib/market/transfermarkt-formatting-contract";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 
 export type TransferHistoryV2Row = {
   transferId: string;
@@ -101,14 +102,6 @@ type ActivityCard = {
   net: number;
 };
 
-function formatCompactNumber(value: number | null | undefined, digits = 1) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  }).format(value);
-}
-
 function formatSignedMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
   const abs = formatTransfermarktCurrency(Math.abs(value));
@@ -178,8 +171,10 @@ function getActivitySummary(rows: TransferHistoryV2Row[], teamOptions: TransferH
   }
 
   return Array.from(entries.values()).sort((left, right) => {
+    if (right.income !== left.income) return right.income - left.income;
+    if (right.spend !== left.spend) return right.spend - left.spend;
     if (right.volume !== left.volume) return right.volume - left.volume;
-    return Math.abs(right.net) - Math.abs(left.net);
+    return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
   });
 }
 
@@ -228,6 +223,8 @@ export default function TransferHistoryV2Client({
 }: TransferHistoryV2ClientProps) {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
   const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
+  const timelineListRef = useRef<HTMLDivElement | null>(null);
+  const timelineCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     if (!visibleRows.some((row) => row.transferId === selectedTransferId)) {
@@ -236,7 +233,15 @@ export default function TransferHistoryV2Client({
   }, [selectedTransferId, visibleRows]);
 
   const activityCards = useMemo(() => getActivitySummary(filteredRows, teamOptions), [filteredRows, teamOptions]);
-  const latestRows = useMemo(() => visibleRows.slice(0, 10), [visibleRows]);
+  const timelineRows = useMemo(() => visibleRows, [visibleRows]);
+  const mostActiveTeam = useMemo(
+    () =>
+      [...activityCards].sort((left, right) => {
+        if (right.volume !== left.volume) return right.volume - left.volume;
+        return right.income - left.income;
+      })[0] ?? null,
+    [activityCards],
+  );
   const biggestBuy = useMemo(
     () => filteredRows.filter((row) => row.type === "buy").sort((left, right) => right.fee - left.fee)[0] ?? null,
     [filteredRows],
@@ -252,12 +257,59 @@ export default function TransferHistoryV2Client({
         .sort((left, right) => (right.guv ?? Number.NEGATIVE_INFINITY) - (left.guv ?? Number.NEGATIVE_INFINITY))[0] ?? null,
     [filteredRows],
   );
-  const activeTeamStory = activityCards[0] ?? null;
+  const activeTeamStory = mostActiveTeam;
   const selectedRow =
-    visibleRows.find((row) => row.transferId === selectedTransferId) ??
+    timelineRows.find((row) => row.transferId === selectedTransferId) ??
     filteredRows.find((row) => row.transferId === selectedTransferId) ??
-    visibleRows[0] ??
+    timelineRows[0] ??
     null;
+
+  const selectedTimelineIndex = useMemo(
+    () => (selectedTransferId ? timelineRows.findIndex((row) => row.transferId === selectedTransferId) : -1),
+    [selectedTransferId, timelineRows],
+  );
+
+  function moveTimelineSelection(key: "ArrowDown" | "ArrowUp" | "Home" | "End") {
+    if (!timelineRows.length) {
+      return;
+    }
+    const currentIndex = selectedTimelineIndex >= 0 ? selectedTimelineIndex : 0;
+    let targetIndex = currentIndex;
+    if (key === "ArrowDown") {
+      targetIndex = Math.min(timelineRows.length - 1, currentIndex + 1);
+    } else if (key === "ArrowUp") {
+      targetIndex = Math.max(0, currentIndex - 1);
+    } else if (key === "Home") {
+      targetIndex = 0;
+    } else {
+      targetIndex = timelineRows.length - 1;
+    }
+    const nextRow = timelineRows[targetIndex];
+    if (!nextRow) {
+      return;
+    }
+    setSelectedTransferId(nextRow.transferId);
+    const node = timelineCardRefs.current.get(nextRow.transferId);
+    node?.scrollIntoView({ block: "nearest" });
+    node?.focus({ preventScroll: true });
+  }
+
+  function handleTimelineKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    moveTimelineSelection(event.key as "ArrowDown" | "ArrowUp" | "Home" | "End");
+  }
+
+  function handleTimelineCardKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, transferId: string) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setSelectedTransferId(transferId);
+      return;
+    }
+    handleTimelineKeyDown(event);
+  }
 
   return (
     <div className="transfer-history-v2-shell">
@@ -442,25 +494,40 @@ export default function TransferHistoryV2Client({
                 Tabelle
               </button>
             </div>
-            <span className="muted">{latestRows.length} sichtbar</span>
+            <span className="muted">{timelineRows.length} sichtbar</span>
           </div>
           {historyLayout === "timeline" ? (
           <>
-          <div className="transfer-history-v2-timeline">
-            {latestRows.length ? (
-              latestRows.map((row) => (
+          <div
+            className="transfer-history-v2-timeline"
+            ref={timelineListRef}
+            role="listbox"
+            aria-label="Deal-Timeline"
+            aria-activedescendant={selectedTransferId ? `transfer-history-timeline-${selectedTransferId}` : undefined}
+            tabIndex={0}
+            onKeyDown={handleTimelineKeyDown}
+          >
+            {timelineRows.length ? (
+              timelineRows.map((row) => (
                 <div
                   key={row.transferId}
-                  role="button"
-                  tabIndex={0}
-                  className={`transfer-history-v2-timeline-card ${getTransferTone(row.type)}${selectedRow?.transferId === row.transferId ? " is-selected" : ""}`}
-                  onClick={() => setSelectedTransferId(row.transferId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setSelectedTransferId(row.transferId);
+                  id={`transfer-history-timeline-${row.transferId}`}
+                  role="option"
+                  aria-selected={selectedRow?.transferId === row.transferId}
+                  tabIndex={selectedRow?.transferId === row.transferId ? 0 : -1}
+                  ref={(node) => {
+                    if (node) {
+                      timelineCardRefs.current.set(row.transferId, node);
+                    } else {
+                      timelineCardRefs.current.delete(row.transferId);
                     }
                   }}
+                  className={`transfer-history-v2-timeline-card ${getTransferTone(row.type)}${selectedRow?.transferId === row.transferId ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setSelectedTransferId(row.transferId);
+                    timelineListRef.current?.focus({ preventScroll: true });
+                  }}
+                  onKeyDown={(event) => handleTimelineCardKeyDown(event, row.transferId)}
                 >
                   <div className="transfer-history-v2-timeline-head">
                     <span className={`transfer-status-pill ${getTransferTone(row.type)}`}>{formatTransferType(row.type)}</span>
@@ -514,28 +581,50 @@ export default function TransferHistoryV2Client({
           </div>
           {selectedRow ? (
             <>
-              <div className="transfer-history-v2-spotlight-top">
-                <OptimizedMediaImage
-                  src={selectedRow.portraitUrl}
-                  alt={selectedRow.playerName}
-                  className="transfer-history-v2-portrait"
-                  width={128}
-                  height={128}
-                  fallback={
-                    <div className="transfer-history-v2-portrait transfermarkt-portrait-placeholder">
-                      {selectedRow.portraitInitials}
-                    </div>
+              <div className="transfer-history-v2-spotlight-hero">
+                <FoundationPlayerPortraitCard
+                  playerId={selectedRow.playerId}
+                  name={selectedRow.playerName}
+                  portraitUrl={selectedRow.portraitUrl}
+                  portraitInitials={selectedRow.portraitInitials}
+                  playerOvr={null}
+                  playerMvs={null}
+                  pow={selectedRow.pow}
+                  spe={selectedRow.spe}
+                  men={selectedRow.men}
+                  soc={selectedRow.soc}
+                  leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                  variant="team"
+                  playerClassName={selectedRow.className}
+                  subMeta={[selectedRow.className, selectedRow.race].filter(Boolean).join(" · ") || null}
+                  economyStats={[
+                    { label: "Fee", value: formatTransfermarktCurrency(selectedRow.fee) },
+                    { label: "MW", value: formatTransfermarktCurrency(selectedRow.marketValue) },
+                    {
+                      label: "Gehalt",
+                      value: formatTransfermarktCurrency(selectedRow.salary),
+                      delta:
+                        selectedRow.remainingContractLength != null
+                          ? `${selectedRow.remainingContractLength}J`
+                          : null,
+                    },
+                  ]}
+                  interactive
+                  onOpen={() => onOpenPlayer(selectedRow.playerId)}
+                  title={`${selectedRow.playerName} Profil öffnen`}
+                  className="transfer-history-v2-portrait-card"
+                  portraitLoading="eager"
+                  portraitFetchPriority="high"
+                  footerSlot={
+                    selectedRow.guv != null ? (
+                      <span className={`transfer-history-v2-spotlight-guv ${selectedRow.guv >= 0 ? "is-positive" : "is-negative"}`}>
+                        GuV {formatSignedMoney(selectedRow.guv)}
+                      </span>
+                    ) : null
                   }
                 />
-                <div className="stack">
+                <div className="transfer-history-v2-spotlight-copy">
                   <span className={`transfer-status-pill ${getTransferTone(selectedRow.type)}`}>{formatTransferType(selectedRow.type)}</span>
-                  <button
-                    type="button"
-                    className="table-link-button transfer-history-v2-player-name"
-                    onClick={() => onOpenPlayer(selectedRow.playerId)}
-                  >
-                    {selectedRow.playerName}
-                  </button>
                   <div className="transfer-history-v2-icon-row">
                     <ClassIcon classNameValue={selectedRow.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
                     <RaceIcon race={selectedRow.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
@@ -549,6 +638,8 @@ export default function TransferHistoryV2Client({
                       >
                         {selectedRow.fromTeamName}
                       </button>
+                    ) : selectedRow.fromTeamName ? (
+                      <span>{selectedRow.fromTeamName}</span>
                     ) : null}
                     {selectedRow.fromTeamName || selectedRow.toTeamName ? <span aria-hidden="true">→</span> : null}
                     {selectedRow.toTeamId && selectedRow.toTeamName ? (
@@ -563,37 +654,11 @@ export default function TransferHistoryV2Client({
                       <span>{selectedRow.toTeamName}</span>
                     ) : null}
                   </div>
+                  <small className="muted">
+                    {new Date(selectedRow.happenedAt).toLocaleString("de-DE")} · {selectedRow.sourceLabel} ·{" "}
+                    {selectedRow.phase ?? selectedRow.matchdayId ?? selectedRow.seasonLabel}
+                  </small>
                 </div>
-              </div>
-              <div className="transfer-history-v2-metric-grid">
-                <article className="metric-card">
-                  <span>Fee</span>
-                  <strong>{formatTransfermarktCurrency(selectedRow.fee)}</strong>
-                  <small>{selectedRow.sourceLabel}</small>
-                </article>
-                <article className="metric-card">
-                  <span>Gehalt</span>
-                  <strong>{formatTransfermarktCurrency(selectedRow.salary)}</strong>
-                  <small>{selectedRow.remainingContractLength != null ? `${selectedRow.remainingContractLength} Jahre Rest` : "Laufzeit offen"}</small>
-                </article>
-                <article className="metric-card">
-                  <span>MW</span>
-                  <strong>{formatTransfermarktCurrency(selectedRow.marketValue)}</strong>
-                  <small>zum Dealzeitpunkt</small>
-                </article>
-                <article className="metric-card">
-                  <span>GuV</span>
-                  <strong className={selectedRow.guv != null && selectedRow.guv >= 0 ? "text-positive" : "text-negative"}>
-                    {selectedRow.guv != null ? formatSignedMoney(selectedRow.guv) : "—"}
-                  </strong>
-                  <small>nur bei Verkauf</small>
-                </article>
-              </div>
-              <div className="transfer-history-v2-axis-grid">
-                <span className="transfer-history-v2-axis-pill is-pow">POW {formatTransfermarktPoints(selectedRow.pow)}</span>
-                <span className="transfer-history-v2-axis-pill is-spe">SPE {formatTransfermarktPoints(selectedRow.spe)}</span>
-                <span className="transfer-history-v2-axis-pill is-men">MEN {formatTransfermarktPoints(selectedRow.men)}</span>
-                <span className="transfer-history-v2-axis-pill is-soc">SOC {formatTransfermarktPoints(selectedRow.soc)}</span>
               </div>
             </>
           ) : (
@@ -609,29 +674,24 @@ export default function TransferHistoryV2Client({
             <span className="muted">{activityCards.length} Teams</span>
           </div>
           <div className="transfer-history-v2-team-list">
-            {activityCards.slice(0, 8).map((team) => (
+            {activityCards.map((team) => (
               <button
                 key={team.teamId}
                 type="button"
-                className="transfer-history-v2-team-card"
+                className="transfer-history-v2-team-card is-compact"
+                title={`${team.teamName} · ${team.volume} Deals · Erlös ${formatTransfermarktCurrency(team.income)} · Ausgaben ${formatTransfermarktCurrency(team.spend)}`}
                 onClick={() => onOpenTeam(team.teamId)}
               >
-                <div className="transfer-history-v2-team-head">
-                  <strong>{team.teamName}</strong>
-                  <span>{team.shortCode}</span>
+                <div className="transfer-history-v2-team-compact-main">
+                  <span className="transfer-history-v2-team-code">{team.shortCode}</span>
+                  <strong className="transfer-history-v2-team-compact-name">{team.teamName}</strong>
+                  <em className={`transfer-history-v2-team-compact-income${team.income > 0 ? " is-positive" : ""}`}>
+                    {formatTransfermarktCurrency(team.income)}
+                  </em>
                 </div>
-                <div className="transfer-history-v2-team-stats">
-                  <span>{team.volume} Deals</span>
-                  <span>{team.buys} K</span>
-                  <span>{team.sells} V</span>
-                </div>
-                <div className="transfer-history-v2-team-stats">
-                  <span>Spend {formatTransfermarktCurrency(team.spend)}</span>
-                  <span>Income {formatTransfermarktCurrency(team.income)}</span>
-                </div>
-                <div className={`transfer-history-v2-team-net ${team.net >= 0 ? "is-positive" : "is-negative"}`}>
-                  Netto {formatSignedMoney(team.net)}
-                </div>
+                <small className="transfer-history-v2-team-compact-meta">
+                  {team.volume} Deals · {team.buys}K/{team.sells}V · Net {formatSignedMoney(team.net)}
+                </small>
               </button>
             ))}
             {!activityCards.length ? <p className="muted">Noch keine Teambewegungen im aktuellen Scope.</p> : null}

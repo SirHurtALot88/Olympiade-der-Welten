@@ -207,76 +207,6 @@ export default function HomeV2Client({
         ))}
       </div>
 
-      <nav className="home-v2-quick-nav modern-game-quick-nav" aria-label="Schnellzugriff">
-        <FoundationCard variant="decision" className="home-v2-quick-card">
-          <span className="eyebrow">Kaderdruck</span>
-          <strong>Einsatzliste</strong>
-          <p className="muted">Slots, Captain und offene Spieltagsthemen direkt bearbeiten.</p>
-          <FoundationButton variant="secondary" className="home-v2-quick-link" onClick={onOpenLineup}>
-            Einsatzliste
-          </FoundationButton>
-        </FoundationCard>
-        <FoundationCard variant="decision" className="home-v2-quick-card">
-          <span className="eyebrow">Marktchance</span>
-          <strong>Transfermarkt</strong>
-          <p className="muted">Scouting, Wishlist und Deal-Vorschau ohne Umweg prüfen.</p>
-          <FoundationButton variant="secondary" className="home-v2-quick-link" onClick={onOpenMarket}>
-            Transfermarkt
-          </FoundationButton>
-        </FoundationCard>
-        <FoundationCard variant="decision" className="home-v2-quick-card">
-          <span className="eyebrow">Entwicklung</span>
-          <strong>Training</strong>
-          <p className="muted">Gewinner, Risiko-Fälle und Klassenfokus kompakt lesen.</p>
-          <FoundationButton variant="secondary" className="home-v2-quick-link" onClick={onOpenTraining}>
-            Training
-          </FoundationButton>
-        </FoundationCard>
-        <FoundationButton variant="secondary" className="home-v2-quick-link" onClick={onOpenOffice}>
-          Office
-        </FoundationButton>
-        <FoundationButton variant="secondary" className="home-v2-quick-link" onClick={onOpenSeason}>
-          Saisonstand
-        </FoundationButton>
-      </nav>
-
-      {(developmentHighlights.winners.length > 0 || developmentHighlights.risks.length > 0) ? (
-        <section className="home-v2-development-split" aria-label="Spielerentwicklung">
-          <FoundationCard variant="panel" className="home-v2-development-column">
-            <span className="eyebrow">Gewinner</span>
-            <strong>Potenzial über CA</strong>
-            <ul className="home-v2-development-list">
-              {developmentHighlights.winners.map((player) => (
-                <li key={player.playerId}>
-                  <button type="button" className="home-v2-development-item" onClick={() => onOpenPlayer(player.playerId)}>
-                    <span>{player.name}</span>
-                    <small className="muted">
-                      CA {formatNumber(player.caRating, 0)} · PO {formatNumber(player.poRangeMax, 0)}
-                    </small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </FoundationCard>
-          <FoundationCard variant="panel" className="home-v2-development-column">
-            <span className="eyebrow">Risiko</span>
-            <strong>Über Erwartung / Deckung</strong>
-            <ul className="home-v2-development-list">
-              {developmentHighlights.risks.map((player) => (
-                <li key={player.playerId}>
-                  <button type="button" className="home-v2-development-item" onClick={() => onOpenPlayer(player.playerId)}>
-                    <span>{player.name}</span>
-                    <small className="muted">
-                      CA {formatNumber(player.caRating, 0)} · Deckung {formatNumber(player.poRangeMax, 0)}
-                    </small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </FoundationCard>
-        </section>
-      ) : null}
-
       <div className="home-v2-main-grid home-v2-main-grid-compact">
         <section className="home-v2-top-players" aria-label="Top 6 Spieler">
           <div className="home-v2-panel-head">
@@ -323,8 +253,8 @@ export default function HomeV2Client({
               <EmptyState
                 title="Noch keine Kaderdaten"
                 text="Sobald das Team geladen ist, erscheinen hier die wichtigsten Kaderkarten."
-                actionLabel="Saisonstand öffnen"
-                onAction={onOpenSeason}
+                actionLabel="Weiter"
+                onAction={onContinue}
               />
             )}
           </div>
@@ -368,10 +298,52 @@ export default function HomeV2Client({
                 ))}
               </div>
             ) : null}
-            <FoundationButton variant="secondary" className="inline-button" onClick={onOpenOffice}>
-              Office
-            </FoundationButton>
           </FoundationCard>
+
+          {(developmentHighlights.winners.length > 0 || developmentHighlights.risks.length > 0) ? (
+            <FoundationCard as="section" variant="panel" className="home-v2-panel home-v2-development-panel">
+              <div className="home-v2-panel-head">
+                <span className="eyebrow">Entwicklung</span>
+                <h3>Gewinner & Risiko</h3>
+              </div>
+              <div className="home-v2-development-split is-sidebar">
+                {developmentHighlights.winners.length > 0 ? (
+                  <div className="home-v2-development-column">
+                    <span className="home-v2-development-label">Gewinner</span>
+                    <ul className="home-v2-development-list">
+                      {developmentHighlights.winners.map((player) => (
+                        <li key={player.playerId}>
+                          <button type="button" className="home-v2-development-item" onClick={() => onOpenPlayer(player.playerId)}>
+                            <span>{player.name}</span>
+                            <small className="muted">
+                              CA {formatNumber(player.caRating, 0)} · PO {formatNumber(player.poRangeMax, 0)}
+                            </small>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {developmentHighlights.risks.length > 0 ? (
+                  <div className="home-v2-development-column">
+                    <span className="home-v2-development-label">Risiko</span>
+                    <ul className="home-v2-development-list">
+                      {developmentHighlights.risks.map((player) => (
+                        <li key={player.playerId}>
+                          <button type="button" className="home-v2-development-item" onClick={() => onOpenPlayer(player.playerId)}>
+                            <span>{player.name}</span>
+                            <small className="muted">
+                              CA {formatNumber(player.caRating, 0)} · Deckung {formatNumber(player.poRangeMax, 0)}
+                            </small>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </FoundationCard>
+          ) : null}
 
           {inboxItems.length > 0 ? (
             <FoundationCard as="section" variant="panel" className="home-v2-panel home-v2-inbox-panel">

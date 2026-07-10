@@ -95,6 +95,7 @@ import {
   isExpectedSeasonOneMarketRosterBlocker,
   isSoftLongRunBlocker,
   isSoftOpenTechnicalBug,
+  isSoftPhaseAuditRed,
 } from "@/lib/season/long-run-soft-blockers";
 import { buildPhaseFeedbackMarkdownDe, printPhaseFeedbackDe } from "@/lib/season/long-run-phase-feedback";
 import { ensureIsolatedLongRunDatabase } from "@/lib/season/long-run-db-isolation";
@@ -573,6 +574,15 @@ function runPhaseCheckpoint(
     auditMdPath,
     [`# Long-Run Audit · ${phase} · ${save.gameState.season.id}`, "", buildPhaseFeedbackMarkdownDe({ save, phase, audit, picksRun: context.picksRun })].join("\n"),
   );
+  const hardReds = audit.checks.filter(
+    (entry) => entry.status === "RED" && !isSoftPhaseAuditRed(entry.id, audit.seasonId, audit.phase),
+  );
+  if (hardReds.length > 0 && process.env.OLY_LONG_RUN_RESILIENT_CHILD === "1") {
+    const redDetails = hardReds.map((entry) => `${entry.id}:${entry.detail}`).join(" | ");
+    console.error(`[long-run] Phase-Audit ${phase} RED (resilient child — orchestrator pauses): ${redDetails}`);
+    process.exitCode = 1;
+    return { save, audit };
+  }
   assertPhaseAuditNoRed(audit);
   return { save, audit };
 }

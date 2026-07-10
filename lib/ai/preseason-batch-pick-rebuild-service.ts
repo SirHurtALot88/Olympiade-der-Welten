@@ -137,6 +137,33 @@ export async function runPreseasonBatchPickRebuild(input: {
     if (topup.picks.length === 0) break;
   }
 
+  // Mandatory min-fill safety net (independent of OLY_ENABLE_EMERGENCY_REPAIR).
+  for (let pass = 0; pass < 4; pass += 1) {
+    const latest = input.persistence.getSaveById(input.saveId);
+    if (!latest) break;
+    const belowMin = latest.gameState.teams
+      .map((team) => team.teamId)
+      .filter((teamId) => rosterCount(latest.gameState, teamId) < getTeamHardMinRequired(latest.gameState, teamId));
+    if (belowMin.length === 0) break;
+
+    const minFill = runChunkedRedraftTopup({
+      persistence: input.persistence,
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      dryRun: false,
+      confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+      mode: "preseason_roster_repair",
+      target: "playerMin",
+      targetTeamIds: belowMin,
+      roundLimit: 6,
+      teamTimeLimitMs: 25_000,
+      watchdogMs: 45_000,
+    });
+    topupAppliedPicks += minFill.picks.length;
+    warnings.push(...minFill.warnings.slice(0, 4));
+    if (minFill.picks.length === 0) break;
+  }
+
   if (input.outputDir) {
     try {
       const outPath = path.join(input.outputDir, `preseason-batch-plan-vs-execute-${input.seasonId}.json`);

@@ -6555,6 +6555,22 @@ function getBudgetStretchEnvelope(input: {
       budgetStretchBlockedReason: null,
     };
   }
+  // Sum-cash rule: per-pick lane target may be exceeded when total cash stays >= 0.
+  const softStretchCap = roundValue(
+    Math.max(lanePriceCap, laneSpendCap) * (1 + Math.max(input.cashStrategy.overspendTolerance, 0.12)),
+    2,
+  );
+  if (canAffordWithoutNegativeCash(price, input.remainingCash) && price <= softStretchCap + 0.01) {
+    return {
+      budgetStretchApplied: price > laneSpendCap + 0.01,
+      effectiveLanePriceCap: softStretchCap,
+      effectiveLaneSpendCap: roundValue(Math.max(softStretchCap, price ?? 0), 2),
+      stretchPct: lanePriceCap > 0 && price != null ? Math.max(0, price / lanePriceCap - 1) : 0,
+      budgetStretchReason: "sum_cash_lane_soft_stretch",
+      budgetStretchPhaseAllowed: true,
+      budgetStretchBlockedReason: null,
+    };
+  }
   if (input.minimumSlotsMissing > 0 && (input.lane === "cheap_fill" || input.lane === "backup")) {
     return {
       budgetStretchApplied: false,

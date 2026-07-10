@@ -7,6 +7,7 @@ import {
   previewContractRenewalAction,
   previewSeasonEndContracts,
   resolveContractExitRenewBias,
+  resolveContractRenewalTco,
 } from "@/lib/contracts/contract-renewal-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
@@ -903,5 +904,49 @@ describe("contract renewal service", () => {
 
     expect(row?.recommendedAction).toBe("renew");
     expect(row?.warnings.some((warning) => warning.startsWith("contract_exit_loss_renew_bias:"))).toBe(true);
+  });
+
+  it("resolveContractRenewalTco prefers renew when exit path is more expensive", () => {
+    const tco = resolveContractRenewalTco({
+      exitProfitLoss: -8,
+      exitPurchasePrice: 20,
+      exitValue: 12,
+      renewalSalary: 4,
+      currentSalary: 4,
+      renewLength: 1,
+      ratingValue: 46,
+      badValueContract: false,
+    });
+    expect(tco.exitTco).toBeGreaterThan(tco.renewTco);
+    expect(tco.shouldBiasRenew).toBe(true);
+  });
+
+  it("blocks release under hard min when preview recommends renew and apply matches preview", () => {
+    const team = createTeam({ teamId: "A-A", cash: 18, humanControlled: false });
+    const players = Array.from({ length: 7 }, (_, index) =>
+      createPlayer(`p-${index}`, { rating: 62, marketValue: 22, salaryDemand: 3 }),
+    );
+    const rosters = players.map((player) =>
+      createRosterEntry(player.id, { teamId: "A-A", contractLength: 1, salary: 3, roleTag: "rotation" }),
+    );
+    const gameState = createGameState({ teams: [team], players, rosters });
+    gameState.teamIdentities = [{ teamId: "A-A", identityId: "A-A", playerMin: 8, playerMax: 14, playerOpt: 10 }];
+    const save = createSave(gameState);
+    const preview = previewSeasonEndContracts(save);
+    const renewRow = preview.rows.find((row) => row.recommendedAction === "renew");
+    expect(renewRow).toBeTruthy();
+    expect(renewRow?.canRenewEffective).toBe(true);
+
+    const persistence = {
+      getSaveById: () => save,
+      saveSingleplayerState: vi.fn((saveId: string, nextState: GameState) => {
+        save.gameState = nextState;
+        return { saveId, updatedAt: new Date().toISOString(), gameState: nextState };
+      }),
+    } as unknown as PersistenceService;
+    const apply = applySeasonEndContractTick(save, preview.confirmToken, persistence, preview);
+    expect(apply.applied).toBe(true);
+    expect(apply.renewedPlayers).toBeGreaterThan(0);
+    expect(save.gameState.rosters.length).toBeGreaterThanOrEqual(7);
   });
 });

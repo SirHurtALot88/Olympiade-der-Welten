@@ -1272,6 +1272,8 @@ export type ContractEventRecord = {
   newSalary: number | null;
   oldLength: number | null;
   newLength: number | null;
+  /** AI renewal/exit rationale (MS-3.2). */
+  decisionReason?: string | null;
   timestamp: string;
   source:
     | "season_end_contract_tick"
@@ -1888,6 +1890,26 @@ export type SeasonSnapshotGeneralManagerRecord = {
   dismissalReason?: TeamGeneralManagerAssignment["dismissalReason"];
 };
 
+export type TeamDisciplineRankSnapshotRecord = {
+  teamId: string;
+  teamCode?: string | null;
+  teamName: string;
+  totalRank: number;
+  powRank: number;
+  speRank: number;
+  menRank: number;
+  socRank: number;
+  disciplineRanks?: Record<string, number>;
+  scorePack?: {
+    total: number;
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+    disciplines?: Record<string, number>;
+  };
+};
+
 export type SeasonSnapshotRecord = {
   snapshotId?: string;
   seasonId: string;
@@ -1899,6 +1921,8 @@ export type SeasonSnapshotRecord = {
   sourceStatus?: "mapped" | "partial" | "missing_source";
   finalStandings: SeasonSnapshotTeamRecord[];
   teamSnapshots?: SeasonSnapshotTeamRecord[];
+  /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
+  teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   matchdayResults?: MatchdayResultRecord[];
   disciplineResults?: DisciplineResultRecord[];
   playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];

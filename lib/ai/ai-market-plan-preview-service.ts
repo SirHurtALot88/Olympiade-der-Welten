@@ -283,18 +283,8 @@ function chooseBuyCandidates(
     if (!isKnownPositiveMoney(priceValue) || usedPlayerIds.has(candidate.playerId)) {
       return false;
     }
-    const cashBuffer =
-      runwayReserve != null && Number.isFinite(runwayReserve)
-        ? runwayReserve
-        : getPreviewCashBuffer({
-            salaryTotal: team.salaryTotal ?? team.salary ?? null,
-            rosterAfterSell,
-            playerMin,
-            wantedCount,
-            plannedBuyCount: selected.length,
-            strategySummary: team.explanation,
-          });
-    if (cashRemaining - priceValue < cashBuffer) {
+    // Sum-cash rule: pick is allowed when team cash stays >= 0 after fee (per-pick buffer overrun OK).
+    if (cashRemaining - priceValue < 0) {
       return false;
     }
     selected.push(candidate);

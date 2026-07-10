@@ -22,6 +22,8 @@ export type PickStepCandidate = {
   marketValue?: number | null;
   strategicBuyScore?: number | null;
   overallRecommendationScore?: number | null;
+  /** Team-need fit for this slot (higher = better match for open need axis / discipline). */
+  needMatchScore?: number | null;
 };
 
 export type PickStepResult = {
@@ -99,6 +101,9 @@ export function pickCandidateForSlot(input: {
           disableCheapLanes: input.qualityProfile.disableCheapLanes,
           pickPhase: input.pickPhase,
         });
+        if (candidate.needMatchScore != null && candidate.needMatchScore > 0) {
+          adjustedScore += candidate.needMatchScore * 0.35;
+        }
         if (!eligible) {
           adjustedScore -= 30;
         }

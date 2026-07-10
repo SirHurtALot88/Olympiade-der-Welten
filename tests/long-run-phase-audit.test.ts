@@ -64,7 +64,31 @@ describe("long-run phase audit", () => {
       matchdayState: { matchdayId: "md1" },
     } as unknown as GameState);
     expect(getAllTeamsBelowMinIds(save.gameState)).toEqual(["t1"]);
-    expect(runPhaseAuditDe(save, "preseason").checks.find((entry) => entry.id === "roster_min_before_md1")?.status).toBe("RED");
+    expect(runPhaseAuditDe(save, "preseason").checks.find((entry) => entry.id === "roster_post_buy")?.status).toBe("RED");
+  });
+
+  it("does not benchmark roster min/opt at season_end (post-sell is not a KPI)", () => {
+    const save = minimalSave({
+      season: { id: "season-1", name: "S1", currentMatchday: 10, matchdayIds: Array.from({ length: 10 }, (_, i) => `md${i + 1}`) },
+      gamePhase: "season_completed",
+      teams: [{ teamId: "t1", shortCode: "A-A", name: "A", budget: 200, cash: 50, rosterLimit: 32, humanControlled: false }],
+      teamIdentities: [{ teamId: "t1", playerMin: 10, playerOpt: 12 }],
+      players: [{ id: "p1", name: "P", gender: "male", race: "human", rating: 50, potential: 60, trainingMode: "mittel", fatigue: 40 }],
+      rosters: [{ id: "r1", teamId: "t1", playerId: "p1", contractLength: 2, salary: 10, upkeep: 0, roleTag: "starter", joinedSeasonId: "season-1" }],
+      transferHistory: [],
+      contracts: [],
+      transferListings: [],
+      seasonState: {
+        standings: { t1: { rank: 1, points: 30, teamId: "t1" } },
+        matchdayResults: Array.from({ length: 10 }, (_, i) => ({ seasonId: "season-1", matchdayId: `md${i + 1}` })),
+        injuryEvents: [{ seasonId: "season-1", playerId: "p1", teamId: "t1", result: "injured" }],
+      },
+      matchdayState: { matchdayId: "md10" },
+    } as unknown as GameState);
+
+    const audit = runPhaseAuditDe(save, "season_end");
+    expect(audit.checks.find((entry) => entry.id === "roster_after_exits")).toBeUndefined();
+    expect(audit.checks.find((entry) => entry.id === "roster_post_buy")).toBeUndefined();
   });
 
   it("flags manual_xp_spend_preview upgrades at season end", () => {

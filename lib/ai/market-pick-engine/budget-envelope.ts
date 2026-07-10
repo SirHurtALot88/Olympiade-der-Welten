@@ -76,6 +76,8 @@ export function capExplicitCountsByBudget(input: {
   brackets: LeagueMarketBrackets;
   missingToMin?: number;
   superstarCap?: number;
+  /** When true, `spendable` already has MW buffer deducted upstream. */
+  spendableIsNet?: boolean;
 }): PlannerExplicitCounts {
   return planSlotsFromBudget({
     counts: input.counts,
@@ -83,6 +85,7 @@ export function capExplicitCountsByBudget(input: {
     slotsToFill: Math.max(input.rosterGap, 0),
     brackets: input.brackets,
     superstarCap: input.superstarCap,
+    spendableIsNet: input.spendableIsNet,
   });
 }
 
@@ -270,6 +273,8 @@ export function buildPlannerEnvelope(input: {
   specialistNeeded?: number;
   superstarCap?: number;
   templateId?: string;
+  /** When true, `spendable` already reflects buy affordability (no second MW buffer). */
+  spendableIsNet?: boolean;
 }): BudgetEnvelope {
   if (input.explicitCounts) {
     const brackets = buildLeagueMarketBrackets(input.faPrices ?? []);
@@ -283,6 +288,7 @@ export function buildPlannerEnvelope(input: {
       missingToMin: input.missingToMin,
       brackets,
       superstarCap: input.superstarCap ?? input.profile.superstarAllowed,
+      spendableIsNet: input.spendableIsNet,
     });
     const slotSequence = buildExplicitSlotSequence({
       steps: planSteps,

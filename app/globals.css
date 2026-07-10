@@ -8550,6 +8550,16 @@ a {
 .transfer-history-v2-timeline {
   display: grid;
   gap: 10px;
+  max-height: min(72vh, 920px);
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.transfer-history-v2-timeline:focus-visible {
+  outline: 2px solid rgba(112, 168, 255, 0.42);
+  outline-offset: 2px;
+  border-radius: 12px;
 }
 
 .transfer-history-v2-timeline-card {
@@ -8607,6 +8617,48 @@ a {
   gap: 16px;
   align-items: start;
   margin-bottom: 14px;
+}
+
+.transfer-history-v2-spotlight-hero {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.transfer-history-v2-portrait-card {
+  width: 100%;
+  max-width: 240px;
+}
+
+.transfer-history-v2-portrait-card .home-v2-player-hero {
+  aspect-ratio: 3 / 4;
+}
+
+.transfer-history-v2-spotlight-copy {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+
+.transfer-history-v2-spotlight-guv {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.transfer-history-v2-spotlight-guv.is-positive {
+  color: #8ee39b;
+}
+
+.transfer-history-v2-spotlight-guv.is-negative {
+  color: #ff9f9f;
 }
 
 .transfer-history-v2-portrait {
@@ -8671,7 +8723,11 @@ a {
 
 .transfer-history-v2-team-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
+  max-height: min(72vh, 920px);
+  overflow: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
 }
 
 .transfer-history-v2-team-card {
@@ -8683,6 +8739,57 @@ a {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(19, 24, 36, 0.76);
+}
+
+.transfer-history-v2-team-card.is-compact {
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.transfer-history-v2-team-compact-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.transfer-history-v2-team-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(226, 235, 250, 0.86);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.transfer-history-v2-team-compact-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.transfer-history-v2-team-compact-income {
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgba(226, 235, 250, 0.92);
+}
+
+.transfer-history-v2-team-compact-income.is-positive {
+  color: #8ee39b;
+}
+
+.transfer-history-v2-team-compact-meta {
+  color: rgba(196, 208, 228, 0.72);
+  font-size: 0.68rem;
+  line-height: 1.2;
 }
 
 .transfer-history-v2-team-net {
@@ -8743,6 +8850,14 @@ a {
 
   .transfer-history-v2-layout {
     grid-template-columns: 1fr;
+  }
+
+  .transfer-history-v2-spotlight-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .transfer-history-v2-portrait-card {
+    max-width: 220px;
   }
 }
 
@@ -9856,6 +9971,68 @@ a {
 .ranks-leader-card.is-soc {
   border-color: rgba(225, 178, 82, 0.38);
   background: linear-gradient(135deg, rgba(225, 164, 47, 0.24), rgba(255, 255, 255, 0.04));
+}
+
+.ranks-panel-header {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ranks-panel-heading {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ranks-season-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.ranks-season-select {
+  min-width: 180px;
+}
+
+.ranks-season-source {
+  font-size: 12px;
+}
+
+.ranks-rank-cell {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.ranks-rank-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.ranks-rank-delta {
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0.95;
+}
+
+.ranks-rank-delta.is-improved {
+  color: #6ee7a8;
+}
+
+.ranks-rank-delta.is-declined {
+  color: #f87171;
+}
+
+.ranks-table tbody td.ranks-metric-cell .ranks-rank-delta.is-improved {
+  color: #bbf7d0;
+}
+
+.ranks-table tbody td.ranks-metric-cell .ranks-rank-delta.is-declined {
+  color: #fecaca;
 }
 
 .league-leaders-panel {
@@ -28245,28 +28422,37 @@ a {
 
 .market-v2-filter-board {
   display: grid;
-  grid-template-columns: minmax(560px, 1.2fr) minmax(320px, 0.8fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(220px, 0.75fr);
+  gap: 8px;
 }
 
 .market-v2-filter-panel {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 16px;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(12, 20, 33, 0.86), rgba(11, 16, 26, 0.9));
   border: 1px solid rgba(92, 126, 185, 0.16);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.02),
     0 12px 28px rgba(5, 10, 18, 0.12);
+  min-width: 0;
 }
 
 .market-v2-filter-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+  min-height: 0;
+}
+
+.market-v2-filter-head strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(214, 223, 238, 0.72);
 }
 
 .market-v2-filter-head small {
@@ -28383,10 +28569,20 @@ a {
   min-width: 0;
 }
 
+.market-v2-filter-chip.is-icon-only {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 0;
+}
+
 .market-v2-filter-icon-chip {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -28394,8 +28590,8 @@ a {
 }
 
 .market-v2-filter-icon {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
 }
 
@@ -28449,36 +28645,53 @@ a {
 
 .market-v2-class-group-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .market-v2-class-group {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 14px;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.025);
+  min-width: 0;
 }
 
 .market-v2-class-axis-chip {
   width: fit-content;
-  min-height: 30px;
-  padding-inline: 12px;
+  min-height: 22px;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
 }
 
 .market-v2-class-axis-label {
   color: rgba(214, 223, 238, 0.68);
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .market-v2-class-group-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
+}
+
+.market-v2-race-chip-row {
+  gap: 4px;
+}
+
+.market-v2-discipline-lens-panel .filter-field {
+  margin: 0;
+}
+
+.market-v2-discipline-lens-panel .market-v2-lens-copy {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .market-v2-filter-presets {
@@ -28941,9 +29154,17 @@ a {
 
 .market-v2-main-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(430px, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+}
+
+.market-v2-focus-deal-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
 }
 
 .market-v2-candidate-rail,
@@ -29400,11 +29621,37 @@ a {
 
 .market-v2-player-hero {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(148px, 220px) minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
   padding-bottom: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.market-v2-selected-portrait-card {
+  width: 100%;
+  max-width: 220px;
+}
+
+.market-v2-selected-portrait-card .home-v2-player-overlay-bottom {
+  gap: 4px;
+  padding: 20px 8px 8px;
+}
+
+.market-v2-selected-portrait-card .home-v2-player-name {
+  font-size: 0.82rem;
+}
+
+.market-v2-selected-portrait-card .foundation-player-portrait-economy {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.market-v2-selected-portrait-card .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip {
+  padding: 3px 2px;
+}
+
+.market-v2-buy-panel .market-v2-buy-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .market-v2-player-copy p {
@@ -30382,6 +30629,23 @@ a {
   justify-content: center;
 }
 
+.market-v2-roster-axis-cell {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  min-width: 52px;
+}
+
+.market-v2-roster-axis-prev {
+  display: block;
+  font-size: 0.62rem;
+  line-height: 1.15;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  color: rgba(196, 208, 228, 0.72);
+  white-space: nowrap;
+}
+
 .market-v2-roster-discipline-head,
 .market-v2-roster-discipline-cell {
   text-align: center;
@@ -30621,6 +30885,56 @@ a {
   background: rgba(255, 255, 255, 0.04);
 }
 
+button.market-v2-bucket-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+button.market-v2-bucket-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(132, 168, 255, 0.34);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+button.market-v2-bucket-card.is-selected {
+  border-color: rgba(132, 168, 255, 0.52);
+  background:
+    radial-gradient(circle at top right, rgba(97, 140, 255, 0.16), transparent 48%),
+    rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(132, 168, 255, 0.18);
+}
+
+.market-v2-pool-bracket-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.market-v2-pool-bracket-table {
+  min-width: 920px;
+}
+
+.market-v2-pool-bracket-row {
+  cursor: pointer;
+}
+
+.market-v2-pool-bracket-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.market-v2-pool-bracket-row.is-selected {
+  background: rgba(112, 168, 255, 0.1);
+}
+
 .market-v2-clickable {
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -30636,7 +30950,11 @@ a {
 
 @media (max-width: 1440px) {
   .market-v2-main-grid {
-    grid-template-columns: minmax(250px, 300px) minmax(320px, 1fr) minmax(280px, 340px);
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  }
+
+  .market-v2-focus-deal-column {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
   }
 
   .market-v2-summary-grid {
@@ -30644,6 +30962,23 @@ a {
   }
 
   .market-v2-focus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1280px) {
+  .market-v2-focus-deal-column {
+    grid-template-columns: 1fr;
+  }
+
+  .market-v2-focus-panel,
+  .market-v2-buy-panel {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .market-v2-buy-panel .market-v2-buy-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -30696,6 +31031,10 @@ a {
   }
 
   .market-v2-class-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .market-v2-filter-board {
     grid-template-columns: 1fr;
   }
 }
@@ -35062,8 +35401,15 @@ a {
   overflow: hidden;
   text-align: left;
   cursor: pointer;
-  color: inherit;
+  color: rgba(248, 251, 255, 0.98);
   font: inherit;
+  min-width: 0;
+}
+
+.foundation-player-portrait-card {
+  overflow: hidden;
+  min-width: 0;
+  color: rgba(248, 251, 255, 0.98);
 }
 
 .home-v2-player-card.is-rank-gold {
@@ -35117,7 +35463,9 @@ a {
   display: grid;
   gap: 8px;
   padding: 28px 10px 10px;
-  background: linear-gradient(180deg, rgba(6, 10, 18, 0) 0%, rgba(6, 10, 18, 0.72) 38%, rgba(6, 10, 18, 0.94) 100%);
+  min-width: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(6, 10, 18, 0) 0%, rgba(6, 10, 18, 0.82) 28%, rgba(6, 10, 18, 0.98) 100%);
 }
 
 .home-v2-player-rank-pill {
@@ -35170,9 +35518,13 @@ a {
   font-size: 0.92rem;
   line-height: 1.2;
   color: rgba(248, 251, 255, 0.98);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.92),
+    0 0 10px rgba(0, 0, 0, 0.72);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .home-v2-player-portrait {
@@ -35288,6 +35640,8 @@ a {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   text-align: center;
   justify-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .foundation-player-portrait-stat.heat-band-1,
@@ -35320,7 +35674,12 @@ a {
 }
 
 .foundation-player-portrait-stat strong {
-  color: inherit;
+  color: rgba(245, 239, 224, 0.98);
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .team-portraits-panel {
@@ -35709,6 +36068,15 @@ a {
 .market-v2-candidate-card .foundation-player-portrait-rail-meta .home-v2-player-name {
   font-size: 0.76rem;
   font-weight: 700;
+  color: rgba(248, 251, 255, 0.98);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-v2-candidate-card {
+  color: rgba(248, 251, 255, 0.96);
 }
 
 .market-v2-candidate-card .foundation-player-portrait-stats.is-rail-inline {
@@ -36130,11 +36498,37 @@ a {
   align-items: start;
 }
 
+.home-v2-panel-head {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.home-v2-panel-head h3 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .home-v2-development-split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 14px;
+}
+
+.home-v2-development-split.is-sidebar {
+  gap: 10px;
+}
+
+.home-v2-development-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(235, 239, 247, 0.62);
 }
 
 .home-v2-development-list {
@@ -36152,16 +36546,28 @@ a {
   border-radius: 10px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.home-v2-development-item span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .home-v2-side-stack {
-  grid-column: span 4;
+  grid-column: span 5;
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .home-v2-main-grid-compact .home-v2-top-players {
-  grid-column: span 8;
+  grid-column: span 7;
 }
 
 .home-v2-next-button {
@@ -39385,8 +39791,6 @@ a {
 .modern-game-decision-stat.is-warning { border-color: rgba(245, 158, 11, 0.35); }
 .modern-game-decision-stat.is-ready strong { color: #93c5fd; }
 .modern-game-today-chips .home-v2-signal-chip.is-primary { border-color: rgba(96, 165, 250, 0.55); box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.18); }
-.modern-game-quick-nav { position: sticky; top: 0; z-index: 2; padding: 8px 0; backdrop-filter: blur(10px); }
-.modern-game-sticky-filters { position: sticky; top: 0; z-index: 4; padding-bottom: 8px; background: linear-gradient(180deg, rgba(8, 12, 20, 0.98) 70%, rgba(8, 12, 20, 0)); }
 .market-v2-decision-board { margin-bottom: 12px; }
 .modern-game-training-compare { display: grid; gap: 10px; margin-top: 12px; }
 .modern-game-training-compare-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -39545,7 +39949,7 @@ a {
 
 @media (min-width: 1440px) {
   .foundation-shell .foundation-main-content {
-    max-width: 1320px;
+    max-width: 1680px;
   }
   .season-v2-table-shell,
   .transfermarkt-v2-table-shell {
@@ -39555,7 +39959,7 @@ a {
 
 @media (min-width: 1920px) {
   .foundation-shell .foundation-main-content {
-    max-width: 1680px;
+    max-width: 1920px;
   }
   .foundation-home-v2-grid,
   .teams-v2-layout,

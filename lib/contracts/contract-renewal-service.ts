@@ -27,6 +27,7 @@ import {
   type ContractNegotiationPreview,
 } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import { applyMoraleToSalary, assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -68,6 +69,8 @@ export type ContractRenewalPreviewRow = {
   recommendedContractShape: ContractShape;
   recommendedAction: "renew" | "sell_or_replace" | "release" | "manual_decision" | "no_action";
   renewalBlockReason: "none" | "cash_gate" | "heuristic" | "morale" | "bad_value" | "manual" | null;
+  canRenewEffective: boolean;
+  decisionReason: string | null;
   marketValue: number | null;
   ovr: number | null;
   mvs: number | null;
@@ -254,6 +257,85 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+const DEFAULT_REPLACEMENT_FEE_MW = 15;
+const TCO_RENEW_MARGIN = 0.08;
+
+function resolveExpectedReplacementFeeMw(input?: { leagueDepthFloorMw?: number | null }) {
+  const depthFloor =
+    input?.leagueDepthFloorMw ??
+    MARKET_BRACKET_DEFINITIONS.find((definition) => definition.lane === "backup")?.defaultTargetMw ??
+    DEFAULT_REPLACEMENT_FEE_MW;
+  return roundMoney(Math.max(DEFAULT_REPLACEMENT_FEE_MW, depthFloor)) ?? DEFAULT_REPLACEMENT_FEE_MW;
+}
+
+/**
+ * Total cost of ownership: exit path (fee + replacement + P/L + min risk) vs renew path (salary × years).
+ */
+export function resolveContractRenewalTco(input: {
+  exitProfitLoss: number | null;
+  exitPurchasePrice: number | null;
+  exitValue: number | null;
+  renewalSalary: number | null;
+  currentSalary: number | null;
+  renewLength: number;
+  ratingValue: number;
+  badValueContract: boolean;
+  rosterAfterRelease?: number;
+  playerMin?: number;
+  expectedReplacementFee?: number | null;
+}): {
+  exitTco: number;
+  renewTco: number;
+  shouldBiasRenew: boolean;
+  preferRenewOverExit: boolean;
+  exitLossAbs: number;
+  renewalYearCost: number;
+  minRiskPremium: number;
+  score: number;
+} {
+  const exitBias = resolveContractExitRenewBias({
+    exitProfitLoss: input.exitProfitLoss,
+    exitPurchasePrice: input.exitPurchasePrice,
+    exitValue: input.exitValue,
+    renewalSalary: input.renewalSalary,
+    currentSalary: input.currentSalary,
+    ratingValue: input.ratingValue,
+    badValueContract: input.badValueContract,
+  });
+  const exitValue = input.exitValue ?? 0;
+  const replacementFee = resolveExpectedReplacementFeeMw({
+    leagueDepthFloorMw: input.expectedReplacementFee,
+  });
+  const profitLossAbs = Math.max(0, -(input.exitProfitLoss ?? 0));
+  const underMin =
+    input.playerMin != null &&
+    input.rosterAfterRelease != null &&
+    input.rosterAfterRelease < input.playerMin;
+  const minRiskPremium = underMin ? replacementFee * 0.35 : 0;
+  const exitTco = roundMoney(exitValue + replacementFee + profitLossAbs + minRiskPremium) ?? 0;
+  const renewLength = Math.max(1, Math.min(5, input.renewLength));
+  const renewalYearCost = exitBias.renewalYearCost;
+  const renewTco = roundMoney(renewalYearCost * renewLength) ?? renewalYearCost;
+  const renewCheaper = renewTco < exitTco * (1 - TCO_RENEW_MARGIN);
+  const shouldBiasRenew =
+    underMin ||
+    exitBias.shouldBiasRenew ||
+    renewCheaper ||
+    (exitBias.preferRenewOverExit && !input.badValueContract);
+  const preferRenewOverExit =
+    underMin || exitBias.preferRenewOverExit || (renewCheaper && input.ratingValue >= 28);
+  return {
+    exitTco,
+    renewTco,
+    shouldBiasRenew,
+    preferRenewOverExit,
+    exitLossAbs: exitBias.exitLossAbs,
+    renewalYearCost,
+    minRiskPremium,
+    score: exitBias.score + (renewCheaper ? 0.15 : 0) + (underMin ? 0.35 : 0),
+  };
+}
+
 /**
  * Sell-parity for contract exits: exit cash (MW × factor) below purchase price is a realized cash loss
  * (e.g. bought for 20, exit fee 15 → −5). Bias toward a short renewal when eating that loss is
@@ -331,6 +413,7 @@ function shouldAiRenewContract(input: {
   exitPurchasePrice?: number | null;
   exitValue?: number | null;
   currentSalary?: number | null;
+  renewLength?: number;
 }) {
   const {
     entry,
@@ -346,8 +429,9 @@ function shouldAiRenewContract(input: {
     exitPurchasePrice,
     exitValue,
     currentSalary,
+    renewLength,
   } = input;
-  if (contractStrategy === "do_not_renew" || contractStrategy === "market_test") {
+  if (contractStrategy === "do_not_renew") {
     return false;
   }
   const marketValue =
@@ -409,17 +493,33 @@ function shouldAiRenewContract(input: {
     playerMin != null &&
     rosterAfterRelease != null &&
     rosterAfterRelease < playerMin &&
+    !(badValueContract && ratingValue < 38) &&
     !isForceReleaseCase({ morale, badValueContract });
 
-  const exitLossRenewBias = resolveContractExitRenewBias({
+  const renewalTco = resolveContractRenewalTco({
     exitProfitLoss,
     exitPurchasePrice,
     exitValue,
     renewalSalary: renewalSalaryPreview,
     currentSalary: currentSalary ?? entry.salary ?? null,
+    renewLength: renewLength ?? 1,
     ratingValue,
     badValueContract,
+    rosterAfterRelease,
+    playerMin,
   });
+
+  if (contractStrategy === "market_test" || contractStrategy === "salary_cap") {
+    return renewalTco.shouldBiasRenew && !badValueContract && !salaryRisk;
+  }
+
+  const exitLossRenewBias = {
+    shouldBiasRenew: renewalTco.shouldBiasRenew,
+    preferRenewOverExit: renewalTco.preferRenewOverExit,
+    score: renewalTco.score,
+    exitLossAbs: renewalTco.exitLossAbs,
+    renewalYearCost: renewalTco.renewalYearCost,
+  };
 
   const strategyRenewBias =
     contractStrategy === "extend_core" ||
@@ -736,18 +836,25 @@ function buildPreviewRow(input: {
   const salaryToMarketRatioForBad = marketValueForBad > 0 ? salaryAfterRenewalForBad / marketValueForBad : 1;
   const badValueContract =
     marketValueForBad > 0 && salaryToMarketRatioForBad > 0.42 && ratingValueForBad < 65;
-  const exitLossRenewBias = resolveContractExitRenewBias({
+  const rosterTargets = deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId));
+  const rosterAfterRelease = save.gameState.rosters.filter(
+    (roster) => roster.teamId === entry.teamId && roster.playerId !== entry.playerId,
+  ).length;
+  const renewalTco = resolveContractRenewalTco({
     exitProfitLoss: exit.profitLoss,
     exitPurchasePrice: exit.purchasePrice,
     exitValue: exit.exitValue,
     renewalSalary: moraleAdjustedRenewalSalary,
     currentSalary: entry.salary ?? null,
+    renewLength: recommendedLength,
     ratingValue: ratingValueForBad,
     badValueContract,
+    rosterAfterRelease,
+    playerMin: rosterTargets.playerMin,
   });
-  const bridgeRenewalCost = exitLossRenewBias.renewalYearCost;
+  const bridgeRenewalCost = renewalTco.renewalYearCost;
   const exitEconomicsAllowRenew =
-    exitLossRenewBias.preferRenewOverExit && renewalCashGate.cash >= bridgeRenewalCost && bridgeRenewalCost > 0;
+    renewalTco.preferRenewOverExit && renewalCashGate.cash >= bridgeRenewalCost && bridgeRenewalCost > 0;
   const canRenewEffective = renewalCashGate.canRenew || exitEconomicsAllowRenew;
   const warnings = [
     ...negotiationPreview.warnings.filter((warning) => warning !== "preview_only_contract_negotiation"),
@@ -757,11 +864,11 @@ function buildPreviewRow(input: {
     controlMode === "ai" && !canRenewEffective ? renewalCashGate.warning : null,
     morale?.contractIntent === "refuses_extension" ? "morale_refuses_extension_risk" : null,
     morale?.contractIntent === "considering_exit" ? "morale_exit_risk" : null,
-    exitLossRenewBias.shouldBiasRenew
-      ? `contract_exit_loss_renew_bias:${exitLossRenewBias.score.toFixed(2)}`
+    renewalTco.shouldBiasRenew
+      ? `contract_exit_loss_renew_bias:${renewalTco.score.toFixed(2)}`
       : null,
-    exitLossRenewBias.preferRenewOverExit
-      ? `contract_exit_tco_prefers_renew:loss=${exitLossRenewBias.exitLossAbs.toFixed(1)}:salary=${bridgeRenewalCost.toFixed(1)}`
+    renewalTco.preferRenewOverExit
+      ? `contract_exit_tco_prefers_renew:exit=${renewalTco.exitTco.toFixed(1)}:renew=${renewalTco.renewTco.toFixed(1)}`
       : null,
     morale?.moraleContractLengthLimit != null ? "morale_limits_contract_length" : null,
     controlMode === "ai" && recommendedContractShape !== "balanced" ? `ai_contract_shape:${recommendedContractShape}` : null,
@@ -769,25 +876,23 @@ function buildPreviewRow(input: {
     ...(morale?.warnings ?? []),
   ].filter((warning): warning is string => Boolean(warning));
 
+  const contractStrategy =
+    save.gameState.seasonState.aiManagerContractStrategies?.[`${entry.teamId}:${entry.playerId}`]?.strategy ?? null;
   const wouldRenewHeuristic = shouldAiRenewContract({
     entry,
     player,
     rating,
     renewalSalaryPreview: moraleAdjustedRenewalSalary,
     morale,
-    contractStrategy:
-      save.gameState.seasonState.aiManagerContractStrategies?.[`${entry.teamId}:${entry.playerId}`]?.strategy ?? null,
-    rosterAfterRelease: save.gameState.rosters.filter(
-      (roster) => roster.teamId === entry.teamId && roster.playerId !== entry.playerId,
-    ).length,
-    playerMin: deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId))
-      .playerMin,
-    playerOpt: deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId))
-      .playerOpt,
+    contractStrategy,
+    rosterAfterRelease,
+    playerMin: rosterTargets.playerMin,
+    playerOpt: rosterTargets.playerOpt,
     exitProfitLoss: exit.profitLoss,
     exitPurchasePrice: exit.purchasePrice,
     exitValue: exit.exitValue,
     currentSalary: entry.salary ?? null,
+    renewLength: recommendedLength,
   });
 
   const recommendedAction =
@@ -813,6 +918,25 @@ function buildPreviewRow(input: {
               : morale?.contractIntent === "refuses_extension" || morale?.contractIntent === "considering_exit"
                 ? "morale"
                 : "heuristic";
+
+  const decisionReason =
+    tick.nextStatus !== "out_of_contract" || controlMode !== "ai"
+      ? null
+      : recommendedAction === "renew"
+        ? rosterAfterRelease < (rosterTargets.playerMin ?? Number.MAX_SAFE_INTEGER)
+          ? "hard_min_retention"
+          : renewalTco.preferRenewOverExit
+            ? "tco_prefers_renew"
+            : contractStrategy === "extend_core"
+              ? "extend_core_strategy"
+              : "heuristic_renew"
+        : !canRenewEffective
+          ? "cash_gate"
+          : badValueContract
+            ? "bad_value_contract"
+            : renewalTco.exitTco <= renewalTco.renewTco
+              ? "exit_cheaper_than_renew"
+              : "heuristic_release";
 
   return {
     rowId: entry.id,
@@ -851,6 +975,8 @@ function buildPreviewRow(input: {
     recommendedContractShape,
     recommendedAction,
     renewalBlockReason,
+    canRenewEffective,
+    decisionReason,
     marketValue: roundMoney(marketValue),
     ovr: rating?.ovrNormalized ?? null,
     mvs: rating?.mvs ?? null,
@@ -978,7 +1104,6 @@ export function applySeasonEndContractTick(
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
   const teamsById = new Map(save.gameState.teams.map((team) => [team.teamId, team] as const));
   const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
-  const strategyProfileByTeamId = new Map(save.gameState.teams.map((team) => [team.teamId, getTeamStrategyProfile(save.gameState, team.teamId)] as const));
   const nextRosters: RosterEntry[] = [];
   const contractEvents: ContractEventRecord[] = [];
   const transferHistory: TransferHistoryEntry[] = [];
@@ -1000,15 +1125,8 @@ export function applySeasonEndContractTick(
       }
 
       const team = teamsById.get(entry.teamId) ?? null;
-      const renewalCashGate = buildAiRenewalCashGate({
-        gameState: save.gameState,
-        team,
-        teamId: entry.teamId,
-        currentSalary: entry.salary,
-        renewalSalary: row?.renewalSalaryPreview ?? null,
-        profile: strategyProfileByTeamId.get(entry.teamId) ?? null,
-      });
-      if (row?.controlMode === "ai" && row.recommendedAction === "renew" && renewalCashGate.canRenew) {
+      const canRenewEffective = row?.canRenewEffective ?? false;
+      if (row?.controlMode === "ai" && row.recommendedAction === "renew" && canRenewEffective) {
         const newSalary = roundMoney(row.renewalSalaryPreview ?? entry.salary) ?? entry.salary;
         const contractShape = row.recommendedContractShape ?? "balanced";
         const bridgeRenew =
@@ -1042,6 +1160,7 @@ export function applySeasonEndContractTick(
             oldLength: normalizeLength(entry.contractLength),
             newLength: renewLength,
             source: "ai_contract_renewal",
+            decisionReason: row.decisionReason,
           }),
         );
         continue;
@@ -1114,6 +1233,7 @@ export function applySeasonEndContractTick(
           oldLength: normalizeLength(entry.contractLength),
           newLength: 0,
           source,
+          decisionReason: row?.decisionReason ?? "contract_expired_exit",
         }),
       );
       continue;

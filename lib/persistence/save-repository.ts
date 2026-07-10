@@ -820,16 +820,17 @@ function loadPlayersForSave(saveId: string) {
   return [...playersById.values()].sort((left, right) => left.id.localeCompare(right.id));
 }
 
-function replacePlayersForSave(saveId: string, players: Player[], catalogSourcePlayers: Player[], updatedAt: string) {
+function replacePlayersForSave(
+  saveId: string,
+  players: Player[],
+  catalogSourcePlayers: Player[],
+  updatedAt: string,
+  options?: { touchPlayerIds?: Set<string> },
+) {
   const database = getDatabase();
   ensurePlayerCatalog(database, catalogSourcePlayers, updatedAt);
   const catalog = loadPlayerCatalog(database);
 
-  // Perf: with thousands of players in the universe, a typical incremental save only actually
-  // changes a handful of them (e.g. the 1-2 players involved in a transfer). Blindly doing a full
-  // DELETE + re-INSERT of every player row on every save (as before) makes per-save cost scale with
-  // total player count instead of with the number of players that actually changed. Diff against
-  // what's already persisted and only touch rows whose payload changed.
   const existingRows = database.prepare("SELECT player_id, payload_json FROM players WHERE save_id = ?").all(saveId) as Array<{
     player_id: string;
     payload_json: string;
@@ -842,8 +843,10 @@ function replacePlayersForSave(saveId: string, players: Player[], catalogSourceP
   );
   const deleteStatement = database.prepare("DELETE FROM players WHERE save_id = ? AND player_id = ?");
 
+  const touchPlayerIds = options?.touchPlayerIds;
+  const playersToWrite = touchPlayerIds ? players.filter((player) => touchPlayerIds.has(player.id)) : players;
   const seenPlayerIds = new Set<string>();
-  for (const player of players) {
+  for (const player of playersToWrite) {
     seenPlayerIds.add(player.id);
     const basePlayer = catalog.get(player.id);
     const payload: PlayerSavePayload | null = basePlayer
@@ -866,9 +869,11 @@ function replacePlayersForSave(saveId: string, players: Player[], catalogSourceP
     }
   }
 
-  for (const existingPlayerId of existingPayloadByPlayerId.keys()) {
-    if (!seenPlayerIds.has(existingPlayerId)) {
-      deleteStatement.run(saveId, existingPlayerId);
+  if (!touchPlayerIds) {
+    for (const existingPlayerId of existingPayloadByPlayerId.keys()) {
+      if (!seenPlayerIds.has(existingPlayerId)) {
+        deleteStatement.run(saveId, existingPlayerId);
+      }
     }
   }
 }
@@ -1195,9 +1200,14 @@ function createPersistedSaveRecord(input: {
       ),
     ),
   );
+  const baselinePlayerIds = new Set([
+    ...normalizedWithoutBaselines.rosters.map((entry) => entry.playerId),
+    ...(normalizedWithoutBaselines.playerBaselines ?? []).map((entry) => entry.playerId),
+  ]);
   const normalizedGameState = ensurePlayerBaselines(normalizedWithoutBaselines, {
     sourcePlayers: loadBaselineSourcePlayers(),
     createdAt,
+    playerIds: baselinePlayerIds,
   }).gameState;
   const existingMetadata = loadSingleton<GameMetadata>("game_metadata", input.saveId);
   const existingBaselines = loadPlayerBaselinesForSave(

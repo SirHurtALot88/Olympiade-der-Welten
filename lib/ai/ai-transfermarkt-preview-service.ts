@@ -1641,8 +1641,9 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
       ? listLocalTransfermarktFreeAgents({
           saveId: context.saveId,
           seasonId: context.seasonId,
-          limit: Math.max(context.gameState.players.length, 5000),
           mode: "ai_preview",
+          fullPool: candidateScopeMode === "budget_wide",
+          limit: candidateScopeMode === "budget_wide" ? undefined : Math.max(120, params.limit ?? 250),
           localRunContext: context.localRunContext,
         })
       : null;

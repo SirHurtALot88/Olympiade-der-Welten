@@ -56,6 +56,40 @@ function log(message: string) {
   console.error(`[resilient-multiseason] ${message}`);
 }
 
+function acquireRunLock(outputDir: string) {
+  const lockPath = path.join(outputDir, "RUN.lock");
+  if (fs.existsSync(lockPath)) {
+    const lock = readJsonIfExists<{ pid: number; startedAt: string }>(lockPath);
+    const ageMs = lock?.startedAt ? Date.now() - new Date(lock.startedAt).getTime() : Number.POSITIVE_INFINITY;
+    if (lock && ageMs < 6 * 60 * 60 * 1000) {
+      throw new Error(
+        `Run lock active on ${outputDir} (pid ${lock.pid}, since ${lock.startedAt}). Stop the other process before starting a new run.`,
+      );
+    }
+    log(`WARN: Stale run lock removed (${lock?.startedAt ?? "unknown"})`);
+  }
+  fs.writeFileSync(
+    lockPath,
+    `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }, null, 2)}\n`,
+  );
+  const release = () => {
+    try {
+      if (fs.existsSync(lockPath)) fs.unlinkSync(lockPath);
+    } catch {
+      // ignore lock cleanup errors on exit
+    }
+  };
+  process.on("exit", release);
+  process.on("SIGINT", () => {
+    release();
+    process.exit(130);
+  });
+  process.on("SIGTERM", () => {
+    release();
+    process.exit(143);
+  });
+}
+
 function readJsonIfExists<T>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) return null;
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
@@ -180,7 +214,7 @@ function runAutoTuneOrganic(saveId: string, seasonId: string) {
   });
 }
 
-async function bootstrapFreshSeasonOneSave(outputDir: string) {
+async function bootstrapFreshSeasonOneSave(outputDir: string, targetSeasons: number) {
   const scriptPath = path.join(PROJECT_ROOT, "scripts", "long-run-sandbox-s1-s6.ts");
   const nodeOptions = process.env.NODE_OPTIONS?.includes("max-old-space-size")
     ? process.env.NODE_OPTIONS
@@ -193,7 +227,9 @@ async function bootstrapFreshSeasonOneSave(outputDir: string) {
       NODE_OPTIONS: nodeOptions,
       OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: process.env.OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER ?? "1",
       OLY_LONG_RUN_ALLOW_DEV_SERVER: process.env.OLY_LONG_RUN_ALLOW_DEV_SERVER ?? "0",
-      OLY_ENABLE_EMERGENCY_REPAIR: process.env.OLY_ENABLE_EMERGENCY_REPAIR ?? "1",
+      // Acceptance runs must never inherit emergency repair from the shell — topup poisons draft audit.
+      OLY_ENABLE_EMERGENCY_REPAIR: "0",
+      OLY_LONG_RUN_RESILIENT_CHILD: "1",
       OLY_LONG_RUN_STOP_AFTER: "draft",
       OLY_LONG_RUN_OUTPUT_DIR: outputDir,
       OLY_LONG_RUN_LABEL: "Resilient Multi S1-S5 Fresh Draft",
@@ -203,12 +239,50 @@ async function bootstrapFreshSeasonOneSave(outputDir: string) {
   const saveMatch =
     combined.match(/STOP_AFTER=draft — Save `([^`]+)` bereit/) ??
     combined.match(/\[long-run\] created (fresh-season-1-\d+)/);
-  if (result.status !== 0 || !saveMatch) {
+  if (!saveMatch) {
     throw new Error(
       `Fresh S1 draft bootstrap failed (exit ${result.status ?? "?"}): ${combined.split("\n").slice(-8).join(" | ")}`,
     );
   }
-  return saveMatch[1];
+  const saveId = saveMatch[1];
+  const resumeCommand = `node --import tsx scripts/run-resilient-multiseason.ts --save-id ${saveId} --seasons ${targetSeasons} --output-dir ${outputDir}`;
+  const pauseReasons: string[] = [];
+  if (result.status !== 0) {
+    const auditMatch = combined.match(/Phase-Audit draft fehlgeschlagen: (.+)/);
+    pauseReasons.push(auditMatch?.[1] ?? `draft child exit ${result.status ?? "?"}`);
+  }
+  const persistence = createPersistenceService();
+  const bootstrapped = persistence.getSaveById(saveId);
+  if (!bootstrapped) {
+    throw new Error(`Fresh S1 draft bootstrap save missing: ${saveId}`);
+  }
+  const legacyDraftBuys = bootstrapped.gameState.transferHistory.filter(
+    (entry) =>
+      entry.seasonId === "season-1" &&
+      entry.transferType === "buy" &&
+      (entry.source === "season1_autoprep_topup" || entry.source === "full_churn_redraft_buy"),
+  );
+  if (legacyDraftBuys.length > 0) {
+    pauseReasons.push(
+      `legacy draft buys: ${legacyDraftBuys.length} × ${legacyDraftBuys[0]?.source ?? "unknown"}`,
+    );
+  }
+  if (pauseReasons.length > 0) {
+    const draftAuditPath = findLatestAuditJson(outputDir, saveId, "draft", "season-1");
+    const draftAudit = draftAuditPath ? readJsonIfExists<PhaseAuditResult>(draftAuditPath) : null;
+    writePausedManifest({
+      outputDir,
+      saveId,
+      seasonId: "season-1",
+      phase: "draft",
+      reason: pauseReasons.join(" | "),
+      resumeCommand,
+      openTechnicalBugs: [],
+      audit: draftAudit,
+    });
+    return { saveId, paused: true };
+  }
+  return { saveId, paused: false };
 }
 
 function runFinalExports(saveId: string, outputDir: string, targetSeasons: number) {
@@ -269,7 +343,8 @@ function runLongRunSeason(input: {
       NODE_OPTIONS: nodeOptions,
       OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: process.env.OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER ?? "1",
       OLY_LONG_RUN_ALLOW_DEV_SERVER: process.env.OLY_LONG_RUN_ALLOW_DEV_SERVER ?? "0",
-      OLY_ENABLE_EMERGENCY_REPAIR: process.env.OLY_ENABLE_EMERGENCY_REPAIR ?? "1",
+      OLY_ENABLE_EMERGENCY_REPAIR: "0",
+      OLY_LONG_RUN_RESILIENT_CHILD: "1",
       OLY_LONG_RUN_SAVE_ID: input.saveId,
       OLY_LONG_RUN_FINAL_SEASON: String(input.finalSeason),
       OLY_LONG_RUN_STOP_AFTER: "season_end",
@@ -293,13 +368,19 @@ async function main() {
       ? path.join(PROJECT_ROOT, "outputs", `resilient-s1s5-${timestamp}`)
       : path.join(PROJECT_ROOT, "outputs", "realistic-5y", `${saveId ?? "unknown"}-${Date.now()}`));
   fs.mkdirSync(outputDir, { recursive: true });
+  acquireRunLock(outputDir);
 
   const dbIsolation = ensureIsolatedLongRunDatabase({ outputDir, projectRoot: PROJECT_ROOT });
   log(`DB: ${dbIsolation.sqlitePath} (isolated=${dbIsolation.isolated}${dbIsolation.clonedFromShared ? ", cloned-from-shared" : ""})`);
 
   const persistence = createPersistenceService();
   if (fresh) {
-    saveId = await bootstrapFreshSeasonOneSave(outputDir);
+    const boot = await bootstrapFreshSeasonOneSave(outputDir, targetSeasons);
+    saveId = boot.saveId;
+    if (boot.paused) {
+      log("Draft bootstrap paused on RED — fix root cause, then resume with RUN-PAUSED.json command.");
+      process.exit(2);
+    }
     log(`Fresh save bootstrapped: ${saveId}`);
   }
   if (!saveId) throw new Error("Missing --save-id (or pass --fresh)");

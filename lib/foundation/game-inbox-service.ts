@@ -440,6 +440,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     const controlMode = settingsMap[team.teamId]?.controlMode ?? (team.humanControlled ? "manual" : "ai");
     const roster = input.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
     const rosterCount = roster.length;
+    const rosterOptTarget = team.rosterOptTarget ?? team.rosterLimit ?? 12;
+    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, rosterOptTarget - 2);
     const lineupDraft =
       (input.gameState.seasonState.lineupDrafts ?? []).find(
         (draft) =>
@@ -515,7 +517,6 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, (team.rosterOptTarget ?? team.rosterLimit ?? 12) - 2);
     if (
       controlMode === "manual" &&
       rosterCount >= rosterMinTarget &&
@@ -711,8 +712,6 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    const rosterOptTarget = team.rosterOptTarget ?? team.rosterLimit ?? 12;
-    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, rosterOptTarget - 2);
     if (transferWindowOpen && rosterCount > 0 && rosterCount < rosterOptTarget && team.cash >= 8) {
       items.push(
         createItem({

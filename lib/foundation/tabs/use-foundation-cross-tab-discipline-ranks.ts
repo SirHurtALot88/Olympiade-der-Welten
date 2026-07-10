@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { Discipline, GameState, Player, Team } from "@/lib/data/olyDataTypes";
+import type { Discipline, GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { sortTableRows as sortRows } from "@/components/foundation/FoundationTableUi";
@@ -9,7 +9,13 @@ import {
   shouldBuildDisciplineConfigDerivations as resolveShouldBuildDisciplineConfigDerivations,
   shouldBuildDisciplineRanks as resolveShouldBuildDisciplineRanks,
 } from "@/lib/foundation/tabs/season-v2-derivations";
-import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import {
+  buildPreviousTeamDisciplineRankLookup,
+  buildTeamDisciplineRankDeltaPack,
+  buildTeamDisciplineRankRowsFromGameState,
+  buildTeamDisciplineRankRowsFromSnapshotRecords,
+  type TeamDisciplineRankDeltaPack,
+} from "@/lib/foundation/team-discipline-rank-engine";
 
 export type FoundationDisciplineRankRow = {
   team: Team;
@@ -27,6 +33,7 @@ export type FoundationDisciplineRankRow = {
     soc: number;
     disciplines: Record<string, number>;
   };
+  rankDeltas: TeamDisciplineRankDeltaPack;
 };
 
 export type FoundationDisciplineLeaderEntry = {
@@ -44,6 +51,8 @@ export type FoundationDisciplineConfigRow = Discipline & {
   mutator1: string;
   mutator2: string;
 };
+
+type SeasonSnapshotInput = NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number];
 
 export function shouldBuildFoundationDisciplineRanks(input: {
   activeView: FoundationViewId;
@@ -68,6 +77,8 @@ export function useFoundationCrossTabDisciplineRanks(input: {
   activeSaveId: string;
   orderedDisciplines: Discipline[];
   disciplineCategoryFilter: string;
+  ranksSeasonId: string;
+  seasonHistorySnapshots: SeasonSnapshotInput[];
   tableSorts: {
     disciplineRanks: SortState;
     disciplineConfig: SortState;
@@ -82,171 +93,64 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     shouldLoadSeasonOverviewFeed: input.shouldLoadSeasonOverviewFeed,
   });
 
+  const teamsById = useMemo(
+    () => new Map(input.gameState.teams.map((team) => [team.teamId, team] as const)),
+    [input.gameState.teams],
+  );
+
+  const selectedRanksSeasonSnapshot = useMemo(
+    () =>
+      input.seasonHistorySnapshots.find((snapshot) => snapshot.seasonId === input.ranksSeasonId) ?? null,
+    [input.ranksSeasonId, input.seasonHistorySnapshots],
+  );
+
+  const isViewingArchivedRanksSeason =
+    input.ranksSeasonId !== input.gameState.season.id && selectedRanksSeasonSnapshot != null;
+
+  const ranksArchiveMissing =
+    isViewingArchivedRanksSeason && !selectedRanksSeasonSnapshot?.teamDisciplineRankSnapshots?.length;
+
+  const previousRankLookup = useMemo(
+    () => buildPreviousTeamDisciplineRankLookup(input.seasonHistorySnapshots, input.ranksSeasonId),
+    [input.ranksSeasonId, input.seasonHistorySnapshots],
+  );
+
   const disciplineRankRows = useMemo(() => {
     if (!shouldBuildDisciplineRanks) {
       return [] as FoundationDisciplineRankRow[];
     }
 
-    const rosterByTeamId = new Map<string, Player[]>();
-    const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+    const useArchivedRanks =
+      isViewingArchivedRanksSeason && Boolean(selectedRanksSeasonSnapshot?.teamDisciplineRankSnapshots?.length);
 
-    for (const team of input.gameState.teams) {
-      rosterByTeamId.set(team.teamId, []);
-    }
+    const coreRows = useArchivedRanks
+      ? buildTeamDisciplineRankRowsFromSnapshotRecords(
+          selectedRanksSeasonSnapshot!.teamDisciplineRankSnapshots!,
+          teamsById,
+          input.orderedDisciplines,
+        )
+      : buildTeamDisciplineRankRowsFromGameState(input.gameState, input.orderedDisciplines);
 
-    for (const rosterEntry of input.gameState.rosters) {
-      const player = playerById.get(rosterEntry.playerId);
-      if (!player) {
-        continue;
-      }
-      const current = rosterByTeamId.get(rosterEntry.teamId) ?? [];
-      current.push(player);
-      rosterByTeamId.set(rosterEntry.teamId, current);
-    }
-
-    const computeTopSixDisciplineSum = (teamId: string, disciplineId: string) => {
-      const values = (rosterByTeamId.get(teamId) ?? [])
-        .map((player) => player.disciplineRatings[disciplineId] ?? 0)
-        .filter((value) => Number.isFinite(value) && value > 0)
-        .sort((left, right) => right - left)
-        .slice(0, 6);
-
-      if (values.length === 0) {
-        return 0;
-      }
-
-      return roundViewNumber(values.reduce((sum, value) => sum + value, 0), 2);
-    };
-
-    const disciplineScoresByTeam = new Map<
-      string,
-      {
-        total: number;
-        pow: number;
-        spe: number;
-        men: number;
-        soc: number;
-        disciplines: Record<string, number>;
-      }
-    >();
-
-    for (const team of input.gameState.teams) {
-      const disciplineScores = Object.fromEntries(
-        input.orderedDisciplines.map((discipline) => [
-          discipline.id,
-          computeTopSixDisciplineSum(team.teamId, discipline.id),
-        ]),
-      );
-      const pow = roundViewNumber(
-        input.orderedDisciplines
-          .filter((discipline) => discipline.category === "power")
-          .reduce((sum, discipline) => sum + (disciplineScores[discipline.id] ?? 0), 0),
-        2,
-      );
-      const spe = roundViewNumber(
-        input.orderedDisciplines
-          .filter((discipline) => discipline.category === "speed")
-          .reduce((sum, discipline) => sum + (disciplineScores[discipline.id] ?? 0), 0),
-        2,
-      );
-      const men = roundViewNumber(
-        input.orderedDisciplines
-          .filter((discipline) => discipline.category === "mental")
-          .reduce((sum, discipline) => sum + (disciplineScores[discipline.id] ?? 0), 0),
-        2,
-      );
-      const soc = roundViewNumber(
-        input.orderedDisciplines
-          .filter((discipline) => discipline.category === "social")
-          .reduce((sum, discipline) => sum + (disciplineScores[discipline.id] ?? 0), 0),
-        2,
-      );
-      const total = roundViewNumber(
-        input.orderedDisciplines.reduce((sum, discipline) => sum + (disciplineScores[discipline.id] ?? 0), 0),
-        2,
-      );
-
-      disciplineScoresByTeam.set(team.teamId, {
-        total,
-        pow,
-        spe,
-        men,
-        soc,
-        disciplines: disciplineScores,
-      });
-    }
-
-    const totalRankMap = buildSharedRankMap(
-      input.gameState.teams.map((team) => ({
-        teamId: team.teamId,
-        value: disciplineScoresByTeam.get(team.teamId)?.total ?? 0,
-      })),
-    );
-    const powRankMap = buildSharedRankMap(
-      input.gameState.teams.map((team) => ({
-        teamId: team.teamId,
-        value: disciplineScoresByTeam.get(team.teamId)?.pow ?? 0,
-      })),
-    );
-    const speRankMap = buildSharedRankMap(
-      input.gameState.teams.map((team) => ({
-        teamId: team.teamId,
-        value: disciplineScoresByTeam.get(team.teamId)?.spe ?? 0,
-      })),
-    );
-    const menRankMap = buildSharedRankMap(
-      input.gameState.teams.map((team) => ({
-        teamId: team.teamId,
-        value: disciplineScoresByTeam.get(team.teamId)?.men ?? 0,
-      })),
-    );
-    const socRankMap = buildSharedRankMap(
-      input.gameState.teams.map((team) => ({
-        teamId: team.teamId,
-        value: disciplineScoresByTeam.get(team.teamId)?.soc ?? 0,
-      })),
-    );
-
-    const disciplineRankMaps = new Map(
-      input.orderedDisciplines.map((discipline) => [
-        discipline.id,
-        buildSharedRankMap(
-          input.gameState.teams.map((team) => ({
-            teamId: team.teamId,
-            value: disciplineScoresByTeam.get(team.teamId)?.disciplines[discipline.id] ?? 0,
-          })),
-        ),
-      ]),
-    );
-
-    return [...input.gameState.teams]
-      .map((team) => {
-        const scorePack = disciplineScoresByTeam.get(team.teamId) ?? {
-          total: 0,
-          pow: 0,
-          spe: 0,
-          men: 0,
-          soc: 0,
-          disciplines: Object.fromEntries(
-            input.orderedDisciplines.map((discipline) => [discipline.id, 0] as const),
-          ),
-        };
-        const disciplineRanks = Object.fromEntries(
-          input.orderedDisciplines.map((discipline) => [
-            discipline.id,
-            disciplineRankMaps.get(discipline.id)?.get(team.teamId) ?? 0,
-          ]),
-        );
+    return coreRows
+      .map((rowCore) => {
+        const team =
+          teamsById.get(rowCore.teamId) ??
+          ({
+            teamId: rowCore.teamId,
+            name: rowCore.teamName,
+            shortCode: rowCore.teamCode ?? rowCore.teamId.slice(0, 3).toUpperCase(),
+          } as Team);
 
         return {
           team,
-          totalRank: totalRankMap.get(team.teamId) ?? 0,
-          powRank: powRankMap.get(team.teamId) ?? 0,
-          speRank: speRankMap.get(team.teamId) ?? 0,
-          menRank: menRankMap.get(team.teamId) ?? 0,
-          socRank: socRankMap.get(team.teamId) ?? 0,
-          disciplineRanks,
-          scorePack,
+          totalRank: rowCore.totalRank,
+          powRank: rowCore.powRank,
+          speRank: rowCore.speRank,
+          menRank: rowCore.menRank,
+          socRank: rowCore.socRank,
+          disciplineRanks: rowCore.disciplineRanks,
+          scorePack: rowCore.scorePack,
+          rankDeltas: buildTeamDisciplineRankDeltaPack(rowCore, previousRankLookup.get(rowCore.teamId)),
         };
       })
       .sort((left, right) => {
@@ -255,7 +159,16 @@ export function useFoundationCrossTabDisciplineRanks(input: {
         }
         return left.team.name.localeCompare(right.team.name, "de");
       });
-  }, [input.gameState, input.orderedDisciplines, shouldBuildDisciplineRanks]);
+  }, [
+    input.gameState,
+    input.orderedDisciplines,
+    input.ranksSeasonId,
+    isViewingArchivedRanksSeason,
+    previousRankLookup,
+    selectedRanksSeasonSnapshot,
+    shouldBuildDisciplineRanks,
+    teamsById,
+  ]);
 
   const seasonDisciplineScheduleRows = useMemo(
     () =>
@@ -396,5 +309,8 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     currentMatchdayDisciplineSchedule,
     sortedDisciplineConfigRows,
     visibleDisciplineConfigRows,
+    isViewingArchivedRanksSeason,
+    ranksArchiveMissing,
+    ranksSeasonId: input.ranksSeasonId,
   };
 }

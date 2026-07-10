@@ -5,6 +5,7 @@ import {
   usesSingleCashPlanningPolicy,
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import { resolveTransferBuyAffordabilityCash } from "@/lib/market/transfermarkt-local-service";
 import {
   isTeamRosterBelowOpt,
   projectExpectedSalaryAtPlannerTarget,
@@ -152,11 +153,15 @@ export function resolveSimulatedPlannerSpendableCash(input: {
   const belowOpt = input.simulatedRosterCount < playerOpt;
 
   if (usesSingleCashPlanningPolicy(input.gameState)) {
-    if (rosterBelowMin) {
-      const minPad = round(Math.max(3, Math.min(15, input.teamCash * 0.05)), 2);
-      return round(Math.max(0, input.teamCash - minPad), 2);
-    }
-    return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, input.teamCash);
+    return resolveTransferBuyAffordabilityCash({
+      gameState: input.gameState,
+      teamId: input.teamId,
+      teamCash: input.teamCash,
+      rosterBefore: input.simulatedRosterCount,
+      playerMin,
+      seasonId: input.gameState.season.id,
+      transferSource: "ai_roster_fill",
+    });
   }
 
   if (input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId]) {
