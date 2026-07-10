@@ -24,6 +24,7 @@ import {
 } from "@/lib/scouting/scouting-wishlist-slots";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { useMarketV2Derivations } from "@/lib/foundation/tabs/use-market-v2-derivations";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 
 const FoundationTransfermarktV2Panel = dynamic(
   () => import("@/app/foundation/transfermarkt-v2/FoundationTransfermarktV2Panel"),
@@ -57,17 +58,7 @@ export type FoundationMarketV2ShellHostProps = {
     string,
     { controlMode: TeamControlMode; ownerId?: string | null; ownerSlot?: string | null }
   >;
-  playerRatingsById: Map<
-    string,
-    {
-      ppsSeason?: number | null;
-      ovrNormalized?: number | null;
-      mvs?: number | null;
-      ovrRank?: number | null;
-      ppsSeasonRank?: number | null;
-      mvsRank?: number | null;
-    }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
   seasonPointsLedger?: import("@/lib/foundation/season-points-ledger").SeasonPointsLedger | null;
   roomContext: FoundationRoomContext | null;
   formatGamePhaseLabel: (phase: string) => string;

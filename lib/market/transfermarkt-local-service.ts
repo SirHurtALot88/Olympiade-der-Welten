@@ -11,6 +11,7 @@ import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facilit
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
@@ -41,6 +42,7 @@ import {
   buildScoutedDisciplineTiers,
   getScoutedNumericEstimate,
   getScoutedTraitView,
+  getTransfermarktScoutingDisclosure,
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
@@ -1282,11 +1284,11 @@ function buildCompactFreeAgentItem(input: {
     ? {
         visiblePositiveTraits: browseEntry.traitsPositive,
         visibleNegativeTraits: browseEntry.traitsNegative,
-        disclosure: {
-          preferredDisciplinesVisible: false,
-          positiveTraitsVisible: browseEntry.traitsPositive.length,
-          negativeTraitsVisible: browseEntry.traitsNegative.length,
-        },
+        // Browse mode shows every trait, so report full (level-5) scouting disclosure
+        // instead of the ad-hoc partial object this used to build (which mismatched
+        // TransfermarktScoutingDisclosure's shape: negativeTraitsVisible is a boolean
+        // gate, not a trait count, and `level`/`exactAttributeValuesVisible` were missing).
+        disclosure: getTransfermarktScoutingDisclosure(5),
         hiddenPositiveTraitCount: 0,
         hiddenNegativeTraitCount: 0,
       }
@@ -1724,7 +1726,9 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         fitAlignment: fitBreakdown.fitAlignment,
         fit: fitBreakdown.teamFit,
         fitDisplay: baseItem.mercenary ? `${fitBreakdown.teamFit ?? 0} · Mercenary` : `${fitBreakdown.teamFit ?? 0}`,
-        fitSource: "compact_list",
+        // Team context (selectedTeam) is available here, matching the
+        // "local_approximation_not_golden_master" branch used elsewhere in this file.
+        fitSource: "local_approximation_not_golden_master",
       };
     }
 

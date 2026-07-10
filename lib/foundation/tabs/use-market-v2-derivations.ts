@@ -5,9 +5,13 @@ import type { GameState, Player, RosterEntry, TeamSeasonObjectiveRecord } from "
 import {
   resolvePlayerDisplayMvs,
   resolvePlayerDisplayPps,
+  type PlayerRatingContractRow,
 } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
-import { buildMarketRosterPreviousSeasonAxisByPlayerId } from "@/lib/market/transfermarkt-roster-previous-season-axis";
+import {
+  buildMarketRosterPreviousSeasonAxisByPlayerId,
+  type MarketRosterPreviousSeasonAxisStats,
+} from "@/lib/market/transfermarkt-roster-previous-season-axis";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getActiveScoutingWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
@@ -33,17 +37,7 @@ export type TransferMarketV2RosterRow = {
   men: number | null;
   soc: number | null;
   disciplineRatings: Player["disciplineRatings"];
-  previousSeasonAxis: {
-    seasonId: string;
-    ppPow: number | null;
-    ppSpe: number | null;
-    ppMen: number | null;
-    ppSoc: number | null;
-    ppPowRank: number | null;
-    ppSpeRank: number | null;
-    ppMenRank: number | null;
-    ppSocRank: number | null;
-  } | null;
+  previousSeasonAxis: MarketRosterPreviousSeasonAxisStats | null;
 };
 
 export function buildMarketV2ClientKey(activeSaveId: string, seasonId: string): string {
@@ -52,7 +46,7 @@ export function buildMarketV2ClientKey(activeSaveId: string, seasonId: string): 
 
 export function buildTransferMarketV2RosterRows(input: {
   gameState: GameState;
-  playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
   seasonPointsLedger?: SeasonPointsLedger | null;
   getRosterEntryDisplayMarketValue: (
     entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
@@ -66,7 +60,7 @@ export function buildTransferMarketV2RosterRows(input: {
   const previousSeasonAxisByPlayerId = buildMarketRosterPreviousSeasonAxisByPlayerId(input.gameState);
 
   return input.gameState.rosters
-    .map((entry) => {
+    .map((entry): TransferMarketV2RosterRow | null => {
       const player = playersById.get(entry.playerId);
       if (!player) {
         return null;
@@ -157,7 +151,7 @@ export interface UseMarketV2DerivationsInput {
   gameState: GameState;
   activeSaveId: string;
   activeManagerTeamId: string | null;
-  playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
   seasonPointsLedger?: SeasonPointsLedger | null;
   selectedTeamObjectives: TeamSeasonObjectiveRecord[];
   getRosterEntryDisplayMarketValue: (

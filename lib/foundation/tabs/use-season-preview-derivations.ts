@@ -61,7 +61,7 @@ export interface UseSeasonPreviewDerivationsInput {
     standingsPreviewTable?: { columnOrder?: string[] };
   };
   standingsPreviewSort: SortState;
-  isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault: boolean) => boolean;
+  isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
   getTablePinnedLeftIds: (tableId: string) => string[];
   getTablePinnedRightIds: (tableId: string) => string[];
 }

@@ -497,9 +497,9 @@ function shouldAiRenewContract(input: {
     !isForceReleaseCase({ morale, badValueContract });
 
   const renewalTco = resolveContractRenewalTco({
-    exitProfitLoss,
-    exitPurchasePrice,
-    exitValue,
+    exitProfitLoss: exitProfitLoss ?? null,
+    exitPurchasePrice: exitPurchasePrice ?? null,
+    exitValue: exitValue ?? null,
     renewalSalary: renewalSalaryPreview,
     currentSalary: currentSalary ?? entry.salary ?? null,
     renewLength: renewLength ?? 1,
@@ -777,6 +777,8 @@ function buildPreviewRow(input: {
       recommendedContractShape: "balanced",
       recommendedAction: "no_action",
       renewalBlockReason: null,
+      canRenewEffective: true,
+      decisionReason: null,
       marketValue: roundMoney(marketValue),
       ovr: rating?.ovrNormalized ?? null,
       mvs: rating?.mvs ?? null,

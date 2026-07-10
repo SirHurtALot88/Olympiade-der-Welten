@@ -39,7 +39,7 @@ const METRIC_DEFINITIONS: Array<{ id: PlayerProgressMetricId; label: string }> =
 
 const AXIS_METRIC_IDS: PlayerProgressMetricId[] = ["pow", "spe", "men", "soc"];
 
-function sortHistoryRows(rows: PlayerProgressHistoryRow[]) {
+function sortHistoryRows<T extends PlayerProgressHistoryRow>(rows: T[]): T[] {
   return [...rows].sort((left, right) => {
     const leftKey = left.seasonId ?? left.seasonName;
     const rightKey = right.seasonId ?? right.seasonName;
@@ -73,7 +73,7 @@ export function formatProgressDelta(value: number | null | undefined, digits = 1
   return formatted;
 }
 
-export function buildPlayerProgressSummary(rows: PlayerProgressHistoryRow[]): PlayerProgressSummary | null {
+export function buildPlayerProgressSummary<T extends PlayerProgressHistoryRow>(rows: T[]): PlayerProgressSummary | null {
   const sortedRows = sortHistoryRows(rows);
   if (sortedRows.length === 0) {
     return null;
@@ -116,7 +116,7 @@ export function buildPlayerProgressSummary(rows: PlayerProgressHistoryRow[]): Pl
   };
 }
 
-export function sortPlayerProgressHistoryRows(rows: PlayerProgressHistoryRow[]) {
+export function sortPlayerProgressHistoryRows<T extends PlayerProgressHistoryRow>(rows: T[]): T[] {
   return sortHistoryRows(rows);
 }
 

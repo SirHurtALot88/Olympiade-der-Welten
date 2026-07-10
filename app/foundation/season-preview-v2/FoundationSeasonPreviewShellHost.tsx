@@ -21,7 +21,7 @@ export type FoundationSeasonPreviewShellHostProps = {
     standingsPreviewTable?: { columnOrder?: string[] };
   };
   tableSorts: Record<string, SortState>;
-  isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault: boolean) => boolean;
+  isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
   setTableColumnVisible: (tableId: string, columnId: string, nextVisible: boolean) => void;
   getTableColumnWidth: (tableId: string, column: FoundationTableColumn) => number;
   getTableHeaderDragProps: (

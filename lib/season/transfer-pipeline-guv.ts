@@ -41,14 +41,13 @@ export function collectSeasonTransferPipelineGuv(gameState: GameState, seasonId:
   const exitCash = sum(contractExitEvents.map((event) => event.exitValue ?? 0));
   const exitPL = sum(contractExitEvents.map((event) => event.profitLoss ?? 0));
 
-  const marketSells = transferHistory.filter(
-    (entry) => entry.transferType === "sell" || entry.transferType === "market_sell",
-  );
-  const marketBuys = transferHistory.filter(
-    (entry) => entry.transferType === "buy" || entry.transferType === "market_buy",
-  );
+  // `TransferHistoryEntry.transferType` is "buy" | "sell" | "contract_exit" — there is no
+  // separate "market_sell"/"market_buy" variant (and no `purchasePrice` field; `fee` is the
+  // transfer amount for both directions).
+  const marketSells = transferHistory.filter((entry) => entry.transferType === "sell");
+  const marketBuys = transferHistory.filter((entry) => entry.transferType === "buy");
   const marketSellFees = sum(marketSells.map((entry) => entry.fee ?? 0));
-  const marketBuyFees = sum(marketBuys.map((entry) => entry.fee ?? entry.purchasePrice ?? 0));
+  const marketBuyFees = sum(marketBuys.map((entry) => entry.fee ?? 0));
 
   const sponsorInflow = sum(
     (gameState.seasonState.sponsorPayoutLogs ?? [])
@@ -67,15 +66,10 @@ export function collectSeasonTransferPipelineGuv(gameState: GameState, seasonId:
   const facilityUpkeep = sum(
     facilityEvents.filter((event) => event.source === "facility_upkeep_paid").map((event) => event.cost ?? 0),
   );
+  // `FacilityEventRecord.source` has no "ai_facility_upgrade"/"facility_build" variants —
+  // both AI-driven and initial-build upgrades are logged as "manual_facility_upgrade".
   const facilityInvest = sum(
-    facilityEvents
-      .filter(
-        (event) =>
-          event.source === "manual_facility_upgrade" ||
-          event.source === "ai_facility_upgrade" ||
-          event.source === "facility_build",
-      )
-      .map((event) => event.cost ?? 0),
+    facilityEvents.filter((event) => event.source === "manual_facility_upgrade").map((event) => event.cost ?? 0),
   );
 
   const salaryOutflow = sum(gameState.teams.map((team) => getTeamSalarySum(gameState, team.teamId)));
