@@ -4,7 +4,7 @@ import {
   AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING,
   buildBudgetWideAffordableScope,
 } from "@/lib/ai/ai-transfermarkt-preview-service";
-import type { TransfermarktFreeAgentItem } from "@/lib/transfermarkt/transfermarkt-types";
+import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 
 function fa(partial: Partial<TransfermarktFreeAgentItem> & Pick<TransfermarktFreeAgentItem, "playerId" | "name">) {
   return {
