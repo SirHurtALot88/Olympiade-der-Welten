@@ -33,7 +33,10 @@ describe("foundation home v2 ui contract", () => {
     expect(shellText).toContain("FoundationSubNav");
     expect(panelText).toContain('tab === "overview"');
     expect(shellText).toContain("homeV2Tab");
-    expect(shellText).toContain("FoundationShellRouterHomeV2");
+    // HomeV2 is rendered inline in the shell via FoundationHomeV2Panel (deliberate: the
+    // FoundationShellRouterHomeV2 wrapper was reverted in fd984c8 because it caused page-load
+    // ReferenceErrors; the wrapper migration is tracked in docs/foundation-monolith-split-plan.md).
+    expect(shellText).toContain("FoundationHomeV2Panel");
     expect(panelText).toContain('if (!active)');
     expect(panelText).toContain('id="foundation-home-v2"');
     expect(panelText).toContain("ManagerOfficeClient");
@@ -41,7 +44,7 @@ describe("foundation home v2 ui contract", () => {
     expect(shellText).not.toContain('getViewClass("hq")');
     expect(navText).not.toContain('id: "hq"');
     expect(routingText).toContain('if (view === "hq") return "homeV2"');
-    expect(shellText).not.toContain("FoundationHomeV2Panel");
+    // (HomeV2 is intentionally rendered inline via FoundationHomeV2Panel — see note above.)
     expect(hostText).toContain("onOpenOffice");
   });
 
@@ -208,7 +211,10 @@ describe("foundation ui v2 roadmap contract", () => {
 
     expect(shellText).toContain('data-testid="foundation-save-compact-menu"');
     expect(shellText).toContain("formatShortSaveId(activeSaveId)");
-    expect(shellText).toContain("FoundationShellRouterHomeV2");
+    // HomeV2 is rendered inline in the shell via FoundationHomeV2Panel (deliberate: the
+    // FoundationShellRouterHomeV2 wrapper was reverted in fd984c8 because it caused page-load
+    // ReferenceErrors; the wrapper migration is tracked in docs/foundation-monolith-split-plan.md).
+    expect(shellText).toContain("FoundationHomeV2Panel");
 
     expect(crossTabFlowText).toContain('item.severity === "blocked" || item.severity === "warning"');
 
