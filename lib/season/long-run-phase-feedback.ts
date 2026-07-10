@@ -4,7 +4,6 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   classifyTeamDraftQuality,
   formatPhaseAuditSummaryDe,
-  isRosterBenchmarkPhase,
   type PhaseAuditResult,
   type LongRunPhaseAuditPhase,
 } from "@/lib/season/long-run-phase-audit";

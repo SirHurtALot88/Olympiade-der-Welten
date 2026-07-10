@@ -47,6 +47,7 @@ function FoundationPrizeV2HostInner(props: PrizeV2HostInnerProps) {
   return (
     <FoundationPrizeV2Panel
       {...panelProps}
+      isTableColumnVisible={isTableColumnVisible}
       prizeForecastRank={model.prizeForecastRank}
       setPrizeForecastRank={model.setPrizeForecastRank}
       prizeForecastRankRow={model.prizeForecastRankRow}

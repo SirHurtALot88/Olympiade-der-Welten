@@ -135,6 +135,7 @@ export default function ScoutingPriorityQueue({
                     src={src}
                     placeholderSrc={previewSrc}
                     alt=""
+                    className=""
                     width={40}
                     height={40}
                     loading="lazy"

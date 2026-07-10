@@ -73,6 +73,7 @@ export default function ScoutingReportPanel({
               src={src}
               placeholderSrc={previewSrc}
               alt=""
+              className=""
               width={72}
               height={72}
               loading="eager"
