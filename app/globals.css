@@ -42532,3 +42532,743 @@ button.foundation-team-portrait-card {
     transform: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Ranks / PPs pro Bereich (nl-ranks-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-ranks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-ranks-hint {
+  margin: 0 0 var(--nl-s3);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ranks-filterbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-ranks-filter {
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: 999px;
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease),
+    background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-ranks-filter:hover,
+.is-new-look .nl-ranks-filter:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-ranks-filter.is-active {
+  color: var(--nl-ink);
+  border-color: var(--nl-tone, var(--nl-accent));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 18%, var(--nl-panel));
+  box-shadow: inset 0 0 0 1px var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-ranks-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-ranks-row {
+  display: grid;
+  grid-template-columns: 44px minmax(180px, 1.2fr) minmax(220px, 1.4fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  box-shadow: var(--nl-e1);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-ranks-row:hover,
+.is-new-look .nl-ranks-row:focus-visible {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-ranks-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
+.is-new-look .nl-ranks-row.is-podium {
+  background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+}
+
+.is-new-look .nl-ranks-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.is-new-look .nl-ranks-ranknum {
+  min-width: 26px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-ranks-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-ranks-crest {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-ranks-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ranks-team-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-ranks-teamname {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-ranks-teamcode {
+  font-size: 11px;
+  color: var(--nl-mut);
+  letter-spacing: 0.06em;
+}
+
+.is-new-look .nl-ranks-value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.is-new-look .nl-ranks-value-number {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-ranks-formbonus {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-ranks-value-bar .nl-progress-track {
+  height: 6px;
+}
+
+.is-new-look .nl-ranks-areas {
+  display: inline-flex;
+  gap: var(--nl-s1, 4px);
+  justify-self: end;
+}
+
+.is-new-look .nl-ranks-area-chip {
+  min-width: 52px;
+}
+
+.is-new-look .nl-ranks-area-chip.is-active {
+  box-shadow: inset 0 0 0 1px var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-ranks-empty {
+  margin: var(--nl-s3) 0 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-ranks-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+
+  .is-new-look .nl-ranks-areas {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+/* ============================================================
+   NEUER LOOK — Liga-Leaders (nl-leaders-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-leaders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-leaders-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-leaders-back {
+  padding: 5px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-leaders-back:hover,
+.is-new-look .nl-leaders-back:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-leaders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-leaders-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--nl-tone, var(--nl-accent));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-leaders-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.is-new-look .nl-leaders-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-leaders-hero {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 10%, var(--nl-panel-2));
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-leaders-hero:hover,
+.is-new-look .nl-leaders-hero:focus-visible {
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 18%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-leaders-hero:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
+.is-new-look .nl-leaders-hero-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--nl-tone, var(--nl-accent));
+  background: var(--nl-panel);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-leaders-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-leaders-hero-rankline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-leaders-hero-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-leaders-hero-team {
+  font-size: 11px;
+  color: var(--nl-mut);
+  letter-spacing: 0.06em;
+}
+
+.is-new-look .nl-leaders-hero-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-leaders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-leaders-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-leaders-row:hover,
+.is-new-look .nl-leaders-row:focus-visible {
+  border-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-leaders-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
+.is-new-look .nl-leaders-rowbar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 12%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.is-new-look .nl-leaders-row > :not(.nl-leaders-rowbar) {
+  position: relative;
+}
+
+.is-new-look .nl-leaders-row-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-leaders-row-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-leaders-row-player {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-leaders-row-player strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-leaders-row-player small {
+  font-size: 10px;
+  color: var(--nl-mut);
+  letter-spacing: 0.05em;
+}
+
+.is-new-look .nl-leaders-row-value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-leaders-hero.is-own-team,
+.is-new-look .nl-leaders-row.is-own-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-leaders-empty {
+  margin: 0;
+  padding: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* ============================================================
+   NEUER LOOK — Preisgeld (nl-prize-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-prize {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-prize-header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-nav-button {
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-prize-nav-button:hover,
+.is-new-look .nl-prize-nav-button:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-prize-summary-chips,
+.is-new-look .nl-prize-factor-chips {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-prize-factor-chips {
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-prize-story-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-champion-card {
+  border-top: 3px solid var(--nl-medal-gold, #d4a72c);
+}
+
+.is-new-look .nl-prize-champion-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-champion-body {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-champion-crest {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-prize-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--nl-s3);
+  align-items: start;
+}
+
+.is-new-look .nl-prize-distribution-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-prize-distribution-chart {
+  min-width: 720px;
+  width: 100%;
+  height: auto;
+}
+
+.is-new-look .nl-prize-forecast-chart {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-rank-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-rank-select select {
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+}
+
+.is-new-look .nl-prize-forecast-chips {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-prize-forecast-table-shell {
+  margin-top: var(--nl-s2);
+  overflow-x: auto;
+}
+
+.is-new-look .nl-prize-forecast-table,
+.is-new-look .nl-prize-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-prize-forecast-table th,
+.is-new-look .nl-prize-forecast-table td,
+.is-new-look .nl-prize-table th,
+.is-new-look .nl-prize-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-prize-forecast-table th,
+.is-new-look .nl-prize-table th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-table-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-prize-table-row {
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-prize-table-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-prize-table-row.is-selected {
+  background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
+  outline: 1px solid var(--nl-accent);
+  outline-offset: -1px;
+}
+
+.is-new-look .nl-prize-td-rank {
+  width: 52px;
+}
+
+.is-new-look .nl-prize-team-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-prize-crest {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-prize-team-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-prize-teamname {
+  font-weight: 600;
+}
+
+.is-new-look .nl-prize-teamcode {
+  font-size: 10px;
+  color: var(--nl-mut);
+  letter-spacing: 0.06em;
+}
+
+.is-new-look .nl-prize-td-money {
+  min-width: 140px;
+}
+
+.is-new-look .nl-prize-money-value {
+  display: block;
+  font-weight: 700;
+}
+
+.is-new-look .nl-prize-money-bar .nl-progress-track {
+  height: 5px;
+}
+
+.is-new-look .nl-prize-cash-risk {
+  color: var(--nl-risk);
+  font-weight: 700;
+}
+
+.is-new-look .nl-prize-td-warnings {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-prize-warning-box {
+  margin-bottom: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-warn);
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 8%, var(--nl-panel));
+  font-size: 12px;
+}
+
+.is-new-look .nl-prize-warning-box.is-blocked {
+  border-color: var(--nl-risk);
+  background: color-mix(in srgb, var(--nl-risk) 8%, var(--nl-panel));
+}
+
+.is-new-look .nl-prize-warning-box ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.is-new-look .nl-prize-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 1100px) {
+  .is-new-look .nl-prize-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Reduced Motion (nl-ranks / nl-leaders / nl-prize) ------------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-ranks-row,
+  .is-new-look .nl-ranks-filter,
+  .is-new-look .nl-leaders-hero,
+  .is-new-look .nl-leaders-row,
+  .is-new-look .nl-prize-table-row {
+    transition: none;
+  }
+}

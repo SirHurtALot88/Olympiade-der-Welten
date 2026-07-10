@@ -1,8 +1,10 @@
 "use client";
 
+import LeagueLeadersNewLook from "@/app/foundation/league-leaders-v2/LeagueLeadersNewLook";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import type { LeagueLeaderCategory } from "@/lib/foundation/league-leaders-service";
 import { joinClassNames } from "@/lib/foundation/tabs/foundation-page-module-helpers";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 export interface LeagueLeadersClientProps {
   categories: LeagueLeaderCategory[];
@@ -13,14 +15,20 @@ export interface LeagueLeadersClientProps {
   onOpenPlayer: (playerId: string) => void;
 }
 
-export default function LeagueLeadersClient({
-  categories,
-  selectedTeamId,
-  seasonLabel,
-  returnContext,
-  onReturnToPlayer,
-  onOpenPlayer,
-}: LeagueLeadersClientProps) {
+export default function LeagueLeadersClient(props: LeagueLeadersClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neue Leader-Karten mit
+  // denselben Props; Flag aus => bestehende Listen unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <LeagueLeadersNewLook {...props} />;
+
+  const {
+    categories,
+    selectedTeamId,
+    seasonLabel,
+    returnContext,
+    onReturnToPlayer,
+    onOpenPlayer,
+  } = props;
   return (
     <section
       className="panel league-leaders-panel"

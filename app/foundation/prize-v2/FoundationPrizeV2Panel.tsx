@@ -2,6 +2,8 @@
 
 import type * as React from "react";
 
+import FoundationPrizeV2NewLook from "@/app/foundation/prize-v2/FoundationPrizeV2NewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type {
   FoundationPrizePreviewItem,
@@ -90,50 +92,56 @@ export interface FoundationPrizeV2PanelProps {
   }>;
 }
 
-export default function FoundationPrizeV2Panel({
-  gameState,
-  activeContextMeta,
-  prizePreviewFeed,
-  prizePreviewHardBlocked,
-  prizePreviewGlobalWarnings,
-  prizeApplyState,
-  seasonEndChampionRow,
-  selectedTeam,
-  prizeForecastRank,
-  setPrizeForecastRank,
-  prizeForecastRankRow,
-  prizeForecastRows,
-  prizePreviewTableColumns,
-  visiblePrizePreviewColumns,
-  displayPrizePreviewRows,
-  prizeV2Summary,
-  prizeV2LeaderRow,
-  prizeV2SelectedTeamSummary,
-  prizeV2SwingRow,
-  prizeV2RiskRow,
-  prizeV2FactorRows,
-  tableSorts,
-  formatLocalePoints,
-  formatNullableMoney,
-  formatSignedDisplayMoney,
-  getViewSourceBadgeLabel,
-  setFoundationView,
-  setActiveView,
-  openTeamProfileById,
-  getTableActivePreset,
-  isTableColumnVisible,
-  setTableColumnVisible,
-  moveTableColumn,
-  getTableColumnWidth,
-  adjustTableColumnWidth,
-  resetTableColumnWidth,
-  resetTableLayout,
-  getTableHeaderDragProps,
-  startTableColumnResize,
-  toggleTableSort,
-  ColumnVisibilityManager,
-  SortableHeader,
-}: FoundationPrizeV2PanelProps) {
+export default function FoundationPrizeV2Panel(props: FoundationPrizeV2PanelProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neue Preisgeld-Ansicht mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <FoundationPrizeV2NewLook {...props} />;
+
+  const {
+    gameState,
+    activeContextMeta,
+    prizePreviewFeed,
+    prizePreviewHardBlocked,
+    prizePreviewGlobalWarnings,
+    prizeApplyState,
+    seasonEndChampionRow,
+    selectedTeam,
+    prizeForecastRank,
+    setPrizeForecastRank,
+    prizeForecastRankRow,
+    prizeForecastRows,
+    prizePreviewTableColumns,
+    visiblePrizePreviewColumns,
+    displayPrizePreviewRows,
+    prizeV2Summary,
+    prizeV2LeaderRow,
+    prizeV2SelectedTeamSummary,
+    prizeV2SwingRow,
+    prizeV2RiskRow,
+    prizeV2FactorRows,
+    tableSorts,
+    formatLocalePoints,
+    formatNullableMoney,
+    formatSignedDisplayMoney,
+    getViewSourceBadgeLabel,
+    setFoundationView,
+    setActiveView,
+    openTeamProfileById,
+    getTableActivePreset,
+    isTableColumnVisible,
+    setTableColumnVisible,
+    moveTableColumn,
+    getTableColumnWidth,
+    adjustTableColumnWidth,
+    resetTableColumnWidth,
+    resetTableLayout,
+    getTableHeaderDragProps,
+    startTableColumnResize,
+    toggleTableSort,
+    ColumnVisibilityManager,
+    SortableHeader,
+  } = props;
   return (
             <div className="prize-v2-shell">
               <section className="prize-v2-hero">
