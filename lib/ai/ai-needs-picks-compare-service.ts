@@ -46,11 +46,8 @@ import {
   estimateSeason1DraftSalaryTotal,
   isDraftCashSalaryRatioOverCap,
   resolveSeason1BonusDraftSteps,
-  resolveMinPickPriceForPlan,
   resolveSeason1DraftSalaryForRatio,
-  resolveSeason1DraftSpendBudget,
   resolveSeason1LaneSpendPool,
-  resolveSeason1TargetCashLeft,
   type Season1DraftSpendPlan,
 } from "@/lib/ai/season1-draft-cash-planner";
 import { shouldBlockCheapSeason1Pick } from "@/lib/ai/season1-draft-spend-policy";
@@ -2627,31 +2624,6 @@ export function isSeason1SpendDownRequired(input: {
   return spentPct + 0.001 < spendFloorPct;
 }
 
-function resolveSeason1SpendShortfall(input: {
-  startingCash: number;
-  remainingCash: number;
-  minimumSlotsBefore: number;
-  targetRosterSize: number | null;
-  simulatedRosterCount: number | null;
-  spendFloorPct: number;
-}) {
-  const spent = input.startingCash - input.remainingCash;
-  const spentPct = spent / input.startingCash;
-  const requiredSpend = input.startingCash * input.spendFloorPct;
-  const shortfall = requiredSpend - spent;
-  const rosterSlotsLeft =
-    input.targetRosterSize != null && input.simulatedRosterCount != null
-      ? Math.max(input.targetRosterSize - input.simulatedRosterCount, 0)
-      : null;
-  const picksLeft = Math.max(input.minimumSlotsBefore, rosterSlotsLeft ?? input.minimumSlotsBefore, 1);
-  return {
-    spentPct,
-    shortfall,
-    picksLeft,
-    trailingSpend: shortfall > 4 && picksLeft <= 2 && spentPct < input.spendFloorPct,
-  };
-}
-
 function shouldContinueSeason1OptimumDraft(input: {
   simulatedRosterCount: number | null;
   playerOpt: number;
@@ -2721,224 +2693,6 @@ function shouldContinueSeason1OptimumDraft(input: {
     return true;
   }
   return isSeason1SpendDownRequired(input);
-}
-
-function findSeason1OptimumSpendCandidate(input: {
-  team: Team;
-  identity: ReturnType<typeof getTeamIdentityRow>;
-  /** Canonical per-step cash strategy — the single source for spend target/target cash left. */
-  cashStrategy: AiNeedsPicksCashStrategy;
-  candidates: AiNeedsPicksCandidateScore[];
-  current: AiNeedsPicksCandidateScore | null;
-  remainingCash: number | null;
-  affordabilityCash?: number | null;
-  minimumSlotsBefore: number;
-  targetRosterSize: number | null;
-  playerOpt: number | null;
-  simulatedRosterCount: number | null;
-}) {
-  const remainingCash = input.remainingCash;
-  const pickAffordableCash = input.affordabilityCash ?? remainingCash;
-  const startingCash = input.cashStrategy.startingCash;
-  if (remainingCash == null || startingCash == null || startingCash <= 0) {
-    return null;
-  }
-  if (
-    input.simulatedRosterCount != null &&
-    input.targetRosterSize != null &&
-    input.simulatedRosterCount >= input.targetRosterSize &&
-    !isSeason1SpendDownRequired({
-      remainingCash,
-      cashStrategy: input.cashStrategy,
-    })
-  ) {
-    return null;
-  }
-  const expectedPrizeSignal = input.cashStrategy.expectedPrizeSignal;
-  const spendTargetPct =
-    input.cashStrategy.season1SpendTargetPct ??
-    getAdjustedSeason1OptimumSpendTargetPct(input.team, input.identity, expectedPrizeSignal);
-  const spendFloorPct =
-    input.cashStrategy.season1SpendMinPct ?? getSeason1SpendCorridor(input.team, input.identity, expectedPrizeSignal).minPct;
-  const spendShortfall = resolveSeason1SpendShortfall({
-    startingCash,
-    remainingCash,
-    minimumSlotsBefore: input.minimumSlotsBefore,
-    targetRosterSize: input.targetRosterSize,
-    simulatedRosterCount: input.simulatedRosterCount,
-    spendFloorPct,
-  });
-  const code = normalizeTeamCode(input.team.shortCode || input.team.teamId);
-  // Same plan the blocker and corridor checks read from — no independent re-derivation here.
-  const salaryForRatio = input.cashStrategy.season1SpendPlan?.estimatedSalaryTotal ?? null;
-  const targetCashLeft =
-    input.cashStrategy.season1TargetCashLeft ??
-    resolveSeason1TargetCashLeft({
-      startingCash,
-      spendTargetPct,
-      finances: input.identity?.finances,
-      estimatedSalaryTotal:
-        salaryForRatio ??
-        estimateSeason1DraftSalaryTotal({
-          anchorsQ50Price: Math.max(18, startingCash * 0.07),
-          plannedRosterSize: input.targetRosterSize ?? 10,
-        }),
-    });
-  const cashSalaryOverCap =
-    salaryForRatio != null && salaryForRatio > 0 && isDraftCashSalaryRatioOverCap(remainingCash, salaryForRatio);
-  const belowIdentityOpt =
-    input.playerOpt != null &&
-    input.simulatedRosterCount != null &&
-    input.simulatedRosterCount < input.playerOpt;
-  const spendDownRequired = isSeason1SpendDownRequired({
-    remainingCash,
-    cashStrategy: input.cashStrategy,
-  });
-  const cashLeftThreshold =
-    cashSalaryOverCap
-      ? 4
-      : code === "C-S" || code === "G-G" || code === "M-M" || (input.team.budget ?? 0) >= 280
-        ? 8
-        : 10;
-  if (
-    !belowIdentityOpt &&
-    !cashSalaryOverCap &&
-    !spendDownRequired &&
-    remainingCash <= targetCashLeft + cashLeftThreshold &&
-    spendShortfall.spentPct >= spendFloorPct
-  ) {
-    return null;
-  }
-  const remainingTargetSlotsBefore =
-    belowIdentityOpt && input.targetRosterSize != null && input.simulatedRosterCount != null
-      ? Math.max(input.targetRosterSize - input.simulatedRosterCount, 1)
-      : spendDownRequired
-        ? 1
-        : Math.max(input.minimumSlotsBefore, 1);
-  const targetAwareSlotBudget = Math.max((remainingCash - targetCashLeft) / remainingTargetSlotsBefore, 0);
-  const maxTargetAwarePrice =
-    targetAwareSlotBudget * (input.minimumSlotsBefore > 0 ? 1.65 : code === "C-S" ? 2.35 : 2.15);
-  const current = input.current;
-  const currentPrice = current?.price ?? 0;
-  const currentScore = current?.finalScore ?? -999;
-  const minIdentity = code === "C-C" || code === "C-S" || code === "G-G" || code === "N-W" ? 2 : 0;
-  const remainingTargetSpend = Math.max(
-    startingCash * Math.max(spendTargetPct, spendFloorPct) - (startingCash - remainingCash),
-    0,
-  );
-  const rosterSlotsLeft =
-    input.targetRosterSize != null && input.simulatedRosterCount != null
-      ? Math.max(input.targetRosterSize - input.simulatedRosterCount, 0)
-      : null;
-  const picksLeft = Math.max(input.minimumSlotsBefore, rosterSlotsLeft ?? input.minimumSlotsBefore, 1);
-  const minSlotSpend = remainingTargetSpend / picksLeft;
-  const desiredMinPriceBase =
-    input.minimumSlotsBefore > 0
-      ? Math.min(Math.max(18, remainingCash * 0.14), 42)
-      : code === "C-S"
-        ? Math.min(Math.max(26, remainingCash * 0.11), 42)
-        : Math.min(Math.max(24, remainingCash * 0.18), 58);
-  const spendPlan = input.cashStrategy.season1SpendPlan;
-  const planMinPickPrice =
-    spendPlan != null
-      ? resolveMinPickPriceForPlan(spendPlan, { remainingCash, picksLeft })
-      : 0;
-  const desiredMinPrice = Math.min(
-    Math.max(
-      desiredMinPriceBase,
-      planMinPickPrice,
-      minSlotSpend * 0.92,
-      spendShortfall.trailingSpend ? spendShortfall.shortfall / Math.max(spendShortfall.picksLeft, 1) : 0,
-    ),
-    remainingCash * 0.88,
-  );
-  const maxPriceShare =
-    spendShortfall.trailingSpend || spendShortfall.spentPct < spendFloorPct - 0.04
-      ? 0.88
-      : input.minimumSlotsBefore > 0
-        ? 0.58
-        : 0.82;
-  const minPriceDeltaVsCurrent = spendShortfall.trailingSpend || minSlotSpend > (input.current?.price ?? 0) + 4 ? 2 : 7;
-  const remainingMinimumSlotsAfterPick = Math.max(input.minimumSlotsBefore - 1, 0);
-  const reservePerFutureMinimumPick = clamp(startingCash * 0.045, 10, 18);
-  const maxMinimumSafePrice =
-    input.minimumSlotsBefore > 0
-      ? Math.max(0, remainingCash - remainingMinimumSlotsAfterPick * reservePerFutureMinimumPick - targetCashLeft)
-      : null;
-  const affordable = input.candidates
-    .filter((candidate) => {
-      if (candidate.price == null || !canAffordWithoutNegativeCash(candidate.price, pickAffordableCash)) {
-        return false;
-      }
-      if (candidate.price > maxTargetAwarePrice + 0.01) {
-        return false;
-      }
-      if (maxMinimumSafePrice != null && candidate.price > maxMinimumSafePrice + 0.01) {
-        return false;
-      }
-      if (candidate.focusTeamStatus === "blocked") {
-        return false;
-      }
-      if (candidate.price <= currentPrice + minPriceDeltaVsCurrent) {
-        return false;
-      }
-      if (candidate.price > remainingCash * maxPriceShare && candidate.finalScore < currentScore + 4) {
-        return false;
-      }
-      return (
-        candidate.scoreBreakdown.teamIdentityScore >= minIdentity ||
-        candidate.scoreBreakdown.needMatchScore >= 4 ||
-        candidate.scoreBreakdown.disciplineCoverageScore >= 5 ||
-        candidate.scoreBreakdown.valueScore >= 3
-      );
-    })
-    .sort((left, right) => {
-      const leftIdentityWeight = code === "C-S" || code === "G-G" ? 2.2 : 1.4;
-      const priceWeight = spendShortfall.spentPct < spendFloorPct ? 0.38 : 0.22;
-      const leftScore =
-        left.finalScore +
-        Math.min(left.price ?? 0, 75) * priceWeight +
-        left.scoreBreakdown.teamIdentityScore * leftIdentityWeight +
-        left.scoreBreakdown.needMatchScore * 0.9 +
-        left.scoreBreakdown.formColorCoverageScore * 1.15 +
-        left.scoreBreakdown.formColorFlexScore * 0.55 -
-        Math.max((left.price ?? 0) - desiredMinPrice, 0) * 0.03;
-      const rightScore =
-        right.finalScore +
-        Math.min(right.price ?? 0, 75) * priceWeight +
-        right.scoreBreakdown.teamIdentityScore * leftIdentityWeight +
-        right.scoreBreakdown.needMatchScore * 0.9 +
-        right.scoreBreakdown.formColorCoverageScore * 1.15 +
-        right.scoreBreakdown.formColorFlexScore * 0.55 -
-        Math.max((right.price ?? 0) - desiredMinPrice, 0) * 0.03;
-      return rightScore - leftScore;
-    });
-  let candidate = affordable[0] ?? null;
-  if (!candidate && picksLeft === 1 && remainingTargetSpend > 1.5) {
-    candidate =
-      [...input.candidates]
-        .filter((entry) => {
-          if (entry.price == null || !canAffordWithoutNegativeCash(entry.price, pickAffordableCash)) return false;
-          if ((entry.price ?? 0) < minSlotSpend * 0.88) return false;
-          if (entry.focusTeamStatus === "blocked") return false;
-          return (
-            entry.scoreBreakdown.teamIdentityScore >= minIdentity ||
-            entry.scoreBreakdown.needMatchScore >= 3 ||
-            entry.scoreBreakdown.disciplineCoverageScore >= 4
-          );
-        })
-        .sort((left, right) => (right.price ?? 0) - (left.price ?? 0))[0] ?? null;
-  }
-  if (!candidate) {
-    return null;
-  }
-  if ((candidate.price ?? 0) < desiredMinPrice && remainingCash > targetCashLeft + (cashSalaryOverCap ? 12 : 45) && remainingTargetSpend <= 1.5) {
-    return null;
-  }
-  if (candidate.finalScore < currentScore - 32 && candidate.scoreBreakdown.teamIdentityScore < 3 && candidate.scoreBreakdown.needMatchScore < 4) {
-    return null;
-  }
-  return candidate;
 }
 
 function getPostMinimumStrongReason(candidate: AiNeedsPicksCandidateScore) {
@@ -7947,8 +7701,7 @@ function buildTeamEntry(input: {
       : [];
   const planner: AiNeedsPicksPlanner = { ...plannerBase, slotBriefs: slotBriefs.length > 0 ? slotBriefs : undefined };
   const expectedPrizeSignal =
-    input.prizeSignalByTeamId.get(team.teamId) ??
-    toComparePrizeSignal(null, "missing_source");
+    input.prizeSignalByTeamId.get(team.teamId) ?? toComparePrizeSignal(null, "missing_source");
   const cashStrategy = buildCashStrategy({
     gameState: input.context.gameState,
     team,
@@ -8728,24 +8481,6 @@ function buildTeamEntry(input: {
       }
     }
     if (season1OptimumMode) {
-      const spendCandidate = findSeason1OptimumSpendCandidate({
-        team,
-        identity,
-        cashStrategy: stepCashStrategy,
-        candidates: minimumSecured ? relativeMarketCandidates : rankedTargetAwareCandidates,
-        current: top,
-        remainingCash,
-        affordabilityCash: pickAffordableCash,
-        minimumSlotsBefore,
-        targetRosterSize,
-        playerOpt,
-        simulatedRosterCount,
-      });
-      if (spendCandidate) {
-        top = spendCandidate;
-        warnings.push(`Schritt ${stepIndex + 1}: Season-1-Spend-Ziel hebt staerkeren Pick gegen zu hohen Restcash hoch.`);
-      }
-
       const impactCandidate = findSeason1OptimumImpactCandidate({
         team,
         candidates: minimumSecured ? relativeMarketCandidates : rankedTargetAwareCandidates,
@@ -9047,7 +8782,28 @@ function buildTeamEntry(input: {
           `Schritt ${stepIndex + 1}: season1_spend_corridor_relaxed_for_target_gap:${targetSlotsBefore}`,
         );
       } else if (spendDownRequiredThisStep) {
-        warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_spend_down`);
+        // Corridor is breached and roster-fill/spend-floor pressure forces a pick anyway — but
+        // "must spend more" doesn't mean "must overshoot by as much as possible": prefer the
+        // cheapest still-quality-gated candidate to minimize how far past the ceiling we land.
+        const cheaperOvershootCandidate =
+          top != null
+            ? rankedQualityCandidates
+                .filter(
+                  (entry) =>
+                    entry.price != null &&
+                    top != null &&
+                    top.price != null &&
+                    entry.price < top.price &&
+                    canAffordWithoutNegativeCash(entry.price, remainingCash),
+                )
+                .sort((left, right) => (left.price ?? 0) - (right.price ?? 0))[0] ?? null
+            : null;
+        if (cheaperOvershootCandidate) {
+          top = cheaperOvershootCandidate;
+          warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_spend_down_min_overshoot`);
+        } else {
+          warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_spend_down`);
+        }
       } else if (shouldContinueSeason1Optimum && !stepCashStrategy.shouldSaveCash) {
         warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_opt_or_cash_target`);
       } else {
