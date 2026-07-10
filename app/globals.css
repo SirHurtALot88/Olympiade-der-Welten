@@ -40688,3 +40688,555 @@ button.foundation-team-portrait-card {
     transition: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Design-System-Grundlage (flag-gated)
+   ------------------------------------------------------------
+   Alles hier greift NUR unterhalb von `.is-new-look`. Die Klasse
+   wird in FoundationShellRouterBody.tsx gesetzt, wenn der Runtime-
+   Flag (useNewLook) aktiv ist. Flag aus => Klasse fehlt => null
+   Änderung an bestehenden Screens.
+
+   Absichtlich minimaler Blast-Radius: nur Tokens, sanfte Basis
+   (Accent/Scrollbar/Selection) und opt-in `.nl-*` Komponenten.
+   Bestehende Roh-Elemente (h1-h6, table, button, …) werden NICHT
+   umgestylt, bis die jeweilige Seite migriert ist.
+   ============================================================ */
+
+.is-new-look {
+  /* Surfaces */
+  --nl-bg: #0b0f17;
+  --nl-bg-2: #0e131d;
+  --nl-panel: #131a26;
+  --nl-panel-2: #0f1621;
+  --nl-line: #1f2937;
+  --nl-line-2: #2a3a52;
+  /* Ink */
+  --nl-ink: #eaf0fa;
+  --nl-mut: #93a3bd;
+  --nl-mut-2: #63748f;
+  /* Accent */
+  --nl-accent: #5b9bff;
+  --nl-accent-soft: #15294b;
+  /* Achsen (Spiel-Identität) */
+  --nl-pow: #ff6b6b;
+  --nl-spe: #57d08a;
+  --nl-men: #5b9bff;
+  --nl-soc: #e6b455;
+  /* Semantik (bewusst getrennt vom Accent) */
+  --nl-good: #4cc56b;
+  --nl-warn: #e0a53a;
+  --nl-risk: #e5615a;
+  /* Radius */
+  --nl-r-sm: 8px;
+  --nl-r-md: 12px;
+  --nl-r-lg: 16px;
+  --nl-r-pill: 999px;
+  /* Elevation */
+  --nl-e1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --nl-e2: 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --nl-e3: 0 24px 60px -30px rgba(0, 0, 0, 0.6);
+  /* Spacing */
+  --nl-s1: 4px;
+  --nl-s2: 8px;
+  --nl-s3: 12px;
+  --nl-s4: 16px;
+  --nl-s5: 24px;
+  --nl-s6: 32px;
+  /* Typografie & Motion */
+  --nl-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --nl-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --nl-t-fast: 120ms;
+  --nl-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Sanfte, sichere Basis — kein Restyling bestehender Markup-Elemente. */
+  accent-color: var(--nl-accent);
+  scrollbar-color: var(--nl-line-2) transparent;
+}
+
+.is-new-look ::selection {
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+/* --- Typo-/Zahlen-Helfer (opt-in) ------------------------------- */
+.is-new-look .nl-tnum {
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-sans {
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-display {
+  font-family: var(--nl-display);
+}
+
+/* --- Ton-Klassen: setzen --nl-tone für alle nl-Komponenten ------- */
+.is-new-look .nl-tone-pow {
+  --nl-tone: var(--nl-pow);
+}
+.is-new-look .nl-tone-spe {
+  --nl-tone: var(--nl-spe);
+}
+.is-new-look .nl-tone-men {
+  --nl-tone: var(--nl-men);
+}
+.is-new-look .nl-tone-soc {
+  --nl-tone: var(--nl-soc);
+}
+.is-new-look .nl-tone-accent {
+  --nl-tone: var(--nl-accent);
+}
+.is-new-look .nl-tone-good {
+  --nl-tone: var(--nl-good);
+}
+.is-new-look .nl-tone-warn {
+  --nl-tone: var(--nl-warn);
+}
+.is-new-look .nl-tone-risk {
+  --nl-tone: var(--nl-risk);
+}
+.is-new-look .nl-tone-neutral {
+  --nl-tone: var(--nl-mut);
+}
+
+/* --- StatChip: "jeder Stat ist ein Portal" ----------------------- */
+.is-new-look .nl-stat-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  position: relative;
+  padding: var(--nl-s2) var(--nl-s3);
+  min-width: 64px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  box-shadow: var(--nl-e1);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+  text-align: left;
+  text-decoration: none;
+}
+.is-new-look .nl-stat-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
+}
+.is-new-look .nl-stat-chip-value {
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 700;
+  font-family: var(--nl-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink);
+}
+.is-new-look .nl-stat-chip-sub {
+  font-size: 10.5px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-stat-chip.is-interactive {
+  cursor: pointer;
+  appearance: none;
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease),
+    box-shadow var(--nl-t-fast) var(--nl-ease);
+}
+.is-new-look .nl-stat-chip .nl-stat-chip-arrow {
+  position: absolute;
+  top: var(--nl-s2);
+  right: var(--nl-s2);
+  font-size: 11px;
+  color: var(--nl-mut-2);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+.is-new-look .nl-stat-chip.is-interactive:hover,
+.is-new-look .nl-stat-chip.is-interactive:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--nl-tone, var(--nl-line-2));
+  box-shadow: var(--nl-e2);
+}
+.is-new-look .nl-stat-chip.is-interactive:hover .nl-stat-chip-arrow,
+.is-new-look .nl-stat-chip.is-interactive:focus-visible .nl-stat-chip-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  color: var(--nl-tone, var(--nl-accent));
+}
+.is-new-look .nl-stat-chip.is-interactive:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+.is-new-look .nl-stat-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--nl-s2);
+}
+.is-new-look .nl-stat-chip-row-label {
+  align-self: center;
+  font-family: var(--nl-sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+  margin-right: var(--nl-s1);
+}
+
+/* --- NlCard: Standard-Oberfläche --------------------------------- */
+.is-new-look .nl-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e2);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-card.is-interactive {
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease),
+    box-shadow var(--nl-t-fast) var(--nl-ease);
+}
+.is-new-look .nl-card.is-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--nl-line-2);
+  box-shadow: var(--nl-e3);
+}
+.is-new-look .nl-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+}
+.is-new-look .nl-card-head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.is-new-look .nl-card-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+.is-new-look .nl-card-title {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+.is-new-look .nl-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-shrink: 0;
+}
+.is-new-look .nl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  min-width: 0;
+}
+
+/* --- NlSubTabs: Sub-Tabs oben ------------------------------------ */
+.is-new-look .nl-subtabs {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  padding: var(--nl-s1);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-bg-2);
+  overflow-x: auto;
+  max-width: 100%;
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px var(--nl-s4);
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-family: var(--nl-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), background-color var(--nl-t-fast) var(--nl-ease),
+    border-color var(--nl-t-fast) var(--nl-ease);
+}
+.is-new-look .nl-subtab:hover {
+  color: var(--nl-ink);
+  background: color-mix(in srgb, var(--nl-panel) 70%, transparent);
+}
+.is-new-look .nl-subtab:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-subtab.is-active {
+  color: var(--nl-ink);
+  background: var(--nl-accent-soft);
+  border-color: var(--nl-line-2);
+}
+.is-new-look .nl-subtab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  color: var(--nl-mut);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.is-new-look .nl-subtab.is-active .nl-subtab-count {
+  color: var(--nl-accent);
+  border-color: var(--nl-line-2);
+}
+
+/* --- NlDeltaChip -------------------------------------------------- */
+.is-new-look .nl-delta-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 1px var(--nl-s2);
+  border-radius: var(--nl-r-pill);
+  font-family: var(--nl-sans);
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--nl-mut);
+}
+.is-new-look .nl-delta-chip .nl-delta-chip-arrow {
+  font-size: 9px;
+}
+.is-new-look .nl-delta-chip.is-good {
+  background: color-mix(in srgb, var(--nl-good) 14%, transparent);
+  color: var(--nl-good);
+}
+.is-new-look .nl-delta-chip.is-risk {
+  background: color-mix(in srgb, var(--nl-risk) 14%, transparent);
+  color: var(--nl-risk);
+}
+
+/* --- NlProgressBar ------------------------------------------------ */
+.is-new-look .nl-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  min-width: 0;
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+.is-new-look .nl-progress-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-progress-value {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-progress-track {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  overflow: hidden;
+}
+.is-new-look .nl-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+  transition: width var(--nl-t-fast) var(--nl-ease);
+}
+
+/* --- NlGauge ------------------------------------------------------ */
+.is-new-look .nl-gauge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-gauge svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.is-new-look .nl-gauge .nl-gauge-track {
+  stroke: var(--nl-line);
+}
+.is-new-look .nl-gauge-copy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding-top: var(--nl-s2);
+  pointer-events: none;
+}
+.is-new-look .nl-gauge-value {
+  font-family: var(--nl-display);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-gauge-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+/* --- Chart-Primitives (Sparkline / BarChart / Radar) -------------- */
+.is-new-look .nl-sparkline {
+  display: inline-block;
+  width: 120px;
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+.is-new-look .nl-sparkline.is-empty {
+  width: auto;
+  color: var(--nl-mut-2);
+  font-family: var(--nl-sans);
+  font-size: 11px;
+}
+.is-new-look .nl-barchart {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+.is-new-look .nl-barchart.is-empty,
+.is-new-look .nl-radar.is-empty {
+  margin: 0;
+  color: var(--nl-mut-2);
+  font-family: var(--nl-sans);
+  font-size: 12px;
+}
+.is-new-look .nl-barchart-axis {
+  stroke: var(--nl-line-2);
+  stroke-width: 1;
+}
+.is-new-look .nl-barchart-value {
+  fill: var(--nl-ink);
+  font-family: var(--nl-sans);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-barchart-label {
+  fill: var(--nl-mut);
+  font-family: var(--nl-sans);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+.is-new-look .nl-radar {
+  display: block;
+  width: 180px;
+  max-width: 100%;
+  height: auto;
+}
+.is-new-look .nl-radar-ring {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+}
+.is-new-look .nl-radar-spoke {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+}
+.is-new-look .nl-radar-shape {
+  fill: color-mix(in srgb, var(--nl-accent) 18%, transparent);
+  stroke: var(--nl-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.is-new-look .nl-radar-label {
+  font-family: var(--nl-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- NlMedalBadge ------------------------------------------------- */
+.is-new-look .nl-medal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  padding: 2px var(--nl-s2) 2px 3px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-medal-disc {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.35);
+}
+.is-new-look .nl-medal.is-gold .nl-medal-disc {
+  background: linear-gradient(160deg, #f5d878, #c99b2e);
+}
+.is-new-look .nl-medal.is-silver .nl-medal-disc {
+  background: linear-gradient(160deg, #e3e9f2, #97a3b5);
+}
+.is-new-look .nl-medal.is-bronze .nl-medal-disc {
+  background: linear-gradient(160deg, #e0a56f, #9c6431);
+}
+.is-new-look .nl-medal-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Reduced Motion: alle nl-Transitions/-Animationen aus --------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-stat-chip,
+  .is-new-look .nl-stat-chip.is-interactive,
+  .is-new-look .nl-stat-chip.is-interactive:hover,
+  .is-new-look .nl-stat-chip-arrow,
+  .is-new-look .nl-card.is-interactive,
+  .is-new-look .nl-card.is-interactive:hover,
+  .is-new-look .nl-subtab,
+  .is-new-look .nl-progress-fill {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
+}

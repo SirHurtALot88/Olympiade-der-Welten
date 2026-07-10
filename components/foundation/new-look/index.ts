@@ -1,0 +1,36 @@
+/**
+ * "Neuer Look" Komponenten-Kit — flag-gated Design-System-Grundlage.
+ *
+ * Alle Styles leben in `app/globals.css` unterhalb von `.is-new-look`
+ * (Tokens `--nl-*`, Komponenten `.nl-*`). Die Klasse `is-new-look` wird
+ * in `app/foundation/FoundationShellRouterBody.tsx` nur gesetzt, wenn
+ * der Runtime-Flag (`useNewLook`) aktiv ist — ohne Flag ändert sich nichts.
+ *
+ * Katalog:
+ * - StatChip / StatChipRow: Stat-Vokabular (OVR/PPs/MVS/MW), klickbar = Portal
+ * - NlCard: Standard-Panel-Oberfläche mit eyebrow/title/actions
+ * - NlSubTabs: horizontale Sub-Tab-Leiste oben (linke Nav + Top-Sub-Tabs)
+ * - NlDeltaChip: vorzeichenbehaftetes Delta mit ▲/▼
+ * - NlProgressBar: beschriftete Fortschritts-/Wear-Bar mit Schwellen-Ton
+ * - NlGauge: kleines Bogen-Gauge (CA→PO, Kommerz-Rating, …)
+ * - NlSparkline / NlBarChart / NlRadar: handgerollte SVG-Chart-Primitives
+ * - NlMedalBadge: Gold/Silber/Bronze-Abzeichen
+ */
+export { StatChip, StatChipRow, type StatChipProps, type StatChipRowProps } from "@/components/foundation/new-look/StatChip";
+export { NlCard, type NlCardProps } from "@/components/foundation/new-look/NlCard";
+export { NlSubTabs, type NlSubTabsProps, type NlSubTabItem } from "@/components/foundation/new-look/NlSubTabs";
+export { NlDeltaChip, type NlDeltaChipProps } from "@/components/foundation/new-look/NlDeltaChip";
+export { NlProgressBar, type NlProgressBarProps } from "@/components/foundation/new-look/NlProgressBar";
+export { NlGauge, type NlGaugeProps } from "@/components/foundation/new-look/NlGauge";
+export { NlSparkline, type NlSparklineProps } from "@/components/foundation/new-look/NlSparkline";
+export { NlBarChart, type NlBarChartProps, type NlBarChartBar } from "@/components/foundation/new-look/NlBarChart";
+export { NlRadar, type NlRadarProps, type NlRadarAxis } from "@/components/foundation/new-look/NlRadar";
+export { NlMedalBadge, type NlMedalBadgeProps, type NlMedalKind } from "@/components/foundation/new-look/NlMedalBadge";
+export {
+  formatNlNumber,
+  NL_AXIS_LABELS,
+  NL_TONE_VAR,
+  nlToneClass,
+  type NlAxisKey,
+  type NlTone,
+} from "@/components/foundation/new-look/nl-tones";

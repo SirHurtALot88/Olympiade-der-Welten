@@ -7,6 +7,7 @@ import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-con
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -191,6 +192,7 @@ type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 type MarketSellAreaRow = { key: string; value: number | null; tone: string };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
+  const [newLookEnabled] = useNewLook();
   const {
   activeContextMeta,
   activeContextStatusChips,
@@ -720,7 +722,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   return (
     (
     <FoundationSharedProvider>
-    <main className="app-shell foundation-shell foundation-app">
+    <main className={`app-shell foundation-shell foundation-app${newLookEnabled ? " is-new-look" : ""}`}>
       {bootstrapError && gameState?.season?.id === "loading" ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{bootstrapError}</strong>
