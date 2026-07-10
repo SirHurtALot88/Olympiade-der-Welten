@@ -2026,7 +2026,10 @@ function buildQualityGate(
     blockingReasons.push(...focusTeamNoCoreIdentity.map((team) => `focus_team_no_core_identity_built:${team.teamCode}`));
   }
   if (mayhemUnderinvested.length > 0) {
-    blockingReasons.push(...mayhemUnderinvested.map((team) => `top_team_underinvested:${team.teamCode}`));
+    // Under-investment is a planner-quality/tuning signal ("this top team should have bought more
+    // impact"), never a reason to execute zero picks. Kept as a warning so it can't be promoted to
+    // a full team exclusion downstream (resolveSeason1PartialExecutionPlan) and zero out the draft.
+    warnings.push(...mayhemUnderinvested.map((team) => `top_team_underinvested_warning:${team.teamCode}`));
   }
   if (coldSteelIdentityBreak.length > 0) {
     blockingReasons.push(...coldSteelIdentityBreak.map((team) => `cold_steel_identity_break:${team.teamCode}`));
@@ -2514,6 +2517,20 @@ function isSeason1HardMinTeamExecutionBlocker(team: AiPicksRunTeamResult) {
   }
   const plannedCount = team.plannedPicks.filter((pick) => pick.status !== "blocked").length;
   return team.rosterBefore + plannedCount < team.targetRosterMin;
+}
+
+/**
+ * True when a team's non-blocked planned picks already reach its legal roster minimum. Such a team
+ * must never be fully excluded from execution for a soft/quality concern — executing its legal
+ * draft is always strictly better than zeroing it. Guards against quality-gate blockers (e.g.
+ * top_team_underinvested, focus_team_*, wrong-axis) getting promoted into a whole-team exclusion.
+ */
+function season1TeamMeetsMinWithPlanned(team: AiPicksRunTeamResult) {
+  if (team.targetRosterMin == null) {
+    return false;
+  }
+  const plannedCount = team.plannedPicks.filter((pick) => pick.status !== "blocked").length;
+  return team.rosterBefore + plannedCount >= team.targetRosterMin;
 }
 
 function shouldContinueExecuteAfterPickDrift(input: {
@@ -3156,7 +3173,11 @@ function resolveSeason1PartialExecutionPlan(input: {
         ),
       );
       if (teamsWithReason.length > 0 && teamsWithReason.length < input.previewTeams.length) {
-        teamsWithReason.forEach((team) => blockedTeamIds.add(team.teamId));
+        // A quality concern must never fully exclude a team that already reaches its legal roster
+        // minimum with planned picks — executing that legal draft always beats zeroing it.
+        teamsWithReason
+          .filter((team) => !season1TeamMeetsMinWithPlanned(team))
+          .forEach((team) => blockedTeamIds.add(team.teamId));
         continue;
       }
       // Reason can't be tied to one team — treat as league-wide, keep the safe full block.
@@ -3165,7 +3186,12 @@ function resolveSeason1PartialExecutionPlan(input: {
     if (attribution.playerId) {
       blockedPickKeys.add(buildPickExclusionKey(attribution.teamId, attribution.playerId));
     } else {
-      blockedTeamIds.add(attribution.teamId);
+      const attributedTeam = input.previewTeams.find((team) => team.teamId === attribution.teamId);
+      // Same safety net for team-level reasons that carry no specific pick: keep a min-satisfying
+      // team executable instead of discarding its whole draft over a soft/quality signal.
+      if (!attributedTeam || !season1TeamMeetsMinWithPlanned(attributedTeam)) {
+        blockedTeamIds.add(attribution.teamId);
+      }
     }
   }
   if (blockedTeamIds.size >= input.previewTeams.length) {
