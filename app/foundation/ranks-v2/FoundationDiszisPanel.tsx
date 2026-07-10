@@ -69,14 +69,14 @@ export default function FoundationDiszisPanel(props: FoundationDiszisPanelProps)
           title="Spalten"
           columns={disciplineConfigTableColumns}
           activePreset={getTableActivePreset("disciplineConfigTable")}
-          isVisible={(columnId, visibleByDefault) =>
+          isVisible={(columnId: string, visibleByDefault?: boolean) =>
             isTableColumnVisible("disciplineConfigTable", columnId, visibleByDefault)
           }
-          onToggle={(columnId, nextVisible) => setTableColumnVisible("disciplineConfigTable", columnId, nextVisible)}
-          onMove={(columnId, direction) => moveTableColumn("disciplineConfigTable", columnId, direction, disciplineConfigTableColumns)}
-          getWidth={(column) => getTableColumnWidth("disciplineConfigTable", column)}
-          onStepWidth={(column, delta) => adjustTableColumnWidth("disciplineConfigTable", column, delta)}
-          onResetWidth={(column) => resetTableColumnWidth("disciplineConfigTable", column)}
+          onToggle={(columnId: string, nextVisible: boolean) => setTableColumnVisible("disciplineConfigTable", columnId, nextVisible)}
+          onMove={(columnId: string, direction: "left" | "right") => moveTableColumn("disciplineConfigTable", columnId, direction, disciplineConfigTableColumns)}
+          getWidth={(column: FoundationTableColumn) => getTableColumnWidth("disciplineConfigTable", column)}
+          onStepWidth={(column: FoundationTableColumn, delta: number) => adjustTableColumnWidth("disciplineConfigTable", column, delta)}
+          onResetWidth={(column: FoundationTableColumn) => resetTableColumnWidth("disciplineConfigTable", column)}
           onResetToDefault={() => resetTableLayout("disciplineConfigTable", disciplineConfigTableColumns)}
         />
       </div>

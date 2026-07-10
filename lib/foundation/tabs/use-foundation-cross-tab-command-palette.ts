@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 import { GAME_ENCYCLOPEDIA_ENTRIES } from "@/lib/ui/game-encyclopedia";
 import type { GameInboxItem, GameState, Team } from "@/lib/data/olyDataTypes";
@@ -30,7 +31,7 @@ export function useFoundationCrossTabCommandPalette(input: {
   openEncyclopediaEntry: (termOrId: string) => void;
   inboxCategoryFilter: string;
   setInboxCategoryFilter: (filter: string) => void;
-  setActiveView: (view: FoundationView) => void;
+  setActiveView: Dispatch<SetStateAction<FoundationView>>;
 }) {
   const foundationCommandItems = useMemo<FoundationCommandItem[]>(() => {
     const viewCommands: FoundationCommandItem[] = [

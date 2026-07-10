@@ -37,6 +37,8 @@ export type TransfermarktSellSummary = {
   marketValueReference: number | null;
   saleFactor: number | null;
   salePrice: number | null;
+  buyoutCost?: number | null;
+  netProceeds?: number | null;
   profit: number | null;
   salaryReduction: number | null;
   projectedReadinessAfterSell: string | null;

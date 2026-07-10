@@ -13,6 +13,7 @@ import {
   buildPlayerProgressSummary,
   formatProgressDelta,
   sortPlayerProgressHistoryRows,
+  type PlayerProgressHistoryRow,
 } from "@/lib/foundation/player-progress-summary";
 
 type PlayerAttributeProgressChartProps = {
@@ -141,7 +142,7 @@ function formatSeasonShortLabel(seasonName: string, seasonId: string | null) {
   return seasonName.replace(/^Season\s+/i, "S");
 }
 
-function buildPpMetricBlockChartsGeometry(rows: PlayerDrawerHistoryRow[]) {
+function buildPpMetricBlockChartsGeometry(rows: PlayerProgressHistoryRow[]) {
   const width = 280;
   const height = 148;
   const paddingLeft = 28;

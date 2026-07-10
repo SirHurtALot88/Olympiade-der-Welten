@@ -10,6 +10,7 @@ import { buildPlayerProgressionForecast } from "@/lib/training/player-progressio
 import {
   buildHomePlayerCardsFromRoster,
   formatLocalePoints,
+  HOME_V2_FACILITY_IDS,
   type HomeV2RosterTableRow,
 } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import type {

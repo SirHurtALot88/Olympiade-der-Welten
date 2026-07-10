@@ -23,15 +23,15 @@ export type TransferMarketV2RosterRow = {
   portraitUrl: string | null;
   marketValue: number | null;
   salary: number | null;
-  contractLength: number | null;
+  contractLength: number;
   pps: number | null;
   ovr: number | null;
   mvs: number | null;
   valueScore: number | null;
-  pow: number | null;
-  spe: number | null;
-  men: number | null;
-  soc: number | null;
+  pow: number;
+  spe: number;
+  men: number;
+  soc: number;
   disciplineRatings: Player["disciplineRatings"];
   previousSeasonAxis: {
     seasonId: string;
@@ -74,12 +74,14 @@ export function buildTransferMarketV2RosterRows(input: {
       const playerRating = input.playerRatingsById.get(player.id) ?? null;
       const portrait = getPlayerPortraitMediaModel(player);
       const salary = input.getRosterEntryDisplaySalary(entry, player);
+      const ppsRating = playerRating ? { ppsSeason: playerRating.ppsSeason ?? null } : null;
+      const mvsRating = playerRating ? { mvs: playerRating.mvs ?? null } : null;
       const pps = resolvePlayerDisplayPps({
-        playerRating,
+        playerRating: ppsRating,
         seasonPointsLedger,
         playerId: player.id,
       });
-      const mvs = resolvePlayerDisplayMvs({ playerRating });
+      const mvs = resolvePlayerDisplayMvs({ playerRating: mvsRating });
       return {
         activePlayerId: entry.id,
         playerId: player.id,

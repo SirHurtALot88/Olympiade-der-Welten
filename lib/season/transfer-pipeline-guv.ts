@@ -41,14 +41,18 @@ export function collectSeasonTransferPipelineGuv(gameState: GameState, seasonId:
   const exitCash = sum(contractExitEvents.map((event) => event.exitValue ?? 0));
   const exitPL = sum(contractExitEvents.map((event) => event.profitLoss ?? 0));
 
-  const marketSells = transferHistory.filter(
-    (entry) => entry.transferType === "sell" || entry.transferType === "market_sell",
-  );
-  const marketBuys = transferHistory.filter(
-    (entry) => entry.transferType === "buy" || entry.transferType === "market_buy",
-  );
+  const marketSells = transferHistory.filter((entry) => {
+    const transferType: string = entry.transferType;
+    return transferType === "sell" || transferType === "market_sell";
+  });
+  const marketBuys = transferHistory.filter((entry) => {
+    const transferType: string = entry.transferType;
+    return transferType === "buy" || transferType === "market_buy";
+  });
   const marketSellFees = sum(marketSells.map((entry) => entry.fee ?? 0));
-  const marketBuyFees = sum(marketBuys.map((entry) => entry.fee ?? entry.purchasePrice ?? 0));
+  const marketBuyFees = sum(
+    marketBuys.map((entry) => entry.fee ?? (entry as { purchasePrice?: number | null }).purchasePrice ?? 0),
+  );
 
   const sponsorInflow = sum(
     (gameState.seasonState.sponsorPayoutLogs ?? [])
@@ -69,12 +73,10 @@ export function collectSeasonTransferPipelineGuv(gameState: GameState, seasonId:
   );
   const facilityInvest = sum(
     facilityEvents
-      .filter(
-        (event) =>
-          event.source === "manual_facility_upgrade" ||
-          event.source === "ai_facility_upgrade" ||
-          event.source === "facility_build",
-      )
+      .filter((event) => {
+        const source: string = event.source;
+        return source === "manual_facility_upgrade" || source === "ai_facility_upgrade" || source === "facility_build";
+      })
       .map((event) => event.cost ?? 0),
   );
 

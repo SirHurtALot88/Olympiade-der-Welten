@@ -2342,6 +2342,7 @@ export default function TransfermarktV2Client({
       setPoolBracketBusy(false);
       return;
     }
+    const activePoolBracketPanel = poolBracketPanel;
 
     let cancelled = false;
     const controller = new AbortController();
@@ -2352,7 +2353,7 @@ export default function TransfermarktV2Client({
       setPoolBracketBusy(true);
       try {
         if (deferredSearch.trim().length === 0 && !marketHasMore && marketItems.length > 0) {
-          const filtered = filterTransfermarktFreeAgentsByBracket(marketItems, poolBracketPanel.bracket);
+          const filtered = filterTransfermarktFreeAgentsByBracket(marketItems, activePoolBracketPanel.bracket);
           if (!cancelled) {
             setPoolBracketItems(filtered);
           }
@@ -2402,7 +2403,7 @@ export default function TransfermarktV2Client({
         }
 
         if (!cancelled) {
-          setPoolBracketItems(filterTransfermarktFreeAgentsByBracket(mergedItems, poolBracketPanel.bracket));
+          setPoolBracketItems(filterTransfermarktFreeAgentsByBracket(mergedItems, activePoolBracketPanel.bracket));
         }
       } catch (error) {
         if (cancelled || controller.signal.aborted || isAbortError(error)) {
@@ -3286,7 +3287,7 @@ export default function TransfermarktV2Client({
                   portraitInitials={selectedPortrait?.initials ?? "FA"}
                   playerOvr={selectedPlayer.ovr ?? null}
                   playerMvs={selectedPlayer.mvs ?? null}
-                  playerPps={selectedPlayer.pps ?? null}
+                  playerPps={(selectedPlayer as { pps?: number | null }).pps ?? null}
                   ovrRank={selectedPlayerRating?.ovrRank ?? null}
                   mvsRank={selectedPlayerRating?.mvsRank ?? null}
                   ppsRank={selectedPlayerRating?.ppsSeasonRank ?? null}
@@ -4446,7 +4447,7 @@ export default function TransfermarktV2Client({
                               leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
                               variant="team"
                               context="market"
-                              density="compact"
+                              previewDensity="compact"
                               playerClassName={item.className}
                               subMeta={item.race}
                               contextData={{

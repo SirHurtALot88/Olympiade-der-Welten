@@ -157,13 +157,13 @@ export { GAME_ENCYCLOPEDIA_ENTRIES } from "@/lib/ui/game-encyclopedia";
 export { MappingHighlight } from "@/app/foundation/MappingHighlight";
 
 export type {
-  FacilityId,
   FoundationView,
-  FoundationViewId,
   NewGamePresetId,
   PlayerTableScope,
-  TeamStrategyProfile,
 } from "@/lib/foundation/tabs/foundation-page-types";
+export type { FacilityId } from "@/lib/facilities/facility-catalog";
+export type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+export type { TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 export type { DisciplineCategoryFilter } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 export type { GameFlowView } from "@/lib/foundation/game-flow-controller";
 export type { PlayerProfileTabId } from "@/lib/foundation/player-profile-service";

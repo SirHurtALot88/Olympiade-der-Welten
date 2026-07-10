@@ -155,7 +155,7 @@ export type TransfermarktFreeAgentItem = {
   mercenary: boolean;
   fit: number | null;
   fitDisplay: string;
-  fitSource: "select_team_for_fit" | "not_ported_golden_master" | "local_approximation_not_golden_master";
+  fitSource: "select_team_for_fit" | "not_ported_golden_master" | "local_approximation_not_golden_master" | "compact_list";
   needMatchScore?: number | null;
   needMatchLabel?: string | null;
   needMatchTone?: TransfermarktNeedMatchTone | null;

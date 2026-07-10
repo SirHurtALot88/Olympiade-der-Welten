@@ -7,6 +7,7 @@ type FoundationCardProps = {
   className?: string;
   children: ReactNode;
   as?: "article" | "div" | "section";
+  title?: string;
   "data-testid"?: string;
 };
 
@@ -22,10 +23,11 @@ export function FoundationCard({
   className = "",
   children,
   as: Tag = "article",
+  title,
   "data-testid": testId,
 }: FoundationCardProps) {
   return (
-    <Tag className={`${VARIANT_CLASS[variant]}${className ? ` ${className}` : ""}`} data-testid={testId}>
+    <Tag className={`${VARIANT_CLASS[variant]}${className ? ` ${className}` : ""}`} title={title} data-testid={testId}>
       {children}
     </Tag>
   );

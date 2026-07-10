@@ -1284,9 +1284,11 @@ function buildCompactFreeAgentItem(input: {
         visiblePositiveTraits: browseEntry.traitsPositive,
         visibleNegativeTraits: browseEntry.traitsNegative,
         disclosure: {
+          level: 0,
           preferredDisciplinesVisible: false,
           positiveTraitsVisible: browseEntry.traitsPositive.length,
-          negativeTraitsVisible: browseEntry.traitsNegative.length,
+          negativeTraitsVisible: browseEntry.traitsNegative.length > 0,
+          exactAttributeValuesVisible: false,
         },
         hiddenPositiveTraitCount: 0,
         hiddenNegativeTraitCount: 0,

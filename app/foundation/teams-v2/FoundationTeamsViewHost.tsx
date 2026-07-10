@@ -21,7 +21,10 @@ import {
   type UseTeamsPanelDerivationsInput,
 } from "@/lib/foundation/tabs/use-teams-panel-derivations";
 import { useTeamsContractDerivations } from "@/lib/foundation/tabs/use-teams-contract-derivations";
-import { useTeamsExtendedPanelDerivations } from "@/lib/foundation/tabs/use-teams-extended-panel-derivations";
+import {
+  useTeamsExtendedPanelDerivations,
+  type UseTeamsExtendedPanelDerivationsInput,
+} from "@/lib/foundation/tabs/use-teams-extended-panel-derivations";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip, getTeamsViewColumnTitle } from "@/lib/foundation/tabs/teams-ui-helpers";
 import {
   useTeamsRosterTableDerivations,
@@ -244,13 +247,13 @@ export default function FoundationTeamsViewHost({
     selectedTeam,
     selectedTeamControl,
     aiTeams,
-    playerRatingsById,
+    playerRatingsById: playerRatingsById as UseTeamsExtendedPanelDerivationsInput["playerRatingsById"],
   });
 
   const { starters, bench, visibleTeamsViewColumns, visibleSelectedRosterColumns } = useTeamsPanelDerivations({
     showExtendedTeamPanels: Boolean(showExtendedTeamPanels),
     rosterPlayers,
-    playerRatingsById,
+    playerRatingsById: playerRatingsById as UseTeamsPanelDerivationsInput["playerRatingsById"],
     getRosterEntryDisplayMarketValue:
       getRosterEntryDisplayMarketValue as UseTeamsPanelDerivationsInput["getRosterEntryDisplayMarketValue"],
     tableColumnPreferences,

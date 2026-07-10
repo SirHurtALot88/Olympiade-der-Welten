@@ -273,7 +273,7 @@ export function collectSeasonWealthSnapshot(input: {
 }
 
 export function formatWealthSnapshotLogLine(snapshot: SeasonWealthSnapshot): string {
-  const pct = (value: number) => `${round(value * 100, 1)}%`;
+  const pct = (value: number | null) => (value == null ? "—" : `${round(value * 100, 1)}%`);
   const corridor = snapshot.corridor;
   const delta =
     snapshot.deltaFromPrior == null
