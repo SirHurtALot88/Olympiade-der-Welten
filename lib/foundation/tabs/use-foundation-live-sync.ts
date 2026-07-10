@@ -35,15 +35,17 @@ export type UseFoundationLiveSyncInput = {
   foundationSaveMode: FoundationSaveMode;
   readMeta: FoundationReadMeta;
   activeView: FoundationView;
-  seasonOverviewSeasonId: string | null;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  seasonOverviewSeasonId: string;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   roomContext: unknown;
   roomLiveState: OlyRoomState | null;
   setRoomActivityNotice: Dispatch<
     SetStateAction<{ title: string; detail: string } | null>
   >;
   setSaveSyncError: Dispatch<SetStateAction<string | null>>;
-  setFoundationActionFeedback: Dispatch<SetStateAction<unknown>>;
+  setFoundationActionFeedback: Dispatch<
+    SetStateAction<{ tone: "success" | "warning" | "info" | "blocked" | "error"; title: string; detail: string } | null>
+  >;
   setMarketReloadToken: Dispatch<SetStateAction<number>>;
   shouldLoadStandingsPreviewFeed: boolean;
   shouldLoadPrizePreviewFeed: boolean;

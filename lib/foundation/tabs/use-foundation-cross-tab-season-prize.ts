@@ -62,7 +62,7 @@ export function useFoundationCrossTabSeasonPrize(input: {
   gameState: GameState;
   seasonStandRows: TeamManagementSnapshotRow[];
   seasonFormBonusByTeamId: ReturnType<typeof buildPpAreaFormBonusByTeamId>;
-  tableSorts: { ppArea: SortState };
+  tableSorts: Record<string, SortState>;
   prizePreviewFeed: FoundationPrizePreviewResponse | null;
   cashApplyFeed: FoundationApplySummary | null;
   selectedTeam: Team | null;

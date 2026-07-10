@@ -1,27 +1,17 @@
 "use client";
 
-import type { ComponentType, MouseEvent } from "react";
+import type { ComponentProps, ComponentType, MouseEvent } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationStandingsPreviewResponse, FoundationTableColumn, SortState } from "@/lib/foundation/tabs/cockpit-types";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { useSeasonPreviewDerivations } from "@/lib/foundation/tabs/use-season-preview-derivations";
+import type { ColumnVisibilityManager as ColumnVisibilityManagerComponent, SortableHeader as SortableHeaderComponent } from "@/components/foundation/FoundationTableUi";
 
-type ColumnVisibilityManagerProps = {
-  title: string;
-  columns: FoundationTableColumn[];
-  isVisible: (columnId: string, visibleByDefault: boolean) => boolean;
-  onToggle: (columnId: string, nextVisible: boolean) => void;
-};
+type ColumnVisibilityManagerProps = ComponentProps<typeof ColumnVisibilityManagerComponent>;
 
-type SortableHeaderProps = {
-  label: string;
-  tableId: string;
-  columnKey: string;
-  sortState: SortState;
-  onToggle: (tableId: string, columnKey: string) => void;
-};
+type SortableHeaderProps = ComponentProps<typeof SortableHeaderComponent>;
 
 export type FoundationSeasonPreviewShellHostProps = {
   activeSaveId: string;
@@ -30,7 +20,7 @@ export type FoundationSeasonPreviewShellHostProps = {
   tableColumnPreferences: {
     standingsPreviewTable?: { columnOrder?: string[] };
   };
-  tableSorts: { standingsPreview: SortState };
+  tableSorts: Record<string, SortState>;
   isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault: boolean) => boolean;
   setTableColumnVisible: (tableId: string, columnId: string, nextVisible: boolean) => void;
   getTableColumnWidth: (tableId: string, column: FoundationTableColumn) => number;
@@ -90,7 +80,7 @@ export default function FoundationSeasonPreviewShellHost({
           title="Spalten"
           columns={standingsPreviewColumns}
           isVisible={(columnId, visibleByDefault) =>
-            isTableColumnVisible("standingsPreviewTable", columnId, visibleByDefault)
+            isTableColumnVisible("standingsPreviewTable", columnId, visibleByDefault ?? true)
           }
           onToggle={(columnId, nextVisible) => setTableColumnVisible("standingsPreviewTable", columnId, nextVisible)}
         />

@@ -5,6 +5,8 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { fetchSeasonSliceJson, readSeasonSliceClientCache } from "@/lib/foundation/season-slice-http";
 import type {
+  FoundationAiLineupBatchApplyResponse,
+  FoundationApplySummary,
   FoundationPrizePreviewResponse,
   FoundationReadMeta,
   FoundationResolvePreviewResponse,
@@ -41,11 +43,11 @@ export type UseFoundationSeasonFeedActionsInput = {
   setSeasonStandingsFeed: Dispatch<SetStateAction<FoundationSeasonStandingsOverviewResponse | null>>;
   setSeasonStandingsLoading: Dispatch<SetStateAction<boolean>>;
   setSeasonManagementFeed: Dispatch<SetStateAction<FoundationSeasonManagementResponse | null>>;
-  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setResultApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setStandingsApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setCashApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setMatchdayAdvanceFeed: Dispatch<SetStateAction<unknown>>;
+  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<FoundationAiLineupBatchApplyResponse | null>>;
+  setResultApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setStandingsApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setCashApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setMatchdayAdvanceFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
 };
 
 export function useFoundationSeasonFeedActions(input: UseFoundationSeasonFeedActionsInput) {
@@ -443,8 +445,8 @@ export type UseFoundationSeasonOverviewFeedEffectInput = {
   activeSaveId: string;
   gameStateSeasonId: string;
   isFoundationBootstrapState: boolean;
-  seasonOverviewSeasonId: string | null;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  seasonOverviewSeasonId: string;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   seasonStandingsFeed: FoundationSeasonStandingsOverviewResponse | null;
   seasonOverviewOptions: SeasonOverviewOption[];
   shouldLoadSeasonOverviewFeed: boolean;

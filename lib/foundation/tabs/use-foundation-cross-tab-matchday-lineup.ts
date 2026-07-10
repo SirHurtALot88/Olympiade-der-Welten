@@ -27,6 +27,7 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
+import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 
 export function shouldBuildFoundationMatchdaySummaryDerivations(activeView: string): boolean {
   return (
@@ -144,16 +145,16 @@ export function useFoundationCrossTabMatchdayLineup(input: {
   activeSaveId: string;
   readMetaSource: string;
   readMetaReadOnly: boolean;
-  roomContext: FoundationRoomContext;
-  foundationSaveMode: string;
+  roomContext: FoundationRoomContext | null;
+  foundationSaveMode: FoundationSaveMode;
   aiLineupEnsureBusy: boolean;
   setAiLineupEnsureBusy: (busy: boolean) => void;
   setAiLineupEnsureFeed: (feed: FoundationAiLineupBatchApplyResponse | null) => void;
   loadSave: (
-    saveId: string,
-    mode: string,
+    saveId?: string,
+    saveMode?: FoundationSaveMode,
     options?: { compactInitial?: boolean },
-  ) => Promise<unknown>;
+  ) => Promise<GameState | null>;
 }) {
   const shouldBuildMatchdayDerivations = shouldBuildFoundationMatchdayFlowDerivations(input.activeView);
   const shouldBuildMatchdaySummary = shouldBuildFoundationMatchdaySummaryDerivations(input.activeView);

@@ -79,10 +79,7 @@ export function useFoundationCrossTabDisciplineRanks(input: {
   disciplineCategoryFilter: string;
   ranksSeasonId: string;
   seasonHistorySnapshots: SeasonSnapshotInput[];
-  tableSorts: {
-    disciplineRanks: SortState;
-    disciplineConfig: SortState;
-  };
+  tableSorts: Record<string, SortState>;
 }) {
   const shouldBuildDisciplineRanks = shouldBuildFoundationDisciplineRanks({
     activeView: input.activeView,

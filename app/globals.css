@@ -2634,6 +2634,12 @@ a {
   background: linear-gradient(135deg, rgba(93, 143, 214, 0.14), rgba(255, 255, 255, 0.04));
 }
 
+.foundation-action-feedback.is-blocked,
+.foundation-action-feedback.is-error {
+  border-color: rgba(220, 99, 87, 0.46);
+  background: linear-gradient(135deg, rgba(220, 99, 87, 0.16), rgba(255, 255, 255, 0.04));
+}
+
 .foundation-ai-preseason-copy {
   display: grid;
   gap: 2px;

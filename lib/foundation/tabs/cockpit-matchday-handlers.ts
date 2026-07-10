@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 
+import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { invalidateMatchdayArenaSessionCache } from "@/lib/foundation/matchday-arena-session-cache";
 import { clearPrefetchedMatchdayArenaBaseKeys } from "@/lib/foundation/foundation-panel-prefetch";
 import type {
@@ -38,8 +39,15 @@ export type CockpitMatchdayApplyHandlersDeps = {
   reloadResolvePreview: (signal?: AbortSignal) => Promise<unknown>;
   reloadStandingsPreviewFeed: (signal?: AbortSignal) => Promise<unknown>;
   reloadPrizePreviewFeed: () => Promise<unknown>;
-  reloadLiveSeasonState: (reason: string) => Promise<unknown>;
-  loadSave: (saveId: string) => Promise<unknown>;
+  reloadLiveSeasonState: (
+    reason?: "manual_apply" | "room_event" | "local_save_version",
+    options?: { skipGameStateReload?: boolean; reloadFullGameState?: boolean; compactReload?: boolean },
+  ) => Promise<unknown>;
+  loadSave: (
+    saveId?: string,
+    saveMode?: FoundationSaveMode,
+    options?: { compactInitial?: boolean },
+  ) => Promise<unknown>;
   reloadSeasonStandingsOverview: () => Promise<unknown>;
   reloadSeasonManagementOverview: () => Promise<unknown>;
   reloadHistoryFeed: () => Promise<unknown>;
@@ -47,7 +55,7 @@ export type CockpitMatchdayApplyHandlersDeps = {
   bumpMarketReloadToken: () => void;
   setFoundationActionFeedback: Dispatch<
     SetStateAction<{
-      tone: "success" | "warning" | "info";
+      tone: "success" | "warning" | "info" | "blocked" | "error";
       title: string;
       detail: string;
     } | null>

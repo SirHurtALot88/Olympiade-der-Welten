@@ -35,73 +35,111 @@ import {
   resolvePreferredFoundationTeamContext,
   syncFoundationTeamIdInUrl,
   withNormalizedLocalTeamSettings,
+  type syncFoundationViewInUrl,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import type { TrainingClassDraft, TrainingModeDraft } from "@/lib/foundation/tabs/foundation-page-types";
 import { foundationFetchWithRetry } from "@/lib/foundation/foundation-fetch-with-retry";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { FoundationPanelId } from "@/lib/foundation/foundation-navigation-history";
+import type {
+  FacilityUpgradeSummary,
+  FoundationAiLineupBatchApplyResponse,
+  FoundationAiMarketPlanApplyResponse,
+  FoundationAiMarketPlanPreviewResponse,
+  FoundationAiNeedsPicksCompareResponse,
+  FoundationAiPickAuditResetResponse,
+  FoundationAiPreseasonAutomationResponse,
+  FoundationAiSellPreviewResponse,
+  FoundationAiTransferPreviewResponse,
+  FoundationApplySummary,
+  FoundationAutoRosterFillResponse,
+  FoundationMatchdayAutoRunSummary,
+  FoundationMatchdayMvpScoringResponse,
+  FoundationPrizePreviewResponse,
+  FoundationResolvePreviewResponse,
+  FoundationSeasonManagementResponse,
+  FoundationSeasonSnapshotSummary,
+  FoundationSeasonStandingsOverviewResponse,
+  FoundationSeasonStartResetResponse,
+  FoundationStandingsPreviewResponse,
+  FoundationTransferHistoryResponse,
+  FoundationTransferRecapResponse,
+  FoundationTransfermarktResponse,
+  FoundationWholeSeasonDryRunSummary,
+  PreSeasonWorkflowSummaryResponse,
+  SeasonCompletionSummaryResponse,
+  SeasonTransitionSummaryResponse,
+  TransfermarktBuyPreviewSubject,
+  TransfermarktBuyRequestContext,
+  TransfermarktBuySummary,
+  TransfermarktSellPreviewSubject,
+  TransfermarktSellSummary,
+} from "@/lib/foundation/tabs/foundation-page-types";
 
 export type FoundationSaveScopedFeedSetters = {
-  setMarketFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketFeed: Dispatch<SetStateAction<FoundationTransfermarktResponse | null>>;
   setMarketRenderLimit: Dispatch<SetStateAction<number>>;
   setMarketLoadingMore: Dispatch<SetStateAction<boolean>>;
-  setMarketBuyPreview: Dispatch<SetStateAction<unknown>>;
-  setMarketBuyPreviewContext: Dispatch<SetStateAction<unknown>>;
+  setMarketBuyPreview: Dispatch<SetStateAction<TransfermarktBuySummary | null>>;
+  setMarketBuyPreviewContext: Dispatch<SetStateAction<TransfermarktBuyRequestContext | null>>;
   setMarketBuyError: Dispatch<SetStateAction<string | null>>;
   setMarketBuySuccess: Dispatch<SetStateAction<string | null>>;
-  setMarketBuySubject: Dispatch<SetStateAction<unknown>>;
-  setFoundationPanel: Dispatch<SetStateAction<string | null>>;
-  setMarketSellPreview: Dispatch<SetStateAction<unknown>>;
+  setMarketBuySubject: Dispatch<SetStateAction<TransfermarktBuyPreviewSubject | null>>;
+  setFoundationPanel: Dispatch<SetStateAction<FoundationPanelId>>;
+  setMarketSellPreview: Dispatch<SetStateAction<TransfermarktSellSummary | null>>;
   setMarketSellError: Dispatch<SetStateAction<string | null>>;
   setMarketSellSuccess: Dispatch<SetStateAction<string | null>>;
-  setMarketSellSubject: Dispatch<SetStateAction<unknown>>;
+  setMarketSellSubject: Dispatch<SetStateAction<TransfermarktSellPreviewSubject | null>>;
   setMarketSellRiskAcknowledged: Dispatch<SetStateAction<boolean>>;
-  setMarketAiPreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setMarketAiSellPreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setMarketAiPlanPreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setMarketAiCompareFeed: Dispatch<SetStateAction<unknown>>;
-  setMarketAiApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setRosterFillFeed: Dispatch<SetStateAction<unknown>>;
-  setAiPreseasonFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketAiPreviewFeed: Dispatch<SetStateAction<FoundationAiTransferPreviewResponse | null>>;
+  setMarketAiSellPreviewFeed: Dispatch<SetStateAction<FoundationAiSellPreviewResponse | null>>;
+  setMarketAiPlanPreviewFeed: Dispatch<SetStateAction<FoundationAiMarketPlanPreviewResponse | null>>;
+  setMarketAiCompareFeed: Dispatch<SetStateAction<FoundationAiNeedsPicksCompareResponse | null>>;
+  setMarketAiApplyFeed: Dispatch<SetStateAction<FoundationAiMarketPlanApplyResponse | null>>;
+  setRosterFillFeed: Dispatch<SetStateAction<FoundationAutoRosterFillResponse | null>>;
+  setAiPreseasonFeed: Dispatch<SetStateAction<FoundationAiPreseasonAutomationResponse | null>>;
   setAiPreseasonBusy: Dispatch<SetStateAction<boolean>>;
-  setAiPickAuditFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonStartResetFeed: Dispatch<SetStateAction<unknown>>;
-  setHistoryFeed: Dispatch<SetStateAction<unknown>>;
+  setAiPickAuditFeed: Dispatch<SetStateAction<FoundationAiPickAuditResetResponse | null>>;
+  setSeasonStartResetFeed: Dispatch<SetStateAction<FoundationSeasonStartResetResponse | null>>;
+  setHistoryFeed: Dispatch<SetStateAction<FoundationTransferHistoryResponse | null>>;
   setHistorySeasonFilter: Dispatch<SetStateAction<string>>;
-  setTransferRecapFeed: Dispatch<SetStateAction<unknown>>;
-  setResolvePreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setMatchdayMvpScoringFeed: Dispatch<SetStateAction<unknown>>;
-  setResultApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setStandingsPreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setStandingsApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonManagementFeed: Dispatch<SetStateAction<unknown>>;
-  setFacilityUpgradePreview: Dispatch<SetStateAction<unknown>>;
+  setTransferRecapFeed: Dispatch<SetStateAction<FoundationTransferRecapResponse | null>>;
+  setResolvePreviewFeed: Dispatch<SetStateAction<FoundationResolvePreviewResponse | null>>;
+  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<FoundationAiLineupBatchApplyResponse | null>>;
+  setMatchdayMvpScoringFeed: Dispatch<SetStateAction<FoundationMatchdayMvpScoringResponse | null>>;
+  setResultApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setStandingsPreviewFeed: Dispatch<SetStateAction<FoundationStandingsPreviewResponse | null>>;
+  setStandingsApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setSeasonManagementFeed: Dispatch<SetStateAction<FoundationSeasonManagementResponse | null>>;
+  setFacilityUpgradePreview: Dispatch<SetStateAction<FacilityUpgradeSummary | null>>;
   setFacilityUpgradeError: Dispatch<SetStateAction<string | null>>;
   setFacilityUpgradeSuccess: Dispatch<SetStateAction<string | null>>;
-  setPreSeasonWorkflowFeed: Dispatch<SetStateAction<unknown>>;
+  setPreSeasonWorkflowFeed: Dispatch<SetStateAction<PreSeasonWorkflowSummaryResponse | null>>;
   setPreSeasonWorkflowError: Dispatch<SetStateAction<string | null>>;
-  setSeasonTransitionFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonCompletionFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonTransitionFeed: Dispatch<SetStateAction<SeasonTransitionSummaryResponse | null>>;
+  setSeasonCompletionFeed: Dispatch<SetStateAction<SeasonCompletionSummaryResponse | null>>;
   setSeasonTransitionError: Dispatch<SetStateAction<string | null>>;
-  setSeasonStandingsFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
-  setPrizePreviewFeed: Dispatch<SetStateAction<unknown>>;
-  setCashApplyFeed: Dispatch<SetStateAction<unknown>>;
-  setMatchdayAdvanceFeed: Dispatch<SetStateAction<unknown>>;
-  setMatchdayAutoRunFeed: Dispatch<SetStateAction<unknown>>;
-  setWholeSeasonDryRunFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonSnapshotFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonStandingsFeed: Dispatch<SetStateAction<FoundationSeasonStandingsOverviewResponse | null>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
+  setPrizePreviewFeed: Dispatch<SetStateAction<FoundationPrizePreviewResponse | null>>;
+  setCashApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setMatchdayAdvanceFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
+  setMatchdayAutoRunFeed: Dispatch<SetStateAction<FoundationMatchdayAutoRunSummary | null>>;
+  setWholeSeasonDryRunFeed: Dispatch<SetStateAction<FoundationWholeSeasonDryRunSummary | null>>;
+  setSeasonSnapshotFeed: Dispatch<SetStateAction<FoundationSeasonSnapshotSummary | null>>;
   setPlayerProfileData: Dispatch<SetStateAction<PlayerDetailDrawerData | null>>;
   setTeamProfileTeamId: Dispatch<SetStateAction<string | null>>;
-  setFoundationActionFeedback: Dispatch<SetStateAction<unknown>>;
+  setFoundationActionFeedback: Dispatch<
+    SetStateAction<{ tone: "warning" | "success" | "info" | "blocked" | "error"; title: string; detail: string } | null>
+  >;
 };
 
 export type UseFoundationPersistenceActionsInput = {
   initialPersistedSave?: { gameState?: GameState } | null;
-  initialSaveId?: string;
-  initialReadSource?: FoundationReadSource;
-  initialSelectedTeamId?: string;
+  initialSaveId?: string | null;
+  initialReadSource?: FoundationReadSource | null;
+  initialSelectedTeamId?: string | null;
   gameState: GameState;
   setGameState: Dispatch<SetStateAction<GameState>>;
   gameStateRef: MutableRefObject<GameState>;
@@ -118,19 +156,19 @@ export type UseFoundationPersistenceActionsInput = {
   activeManagerTeamSource: ActiveManagerTeamSource;
   setActiveManagerTeamSource: Dispatch<SetStateAction<ActiveManagerTeamSource>>;
   setActiveManagerTeamWarning: Dispatch<SetStateAction<string | null>>;
-  setMarketTeamId: Dispatch<SetStateAction<string | null>>;
+  setMarketTeamId: Dispatch<SetStateAction<string>>;
   setIsSaveBusy: Dispatch<SetStateAction<boolean>>;
   setPersistenceError: Dispatch<SetStateAction<string | null>>;
   setBootstrapError: Dispatch<SetStateAction<string | null>>;
-  setTrainingModeDraft: Dispatch<SetStateAction<TrainingModeDraft>>;
-  setTrainingClassDraft: Dispatch<SetStateAction<TrainingClassDraft>>;
+  setTrainingModeDraft: Dispatch<SetStateAction<Record<string, TrainingModeDraft>>>;
+  setTrainingClassDraft: Dispatch<SetStateAction<Record<string, TrainingClassDraft>>>;
   setActiveView: Dispatch<SetStateAction<FoundationView>>;
-  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string>>;
   roomContext: unknown;
   feedSetters: FoundationSaveScopedFeedSetters;
   onSaveConflictReload: (reloaded: GameState) => Promise<void>;
   showReadOnlyNotice: () => void;
-  syncFoundationViewInUrl: (view: string) => void;
+  syncFoundationViewInUrl: typeof syncFoundationViewInUrl;
   setFreshSeasonStartMessage: Dispatch<SetStateAction<string | null>>;
   onFetchSlow?: () => void;
   onFetchSlowClear?: () => void;

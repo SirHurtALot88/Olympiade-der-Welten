@@ -61,6 +61,7 @@ import {
   formatTransfermarktCurrency,
   formatTransfermarktPoints,
   formatTransfermarktRatio,
+  type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
@@ -230,12 +231,14 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
 import {
-  buildTeamHistoryDisciplineValuesFromRecord,
-  buildTeamHistoryDisciplineValuesFromSnapshot,
   CANONICAL_PROGRESS_TRAITS,
   PROGRESSION_ATTRIBUTE_ORDER,
   PROGRESSION_CLASS_ORDER,
 } from "@/lib/training/class-progression-config";
+import {
+  buildTeamHistoryDisciplineValuesFromRecord,
+  buildTeamHistoryDisciplineValuesFromSnapshot,
+} from "@/lib/season/season-discipline-area-groups";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
@@ -906,6 +909,17 @@ function getPpAreaKeyForDisciplineCategory(category: string | null | undefined):
   if (category === "mental") return "men";
   if (category === "social") return "soc";
   return null;
+}
+
+function pickRatingsForPlayerIds<T>(ratingsById: Map<string, T>, playerIds: string[]): Map<string, T> {
+  const picked = new Map<string, T>();
+  for (const playerId of playerIds) {
+    const rating = ratingsById.get(playerId);
+    if (rating !== undefined) {
+      picked.set(playerId, rating);
+    }
+  }
+  return picked;
 }
 
 function getPlayerPortraitBrowserUrl(playerId: string, portraitUrl?: string | null, portraitPath?: string | null) {
@@ -5321,13 +5335,13 @@ export function useFoundationShellRouterBodyScope({
     if (navigationTeamId && navigationTeamId !== activeManagerTeamId) {
       setActiveManagerTeam(navigationTeamId, "manual_select");
     }
+    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
     if (targetView === "lineup") {
       setLineupFocusRequestKey(`lineup-${navigationTeamId ?? activeManagerTeamId ?? "team"}-${Date.now()}`);
-      if (targetPanel === "form-board") {
+      if (panel === "form-board") {
         setLineupDraftBoardViewRequest("formBoard");
       }
     }
-    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
     const focusPlayerId =
       item.playerId ??
       (typeof item.targetParams.player === "string" ? item.targetParams.player : null);
@@ -7954,7 +7968,15 @@ export function useFoundationShellRouterBodyScope({
       if (!shouldBuildHomeV2Overview) {
         return [];
       }
-      return [
+      const cards: Array<{
+        key: string;
+        kicker: string;
+        title: string;
+        detail: string;
+        tone: "ready" | "warning" | "info";
+        view: FoundationView;
+        urgency: number;
+      }> = [
       {
         key: "lineup",
         kicker: "Heute wichtig",
@@ -7986,7 +8008,8 @@ export function useFoundationShellRouterBodyScope({
         view: homeTasks.length > 0 ? "inboxV2" : "home",
         urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeTasks.length > 0 ? 4 : 5,
       },
-    ].sort((left, right) => left.urgency - right.urgency);
+    ];
+    return cards.sort((left, right) => left.urgency - right.urgency);
     },
     [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
   );
@@ -9148,7 +9171,6 @@ export function useFoundationShellRouterBodyScope({
     getRosterEntryCurrentSeasonSalary,
     getRosterEntrySalaryDelta,
     playerRatingsById,
-    getViewClass,
     getRankHeatClass,
     SortableHeader,
     getTableColumnWidth,

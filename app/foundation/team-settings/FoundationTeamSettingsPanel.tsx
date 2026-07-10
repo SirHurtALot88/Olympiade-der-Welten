@@ -37,7 +37,7 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
-import type { NewGamePresetId } from "@/app/foundation/foundation-page-client-exports";
+import type { NewGamePresetId, TeamStrategyProfile } from "@/app/foundation/foundation-page-client-exports";
 
 /** Dumb Team Settings panel (Strangler Phase 3). */
 export type FoundationTeamSettingsPanelProps = FoundationShellRouterBodyProps;

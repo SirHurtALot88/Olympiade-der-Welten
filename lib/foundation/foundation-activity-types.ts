@@ -53,8 +53,8 @@ export type FoundationActivityInput = {
   aiTeamsCount: number;
   marketBuyBusy?: boolean;
   marketSellBusy?: boolean;
-  contractRenewalBusy?: boolean;
-  sponsorChoiceBusy?: boolean;
+  contractRenewalBusy?: boolean | string | null;
+  sponsorChoiceBusy?: boolean | string | null;
   facilityUpgradeBusy?: boolean;
   facilityMaintenanceBusy?: boolean;
   assignTeamCaptainBusy?: boolean;

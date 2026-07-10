@@ -6,7 +6,7 @@ import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import FoundationTeamsDetailPanel, {
   type FoundationTeamsDetailPanelProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsDetailPanel";
-import type { GameState, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { FoundationTableSortState } from "@/lib/foundation/foundation-table-sort";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { DisciplineRankRowInput } from "@/lib/foundation/tabs/teams-view-derivations";
@@ -33,6 +33,7 @@ import {
 
 type FoundationTeamsViewHostProps = Omit<
   FoundationTeamsDetailPanelProps,
+  | "active"
   | "teamsHydrationPhase"
   | "sortedTeamsViewRows"
   | "teamHistoryPointRankMaps"
@@ -84,9 +85,9 @@ type FoundationTeamsViewHostProps = Omit<
   ) => TeamDetailDrawerData | null;
   formatMoney: (value: number) => string;
   getRosterEntrySalarySortValue: (
-    entry: { salary?: number | null },
-    player?: unknown,
-  ) => number | null;
+    entry: Pick<RosterEntry, "salary">,
+    player?: Player | null,
+  ) => number;
   aiTeams: Team[];
   selectedTeamControl: TeamControlSettings | null | undefined;
   showTeamContractPreviewRows: boolean;
@@ -180,8 +181,10 @@ export default function FoundationTeamsViewHost({
       getRosterEntryDisplayMarketValue as UseTeamsRosterTableDerivationsInput["getRosterEntryDisplayMarketValue"],
     getRosterEntryDisplaySalary:
       getRosterEntryDisplaySalary as UseTeamsRosterTableDerivationsInput["getRosterEntryDisplaySalary"],
-    getRosterEntrySalarySortValue:
-      getRosterEntrySalarySortValue as UseTeamsRosterTableDerivationsInput["getRosterEntrySalarySortValue"],
+    // Bridges the strict RosterEntry/Player-based helper onto the looser row-shaped
+    // signature this internal hook expects; the row's entry/player always carry the
+    // fields the helper reads (salary, id, economy inputs) at runtime.
+    getRosterEntrySalarySortValue: getRosterEntrySalarySortValue as unknown as UseTeamsRosterTableDerivationsInput["getRosterEntrySalarySortValue"],
     getRosterEntrySalaryDelta:
       getRosterEntrySalaryDelta as UseTeamsRosterTableDerivationsInput["getRosterEntrySalaryDelta"],
   });

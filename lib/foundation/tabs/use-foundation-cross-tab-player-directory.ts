@@ -112,9 +112,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
   deferredPlayerTeamFilter: string;
   deferredPlayerClassFilter: string;
   deferredPlayerBracketFilter: string;
-  tableSorts: {
-    playersTable: SortState;
-  };
+  tableSorts: Record<string, SortState>;
   playerDirectoryOrderedIds: string[] | null | undefined;
   sortPlayerDirectoryRows: (
     rows: Array<{ id: string; sortValues: Record<string, string | number> }>,

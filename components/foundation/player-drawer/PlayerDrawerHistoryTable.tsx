@@ -231,6 +231,8 @@ type PlayerDrawerTransferHistoryTableProps = {
     seasonLabel: string;
     happenedAt: string;
     transferType: "buy" | "sell" | "contract_exit";
+    fromTeamId: string | null;
+    toTeamId: string | null;
     fromTeamName: string | null;
     toTeamName: string | null;
     fee: number | null;

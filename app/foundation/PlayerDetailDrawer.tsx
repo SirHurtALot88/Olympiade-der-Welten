@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
+import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerTrainingControls from "@/app/foundation/player-profile/PlayerTrainingControls";
@@ -160,7 +161,7 @@ function formatTrainingSeasonLabel(seasonId: string) {
   if (match) {
     return `S${match[1]}`;
   }
-  return getCanonicalSeasonLabel(seasonId) ?? seasonId;
+  return getCanonicalSeasonLabel({ seasonId }) ?? seasonId;
 }
 
 function formatTrainingAttributeLabel(attribute: string) {

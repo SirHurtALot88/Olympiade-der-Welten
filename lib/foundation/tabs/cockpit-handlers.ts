@@ -352,7 +352,7 @@ export type CockpitSeasonTransitionHandlersDeps = {
   setWholeSeasonDryRunFeed: Dispatch<SetStateAction<FoundationWholeSeasonDryRunSummary | null>>;
   setFoundationActionFeedback: Dispatch<
     SetStateAction<{
-      tone: "success" | "warning" | "info";
+      tone: "success" | "warning" | "info" | "blocked" | "error";
       title: string;
       detail: string;
     } | null>

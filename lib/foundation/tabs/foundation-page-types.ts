@@ -14,7 +14,7 @@
  * `cockpit-handlers.ts`) keep working unchanged.
  */
 import type { ContractShape, GameState, NewGameFlowStepId, RosterEntry, TeamControlMode, TeamControlSettings, TeamIdentity, TeamStrategyBias, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
-import type { FacilityId } from "@/lib/facilities/facility-catalog";
+import type { FacilityId, SpecialistWingVariant } from "@/lib/facilities/facility-catalog";
 import type { getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import type { SaveSummary } from "@/lib/persistence/types";
@@ -31,12 +31,30 @@ import type {
 } from "@/lib/market/contract-negotiation-preview";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
+import type { DisciplineCategoryFilter } from "@/lib/foundation/tabs/foundation-format-render-helpers";
+import type { GameFlowView } from "@/lib/foundation/game-flow-controller";
+import type { PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import type { TeamControlFilter } from "@/lib/foundation/team-control-settings";
+import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
 export type PlayerTableScope = "active" | "free_agents" | "all";
 export type TrainingModeDraft = PlayerTrainingMode;
 export type TrainingClassDraft = string;
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";
-export type { FoundationTableColumn, FoundationTablePreset, FoundationTablePresetId, SortState };
+export type {
+  FoundationTableColumn,
+  FoundationTablePreset,
+  FoundationTablePresetId,
+  SortState,
+  FacilityId,
+  SpecialistWingVariant,
+  DisciplineCategoryFilter,
+  GameFlowView,
+  PlayerProfileTabId,
+  TeamControlFilter,
+  TeamStrategyProfile,
+  FoundationViewId,
+};
 export type FoundationView =
   | "home"
   | "homeV2"
