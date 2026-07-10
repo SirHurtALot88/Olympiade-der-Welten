@@ -109,7 +109,6 @@ function buildTeamProfileContentSignature(input: {
     input.saveId,
     input.gameState.season.id,
     team?.cash ?? "cash",
-    team?.salaryCap ?? "cap",
     rosterSize,
     seasonSnapshotCount,
     transferCount,
@@ -227,7 +226,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
         return null;
       }
 
-      const saveId = input.gameState.saveMeta?.saveId ?? "default";
+      const saveId = input.activeSaveId ?? "default";
       const contentSignature = buildTeamProfileContentSignature({
         saveId,
         gameState: input.gameState,

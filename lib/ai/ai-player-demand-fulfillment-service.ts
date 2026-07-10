@@ -1,4 +1,4 @@
-import type { GameState, Player, PlayerDemandRecord, PlayerTrainingMode, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerDemandRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTeamPlayerDemandMap } from "@/lib/morale/player-demands-service";
 import type { PlayerTrainingMode as TrainingMode } from "@/lib/training/training-plan-types";
@@ -129,7 +129,7 @@ export function applyAiTeamPlayerDemandFulfillment(input: {
       if (!shouldAiAttemptDemandFulfillment(nextGameState, demand, input.probabilityPct)) continue;
 
       if (demand.type === "training_mode" && typeof demand.targetValue === "string") {
-        const preferredMode = demand.targetValue as PlayerTrainingMode;
+        const preferredMode = demand.targetValue as TrainingMode;
         if ((player.trainingMode ?? "mittel") !== preferredMode) {
           nextGameState = setPlayerTrainingMode(nextGameState, playerId, preferredMode);
           fulfilledDemandIds.push(demand.demandId);

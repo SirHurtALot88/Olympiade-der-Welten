@@ -1,4 +1,6 @@
-import type { GameState, PlayerAttributeSheetRatings, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
+
+type PlayerAttributeSheetRatings = NonNullable<Player["attributeSheetRatings"]>;
 
 export type PlayerAttributeSheetPayload = {
   ok?: boolean;
@@ -20,6 +22,7 @@ export function mergePlayerAttributeSheetIntoGameState(
   if (!sheet?.attributeSheetStats) {
     return gameState;
   }
+  const attributeSheetStats = sheet.attributeSheetStats;
 
   return {
     ...gameState,
@@ -27,7 +30,7 @@ export function mergePlayerAttributeSheetIntoGameState(
       player.id === playerId
         ? {
             ...player,
-            attributeSheetStats: sheet.attributeSheetStats,
+            attributeSheetStats,
             attributeSheetRatings: sheet.attributeSheetRatings ?? player.attributeSheetRatings,
           }
         : player,

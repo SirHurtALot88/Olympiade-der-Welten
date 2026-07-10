@@ -317,8 +317,6 @@ import {
   withNormalizedLocalTeamSettings,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 
-import type { FoundationPageClientProps } from "@/lib/foundation/tabs/foundation-page-types";
-
 export function useFoundationPageState({
   initialReadSource,
   initialSelectedTeamId,

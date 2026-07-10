@@ -37,6 +37,8 @@ import type {
 import { trainingModeConfigs } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { useTrainingForecastLimit } from "@/lib/foundation/tabs/use-training-forecast-limit";
 import { getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 
 type RosterPlayer = ReturnType<typeof getRosterPlayers>[number];
 
@@ -64,8 +66,8 @@ export function useFoundationCrossTabTraining(input: {
   selectedTeam: Team;
   selectedTeamFacilityState: TeamFacilityCollection;
   rosterPlayers: RosterPlayer[];
-  playerRatingsById: Map<string, { mvs?: number | null; ppsSeason?: number | null; ovrNormalized?: number | null }>;
-  playerSeasonPerformanceMap: Map<string, { appearances?: number; totalPoints?: number | null } | null>;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
+  playerSeasonPerformanceMap: Map<string, PlayerSeasonPerformanceSummary | null>;
   trainingModeDraft: Record<string, TrainingModeDraft>;
   trainingClassDraft: Record<string, TrainingClassDraft>;
   trainingDevelopmentFilter: TrainingDevelopmentFilter;
