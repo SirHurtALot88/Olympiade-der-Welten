@@ -1,4 +1,5 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
+import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import { getAiManagerMarketSpendableCash, resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { ContractShape, GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
@@ -67,6 +68,16 @@ export type AiPreviewCandidateScopeMode = "strategic" | "budget_wide";
 
 /** Full-score cap for budget_wide when caller does not pass fullScoringLimit. */
 export const AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING = 480;
+
+/**
+ * Corrected note (see resolveBudgetWideMwFloor below): an earlier version of this fix tried to
+ * bound the "budget_wide" base feed via a plain item-count `limit`. That was wrong —
+ * buildAiPreviewFreeAgentSlice/buildDiverseFreeAgentSlice always sort ascending by market value
+ * and fill bottom-up, so ANY item-count limit well short of the full pool systematically excludes
+ * Core/Star tiers (they sit in the top ~13-36% by MW). Raising the limit from 250/400 to
+ * 900-1400 out of ~2984 just produced a bigger pile of cheap players — it did not fix the
+ * original Core/Star representation bug. Replaced by an MW-band preset instead (below).
+ */
 
 export type AiTransferPreviewRecommendation = {
   playerId: string;
@@ -196,6 +207,47 @@ type RosterEntry = GameState["rosters"][number];
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Presets the MW band for a "budget_wide" planner scan from the team's own depth signal
+ * (rosterGap / budgetPressure from evaluateAiNeeds, plus current cash), instead of an item-count
+ * `limit`.
+ *
+ * Passing `minMarketValue`/`maxMarketValue` to listLocalTransfermarktFreeAgents takes a different
+ * code path than `limit`: it skips buildAiPreviewFreeAgentSlice entirely and returns EVERY item
+ * inside the band (see `useUnboundedFilteredPool` in transfermarkt-local-service.ts) — so, unlike
+ * an item-count limit, it never truncates Core/Star tiers out from the bottom up.
+ *
+ * - Team at/above Opt with cash to spare (low pressure): only doing opportunistic upgrades, has no
+ *   use for the ~60-70% of the pool sitting in reserve/backup/depth territory — floor moves up to
+ *   just below the "core" bracket; ceiling stays uncapped (a rich, healthy team legitimately might
+ *   go for Superstar tier).
+ * - Team below Opt or cash-constrained (high pressure): still needs the full low-end spread
+ *   (reserve/backup/depth/core), so floor stays at 0 — but it realistically can't afford Superstar
+ *   tier this window either, so the ceiling is capped to a generous multiple of current cash
+ *   (aspirational headroom for saving up), rather than loading the whole pool up to MW 110+.
+ */
+function resolveBudgetWideMwBand(input: {
+  needs: { rosterGap: number; budgetPressure: number } | null;
+  cash: number | null;
+}): { minMarketValue: number | null; maxMarketValue: number | null } {
+  if (!input.needs) return { minMarketValue: 0, maxMarketValue: null };
+  const pressure = clamp((input.needs.rosterGap + input.needs.budgetPressure) / 2, 0, 1);
+  const CASH_HEALTHY_UPGRADE_ONLY_THRESHOLD = 0.15;
+  const CASH_CONSTRAINED_ASPIRATIONAL_HEADROOM_MULTIPLIER = 2.5;
+  const CASH_CONSTRAINED_MAX_CEILING_MW = 90;
+
+  if (pressure <= CASH_HEALTHY_UPGRADE_ONLY_THRESHOLD) {
+    const coreFloorMw = MARKET_BRACKET_DEFINITIONS.find((entry) => entry.lane === "core")?.minMw ?? 30;
+    return { minMarketValue: Math.max(0, coreFloorMw - 2), maxMarketValue: null };
+  }
+
+  const cashCeiling =
+    input.cash != null && Number.isFinite(input.cash) && input.cash > 0
+      ? Math.min(CASH_CONSTRAINED_MAX_CEILING_MW, input.cash * CASH_CONSTRAINED_ASPIRATIONAL_HEADROOM_MULTIPLIER)
+      : null;
+  return { minMarketValue: 0, maxMarketValue: cashCeiling };
 }
 
 function roundValue(value: number, digits = 1) {
@@ -1635,6 +1687,13 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     return control?.controlMode === "ai";
   });
 
+  const budgetWideMwBand =
+    candidateScopeMode === "budget_wide"
+      ? resolveBudgetWideMwBand({
+          needs: requestedTeam ? evaluateAiNeeds(context.gameState, requestedTeam.teamId) : null,
+          cash: requestedTeam?.cash ?? null,
+        })
+      : null;
   const baseFeedStartedAt = Date.now();
   const baseFreeAgentFeed =
     context.source === "sqlite"
@@ -1642,7 +1701,12 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
           saveId: context.saveId,
           seasonId: context.seasonId,
           mode: "ai_preview",
-          fullPool: candidateScopeMode === "budget_wide",
+          fullPool: false,
+          // budget_wide: minMarketValue/maxMarketValue trigger the unbounded/unsliced pool path
+          // (no cheap-first bias) — exhaustive within the band, just narrower than the whole pool
+          // when the team demonstrably has no use for one end of it (see resolveBudgetWideMwBand).
+          minMarketValue: candidateScopeMode === "budget_wide" ? budgetWideMwBand?.minMarketValue ?? null : null,
+          maxMarketValue: candidateScopeMode === "budget_wide" ? budgetWideMwBand?.maxMarketValue ?? null : null,
           limit: candidateScopeMode === "budget_wide" ? undefined : Math.max(120, params.limit ?? 250),
           localRunContext: context.localRunContext,
         })
