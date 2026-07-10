@@ -7958,7 +7958,15 @@ export function useFoundationShellRouterBodyScope({
       if (!shouldBuildHomeV2Overview) {
         return [];
       }
-      return [
+      const todayCards: Array<{
+        key: string;
+        kicker: string;
+        title: string;
+        detail: string;
+        tone: "ready" | "warning" | "info";
+        view: FoundationView;
+        urgency: number;
+      }> = [
       {
         key: "lineup",
         kicker: "Heute wichtig",
@@ -7990,7 +7998,8 @@ export function useFoundationShellRouterBodyScope({
         view: homeTasks.length > 0 ? "inboxV2" : "home",
         urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeTasks.length > 0 ? 4 : 5,
       },
-    ].sort((left, right) => left.urgency - right.urgency);
+    ];
+    return todayCards.sort((left, right) => left.urgency - right.urgency);
     },
     [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
   );
