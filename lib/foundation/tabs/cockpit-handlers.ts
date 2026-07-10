@@ -1,3 +1,4 @@
+import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
@@ -350,13 +351,7 @@ export type CockpitSeasonTransitionHandlersDeps = {
   setCashApplyFeed: Dispatch<SetStateAction<FoundationApplySummary | null>>;
   setSeasonSnapshotFeed: Dispatch<SetStateAction<FoundationSeasonSnapshotSummary | null>>;
   setWholeSeasonDryRunFeed: Dispatch<SetStateAction<FoundationWholeSeasonDryRunSummary | null>>;
-  setFoundationActionFeedback: Dispatch<
-    SetStateAction<{
-      tone: "success" | "warning" | "info";
-      title: string;
-      detail: string;
-    } | null>
-  >;
+  setFoundationActionFeedback: Dispatch<SetStateAction<FoundationActionFeedback | null>>;
   loadSave: (saveId: string) => Promise<unknown>;
   reloadResolvePreview: (signal?: AbortSignal) => Promise<unknown>;
   reloadStandingsPreviewFeed: (signal?: AbortSignal) => Promise<unknown>;

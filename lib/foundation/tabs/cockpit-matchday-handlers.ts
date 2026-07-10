@@ -1,3 +1,4 @@
+import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
 import type { Dispatch, SetStateAction } from "react";
 
 import { invalidateMatchdayArenaSessionCache } from "@/lib/foundation/matchday-arena-session-cache";
@@ -45,13 +46,7 @@ export type CockpitMatchdayApplyHandlersDeps = {
   reloadHistoryFeed: () => Promise<unknown>;
   reloadTransferRecapFeed: () => Promise<unknown>;
   bumpMarketReloadToken: () => void;
-  setFoundationActionFeedback: Dispatch<
-    SetStateAction<{
-      tone: "success" | "warning" | "info";
-      title: string;
-      detail: string;
-    } | null>
-  >;
+  setFoundationActionFeedback: Dispatch<SetStateAction<FoundationActionFeedback | null>>;
 };
 
 export type CockpitMatchdayMvpScoringFeed = FoundationMatchdayMvpScoringResponse & { error?: string };

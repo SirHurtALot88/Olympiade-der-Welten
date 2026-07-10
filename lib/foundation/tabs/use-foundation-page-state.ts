@@ -317,7 +317,7 @@ import {
   withNormalizedLocalTeamSettings,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 
-import type { FoundationPageClientProps } from "@/lib/foundation/tabs/foundation-page-types";
+import type { FoundationActionFeedback, FoundationPageClientProps } from "@/lib/foundation/tabs/foundation-page-types";
 
 export function useFoundationPageState({
   initialReadSource,
@@ -498,11 +498,7 @@ export function useFoundationPageState({
   const [marketBuyBusy, setMarketBuyBusy] = useState<boolean>(false);
   const [marketBuyError, setMarketBuyError] = useState<string | null>(null);
   const [marketBuySuccess, setMarketBuySuccess] = useState<string | null>(null);
-  const [foundationActionFeedback, setFoundationActionFeedback] = useState<{
-    tone: "success" | "warning" | "info" | "blocked" | "error";
-    title: string;
-    detail: string;
-  } | null>(null);
+  const [foundationActionFeedback, setFoundationActionFeedback] = useState<FoundationActionFeedback | null>(null);
   const [seasonBriefingOpen, setSeasonBriefingOpen] = useState<boolean>(false);
   const [freshSeasonStartMessage, setFreshSeasonStartMessage] = useState<string | null>(null);
   const [newGamePresetId, setNewGamePresetId] = useState<NewGamePresetId>("solo_1");

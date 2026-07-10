@@ -1,5 +1,6 @@
 "use client";
 
+import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
 import { useEffect, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
@@ -43,7 +44,7 @@ export type UseFoundationLiveSyncInput = {
     SetStateAction<{ title: string; detail: string } | null>
   >;
   setSaveSyncError: Dispatch<SetStateAction<string | null>>;
-  setFoundationActionFeedback: Dispatch<SetStateAction<unknown>>;
+  setFoundationActionFeedback: Dispatch<SetStateAction<FoundationActionFeedback | null>>;
   setMarketReloadToken: Dispatch<SetStateAction<number>>;
   shouldLoadStandingsPreviewFeed: boolean;
   shouldLoadPrizePreviewFeed: boolean;

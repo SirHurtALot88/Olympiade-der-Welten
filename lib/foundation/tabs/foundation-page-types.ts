@@ -2954,3 +2954,10 @@ export const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 export const TRANSFER_HISTORY_SEASON_LIMIT = 100;
 export const TRANSFER_MARKET_INITIAL_RENDER_LIMIT = 48;
 export const TRANSFER_MARKET_RENDER_STEP = 48;
+
+/** Canonical shape for the transient Foundation action-feedback banner. */
+export type FoundationActionFeedback = {
+  tone: "success" | "warning" | "info" | "blocked" | "error";
+  title: string;
+  detail: string;
+};

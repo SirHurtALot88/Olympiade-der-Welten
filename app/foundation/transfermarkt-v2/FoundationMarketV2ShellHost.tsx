@@ -1,5 +1,6 @@
 "use client";
 
+import type { FoundationActionFeedback } from "@/lib/foundation/tabs/foundation-page-types";
 import dynamic from "next/dynamic";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -83,9 +84,7 @@ export type FoundationMarketV2ShellHostProps = {
     source?: "manual_select" | "route" | "saved_preference" | "default_human_team",
   ) => void;
   setMarketFocusPlayerId: Dispatch<SetStateAction<string | null>>;
-  setFoundationActionFeedback: Dispatch<
-    SetStateAction<{ tone: "success" | "warning" | "error"; title: string; detail: string } | null>
-  >;
+  setFoundationActionFeedback: Dispatch<SetStateAction<FoundationActionFeedback | null>>;
   openPlayerDrawerById: (playerId: string, activePlayerId?: string | null) => void;
   toggleTransferWishlist: (item: TransfermarktFreeAgentItem) => void;
   removeTransferWishlistEntry: (playerId: string) => void;
