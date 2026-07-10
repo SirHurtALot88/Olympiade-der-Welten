@@ -4,6 +4,7 @@ import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type { TeamControlSettings } from "@/lib/data/olyDataTypes";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 
 export type UseTeamsExtendedPanelDerivationsInput = {
   enabled: boolean;
@@ -11,12 +12,7 @@ export type UseTeamsExtendedPanelDerivationsInput = {
   selectedTeam: Team | null;
   selectedTeamControl: TeamControlSettings | null | undefined;
   aiTeams: Team[];
-  playerRatingsById: Map<
-    string,
-    {
-      ovrNormalized?: number | null;
-    }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
 };
 
 export function useTeamsExtendedPanelDerivations(input: UseTeamsExtendedPanelDerivationsInput) {

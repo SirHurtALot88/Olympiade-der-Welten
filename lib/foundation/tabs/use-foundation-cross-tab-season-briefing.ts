@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, GameState, NewGameFlowStepId, NewGameFlowStepStatus, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityLevel } from "@/lib/facilities/facility-effects";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
@@ -26,13 +26,13 @@ type SeasonDisciplineScheduleRow = {
     disciplineId?: string | null;
     displayName?: string | null;
     playerCount?: number | null;
-    category?: string | null;
+    category?: DisciplineCategory | null;
   } | null;
   discipline2?: {
     disciplineId?: string | null;
     displayName?: string | null;
     playerCount?: number | null;
-    category?: string | null;
+    category?: DisciplineCategory | null;
   } | null;
 };
 
@@ -217,16 +217,17 @@ export function useFoundationCrossTabSeasonBriefing(input: {
     if (!shouldShow) {
       return null;
     }
+    const selectedTeam = input.selectedTeam;
 
     const storedStatusById = new Map<NewGameFlowStepId, NewGameFlowStepStatus>(
       (storedFlow?.steps ?? []).map((step) => [step.stepId, step.status]),
     );
     const rosterCount = input.rosterPlayers.length;
-    const targetRosterCount = Math.max(10, Math.min(12, input.selectedTeam.rosterLimit ?? 12));
+    const targetRosterCount = Math.max(10, Math.min(12, selectedTeam.rosterLimit ?? 12));
     const activeTransfers = input.gameState.transferHistory.some(
       (transfer) =>
         transfer.seasonId === input.gameState.season.id &&
-        (transfer.toTeamId === input.selectedTeam!.teamId || transfer.fromTeamId === input.selectedTeam!.teamId),
+        (transfer.toTeamId === selectedTeam.teamId || transfer.fromTeamId === selectedTeam.teamId),
     );
     const facilityUpgradeCount = FACILITY_CATALOG.reduce(
       (sum, facility) => sum + (getFacilityLevel(input.selectedTeamFacilityState, facility.facilityId) > 1 ? 1 : 0),
@@ -290,11 +291,11 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         stepId: "team_confirm",
         title: "Team wählen",
         kicker: "Start",
-        detail: `${input.selectedTeam.shortCode} ist aktiv. Wechsel, wenn du ein anderes Team starten willst.`,
+        detail: `${selectedTeam.shortCode} ist aktiv. Wechsel, wenn du ein anderes Team starten willst.`,
         targetLabel: "Team prüfen",
         targetView: "manager_team",
-        status: getResolvedStatus("team_confirm", Boolean(input.selectedTeam.teamId)),
-        progress: input.selectedTeam.shortCode,
+        status: getResolvedStatus("team_confirm", Boolean(selectedTeam.teamId)),
+        progress: selectedTeam.shortCode,
       },
       {
         stepId: "roster_review",
@@ -320,7 +321,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
           "appoint_captain",
           Boolean(
             input.gameState.teamCaptains?.some(
-              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === input.selectedTeam.teamId,
+              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === selectedTeam.teamId,
             ),
           ),
         ),

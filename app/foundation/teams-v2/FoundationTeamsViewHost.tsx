@@ -300,6 +300,11 @@ export default function FoundationTeamsViewHost({
       visibleSelectedRosterColumns={visibleSelectedRosterColumns}
       getTeamsViewColumnTitle={getTeamsViewColumnTitle}
       getTeamAxisRankTooltip={getTeamAxisRankTooltip}
+      playerRatingsById={playerRatingsById}
+      selectedTeamControl={selectedTeamControl}
+      showTeamDisciplines={showTeamDisciplines}
+      showSelectedRosterPpsBreakdown={showSelectedRosterPpsBreakdown}
+      showTeamContractPreviewRows={showTeamContractPreviewRows}
     />
   );
 }

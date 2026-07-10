@@ -759,7 +759,7 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
     players.push({
       playerId: player.id,
       availableXP: currentXPBefore + seasonXp.earnedSeasonXP,
-      earnedSeasonXP,
+      earnedSeasonXP: seasonXp.earnedSeasonXP,
       currentXPBefore,
       lifetimeXP: lifetimeXPBefore,
       lifetimeXPAfter,
@@ -1001,8 +1001,14 @@ export function applySeasonEndXpSpend(
     const player = save.gameState.players.find((entry) => entry.id === playerId);
     if (!player) continue;
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
-    attributeOverridesAfter[playerId] = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
-    attributeOverridesBefore[playerId] = normalizeAttributes(player);
+    const normalizedAfter = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
+    const normalizedBefore = normalizeAttributes(player);
+    if (normalizedAfter) {
+      attributeOverridesAfter[playerId] = normalizedAfter;
+    }
+    if (normalizedBefore) {
+      attributeOverridesBefore[playerId] = normalizedBefore;
+    }
   }
   let disciplineRatingsAfterByPlayerId: Map<string, Record<string, number>>;
   let disciplineRatingsBeforeByPlayerId: Map<string, Record<string, number>>;

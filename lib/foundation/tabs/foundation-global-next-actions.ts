@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import type { GameInboxItem, GameState } from "@/lib/data/olyDataTypes";
-import type { GameFlowStepStatus } from "@/lib/foundation/game-flow-controller";
+import type { GameFlowStepStatus, GameFlowView } from "@/lib/foundation/game-flow-controller";
 import { formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
 import type { FoundationReadMeta, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
 import { getGameFlowStatusClass } from "@/lib/foundation/tabs/cockpit-ui-helpers";
@@ -112,13 +112,13 @@ export type TriggerGlobalNextDeps = {
   gameFlowActionStep: {
     stepId: string;
     status: GameFlowStepStatus;
-    targetView: Parameters<TriggerGlobalNextDeps["navigateToGameFlowStep"]>[0];
+    targetView: GameFlowView;
     teamId?: string | null;
     targetPanel?: string | null;
   };
   navigateToInboxItem: (item: GameInboxItem) => void;
   navigateToGameFlowStep: (
-    targetView: TriggerGlobalNextDeps["gameFlowActionStep"]["targetView"],
+    targetView: GameFlowView,
     teamId?: string | null,
     targetPanel?: string | null,
   ) => void;
@@ -164,7 +164,7 @@ export function createTriggerGlobalNext(deps: TriggerGlobalNextDeps) {
       return;
     }
     if (deps.gameFlowActionStep.stepId === "advance_to_next_matchday" && deps.gameFlowActionStep.status === "ready") {
-      const result = await deps.matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance(true);
+      const result = await deps.matchdayArenaApplyHandlers?.runCockpitMatchdayAdvance?.(true);
       if (result?.applied) {
         deps.setAcknowledgedFlowStepIds(new Set());
       } else {

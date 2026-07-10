@@ -16,6 +16,7 @@ import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-me
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 
 const TEAM_ROSTER_PORTRAIT_LOADING = {
   loading: "lazy",
@@ -135,7 +136,7 @@ export type FoundationTeamsDetailPanelProps = {
   openContractRenewalNegotiation: unknown;
   openMarketSellModal: unknown;
   openPlayerDrawerById: unknown;
-  playerRatingsById: unknown;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
   getPlayerPortraitModel: unknown;
   getClassColorClassName: unknown;
   getRosterEntryDisplaySalary: unknown;

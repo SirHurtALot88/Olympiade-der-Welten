@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type { FoundationTableColumn } from "@/lib/foundation/tabs/cockpit-types";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { TEAMS_VIEW_COLUMNS } from "@/lib/foundation/tabs/teams-ui-helpers";
 
@@ -53,13 +54,7 @@ export type TeamsRosterPlayerPair = {
 export type UseTeamsPanelDerivationsInput = {
   showExtendedTeamPanels: boolean;
   rosterPlayers: TeamsRosterPlayerPair[];
-  playerRatingsById: Map<
-    string,
-    {
-      ovrNormalized?: number | null;
-      mvs?: number | null;
-    }
-  >;
+  playerRatingsById: Map<string, PlayerRatingContractRow>;
   getRosterEntryDisplayMarketValue: (entry: RosterEntry, player: Player) => number | null;
   tableColumnPreferences: Record<string, { columnOrder?: string[] } | undefined>;
   isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
