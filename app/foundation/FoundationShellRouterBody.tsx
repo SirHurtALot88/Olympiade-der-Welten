@@ -4,7 +4,7 @@
 // Contains the real Foundation shell UI (previously the monolith return block).
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
-import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
+import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterHomeV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
@@ -21,7 +21,6 @@ import {
   FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
   FOUNDATION_SAVE_MODE_OPTIONS,
   FacilitiesV2Client,
-  FoundationHomeV2Panel,
   FoundationLineupPanel,
   FoundationMatchdayArenaPanel,
   FoundationPlayerPortraitPreview,
@@ -246,6 +245,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationMarketV2ShellHostProps,
   foundationMatchdayResultHostProps,
   foundationHistoryV2HostProps,
+  foundationHomeV2HostProps,
   foundationSeasonPreviewHostProps,
   foundationTeamsViewHostProps,
   foundationTrainingCompactHostProps,
@@ -1619,107 +1619,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
 
-          {activeView === "homeV2" ? (
-          <FoundationHomeV2Panel
-            active
-            tab={homeV2Tab}
-            overview={{
-              teamName: selectedTeam?.name ?? "Kein Team",
-              teamCode: selectedTeam?.shortCode ?? "—",
-              teamLogoUrl: homeActiveTeamLogo?.src ?? null,
-              teamLogoInitials: homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?",
-              seasonName: gameState.season.name,
-              matchdayLabel: currentMatchdayDisplayLabel,
-              managerLabel: activeOwner?.label ?? "—",
-              controlModeLabel: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
-              rank: selectedStandingRow?.rank ?? null,
-              points: selectedStandingRow?.points ?? null,
-              cash: selectedStandingRow?.cash ?? null,
-              salaryTotal: selectedStandingRow?.salaryTotal ?? null,
-              guv: selectedStandingRow?.guv ?? null,
-              rosterCount: selectedRosterTableRows.length,
-              gmStoryLabel: selectedHqGmStory?.label ?? null,
-              gmStoryDetail: selectedHqGmStory?.detail ?? null,
-              gmStoryTone: selectedHqGmStory?.tone ?? null,
-              boardPressure: selectedBoardConfidence?.pressure ?? null,
-              boardRating: selectedBoardConfidence?.value ?? null,
-              boardObjectives: homeV2BoardObjectives,
-              nextStepLabel: globalNextLabel,
-              nextStepStatus: getGameFlowStatusLabel(gameFlowActionStep.status),
-              nextStepDetail:
-                gameFlowActionStep.blockers[0]
-                  ? formatCockpitReason(gameFlowActionStep.blockers[0])
-                  : gameFlowActionStep.warnings[0]
-                    ? formatCockpitReason(gameFlowActionStep.warnings[0])
-                    : "Flow bereit — weiter zum naechsten Schritt.",
-              warnings: homeWarnings.map(formatHomeWarningLabel),
-              topPlayers: homeV2TopPlayers,
-              leagueHeatPools: leaguePlayerHeatPools,
-              facilities: homeV2Facilities,
-              scheduleItems: homeV2ScheduleItems,
-              inboxItems: homeV2InboxItems,
-              todayCards: homeTodayCards,
-              onContinue: triggerGlobalNext,
-              onOpenTeams: () => setFoundationView("teams", setActiveView),
-              onOpenLineup: () => setFoundationView("lineup", setActiveView),
-              onOpenMarket: () => setFoundationView("marketV2", setActiveView),
-              onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
-              onOpenOffice: () => navigateHomeTab("office"),
-              onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
-              onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
-              onCompleteInboxItem: (itemId) => {
-                const sourceItem = visibleInboxItems.find((item: any) => item.itemId === itemId);
-                if (sourceItem) {
-                  updateInboxItemStatus(sourceItem, "done");
-                }
-              },
-              onOpenBoardObjectives: () => {
-                setFoundationView("teams", setActiveView);
-                scrollToFoundationTarget("team-board-objectives");
-              },
-              onOpenPlayer: (playerId) => openPlayerDrawerById(playerId),
-            }}
-            office={{
-              homeNextMatchdayStatus,
-              selectedTeamPlayerDemands,
-              selectedHqFinanceWarnings,
-              selectedStandingRow,
-              activeTeamOpenInboxItems,
-              activeTeamCriticalInboxItems,
-              selectedOpenObjectives,
-              selectedBoardConfidence,
-              hqTrainingFocusCount,
-              selectedTeamGeneralManager,
-              hqTransferWishlistEntries,
-              selectedTeamCaptainProfile,
-              selectedTeamCaptainCandidates,
-              selectedTeamCaptainPlayerId,
-              assignTeamCaptainBusy,
-              onAssignTeamCaptain: assignTeamCaptainForSelectedTeam,
-              captainEffectsTooltip,
-              selectedTeamPowers,
-              hqContractExpiringCount,
-              hqTransferSellMarkers,
-              selectedHqMoraleSummary,
-              selectedRosterTableRows,
-              selectedHqAxisSummary,
-              selectedHqInboxItems,
-              selectedHqGmStory,
-              selectedTeam,
-              selectedTeamControl,
-              homeActiveTeamLogo,
-              gameState,
-              currentMatchdayDisplayLabel,
-              selectedTeamCanManage,
-              isReadOnlyMode: readMeta.readOnly,
-              selectedTeamAverageAxisStats,
-              rosterPlayers,
-              onNavigate: (view) => setFoundationView(view, setActiveView),
-              onOpenTeam: (teamId) => openTeamDrawerById(teamId),
-              onNavigateInboxItem: navigateToInboxItem,
-            }}
+          <FoundationShellRouterHomeV2
+            active={activeView === "homeV2"}
+            placement="content"
+            hostProps={foundationHomeV2HostProps}
           />
-          ) : null}
 
           <FoundationShellRouterTeams
             active={activeView === "teams"}

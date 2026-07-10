@@ -13,7 +13,7 @@ describe("foundation hq gm story contract", () => {
     const panelSource = readFileSync(join(root, "app/foundation/home-v2/FoundationHomeV2Panel.tsx"), "utf8");
     const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
 
-    expect(foundationSource).toContain("FoundationHomeV2Panel");
+    expect(foundationSource).toContain("FoundationShellRouterHomeV2");
     expect(panelSource).toContain("ManagerOfficeClient");
     expect(officeSource).toContain('data-testid="foundation-hq-gm-story"');
     expect(officeSource).toContain("selectedHqGmStory");

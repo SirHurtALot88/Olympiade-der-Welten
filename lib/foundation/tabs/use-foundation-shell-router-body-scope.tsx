@@ -346,6 +346,7 @@ import {
 import { resolveShouldBuildTeamsScopedRatings, shouldBuildTeamsView as resolveShouldBuildTeamsView } from "@/lib/foundation/tabs/teams-view-derivations";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
+import type { FoundationHomeV2HostProps } from "@/app/foundation/home-v2/FoundationHomeV2Host";
 import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
 import type { FoundationTeamsViewHostProps } from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
 import type { FoundationCockpitHostProps } from "@/app/foundation/cockpit-v2/FoundationCockpitHost";
@@ -9092,6 +9093,69 @@ export function useFoundationShellRouterBodyScope({
     onLoadMore: loadMoreHistoryFeed,
   };
 
+  const foundationHomeV2HostProps: FoundationHomeV2HostProps = {
+    tab: homeV2Tab,
+    gameState,
+    seasonStandRows,
+    selectedRosterTableRows,
+    playerRatingsById,
+    playerSeasonPerformanceMap,
+    selectedStandingRow,
+    selectedTeam,
+    selectedTeamControl,
+    selectedTeamFacilityState,
+    activeManagerTeamId,
+    activeTeamDecisionInboxItems,
+    activeTeamDecisionCriticalInboxItems,
+    teamObjectives: teamObjectiveOverview.objectives,
+    activeViewContextWarning,
+    activeContextMeta,
+    homeNextMatchdayStatus,
+    activeManagerLineupSubmitted,
+    leaguePlayerHeatPools,
+    currentMatchdayDisplayLabel,
+    activeOwnerLabel: activeOwner?.label ?? null,
+    selectedHqGmStory,
+    selectedBoardConfidence,
+    globalNextLabel,
+    gameFlowActionStep,
+    triggerGlobalNext,
+    navigateHomeTab,
+    onNavigateView: (view) => setFoundationView(view, setActiveView),
+    scrollToFoundationTarget,
+    openPlayerDrawerById,
+    office: {
+      selectedTeamPlayerDemands,
+      selectedHqFinanceWarnings,
+      selectedOpenObjectives,
+      selectedBoardConfidence,
+      hqTrainingFocusCount,
+      selectedTeamGeneralManager,
+      hqTransferWishlistEntries,
+      selectedTeamCaptainProfile,
+      selectedTeamCaptainCandidates,
+      selectedTeamCaptainPlayerId,
+      assignTeamCaptainBusy,
+      onAssignTeamCaptain: assignTeamCaptainForSelectedTeam,
+      captainEffectsTooltip: getTeamCaptainEffectsTooltip(),
+      selectedTeamPowers,
+      hqContractExpiringCount,
+      hqTransferSellMarkers,
+      selectedHqMoraleSummary,
+      selectedHqAxisSummary,
+      selectedHqInboxItems,
+      selectedHqGmStory,
+      selectedTeamCanManage,
+      isReadOnlyMode: readMeta.readOnly,
+      selectedTeamAverageAxisStats,
+      rosterPlayers,
+      seasonReadinessChecklist,
+      onNavigate: (view) => setFoundationView(view, setActiveView),
+      onOpenTeam: (teamId) => openTeamDrawerById(teamId),
+      onNavigateInboxItem: navigateToInboxItem,
+    },
+  };
+
   const transferSeasonOptions = useMemo(() => {
     const labelBySeasonId = new Map<string, string>();
     labelBySeasonId.set(
@@ -10070,6 +10134,7 @@ export function useFoundationShellRouterBodyScope({
     standingsPreviewFeed,
     foundationMatchdayResultHostProps,
     foundationHistoryV2HostProps,
+    foundationHomeV2HostProps,
     foundationSeasonPreviewHostProps,
     foundationTeamsViewHostProps,
     foundationCockpitHostProps,
