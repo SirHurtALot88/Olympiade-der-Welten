@@ -532,6 +532,30 @@ function applyPositiveGrowthMultiplier(value: number, multiplier: number) {
   return value * multiplier;
 }
 
+/**
+ * Performance-driven relief on the market-value regression pressure. Solid discipline performance
+ * dampens the MW-scaled part of regression so a league-dominating high-MW star can hold / slightly
+ * grow instead of inexorably declining, while a genuine underperformer still faces the full pressure.
+ * Only the MW-pressure part is relieved — the flat base regression (natural drift) always applies,
+ * and near-cap headroom still throttles growth. Curve is intentionally simple; tune against the
+ * capstone multi-season distribution (median ~stable, some improve, some decline).
+ */
+const MW_MAINTENANCE_RELIEF_MIN_BUDGET = 0.38; // at/below "meets expectation": no relief → declines
+const MW_MAINTENANCE_RELIEF_MAX_BUDGET = 0.75; // league-dominating performance: near-full relief
+const MW_MAINTENANCE_RELIEF_MAX_PCT = 0.9;
+function getMarketValueMaintenanceReliefPct(signals: SeasonPerformanceSignals): number {
+  if (signals.appearances < 4) return 0;
+  const budget = signals.avgPerformanceBudget;
+  if (budget <= MW_MAINTENANCE_RELIEF_MIN_BUDGET) return 0;
+  if (budget >= MW_MAINTENANCE_RELIEF_MAX_BUDGET) return MW_MAINTENANCE_RELIEF_MAX_PCT;
+  return roundValue(
+    ((budget - MW_MAINTENANCE_RELIEF_MIN_BUDGET) /
+      (MW_MAINTENANCE_RELIEF_MAX_BUDGET - MW_MAINTENANCE_RELIEF_MIN_BUDGET)) *
+      MW_MAINTENANCE_RELIEF_MAX_PCT,
+    3,
+  );
+}
+
 export function buildOrganicSeasonProgression(input: {
   gameState: GameState;
   player: Player;
@@ -667,6 +691,11 @@ export function buildOrganicSeasonProgression(input: {
     marketValuePressurePerAttribute,
   });
   const affinityProfile = deriveAttributeAffinityProfile(input.player);
+  const marketValueMaintenanceReliefPct = getMarketValueMaintenanceReliefPct(performanceSignals);
+  const effectiveMarketValuePressurePerAttribute = roundValue(
+    marketValuePressurePerAttribute * (1 - marketValueMaintenanceReliefPct),
+    3,
+  );
   const attributesAfter = { ...attributesBefore };
   const rawAttributeBreakdown = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const affinity = getAttributeAffinityKind(attribute, affinityProfile);
@@ -694,7 +723,7 @@ export function buildOrganicSeasonProgression(input: {
       signals: performanceSignals,
       potentialGapStars: starSnapshot.potentialGap,
     });
-    const regression = -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute);
+    const regression = -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + effectiveMarketValuePressurePerAttribute);
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
     const performanceDelta =
       applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
@@ -770,7 +799,7 @@ export function buildOrganicSeasonProgression(input: {
     baseRegressionPerAttribute: ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
     marketValuePressureTotal,
     marketValuePressurePerAttribute,
-    marketValueMaintenanceReliefPct: 0,
+    marketValueMaintenanceReliefPct,
     trainingSetpoints,
     appliedTrainingSetpoints,
     performanceSetpoints: performance.totalBudget,
