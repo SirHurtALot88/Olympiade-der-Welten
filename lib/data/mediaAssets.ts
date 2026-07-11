@@ -1,4 +1,5 @@
 import playerPortraitMap from "@/data/generated/player-portrait-map.json";
+import portraitFileIndex from "@/data/generated/portrait-files.json";
 import teamLogoMap from "@/data/generated/team-logo-map.json";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { hydratePlayersWithAttributeSheet } from "@/lib/data/playerAttributeSheetData";
@@ -28,6 +29,49 @@ export function getPlayerPortraitPathById(playerId: string) {
   return portraitPathByPlayerId[playerId] ?? null;
 }
 
+// Repo-relative portraits. Drop image files into public/portraits/ and run
+// `npm run portraits:index` (see public/portraits/README.md) to regenerate
+// data/generated/portrait-files.json. Files here always take priority over
+// the legacy absolute-path map below, and with no files present this is a
+// no-op (falls through to the existing map / initials fallback).
+const PORTRAIT_STATIC_DIR = "/portraits";
+const portraitFileBasenames = portraitFileIndex as string[];
+const portraitFileByKey = new Map<string, string>();
+for (const filename of portraitFileBasenames) {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0) {
+    continue;
+  }
+  const key = filename.slice(0, dot).toLowerCase();
+  if (!portraitFileByKey.has(key)) {
+    portraitFileByKey.set(key, filename);
+  }
+}
+
+function getStaticPortraitUrl(playerId: string): string | null {
+  if (portraitFileByKey.size === 0) {
+    return null;
+  }
+
+  const idKey = playerId.toLowerCase();
+  const byId = portraitFileByKey.get(idKey);
+  if (byId) {
+    return `${PORTRAIT_STATIC_DIR}/${byId}`;
+  }
+
+  // Player ids look like "player-0001-umbros" — the part after the 4-digit
+  // number is a name slug, so a file named "umbros.jpg" also matches.
+  const slugMatch = idKey.match(/^player-\d+-(.+)$/);
+  if (slugMatch) {
+    const bySlug = portraitFileByKey.get(slugMatch[1]);
+    if (bySlug) {
+      return `${PORTRAIT_STATIC_DIR}/${bySlug}`;
+    }
+  }
+
+  return null;
+}
+
 export function getTeamLogoPathById(teamId: string) {
   return teamLogoPathByTeamId[teamId] ?? null;
 }
@@ -50,6 +94,11 @@ export function getPlayerPortraitBrowserUrl(
 
   if (portraitPath?.startsWith("/") && !portraitPath.startsWith("/Users/")) {
     return appendMediaImageVariant(portraitPath, variant);
+  }
+
+  const staticPortraitUrl = getStaticPortraitUrl(playerId);
+  if (staticPortraitUrl) {
+    return staticPortraitUrl;
   }
 
   if (portraitPathByPlayerId[playerId] || portraitPath?.startsWith("/Users/")) {
@@ -134,5 +183,6 @@ export function getMediaMappingSummary() {
   return {
     mappedTeamLogos: Object.keys(teamLogoPathByTeamId).length,
     mappedPlayerPortraits: Object.keys(portraitPathByPlayerId).length,
+    staticPortraitFiles: portraitFileByKey.size,
   };
 }
