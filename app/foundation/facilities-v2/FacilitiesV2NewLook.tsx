@@ -45,6 +45,32 @@ const TIP_BELIEBTHEIT =
   "Die Beliebtheit (1.0 = Liga-Durchschnitt) treibt die Arena-Einnahme: Effektiv = Basis × Beliebtheit. Sie steigt mit sportlichem Erfolg (Tabellenplatz), dem Anteil an Fan-Favoriten im Kader und der Stärke der Top-Spieler. Ein beliebtes Team verdient an der Arena mehr, ein schwaches weniger. Der Fan-Shop bleibt davon unberührt.";
 
 /**
+ * Effektive Saison-Einnahme fürs Anzeigen: nur die Arena (`arena_upgrade`)
+ * skaliert mit der Team-Beliebtheit (Basis × Beliebtheit) — exakt wie das
+ * reale Cash am Season-End (`facility-season-end-service`). Alle anderen
+ * Gebäude, inkl. Fan-Shop, bleiben flach bei ihrer Basis. Fehlt `beliebtheit`
+ * (kein Liga-Kontext im jeweiligen Render), fällt der Wert auf die Basis
+ * zurück — kein erfundener Faktor.
+ */
+function effectiveSeasonIncome(
+  facility: Pick<FacilityRowView, "id" | "currentIncome">,
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"],
+) {
+  return facility.id === "arena_upgrade" && beliebtheit
+    ? facility.currentIncome * beliebtheit.value
+    : facility.currentIncome;
+}
+
+/** Wie `effectiveSeasonIncome`, aber für einen beliebigen Rohwert (z. B. `nextIncome`) einer Facility. */
+function effectiveIncomeFor(
+  facilityId: FacilityId,
+  income: number,
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"],
+) {
+  return facilityId === "arena_upgrade" && beliebtheit ? income * beliebtheit.value : income;
+}
+
+/**
  * Erklärtexte (E5): Konzepte in einfachem Deutsch, Schwellen kommen aus den
  * echten Konstanten in `lib/facilities/facility-condition.ts` — keine
  * erfundenen Zahlen.
@@ -236,7 +262,11 @@ const FACILITY_LIST_COLUMNS: Array<{ key: FacilitySortKey; label: string; title?
 ];
 
 /** Nur echte Felder aus `FacilityRowView`; "default" hält die Katalog-Reihenfolge. */
-function facilitySortValue(facility: FacilityRowView, key: FacilitySortKey): number | string {
+function facilitySortValue(
+  facility: FacilityRowView,
+  key: FacilitySortKey,
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"],
+): number | string {
   switch (key) {
     case "name":
       return facility.name;
@@ -249,7 +279,7 @@ function facilitySortValue(facility: FacilityRowView, key: FacilitySortKey): num
     case "upkeep":
       return facility.currentUpkeep;
     case "net":
-      return facility.currentIncome - facility.currentUpkeep;
+      return effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep;
     default:
       return 0;
   }
@@ -259,12 +289,13 @@ function sortFacilityRows(
   rows: FacilityRowView[],
   sortKey: FacilitySortKey,
   direction: FacilitySortDirection,
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"],
 ): FacilityRowView[] {
   if (sortKey === "default") return rows;
   const sign = direction === "asc" ? 1 : -1;
   return [...rows].sort((left, right) => {
-    const a = facilitySortValue(left, sortKey);
-    const b = facilitySortValue(right, sortKey);
+    const a = facilitySortValue(left, sortKey, beliebtheit);
+    const b = facilitySortValue(right, sortKey, beliebtheit);
     if (typeof a === "string" || typeof b === "string") {
       return sign * String(a).localeCompare(String(b), "de");
     }
@@ -334,7 +365,11 @@ export default function FacilitiesV2NewLook({
    * (lib/facilities/facility-effects.ts, gleiche Katalog-Quelle), damit
    * „Einnahmen − Unterhalt" dem Netto-Chip (`summary.netFacilityResult`)
    * entspricht: Einnahmen effizienzgewichtet, Unterhalt inkl.
-   * Spezialisten-Flügel-Rabatt. Reine Präsentation — keine neuen Balance-Zahlen.
+   * Spezialisten-Flügel-Rabatt. Arena-Einnahme fließt EFFEKTIV (Basis ×
+   * Beliebtheit) ein — genau wie das reale Cash am Season-End
+   * (facility-season-end-service) — sonst würde der Header-Chip von
+   * `summary.netFacilityResult` abweichen. Reine Präsentation — keine neuen
+   * Balance-Zahlen.
    */
   const portfolioFinance = useMemo(() => {
     const specialistRow = facilityRows.find((facility) => facility.id === "specialist_wing");
@@ -356,7 +391,7 @@ export default function FacilitiesV2NewLook({
       if (facility.currentUpkeep > 0) {
         upkeepTotal += Number((facility.currentUpkeep * (1 - specialistDiscountPct / 100)).toFixed(2));
       }
-      incomeTotal += (facility.currentIncome * facility.efficiencyPct) / 100;
+      incomeTotal += (effectiveSeasonIncome(facility, beliebtheit) * facility.efficiencyPct) / 100;
     }
 
     return {
@@ -364,13 +399,13 @@ export default function FacilitiesV2NewLook({
       incomeTotal: Number(incomeTotal.toFixed(2)),
       builtCount,
     };
-  }, [facilityRows]);
+  }, [facilityRows, beliebtheit]);
 
   const visibleFacilityRows = useMemo(() => {
     const filtered =
       wearFilter === "all" ? facilityRows : facilityRows.filter((facility) => facility.level > 0 && getWearTone(facility) === wearFilter);
-    return sortFacilityRows(filtered, sort.key, sort.direction);
-  }, [facilityRows, wearFilter, sort]);
+    return sortFacilityRows(filtered, sort.key, sort.direction, beliebtheit);
+  }, [facilityRows, wearFilter, sort, beliebtheit]);
 
   function toggleWearFilter(tone: "good" | "warn" | "risk") {
     if (wearFilter === tone) {
@@ -651,10 +686,11 @@ export default function FacilitiesV2NewLook({
                 <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
                 {facility.id === "arena_upgrade" && beliebtheit ? (
                   <small
-                    className="nl-facility-arena-popularity"
+                    className="nl-facility-arena-popularity nl-tnum"
                     title={TIP_BELIEBTHEIT}
                   >
-                    Einnahme: Basis ×{formatNlNumber(beliebtheit.value, 2)} Beliebtheit
+                    Basis {formatTransfermarktCurrency(facility.currentIncome)} × {formatNlNumber(beliebtheit.value, 2)} ={" "}
+                    {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit))}
                   </small>
                 ) : null}
                 {facility.level > 0 ? (
@@ -682,10 +718,10 @@ export default function FacilitiesV2NewLook({
                   <span title="Effizienz">Eff. {facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</span>
                   <span title="Unterhalt pro Saison">−{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
                   <span
-                    title="Netto (Einnahmen − Unterhalt)"
-                    className={facility.currentIncome - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}
+                    title="Netto (Einnahmen − Unterhalt, Arena effektiv Basis × Beliebtheit)"
+                    className={effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}
                   >
-                    {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}
+                    {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}
                   </span>
                 </div>
               </button>
@@ -730,8 +766,15 @@ export default function FacilitiesV2NewLook({
                     <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.conditionPct, 0)}%` : "—"}</td>
                     <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</td>
                     <td className="nl-tnum">−{formatTransfermarktCurrency(facility.currentUpkeep)}</td>
-                    <td className={`nl-tnum ${facility.currentIncome - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}`}>
-                      {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}
+                    <td
+                      className={`nl-tnum ${effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}`}
+                      title={
+                        facility.id === "arena_upgrade" && beliebtheit
+                          ? `Basis ${formatTransfermarktCurrency(facility.currentIncome)} × ${formatNlNumber(beliebtheit.value, 2)} = ${formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit))}`
+                          : undefined
+                      }
+                    >
+                      {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}
                     </td>
                   </tr>
                 );
@@ -827,9 +870,16 @@ export default function FacilitiesV2NewLook({
             {activeFacility.upgradeCost != null ? (
               <div className="nl-facility-action-consequence" aria-label="Konsequenz-Vorschau nach Upgrade">
                 <NlDeltaChip
-                  value={activeFacility.nextIncome - activeFacility.currentIncome}
+                  value={
+                    effectiveIncomeFor(activeFacility.id, activeFacility.nextIncome, beliebtheit) -
+                    effectiveSeasonIncome(activeFacility, beliebtheit)
+                  }
                   format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Einnahmen`}
-                  title="Einnahmen-Änderung nach Upgrade auf die nächste Stufe"
+                  title={
+                    activeFacility.id === "arena_upgrade" && beliebtheit
+                      ? `Effektive Einnahmen-Änderung (Basis × ${formatNlNumber(beliebtheit.value, 2)} Beliebtheit) nach Upgrade auf die nächste Stufe`
+                      : "Einnahmen-Änderung nach Upgrade auf die nächste Stufe"
+                  }
                 />
                 <NlDeltaChip
                   value={activeFacility.nextUpkeep - activeFacility.currentUpkeep}
