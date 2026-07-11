@@ -426,10 +426,10 @@ describe("fatigue injury service", () => {
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
     // Intensity-scaled load (7a): the draft has no explicit modifiers, so intensity defaults
-    // to "normal" (fatigueBase 3, additionalFatigueCap 8). At fatigue 20 the load scales to
-    // 3 + (8 - 3) * (20 / 100) = 4, so 20 + 4 = 24 (previously a flat +11 regardless of
-    // intensity, which was the coherence bug this task fixes).
-    expect(usedPlayer?.fatigue).toBe(24);
+    // to "normal" (fatigueBase 4, additionalFatigueCap 9 after the S3 recalibration). At
+    // fatigue 20 the load scales to 4 + (9 - 4) * (20 / 100) = 5, so 20 + 5 = 25 (previously a
+    // flat +11 regardless of intensity, which was the coherence bug this task fixes).
+    expect(usedPlayer?.fatigue).toBe(25);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
@@ -478,9 +478,11 @@ describe("fatigue injury service", () => {
     // fatigueBase..additionalFatigueCap from lib/lineups/matchday-slot-roles.ts by how
     // fatigued the player already is (40% of the way to max here). Previously all three
     // intensities produced an identical flat +11 regardless of the chosen intensity.
-    expect(conserve.appliedFatigue).toBe(42.6);
-    expect(normal.appliedFatigue).toBe(45);
-    expect(push.appliedFatigue).toBe(46.8);
+    // Post S3-recalibration bands: conserve 2..6 -> 40 + (2 + 4*0.4)=43.6,
+    // normal 4..9 -> 40 + (4 + 5*0.4)=46, push 6..12 -> 40 + (6 + 6*0.4)=48.4.
+    expect(conserve.appliedFatigue).toBe(43.6);
+    expect(normal.appliedFatigue).toBe(46);
+    expect(push.appliedFatigue).toBe(48.4);
     expect(conserve.appliedFatigue!).toBeLessThan(normal.appliedFatigue!);
     expect(normal.appliedFatigue!).toBeLessThan(push.appliedFatigue!);
   });

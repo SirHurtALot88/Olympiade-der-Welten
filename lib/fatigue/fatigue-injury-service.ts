@@ -35,7 +35,27 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
  * `resolveIntensityScaledMatchdayFatigueLoad`.
  */
 export const MATCHDAY_FATIGUE_LOAD = 11;
-export const BASE_MATCHDAY_RECOVERY = 24;
+/**
+ * Base fatigue recovered by a rostered player who SITS OUT a matchday (before training-mode
+ * and recovery-facility modifiers). Recovery is applied only to players who did NOT play the
+ * matchday; players who played gain the intensity-scaled load instead (see
+ * `resolveIntensityScaledMatchdayFatigueLoad`) with no recovery that matchday.
+ *
+ * S3 recalibration: previously 24. At 24, one rest wiped ~7 matchdays of "normal" load
+ * (~3.5 each), so any realistic rotation kept regularly-played starters pinned near 0 fatigue
+ * and the injury system (risk begins at fatigue>30) was effectively inert. Lowered to 11
+ * (≈2.75× the new normal base load of 4) so a rest is still meaningful but no longer
+ * season-wiping. Accumulation for a typical starter over an 11-matchday season, at "mittel"
+ * training with no facility modifier (so recovery = 11):
+ *   - iron-man (plays every MD):        conserve ~27 (never crosses 30) · normal ~57 (crosses ~MD7) · push ~90 (crosses ~MD5)
+ *   - heavy starter (rests 1-in-6):     conserve ~11 · normal ~36 (crosses ~MD10) · push ~64 (crosses ~MD5)
+ *   - rotation starter (rests 1-in-3):  conserve ~4 · normal ~8 · push ~18 (none cross 30 -> rotation stays safe)
+ * Expected full-season injury incidence to confirm once seasons play through: near-zero at
+ * conserve, occasional for iron-man/heavy starters at normal (avg per-play risk ~3-6%),
+ * clearly present for push-heavy usage (avg per-play risk ~7-11%), while a manager who
+ * rotates ~1-in-3 keeps players out of the risk band entirely.
+ */
+export const BASE_MATCHDAY_RECOVERY = 11;
 
 export { getInjuryRiskBand, getInjuryRiskPercent, injuryRiskBands, type InjuryRiskBand };
 export const FATIGUE_INJURY_RISK_CURVE = FATIGUE_INJURY_RISK_ANCHORS;

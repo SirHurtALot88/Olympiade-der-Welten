@@ -423,7 +423,7 @@ describe("matchday slot roles", () => {
       rivalryPressure: 2,
     });
 
-    expect(projected.additionalFatigue).toBeLessThanOrEqual(11);
+    expect(projected.additionalFatigue).toBeLessThanOrEqual(12);
     expect(projected.fatigueRisk).toBe("hoch");
   });
 

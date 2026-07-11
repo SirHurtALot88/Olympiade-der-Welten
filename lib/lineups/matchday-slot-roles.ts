@@ -90,9 +90,19 @@ const INTENSITY_CONFIG: Record<
     strainLoadModifier: number;
   }
 > = {
-  conserve: { label: "Schonen", scoreModifier: -2, fatigueBase: 1, additionalFatigueCap: 5, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
-  normal: { label: "Normal", scoreModifier: 0, fatigueBase: 3, additionalFatigueCap: 8, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
-  push: { label: "Push", scoreModifier: 3, fatigueBase: 4, additionalFatigueCap: 11, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
+  // fatigueBase..additionalFatigueCap define the per-matchday fatigue load band that both
+  // this preview (`resolveAdditionalFatigueFromRisk`) and the persisted post-matchday load
+  // (`resolveIntensityScaledMatchdayFatigueLoad` in lib/fatigue/fatigue-injury-service.ts)
+  // draw from. Recalibrated (S3) against BASE_MATCHDAY_RECOVERY=11: with a realistic
+  // rotation a player who plays MOST matchdays now meaningfully accumulates fatigue and can
+  // cross the injury-risk threshold (fatigue>30), while a properly rotated player (rests
+  // ~1-in-3) still trends toward 0. See BASE_MATCHDAY_RECOVERY docs for the accumulation math.
+  //   conserve: near-neutral even for an iron-man (~27 over an 11-MD season, never crosses 30)
+  //   normal:   small net gain -- heavy starter reaches ~36 (crosses ~MD10), iron-man ~57
+  //   push:     meaningful gain -- heavy starter ~64, iron-man ~90 (crosses ~MD5)
+  conserve: { label: "Schonen", scoreModifier: -2, fatigueBase: 2, additionalFatigueCap: 6, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
+  normal: { label: "Normal", scoreModifier: 0, fatigueBase: 4, additionalFatigueCap: 9, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
+  push: { label: "Push", scoreModifier: 3, fatigueBase: 6, additionalFatigueCap: 12, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
 };
 
 const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]> = {

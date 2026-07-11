@@ -181,7 +181,7 @@ function getRestBenefit(health: RosterHealthSnapshot): number {
   return fatigueOverFloor * REST_BENEFIT_FATIGUE_WEIGHT + health.injuryRiskPercent * REST_BENEFIT_INJURY_RISK_WEIGHT;
 }
 
-type DisciplineSideCandidate = {
+export type DisciplineSideCandidate = {
   activePlayerId: string;
   playerId: string;
   score: number;
@@ -193,13 +193,43 @@ type DisciplineSideCandidate = {
 };
 
 /**
+ * Finds the index of the best bench replacement for a slot we are trying to rest a starter
+ * out of.
+ *
+ * Bug fix (S3/S4): once a rested starter is spliced back into `benchPool`, a later slot's
+ * search would happily re-pick that just-rested star, because it only maximised
+ * `selectionScore` and never checked whether the candidate itself wants rest. That defeats
+ * the whole point of the rest -- the star is benched for one slot and immediately re-used in
+ * the next. We now prefer candidates who do NOT themselves need rest (`getRestBenefit === 0`)
+ * whenever any such alternative exists, and only fall back to a rest-wanting candidate when
+ * the bench offers nobody fresher.
+ */
+function findBestBenchReplacementIndex(benchPool: DisciplineSideCandidate[]): number {
+  let bestFreshIndex = -1;
+  let bestAnyIndex = -1;
+  for (let candidateIndex = 0; candidateIndex < benchPool.length; candidateIndex += 1) {
+    const candidate = benchPool[candidateIndex]!;
+    if (!candidate.hasScore) continue;
+    if (bestAnyIndex === -1 || candidate.selectionScore > benchPool[bestAnyIndex]!.selectionScore) {
+      bestAnyIndex = candidateIndex;
+    }
+    if (getRestBenefit(candidate.health) <= 0) {
+      if (bestFreshIndex === -1 || candidate.selectionScore > benchPool[bestFreshIndex]!.selectionScore) {
+        bestFreshIndex = candidateIndex;
+      }
+    }
+  }
+  return bestFreshIndex !== -1 ? bestFreshIndex : bestAnyIndex;
+}
+
+/**
  * Reviews the initially-picked starters (weakest selectionScore first, since a marginal
  * starter is the cheapest one to hand off) and swaps out any elevated-fatigue starter whose
  * rest benefit exceeds the marginal cost of playing their best available bench replacement
  * instead. A starter with no viable bench replacement (nobody else has a discipline score)
  * is never rested -- there is no one to rest them for.
  */
-function applyOpportunityCostRotation(
+export function applyOpportunityCostRotation(
   picked: DisciplineSideCandidate[],
   bench: DisciplineSideCandidate[],
 ): DisciplineSideCandidate[] {
@@ -215,14 +245,7 @@ function applyOpportunityCostRotation(
     const restBenefit = getRestBenefit(starter.health);
     if (restBenefit <= 0) continue;
 
-    let bestBenchIndex = -1;
-    for (let candidateIndex = 0; candidateIndex < benchPool.length; candidateIndex += 1) {
-      const candidate = benchPool[candidateIndex]!;
-      if (!candidate.hasScore) continue;
-      if (bestBenchIndex === -1 || candidate.selectionScore > benchPool[bestBenchIndex]!.selectionScore) {
-        bestBenchIndex = candidateIndex;
-      }
-    }
+    const bestBenchIndex = findBestBenchReplacementIndex(benchPool);
     if (bestBenchIndex === -1) continue;
 
     const replacement = benchPool[bestBenchIndex]!;

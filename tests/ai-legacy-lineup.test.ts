@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { buildAiLegacyLineupPreview, buildAiLegacyLineupSuggestion } from "@/lib/ai/ai-legacy-lineup-engine";
+import {
+  applyOpportunityCostRotation,
+  buildAiLegacyLineupPreview,
+  buildAiLegacyLineupSuggestion,
+  type DisciplineSideCandidate,
+} from "@/lib/ai/ai-legacy-lineup-engine";
 import { evaluateLegacyAiNeeds } from "@/lib/ai/ai-needs-engine";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -160,6 +165,80 @@ function createContext(): LegacyLineupLoadedContext {
     },
   };
 }
+
+describe("opportunity-cost rotation (7b/S4)", () => {
+  function candidate(overrides: Partial<DisciplineSideCandidate> & { playerId: string }): DisciplineSideCandidate {
+    return {
+      activePlayerId: `active-${overrides.playerId}`,
+      score: 0,
+      selectionScore: 0,
+      fatigueAdjustedScore: 0,
+      hasScore: true,
+      tieBreak: 0,
+      health: { fatigue: 0, injuryRiskPercent: 0 },
+      ...overrides,
+    };
+  }
+
+  it("does not re-use a just-rested fatigued starter to cover another slot", () => {
+    // Two fatigued starters both want rest. starterA (lower selectionScore) is reviewed
+    // first and swapped to the bench. When starterB is reviewed, the OLD logic would pick the
+    // highest-selectionScore bench candidate -- which is now the just-rested starterA -- and
+    // re-insert them, defeating the rest. The fix must instead prefer a genuinely fresh bench
+    // option (restBenefit === 0), so both fatigued stars end up rested.
+    const starterA = candidate({
+      playerId: "starterA",
+      selectionScore: 40,
+      fatigueAdjustedScore: 58,
+      health: { fatigue: 75, injuryRiskPercent: 10 }, // restBenefit = 5*0.6 + 10*1.1 = 14
+    });
+    const starterB = candidate({
+      playerId: "starterB",
+      selectionScore: 42,
+      fatigueAdjustedScore: 60,
+      health: { fatigue: 78, injuryRiskPercent: 12 }, // restBenefit = 8*0.6 + 12*1.1 = 18
+    });
+    const benchFresh1 = candidate({
+      playerId: "benchFresh1",
+      selectionScore: 38,
+      fatigueAdjustedScore: 55, // restCost vs starterA = 3 < 14 -> swap
+      health: { fatigue: 40, injuryRiskPercent: 5 }, // restBenefit 0
+    });
+    const benchFresh2 = candidate({
+      playerId: "benchFresh2",
+      selectionScore: 30,
+      fatigueAdjustedScore: 45, // restCost vs starterB = 15 < 18 -> swap
+      health: { fatigue: 30, injuryRiskPercent: 3 }, // restBenefit 0
+    });
+
+    const result = applyOpportunityCostRotation([starterA, starterB], [benchFresh1, benchFresh2]);
+    const playerIds = result.map((entry) => entry.playerId);
+
+    // Both fatigued stars rested; the just-rested starterA is NOT re-used elsewhere.
+    expect(playerIds).toEqual(["benchFresh1", "benchFresh2"]);
+    expect(playerIds).not.toContain("starterA");
+    expect(playerIds).not.toContain("starterB");
+  });
+
+  it("still rests a fatigued starter onto the single fresh bench option available", () => {
+    const starter = candidate({
+      playerId: "starter",
+      selectionScore: 40,
+      fatigueAdjustedScore: 58,
+      health: { fatigue: 75, injuryRiskPercent: 10 },
+    });
+    const benchFresh = candidate({
+      playerId: "benchFresh",
+      selectionScore: 38,
+      fatigueAdjustedScore: 55,
+      health: { fatigue: 20, injuryRiskPercent: 4 },
+    });
+
+    const result = applyOpportunityCostRotation([starter], [benchFresh]);
+
+    expect(result.map((entry) => entry.playerId)).toEqual(["benchFresh"]);
+  });
+});
 
 describe("legacy ai needs", () => {
   it("returns structured needs for team and matchday", () => {
