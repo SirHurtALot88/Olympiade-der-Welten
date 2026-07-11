@@ -7125,10 +7125,15 @@ function scoreCandidate(input: {
       : 0;
   const laneFitScore = roundValue(
     clamp(
+      // Star/superstar now reward VALUE (quality-per-cost), like every other lane — instead of the
+      // old term that paid +4 for buying near the (uncapped) price ceiling and -3 for the cheaper
+      // in-lane option. That regression made teams grab only the most expensive star; folding
+      // valueScore back in lets a strong, well-priced 60-70 star beat a marginally-better outlier
+      // priced multiples higher. Ability still counts (playerQualityScore); value now breaks the tie.
       input.budgetLane.lane === "superstar"
-        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + (price != null && laneCap != null && price >= laneCap * 0.72 ? 4 : -3)
+        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + valueScore * 0.4
         : input.budgetLane.lane === "star"
-          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
+          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + valueScore * 0.4 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
           : input.budgetLane.lane === "core"
             ? needMatchScore * 0.18 +
               rosterBalanceScore * 0.28 +
