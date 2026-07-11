@@ -2,7 +2,12 @@ import type { Player } from "@/lib/data/olyDataTypes";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 
-import { planTeamLanes } from "./plan-team-lanes";
+import {
+  ELITE_QUALITY_LEAN_THRESHOLD,
+  planTeamLanes,
+  resolveCleanTeamTraits,
+  resolveEliteQualityLean,
+} from "./plan-team-lanes";
 import { scoreCandidate } from "./score-candidate";
 import { candidateToThemePlayer, evaluateCleanTheme, isCleanThemeHardEligible } from "./theme-match";
 import type {
@@ -119,6 +124,15 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
   // reproducing the legacy hard-focus gate from the theme target alone (no team-code hardcodes).
   // Non-hard teams keep the full pool (theme stays a scoring lean). The below-min safety net below
   // may still relax to the full pool so a hard team is never stranded under its minimum.
+  // ELITE-QUALITY teams refuse Backup/Reserve filler: a planned body slot that can't be filled at its
+  // tier is downgraded only as far as Depth, never below — if no Depth+ player is affordable the slot is
+  // left empty (fewer players, no filler), matching the "kleine Elite" identity. Non-elite teams keep
+  // the full downgrade so they always reach a broad body.
+  const eliteNoFiller =
+    resolveEliteQualityLean(resolveCleanTeamTraits({ identity: input.identity, strategy: input.strategy })) >=
+    ELITE_QUALITY_LEAN_THRESHOLD;
+  const eliteDowngradeFloor = input.brackets.depth.floorMw;
+
   const isHardFocus = input.themeTarget?.strictness === "hard";
   const eligiblePool = isHardFocus
     ? input.freeAgents.filter((candidate) =>
@@ -221,7 +235,7 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
       selection = selectBest({
         pool: eligiblePool,
         used,
-        minPrice: 0,
+        minPrice: eliteNoFiller ? eliteDowngradeFloor : 0,
         maxPrice: spendCeiling,
         slot,
         themeTarget: input.themeTarget,

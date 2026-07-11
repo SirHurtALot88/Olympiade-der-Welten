@@ -89,6 +89,22 @@ function resolveReachLaneIndex(traits: CleanTeamTraits): number {
   return 3; // depth
 }
 
+/** Quality-focus (0..1): ambition/star-led, value-priority pulls it down. */
+function resolveQualityFocus(traits: CleanTeamTraits): number {
+  return clamp(0.5 * traits.ambition + 0.3 * traits.starPriority + 0.2 * (1 - traits.valuePriority), 0, 1);
+}
+
+/**
+ * Elite-quality lean = quality-focus minus depth-preference. Above the threshold the team behaves as a
+ * "small elite": it plans a shorter squad and REFUSES Backup/Reserve filler (drops the slot instead),
+ * running fewer real Depth/Core players. Below it, the team keeps a broad body and may take reserve
+ * gems. Shared by the planner (trim / reserve-flex) and the executor (no sub-tier downgrade).
+ */
+export const ELITE_QUALITY_LEAN_THRESHOLD = 0.2;
+export function resolveEliteQualityLean(traits: CleanTeamTraits): number {
+  return resolveQualityFocus(traits) - traits.rosterDepthPreference;
+}
+
 /**
  * Trait-driven squad size around the SOFT opt target. A "small elite" (high quality-focus, low
  * depth-preference — e.g. B-P) plans FEWER slots so the per-slot budget rises into Core; a depth-led
@@ -96,8 +112,7 @@ function resolveReachLaneIndex(traits: CleanTeamTraits): number {
  * Backup wall" and "9 slots × ~30 MW = real Core body" on the SAME budget.
  */
 function resolveTargetSquadSize(traits: CleanTeamTraits, opt: number, playerMin: number, playerMax: number): number {
-  const qualityFocus = clamp(0.5 * traits.ambition + 0.3 * traits.starPriority + 0.2 * (1 - traits.valuePriority), 0, 1);
-  const eliteLean = clamp(qualityFocus - traits.rosterDepthPreference, -1, 1); // >0 smaller elite, <0 broader
+  const eliteLean = clamp(resolveEliteQualityLean(traits), -1, 1); // >0 smaller elite, <0 broader
   const target =
     eliteLean >= 0 ? opt - eliteLean * (opt - playerMin) : opt - eliteLean * (playerMax - opt);
   return clamp(Math.round(target), playerMin, playerMax);
@@ -168,7 +183,7 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
   // so the body is a real Depth/Core tier instead of a Backup/Reserve wall. The aim is identity-scaled:
   // quality/elite teams aim at ~Core (fewer, better slots — B-P's "kleine Elite"); depth/value teams
   // aim at ~Backup-Depth (more bodies). Holds at 175 AND 325 cash.
-  const qualityFocus = clamp(0.5 * traits.ambition + 0.3 * traits.starPriority + 0.2 * (1 - traits.valuePriority), 0, 1);
+  const qualityFocus = resolveQualityFocus(traits);
   const bodyAimT = clamp(0.5 + 0.6 * (qualityFocus - traits.rosterDepthPreference), 0, 1);
   // Aim the per-slot budget within the Depth band — a touch below Depth for value/depth teams (keep
   // more bodies), a touch above for quality/elite teams (fewer, better slots) — WITHOUT demanding a
@@ -283,13 +298,26 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
     };
   });
 
+  // ELITE-QUALITY TRIM: a clearly quality-over-depth team (e.g. B-P's "kleine Elite") would rather run
+  // a SHORTER squad of real Depth/Core players than pad it with Backup/Reserve. Drop trailing sub-Depth
+  // slots (they sort last) down to the hard minimum — fewer players, but no Backup/Reserve tail. Value/
+  // depth teams (below the threshold) skip this and keep their broad bodies / reserve gems.
+  const eliteQualityLean = resolveEliteQualityLean(traits);
+  if (eliteQualityLean >= ELITE_QUALITY_LEAN_THRESHOLD) {
+    while (slots.length > minN) {
+      const last = slots[slots.length - 1]!;
+      if (last.lane !== "backup" && last.lane !== "reserve") break;
+      slots.pop();
+    }
+  }
+
   // OPPORTUNISTIC RESERVE: a value/development-leaning team keeps its 1-2 cheapest slots OPEN to the
   // reserve tier (floor dropped to 0). Reserve is never planned as a wall, but a sub-bracket player can
   // be a smart pickup — a cheap salary alternative or a high-potential prospect — and the scorer's
   // value/potential terms will take one only when it genuinely out-scores a backup. So Reserve stays
   // low but not forced to exactly zero. Trait-gated: no reserve flex for star/ambition-led teams.
   const reserveFlexAppetite = Math.max(traits.developmentBias, traits.valuePriority);
-  if (reserveFlexAppetite >= 0.55 && slots.length > 0) {
+  if (eliteQualityLean < ELITE_QUALITY_LEAN_THRESHOLD && reserveFlexAppetite >= 0.55 && slots.length > 0) {
     const flexCount = clamp(Math.round(reserveFlexAppetite * 2), 1, 2);
     for (let k = 0; k < flexCount && k < slots.length; k += 1) {
       const slot = slots[slots.length - 1 - k]!;
