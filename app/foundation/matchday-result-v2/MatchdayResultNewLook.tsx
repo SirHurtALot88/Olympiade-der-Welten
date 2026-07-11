@@ -238,6 +238,57 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   const championRow = matchdaySummary.topTeams[0] ?? boardRows[0] ?? null;
   const topPlayers = matchdaySummary.topPlayers.slice(0, 5);
 
+  // Tages-Podium: die echten Rang-1-bis-3-Zeilen des gespeicherten Ergebnisses.
+  const podiumRows = useMemo(
+    () => boardRows.filter((row) => row.matchdayRank != null && row.matchdayRank <= 3).slice(0, 3),
+    [boardRows],
+  );
+  const mvpPlayer = topPlayers[0] ?? null;
+
+  function renderPodiumStep(row: MatchdaySummaryTeamRow) {
+    const rank = row.matchdayRank ?? 0;
+    const medalKind = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+    const isActive = row.teamId === activeManagerTeamId;
+    const logoSrc = getTeamLogoBrowserUrl(row.teamId, null, { variant: "thumb" });
+    return (
+      <div
+        key={row.teamId}
+        role="listitem"
+        className={`nl-result-podium-step is-rank-${rank}${isActive ? " is-active-team" : ""}`}
+        style={getSeasonV2TeamTagStyle(row.teamShortCode)}
+      >
+        <NlMedalBadge kind={medalKind} title={`Tagesrang ${rank}`} className="nl-result-podium-medal" />
+        <BudgetedMediaImage
+          src={logoSrc}
+          alt={`${row.teamName} Logo`}
+          className="nl-result-podium-crest"
+          width={52}
+          height={52}
+          loading="lazy"
+          fallback={<span className="nl-result-podium-crest nl-result-podium-crest-fallback">{row.teamShortCode}</span>}
+        />
+        <button
+          type="button"
+          className="nl-result-podium-team"
+          onClick={() => openTeamProfileById(row.teamId)}
+          title={`${row.teamName} öffnen`}
+        >
+          {row.teamName}
+        </button>
+        <strong className="nl-result-podium-points nl-tnum">
+          {row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}
+          <small>Punkte</small>
+        </strong>
+        <span className="nl-result-podium-scores nl-tnum" title={`${matchdaySummary.d1.disciplineName ?? "D1"} · ${matchdaySummary.d2.disciplineName ?? "D2"}`}>
+          {formatNlNumber(row.d1Score, 1)} · {formatNlNumber(row.d2Score, 1)}
+        </span>
+        <span className="nl-result-podium-block" aria-hidden="true">
+          <span className="nl-result-podium-blockrank nl-tnum">{rank}</span>
+        </span>
+      </div>
+    );
+  }
+
   function renderTopPlayerRow(player: MatchdaySummaryTopPlayer, index: number) {
     const medalKind = index === 0 ? "gold" : index === 1 ? "silver" : index === 2 ? "bronze" : null;
     return (
@@ -494,6 +545,24 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         </div>
       </NlCard>
 
+      {podiumRows.length > 0 ? (
+        <NlCard
+          className="nl-result-podium-card"
+          title="Tages-Podium"
+          eyebrow="Die drei besten Teams dieses Spieltags"
+        >
+          <div className="nl-result-podium" role="list" aria-label="Tages-Podium">
+            {[
+              podiumRows.find((row) => row.matchdayRank === 2),
+              podiumRows.find((row) => row.matchdayRank === 1),
+              podiumRows.find((row) => row.matchdayRank === 3),
+            ]
+              .filter((row): row is MatchdaySummaryTeamRow => row != null)
+              .map((row) => renderPodiumStep(row))}
+          </div>
+        </NlCard>
+      ) : null}
+
       <NlCard
         className="nl-result-board-card"
         title="Tageswertung"
@@ -522,9 +591,54 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         {topPlayers.length === 0 ? (
           <p className="nl-result-empty-text">Für diesen Spieltag liegen noch keine Spieler-Wertungen vor.</p>
         ) : (
-          <ol className="nl-result-mvp-list" aria-label="Tages-MVPs">
-            {topPlayers.map((player, index) => renderTopPlayerRow(player, index))}
-          </ol>
+          <>
+            {mvpPlayer ? (
+              <div className="nl-result-mvp-hero" data-testid="nl-result-mvp-hero">
+                <span className="nl-result-mvp-hero-eyebrow">Tages-MVP</span>
+                <div className="nl-result-mvp-hero-main">
+                  <NlMedalBadge kind="gold" title="Tages-MVP" className="nl-result-mvp-hero-medal" />
+                  <div className="nl-result-mvp-hero-copy">
+                    <strong className="nl-result-mvp-hero-name">{mvpPlayer.playerName}</strong>
+                    <button
+                      type="button"
+                      className="nl-result-mvp-hero-team"
+                      onClick={() => openTeamProfileById(mvpPlayer.teamId)}
+                      title={`${mvpPlayer.teamName} öffnen`}
+                    >
+                      {mvpPlayer.teamShortCode} · {mvpPlayer.teamName}
+                    </button>
+                  </div>
+                  <span
+                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "pow" : "men")}`}
+                    title={mvpPlayer.disciplineName}
+                  >
+                    {mvpPlayer.disciplineName}
+                  </span>
+                </div>
+                <div className="nl-result-mvp-hero-stats nl-tnum">
+                  <span className="nl-result-mvp-hero-stat">
+                    <strong>{formatNlNumber(mvpPlayer.finalPlayerScore, 1)}</strong>
+                    <small>Score</small>
+                  </span>
+                  <span className="nl-result-mvp-hero-stat">
+                    <strong>{mvpPlayer.points != null ? formatNlNumber(mvpPlayer.points, 1) : "—"}</strong>
+                    <small>PPs</small>
+                  </span>
+                  {mvpPlayer.totalBonus != null && mvpPlayer.totalBonus !== 0 ? (
+                    <span className="nl-result-mvp-hero-stat">
+                      <strong>{`${mvpPlayer.totalBonus > 0 ? "+" : ""}${formatNlNumber(mvpPlayer.totalBonus, 1)}`}</strong>
+                      <small>Bonus</small>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {topPlayers.length > 1 ? (
+              <ol className="nl-result-mvp-list" aria-label="Weitere Tages-MVPs" start={2}>
+                {topPlayers.slice(1).map((player, index) => renderTopPlayerRow(player, index + 1))}
+              </ol>
+            ) : null}
+          </>
         )}
       </NlCard>
 

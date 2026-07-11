@@ -48716,3 +48716,670 @@ button.foundation-team-portrait-card {
     transform: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Arena Resolve-Show (nl-arena-stage / nl-arena-run /
+   Kletter-Animation) + Ergebnis-Crescendo (nl-result-podium / MVP-Hero).
+   Nur aktiv unterhalb von `.is-new-look` (Flag an), rein additiv.
+   ============================================================ */
+
+/* --- Kletter-Show: federnde Rang-Bewegung + Phasen-Puls ------------- */
+.is-new-look .nl-arena-row {
+  transition:
+    top 700ms cubic-bezier(0.22, 1.12, 0.3, 1),
+    box-shadow 260ms var(--nl-ease);
+}
+
+.is-new-look .nl-arena-row.is-own-team {
+  z-index: 2;
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel)), var(--nl-panel) 55%);
+  box-shadow: 0 0 18px -6px color-mix(in srgb, var(--nl-accent) 65%, transparent);
+}
+
+.is-new-look .nl-arena-own-flag {
+  position: absolute;
+  top: -7px;
+  left: 8px;
+  z-index: 3;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.is-new-look .nl-arena-row-pulse {
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--nl-r-sm);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.is-new-look .nl-arena-row-pulse.is-up {
+  background: color-mix(in srgb, var(--nl-good) 18%, transparent);
+  animation: nl-arena-rowpulse 1100ms var(--nl-ease) 1;
+}
+
+.is-new-look .nl-arena-row-pulse.is-down {
+  background: color-mix(in srgb, var(--nl-risk) 14%, transparent);
+  animation: nl-arena-rowpulse 1100ms var(--nl-ease) 1;
+}
+
+@keyframes nl-arena-rowpulse {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.is-new-look .nl-arena-score {
+  display: inline-block;
+}
+
+.is-new-look .nl-arena-score-toggle .nl-arena-score {
+  animation: nl-arena-scorepop 520ms var(--nl-ease) 1;
+}
+
+@keyframes nl-arena-scorepop {
+  0% {
+    transform: scale(1.18);
+    color: var(--nl-accent);
+  }
+  100% {
+    transform: scale(1);
+    color: inherit;
+  }
+}
+
+/* --- Bühnen-Spotlight der aktiven Phase ------------------------------ */
+.is-new-look .nl-arena-stage {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  flex-wrap: wrap;
+  margin-bottom: var(--nl-s3);
+  padding: var(--nl-s3) var(--nl-s4);
+  border: 1px solid var(--nl-line-2);
+  border-left: 3px solid var(--nl-accent);
+  border-radius: var(--nl-r-md);
+  background: linear-gradient(135deg, var(--nl-accent-soft), var(--nl-panel) 62%);
+  animation: nl-arena-stage-in 420ms var(--nl-ease) 1;
+}
+
+@keyframes nl-arena-stage-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.is-new-look .nl-arena-stage-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  flex: 1 1 220px;
+}
+
+.is-new-look .nl-arena-stage-count {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-stage-title {
+  font-family: var(--nl-display);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-arena-stage-desc {
+  font-size: 12px;
+  color: var(--nl-mut);
+  max-width: 420px;
+}
+
+.is-new-look .nl-arena-stage-chips {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+  flex: 1 1 260px;
+}
+
+.is-new-look .nl-arena-stage-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  max-width: 190px;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-arena-stage-chip:hover,
+.is-new-look .nl-arena-stage-chip:focus-visible {
+  border-color: var(--nl-accent);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-arena-stage-chip.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line-2));
+}
+
+.is-new-look .nl-arena-stage-chip.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, var(--nl-line-2));
+}
+
+.is-new-look .nl-arena-stage-chip.is-accent {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, var(--nl-line-2));
+}
+
+.is-new-look .nl-arena-stage-chip.is-own {
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel));
+}
+
+.is-new-look .nl-arena-stage-chip-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-stage-chip-team {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.is-new-look .nl-arena-stage-chip-value {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-arena-stage-chip.is-good .nl-arena-stage-chip-value {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-arena-stage-chip.is-risk .nl-arena-stage-chip-value {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-arena-stage-chip.is-accent .nl-arena-stage-chip-value {
+  color: var(--nl-accent);
+}
+
+/* --- "Dein Lauf" — Rang-Timeline des eigenen Teams ------------------- */
+.is-new-look .nl-arena-run {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  margin-bottom: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.is-new-look .nl-arena-run-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-run-team {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--nl-ink);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-arena-run-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--nl-s1);
+  flex: 1 1 auto;
+}
+
+.is-new-look .nl-arena-run-item {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 64px;
+  position: relative;
+}
+
+.is-new-look .nl-arena-run-item + .nl-arena-run-item::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: 50%;
+  width: 4px;
+  height: 1px;
+  background: var(--nl-line-2);
+}
+
+.is-new-look .nl-arena-run-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-arena-run-step:hover,
+.is-new-look .nl-arena-run-step:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-arena-run-step.is-revealed {
+  color: var(--nl-ink);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-arena-run-step.is-current {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 14%, var(--nl-panel));
+  box-shadow: 0 0 10px -4px color-mix(in srgb, var(--nl-accent) 70%, transparent);
+}
+
+.is-new-look .nl-arena-run-step.is-up.is-revealed {
+  border-bottom: 2px solid var(--nl-good);
+}
+
+.is-new-look .nl-arena-run-step.is-down.is-revealed {
+  border-bottom: 2px solid var(--nl-risk);
+}
+
+.is-new-look .nl-arena-run-phase {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-arena-run-rank {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-arena-run-trend {
+  font-size: 8px;
+  line-height: 1;
+  min-height: 8px;
+}
+
+.is-new-look .nl-arena-run-step.is-up .nl-arena-run-trend {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-arena-run-step.is-down .nl-arena-run-trend {
+  color: var(--nl-risk);
+}
+
+/* --- Playback: Tempo-Regler & Empty-State ---------------------------- */
+.is-new-look .nl-arena-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-arena-speed-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-empty-text {
+  margin: 0;
+  padding: var(--nl-s4);
+  font-size: 13px;
+  color: var(--nl-mut);
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  text-align: center;
+}
+
+/* --- Ergebnis-Crescendo: Tages-Podium -------------------------------- */
+.is-new-look .nl-result-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--nl-s3);
+  padding-top: var(--nl-s2);
+}
+
+.is-new-look .nl-result-podium-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+  flex: 1 1 0;
+  max-width: 220px;
+  min-width: 0;
+  padding: var(--nl-s3) var(--nl-s2) 0;
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-md) var(--nl-r-md) 0 0;
+  background: var(--nl-panel);
+  animation: nl-result-podium-rise 640ms var(--nl-ease) both;
+}
+
+.is-new-look .nl-result-podium-step.is-rank-3 {
+  animation-delay: 120ms;
+}
+
+.is-new-look .nl-result-podium-step.is-rank-2 {
+  animation-delay: 480ms;
+}
+
+.is-new-look .nl-result-podium-step.is-rank-1 {
+  animation-delay: 900ms;
+}
+
+@keyframes nl-result-podium-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.is-new-look .nl-result-podium-step.is-active-team {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-result-podium-medal {
+  transform: scale(1.15);
+}
+
+.is-new-look .nl-result-podium-crest {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-result-podium-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-podium-team {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-result-podium-team:hover,
+.is-new-look .nl-result-podium-team:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-podium-points {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 18px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-result-podium-points small {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-podium-scores {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-podium-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--nl-s2);
+  border-radius: var(--nl-r-sm) var(--nl-r-sm) 0 0;
+  background: linear-gradient(180deg, var(--nl-panel-2), var(--nl-bg-2));
+  border-top: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-result-podium-step.is-rank-1 .nl-result-podium-block {
+  height: 74px;
+  background: linear-gradient(180deg, color-mix(in srgb, #d4a72c 22%, var(--nl-panel-2)), var(--nl-bg-2));
+}
+
+.is-new-look .nl-result-podium-step.is-rank-2 .nl-result-podium-block {
+  height: 52px;
+  background: linear-gradient(180deg, color-mix(in srgb, #9fb2cc 16%, var(--nl-panel-2)), var(--nl-bg-2));
+}
+
+.is-new-look .nl-result-podium-step.is-rank-3 .nl-result-podium-block {
+  height: 38px;
+  background: linear-gradient(180deg, color-mix(in srgb, #c9834a 16%, var(--nl-panel-2)), var(--nl-bg-2));
+}
+
+.is-new-look .nl-result-podium-blockrank {
+  font-family: var(--nl-display);
+  font-size: 24px;
+  color: color-mix(in srgb, var(--nl-ink) 55%, transparent);
+}
+
+/* --- Ergebnis-Crescendo: Tages-MVP-Reveal ----------------------------- */
+.is-new-look .nl-result-mvp-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+  padding: var(--nl-s3) var(--nl-s4);
+  border: 1px solid color-mix(in srgb, #d4a72c 45%, var(--nl-line-2));
+  border-radius: var(--nl-r-md);
+  background: linear-gradient(130deg, color-mix(in srgb, #d4a72c 12%, var(--nl-panel)), var(--nl-panel) 60%);
+  animation: nl-result-mvp-in 620ms var(--nl-ease) 1400ms both;
+}
+
+@keyframes nl-result-mvp-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.is-new-look .nl-result-mvp-hero-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #d4a72c 80%, var(--nl-ink));
+}
+
+.is-new-look .nl-result-mvp-hero-main {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-result-mvp-hero-medal {
+  transform: scale(1.25);
+}
+
+.is-new-look .nl-result-mvp-hero-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.is-new-look .nl-result-mvp-hero-name {
+  font-family: var(--nl-display);
+  font-size: 20px;
+  line-height: 1.15;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-result-mvp-hero-team {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-result-mvp-hero-team:hover,
+.is-new-look .nl-result-mvp-hero-team:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-mvp-hero-stats {
+  display: flex;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-result-mvp-hero-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .nl-result-mvp-hero-stat strong {
+  font-size: 16px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-result-mvp-hero-stat small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-arena-stage-title {
+    font-size: 18px;
+  }
+
+  .is-new-look .nl-result-podium {
+    gap: var(--nl-s2);
+  }
+
+  .is-new-look .nl-result-podium-crest {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* --- Reduced Motion (Arena Resolve-Show + Ergebnis-Crescendo) -------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-arena-row {
+    transition: none;
+  }
+
+  .is-new-look .nl-arena-row-pulse.is-up,
+  .is-new-look .nl-arena-row-pulse.is-down,
+  .is-new-look .nl-arena-score-toggle .nl-arena-score,
+  .is-new-look .nl-arena-stage,
+  .is-new-look .nl-result-podium-step,
+  .is-new-look .nl-result-mvp-hero {
+    animation: none;
+  }
+
+  .is-new-look .nl-arena-stage-chip,
+  .is-new-look .nl-arena-run-step {
+    transition: none;
+  }
+
+  .is-new-look .nl-arena-stage-chip:hover,
+  .is-new-look .nl-arena-stage-chip:focus-visible {
+    transform: none;
+  }
+}

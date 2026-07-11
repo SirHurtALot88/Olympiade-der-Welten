@@ -94,6 +94,30 @@ type ArenaNewLookTotalRow = {
 
 const NL_ARENA_ROW_STRIDE = 52;
 
+/**
+ * Abspielgeschwindigkeiten für die Reveal-Show (Intervall pro Phase in ms).
+ * Reines UI-Timing — kein Einfluss auf Werte oder Reihenfolge.
+ */
+const NL_ARENA_SPEED_OPTIONS = [
+  { id: "slow", label: "0.5×", intervalMs: 3600 },
+  { id: "normal", label: "1×", intervalMs: 1800 },
+  { id: "fast", label: "2×", intervalMs: 900 },
+] as const;
+
+/** Dramaturgie-Zeile pro Phase — reine UI-Copy, keine Daten. */
+const NL_ARENA_PHASE_DESCRIPTIONS: Record<MatchdayArenaPhaseId, string> = {
+  slots: "Basiswertung aus den aufgestellten Slots — hier zahlt sich deine Aufstellung aus.",
+  push: "Intensitäts-Ansagen schlagen zu: Push riskiert mehr, Schonen spart Kräfte.",
+  form: "Die Formkarten landen — Tagesform hebt oder drückt den Score.",
+  mutator: "Mutatoren greifen: Die Spezialregeln des Spieltags belohnen Treffer.",
+  captain: "Der Kapitäns-Bonus kommt aufs Board.",
+  power: "Team-Power veredelt den Score der stärksten Kader.",
+  final: "Endwertung steht — alle Effekte sind eingerechnet.",
+  result: "Tagespunkte (PPs) werden vergeben — das zählt für die Saison.",
+};
+
+type ArenaStageMover = { teamId: string; teamName: string; value: number };
+
 function formatSignedNlDelta(value: number): string {
   return `${value > 0 ? "+" : ""}${formatNlNumber(value, 1)}`;
 }
@@ -129,6 +153,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [speedIndex, setSpeedIndex] = useState(1);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
 
   useEffect(() => {
@@ -284,11 +309,12 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       setIsAutoPlaying(false);
       return;
     }
+    const intervalMs = NL_ARENA_SPEED_OPTIONS[speedIndex]?.intervalMs ?? 1800;
     const interval = setInterval(() => {
       setPhaseIndex((index) => Math.min(MATCHDAY_ARENA_PHASES.length - 1, index + 1));
-    }, 1600);
+    }, intervalMs);
     return () => clearInterval(interval);
-  }, [isAutoPlaying, boardSide, phaseIndex]);
+  }, [isAutoPlaying, boardSide, phaseIndex, speedIndex]);
 
   // Wechsel der Disziplin-Seite schließt eine offene Score-Herkunft und
   // stoppt eine laufende Autoplay-Show (die Phasen gelten pro Board-Seite).
@@ -297,8 +323,8 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     setIsAutoPlaying(false);
   }, [boardSide]);
 
-  function scrollToOwnTeam() {
-    const node = rowNodesRef.current.get(params.teamId);
+  function scrollToTeam(teamId: string) {
+    const node = rowNodesRef.current.get(teamId);
     if (!node) {
       return;
     }
@@ -307,6 +333,10 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+  }
+
+  function scrollToOwnTeam() {
+    scrollToTeam(params.teamId);
   }
 
   // Rang-Karten je Phase über den Presenter (Slots-Phase = Base-Scores).
@@ -337,6 +367,80 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       }, 0),
     [boardRows, activePhase],
   );
+
+  // Bühnen-Spotlight der aktiven Phase: wer gewinnt/verliert am meisten
+  // Score (echte Phase-Deltas) und wer klettert am weitesten im Rang.
+  const stageInfo = useMemo(() => {
+    if (boardRows.length === 0) {
+      return null;
+    }
+    let topGain: ArenaStageMover | null = null;
+    let topLoss: ArenaStageMover | null = null;
+    let gainers = 0;
+    let losers = 0;
+    let ownDelta: number | null = null;
+    for (const row of boardRows) {
+      const delta = getMatchdayArenaPhaseDelta(row, activePhase);
+      if (delta == null || delta === 0) {
+        if (delta === 0 && row.teamId === params.teamId) {
+          ownDelta = 0;
+        }
+        continue;
+      }
+      if (row.teamId === params.teamId) {
+        ownDelta = delta;
+      }
+      if (delta > 0) {
+        gainers += 1;
+        if (!topGain || delta > topGain.value) {
+          topGain = { teamId: row.teamId, teamName: row.teamName, value: delta };
+        }
+      } else {
+        losers += 1;
+        if (!topLoss || delta < topLoss.value) {
+          topLoss = { teamId: row.teamId, teamName: row.teamName, value: delta };
+        }
+      }
+    }
+    let climber: ArenaStageMover | null = null;
+    for (const row of boardRows) {
+      const rank = rankMaps.current.get(row.teamId) ?? null;
+      const previousRank = rankMaps.previous?.get(row.teamId) ?? null;
+      const rankDelta = getArenaStepRankDelta(rank, previousRank);
+      if (rankDelta != null && rankDelta > 0 && (!climber || rankDelta > climber.value)) {
+        climber = { teamId: row.teamId, teamName: row.teamName, value: rankDelta };
+      }
+    }
+    const leader = boardRows[0] ?? null;
+    return {
+      topGain,
+      topLoss,
+      gainers,
+      losers,
+      ownDelta,
+      climber,
+      leader: leader
+        ? {
+            teamId: leader.teamId,
+            teamName: leader.teamName,
+            value: getMatchdayArenaPhaseScore(leader, activePhase) ?? 0,
+          }
+        : null,
+    };
+  }, [boardRows, activePhase, rankMaps, params.teamId]);
+
+  // "Dein Lauf": Rang des eigenen Teams nach jeder Reveal-Phase — dieselben
+  // Presenter-Rankings wie das Board, nur je Phase eingefroren.
+  const ownRun = useMemo(() => {
+    if (activeView.length === 0 || !activeView.some((row) => row.teamId === params.teamId)) {
+      return [];
+    }
+    const slotScores = () => buildBaseScoreMap(activeView);
+    return MATCHDAY_ARENA_PHASES.map((phase) => {
+      const rankMap = buildArenaTeamRankMap(activeView, { phaseId: phase.id, revealedSlotCount: 0 }, slotScores);
+      return { id: phase.id, label: phase.label, rank: rankMap.get(params.teamId) ?? null };
+    });
+  }, [activeView, params.teamId]);
 
   // Gesamt-Tageswertung aus beiden Disziplin-Boards (echte Scores/Punkte).
   const totalRows = useMemo<ArenaNewLookTotalRow[]>(() => {
@@ -462,6 +566,18 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 top: Math.max(0, rank - 1) * NL_ARENA_ROW_STRIDE,
               }}
             >
+              {rankDelta != null && rankDelta !== 0 ? (
+                <span
+                  key={`nl-arena-pulse-${activePhase}`}
+                  aria-hidden="true"
+                  className={`nl-arena-row-pulse ${rankDelta > 0 ? "is-up" : "is-down"}`}
+                />
+              ) : null}
+              {isOwnTeam ? (
+                <span className="nl-arena-own-flag" aria-hidden="true">
+                  Du
+                </span>
+              ) : null}
               <span className="nl-arena-rank">
                 <span className="nl-arena-ranknum nl-tnum">{rank}</span>
                 {rankDelta != null && rankDelta !== 0 ? (
@@ -502,7 +618,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   title="Score-Herkunft aufklappen"
                   onClick={() => setExpandedTeamId((current) => (current === row.teamId ? null : row.teamId))}
                 >
-                  <strong className="nl-arena-score nl-tnum">{formatNlNumber(phaseScore, 1)}</strong>
+                  <strong key={`nl-arena-score-${activePhase}`} className="nl-arena-score nl-tnum">
+                    {formatNlNumber(phaseScore, 1)}
+                  </strong>
                 </button>
                 {isResultPhase && row.points != null ? (
                   <span className="nl-arena-points nl-tnum" title="Tagespunkte (PPs) in dieser Disziplin">
@@ -713,46 +831,203 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             }
           >
             {boardSide !== "total" ? (
-              <div className="nl-arena-phase-controls">
-                <button
-                  className="nl-arena-button"
-                  type="button"
-                  disabled={phaseIndex <= 0}
-                  onClick={() => setPhaseIndex((index) => Math.max(0, index - 1))}
-                >
-                  Zurück
-                </button>
-                <NlSubTabs
-                  items={phaseItems}
-                  activeId={activePhase}
-                  onSelect={(id) =>
-                    setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === id)))
-                  }
-                  aria-label="Reveal-Phase"
-                  className="nl-arena-phase-tabs"
-                />
-                <button
-                  className="nl-arena-button is-primary"
-                  type="button"
-                  disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1}
-                  onClick={() => setPhaseIndex((index) => Math.min(MATCHDAY_ARENA_PHASES.length - 1, index + 1))}
-                >
-                  Weiter
-                </button>
-                <button
-                  className="nl-arena-button nl-arena-autoplay-toggle"
-                  type="button"
-                  aria-pressed={isAutoPlaying}
-                  title={
-                    isAutoPlaying
-                      ? "Automatischen Reveal pausieren"
-                      : "Reveal-Phasen automatisch durchschalten (Live-Sortier-Show)"
-                  }
-                  onClick={() => setIsAutoPlaying((value) => !value)}
-                >
-                  {isAutoPlaying ? "❚❚ Auto" : "▶ Auto"}
-                </button>
-              </div>
+              <>
+                <div className="nl-arena-phase-controls">
+                  <button
+                    className="nl-arena-button"
+                    type="button"
+                    disabled={phaseIndex <= 0}
+                    title="Eine Phase zurück"
+                    onClick={() => {
+                      setIsAutoPlaying(false);
+                      setPhaseIndex((index) => Math.max(0, index - 1));
+                    }}
+                  >
+                    Zurück
+                  </button>
+                  <NlSubTabs
+                    items={phaseItems}
+                    activeId={activePhase}
+                    onSelect={(id) => {
+                      setIsAutoPlaying(false);
+                      setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === id)));
+                    }}
+                    aria-label="Reveal-Phase"
+                    className="nl-arena-phase-tabs"
+                  />
+                  <button
+                    className="nl-arena-button"
+                    type="button"
+                    disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1}
+                    title="Eine Phase weiter"
+                    onClick={() => {
+                      setIsAutoPlaying(false);
+                      setPhaseIndex((index) => Math.min(MATCHDAY_ARENA_PHASES.length - 1, index + 1));
+                    }}
+                  >
+                    Weiter
+                  </button>
+                  <button
+                    className="nl-arena-button is-primary nl-arena-autoplay-toggle"
+                    type="button"
+                    aria-pressed={isAutoPlaying}
+                    title={
+                      isAutoPlaying
+                        ? "Reveal-Show pausieren"
+                        : phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1
+                          ? "Reveal-Show von vorn abspielen"
+                          : "Reveal-Phasen automatisch durchschalten (Auflösungs-Show)"
+                    }
+                    onClick={() => {
+                      if (isAutoPlaying) {
+                        setIsAutoPlaying(false);
+                        return;
+                      }
+                      if (phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1) {
+                        setExpandedTeamId(null);
+                        setPhaseIndex(0);
+                      }
+                      setIsAutoPlaying(true);
+                    }}
+                  >
+                    {isAutoPlaying ? "❚❚ Pause" : phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1 ? "↺ Replay" : "▶ Play"}
+                  </button>
+                  <button
+                    className="nl-arena-button nl-arena-speed"
+                    type="button"
+                    title={`Reveal-Tempo: ${NL_ARENA_SPEED_OPTIONS[speedIndex]?.label ?? "1×"} — klicken zum Wechseln`}
+                    onClick={() => setSpeedIndex((index) => (index + 1) % NL_ARENA_SPEED_OPTIONS.length)}
+                  >
+                    <span className="nl-arena-speed-label">Tempo</span>
+                    <span className="nl-tnum">{NL_ARENA_SPEED_OPTIONS[speedIndex]?.label ?? "1×"}</span>
+                  </button>
+                </div>
+                {stageInfo ? (
+                  <div className="nl-arena-stage" key={`nl-arena-stage-${boardSide}-${activePhase}`}>
+                    <div className="nl-arena-stage-copy">
+                      <span className="nl-arena-stage-count nl-tnum">
+                        Phase {phaseIndex + 1}/{MATCHDAY_ARENA_PHASES.length}
+                      </span>
+                      <strong className="nl-arena-stage-title">
+                        {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === activePhase)?.label ?? "Slots"}
+                      </strong>
+                      <span className="nl-arena-stage-desc">{NL_ARENA_PHASE_DESCRIPTIONS[activePhase]}</span>
+                    </div>
+                    <div className="nl-arena-stage-chips">
+                      {stageInfo.topGain ? (
+                        <button
+                          type="button"
+                          className="nl-arena-stage-chip is-good"
+                          onClick={() => scrollToTeam(stageInfo.topGain!.teamId)}
+                          title={`${stageInfo.topGain.teamName} im Board anzeigen — ${stageInfo.gainers} Team(s) legen in dieser Phase zu`}
+                        >
+                          <span className="nl-arena-stage-chip-label">Stärkster Schub</span>
+                          <span className="nl-arena-stage-chip-team">{stageInfo.topGain.teamName}</span>
+                          <span className="nl-arena-stage-chip-value nl-tnum">
+                            {formatSignedNlDelta(stageInfo.topGain.value)}
+                          </span>
+                        </button>
+                      ) : null}
+                      {stageInfo.topLoss ? (
+                        <button
+                          type="button"
+                          className="nl-arena-stage-chip is-risk"
+                          onClick={() => scrollToTeam(stageInfo.topLoss!.teamId)}
+                          title={`${stageInfo.topLoss.teamName} im Board anzeigen — ${stageInfo.losers} Team(s) verlieren in dieser Phase`}
+                        >
+                          <span className="nl-arena-stage-chip-label">Härtester Dämpfer</span>
+                          <span className="nl-arena-stage-chip-team">{stageInfo.topLoss.teamName}</span>
+                          <span className="nl-arena-stage-chip-value nl-tnum">
+                            {formatSignedNlDelta(stageInfo.topLoss.value)}
+                          </span>
+                        </button>
+                      ) : null}
+                      {stageInfo.climber ? (
+                        <button
+                          type="button"
+                          className="nl-arena-stage-chip is-accent"
+                          onClick={() => scrollToTeam(stageInfo.climber!.teamId)}
+                          title={`${stageInfo.climber.teamName} im Board anzeigen — größter Rang-Sprung dieser Phase`}
+                        >
+                          <span className="nl-arena-stage-chip-label">Kletterer</span>
+                          <span className="nl-arena-stage-chip-team">{stageInfo.climber.teamName}</span>
+                          <span className="nl-arena-stage-chip-value nl-tnum">+{stageInfo.climber.value} Ränge</span>
+                        </button>
+                      ) : null}
+                      {!stageInfo.topGain && !stageInfo.topLoss && !stageInfo.climber && stageInfo.leader ? (
+                        <button
+                          type="button"
+                          className="nl-arena-stage-chip is-accent"
+                          onClick={() => scrollToTeam(stageInfo.leader!.teamId)}
+                          title={`${stageInfo.leader.teamName} im Board anzeigen`}
+                        >
+                          <span className="nl-arena-stage-chip-label">Führt das Board an</span>
+                          <span className="nl-arena-stage-chip-team">{stageInfo.leader.teamName}</span>
+                          <span className="nl-arena-stage-chip-value nl-tnum">
+                            {formatNlNumber(stageInfo.leader.value, 1)}
+                          </span>
+                        </button>
+                      ) : null}
+                      {stageInfo.ownDelta != null && ownTeamName ? (
+                        <button
+                          type="button"
+                          className={`nl-arena-stage-chip is-own${stageInfo.ownDelta > 0 ? " is-good" : stageInfo.ownDelta < 0 ? " is-risk" : ""}`}
+                          onClick={scrollToOwnTeam}
+                          title={`${ownTeamName} im Board anzeigen`}
+                        >
+                          <span className="nl-arena-stage-chip-label">Dein Team</span>
+                          <span className="nl-arena-stage-chip-team">{ownTeamName}</span>
+                          <span className="nl-arena-stage-chip-value nl-tnum">
+                            {formatSignedNlDelta(stageInfo.ownDelta)}
+                          </span>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+                {ownRun.length > 0 && ownTeamName ? (
+                  <div className="nl-arena-run" role="group" aria-label={`Dein Lauf — ${ownTeamName}`}>
+                    <span className="nl-arena-run-label">
+                      Dein Lauf
+                      <span className="nl-arena-run-team">{ownTeamName}</span>
+                    </span>
+                    <ol className="nl-arena-run-steps">
+                      {ownRun.map((step, index) => {
+                        const revealed = index <= phaseIndex;
+                        const previousRank = index > 0 ? (ownRun[index - 1]?.rank ?? null) : null;
+                        const stepDelta = revealed ? getArenaStepRankDelta(step.rank, previousRank) : null;
+                        const trendClass =
+                          stepDelta != null && stepDelta !== 0 ? (stepDelta > 0 ? " is-up" : " is-down") : "";
+                        return (
+                          <li key={step.id} className="nl-arena-run-item">
+                            <button
+                              type="button"
+                              className={`nl-arena-run-step${index === phaseIndex ? " is-current" : ""}${revealed ? " is-revealed" : ""}${trendClass}`}
+                              onClick={() => {
+                                setIsAutoPlaying(false);
+                                setPhaseIndex(index);
+                              }}
+                              title={
+                                revealed && step.rank != null
+                                  ? `${step.label}: Rang ${step.rank}${stepDelta != null && stepDelta !== 0 ? ` (${stepDelta > 0 ? "+" : ""}${stepDelta} gegenüber der Phase davor)` : ""}`
+                                  : `${step.label}: noch verdeckt — Phase anspringen`
+                              }
+                            >
+                              <span className="nl-arena-run-phase">{step.label}</span>
+                              <span className="nl-arena-run-rank nl-tnum">
+                                {revealed && step.rank != null ? `#${step.rank}` : "·"}
+                              </span>
+                              <span className="nl-arena-run-trend" aria-hidden="true">
+                                {stepDelta != null && stepDelta !== 0 ? (stepDelta > 0 ? "▲" : "▼") : " "}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                ) : null}
+              </>
             ) : null}
             {ownTeamRank != null && ownTeamName ? (
               <div className="nl-arena-owncall">
@@ -762,7 +1037,23 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 </button>
               </div>
             ) : null}
-            {boardSide === "total" ? renderTotalBoard() : renderDisciplineBoard()}
+            {boardSide === "total" ? (
+              totalRows.length === 0 ? (
+                <p className="nl-arena-empty-text">
+                  Für diesen Spieltag liegen noch keine Wertungen vor — die Show startet, sobald der Spieltag
+                  aufgelöst ist.
+                </p>
+              ) : (
+                renderTotalBoard()
+              )
+            ) : boardRows.length === 0 ? (
+              <p className="nl-arena-empty-text">
+                Für diese Disziplin liegen noch keine Wertungen vor — die Show startet, sobald der Spieltag aufgelöst
+                ist.
+              </p>
+            ) : (
+              renderDisciplineBoard()
+            )}
           </NlCard>
 
           <NlCard
