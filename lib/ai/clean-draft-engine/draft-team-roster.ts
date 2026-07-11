@@ -163,6 +163,12 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
     suffixReserve[i] = suffixReserve[i + 1]! + effectiveFloor(plan.slots[i]!);
   }
 
+  // CASH BUFFER: the plan holds back a trait-driven retention slice (plan.spendable is already net of
+  // it). Keep that buffer untouched during the planned buys so finance-/cash-priority teams actually
+  // end with a war chest (the user's "C-S should keep a buffer") instead of splashing to zero. It is a
+  // SOFT reserve — the below-min safety net may still dip into it so the hard minimum is never missed.
+  const retainedBuffer = Math.max(0, Math.round((input.spendableCash - plan.spendable) * 100) / 100);
+
   const buy = (selection: Selection, slot: CleanLanePlanSlot) => {
     const fee = candidateFee(selection.candidate) ?? 0;
     used.add(selection.candidate.playerId);
@@ -185,7 +191,7 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
     if (cashLeft <= cheapFloor - EPS) break;
     const slot = plan.slots[i]!;
     const reserveForRest = suffixReserve[i + 1]!;
-    const spendCeiling = Math.round((cashLeft - reserveForRest) * 100) / 100;
+    const spendCeiling = Math.round((cashLeft - reserveForRest - retainedBuffer) * 100) / 100;
     if (spendCeiling < cheapFloor - EPS) continue; // nothing affordable without starving later slots
 
     // Dynamic buffer: let this slot reach above its planned cap by the accumulated surplus (bounded by

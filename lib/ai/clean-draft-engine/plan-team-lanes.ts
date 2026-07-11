@@ -283,6 +283,21 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
     };
   });
 
+  // OPPORTUNISTIC RESERVE: a value/development-leaning team keeps its 1-2 cheapest slots OPEN to the
+  // reserve tier (floor dropped to 0). Reserve is never planned as a wall, but a sub-bracket player can
+  // be a smart pickup — a cheap salary alternative or a high-potential prospect — and the scorer's
+  // value/potential terms will take one only when it genuinely out-scores a backup. So Reserve stays
+  // low but not forced to exactly zero. Trait-gated: no reserve flex for star/ambition-led teams.
+  const reserveFlexAppetite = Math.max(traits.developmentBias, traits.valuePriority);
+  if (reserveFlexAppetite >= 0.55 && slots.length > 0) {
+    const flexCount = clamp(Math.round(reserveFlexAppetite * 2), 1, 2);
+    for (let k = 0; k < flexCount && k < slots.length; k += 1) {
+      const slot = slots[slots.length - 1 - k]!;
+      // Only open body slots (Depth/Backup) down to reserve — never the premium/Core anchors.
+      if (slot.lane === "depth" || slot.lane === "backup") slot.priceFloor = 0;
+    }
+  }
+
   return {
     spendable: round2(spendable),
     perSlotBudget: round2(perSlotBudget),
