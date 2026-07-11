@@ -19,6 +19,13 @@ import {
   evaluateSponsorImprovementObjective,
   evaluateSponsorRankObjective,
 } from "@/lib/sponsor/sponsor-objective-evaluator";
+import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
+import {
+  BOARD_V2_CALIBRATION,
+  BOARD_V2_COMPOSITION,
+  BOARD_V2_NET_TRANSFER,
+  isBoardObjectivesV2Enabled,
+} from "@/lib/board/board-objectives-config";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -485,6 +492,126 @@ function getSportTarget(input: {
   if (ambition <= 4) return { rank: 20, label: "Rebuild: konkurrenzfaehig bleiben" };
   if (depthPriority >= 8) return { rank: 12, label: "Breite Playoff-Zone erreichen" };
   return strengthReady ? { rank: 12, label: "Breite Playoff-Zone erreichen" } : { rank: 16, label: "Mittelfeld erreichen" };
+}
+
+/**
+ * Board-Objectives V2 — expected league rank from team strength (composite of PPs + market-value
+ * rank), the same signal getSportTarget uses internally, extracted for reuse by the calibrated
+ * targets. Lower = stronger (1 = strongest team).
+ */
+function resolveExpectedLeagueRank(input: {
+  teamId: string;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+}) {
+  const ppsRank = getRelativeMetricRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId, metric: "ppsTotal" }).rank;
+  const marketValueRank = getRelativeMetricRank({
+    teamId: input.teamId,
+    rowsByTeamId: input.rowsByTeamId,
+    metric: "marketValueTotal",
+  }).rank;
+  return Math.round((ppsRank * 2 + marketValueRank) / 3);
+}
+
+/**
+ * V2 calibrated sport target: targetRank = expectedRank − stretch(ambition). Replaces the hardcoded
+ * tier ladder + per-team shortCode special-cases with a strength-relative goal — weak teams get an
+ * achievable "hold your ground" target, strong+ambitious teams get a real climb. Organic, no quotas.
+ */
+export function getSportTargetV2(input: {
+  identity: TeamIdentity | null;
+  teamId: string;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+}) {
+  const leagueSize = Math.max(1, input.rowsByTeamId.size);
+  const expectedRank = clamp(resolveExpectedLeagueRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId }), 1, leagueSize);
+  const ambition01 = clamp((input.identity?.ambition ?? 5) / 10, 0, 1);
+  let maxStretch = BOARD_V2_CALIBRATION.maxStretch;
+  if (expectedRank >= BOARD_V2_CALIBRATION.bottomDampFromRank) {
+    maxStretch *= BOARD_V2_CALIBRATION.bottomDampFactor;
+  }
+  const stretch = Math.round(BOARD_V2_CALIBRATION.minStretch + (maxStretch - BOARD_V2_CALIBRATION.minStretch) * ambition01);
+  const rank = clamp(expectedRank - stretch, 1, leagueSize);
+  const label =
+    stretch <= 0
+      ? `Erwartung bestätigen (~Rang ${rank})`
+      : `Rang ${rank} angreifen (Stärke-Erwartung ~${expectedRank})`;
+  return { rank, label };
+}
+
+/**
+ * V2 finance goal (replaces the tautological "cash > 0"): a net transfer-balance target scaled by
+ * cash priority + season maturity — a real "run a sustainable transfer economy" objective.
+ */
+function getNetTransferBalanceObjective(input: {
+  row: TeamManagementSnapshotRow;
+  profile: TeamStrategyProfile | null;
+  seasonNum: number;
+}): ObjectiveDraft {
+  const cashPriority = input.profile?.bias.cashPriority ?? 5;
+  const seasonScale = Math.min(1 + (input.seasonNum - 1) * 0.15, 1.6);
+  const target = roundValue(
+    Math.max(0, BOARD_V2_NET_TRANSFER.baseTargetM + (cashPriority - 5) * BOARD_V2_NET_TRANSFER.perCashPriorityM) * seasonScale,
+    1,
+  );
+  const current = roundValue(input.row.transferNet ?? 0, 1);
+  const status = statusForMin(input.row.transferNet ?? null, target);
+  return {
+    objectiveId: "finance-net-transfer-balance",
+    category: "finance",
+    label: target > 0 ? `Transferbilanz ≥ ${target}M` : "Transferbilanz stabil halten",
+    targetValue: target,
+    currentValue: current,
+    status,
+    rewardCash: target > 0 ? 4 : undefined,
+    penaltyCash: target > 0 ? 3 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+    source: "board_v2_net_transfer_balance",
+  };
+}
+
+/**
+ * V2 roster goal (replaces the trivial "roster >= N"): minimum share of non-reserve players
+ * (superstar+star+core+depth via fixed market-value tiers) on the roster, nudged by ambition. This
+ * is the organic composition metric — a team is judged on squad *quality mix*, not headcount. No
+ * hard tier quotas: it's a share target the AI/human satisfies by buying real core/depth over reserve.
+ */
+function getRosterQualityCompositionObjective(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+}): ObjectiveDraft {
+  const brackets = buildLeagueMarketBrackets(
+    input.gameState.players.map((player) => player.marketValue ?? player.displayMarketValue ?? null),
+  );
+  const rosterPlayerIds = new Set(
+    input.gameState.rosters.filter((entry) => entry.teamId === input.team.teamId).map((entry) => entry.playerId),
+  );
+  const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+  const rosterPlayers = [...rosterPlayerIds].map((id) => playersById.get(id)).filter((player): player is NonNullable<typeof player> => Boolean(player));
+  const rosterCount = rosterPlayers.length;
+  const nonReserve = rosterPlayers.filter((player) => {
+    const tier = classifyMarketBracket(player.marketValue ?? player.displayMarketValue ?? null, brackets);
+    return tier !== "Reserve" && tier !== "Backup";
+  }).length;
+  const currentShare = rosterCount > 0 ? nonReserve / rosterCount : 0;
+  const ambition = input.identity?.ambition ?? 5;
+  const targetShare = clamp(
+    BOARD_V2_COMPOSITION.baseCoreShare + (ambition - 5) * BOARD_V2_COMPOSITION.perAmbitionShare,
+    BOARD_V2_COMPOSITION.minCoreShare,
+    BOARD_V2_COMPOSITION.maxCoreShare,
+  );
+  const status = statusForMin(currentShare, targetShare);
+  return {
+    objectiveId: "roster-quality-composition",
+    category: "roster",
+    label: `Kaderqualität: ≥ ${Math.round(targetShare * 100)}% Kern/Depth/Star`,
+    detail: `Aktuell ${Math.round(currentShare * 100)}% Nicht-Reserve (${nonReserve}/${rosterCount}).`,
+    targetValue: roundValue(targetShare, 2),
+    currentValue: roundValue(currentShare, 2),
+    status,
+    boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" ? -0.6 : status === "at_risk" ? -0.15 : 0,
+    source: "board_v2_roster_quality_composition",
+  };
 }
 
 function getPreferredAxisObjective(input: {
@@ -1199,7 +1326,10 @@ function buildTeamObjectives(input: {
   profile: TeamStrategyProfile | null;
 }): TeamSeasonObjectiveRecord[] {
   const { gameState, team, row, rowsByTeamId, identity, profile } = input;
-  const sportTarget = getSportTarget({ team, identity, profile, row, rowsByTeamId });
+  const boardV2 = isBoardObjectivesV2Enabled();
+  const sportTarget = boardV2
+    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId })
+    : getSportTarget({ team, identity, profile, row, rowsByTeamId });
   const seasonNum = resolveSeasonNumberFromState(gameState) ?? 1;
   const isInitialSeason = seasonNum === 1;
   // C-C and high-profit teams have a transfer target that scales up over seasons.
@@ -1240,20 +1370,24 @@ function buildTeamObjectives(input: {
       getPreferredAxisObjective({ team, identity, profile, row }),
       getAxisRankObjective({ team, identity, profile, rowsByTeamId }),
       getAllRoundAxisObjective({ team, identity, profile, rowsByTeamId }),
-      {
-        objectiveId: "finance-cash-positive",
-        category: "finance",
-        label: "Cash positiv halten",
-        targetValue: "> 0",
-        currentValue: row.cash,
-        status: (row.cash ?? 0) >= 0 ? "completed" : "failed",
-        penaltyCash: (row.cash ?? 0) < 0 ? 3 : undefined,
-        boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
-        source: "active_local_team_cash",
-      },
+      // V2 replaces the tautological "cash > 0" with a real net-transfer-balance goal; V1 keeps it.
+      boardV2
+        ? getNetTransferBalanceObjective({ row, profile, seasonNum })
+        : {
+            objectiveId: "finance-cash-positive",
+            category: "finance",
+            label: "Cash positiv halten",
+            targetValue: "> 0",
+            currentValue: row.cash,
+            status: (row.cash ?? 0) >= 0 ? "completed" : "failed",
+            penaltyCash: (row.cash ?? 0) < 0 ? 3 : undefined,
+            boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
+            source: "active_local_team_cash",
+          },
       buildSalaryPressureObjective({ row, rowsByTeamId, seasonId: gameState.season.id }),
       transferObjective,
-      getRosterTarget(row),
+      // V2 replaces trivial "roster >= N" with a composition-quality (non-reserve share) goal.
+      boardV2 ? getRosterQualityCompositionObjective({ gameState, team, identity }) : getRosterTarget(row),
       getFormColorObjective(gameState, team),
       getNextMatchdayTop10Objective(gameState, team),
       getMatchdayMedalObjective({ gameState, team, identity, profile }),

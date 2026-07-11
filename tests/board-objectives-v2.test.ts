@@ -1,0 +1,77 @@
+import { describe, expect, it } from "vitest";
+
+import { getSportTargetV2 } from "@/lib/board/team-season-objectives-service";
+import { isBoardObjectivesV2Enabled } from "@/lib/board/board-objectives-config";
+import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import type { TeamIdentity } from "@/lib/data/olyDataTypes";
+
+function row(teamId: string, ppsTotal: number, marketValueTotal: number): TeamManagementSnapshotRow {
+  return { teamId, ppsTotal, marketValueTotal } as TeamManagementSnapshotRow;
+}
+
+/** A 4-team league: T1 strongest ... T4 weakest (by pps + market value). */
+function buildLeague(): Map<string, TeamManagementSnapshotRow> {
+  return new Map([
+    ["T1", row("T1", 130, 320)],
+    ["T2", row("T2", 110, 260)],
+    ["T3", row("T3", 90, 200)],
+    ["T4", row("T4", 70, 140)],
+  ]);
+}
+
+function identity(ambition: number): TeamIdentity {
+  return { ambition } as TeamIdentity;
+}
+
+describe("Board-Objectives V2 — calibrated sport target", () => {
+  it("defaults the V2 flag OFF unless env enables it", () => {
+    const prev = process.env.OLY_BOARD_OBJECTIVES_V2;
+    delete process.env.OLY_BOARD_OBJECTIVES_V2;
+    expect(isBoardObjectivesV2Enabled()).toBe(false);
+    process.env.OLY_BOARD_OBJECTIVES_V2 = "1";
+    expect(isBoardObjectivesV2Enabled()).toBe(true);
+    if (prev == null) delete process.env.OLY_BOARD_OBJECTIVES_V2;
+    else process.env.OLY_BOARD_OBJECTIVES_V2 = prev;
+  });
+
+  it("targets a strong ambitious team above its expected finish (a real climb)", () => {
+    const rows = buildLeague();
+    const target = getSportTargetV2({ identity: identity(10), teamId: "T1", rowsByTeamId: rows });
+    // T1 is expected ~rank 1; high ambition still can't go below 1.
+    expect(target.rank).toBe(1);
+  });
+
+  it("gives a weak team an achievable target near the bottom, not a title push", () => {
+    const rows = buildLeague();
+    const weakLowAmbition = getSportTargetV2({ identity: identity(2), teamId: "T4", rowsByTeamId: rows });
+    // Expected rank for T4 is 4 (weakest); low ambition -> small stretch -> target stays near the bottom.
+    expect(weakLowAmbition.rank).toBeGreaterThanOrEqual(3);
+  });
+
+  it("damps the stretch for weak teams in a full-size league (bottom-of-table gets a hold target)", () => {
+    // 24-team league where the probe team is dead last on both metrics -> expectedRank ~24 (>= damp threshold).
+    const rows = new Map<string, TeamManagementSnapshotRow>();
+    for (let i = 1; i <= 24; i++) rows.set(`X${i}`, row(`X${i}`, 200 - i * 5, 400 - i * 10));
+    const target = getSportTargetV2({ identity: identity(10), teamId: "X24", rowsByTeamId: rows });
+    // Damped: maxStretch*0.4=2.4 -> stretch 2 -> target 22, far milder than the undamped stretch-6 (rank 18).
+    expect(target.rank).toBeGreaterThanOrEqual(22);
+  });
+
+  it("scales difficulty with ambition: more ambition -> harder (lower) target for the same team", () => {
+    const rows = buildLeague();
+    const lowAmb = getSportTargetV2({ identity: identity(2), teamId: "T2", rowsByTeamId: rows });
+    const highAmb = getSportTargetV2({ identity: identity(10), teamId: "T2", rowsByTeamId: rows });
+    expect(highAmb.rank).toBeLessThanOrEqual(lowAmb.rank);
+  });
+
+  it("never targets below rank 1 or above league size", () => {
+    const rows = buildLeague();
+    for (const teamId of ["T1", "T2", "T3", "T4"]) {
+      for (const amb of [0, 5, 10]) {
+        const t = getSportTargetV2({ identity: identity(amb), teamId, rowsByTeamId: rows });
+        expect(t.rank).toBeGreaterThanOrEqual(1);
+        expect(t.rank).toBeLessThanOrEqual(4);
+      }
+    }
+  });
+});
