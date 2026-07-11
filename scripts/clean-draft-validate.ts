@@ -18,7 +18,7 @@ import type { GameState, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
+import { buildTeamThemeCompositionAudit, getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 import { buildLeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import { planTeamLanes } from "@/lib/ai/clean-draft-engine/plan-team-lanes";
 import { buildCleanThemeTarget } from "@/lib/ai/clean-draft-engine/run-clean-draft";
@@ -120,7 +120,7 @@ function previewPlans(gameState: GameState, teamCodes: string[]) {
     });
     const meanCost = plan.slots.reduce((sum, slot) => sum + brackets[slot.lane].targetMw, 0);
     log(
-      `${team.shortCode.padStart(4)} cash=${team.cash.toFixed(0).padStart(4)} spendable=${plan.spendable.toFixed(0).padStart(4)} perSlot=${plan.perSlotBudget.toFixed(1).padStart(5)} slots=${String(plan.slots.length).padStart(2)} ΣmeanCost=${meanCost.toFixed(0).padStart(4)} theme=${themeTarget ? themeTarget.coreRaces.join("/") : "-"} | ${laneHistogram(plan.slots.map((s) => s.lane))}`,
+      `${team.shortCode.padStart(4)} cash=${team.cash.toFixed(0).padStart(4)} spendable=${plan.spendable.toFixed(0).padStart(4)} perSlot=${plan.perSlotBudget.toFixed(1).padStart(5)} slots=${String(plan.slots.length).padStart(2)} ΣmeanCost=${meanCost.toFixed(0).padStart(4)} theme=${themeTarget ? `${themeTarget.primaryThemeTags.join("/")}[${themeTarget.strictness}]` : "-"} | ${laneHistogram(plan.slots.map((s) => s.lane))}`,
     );
   }
 }
@@ -217,6 +217,20 @@ function report(gameState: GameState) {
   // A rich team can still buy premium?
   const anyPremium = richestByCashDesc.some((row) => row.premium > 0);
   log(`\nAny team bought premium (SS/St): ${anyPremium ? "YES" : "NO"}`);
+
+  // Per-team theme adherence (canonical audit) — every themed team should read on-identity now, not
+  // just the two race-quota teams. Flags any themed team whose combined share is below its minimum.
+  log("\n=== PER-TEAM THEME ADHERENCE (canonical audit) ===");
+  const audit = buildTeamThemeCompositionAudit(gameState);
+  const below: string[] = [];
+  for (const row of audit.sort((a, b) => a.combinedThemeShare - b.combinedThemeShare)) {
+    const flag = row.combinedThemeShare + 1e-6 < row.minimumShare ? " ⚠ BELOW-MIN" : "";
+    log(
+      `${row.teamId.padStart(4)} ${row.status.padEnd(20)} combined=${(row.combinedThemeShare * 100).toFixed(0).padStart(3)}% (min ${(row.minimumShare * 100).toFixed(0)}%) primary=${row.primaryThemeCount}/${row.rosterCount} outsiders=${row.outsiderCount}${flag}`,
+    );
+    if (flag) below.push(row.teamId);
+  }
+  log(`themed teams below minimum: ${below.length === 0 ? "NONE ✅" : below.join(", ")}`);
 }
 
 async function main() {

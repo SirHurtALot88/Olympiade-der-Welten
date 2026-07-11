@@ -16,7 +16,8 @@ function cleanColorspamPenalty(existingCountBeforePick: number): number {
 }
 
 import { resolveCleanTeamTraits, type CleanTeamTraits } from "./plan-team-lanes";
-import type { CleanThemeTarget, ScoreCandidateInput, ScoreCandidateResult } from "./types";
+import { candidateToThemePlayer, evaluateCleanTheme } from "./theme-match";
+import type { ScoreCandidateInput, ScoreCandidateResult } from "./types";
 
 // Balanced weighting: quality anchors the score, but marginal-need, identity fit, weighted value,
 // discipline coverage and a strong-consistent theme bonus all pull real weight. Value is a genuine
@@ -30,18 +31,12 @@ const W_VALUE_BASE = 12;
 const W_VALUE_TRAIT = 26; // scaled by valuePriority
 const W_DISCIPLINE = 16;
 const W_POTENTIAL = 20; // scaled by development bias, weighted more on lower-tier slots
-const THEME_BASE = 26;
-const THEME_URGENCY = 16; // extra weight while below the theme quota (never reduces the base)
 
 type Axis = "pow" | "spe" | "men" | "soc";
 const AXES: Axis[] = ["pow", "spe", "men", "soc"];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function normalizeRace(value: string | null | undefined) {
-  return String(value ?? "").trim().toLowerCase();
 }
 
 function candidateAxis(candidate: TransfermarktFreeAgentItem, axis: Axis): number {
@@ -162,22 +157,9 @@ function potentialScore(candidate: TransfermarktFreeAgentItem): number {
   }
 }
 
-function isOnTheme(candidate: TransfermarktFreeAgentItem, themeTarget: CleanThemeTarget): boolean {
-  if (!themeTarget || themeTarget.coreRaces.length === 0) return false;
-  const race = normalizeRace(candidate.race);
-  if (!race) return false;
-  return themeTarget.coreRaces.some((entry) => normalizeRace(entry) === race);
-}
-
-/** Strong, CONSISTENT theme bonus on every slot; boosted (never reduced) while below the quota. */
-function themeBonus(input: ScoreCandidateInput, onTheme: boolean): number {
-  if (!onTheme || !input.themeTarget) return 0;
-  const minCorePct = clamp(input.themeTarget.minCorePct, 0, 1);
-  const currentShare =
-    input.rosterCountSoFar > 0 ? clamp(input.onThemeCountSoFar / input.rosterCountSoFar, 0, 1) : 0;
-  const deficit = minCorePct > 0 ? clamp((minCorePct - currentShare) / minCorePct, 0, 1) : 0;
-  return THEME_BASE + deficit * THEME_URGENCY;
-}
+// Theme is evaluated via the canonical tag/quota matcher (see theme-match.ts / evaluateCleanTheme),
+// so every themed team — tag-based (Undead, Divine, Pirate…), gender-quota (D-P/V-D Female) and
+// race-quota (R-R, H-R) alike — gets a real identity signal, consistent with the audit.
 
 // scoreCandidate runs once per (candidate × slot); traits depend only on the team's identity/strategy,
 // which are stable references across a single team's draft. Memoize on those references so we don't
@@ -200,7 +182,13 @@ export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult
   const isPremiumSlot = input.slot.lane === "superstar" || input.slot.lane === "star";
   const isLowerSlot = input.slot.lane === "backup" || input.slot.lane === "reserve" || input.slot.lane === "depth";
 
-  const onTheme = isOnTheme(input.candidate, input.themeTarget);
+  const themeEval = evaluateCleanTheme({
+    player: candidateToThemePlayer(input.candidate),
+    target: input.themeTarget,
+    onThemeCountSoFar: input.onThemeCountSoFar,
+    rosterCountSoFar: input.rosterCountSoFar,
+  });
+  const onTheme = themeEval.counts;
 
   const quality = candidateOverall(input.candidate) * W_QUALITY;
 
@@ -219,8 +207,10 @@ export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult
   const potential = potentialScore(input.candidate) * potentialWeight;
 
   // The premium/franchise pick is the team's anchor: it should favor on-theme even MORE (the star
-  // represents the identity), so there is no off-theme exception for the marquee slot.
-  const theme = themeBonus(input, onTheme) * (isPremiumSlot ? 1.35 : 1);
+  // represents the identity), so on-theme fit is amplified on the marquee slot. Off-theme premium
+  // picks (negative theme bonus) are amplified too, so a themed team's franchise player lands
+  // on-theme unless a clearly-superior off-theme player overcomes the whole (quality-led) gap.
+  const theme = themeEval.bonus * (isPremiumSlot ? 1.5 : 1);
 
   // Form-color / class anti-monoculture: don't keep stacking the same form-color or class. Race
   // (theme) and form-color (class) are orthogonal, so a themed team stays on-race while spreading

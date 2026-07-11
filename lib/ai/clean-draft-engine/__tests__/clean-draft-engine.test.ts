@@ -226,9 +226,28 @@ describe("planTeamLanes", () => {
   });
 });
 
+// A soft-strictness race-quota theme (fish/aqua) — a fish candidate counts on-theme via the canonical
+// quota classifier, an off-theme race scores as an outsider. Soft strictness keeps theme additive so a
+// clearly-superior off-theme player can still win (hard-strictness teams are stickier / pool-filtered).
+const FISH_THEME_TARGET: TeamThemeCompositionTarget = {
+  teamId: "R-R",
+  primaryThemeTags: ["Fish", "Aquatic"],
+  secondaryThemeTags: ["Mermaid", "Siren"],
+  softPreferredTags: ["Ocean"],
+  allowedOutsiderTags: [],
+  avoidTags: [],
+  targetShare: 0.7,
+  minimumShare: 0.6,
+  strictness: "soft",
+  exceptionPolicy: "audit_required",
+  qualityOverrideThreshold: 16,
+  raceQuotaScoped: { races: ["fish", "aqua", "lizard"] },
+  notes: "",
+};
+
 describe("scoreCandidate theme weighting", () => {
   const slot: CleanLanePlanSlot = { lane: "core", priceFloor: 30, priceCap: 45 };
-  const themeTarget: CleanThemeTarget = { coreRaces: ["fish"], minCorePct: 0.6 };
+  const themeTarget: CleanThemeTarget = FISH_THEME_TARGET;
   const identity = makeIdentity({});
   const strategy = makeStrategy({});
 
@@ -360,15 +379,10 @@ describe("resolveCashRetentionPct", () => {
 });
 
 describe("buildCleanThemeTarget", () => {
-  it("null / no race quota -> null; race quota -> core races + min share", () => {
+  it("passes the full theme model through (null stays null)", () => {
     expect(buildCleanThemeTarget(null)).toBeNull();
-    expect(buildCleanThemeTarget({ targetShare: 0.9, minimumShare: 0.6 } as TeamThemeCompositionTarget)).toBeNull();
-    const target = buildCleanThemeTarget({
-      raceQuotaScoped: { races: ["Fish", "Aqua"] },
-      targetShare: 0.9,
-      minimumShare: 0.6,
-    } as TeamThemeCompositionTarget);
-    expect(target).toEqual({ coreRaces: ["fish", "aqua"], minCorePct: 0.6 });
+    // The full target now flows to the scorer (tag/gender/race matching), not a reduced race list.
+    expect(buildCleanThemeTarget(FISH_THEME_TARGET)).toBe(FISH_THEME_TARGET);
   });
 });
 

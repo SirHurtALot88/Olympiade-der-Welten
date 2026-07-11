@@ -4,6 +4,7 @@ import { FIXED_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 
 import { planTeamLanes } from "./plan-team-lanes";
 import { scoreCandidate } from "./score-candidate";
+import { candidateToThemePlayer, evaluateCleanTheme, isCleanThemeHardEligible } from "./theme-match";
 import type {
   CleanDraftPick,
   CleanLanePlanSlot,
@@ -13,15 +14,9 @@ import type {
 
 const EPS = 0.01;
 
-function normalizeRace(value: string | null | undefined) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function isOnThemeRace(race: string | null | undefined, themeTarget: CleanThemeTarget): boolean {
-  if (!themeTarget || themeTarget.coreRaces.length === 0) return false;
-  const normalized = normalizeRace(race);
-  if (!normalized) return false;
-  return themeTarget.coreRaces.some((entry) => normalizeRace(entry) === normalized);
+/** Canonical on-theme test for an already-rostered Player (counts toward primary/secondary share). */
+function playerCountsOnTheme(player: Player, themeTarget: CleanThemeTarget): boolean {
+  return evaluateCleanTheme({ player, target: themeTarget, onThemeCountSoFar: 0, rosterCountSoFar: 0 }).counts;
 }
 
 function candidateFee(candidate: TransfermarktFreeAgentItem): number | null {
@@ -119,7 +114,27 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
   const picks: CleanDraftPick[] = [];
   let cashLeft = Math.max(0, input.spendableCash);
 
-  let onThemeCount = input.currentRoster.filter((player) => isOnThemeRace(player.race, input.themeTarget)).length;
+  // HARD-FOCUS eligibility: for hard-strictness identity teams (undead, demon, female-humanoid,
+  // construct, pirate, giant …) the planned roster is drafted ONLY from theme-eligible candidates —
+  // reproducing the legacy hard-focus gate from the theme target alone (no team-code hardcodes).
+  // Non-hard teams keep the full pool (theme stays a scoring lean). The below-min safety net below
+  // may still relax to the full pool so a hard team is never stranded under its minimum.
+  const isHardFocus = input.themeTarget?.strictness === "hard";
+  const eligiblePool = isHardFocus
+    ? input.freeAgents.filter((candidate) =>
+        isCleanThemeHardEligible(
+          evaluateCleanTheme({
+            player: candidateToThemePlayer(candidate),
+            target: input.themeTarget,
+            onThemeCountSoFar: 0,
+            rosterCountSoFar: 0,
+          }),
+          input.themeTarget,
+        ),
+      )
+    : input.freeAgents;
+
+  let onThemeCount = input.currentRoster.filter((player) => playerCountsOnTheme(player, input.themeTarget)).length;
   let rosterCount = input.currentRoster.length;
   // Roster-so-far grows as we buy, so need/marginal-axis and discipline-coverage scoring reflects the
   // team's evolving gaps (not just the pre-draft roster, which is empty in S1).
@@ -180,7 +195,7 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
 
     // Prefer a candidate at or above the slot's tier floor (respecting the spread reservation).
     let selection = selectBest({
-      pool: input.freeAgents,
+      pool: eligiblePool,
       used,
       minPrice: slot.priceFloor,
       maxPrice: bandMax,
@@ -198,7 +213,7 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
     // become real-tier body picks instead of stranding the roster below its minimum.
     if (!selection) {
       selection = selectBest({
-        pool: input.freeAgents,
+        pool: eligiblePool,
         used,
         minPrice: 0,
         maxPrice: spendCeiling,
@@ -217,22 +232,40 @@ export function draftTeamRoster(input: DraftTeamRosterInput): CleanDraftPick[] {
   }
 
   // 2) Safety net: while still below the hard minimum, buy the best affordable player regardless of
-  //    tier (should rarely trigger — the reservation above already guarantees fillability).
+  //    tier (should rarely trigger — the reservation above already guarantees fillability). Hard-focus
+  //    teams still prefer an eligible (on-theme) player and only relax to the full pool if no eligible
+  //    candidate remains, so the minimum is always reachable without abandoning identity prematurely.
   while (rosterCount < playerMin && cashLeft > cheapFloor - EPS) {
     const reserveSlot: CleanLanePlanSlot = { lane: "reserve", priceFloor: 0, priceCap: cashLeft };
-    const selection = selectBest({
-      pool: input.freeAgents,
-      used,
-      minPrice: 0,
-      maxPrice: cashLeft,
-      slot: reserveSlot,
-      themeTarget: input.themeTarget,
-      identity: input.identity,
-      strategy: input.strategy,
-      onThemeCountSoFar: onThemeCount,
-      rosterCountSoFar: rosterCount,
-      currentRosterPlayers: rosterSoFar,
-    });
+    const selection =
+      selectBest({
+        pool: eligiblePool,
+        used,
+        minPrice: 0,
+        maxPrice: cashLeft,
+        slot: reserveSlot,
+        themeTarget: input.themeTarget,
+        identity: input.identity,
+        strategy: input.strategy,
+        onThemeCountSoFar: onThemeCount,
+        rosterCountSoFar: rosterCount,
+        currentRosterPlayers: rosterSoFar,
+      }) ??
+      (isHardFocus
+        ? selectBest({
+            pool: input.freeAgents,
+            used,
+            minPrice: 0,
+            maxPrice: cashLeft,
+            slot: reserveSlot,
+            themeTarget: input.themeTarget,
+            identity: input.identity,
+            strategy: input.strategy,
+            onThemeCountSoFar: onThemeCount,
+            rosterCountSoFar: rosterCount,
+            currentRosterPlayers: rosterSoFar,
+          })
+        : null);
     if (!selection) break;
     buy(selection, reserveSlot);
   }

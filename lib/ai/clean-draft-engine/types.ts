@@ -1,5 +1,6 @@
 import type { Player, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import type { LeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
+import type { TeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 
 /**
@@ -48,7 +49,13 @@ export type PlanTeamLanesInput = {
   brackets: LeagueMarketBrackets;
 };
 
-export type CleanThemeTarget = { coreRaces: string[]; minCorePct: number } | null;
+/**
+ * The team's full theme model (primary/secondary/soft tags, gender/race quota, strictness). The clean
+ * scorer evaluates every candidate against this via the canonical tag derivation (see theme-match.ts),
+ * so ALL themed teams get an identity signal — not just the two with a raw race quota. Null = the team
+ * has no configured theme (strategy + quality drive it).
+ */
+export type CleanThemeTarget = TeamThemeCompositionTarget | null;
 
 export type ScoreCandidateInput = {
   candidate: TransfermarktFreeAgentItem;

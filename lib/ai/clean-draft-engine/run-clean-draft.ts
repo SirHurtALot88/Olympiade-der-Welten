@@ -31,22 +31,15 @@ export function isCleanDraftEnabled(): boolean {
 }
 
 /**
- * Data-driven theme target for the clean scorer: uses the team's explicit race quota from
- * team-theme-composition-service when present (e.g. R-R fish/aqua/lizard, H-R demon). No team-code
- * hardcodes — teams without a race quota simply score theme-neutral (strategy + quality drive them).
+ * Data-driven theme target for the clean scorer: the team's FULL theme model from
+ * team-theme-composition-service (primary/secondary/soft tags, gender/race quota, strictness). The
+ * scorer evaluates every candidate against it via the canonical tag derivation (theme-match.ts), so
+ * ALL themed teams get an identity signal — tag-based (Undead, Divine, Pirate…), gender-quota
+ * (D-P/V-D Female) and race-quota (R-R, H-R) alike. No team-code hardcodes; a team with no configured
+ * theme simply scores theme-neutral (strategy + quality drive it).
  */
 export function buildCleanThemeTarget(target: TeamThemeCompositionTarget | null): CleanThemeTarget {
-  if (!target) return null;
-  const races = target.raceQuotaScoped?.races ?? [];
-  if (races.length === 0) return null;
-  const coreRaces = races.map((race) => race.trim().toLowerCase()).filter(Boolean);
-  if (coreRaces.length === 0) return null;
-  const minCorePct = Number.isFinite(target.minimumShare)
-    ? target.minimumShare
-    : Number.isFinite(target.targetShare)
-      ? target.targetShare
-      : 0.5;
-  return { coreRaces, minCorePct };
+  return target ?? null;
 }
 
 export type CleanDraftTeamOutcome = {

@@ -76,13 +76,50 @@ export function resolveCashRetentionPct(traits: CleanTeamTraits): number {
   return clamp(keep, 0.05, 0.2);
 }
 
-/** Highest lane the team's traits are willing to reach (premium desire, NOT affordability). */
+/**
+ * Highest lane the team's traits WANT to reach (premium desire, NOT affordability). Driven by ambition
+ * / star-priority; finances only mildly enable it. A rich but low-ambition VALUE team (e.g. C-C) can
+ * afford stars but chooses breadth/value, so finances must not by itself pull the reach up to premium.
+ */
 function resolveReachLaneIndex(traits: CleanTeamTraits): number {
-  const reach = Math.max(traits.ambition, traits.starPriority, traits.finances * 0.85);
+  const reach = Math.max(traits.ambition, traits.starPriority, traits.finances * 0.5) - traits.valuePriority * 0.15;
   if (reach >= 0.62) return 0; // superstar
   if (reach >= 0.45) return 1; // star
   if (reach >= 0.28) return 2; // core
   return 3; // depth
+}
+
+/**
+ * Trait-driven squad size around the SOFT opt target. A "small elite" (high quality-focus, low
+ * depth-preference — e.g. B-P) plans FEWER slots so the per-slot budget rises into Core; a depth-led
+ * team fills toward opt/max with more bodies. This is the difference between "12 slots × ~15 MW =
+ * Backup wall" and "9 slots × ~30 MW = real Core body" on the SAME budget.
+ */
+function resolveTargetSquadSize(traits: CleanTeamTraits, opt: number, playerMin: number, playerMax: number): number {
+  const qualityFocus = clamp(0.5 * traits.ambition + 0.3 * traits.starPriority + 0.2 * (1 - traits.valuePriority), 0, 1);
+  const eliteLean = clamp(qualityFocus - traits.rosterDepthPreference, -1, 1); // >0 smaller elite, <0 broader
+  const target =
+    eliteLean >= 0 ? opt - eliteLean * (opt - playerMin) : opt - eliteLean * (playerMax - opt);
+  return clamp(Math.round(target), playerMin, playerMax);
+}
+
+/**
+ * Trait-gated count of premium (Superstar/Star) SPIKES. NOT a hard team cap — it scales with
+ * ambition/star-priority/finances, so a genuinely rich & ambitious team can spike several premium
+ * slots (and, with more cash later, as many as it can afford), while a modest team spikes 0-1. The
+ * budget is the real limiter; this only shapes how much of the surplus goes to a few high picks vs a
+ * broader body. Zero when the team's reach is not premium (reachIdx > star).
+ */
+function resolvePremiumSpikeCap(traits: CleanTeamTraits, reachIdx: number, openSlots: number): number {
+  if (reachIdx > 1) return 0; // reach is core/depth — no Superstar/Star desire
+  // Ambition/star-priority drive premium; value-priority suppresses it (a value team spends on breadth,
+  // not marquee names) and finances only lightly enable it.
+  const premiumFactor = clamp(
+    0.5 * traits.ambition + 0.3 * traits.starPriority + 0.15 * traits.finances - 0.35 * traits.valuePriority,
+    0,
+    1,
+  );
+  return clamp(Math.round(premiumFactor * openSlots * 0.4), 0, openSlots);
 }
 
 /** Per-slot allowed spend cap: around the lane mean, with headroom the buffer can cover. */
@@ -92,12 +129,19 @@ function laneSlotCap(brackets: LeagueMarketBrackets, lane: CleanLane): number {
 }
 
 /**
- * Budget-fitted lane mix (per the user's design): pre-calculate with each lane's MEAN price so the
- * sum of (count × mean) lands near spendable at the OPT roster size — the plan reaches ~OPT with a
- * real-tier body instead of stopping early. Trait tendency decides how premium-vs-depth-heavy the
- * pyramid is; the budget then scales that tendency (upgrade the mix when cash is spare, downgrade
- * when it is tight) while keeping the slot count fixed at OPT. NO hard caps — richer teams simply
- * afford more premium; poorer teams settle into Depth/Backup cores.
+ * Budget-fitted lane mix (per the user's design). Two ideas prevent the "1-2 Superstars + a wall of
+ * Backup" barbell the old planner built in on purpose:
+ *
+ *  1. SQUAD SIZE flexes by identity: a small-elite team plans fewer slots (higher per-slot budget →
+ *     a real Core body); a depth team fills toward opt/max.
+ *  2. BODY-FLOOR + capped premium SPIKES: every slot is guaranteed the highest tier the team can
+ *     afford for the WHOLE squad (the body floor B0 — a real Depth/Core body, never Backup). Premium
+ *     (Superstar/Star) is funded ONLY from the surplus ABOVE that floor and limited to a trait-gated
+ *     number of spikes. The rest of the surplus BROADENS the body toward Core. So a rich, ambitious
+ *     team gets a few premium spikes on top of a Core body; a modest team gets a broad Depth/Core
+ *     body with 0-1 spikes; nobody gets a Backup wall. Leftover cash stays as a buffer (intended).
+ *
+ * NO hard team caps — the budget is the real limiter; traits only shape the premium-vs-breadth split.
  */
 export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
   const traits = resolveCleanTeamTraits(input);
@@ -105,24 +149,34 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
   const currentCount = Math.max(0, input.currentRosterCount);
   const opt = clamp(Math.round(playerOpt), playerMin, playerMax);
 
-  // OPT is a SOFT target. Center the plan on OPT but let the budget-fit flex the final size within
-  // ~[opt-2, opt+1] (clamped to the roster min/max): a tight budget lands a slot or two short rather
-  // than dumping cheap filler; a spare budget can add one extra real-tier player.
-  const centerN = Math.max(0, opt - currentCount);
+  // OPT is a SOFT target. Squad size flexes by identity (small elite -> fewer, better slots; depth
+  // team -> more bodies), then the budget can still trim it a touch if genuinely too tight.
+  const targetSize = resolveTargetSquadSize(traits, opt, playerMin, playerMax);
+  const centerN = Math.max(0, targetSize - currentCount);
   const minN = Math.max(0, playerMin - currentCount); // mandatory floor to reach the hard minimum
-  const lowN = Math.max(minN, centerN - 2);
   const highN = Math.max(centerN, Math.min(centerN + 1, playerMax - currentCount));
 
   const retentionPct = resolveCashRetentionPct(traits);
   const spendable = Math.max(0, input.spendableCash) * (1 - retentionPct);
 
   const means = CLEAN_LANE_ORDER.map((lane) => bandFor(input.brackets, lane).targetMw);
-  const reserveMean = means[CLEAN_LANE_ORDER.length - 1]!;
+  const coreIdx = CLEAN_LANE_ORDER.indexOf("core"); // 2 — the body ceiling for broadening
+  const depthIdx = CLEAN_LANE_ORDER.indexOf("depth");
 
-  // Soft-flex DOWN: a genuinely cash-poor team plans a slightly smaller squad rather than being
-  // forced to buy more sub-real filler than its budget covers (never below the hard minimum).
+  // BUDGET-AWARE body-tier floor (the user's "budget/slots = the tier you build" model): shrink the
+  // squad — down to the hard minimum — until the per-slot budget reaches the team's AIMED body tier,
+  // so the body is a real Depth/Core tier instead of a Backup/Reserve wall. The aim is identity-scaled:
+  // quality/elite teams aim at ~Core (fewer, better slots — B-P's "kleine Elite"); depth/value teams
+  // aim at ~Backup-Depth (more bodies). Holds at 175 AND 325 cash.
+  const qualityFocus = clamp(0.5 * traits.ambition + 0.3 * traits.starPriority + 0.2 * (1 - traits.valuePriority), 0, 1);
+  const bodyAimT = clamp(0.5 + 0.6 * (qualityFocus - traits.rosterDepthPreference), 0, 1);
+  // Aim the per-slot budget within the Depth band — a touch below Depth for value/depth teams (keep
+  // more bodies), a touch above for quality/elite teams (fewer, better slots) — WITHOUT demanding a
+  // full Core body per slot (that over-shrinks ambitious teams toward the minimum). Premium spikes and
+  // pass-2 broadening still lift the best slots into Core on top of this body.
+  const bodyAimMean = means[depthIdx]! * (0.72 + 0.5 * bodyAimT);
   let openSlots = centerN;
-  while (openSlots > lowN && spendable + EPS < openSlots * reserveMean) {
+  while (openSlots > minN && spendable / Math.max(1, openSlots) + EPS < bodyAimMean) {
     openSlots -= 1;
   }
   openSlots = Math.max(openSlots, minN);
@@ -133,30 +187,18 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
   }
 
   const reachIdx = resolveReachLaneIndex(traits);
-  const depthIdx = CLEAN_LANE_ORDER.indexOf("depth");
-  // Concentration vs breadth: star/ambition-led teams pour surplus into a few high picks; depth-led
-  // teams spread it across many one-tier upgrades toward Core/Depth.
-  const concentrate = traits.starPriority + 0.5 * traits.ambition >= traits.rosterDepthPreference + 0.35;
 
-  // Affordable base = highest tier whose MEAN the team can afford for EVERY slot (Σ mean <= spendable).
-  let affordableBaseIdx = CLEAN_LANE_ORDER.length - 1; // reserve
+  // BODY FLOOR B0 = highest tier whose MEAN the team can afford for EVERY slot (Σ mean <= spendable).
+  // Every slot sits at least here, so the body is always a real tier — never a Backup wall.
+  let baseIdx = CLEAN_LANE_ORDER.length - 1; // reserve
   for (let idx = 0; idx < CLEAN_LANE_ORDER.length; idx += 1) {
     if (means[idx]! * openSlots <= spendable + EPS) {
-      affordableBaseIdx = idx;
+      baseIdx = idx;
       break;
     }
   }
 
-  // A concentrate team that can already sustain a REAL body (Depth+) starts one tier lower on
-  // purpose, freeing surplus to buy a Superstar/Star while the rest stays a real (Backup) body — a
-  // premium behaviour that only emerges when the team is genuinely rich enough. Poor/breadth teams
-  // keep the highest affordable base (a broad Depth/Backup body, no barbell).
-  const baseIdx =
-    concentrate && affordableBaseIdx <= depthIdx
-      ? Math.min(affordableBaseIdx + 1, CLEAN_LANE_ORDER.length - 1)
-      : affordableBaseIdx;
-
-  // Start every slot at the base tier, then spend the leftover on upgrades.
+  // Start every slot at the body floor; premium spikes and broadening spend only the surplus above it.
   const laneOf: number[] = new Array(openSlots).fill(baseIdx);
   let budgetLeft = spendable - openSlots * means[baseIdx]!;
 
@@ -168,40 +210,57 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
     return true;
   };
 
-  // Guard against pathological loops (bounded by slots × tiers).
-  const maxUpgradeSteps = openSlots * CLEAN_LANE_ORDER.length + 4;
-  for (let step = 0; step < maxUpgradeSteps; step += 1) {
-    // Concentrate: lift the currently-highest upgradable slot one more tier (up to reach).
-    // Breadth: lift the currently-lowest slot one tier (up to reach). Stop when nothing affordable.
-    let targetSlot = -1;
-    if (concentrate) {
-      let bestLane = CLEAN_LANE_ORDER.length; // higher number = lower lane
-      for (let s = 0; s < openSlots; s += 1) {
-        if (laneOf[s]! > reachIdx && laneOf[s]! < bestLane) {
-          bestLane = laneOf[s]!;
-          targetSlot = s;
-        }
+  // PASS 1 — premium spikes (concentrate behaviour): promote up to `premiumCap` body slots toward the
+  // team's premium reach (SS/St), each as high as the surplus affords. Funded purely from surplus, so
+  // the remaining slots never drop below the body floor. Zero for teams whose reach is not premium.
+  // No premium spikes on a sub-Depth body: if the team can only afford a Backup/Reserve body, a
+  // Superstar on top of it is exactly the barbell we are killing. Such a team spends its surplus
+  // broadening the body toward Depth/Core instead (pass 2). Premium only when the body is Depth+.
+  const premiumCap = baseIdx <= depthIdx ? resolvePremiumSpikeCap(traits, reachIdx, openSlots) : 0;
+  for (let spike = 0; spike < premiumCap; spike += 1) {
+    // Consolidate the spike into a single slot: pick the highest-tier body slot still above reach.
+    let slotToPromote = -1;
+    let bestLane = CLEAN_LANE_ORDER.length;
+    for (let s = 0; s < openSlots; s += 1) {
+      if (laneOf[s]! > reachIdx && laneOf[s]! < bestLane) {
+        bestLane = laneOf[s]!;
+        slotToPromote = s;
       }
-    } else {
-      let worstLane = -1;
-      for (let s = 0; s < openSlots; s += 1) {
-        if (laneOf[s]! > reachIdx && laneOf[s]! > worstLane) {
-          worstLane = laneOf[s]!;
-          targetSlot = s;
-        }
+    }
+    if (slotToPromote < 0) break;
+    let promotedAny = false;
+    while (laneOf[slotToPromote]! > reachIdx) {
+      if (!upgradeSlot(slotToPromote, laneOf[slotToPromote]! - 1)) break;
+      promotedAny = true;
+    }
+    if (!promotedAny) break; // could not afford any further promotion — stop spiking
+  }
+
+  // PASS 2 — broaden the body: lift the currently-lowest body slot one tier at a time toward Core with
+  // whatever surplus remains. Never creates premium (bodyCeil = Core), so extra cash thickens the
+  // Core/Depth body rather than spiking more Superstars. A pure-depth team keeps a broad Depth body.
+  const bodyCeil = coreIdx;
+  const maxSteps = openSlots * CLEAN_LANE_ORDER.length + 4;
+  for (let step = 0; step < maxSteps; step += 1) {
+    let targetSlot = -1;
+    let worstLane = -1;
+    for (let s = 0; s < openSlots; s += 1) {
+      if (laneOf[s]! > bodyCeil && laneOf[s]! > worstLane) {
+        worstLane = laneOf[s]!;
+        targetSlot = s;
       }
     }
     if (targetSlot < 0) break;
     if (!upgradeSlot(targetSlot, laneOf[targetSlot]! - 1)) break;
   }
 
-  // Soft-flex UP: a spare budget (leftover still covers a real-tier player) adds ONE extra slot at
-  // the best body tier the leftover affords, rather than overloading the existing slots — so a rich
-  // team lands slightly above OPT with an extra real player instead of a lone Superstar + filler.
+  // Soft-flex UP: a spare budget (leftover still covers a real-tier player) adds ONE extra body slot
+  // at the best Depth/Core tier the leftover affords — a rich team lands slightly above target with an
+  // extra real player, not a lone Superstar + filler.
   if (openSlots < highN && budgetLeft + EPS >= means[depthIdx]!) {
-    let addLane = CLEAN_LANE_ORDER.length - 1;
-    for (let idx = Math.max(reachIdx, 0); idx < CLEAN_LANE_ORDER.length; idx += 1) {
-      if (means[idx]! <= budgetLeft + EPS && idx <= depthIdx) {
+    let addLane = depthIdx;
+    for (let idx = coreIdx; idx <= depthIdx; idx += 1) {
+      if (means[idx]! <= budgetLeft + EPS) {
         addLane = idx;
         break;
       }
