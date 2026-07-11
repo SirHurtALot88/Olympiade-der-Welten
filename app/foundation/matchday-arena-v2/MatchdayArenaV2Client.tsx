@@ -835,7 +835,6 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   // "Neuer Look" Flag-Gate (additiv): Flag an => 32-Team-Scoreboard mit
   // Phasen-Reveal aus denselben Props; Flag aus => bestehendes Layout unverändert.
   const [newLook] = useNewLook();
-  if (newLook) return <MatchdayArenaNewLook {...props} />;
 
   const [params, setParams] = useState(() => defaultArenaParams(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
@@ -2935,6 +2934,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     }
     return renderFocusEntries(entries, disciplineLabel, fallbackPlayers, rankPoolState);
   };
+
+  if (newLook) return <MatchdayArenaNewLook {...props} />;
 
   return (
     <div className={`arena-v2-shell is-act-${arenaAct}${isArenaEventMode ? " is-event-mode" : ""}${isFocusedBoardMode ? " is-focused-board" : ""}${broadcastFocusMode ? " is-broadcast-mode" : ""}`}>

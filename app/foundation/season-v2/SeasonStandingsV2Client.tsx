@@ -546,7 +546,6 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
   // "Neuer Look" Flag-Gate (additiv): Flag an => neues Liga-Board mit
   // denselben Props; Flag aus => bestehendes Layout unverändert.
   const [newLook] = useNewLook();
-  if (newLook) return <SeasonStandingsNewLook {...props} />;
 
   const {
     selectedSeasonId,
@@ -1044,6 +1043,8 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
     () => seasonOptions.filter((option) => option.status !== "active"),
     [seasonOptions],
   );
+
+  if (newLook) return <SeasonStandingsNewLook {...props} />;
 
   return (
     <div className="season-v2-shell">
