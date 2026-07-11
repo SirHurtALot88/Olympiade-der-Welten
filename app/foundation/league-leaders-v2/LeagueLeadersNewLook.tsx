@@ -1,8 +1,16 @@
 "use client";
 
-import { NlCard, NlMedalBadge, formatNlNumber, nlToneClass, type NlTone } from "@/components/foundation/new-look";
+import {
+  NlCard,
+  NlMedalBadge,
+  StatChip,
+  StatChipRow,
+  formatNlNumber,
+  nlToneClass,
+  type NlTone,
+} from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
-import type { LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
+import type { LeagueLeaderCategory, LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
 
 /**
  * "Neuer Look" Liga-Leaders — Kategorie-Karten mit Leader-Podium (flag-gated, additiv).
@@ -12,10 +20,16 @@ import type { LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/leagu
  * Listen zurück. Konsumiert exakt dieselben Props/Daten (Kategorien,
  * `displayValue`, `onOpenPlayer`, Own-Team-Markierung).
  *
+ * Die Einordnungs-Zeile pro Kategorie (Leader / Median / "Dein Bester")
+ * ist komplett aus `category.entries` berechnet — inkl. des absoluten
+ * `entry.rank` des besten eigenen Spielers, wenn er gelistet ist.
+ *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
  * - keine Spieler-Portraits (`LeagueLeaderEntry` trägt keine Portrait-URL,
  *   nur Name/Team) — stattdessen Initialen-Avatare,
- * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden).
+ * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden),
+ * - kein erfundener Rang außerhalb der gelisteten Einträge: ist kein eigener
+ *   Spieler in `entries`, zeigt "Dein Bester" ehrlich "außerhalb Top N".
  */
 
 const NL_LEADER_TONE_MAP: Record<LeagueLeaderTone, NlTone> = {
@@ -45,6 +59,24 @@ function getLeaderBarPercent(entry: LeagueLeaderEntry, topValue: number): number
     return 0;
   }
   return Math.max(4, Math.min(100, (entry.value / topValue) * 100));
+}
+
+/** Median der gelisteten Top-Werte einer Kategorie (nur echte `entry.value`s). */
+function getCategoryMedian(category: LeagueLeaderCategory): number | null {
+  const values = category.entries
+    .map((entry) => entry.value)
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => left - right);
+  if (values.length === 0) {
+    return null;
+  }
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 === 1 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+}
+
+/** MVS/OVR werden ligaweit ganzzahlig ausgewiesen — Median entsprechend formatieren. */
+function getCategoryStatDecimals(categoryId: string): number {
+  return categoryId === "mvs" || categoryId === "ovr" ? 0 : 1;
 }
 
 export default function LeagueLeadersNewLook({
@@ -86,6 +118,13 @@ export default function LeagueLeadersNewLook({
           const leader = category.entries.length > 0 ? category.entries[0] : null;
           const topValue = leader != null && Number.isFinite(leader.value) ? leader.value : 0;
           const chasers = category.entries.slice(1);
+          const median = getCategoryMedian(category);
+          const statDecimals = getCategoryStatDecimals(category.id);
+          // Bester eigener Spieler: erster Eintrag (nach Rang sortiert) des eigenen Teams.
+          const ownBest =
+            selectedTeamId != null
+              ? category.entries.find((entry) => entry.teamId != null && entry.teamId === selectedTeamId) ?? null
+              : null;
 
           return (
             <article
@@ -153,6 +192,43 @@ export default function LeagueLeadersNewLook({
                     </button>
                   ))}
                 </div>
+              ) : null}
+
+              {leader ? (
+                <StatChipRow className="nl-leaders-stats" aria-label={`Einordnung ${category.label}`}>
+                  <StatChip
+                    label="Leader"
+                    value={leader.displayValue}
+                    tone={tone}
+                    title={`#1 ${leader.name} (${leader.teamCode ?? leader.teamName})`}
+                  />
+                  {median != null ? (
+                    <StatChip
+                      label={`Median Top ${formatNlNumber(category.entries.length, 0)}`}
+                      value={formatNlNumber(median, statDecimals)}
+                      title={`Median der gelisteten Top-${formatNlNumber(category.entries.length, 0)}-Werte (${category.label})`}
+                    />
+                  ) : null}
+                  {selectedTeamId != null ? (
+                    ownBest ? (
+                      <StatChip
+                        label="Dein Bester"
+                        value={ownBest.displayValue}
+                        sub={`#${formatNlNumber(ownBest.rank, 0)} · ${ownBest.name}`}
+                        tone="accent"
+                        onClick={() => onOpenPlayer(ownBest.playerId)}
+                        title={`${ownBest.name} · Rang ${formatNlNumber(ownBest.rank, 0)} in ${category.label} · Profil öffnen`}
+                      />
+                    ) : (
+                      <StatChip
+                        label="Dein Bester"
+                        value="—"
+                        sub={`außerhalb Top ${formatNlNumber(category.entries.length, 0)}`}
+                        title={`Kein eigener Spieler unter den gelisteten Top ${formatNlNumber(category.entries.length, 0)} (${category.label})`}
+                      />
+                    )
+                  ) : null}
+                </StatChipRow>
               ) : null}
             </article>
           );

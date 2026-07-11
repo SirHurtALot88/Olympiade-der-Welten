@@ -42566,6 +42566,11 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Liga-Überblick (Ø / Spannweite / eigenes Team / Abstand zu #1) über dem Board. */
+.is-new-look .nl-ranks-statrow {
+  margin: 0 0 var(--nl-s3);
+}
+
 .is-new-look .nl-ranks-filterbar {
   display: inline-flex;
   flex-wrap: wrap;
@@ -42638,6 +42643,31 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-ranks-row.is-podium {
   background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+}
+
+/* Eigenes Team (team.humanControlled) im Board hervorheben. */
+.is-new-look .nl-ranks-row.is-own-team {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 7%, var(--nl-panel));
+}
+
+.is-new-look .nl-ranks-row.is-own-team:hover,
+.is-new-look .nl-ranks-row.is-own-team:focus-visible {
+  background: color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel));
+}
+
+.is-new-look .nl-ranks-own-tag {
+  margin-left: var(--nl-s2);
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
+  color: var(--nl-accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .is-new-look .nl-ranks-rank {
@@ -42982,6 +43012,31 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-leaders-row-value {
   font-size: 13px;
   font-weight: 700;
+}
+
+/* Einordnungs-Zeile pro Kategorie: Leader / Median Top N / Dein Bester.
+   `margin-top: auto` pinnt die Zeile in der Flex-Karte nach unten, damit
+   die Zeilen über alle Grid-Karten hinweg auf einer Linie liegen. */
+.is-new-look .nl-leaders-stats {
+  margin-top: auto;
+  padding-top: var(--nl-s2);
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-leaders-stats .nl-stat-chip {
+  flex: 1 1 0;
+  min-width: 88px;
+}
+
+.is-new-look .nl-leaders-stats .nl-stat-chip-value {
+  font-size: 14px;
+}
+
+.is-new-look .nl-leaders-stats .nl-stat-chip-sub {
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .is-new-look .nl-leaders-hero.is-own-team,
@@ -46710,6 +46765,123 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-facility-overview-upgrade small {
   color: var(--nl-mut);
+}
+
+/* --- Portfolio-Header (Summen + Ausbau-Fortschritt) --------------- */
+.is-new-look .nl-facility-overview-portfolio {
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-facility-overview-build {
+  margin-top: var(--nl-s2);
+  max-width: 420px;
+}
+
+/* --- "Nächstes bestes Upgrade" (Investitions-Radar) ---------------- */
+.is-new-look .nl-facility-overview-next-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-facility-overview-next-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-facility-overview-next-item.is-top {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-facility-overview-next-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-overview-next-item.is-top .nl-facility-overview-next-rank {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-facility-overview-next-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.is-new-look .nl-facility-overview-next-levels {
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-overview-next-effect {
+  font-size: 12px;
+}
+
+.is-new-look .nl-facility-overview-next-copy small {
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-overview-next-badge {
+  justify-self: end;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-facility-overview-next-badge.is-affordable {
+  border: 1px solid color-mix(in srgb, var(--nl-good) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-good) 14%, transparent);
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-facility-overview-next-badge.is-over {
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 14%, transparent);
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-facility-overview-next-hint {
+  margin: var(--nl-s2) 0 0;
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 560px) {
+  .is-new-look .nl-facility-overview-next-item {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .is-new-look .nl-facility-overview-next-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 
 /* ============================================================
