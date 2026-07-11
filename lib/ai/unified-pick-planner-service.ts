@@ -148,6 +148,19 @@ export function mapPlannedPicksToBuyCandidates<T extends { playerId: string }>(
   return selected;
 }
 
+/**
+ * Base for the order-preserving strategicBuyScore stamped on each mapped compare pick.
+ * The compare planner emits plannedPicks already sorted by need priority / identity concentration.
+ * The apply gate (`rankFinalBuyCandidates`) sorts buy candidates by `strategicBuyScore` first and only
+ * falls back to a generic class/race DIVERSITY heuristic when scores are absent/equal — which would
+ * otherwise scramble the planner's need order and actively fight concentrated team identities. We
+ * therefore stamp a monotonically decreasing strategicBuyScore in acceptance order so the apply gate
+ * preserves the planner's ordering. Only `strategicBuyScore` is set (not overallRecommendationScore /
+ * score) so cross-team buy priority (`getTopBuyCandidateScore`) stays untouched — this confines the
+ * change to intra-team ranking, the exact spot the order was being lost.
+ */
+const UNIFIED_PICK_ORDER_SCORE_BASE = 1000;
+
 /** Fallback when market-plan pool and compare pool diverge — use compare pick metadata directly. */
 export function mapPlannedPicksToBuyRecommendations(
   plannedPicks: AiNeedsPicksPlannedPick[],
@@ -159,6 +172,7 @@ export function mapPlannedPicksToBuyRecommendations(
     if (pick.price == null || pick.price <= 0) continue;
     used.add(pick.playerId);
     selected.push({
+      strategicBuyScore: UNIFIED_PICK_ORDER_SCORE_BASE - selected.length,
       playerId: pick.playerId,
       playerName: pick.playerName,
       name: pick.playerName,
