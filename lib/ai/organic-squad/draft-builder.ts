@@ -72,6 +72,19 @@ function price(player: OrganicPlayerView): number {
   return Math.max(0, player.marketValue);
 }
 
+/**
+ * Minimum spend still needed to reach the roster MINIMUM: the sum of the `count` cheapest available
+ * prices. Reserving this keeps the hard min-roster rule FEASIBLE, so the builder can't blow its whole
+ * budget on a few stars and end below min. This reserves feasibility of a hard rule, NOT composition.
+ */
+function cheapestPriceSum(pool: OrganicPlayerView[], count: number): number {
+  if (count <= 0) return 0;
+  const prices = pool.map(price).sort((left, right) => left - right);
+  let sum = 0;
+  for (let i = 0; i < count && i < prices.length; i += 1) sum += prices[i];
+  return sum;
+}
+
 /** Greedy organic squad plan. Deterministic; ties broken by pool order (stable). */
 export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSquadPlanResult {
   const rosterMax = input.economy.rosterMax ?? ROSTER_MAX;
@@ -113,11 +126,17 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
 
   while (squad.length < rosterMax) {
     const state = buildState();
-    // Affordability keeps cash ≥ buffer AFTER the buy (a hard blocker, never crossed).
+    // Budget pacing for the hard MIN rule: after this buy, keep enough to cheap-fill the remaining
+    // mandatory slots. Reserving the cheapest such prices means a rich club can chase a star AND still
+    // reach min, while nobody blows the whole budget on a few stars and ends below min. Once at/above
+    // min this reserve is 0, so composition past min is fully emergent.
+    const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
+    const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
+    // Affordability keeps cash ≥ buffer AFTER the buy AND after the reserved min-fill (hard blockers).
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const candidate of pool) {
-      if (cash - price(candidate) < cashBuffer) continue;
+      if (cash - price(candidate) - reserveForMin < cashBuffer) continue;
       const utility = buyUtility(candidate, state);
       if (utility > bestUtility) {
         bestUtility = utility;

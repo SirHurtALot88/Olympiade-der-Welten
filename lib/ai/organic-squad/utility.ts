@@ -29,6 +29,23 @@ import {
 /** A strong player that lands on no needed discipline still has some baseline value. */
 const COVERAGE_FLOOR = 0.25;
 
+/**
+ * Converts the budget-relative "price in slots" into a penalty comparable to ΔStrength (~0..90).
+ * A player costing one whole remaining-OPT-slot of budget costs PRICE_SLOT_SCALE utility before wThrift.
+ * This is the "Preis / Budget-Skala": a star is cheap to a rich/elite club (few slots, high budget/slot)
+ * and expensive to a depth club (many slots, low budget/slot) — the driver of roster-SIZE variety.
+ */
+const PRICE_SLOT_SCALE = 18;
+
+/**
+ * Baseline value of a body for rotation/fatigue depth (≤12 deploy per matchday, fatigue), independent
+ * of discipline coverage. Fades from full at an empty squad to 0 at optTarget, so teams fill toward
+ * their (GM-modulated) OPT even once their needed disciplines are covered — this, with optTarget, is
+ * what makes a depth club big and an elite club small. Weighted flat (every club needs a squad), not
+ * by wWin, so low-ambition depth clubs still fill out.
+ */
+const ROTATION_VALUE = 30;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -83,11 +100,18 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const w = state.weights;
   const fullness = rosterFullnessFactor(state.rosterSize, w.optTarget);
   const deltaStrength = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights) * fullness;
-  const price = Math.max(0, player.marketValue);
+  // Budget-relative price: cost measured in remaining-OPT-slots of budget, not absolute MW.
+  const optSlotsRemaining = Math.max(1, w.optTarget - state.rosterSize);
+  const budgetPerOptSlot = Math.max(1, state.cash / optSlotsRemaining);
+  const priceInSlots = Math.max(0, player.marketValue) / budgetPerOptSlot;
   const potential = Math.max(0, player.potential ?? 0);
+  // Rotation/depth baseline: fades from full (empty squad) to 0 at optTarget.
+  const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));
+  const rotationValue = ROTATION_VALUE * belowOptFraction;
   return (
-    w.wWin * deltaStrength -
-    w.wThrift * price -
+    w.wWin * deltaStrength +
+    rotationValue -
+    w.wThrift * priceInSlots * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential
   );

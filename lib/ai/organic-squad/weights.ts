@@ -109,19 +109,26 @@ export function deriveUtilityWeights(
   const wageSensitivity = normBias(gmBias?.wageSensitivity);
   const eliteSmallRosterPreference = normBias(gmBias?.eliteSmallRosterPreference);
   const sellForProfitAggression = normBias(gmBias?.sellForProfitAggression);
+  const rosterDepthPreference = normBias(gmBias?.rosterDepthPreference);
 
   const wWin = clamp(
     wWinBase + starPriority * 0.6 + riskTolerance * 0.4 + eliteSmallRosterPreference * 0.3,
     0,
     3,
   );
-  const wThrift = clamp(wThriftBase + valuePriority * 0.6, 0, 3);
+  // Depth GMs value-seek (cheaper players, more of them → they can actually reach a big squad); elite
+  // GMs concentrate budget on fewer, better players. This wThrift shift — alongside optTarget — is what
+  // makes roster SIZE vary: high thrift spreads the budget across many slots, low thrift concentrates it.
+  const wThrift = clamp(
+    wThriftBase + valuePriority * 0.6 + rosterDepthPreference * 0.7 - eliteSmallRosterPreference * 0.5,
+    0,
+    3,
+  );
   const wPatience = clamp(wPatienceBase + cashPriority * 0.6, 0, 3);
   const wSustain = clamp(wSustainBase - riskTolerance * 0.4 + wageSensitivity * 0.6, 0, 3);
   const wAsset = clamp(wAssetBase + sellForProfitAggression * 0.3, 0, 3);
 
   // --- Soft roster target: identity base, shifted by depth vs. elite-small-roster GM bias. ---
-  const rosterDepthPreference = normBias(gmBias?.rosterDepthPreference);
   const K = 3.5;
   const optTargetRaw =
     (Number.isFinite(identity?.playerOpt) ? Number(identity.playerOpt) : (ROSTER_MIN + ROSTER_MAX) / 2) +
