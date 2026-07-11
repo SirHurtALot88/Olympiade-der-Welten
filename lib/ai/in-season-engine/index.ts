@@ -38,3 +38,27 @@ export {
   buildFinalBuyGate,
   rankFinalBuyCandidates,
 } from "@/lib/ai/in-season-engine/buy-scoring-pipeline";
+
+export {
+  evaluateAntiChurn,
+  resolveAntiChurnOverrides,
+  type AntiChurnInput,
+  type AntiChurnResult,
+} from "@/lib/ai/in-season-engine/anti-churn-guard";
+
+export {
+  evaluateAiSellDecision,
+  computeCompositeSellScore,
+  selectCompositeSellCandidates,
+  compareStrategicSellCandidates,
+  resolveCompositeSellTeamProfile,
+  type CompositeSellScoreInput,
+  type CompositeSellScoreResult,
+} from "@/lib/ai/in-season-engine/sell-scoring-pipeline";
+
+export {
+  buildReplacementSlotsFromPlannedSells,
+  scoreReplacementFitForSlots,
+  markReplacementSlotFulfilled,
+  type ReplacementSlot,
+} from "@/lib/ai/in-season-engine/replacement-linkage";
