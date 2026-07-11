@@ -745,11 +745,21 @@ export function applyAiManagerPlan(input: {
       .filter((team) => (currentSave.gameState.seasonState.teamControlSettings?.[team.teamId]?.controlMode ?? "ai") === "ai")
       .map((team) => team.teamId),
   );
+  // Perf: thread the demand-fulfilment result in-memory across all AI teams and persist the full
+  // state ONCE, instead of writing the whole ~33MB game state per team (up to 32 x ~1.1s saves per
+  // manager-apply call). Each team's fulfilment is applied on the running gameState, so chaining is
+  // equivalent to the previous per-team save+reload.
+  let demandGameState = currentSave.gameState;
+  let anyDemandFulfilled = false;
   for (const teamId of aiControlledTeamIds) {
-    const demandResult = applyAiTeamPlayerDemandFulfillment({ gameState: currentSave.gameState, teamId });
+    const demandResult = applyAiTeamPlayerDemandFulfillment({ gameState: demandGameState, teamId });
     if (demandResult.fulfilledDemandIds.length > 0) {
-      currentSave = persistence.saveSingleplayerState(currentSave.saveId, demandResult.gameState);
+      demandGameState = demandResult.gameState;
+      anyDemandFulfilled = true;
     }
+  }
+  if (anyDemandFulfilled) {
+    currentSave = persistence.saveSingleplayerState(currentSave.saveId, demandGameState);
   }
 
   return {
