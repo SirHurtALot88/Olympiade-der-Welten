@@ -7112,13 +7112,18 @@ function scoreCandidate(input: {
     price != null && price > 0
       ? roundValue(
           clamp(
-            (Math.max(0, needMatchScore) * 0.45 +
+            // A2: fold raw ability (playerQualityScore) into the numerator so this is genuine
+            // "quality-per-cost", not just "fit-per-cost". Combined with the raised clamp below, a
+            // strong, well-priced player now scores real value — a marginally-better outlier priced
+            // multiples higher no longer wins on ability alone. Modest quality weight = milder tilt (G1).
+            (Math.max(0, playerQualityScore) * 0.5 +
+              Math.max(0, needMatchScore) * 0.45 +
               Math.max(0, disciplineCoverageScore) * 0.75 +
               Math.max(0, teamIdentityScore) * 0.55 +
               Math.max(0, rosterBalanceScore) * 0.35) /
               Math.max(1, price * 0.22 + (input.recommendation.salary ?? 0) * 0.65),
             0,
-            12,
+            16,
           ),
           1,
         )
