@@ -13,6 +13,7 @@ import {
   type FoundationSidebarOrderState,
 } from "@/lib/foundation/foundation-sidebar-order";
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 
 type FoundationSidebarProps = {
   activeView: FoundationViewId;
@@ -146,6 +147,9 @@ export default function FoundationSidebar({
             {seasonContextLabel}
           </span>
         ) : null}
+      </div>
+      <div className="foundation-sidebar-newlook">
+        <NewLookToggle className="is-sidebar" />
       </div>
       {navGroups.map((group) => (
         <section key={group.id} className="foundation-sidebar-group">

@@ -47805,3 +47805,48 @@ button.foundation-team-portrait-card {
     animation: none;
   }
 }
+
+/* ── Prominenter "Neuer Look"-Umschalter oben in der Sidebar (global, auch im alten Look sichtbar) ── */
+.foundation-sidebar-newlook {
+  margin: 8px 10px 4px;
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 170, 255, 0.45);
+  background: linear-gradient(180deg, rgba(30, 52, 92, 0.55), rgba(18, 30, 55, 0.55));
+  box-shadow: 0 0 0 1px rgba(120, 170, 255, 0.1), 0 6px 18px -12px rgba(90, 150, 255, 0.8);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar:hover {
+  transform: translateY(-1px);
+  border-color: rgba(120, 170, 255, 0.75);
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar.is-on {
+  border-color: rgba(90, 210, 140, 0.7);
+  background: linear-gradient(180deg, rgba(24, 60, 40, 0.6), rgba(16, 40, 28, 0.6));
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar .werdegang-new-look-label {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: #eaf0fa;
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar::after {
+  content: "AUS";
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #9db0cc;
+}
+.foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar.is-on::after {
+  content: "AN";
+  color: #57d08a;
+}
