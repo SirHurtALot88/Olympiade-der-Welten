@@ -388,7 +388,6 @@ export default function FoundationPlayersTableNewLook({
               <BudgetedMediaImage
                 className="nl-players-portrait"
                 src={portrait.src}
-                placeholderSrc={portrait.previewSrc ?? portrait.thumbSrc}
                 alt={row.player.name}
                 width={44}
                 height={44}
