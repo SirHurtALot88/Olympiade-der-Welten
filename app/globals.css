@@ -32416,6 +32416,127 @@ button.market-v2-bucket-card.is-selected {
   color: rgba(103, 89, 61, 0.58);
 }
 
+/* NlAbilityStars — shared CA-beside-PO stars-only renderer (see components/foundation/velo-ui/NlAbilityStars.tsx).
+   Global (like .velo-*) so callers that also appear in a flag-off path stay intact; reuses the gold star visuals. */
+.nl-ability-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  vertical-align: middle;
+}
+
+.nl-ability-stars.is-compact {
+  gap: 10px;
+}
+
+.nl-ability-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nl-ability-metric-label {
+  color: rgba(235, 239, 247, 0.66);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nl-ability-empty {
+  color: rgba(235, 239, 247, 0.62);
+}
+
+.nl-ability-star-row {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
+}
+
+.nl-ability-star-row.is-range {
+  filter: none;
+}
+
+.nl-ability-stars.is-danger .nl-ability-star-row {
+  filter: drop-shadow(0 0 9px rgba(255, 96, 86, 0.35));
+}
+
+.nl-ability-star {
+  position: relative;
+  display: inline-block;
+  width: 0.86em;
+  color: rgba(111, 91, 48, 0.72);
+  font-size: 0.94rem;
+}
+
+.nl-ability-stars.is-compact .nl-ability-star {
+  font-size: 0.82rem;
+}
+
+.nl-ability-star-empty {
+  color: rgba(103, 89, 61, 0.58);
+}
+
+.nl-ability-star.is-inactive .nl-ability-star-empty {
+  color: rgba(103, 89, 61, 0.28);
+}
+
+.nl-ability-star-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  overflow: hidden;
+  color: #ffd76a;
+  text-shadow:
+    0 0 3px rgba(255, 245, 181, 0.95),
+    0 0 9px rgba(255, 191, 49, 0.8),
+    0 1px 0 rgba(85, 47, 7, 0.65);
+}
+
+.nl-ability-stars.is-danger .nl-ability-star-fill {
+  color: #ff8d84;
+  text-shadow:
+    0 0 3px rgba(255, 214, 210, 0.95),
+    0 0 9px rgba(255, 96, 86, 0.75);
+}
+
+.nl-ability-star-uncertain {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  color: #12151c;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.18),
+    0 1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.nl-ability-star.has-uncertain .nl-ability-star-uncertain {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nl-ability-star-fill {
+    transition: width 160ms ease;
+  }
+}
+
+/* Portrait-Karten-Slot für NlAbilityStars (Tier-3 Rosterkarten: Home Top-Kader, Teams-Kader,
+   Team-Profil). Additiv und nur unterhalb von `.is-new-look` gerendert — siehe
+   `FoundationPlayerPortraitCard`'s `newLook`/`showAbilityStars`. */
+/* `.nl-portrait-ability-stars` only exists when `newLook` is set (never in flag-off), so the
+   base layout is ungated — this also covers the hover-preview card, which renders in a
+   portal on document.body (outside the `.is-new-look` ancestor). */
+.nl-portrait-ability-stars {
+  display: flex;
+  margin-top: 2px;
+}
+
+.nl-portrait-ability-stars .nl-ability-stars {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .velo-star-stack,
 .training-v2-rider-star-stack {
   display: grid;
@@ -40750,6 +40871,15 @@ button.foundation-team-portrait-card {
   --nl-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --nl-t-fast: 120ms;
   --nl-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* Font-Size-Skala (Design-System-Grundlage): fasst vormals verstreute,
+     nahezu identische Werte (9.5–10.5px / 11–11.5px / 12–12.5px …) in
+     der Kit-Basis zu einer kleinen Skala zusammen. Bewusst NICHT auf
+     NlGauge/NlMedalBadge angewandt — deren Größen bleiben eigenständig. */
+  --nl-fs-xs: 10px;
+  --nl-fs-sm: 11px;
+  --nl-fs-md: 12px;
+  --nl-fs-lg: 13px;
+  --nl-fs-xl: 17px;
 
   /* Sanfte, sichere Basis — kein Restyling bestehender Markup-Elemente. */
   accent-color: var(--nl-accent);
@@ -40820,14 +40950,14 @@ button.foundation-team-portrait-card {
   text-decoration: none;
 }
 .is-new-look .nl-stat-chip-label {
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
 }
 .is-new-look .nl-stat-chip-value {
-  font-size: 17px;
+  font-size: var(--nl-fs-xl);
   line-height: 1.15;
   font-weight: 700;
   font-family: var(--nl-display);
@@ -40835,7 +40965,7 @@ button.foundation-team-portrait-card {
   color: var(--nl-ink);
 }
 .is-new-look .nl-stat-chip-sub {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   color: var(--nl-mut);
   font-variant-numeric: tabular-nums;
 }
@@ -40849,7 +40979,7 @@ button.foundation-team-portrait-card {
   position: absolute;
   top: var(--nl-s2);
   right: var(--nl-s2);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   color: var(--nl-mut-2);
   opacity: 0;
   transform: translateX(-3px);
@@ -40880,7 +41010,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-stat-chip-row-label {
   align-self: center;
   font-family: var(--nl-sans);
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -40927,7 +41057,7 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 .is-new-look .nl-card-eyebrow {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -40936,7 +41066,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-card-title {
   margin: 0;
   font-family: var(--nl-display);
-  font-size: 17px;
+  font-size: var(--nl-fs-xl);
   line-height: 1.25;
   font-weight: 600;
   color: var(--nl-ink);
@@ -40977,7 +41107,7 @@ button.foundation-team-portrait-card {
   background: transparent;
   color: var(--nl-mut);
   font-family: var(--nl-sans);
-  font-size: 12.5px;
+  font-size: var(--nl-fs-md);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -41007,7 +41137,7 @@ button.foundation-team-portrait-card {
   background: var(--nl-panel);
   border: 1px solid var(--nl-line);
   color: var(--nl-mut);
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   line-height: 16px;
 }
@@ -41024,7 +41154,7 @@ button.foundation-team-portrait-card {
   padding: 1px var(--nl-s2);
   border-radius: var(--nl-r-pill);
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   font-weight: 700;
   background: rgba(255, 255, 255, 0.05);
   color: var(--nl-mut);
@@ -41056,14 +41186,14 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 .is-new-look .nl-progress-label {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nl-mut);
 }
 .is-new-look .nl-progress-value {
-  font-size: 11.5px;
+  font-size: var(--nl-fs-sm);
   font-weight: 600;
   color: var(--nl-ink);
   font-variant-numeric: tabular-nums;
@@ -41138,7 +41268,7 @@ button.foundation-team-portrait-card {
   width: auto;
   color: var(--nl-mut-2);
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
 }
 .is-new-look .nl-barchart {
   display: block;
@@ -41151,7 +41281,7 @@ button.foundation-team-portrait-card {
   margin: 0;
   color: var(--nl-mut-2);
   font-family: var(--nl-sans);
-  font-size: 12px;
+  font-size: var(--nl-fs-md);
 }
 .is-new-look .nl-barchart-axis {
   stroke: var(--nl-line-2);
@@ -41160,14 +41290,14 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-barchart-value {
   fill: var(--nl-ink);
   font-family: var(--nl-sans);
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .is-new-look .nl-barchart-label {
   fill: var(--nl-mut);
   font-family: var(--nl-sans);
-  font-size: 9.5px;
+  font-size: var(--nl-fs-xs);
   font-variant-numeric: tabular-nums;
 }
 .is-new-look .nl-radar {
@@ -41192,21 +41322,21 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-radar-label {
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   font-weight: 700;
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
 }
 
 .is-new-look .nl-radar-label-name {
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.85;
 }
 
 .is-new-look .nl-radar-label-value {
-  font-size: 13px;
+  font-size: var(--nl-fs-lg);
   font-weight: 800;
 }
 
@@ -42564,6 +42694,20 @@ button.foundation-team-portrait-card {
   margin: 0 0 var(--nl-s3);
   font-size: 12px;
   color: var(--nl-mut);
+}
+
+/* Leaderboard-Balkendiagramm für die aktive Metrik (Gesamt/POW/SPE/MEN/SOC),
+   demselben Grammatik-Muster wie der Prize-Forecast folgend. */
+.is-new-look .nl-ranks-metric-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+  margin: 0 0 var(--nl-s3);
+}
+
+.is-new-look .nl-ranks-metric-chart {
+  width: 100%;
+  min-width: 480px;
+  height: auto;
 }
 
 /* Liga-Überblick (Ø / Spannweite / eigenes Team / Abstand zu #1) über dem Board. */
@@ -45931,6 +46075,26 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s1);
 }
 
+/* Transferbilanz über Seasons: Netto-Balkendiagramm (Ton nach Vorzeichen),
+   demselben Grammatik-Muster wie der Prize-Forecast folgend. */
+.is-new-look .nl-thist-season-net {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-thist-season-net-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-thist-season-net-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 420px;
+  height: auto;
+}
+
 @media (max-width: 1200px) {
   .is-new-look .nl-thist-layout {
     grid-template-columns: minmax(300px, 1.3fr) minmax(260px, 1fr);
@@ -46387,7 +46551,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-intensity-row {
   display: grid;
-  grid-template-columns: 66px 1fr auto auto;
+  grid-template-columns: 66px 1fr auto auto auto;
   align-items: center;
   gap: var(--nl-s2);
   font-size: 12px;
@@ -46444,6 +46608,27 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-training-intensity-gain small {
   font-weight: 500;
   color: var(--nl-mut);
+  margin-left: 2px;
+}
+
+.is-new-look .nl-training-intensity-recovery {
+  font-weight: 600;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-intensity-recovery.is-positive {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-training-intensity-recovery.is-negative {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-training-intensity-recovery small {
+  font-weight: 500;
+  color: inherit;
+  opacity: 0.75;
   margin-left: 2px;
 }
 
@@ -48222,6 +48407,25 @@ button.foundation-team-portrait-card {
   margin: var(--nl-s2) 0 0;
   font-size: 12px;
   color: var(--nl-mut);
+}
+
+/* Forecast-Karte "Dein Team": KPI-Chips + Punkte-Delta-Balkendiagramm,
+   demselben Grammatik-Muster wie die Prize-Forecast-Karte folgend. */
+.is-new-look .nl-spreview-own-card .nl-stat-chip-row {
+  margin: 0 0 var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-spreview-delta-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-spreview-delta-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 720px;
+  height: auto;
 }
 
 .is-new-look .nl-spreview-board {
@@ -51662,6 +51866,63 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* --- Board: Momentum-Chip (Rang-Bewegung seit Saisonstart als Formtrend,
+   ehrlicher Ersatz für eine nicht existierende Pro-Spieltag-Sparkline) --- */
+.is-new-look .nl-standings-momentum-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: var(--nl-s2) var(--nl-s3);
+  min-width: 56px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-standings-momentum-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-momentum-delta {
+  font-size: 13px;
+}
+
+.is-new-look .nl-standings-momentum-delta.is-flat {
+  color: var(--nl-mut);
+}
+
+/* --- Daten-Modus: KPI-Kacheln (eigenes Team) + Balkenchart über der
+   sortierbaren Tabelle; Chart-Muster folgt der Prize-Forecast-Karte --- */
+.is-new-look .nl-standings-daten-kpis {
+  margin: 0 0 var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-standings-daten-chart-scroll {
+  overflow-x: auto;
+  margin-bottom: var(--nl-s3);
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-standings-daten-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 900px;
+  height: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-standings-momentum-chip {
+    transition: none;
+  }
+}
+
 /* ============================================================
    NEUER LOOK — Teams: Entwicklung über Saisons, Delta-Chips,
    sortierbare Teamtabelle & Zeilen-Hover (nl-teams-*)
@@ -52042,6 +52303,431 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-player-hero-radar-legend-item.is-ghost .nl-player-hero-radar-legend-swatch {
   border-top-style: dashed;
   border-top-color: color-mix(in srgb, var(--nl-mut, #93a3bd) 75%, transparent);
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Drawer: Liga-Heat-Bar unter Top-Disziplinen-Werten
+   (FM Data-Hub #60). Dünne NlProgressBar, ohne Kopfzeile (kein `label`/
+   `showValue`), direkt unter dem formatierten Diszi-Wert in der Zelle.
+   =================================================================== */
+
+.is-new-look.nl-player-discipline-heat-bar,
+.is-new-look .nl-player-discipline-heat-bar {
+  margin-top: 4px;
+  max-width: 92px;
+}
+
+.is-new-look.nl-player-discipline-heat-bar .nl-progress-track,
+.is-new-look .nl-player-discipline-heat-bar .nl-progress-track {
+  height: 4px;
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Drawer: Zwei-Spieler-Vergleich (FM-Vergleichsscreen
+   #60). Picker (Suche + Ergebnisliste), Vergleichs-Panel (Radar-Ghost,
+   Kennzahlen-Deltas, Diszi-Tabelle mit Fog-of-war-Tier-Ranges).
+   =================================================================== */
+
+.is-new-look.nl-player-compare,
+.is-new-look .nl-player-compare {
+  margin-top: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-player-compare-toggle {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  border-radius: var(--nl-r-pill);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-player-compare-toggle:hover {
+  background: color-mix(in srgb, var(--nl-accent-soft) 70%, var(--nl-accent) 30%);
+}
+
+.is-new-look .nl-compare-panel {
+  margin-top: var(--nl-s3);
+  padding: var(--nl-s4);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e1, none);
+}
+
+.is-new-look .nl-compare-panel[hidden] {
+  display: none;
+}
+
+.is-new-look .nl-compare-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-compare-picker-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-picker-input {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-compare-picker-input:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-compare-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-compare-picker-item {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  padding: 6px 10px;
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-compare-picker-item:hover,
+.is-new-look .nl-compare-picker-item:focus-visible {
+  background: var(--nl-bg-2);
+  border-color: var(--nl-line);
+}
+
+.is-new-look .nl-compare-picker-item-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-compare-picker-item-meta {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-compare-picker-empty {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-compare-loading {
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-compare-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-compare-result-players {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-family: var(--nl-display);
+  font-size: 16px;
+}
+
+.is-new-look .nl-compare-result-players .is-a {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-compare-result-players .is-b {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-vs {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-clear {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+}
+
+.is-new-look .nl-compare-clear:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-compare-radar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-compare-radar {
+  width: 200px;
+  height: auto;
+}
+
+.is-new-look .nl-compare-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-compare-metric-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 10px;
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-compare-metric-a {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-compare-metric-b {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-metric-label {
+  justify-self: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-metric-gap {
+  justify-self: center;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-discipline-table-shell {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.is-new-look .nl-compare-discipline-table th,
+.is-new-look .nl-compare-discipline-table td {
+  text-align: center;
+}
+
+.is-new-look .nl-compare-discipline-table th:first-child,
+.is-new-look .nl-compare-discipline-table td:first-child {
+  text-align: left;
+}
+
+.is-new-look .nl-compare-fog-note {
+  margin-top: var(--nl-s2);
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-compare-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-player-compare-toggle,
+  .is-new-look .nl-compare-picker-item {
+    transition: none;
+  }
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Attribut-Chart: annotierte Entwicklungs-Zeitleiste
+   (FM-Attribut-Graph #60). Season-Spalten mit Ereignis-Marker-Buttons
+   (Transfer/Verletzung/Klassenwechsel/XP-Ausgabe) + Detail-Karte mit
+   Attribut-Deltas der ausgewählten Saison.
+   =================================================================== */
+
+.is-new-look.nl-devtimeline,
+.is-new-look .nl-devtimeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-devtimeline-track {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  padding-bottom: 4px;
+  overflow-x: auto;
+}
+
+.is-new-look .nl-devtimeline-season {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 46px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-devtimeline-season-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-devtimeline-season-label.is-live {
+  color: var(--nl-accent);
+  font-weight: 700;
+}
+
+.is-new-look .nl-devtimeline-markers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.is-new-look .nl-devtimeline-marker {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--nl-ink);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.is-new-look .nl-devtimeline-marker:hover {
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-devtimeline-marker:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-devtimeline-marker.is-transfer {
+  color: var(--nl-men, #5b9bff);
+  border-color: color-mix(in srgb, var(--nl-men, #5b9bff) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-injury {
+  color: var(--nl-risk, #e5615a);
+  border-color: color-mix(in srgb, var(--nl-risk, #e5615a) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-classup {
+  color: var(--nl-good, #4cc56b);
+  border-color: color-mix(in srgb, var(--nl-good, #4cc56b) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-xp {
+  color: var(--nl-warn, #e0a53a);
+  border-color: color-mix(in srgb, var(--nl-warn, #e0a53a) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-selected {
+  background: var(--nl-accent-soft);
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 0 1px var(--nl-accent);
+}
+
+.is-new-look .nl-devtimeline-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .nl-devtimeline-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-devtimeline-detail-head strong {
+  font-family: var(--nl-display);
+  font-size: 14px;
+}
+
+.is-new-look .nl-devtimeline-detail-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-devtimeline-marker {
+    transition: none;
+  }
 }
 
 /* --- Werdegang: Hover-Scrubber / Fadenkreuz auf den Karriere-Kurven --- */
@@ -53680,6 +54366,150 @@ button.is-new-look .nl-thist-season-pill,
   text-align: center;
 }
 
+/* --- Primäre/sekundäre Spalten-Betonung (PPs > OVR) ------------------
+   PPs ist die wichtigste Kennzahl (wichtiger als OVR/MVS) und bekommt die
+   stärkste Betonung; OVR bleibt sekundär hervorgehoben, aber schwächer.
+   Nutzt Ränder statt Hintergrund, damit die liga-relative Heat-Färbung
+   (getPoolHeatClass) je Zelle weiterhin sichtbar bleibt. ---------------- */
+.is-new-look .nl-players-th.is-highlight-primary {
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  box-shadow: inset 0 -2px 0 var(--nl-accent);
+}
+
+.is-new-look .nl-players-th.is-highlight-secondary {
+  box-shadow: inset 0 -2px 0 var(--nl-line-2);
+}
+
+.is-new-look .nl-players-td-metric.is-highlight-primary {
+  box-shadow:
+    inset 2px 0 0 var(--nl-accent),
+    inset -2px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-players-td-metric.is-highlight-secondary {
+  box-shadow:
+    inset 1px 0 0 var(--nl-line-2),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+/* --- PPs: aufklappbarer Zellen-Button + Detailzeile ------------------- */
+.is-new-look .nl-players-pps-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-players-pps-toggle:hover,
+.is-new-look .nl-players-pps-toggle.is-expanded {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-players-pps-toggle:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-players-pps-toggle-caret {
+  font-size: 9px;
+  opacity: 0.75;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-players-detail-row > .nl-players-detail-cell {
+  padding: 0;
+  background: var(--nl-panel-2);
+  cursor: default;
+}
+
+.is-new-look .nl-players-pps-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+  white-space: normal;
+  border-left: 2px solid var(--nl-accent);
+}
+
+.is-new-look .nl-players-pps-detail-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-players-pps-detail-name {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-players-pps-detail-total {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-players-pps-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+  max-width: 720px;
+}
+
+.is-new-look .nl-players-pps-detail-axis {
+  display: grid;
+  grid-template-columns: 34px minmax(60px, 1fr) 30px;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-players-pps-detail-axis-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-players-pps-detail-axis-track {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-players-pps-detail-axis-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-players-pps-detail-axis-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .nl-players-pps-detail-note {
+  margin: 0;
+  max-width: 720px;
+  font-size: 11px;
+  color: var(--nl-mut-2);
+  white-space: normal;
+}
+
 /* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
 .is-new-look .nl-players-sort-th {
   display: inline-flex;
@@ -53830,34 +54660,39 @@ button.is-new-look .nl-thist-season-pill,
   white-space: nowrap;
 }
 
-/* --- Achsen-Mini-Bars (POW/SPE/MEN/SOC, 0-100) ---------------------- */
+/* --- Achsen-Mini-Bars (POW/SPE/MEN/SOC, 0-100) ---------------------------
+   Eine Zeile je Achse (1×4) statt eines engen 2×2-Clusters: Label, Balken
+   und Wert stehen so nie horizontal neben der nächsten Achse und laufen
+   nicht zusammen (z. B. "91SPE"). Jede Achse bekommt eigenen Raum. --------- */
 .is-new-look .nl-players-td-axes {
-  min-width: 190px;
+  min-width: 172px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .is-new-look .nl-players-axes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px var(--nl-s3);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
   min-width: 0;
 }
 
 .is-new-look .nl-players-axis {
   display: grid;
-  grid-template-columns: 28px minmax(36px, 1fr) 22px;
+  grid-template-columns: 30px minmax(48px, 1fr) 28px;
   align-items: center;
-  gap: 4px;
+  gap: var(--nl-s2);
 }
 
 .is-new-look .nl-players-axis-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--nl-tone, var(--nl-mut));
 }
 
 .is-new-look .nl-players-axis-track {
-  height: 5px;
+  height: 6px;
   border-radius: var(--nl-r-pill);
   background: var(--nl-panel-2);
   overflow: hidden;
@@ -53871,8 +54706,9 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look .nl-players-axis-value {
-  font-size: 10px;
-  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-ink);
   text-align: right;
 }
 
@@ -54682,8 +55518,278 @@ button.is-new-look .nl-thist-season-pill,
 /* --- Reduced Motion (nl-teamprofile) --------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-teamprofile-action,
-  .is-new-look .nl-teamprofile-table-row {
+  .is-new-look .nl-teamprofile-table-row,
+  .is-new-look .nl-teamprofile-fan-chip,
+  .is-new-look .nl-teamprofile-depth-cell {
     transition: none;
+  }
+}
+
+/* --- Fans & Beliebtheit (nl-teamprofile-fan-*) ----------------------- */
+.is-new-look .nl-teamprofile-fan-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  align-items: center;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-fan-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamprofile-fan-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-teamprofile-fan-chip {
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-line));
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-fan-chip:hover {
+  border-color: var(--nl-accent);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-teamprofile-fan-consequence {
+  margin-top: var(--nl-s3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+/* --- Board-Vertrauen-Verlauf (nl-teamprofile-board-*) ---------------- */
+.is-new-look .nl-teamprofile-board-lead {
+  grid-column: span 2;
+  min-width: 280px;
+}
+
+.is-new-look .nl-teamprofile-board-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-teamprofile-board-meter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.is-new-look .nl-teamprofile-board-pressure-bar {
+  width: 100%;
+}
+
+.is-new-look .nl-teamprofile-board-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamprofile-board-history-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-board-history-empty {
+  margin: 0;
+  font-size: 12px;
+}
+
+.is-new-look .nl-teamprofile-board-warnings {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-objective-bar {
+  margin-top: 2px;
+  width: 100%;
+}
+
+/* --- Squad Depth Chart (nl-teamprofile-depth-*) ---------------------- */
+.is-new-look .nl-teamprofile-depth-stress-bar {
+  width: 100%;
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-depth-shell {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.is-new-look .nl-teamprofile-depth-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamprofile-depth-table th {
+  position: sticky;
+  top: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+  border-bottom: 1px solid var(--nl-line-2);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-depth-table th.nl-teamprofile-depth-th-discipline {
+  text-align: left;
+}
+
+.is-new-look .nl-teamprofile-depth-table td {
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: center;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-depth-row.is-thin td.nl-teamprofile-depth-discipline {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamprofile-depth-row.is-thin {
+  background: color-mix(in srgb, var(--nl-risk) 6%, transparent);
+}
+
+.is-new-look .nl-teamprofile-depth-discipline {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  text-align: left;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamprofile-depth-axis-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-depth-slots {
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-wrap {
+  padding: var(--nl-s1) var(--nl-s2);
+}
+
+.is-new-look .nl-teamprofile-depth-cell {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 88px;
+  padding: var(--nl-s1) var(--nl-s2);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-line)) 55%, var(--nl-line));
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, var(--nl-panel-2));
+  color: var(--nl-ink);
+  cursor: pointer;
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-depth-cell:hover {
+  border-color: var(--nl-tone, var(--nl-accent));
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-teamprofile-depth-cell.is-empty {
+  min-width: 88px;
+  border: 1px dashed var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  color: var(--nl-mut);
+  background: transparent;
+  cursor: default;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-rating {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-depth-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid var(--nl-panel);
+}
+
+.is-new-look .nl-teamprofile-depth-badge.is-injury {
+  background: var(--nl-risk);
+}
+
+.is-new-look .nl-teamprofile-depth-badge.is-fatigue {
+  background: var(--nl-warn);
+}
+
+/* --- Responsive (nl-teamprofile-fan-/board-/depth-) ------------------ */
+@media (max-width: 900px) {
+  .is-new-look .nl-teamprofile-fan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .nl-teamprofile-board-lead {
+    grid-column: auto;
+  }
+
+  .is-new-look .nl-teamprofile-board-gauge-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -55345,4 +56451,2010 @@ button.is-new-look .nl-thist-season-pill,
     transition: none;
     transform: none;
   }
+}
+
+/* ============================================================
+   NEUER LOOK — Liga-Leaders: Rekorde & Hall of Fame (nl-records-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an). Additiv, gehört zum
+   neuen Sub-Tab in app/foundation/league-leaders-v2/LeagueLeadersNewLook.tsx.
+   ============================================================ */
+
+/* Sub-Tab-Leiste unter dem Hint-Text im Header-Card. */
+.is-new-look .nl-leaders-subtabs {
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-records {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-records-empty-text {
+  margin: 0;
+  padding: var(--nl-s2) 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- All-Time-Medaillenspiegel ------------------------------------- */
+.is-new-look .nl-records-champions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-records-champion-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 8px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-records-champion-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-records-champion-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-records-champion-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-records-champion-name small {
+  font-size: 10px;
+  color: var(--nl-mut);
+  letter-spacing: 0.05em;
+}
+
+.is-new-look .nl-records-champion-medals {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.is-new-look .nl-records-champions-chart {
+  margin-top: var(--nl-s3);
+  max-width: 100%;
+}
+
+/* --- Rekord-Karten-Grid (Kaderwert / Ablöse / Board / MW-Sprung) ---- */
+.is-new-look .nl-records-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-records-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--nl-tone, var(--nl-accent));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-records-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-records-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+}
+
+.is-new-look .nl-records-card-body.is-interactive {
+  cursor: pointer;
+  border-radius: var(--nl-r-sm);
+  transition: opacity var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-records-card-body.is-interactive:hover,
+.is-new-look .nl-records-card-body.is-interactive:focus-visible {
+  opacity: 0.82;
+}
+
+.is-new-look .nl-records-card-body.is-interactive:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-records-card-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-records-card-holder {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-records-card-sub {
+  font-size: 11px;
+  color: var(--nl-mut);
+  letter-spacing: 0.02em;
+}
+
+/* --- Karriere-Bestenliste ------------------------------------------- */
+.is-new-look .nl-records-career-stats {
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-records-career-chart {
+  margin-bottom: var(--nl-s3);
+  max-width: 100%;
+}
+
+.is-new-look .nl-records-career-list {
+  gap: 4px;
+}
+
+/* ===================================================================
+   "Neuer Look" — Scouting-Center Wave 2 (Erkenntnis-Ladder + Shortlist-Board)
+   Scratch file — merge under `.is-new-look` in app/globals.css.
+   Namespacing: everything below is `.nl-scout-ladder-*` (task 1,
+   ScoutingKnowledgeLadder) or `.nl-scout-shortlist-*` (task 2,
+   ScoutingShortlistBoard) — both sub-families of the existing
+   `.nl-scout-*` scouting-center namespace, so they only ever apply
+   inside `.is-new-look` and never leak into the old look.
+   =================================================================== */
+
+/* --- Erkenntnis-Ladder (ScoutingKnowledgeLadder) ------------------- */
+
+.is-new-look .nl-scout-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+  padding-bottom: var(--nl-s3);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-scout-ladder-rail {
+  display: flex;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-scout-ladder-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 58px;
+  flex: 1 1 0;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut-2);
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-ladder-step small {
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-scout-ladder-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-ladder-step.is-reached {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-accent) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-scout-ladder-step.is-reached .nl-scout-ladder-dot {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-ladder-step.is-current {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  box-shadow: 0 0 0 1px var(--nl-accent), var(--nl-e1);
+}
+
+.is-new-look .nl-scout-ladder-step.is-current .nl-scout-ladder-dot {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-scout-ladder-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* "Vorher → Nachher"-Reveal-Moment */
+.is-new-look .nl-scout-ladder-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 40%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-good) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-scout-ladder-reveal-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-ladder-reveal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-ladder-reveal-row strong {
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-ladder-reveal-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.is-new-look .nl-scout-ladder-trait-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-scout-ladder-trait-pill.is-positive {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-ladder-trait-pill.is-negative {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+/* --- Shortlist-Analytics-Board (ScoutingShortlistBoard) ------------ */
+
+.is-new-look .nl-scout-shortlist-card .nl-card-body {
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-scout-shortlist-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-scout-shortlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-scout-shortlist-table th,
+.is-new-look .nl-scout-shortlist-table td {
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-table th {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-sort-th {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.is-new-look .nl-scout-shortlist-sort-th:hover,
+.is-new-look .nl-scout-shortlist-sort-th:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-sort-th:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-row {
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-shortlist-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-scout-shortlist-row.is-loaded {
+  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
+}
+
+.is-new-look .nl-scout-shortlist-row.is-selected {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: -1px;
+}
+
+.is-new-look .nl-scout-shortlist-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: var(--nl-ink);
+  text-align: left;
+}
+
+.is-new-look .nl-scout-shortlist-name strong {
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-shortlist-name small {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-scout-shortlist-name:hover strong,
+.is-new-look .nl-scout-shortlist-name:focus-visible strong {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-name:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-nowrap {
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-focus {
+  border-color: color-mix(in srgb, var(--nl-accent) 50%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-ready {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-active {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-waiting {
+  color: var(--nl-mut-2);
+  opacity: 0.75;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  font-size: 10.5px;
+  font-weight: 700;
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-elite {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-high {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-medium {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-low {
+  color: var(--nl-mut-2);
+  opacity: 0.8;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-unknown {
+  color: var(--nl-mut-2);
+  opacity: 0.6;
+}
+
+.is-new-look .nl-scout-shortlist-compare {
+  appearance: none;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-shortlist-compare:hover:not(:disabled),
+.is-new-look .nl-scout-shortlist-compare:focus-visible:not(:disabled) {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-compare:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-compare:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-scout-shortlist-row,
+  .is-new-look .nl-scout-shortlist-compare {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Wave 2 — Narrative additions ("Neuer Look")
+   Merge into app/globals.css underneath the existing `.is-new-look` rules.
+   Every selector below is namespaced `.is-new-look .nl-*` per convention.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1) Count-up / staggered-reveal primitive
+   Used by: useCountUp.ts (NlCountUpValue), HomeV2NewLook, MatchdayResultNewLook,
+   InboxV2NewLook (chronicle magazine cards).
+   Usage: className="nl-reveal" + inline style={{ "--nl-reveal-i": index }}
+   -------------------------------------------------------------------------- */
+.is-new-look .nl-reveal {
+  animation: nl-reveal-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--nl-reveal-i, 0) * 70ms);
+}
+
+@keyframes nl-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2) Matchday-Result: podium reveal stagger anchor
+   (renderPodiumStep already gets `.nl-reveal`; no extra class needed beyond
+   the primitive above, kept here as a marker/comment for the merge review.)
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   3) Inbox — Chronik "Magazin"-Layout
+   Lead-Story-Karte + Support-Karten-Grid, nur im Chronik-Modus verwendet.
+   -------------------------------------------------------------------------- */
+.is-new-look .nl-chronicle-magazine {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s5);
+}
+
+.is-new-look .nl-chronicle-lead {
+  background: linear-gradient(180deg, var(--nl-panel-2) 0%, var(--nl-panel) 100%);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-chronicle-lead .nl-card-title {
+  font-size: 1.4rem;
+  line-height: 1.28;
+}
+
+.is-new-look .nl-chronicle-lead-body {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-chronicle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-chronicle-story .nl-card-title {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.is-new-look .nl-chronicle-story-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--nl-mut);
+}
+
+/**
+ * Wave 3 — Spieler-Verzeichnis ("Neuer Look"), additive CSS.
+ *
+ * Scope: `app/foundation/players-table/FoundationPlayersTableNewLook.tsx`.
+ * Alles unter `.is-new-look`, alle NEUEN Klassen mit `nl-ptable-*` Präfix
+ * (bestehende `.nl-players-*`-Klassen bleiben unverändert — sie werden hier
+ * nur als Layout-Container weiterverwendet, nie neu definiert).
+ *
+ * Tasks:
+ * 1) Liga-Perzentil-Chips (OVR/PPs/MVS + Achsen) — `.nl-ptable-percentile`,
+ *    `.nl-ptable-axis-percentile`.
+ * 2) Nächster-Spieltag Disziplin-Eignungs-Strip — `.nl-ptable-discipline-*`.
+ * 3) CA/PO-Sterne-Spalte (NlAbilityStars) — `.nl-ptable-td-ability`.
+ * 4) MW-Bracket-Histogramm (NlBarChart) — `.nl-ptable-bracket-*`.
+ */
+
+/* --- 1) Liga-Perzentil-Chips (OVR/PPs/MVS) --------------------------- */
+.is-new-look .nl-ptable-metric-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.is-new-look .nl-ptable-percentile {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* --- 1) Achsen-Perzentil-Badge (kompakt, "T8%") ---------------------- */
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  grid-template-columns: 28px minmax(40px, 1fr) 26px 30px;
+}
+
+.is-new-look .nl-ptable-axis-percentile {
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--nl-tone, var(--nl-mut));
+  white-space: nowrap;
+}
+
+.is-new-look .nl-ptable-axis-percentile.is-empty {
+  visibility: hidden;
+}
+
+/* --- 2) Disziplin-Eignungs-Strip (nächster Spieltag) ----------------- */
+.is-new-look .nl-ptable-td-disciplines {
+  min-width: 76px;
+}
+
+.is-new-look .nl-ptable-discipline-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-ptable-discipline-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+}
+
+.is-new-look .nl-ptable-discipline-chip .nl-ptable-discipline-icon.discipline-icon-chip {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.is-new-look .nl-ptable-discipline-chip .nl-ptable-discipline-icon .discipline-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- 3) CA/PO-Sterne-Spalte ------------------------------------------ */
+.is-new-look .nl-ptable-td-ability {
+  min-width: 96px;
+  vertical-align: middle;
+}
+
+.is-new-look .nl-ptable-td-ability .nl-ability-stars {
+  justify-content: flex-start;
+}
+
+/* --- 4) MW-Bracket-Histogramm ----------------------------------------- */
+.is-new-look .nl-ptable-bracket-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-ptable-bracket-barchart {
+  max-width: 440px;
+  max-height: 132px;
+}
+
+.is-new-look .nl-ptable-bracket-legend {
+  margin: 0;
+  color: var(--nl-mut-2);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Wave 4 — Teams-Fokus: Disziplin-Profil (Radar + Breakdown, #46)
+   Ergänzt das bestehende POW/SPE/MEN/SOC-Stärkenprofil-Radar
+   (siehe "=== Team-Fokus-Hero: Stärkenprofil-Radar + Achsen ===")
+   um ein zweites Radar + eine Liste über alle Einzeldisziplinen.
+   Nur unter `.is-new-look .nl-teamdisc-*` — bestehende `.nl-teams-*`
+   und `.nl-radar-*` Regeln bleiben unberührt.
+   Betrifft: app/foundation/teams-v2/FoundationTeamsNewLook.tsx
+   ============================================================ */
+
+.is-new-look .nl-teamdisc-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teamdisc-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nl-s4, 20px);
+}
+
+/* --- Radar ---------------------------------------------------------- */
+.is-new-look .nl-teamdisc-radar-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-teamdisc-radar,
+.is-new-look .nl-teamdisc-radar-svg {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+}
+
+.is-new-look .nl-teamdisc-radar-empty {
+  margin: 0;
+  color: var(--nl-mut-2);
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-md);
+  max-width: 220px;
+  text-align: center;
+}
+
+.is-new-look .nl-teamdisc-radar-ring {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+  fill: none;
+}
+
+.is-new-look .nl-teamdisc-radar-spoke {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+}
+
+.is-new-look .nl-teamdisc-radar-shape {
+  fill: color-mix(in srgb, var(--nl-accent) 16%, transparent);
+  stroke: var(--nl-accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.is-new-look .nl-teamdisc-radar-dot {
+  fill: var(--nl-tone, var(--nl-accent));
+  stroke: var(--nl-panel);
+  stroke-width: 1;
+}
+
+.is-new-look .nl-teamdisc-radar-label {
+  fill: var(--nl-tone, var(--nl-mut));
+  font-family: var(--nl-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-teamdisc-radar-caption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  text-align: center;
+  max-width: 220px;
+}
+
+/* --- Breakdown-Liste -------------------------------------------------- */
+.is-new-look .nl-teamdisc-list {
+  flex: 1 1 320px;
+  min-width: 280px;
+  max-width: 100%;
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 var(--nl-s1) 0 0;
+  list-style: none;
+}
+
+.is-new-look .nl-teamdisc-row {
+  display: grid;
+  grid-template-columns: 12px 38px minmax(60px, 1fr) 48px 40px;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 4px var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-teamdisc-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamdisc-row-axis {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamdisc-row-label {
+  font-family: var(--nl-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--nl-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-teamdisc-row-bar {
+  min-width: 60px;
+}
+
+.is-new-look .nl-teamdisc-row-bar .nl-progress-track {
+  height: 6px;
+}
+
+.is-new-look .nl-teamdisc-row-score {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .nl-teamdisc-row-rank {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamdisc-footnote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--nl-mut-2);
+}
+
+/* --- Sub-Tabs-Aktion in der Karten-Kopfzeile -------------------------- */
+.is-new-look .nl-teamdisc-subtabs {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-teamdisc-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .is-new-look .nl-teamdisc-list {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Wave 4 — Training (Neuer Look) — #48/#49/#52/#53/#54
+   Nur additiv, ausschließlich unterhalb von `.is-new-look`.
+   Merge-Ziel: app/globals.css, direkt hinter den bestehenden
+   `.is-new-look .nl-training-*` Regeln (ab ca. Zeile 46137).
+   ============================================================ */
+
+/* #52 — Spielername als Profil-Link statt separatem "Profil öffnen"-Button.
+   Visuell identisch zum vorherigen <strong>, aber interaktiv (Button-Reset). */
+.is-new-look .nl-training-player-name-button {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--nl-ink);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  border-radius: var(--nl-r-sm, 4px);
+}
+
+.is-new-look .nl-training-player-name-button:hover,
+.is-new-look .nl-training-player-name-button:focus-visible {
+  color: var(--nl-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.is-new-look .nl-training-player-name-button:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+
+/* #49/#54 — dezentes Hinweis-Styling für Text mit erklärendem Tooltip
+   (Badge "kann fallen"/"steigt", Strain-Risiko-Label). Gepunktete
+   Unterstreichung signalisiert "hier gibt's mehr Kontext per Hover". */
+.is-new-look .nl-training-hint {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--nl-line-2);
+  text-underline-offset: 2px;
+}
+
+.is-new-look .nl-training-player-badge.nl-training-hint {
+  text-decoration-style: dotted;
+}
+
+/* #48 — Entwicklungsziel-Zeile aus der Kopf-Statleiste in die Topline
+   verschoben (Kacheln zeigen jetzt exakt Performance/Trainings-Zugewinn/
+   Regression/Netto). Bleibt klickbar, springt weiterhin zu den Filtern. */
+.is-new-look .nl-training-topline-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--nl-line-2);
+  text-underline-offset: 2px;
+}
+
+.is-new-look .nl-training-topline-link:hover,
+.is-new-look .nl-training-topline-link:focus-visible {
+  color: var(--nl-ink);
+  text-decoration-style: solid;
+}
+
+.is-new-look .nl-training-topline-link:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm, 4px);
+}
+
+/* #53 — Top-3 Klassen nach geschätztem SP-Zugewinn. Gleiche Bar-Optik wie
+   `.nl-training-intensity-*`, damit sich beide Prognose-Panels visuell
+   als zusammengehöriges Paar lesen. */
+.is-new-look .nl-training-class-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-2, 10px);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-training-class-ranking-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-training-class-ranking-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-training-class-ranking-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  grid-template-areas: "rank label value" "bar bar bar";
+  align-items: center;
+  gap: 2px var(--nl-s2);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: var(--nl-r-1, 6px);
+}
+
+.is-new-look .nl-training-class-ranking-row.is-current {
+  background: color-mix(in srgb, var(--nl-soc) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--nl-soc);
+}
+
+.is-new-look .nl-training-class-ranking-rank {
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-training-class-ranking-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--nl-ink, var(--nl-mut));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-class-ranking-current {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-soc);
+  padding: 1px 6px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-soc) 45%, transparent);
+}
+
+/* Bar sitzt in einer eigenen Reihe unter Rank+Label+Value, damit die
+   Zeile bei schmalen Karten nicht zu voll wird (grid-template-areas s.o.). */
+.is-new-look .nl-training-class-ranking-rank {
+  grid-area: rank;
+}
+
+.is-new-look .nl-training-class-ranking-label {
+  grid-area: label;
+}
+
+.is-new-look .nl-training-class-ranking-value {
+  grid-area: value;
+  justify-self: end;
+  font-weight: 700;
+  color: var(--nl-good);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-class-ranking-bar {
+  grid-area: bar;
+  position: relative;
+  height: 5px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-line);
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.is-new-look .nl-training-class-ranking-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--nl-soc);
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .nl-training-class-ranking-row.is-current .nl-training-class-ranking-fill {
+  background: var(--nl-accent);
+}
+
+/*
+ * Wave 4 — KPI Ranking Drawer (#37), NlRankingDrawer
+ * ---------------------------------------------------
+ * Flag-gated under `.is-new-look`. Merge these rules into app/globals.css
+ * (near the other `.player-drawer-*` / `.nl-*` overlay rules).
+ *
+ * Component: components/foundation/new-look/NlRankingDrawer.tsx
+ * Wired into: HomeV2NewLook, SeasonStandingsNewLook, FoundationRanksNewLook,
+ * LeagueLeadersNewLook (see PR notes for exact chip -> metric wiring).
+ *
+ * Mirrors the existing `.player-drawer-backdrop` / `.player-drawer` overlay
+ * conventions (fixed inset backdrop, blur, dialog surface) but renders as a
+ * right-edge sliding panel sized for a compact ranked list instead of a
+ * full profile. prefers-reduced-motion disables the enter animation.
+ */
+
+.is-new-look .nl-rankdrawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  background: rgba(3, 7, 13, 0.6);
+  backdrop-filter: blur(4px);
+  padding: 0;
+  animation: nl-rankdrawer-fade 0.18s ease-out;
+}
+
+.is-new-look .nl-rankdrawer {
+  width: min(420px, 100vw);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 24px;
+  background: linear-gradient(180deg, rgba(32, 35, 42, 0.98), rgba(19, 22, 28, 0.98));
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.42);
+  animation: nl-rankdrawer-slide-in 0.22s ease-out;
+}
+
+@keyframes nl-rankdrawer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nl-rankdrawer-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-rankdrawer-backdrop,
+  .is-new-look .nl-rankdrawer {
+    animation: none;
+  }
+}
+
+.is-new-look .nl-rankdrawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+.is-new-look .nl-rankdrawer-head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-rankdrawer-eyebrow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-rankdrawer-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-close {
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.is-new-look .nl-rankdrawer-close:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.is-new-look .nl-rankdrawer-close:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-rankdrawer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-rankdrawer-empty {
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.is-new-look .nl-rankdrawer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-rankdrawer-row {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.is-new-look .nl-rankdrawer-row.is-own {
+  border-color: var(--nl-accent, #5b9bff);
+  background: rgba(91, 155, 255, 0.1);
+}
+
+.is-new-look .nl-rankdrawer-row.is-highlighted {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: -1px;
+}
+
+.is-new-look .nl-rankdrawer-rowinner {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.is-new-look .nl-rankdrawer-rowbtn {
+  background: none;
+  border: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-rankdrawer-rowbtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.is-new-look .nl-rankdrawer-rowbtn:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-rankdrawer-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+}
+
+.is-new-look .nl-rankdrawer-rank-num {
+  font-size: 0.85rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.is-new-look .nl-rankdrawer-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.is-new-look .nl-rankdrawer-sub {
+  font-size: 0.74rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-rankdrawer-value {
+  font-weight: 600;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-rankdrawer-delta {
+  font-size: 0.76rem;
+  white-space: nowrap;
+  min-width: 2.4em;
+  text-align: right;
+}
+
+.is-new-look .nl-rankdrawer-delta.is-positive {
+  color: var(--nl-good, #4cc56b);
+}
+
+.is-new-look .nl-rankdrawer-delta.is-negative {
+  color: var(--nl-risk, #e5615a);
+}
+
+.is-new-look .nl-rankdrawer-delta.is-empty {
+  visibility: hidden;
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-rankdrawer {
+    width: 100vw;
+  }
+}
+
+/* ============================================================
+   NEUER LOOK — Spieler: Ligaweiter Analyse-/Ranking-Hub (#47)
+   Additiv zum bestehenden Spieler-Verzeichnis. Alles unter
+   `.is-new-look`, alle NEUEN Klassen mit `nl-phub-*` Präfix
+   (bestehende `.nl-players-*`/`.nl-ptable-*`-Klassen bleiben
+   unverändert). Betrifft:
+   - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
+   Merge-Ziel: app/globals.css (irgendwo im `.is-new-look`-Block).
+   ============================================================ */
+
+/* --- Verzeichnis/Hub-Umschalter (NlSubTabs) -------------------------- */
+.is-new-look .nl-phub-view-tabs {
+  margin-bottom: 2px;
+}
+
+/* --- Hub-Wrapper ------------------------------------------------------ */
+.is-new-look .nl-phub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-phub-empty,
+.is-new-look .nl-phub-empty-inline {
+  margin: 0;
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm, 13px);
+}
+
+.is-new-look .nl-phub-empty-inline {
+  padding: var(--nl-s2) 0;
+}
+
+.is-new-look .nl-phub-hint {
+  margin: var(--nl-s2) 0 0;
+  color: var(--nl-mut-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* --- Leaderboard-Kachel ------------------------------------------------ */
+.is-new-look .nl-phub-metric-bar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-phub-metric-btn {
+  padding: 5px 11px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill, 999px);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease),
+    background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-phub-metric-btn:hover,
+.is-new-look .nl-phub-metric-btn:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-phub-metric-btn:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-phub-metric-btn.is-active {
+  color: var(--nl-ink);
+  border-color: var(--nl-tone, var(--nl-accent));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 18%, var(--nl-panel));
+  box-shadow: inset 0 0 0 1px var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-phub-board-stats {
+  margin: 0 0 var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-phub-board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-phub-board-row {
+  display: grid;
+  grid-template-columns: 36px minmax(120px, 1.1fr) minmax(120px, 1fr) auto 52px;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 7px 10px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-phub-board-row.is-own {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-phub-board-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.is-new-look .nl-phub-board-ranknum {
+  min-width: 22px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-phub-board-name-btn,
+.is-new-look .nl-phub-board-team-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--nl-sans);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-board-name-btn {
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-phub-board-name-btn:hover,
+.is-new-look .nl-phub-board-name-btn:focus-visible {
+  color: var(--nl-tone, var(--nl-accent));
+  text-decoration: underline;
+}
+
+.is-new-look .nl-phub-board-team-btn {
+  color: var(--nl-mut);
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-phub-board-team-btn:hover,
+.is-new-look .nl-phub-board-team-btn:focus-visible {
+  color: var(--nl-ink);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-phub-board-team-btn.is-free-agent {
+  cursor: default;
+  color: var(--nl-mut-2);
+  font-style: italic;
+}
+
+.is-new-look .nl-phub-board-name-btn:focus-visible,
+.is-new-look .nl-phub-board-team-btn:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-phub-own-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-board-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--nl-tone, var(--nl-ink));
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-board-percentile {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: var(--nl-r-pill, 999px);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-board-percentile.is-empty {
+  visibility: hidden;
+}
+
+/* --- Analyse-Kacheln-Grid ---------------------------------------------- */
+.is-new-look .nl-phub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+/* Kachel-spezifische Modifier-Klassen auf `NlCard` (Basisdarstellung kommt
+   von `.nl-card`) — hier nur, damit jede Kachel innerhalb des Grids nicht
+   über ihre Spalte hinauswächst (lange Spielernamen/Team-Namen). */
+.is-new-look .nl-phub-board-card,
+.is-new-look .nl-phub-value-card,
+.is-new-look .nl-phub-movers-card,
+.is-new-look .nl-phub-potential-card,
+.is-new-look .nl-phub-scarcity-card {
+  min-width: 0;
+}
+
+/* --- Generische kompakte Liste (Value/Potential/Movers) ---------------- */
+.is-new-look .nl-phub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-phub-list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 8px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-phub-list-rank {
+  min-width: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-phub-list-name-btn,
+.is-new-look .nl-phub-list-team-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--nl-sans);
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-list-name-btn {
+  color: var(--nl-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  flex: 0 1 auto;
+}
+
+.is-new-look .nl-phub-list-name-btn:hover,
+.is-new-look .nl-phub-list-name-btn:focus-visible {
+  color: var(--nl-accent);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-phub-list-team-btn {
+  color: var(--nl-mut);
+  font-size: 10.5px;
+  flex: 0 1 auto;
+}
+
+.is-new-look .nl-phub-list-team-btn:hover,
+.is-new-look .nl-phub-list-team-btn:focus-visible {
+  color: var(--nl-ink);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-phub-list-team-btn.is-free-agent {
+  cursor: default;
+  color: var(--nl-mut-2);
+  font-style: italic;
+}
+
+.is-new-look .nl-phub-list-name-btn:focus-visible,
+.is-new-look .nl-phub-list-team-btn:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-phub-list-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-phub-list-ratio {
+  font-weight: 700;
+}
+
+/* --- Auf-/Absteiger (Movers) -------------------------------------------- */
+.is-new-look .nl-phub-movers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-phub-movers-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-phub-movers-col-label {
+  font-size: var(--nl-fs-xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-phub-movers-col .nl-phub-list-row {
+  justify-content: space-between;
+}
+
+.is-new-look .nl-phub-movers-col .nl-phub-list-name-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* --- Spezialisierungs-Verteilung (Disziplin-Scarcity) ------------------- */
+.is-new-look .nl-phub-scarcity-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-phub-scarcity-chart {
+  width: 100%;
+  min-width: 360px;
+  height: auto;
+}
+
+/* --- Responsive: schmale Viewports (Movers-Spalten stapeln) ------------- */
+@media (max-width: 640px) {
+  .is-new-look .nl-phub-movers-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .nl-phub-board-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "rank name value"
+      "rank team pctl";
+    row-gap: 2px;
+  }
+
+  .is-new-look .nl-phub-board-rank {
+    grid-area: rank;
+  }
+
+  .is-new-look .nl-phub-board-name-btn {
+    grid-area: name;
+  }
+
+  .is-new-look .nl-phub-board-team-btn {
+    grid-area: team;
+  }
+
+  .is-new-look .nl-phub-board-value {
+    grid-area: value;
+  }
+
+  .is-new-look .nl-phub-board-percentile {
+    grid-area: pctl;
+    justify-self: start;
+  }
+}
+
+/* --- Reduced Motion: keine neuen Transitions außer bestehendem Muster --- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-phub-metric-btn {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   NEUER LOOK — Spieler-Tabelle: HIGH-PRIORITY UI-Fixes (Wave 5)
+   Additiv, überschreibt bestehende `.nl-players-*`-Regeln aus
+   app/globals.css mit gleich-/höherwertiger Spezifität (alles
+   flag-gated unter `.is-new-look`). Betrifft:
+   - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
+   ============================================================ */
+
+/* --- Fix 1) BILD-Portrait füllt die ROW-HÖHE (genau EIN Bild) ----------
+   Bisher 44×44 Mini-Thumbnail. Jetzt füllt das (einzige) Portrait die
+   Zeilenhöhe: die `<td>`-Höhe (100% = Zeilenhöhe in Tabellen-Layout)
+   wird über den Anchor-Span an das quadratische Bild durchgereicht.
+   Das Hover-Preview-Panel (Portal) bleibt unberührt — hier wird nur der
+   Inline-Anchor + das Bild in DIESER Zelle gestylt. */
+.is-new-look .nl-players-td-image {
+  height: 100%;
+  vertical-align: middle;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Anchor-Span (shared class, hier NUR innerhalb der BILD-Zelle des neuen
+   Looks gescoped) streckt sich auf die volle Zellenhöhe. */
+.is-new-look .nl-players-td-image .foundation-player-portrait-preview-anchor {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  min-height: 56px;
+}
+
+/* Das einzige Portrait (Bild ODER Initialen-Fallback teilen die Klasse)
+   füllt die Zeilenhöhe und bleibt quadratisch. */
+.is-new-look .nl-players-td-image .nl-players-portrait {
+  width: auto;
+  height: 100%;
+  min-height: 56px;
+  max-height: 104px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--nl-r-md);
+  object-fit: cover;
+}
+
+/* Fallback-Kachel: quadratisch mitwachsen, Initialen mittig, größer lesbar. */
+.is-new-look .nl-players-td-image .nl-players-portrait-fallback {
+  width: auto;
+  aspect-ratio: 1 / 1;
+  font-size: 18px;
+}
+
+/* --- Fix 2) ACHSEN: Wert/Label-Abstand + vertikaler Atem ---------------
+   "60SPE"/"66SOC" liefen zusammen und die Achsen-Zeilen klebten
+   aneinander. Mehr Spaltenbreite, größerer column-gap (Wert nie am Label
+   klebend) und mehr row-gap zwischen POW/SPE/MEN/SOC. Höhere Spezifität
+   als die Basisregeln, damit der Merge-Order egal ist. */
+.is-new-look td.nl-players-td-axes {
+  min-width: 208px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.is-new-look .nl-players-td-axes .nl-players-axes {
+  gap: 9px;
+}
+
+/* Label · Balken · Wert · Perzentil — breitere, klar getrennte Spalten. */
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  grid-template-columns: 34px minmax(46px, 1fr) 32px 34px;
+  column-gap: 10px;
+  min-height: 18px;
+}
+
+/* Wert nie am Label/Balken kleben — eigener Innenabstand + eigene Spalte. */
+.is-new-look .nl-players-td-axes .nl-players-axis-value {
+  padding-left: 4px;
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-players-td-axes .nl-players-axis-label {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+/* Wave 5 — Home-Politur (#40): Radar-Prominenz + reichhaltigere
+   Aufsteiger/Risiken-Zeilen. Nur NEUE `.nl-home-*` Klassen; alle
+   Selektoren sind bewusst spezifischer als die bestehenden Regeln in
+   globals.css, damit sie unabhängig von der Merge-Reihenfolge greifen.
+   Datei betrifft ausschließlich HomeV2NewLook.tsx. */
+
+/* --- Team-Profil-Radar: größer + mehr Spaltenbreite im Profil-Grid --- */
+.is-new-look .nl-home-profile-grid.nl-home-profile-grid-hero {
+  grid-template-columns: minmax(320px, 1.35fr) minmax(280px, 1fr);
+  align-items: stretch;
+}
+@media (max-width: 860px) {
+  .is-new-look .nl-home-profile-grid.nl-home-profile-grid-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-home-radar-card.nl-home-radar-card-hero {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero {
+  padding: var(--nl-s3) 0 var(--nl-s2);
+}
+.is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero .nl-radar {
+  width: 100%;
+  max-width: 340px;
+}
+@media (max-width: 480px) {
+  .is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero .nl-radar {
+    max-width: 280px;
+  }
+}
+
+/* --- Aufsteiger/Risiken: reichhaltigere, mehrzeilige Zeilen ---------- */
+.is-new-look .nl-home-development-row.nl-home-development-row-rich {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.is-new-look .nl-home-development-row.nl-home-development-row-rich:hover,
+.is-new-look .nl-home-development-row.nl-home-development-row-rich:focus-visible {
+  transform: none;
+}
+
+.is-new-look .nl-home-development-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-home-development-rank {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-home-development-row-rich .nl-home-development-figures {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.is-new-look .nl-home-development-bar.nl-progress {
+  width: 100%;
+  gap: 0;
+}
+.is-new-look .nl-home-development-bar .nl-progress-track {
+  height: 4px;
+}
+
+.is-new-look .nl-home-development-range {
+  font-size: 10.5px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Wave 5 — Inbox rework (#43 auto-resolve, #44 categorization)
+   Namespace: .is-new-look .nl-inbox-* (matches existing inbox-v2
+   "Neuer Look" block in app/globals.css — merge alongside it).
+   ============================================================ */
+
+/* #44 — "Wiederkehrend" / "Einmalig" cadence tag next to the
+   category label in the Aktionen list. Recurring reminders get a
+   faint accent tint so they read as "keeps coming back"; one-time
+   setup tasks stay neutral. */
+.is-new-look .nl-inbox-cadence-tag {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-recurring {
+  border-color: color-mix(in srgb, var(--nl-accent) 40%, transparent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-once {
+  border-color: var(--nl-line-2);
+  color: var(--nl-mut);
+}
+
+/* #43 — "Automatisch" tag shown on still-open condition items to
+   explain why there is no manual "Erledigt" button: the game will
+   resolve it once the underlying condition is met. Dashed border
+   distinguishes it from the solid cadence tag. */
+.is-new-look .nl-inbox-auto-tag {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px dashed var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+/* #43 — small check glyph inside the existing .nl-inbox-card-status
+   pill, only for auto-resolved ("Automatisch erledigt") items. */
+.is-new-look .nl-inbox-card-status-icon {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--nl-good, #4cc56b);
 }

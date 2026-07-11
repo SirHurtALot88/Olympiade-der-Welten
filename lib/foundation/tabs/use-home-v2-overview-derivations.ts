@@ -260,6 +260,8 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         caRating: developmentInsight?.currentRating ?? null,
         poRangeMin: developmentInsight?.potentialRangeDisplay?.min ?? null,
         poRangeMax: developmentInsight?.potentialRangeDisplay?.max ?? null,
+        caStars: forecast?.currentAbilityStars ?? null,
+        poStars: forecast?.potentialStars ?? null,
       };
     });
   }, [enableTopPlayerForecasts, gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap]);

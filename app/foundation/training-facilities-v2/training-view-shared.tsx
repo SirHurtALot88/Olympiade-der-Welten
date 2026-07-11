@@ -26,6 +26,7 @@ import {
   PROGRESSION_CLASS_ORDER,
   type ProgressionClassName,
 } from "@/lib/training/class-progression-config";
+import { getAttributeGrowthMultiplier } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
@@ -76,6 +77,8 @@ export type TrainingIntensityProjectionEntry = {
   net: number;
   isCurrent: boolean;
   fatigueLoad: number;
+  /** Regenerations-Delta dieser Intensität in % (echtes Feld aus `trainingModeOptions`, z. B. Recovery/Verletzungsschutz-Trade-off). */
+  recoveryDeltaPct: number;
 };
 
 /**
@@ -124,6 +127,7 @@ export function buildTrainingIntensityProjection(
       net: roundTo(net, 1),
       isCurrent: option.value === row.mode,
       fatigueLoad: option.fatigueLoad,
+      recoveryDeltaPct: option.recoveryDeltaPct,
     };
   });
 }
@@ -187,6 +191,62 @@ export function buildTrainingClassSuggestion(
     label,
     attributes: [first.attribute, second.attribute],
   };
+}
+
+export type TrainingClassGainEstimate = {
+  className: ProgressionClassName;
+  label: string;
+  /** Geschätzter Trainings-SP-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. */
+  estimatedGain: number;
+  isCurrent: boolean;
+};
+
+/**
+ * #53 — Top-3 Klassen nach geschätztem Trainings-SP-Zugewinn.
+ *
+ * Schätzung, KEINE neue Balance-Formel: Das echte, bereits Trait-/Potential-/
+ * Facility-adjustierte Trainingsbudget des Spielers (`organicForecast.trainingSetpoints`)
+ * wird nach der jeweiligen Klassen-Attributgewichtung (`CLASS_PROGRESSION_WEIGHTS`,
+ * positiv normalisiert wie in `distributeByClassProfile`, organic-season-progression.ts)
+ * verteilt und mit dem ECHTEN Potential-Decke-Multiplikator je Attribut abgeschwächt
+ * (`getAttributeGrowthMultiplier` — dieselbe Funktion, die die Engine für den
+ * Headroom-Malus nutzt: 0.05 bei "capped", 0.45 bei "closing", 1 bei "open").
+ * Reale Werte weichen ab, sobald Performance-Anteil, Signature/Weak-Affinität und
+ * Trait-Nebenwirkungen mit einfließen — daher UI-seitig klar als Schätzung markieren.
+ */
+export function buildTrainingClassGainRanking(
+  row: TrainingPlayerRowView,
+  trainingClassOptions: TrainingClassOption[],
+): TrainingClassGainEstimate[] {
+  const budget = row.organicForecast.trainingSetpoints;
+  if (!(budget > 0)) return [];
+  const currentClass = normalizeProgressionClassName(row.trainingClass);
+  const capacityByAttribute = new Map(
+    row.attributeForecast.map((entry) => [entry.attributeKey, getAttributeGrowthMultiplier(entry.ceilingState ?? "open")]),
+  );
+
+  const estimates = PROGRESSION_CLASS_ORDER.map((className) => {
+    const profile = getClassTrainingProfile(className, row.adminBalancingConfig);
+    const positiveTotal = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => sum + Math.max(0, profile[key]), 0);
+    const estimatedGain =
+      positiveTotal > 0
+        ? PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => {
+            const weight = Math.max(0, profile[key]);
+            if (weight <= 0) return sum;
+            const capacity = capacityByAttribute.get(key) ?? 1;
+            return sum + budget * (weight / positiveTotal) * capacity;
+          }, 0)
+        : 0;
+    const label = trainingClassOptions.find((option) => option.value === className)?.label ?? className;
+    return {
+      className,
+      label,
+      estimatedGain: roundTo(estimatedGain, 1),
+      isCurrent: className === currentClass,
+    };
+  });
+
+  return estimates.sort((left, right) => right.estimatedGain - left.estimatedGain).slice(0, 3);
 }
 
 export type TrainingBudgetBreakdownStep = {

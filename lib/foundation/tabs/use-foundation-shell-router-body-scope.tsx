@@ -6675,6 +6675,7 @@ export function useFoundationShellRouterBodyScope({
     seasonPointsLedger,
     teamObjectiveOverview,
     currentMatchdayDisciplineSchedule,
+    manageableTeamIds: foundationManageableTeamIds,
   });
 
   const playerSeasonPerformanceMap = useMemo(
