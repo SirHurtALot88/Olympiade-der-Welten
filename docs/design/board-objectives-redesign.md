@@ -68,7 +68,11 @@ Zwei Werte pro Team/Season, die sich innerhalb der **Persönlichkeits-Bandbreite
 - `patience ∈ [0,1]` — wie schnell aus Unterperformance *Druck* wird. Startwert aus `identity.boardConfidence`
   + `identity.harmony`. Ein geduldiges Board eskaliert langsamer.
 
-Das ist dein *"mal ambitionierter, mal weniger ambitioniert, je nachdem wie das Board drauf ist"*.
+**Reaktion auf Ergebnisse (F1, entschieden):** wiederholte Unterperformance wirkt **dreifach** — Ambition
+kann leicht sinken (realistischere Latte), **Geduld sinkt** (`patience ↓` → schnellere Eskalation, mehr
+GM-Wechsel) **und** das harte Rating (`value`) fällt über die negativen `objectiveDelta`. Überperformance
+hebt Ambition + Geduld + Rating. Das ist dein *"mal ambitionierter, mal weniger ambitioniert, je nachdem
+wie das Board drauf ist"* — mit klarer Straf-Richtung bei Enttäuschung.
 
 ### 2.3 Ziel-Difficulty-Kalibrierung
 Jedes Ziel bekommt ein **Difficulty-Band** relativ zu `expectedRank`, moduliert durch `ambition`:
@@ -99,9 +103,9 @@ perceivedPressure = clamp( basePressure(momentum, narrativeBoost) − patienceDa
 
 ### 2.5 Captain → Board-Kanal
 `captainDamping = clamp(leadershipScore / K, 0, maxDamp)` — hoher Leadership-Captain **nimmt Druck raus**:
-- **primär (empfohlen):** senkt `perceivedPressure` direkt (Kabinen-Rückhalt) und **verbreitert das
-  Toleranzband** (at_risk-Schwelle wächst; GM-Rauswurf-Wahrscheinlichkeit sinkt). Ziele bleiben unverändert.
-- **optional (offene Frage F2):** verhandelt zusätzlich die `difficulty` minimal runter (kleinerer `stretch`).
+- **entschieden (F2):** senkt `perceivedPressure` direkt (Kabinen-Rückhalt) und **verbreitert das
+  Toleranzband** (at_risk-Schwelle wächst; GM-Rauswurf-Wahrscheinlichkeit sinkt). **Ziele/`difficulty`
+  bleiben unverändert** — der Captain verhandelt keine leichteren Ziele, nur weniger gefühlten Druck.
 - Die zwei toten Captain-Felder werden umgewidmet:
   `rivalryPressureReductionPct` → `boardPressureReductionPct` (jetzt echt konsumiert),
   `conflictSoftenChancePct` → `objectiveToleranceBonusPct` (verbreitert at_risk-Band).
@@ -162,7 +166,16 @@ Konstanten (`α`, `maxStretch`, `momentum-decay`, `K=40`, Damping-Caps) landen i
   (+ `value` als Floor) statt roher Inverse; Captain-Damping senkt sie organisch. Human-Ausschluss bleibt.
 - **AI-Transfer-Bias** (`buildAiBias`): `pressureFactor = perceivedPressure/10`.
 - **gm-pressure-behavior**: liest den **dynamischen** Zustand (Bug #1 Fix), inkl. Captain-Damping.
-- **Human-Budget-Kürzung**: bleibt, aber Schwelle an `perceivedPressure` statt an rohem `value` — konsistent.
+- **Human-Team-Mandate (F3, erweitert):** statt nur stumpfer Budget-Kürzung legt das Board bei niedrigem
+  Rating / hohem `perceivedPressure` ein **`BoardMandate`** auf — organisch nach Lage gewählt:
+  - `budget_restriction` — Transferbudget/Cash-Deckel diese Season (skaliert mit Druck).
+  - `mandatory_sale` / `rebuild` — Auflage, einen bestimmten Spieler (z.B. teuersten oder ältesten Star)
+    zu verkaufen; erfüllt → Druck runter, verweigert → Rating-/Druck-Strafe.
+  - `transfer_income_target` — „generiere ≥ N M Einnahmen in dieser Transferperiode".
+  Mandate erscheinen als Human-Team-Objectives mit `actionHint`, Deadline-Phase (Transfer-/Season-Ende) und
+  klarer Auswertung. Auswahl-Logik: welche Direktive passt zur Ursache (Kader zu alt → rebuild; Cash-Loch →
+  income_target; Überinvestition → budget_restriction). **Keine Hard-Limits** — Mandate sind Ziele mit Folgen,
+  keine Sperren. AI-Teams behalten stattdessen den GM-Rauswurf-Pfad.
 
 ---
 
@@ -178,6 +191,16 @@ Konstanten (`α`, `maxStretch`, `momentum-decay`, `K=40`, Damping-Caps) landen i
   conflictSoftenChancePct     → objectiveToleranceBonusPct  (jetzt konsumiert)
 // Board-Disposition
 + seasonState.boardDisposition?: Record<teamId, { ambition:number; patience:number }>;
+// Human-Team Board-Mandate (F3)
++ type BoardMandateType = "budget_restriction" | "mandatory_sale" | "rebuild" | "transfer_income_target";
++ type BoardMandateRecord = {
++   teamId: string; seasonId: string; type: BoardMandateType;
++   targetValue: number | null; targetPlayerId?: string | null;
++   deadlinePhase: "transfer" | "season_end";
++   status: "open" | "met" | "failed"; rewardPressureDelta: number; penaltyDelta: number;
++ };
++ seasonState.boardMandates?: BoardMandateRecord[];
+// Slate-Größe wird zur Laufzeit aus Disposition berechnet (kein Feld nötig)
 ```
 
 ---
@@ -190,10 +213,13 @@ Flag `OLY_BOARD_OBJECTIVES_V2` (default AUS bis Parität/Balancing grün).
   *Messung:* Ziel-Erfüllungsrate pro Stärke-Tertil im Long-Run (schwach/mittel/stark sollen alle ~erfüllbar).
 - **Slice 2 — Perceived-Pressure-Ebene:** neues Feld + Formel; alle Konsequenzen auf `perceivedPressure`
   umstellen; Bug #1/#3 fixen. *Messung:* GM-Rauswurf-Rate, Pressure-Verlauf-Glätte.
-- **Slice 3 — Board-Disposition:** `ambition/patience`-Fortschreibung. *Messung:* Ziel-Ambition-Varianz über Seasons.
-- **Slice 4 — Captain-Kanal:** Damping + Toleranzband; tote Felder umwidmen; Duplikat-Captain-Formel
-  in eine Quelle konsolidieren. *Messung:* Effekt guter Captain auf Rauswurf-Rate/Pressure.
-- **Slice 5 — Skalen-Bug #2 + UI/Tooltips** an die neue Semantik anpassen.
+- **Slice 3 — Board-Disposition + dynamische Slate:** `ambition/patience`-Fortschreibung (F1: Enttäuschung →
+  Geduld↓ + Rating↓); Slate-Größe 3–5 aus Disposition (F4). *Messung:* Ziel-Ambition-Varianz über Seasons.
+- **Slice 4 — Captain-Kanal:** Damping + Toleranzband (F2: nur Druck, Ziele bleiben); tote Felder umwidmen;
+  Duplikat-Captain-Formel in eine Quelle konsolidieren. *Messung:* Effekt guter Captain auf Rauswurf-Rate/Pressure.
+- **Slice 5 — Human-Team-Mandate (F3):** `BoardMandate` (budget_restriction / mandatory_sale / rebuild /
+  transfer_income_target) + Auswahl-Logik + Auswertung. *Messung:* Mandat-Erfüllungsrate, Human-Druck-Verlauf.
+- **Slice 6 — Skalen-Bug #2 + UI/Tooltips** an die neue Semantik anpassen (perceivedPressure, Mandate, Captain).
 
 ---
 
@@ -207,11 +233,33 @@ Flag `OLY_BOARD_OBJECTIVES_V2` (default AUS bis Parität/Balancing grün).
 
 ---
 
-## 9. Offene Design-Entscheidungen (brauche dein Urteil)
-- **F1 — Board bei Enttäuschung:** Ambition *senken* (realistischer, weniger Druck) **oder** *ungeduldiger*
-  werden (mehr Druck, mehr GM-Wechsel)? Oder stärke-abhängig beides?
-- **F2 — Captain-Reichweite:** Nur `perceivedPressure` dämpfen + Toleranzband (Ziele bleiben hart) —
-  **oder** darf ein Top-Captain die `difficulty` minimal runter-verhandeln?
-- **F3 — Human vs. AI:** Gilt das neue Pressure/Captain-System symmetrisch für Menschen-Teams (nur Budget-Folge)
-  und AI-Teams (Rauswurf-Folge), oder unterschiedlich kalibriert?
-- **F4 — Slate-Größe:** Vierer-Slate beibehalten oder stärke-/disposition-abhängig 3–5 Ziele?
+## 9. Design-Entscheidungen (vom Owner freigegeben)
+
+- **F1 — Board bei Enttäuschung → BEIDES.** Wiederholte Unterperformance macht das Board **ungeduldiger**
+  (`patience` sinkt → schnellere Druck-Eskalation, höhere GM-Rauswurf-Wahrscheinlichkeit) **und** das
+  **Rating fällt** (`value`/`boardConfidence` sinkt). Konkret in 4.2: `patience(s) = patience(s−1) − β*underPerformance`,
+  zusätzlich zum bestehenden negativen `objectiveDelta` auf `value`. Über-/Unterperformance wirkt also auf
+  Ambition (Latte), Geduld (Eskalationstempo) und Rating (harte Bilanz) zugleich.
+
+- **F2 — Captain senkt Druck, Ziele bleiben hart.** Nur `perceivedPressure`-Damping + breiteres Toleranzband
+  (at_risk-Schwelle, niedrigere Rauswurf-Wahrscheinlichkeit). **Keine** Verhandlung der `difficulty`/Zielwerte.
+  Die in 2.5 als optional markierte Difficulty-Verhandlung entfällt.
+
+- **F3 — Human-Team-Konsequenzen werden reichhaltiger** (nicht nur Budget). Bei niedrigem Rating / hohem
+  `perceivedPressure` kann das Board dem Menschen-Team **eine von mehreren Direktiven** auferlegen (organisch
+  je nach Lage), als *board mandate* statt stumpfer Cash-Kürzung:
+  - **Budget-Restriktion** (wie heute, aber skaliert),
+  - **Verkaufsauflage / Rebuild-Mandat** — „verkaufe X (z.B. teuersten/ältesten Star) für Verjüngung",
+  - **Transfer-Perioden-Einnahmeziel** — „generiere in dieser Transferperiode ≥ N M Einnahmen".
+  Diese Mandate erscheinen als eigene Human-Team-Objectives mit klarer `actionHint` und werden am Transfer-/
+  Season-Ende ausgewertet (erfüllt → Druck runter; verfehlt → Rating/Druck-Strafe). AI-Teams behalten den
+  Rauswurf-Pfad. Neues Konzept: `BoardMandate` (Typ + Zielwert + Deadline-Phase), s. 6.
+
+- **F4 — Slate wird disposition-abhängig 3–5 Ziele** (Owner offen, Empfehlung angenommen). Begründung:
+  koppelt direkt an die Board-Persönlichkeit — ein **ambitioniertes/ungeduldiges** Board stellt mehr
+  Forderungen (bis 5), ein **ruhiges/geduldiges** weniger (min 3). Verstärkt das „je nachdem wie das Board
+  drauf ist" ohne Extra-Mechanik. Umsetzung in Slice 3 (Disposition) — bis dahin bleibt die Slate bei 4,
+  damit die Kern-Slices (1–2) klein bleiben.
+  ```
+  slateSize = clamp( 3 + round( 2 * (0.5*disposition.ambition + 0.5*(perceivedPressure/10)) ), 3, 5 )
+  ```
