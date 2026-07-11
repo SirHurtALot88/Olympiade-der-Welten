@@ -94,6 +94,11 @@ if grep -qE "organic_peak_net_corridor" "$OUT/phase3-s2.log" 2>/dev/null; then
 fi
 
 log "Phase 4: Exports"
+# The long-run harness writes to the isolated per-run DB (long-run-db-isolation clones the shared DB
+# into $OUT/balancing-run.sqlite). The export/report scripts default to data/persistence/oly-app.sqlite
+# and would otherwise fail with "Save not found". Point them at the isolated run DB so the tables
+# (Marktwert/Cash/Spieleranzahl/Rollen) and the balancing report actually populate.
+export OLY_APP_SQLITE_PATH="$OUT/balancing-run.sqlite"
 npx tsx scripts/multiseason-final-audit.ts --save-id "$SAVE_ID" --history > "$OUT/multiseason-final-audit-history.txt" 2>&1 || true
 npx tsx scripts/export-team-kpi-table.ts --save-id "$SAVE_ID" --output "$OUT/team-kpi-table.md" 2>&1 | tee "$OUT/export-kpi.log" || true
 npx tsx scripts/export-team-finance-season-table.ts --save-id "$SAVE_ID" > "$OUT/team-finance-season-table.md" 2>&1 || true
