@@ -522,7 +522,7 @@ function FoundationTeamsDetailPanel({
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown }) => {
+                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown, known: rowKnown, caStars: rowCaStars, poStarRange: rowPoStarRange, caScore: rowCaScore, poScoreRange: rowPoScoreRange }) => {
                               const hasPpsBreakdown = [ppPow, ppSpe, ppMen, ppSoc].some((value) => value != null && Number.isFinite(value));
                               const isContractExpiring = entry.contractLength <= 1;
                               return (
@@ -557,6 +557,13 @@ function FoundationTeamsDetailPanel({
                                           context="teamGrid"
                                           roleTag={entry.roleTag}
                                           playerClassName={player.className}
+                                          previewDensity="full"
+                                          newLook
+                                          known={rowKnown}
+                                          caStars={rowCaStars}
+                                          caScore={rowCaScore}
+                                          poStarRange={rowPoStarRange}
+                                          poScoreRange={rowPoScoreRange}
                                         >
                                           {thumbSrc ? (
                                             <img

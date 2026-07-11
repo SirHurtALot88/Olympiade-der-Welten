@@ -204,10 +204,28 @@ function FacilityMotif({ facilityId }: { facilityId: FacilityId }) {
   }
 }
 
-/** Horizontale Meilenstein-Leiter L1–L5: erreicht = voll, nächste = pulsierend, gesperrt = gedimmt. */
+/** Horizontale Meilenstein-Leiter L1–L5: erreicht = voll, nächste = pulsierend, gesperrt = gedimmt.
+ *  Unbebaut (Level 0) bekommt einen expliziten, neutralen "L0"-Schritt vor der Leiter, damit
+ *  L1 (amber/pulsierend = "nächstes Ziel") nicht als aktuell erreichter Stand missverstanden wird. */
 function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId; level: number }) {
+  const isUnbuilt = level <= 0;
   return (
-    <div className="nl-facility-ladder" aria-label={`Ausbaustufen L1 bis L${FACILITY_MAX_LEVEL}`}>
+    <div
+      className="nl-facility-ladder"
+      aria-label={`Ausbaustufen L1 bis L${FACILITY_MAX_LEVEL}${isUnbuilt ? " · aktuell Level 0, nicht gebaut" : ""}`}
+    >
+      {isUnbuilt ? (
+        // Reused "is-reached" (voll gefüllt/grün) statt eines neuen Status: das ist der
+        // tatsächliche aktuelle Stand ("Level 0 erreicht"), damit er gegenüber dem
+        // gepulsten "is-next"-Schritt (L1 = nächstes Ziel) eindeutig als "aktuell" erkennbar ist.
+        <span
+          className="nl-facility-ladder-step is-reached"
+          title="Aktuell: Level 0 · noch nicht gebaut"
+          aria-current="step"
+        >
+          L0
+        </span>
+      ) : null}
       {Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
         const targetLevel = index + 1;
         const definition = getFacilityLevelDefinition(facilityId, targetLevel);

@@ -184,3 +184,98 @@ export function buildPlayerAttributeHistoryRows(input: {
 
   return rows;
 }
+
+/**
+ * Rohdaten für die annotierte Entwicklungs-Zeitleiste (#60, FM-Attribut-
+ * Graph): season-verortete Karriere-Ereignisse aus real vorhandenen Feldern
+ * der Spieler-Drawer-Daten — Transfer (`historyRows.transferType`),
+ * Verletzung (`historyRows.injuriesCount`/`matchdaysMissed`), Klassenwechsel
+ * (`classHistory`) und XP-Ausgabe (`progressionEvents`, nur der bewusste
+ * `manual_season_end_xp_spend`-Pfad, nicht die passive organische
+ * Progression). Es werden nur Marker für tatsächlich vorhandene Ereignisse
+ * gebaut — reine Formatierung/Labels bleiben Sache der UI-Komponente.
+ */
+export type PlayerCareerEventMarker =
+  | { kind: "transfer"; seasonKey: string; transferType: "buy" | "sell" | "contract_exit"; fee: number | null }
+  | { kind: "injury"; seasonKey: string; injuriesCount: number; matchdaysMissed: number | null }
+  | { kind: "class_change"; seasonKey: string; className: string; previousClassName: string | null }
+  | { kind: "xp_spend"; seasonKey: string; xpSpent: number; upgradeCount: number };
+
+type CareerEventHistoryRowLike = {
+  seasonId: string | null;
+  seasonName: string;
+  transferType: "buy" | "sell" | "contract_exit" | null;
+  transferFee: number | null;
+  injuriesCount: number | null;
+  matchdaysMissed: number | null;
+};
+
+type CareerEventClassHistoryEntryLike = {
+  seasonId: string;
+  className: string;
+  previousClassName?: string | null;
+  reason: "seed" | "organic_progression" | "manual";
+};
+
+type CareerEventProgressionEventLike = {
+  seasonId: string;
+  xpSpent: number;
+  source: "manual_season_end_xp_spend" | "organic_season_progression";
+  upgrades: Array<{ attribute: string }>;
+};
+
+export function buildPlayerCareerEventMarkers(input: {
+  historyRows: CareerEventHistoryRowLike[];
+  classHistory?: CareerEventClassHistoryEntryLike[] | null;
+  progressionEvents?: CareerEventProgressionEventLike[] | null;
+}): PlayerCareerEventMarker[] {
+  const markers: PlayerCareerEventMarker[] = [];
+
+  for (const row of input.historyRows) {
+    const seasonKey = row.seasonId ?? row.seasonName;
+    if (row.transferType) {
+      markers.push({ kind: "transfer", seasonKey, transferType: row.transferType, fee: row.transferFee ?? null });
+    }
+    const injuriesCount = row.injuriesCount ?? 0;
+    const matchdaysMissed = row.matchdaysMissed ?? 0;
+    if (injuriesCount > 0 || matchdaysMissed > 0) {
+      markers.push({
+        kind: "injury",
+        seasonKey,
+        injuriesCount,
+        matchdaysMissed: row.matchdaysMissed ?? null,
+      });
+    }
+  }
+
+  for (const entry of input.classHistory ?? []) {
+    if (entry.reason === "seed") {
+      continue;
+    }
+    if (!entry.previousClassName || entry.previousClassName === entry.className) {
+      continue;
+    }
+    markers.push({
+      kind: "class_change",
+      seasonKey: entry.seasonId,
+      className: entry.className,
+      previousClassName: entry.previousClassName,
+    });
+  }
+
+  const xpBySeasonKey = new Map<string, { xpSpent: number; upgradeCount: number }>();
+  for (const event of input.progressionEvents ?? []) {
+    if (event.source !== "manual_season_end_xp_spend" || !(event.xpSpent > 0)) {
+      continue;
+    }
+    const existing = xpBySeasonKey.get(event.seasonId) ?? { xpSpent: 0, upgradeCount: 0 };
+    existing.xpSpent += event.xpSpent;
+    existing.upgradeCount += event.upgrades.length;
+    xpBySeasonKey.set(event.seasonId, existing);
+  }
+  for (const [seasonKey, aggregate] of xpBySeasonKey) {
+    markers.push({ kind: "xp_spend", seasonKey, xpSpent: aggregate.xpSpent, upgradeCount: aggregate.upgradeCount });
+  }
+
+  return markers;
+}

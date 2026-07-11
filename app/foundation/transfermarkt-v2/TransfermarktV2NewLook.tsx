@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
+import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
 import {
@@ -743,25 +744,28 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels). */}
                 {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay || selectedPlayer.developmentTrend ? (
                   <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
-                    {selectedPlayer.axisStarsDisplay ? (
-                      <span className="nl-market-talent-line">
-                        <span className="nl-market-talent-key">Aktuell</span>
-                        <strong>{selectedPlayer.axisStarsDisplay}</strong>
-                      </span>
+                    {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay ? (
+                      <NlAbilityStars
+                        caScore={selectedPlayer.ovr}
+                        caStars={selectedPlayer.axisStarsOverall ?? selectedPlayer.axisStarsDisplay}
+                        poStarRange={
+                          selectedPlayer.potentialStarsMin != null && selectedPlayer.potentialStarsMax != null
+                            ? { min: selectedPlayer.potentialStarsMin, max: selectedPlayer.potentialStarsMax }
+                            : null
+                        }
+                        poScoreRange={selectedPlayer.potentialRange}
+                        poStars={selectedPlayer.potentialStarsMax ?? selectedPlayer.potentialStarsDisplay}
+                        known={false}
+                        label="Talent"
+                      />
                     ) : null}
-                    {selectedPlayer.potentialStarsDisplay ? (
-                      <span className="nl-market-talent-line">
-                        <span className="nl-market-talent-key">Potenzial</span>
-                        <strong>{selectedPlayer.potentialStarsDisplay}</strong>
-                        {selectedPlayer.potentialGapStars != null && Number.isFinite(selectedPlayer.potentialGapStars) ? (
-                          <span
-                            className={`nl-market-signal-chip ${nlToneClass(
-                              selectedPlayer.potentialGapStars >= 2 ? "good" : "neutral",
-                            )}`}
-                          >
-                            Gap {selectedPlayer.potentialGapStars}★
-                          </span>
-                        ) : null}
+                    {selectedPlayer.potentialGapStars != null && Number.isFinite(selectedPlayer.potentialGapStars) ? (
+                      <span
+                        className={`nl-market-signal-chip ${nlToneClass(
+                          selectedPlayer.potentialGapStars >= 2 ? "good" : "neutral",
+                        )}`}
+                      >
+                        Gap {selectedPlayer.potentialGapStars}★
                       </span>
                     ) : null}
                     {selectedPlayer.developmentTrend ? (

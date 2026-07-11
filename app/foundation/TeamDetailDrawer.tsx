@@ -68,6 +68,12 @@ export type TeamDetailDrawerPlayerCard = {
   topDisciplines: Array<{ label: string; value: number | null }>;
   potential?: number | null;
   potentialBand?: PlayerPotentialBand | null;
+  /** "Neuer Look" CA/PO-Sterne (Tier-3 Rosterkarten) — fog-korrekt, siehe `buildRosterCaPoStarFields`. */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
 
 export type TeamDetailDrawerHistoryRow = {
@@ -872,7 +878,7 @@ export default function TeamDetailDrawer({
             </div>
           </div>
           <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Schliessen
+            Schließen
           </button>
         </div>
         {profileBody}

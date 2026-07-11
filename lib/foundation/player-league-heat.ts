@@ -56,6 +56,57 @@ export function getPoolHeatClass(value: number | null | undefined, pool: Array<n
   return `heat-band-${bucketIndex + 1}`;
 }
 
+/**
+ * Liga-Perzentil-Label für Rang-Chips ("Top 8%"), FM Data-Hub-Stil.
+ *
+ * percentile = 1 − (rank−1)/poolSize (1.0 = Rang 1 von poolSize). Das Label
+ * zeigt die Kehrseite als "Top X%" (X = (rank−1)/poolSize * 100, mind. 1%),
+ * also wie viele Spieler *vor* diesem Rang liegen. Ohne validen Rang/Pool
+ * (z. B. Free Agent ohne Liga-Einsatz) wird nichts erfunden — `null`.
+ */
+export function formatLeaguePercentile(
+  rank: number | null | undefined,
+  poolSize: number | null | undefined,
+): string | null {
+  if (rank == null || !Number.isFinite(rank) || rank < 1) {
+    return null;
+  }
+  if (poolSize == null || !Number.isFinite(poolSize) || poolSize < 1) {
+    return null;
+  }
+
+  const percentile = 1 - (rank - 1) / poolSize;
+  const topPercent = Math.max(1, Math.min(100, Math.round((1 - percentile) * 100)));
+  return `Top ${topPercent}%`;
+}
+
+export type LeagueHeatTone = "risk" | "warn" | "good" | "neutral";
+
+/**
+ * Bildet die Heat-Band-Bucket (`heat-band-1`..`heat-band-8`, siehe
+ * `getPoolHeatClass`) auf einen `NlTone`-kompatiblen String ab, damit
+ * `NlProgressBar` (`tone`-Prop) den Liga-Vergleich direkt einfärben kann,
+ * ohne dass `player-league-heat.ts` selbst von UI-Komponenten abhängt.
+ */
+export function getPoolHeatTone(
+  value: number | null | undefined,
+  pool: Array<number | null | undefined>,
+): LeagueHeatTone {
+  const heatClass = getPoolHeatClass(value, pool);
+  const match = heatClass.match(/heat-band-(\d)/);
+  const band = match ? Number(match[1]) : null;
+  if (band == null) {
+    return "neutral";
+  }
+  if (band <= 2) {
+    return "risk";
+  }
+  if (band <= 5) {
+    return "warn";
+  }
+  return "good";
+}
+
 export function getMetricBarPercent(
   value: number | null | undefined,
   pool: Array<number | null | undefined> = [],

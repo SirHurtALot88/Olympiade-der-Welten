@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
@@ -13,6 +14,7 @@ import {
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
 } from "@/components/foundation/new-look";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
@@ -72,48 +74,6 @@ function getNlResultSortValue(row: MatchdaySummaryTeamRow, key: NlResultSortKey)
     default:
       return "";
   }
-}
-
-/** Zähler-Animation, die `prefers-reduced-motion` respektiert. */
-function useCountUp(target: number | null, durationMs = 900): number | null {
-  const [display, setDisplay] = useState<number | null>(target);
-  const frameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (target == null || !Number.isFinite(target)) {
-      setDisplay(target ?? null);
-      return;
-    }
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      setDisplay(target);
-      return;
-    }
-
-    const start = performance.now();
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / durationMs);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(target * eased);
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(tick);
-      } else {
-        setDisplay(target);
-      }
-    };
-    setDisplay(0);
-    frameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (frameRef.current != null) {
-        cancelAnimationFrame(frameRef.current);
-      }
-    };
-  }, [target, durationMs]);
-
-  return display;
 }
 
 function getBarPercent(value: number | null, max: number): number {
@@ -246,17 +206,19 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   );
   const mvpPlayer = topPlayers[0] ?? null;
 
-  function renderPodiumStep(row: MatchdaySummaryTeamRow) {
+  function renderPodiumStep(row: MatchdaySummaryTeamRow, revealIndex: number) {
     const rank = row.matchdayRank ?? 0;
     const medalKind = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
     const isActive = row.teamId === activeManagerTeamId;
     const logoSrc = getTeamLogoBrowserUrl(row.teamId, null, { variant: "thumb" });
+    // Podium-Reveal-Reihenfolge: gestaffelt nach Tagesrang (1 zuerst), nicht
+    // nach der visuellen Silber-Gold-Bronze-Anordnung.
     return (
       <div
         key={row.teamId}
         role="listitem"
-        className={`nl-result-podium-step is-rank-${rank}${isActive ? " is-active-team" : ""}`}
-        style={getSeasonV2TeamTagStyle(row.teamShortCode)}
+        className={`nl-result-podium-step nl-reveal is-rank-${rank}${isActive ? " is-active-team" : ""}`}
+        style={{ ...getSeasonV2TeamTagStyle(row.teamShortCode), "--nl-reveal-i": revealIndex } as CSSProperties}
       >
         <NlMedalBadge kind={medalKind} title={`Tagesrang ${rank}`} className="nl-result-podium-medal" />
         <BudgetedMediaImage
@@ -277,7 +239,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           {row.teamName}
         </button>
         <strong className="nl-result-podium-points nl-tnum">
-          {row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}
+          <NlCountUpValue value={row.matchdayPoints} format={(value) => formatNlNumber(value, 1)} />
           <small>Punkte</small>
         </strong>
         <span className="nl-result-podium-scores nl-tnum" title={`${matchdaySummary.d1.disciplineName ?? "D1"} · ${matchdaySummary.d2.disciplineName ?? "D2"}`}>
@@ -571,7 +533,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               podiumRows.find((row) => row.matchdayRank === 3),
             ]
               .filter((row): row is MatchdaySummaryTeamRow => row != null)
-              .map((row) => renderPodiumStep(row))}
+              .map((row) => renderPodiumStep(row, (row.matchdayRank ?? 4) - 1))}
           </div>
         </NlCard>
       ) : null}
@@ -630,11 +592,11 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
                 </div>
                 <div className="nl-result-mvp-hero-stats nl-tnum">
                   <span className="nl-result-mvp-hero-stat">
-                    <strong>{formatNlNumber(mvpPlayer.finalPlayerScore, 1)}</strong>
+                    <strong><NlCountUpValue value={mvpPlayer.finalPlayerScore} format={(value) => formatNlNumber(value, 1)} /></strong>
                     <small>Score</small>
                   </span>
                   <span className="nl-result-mvp-hero-stat">
-                    <strong>{mvpPlayer.points != null ? formatNlNumber(mvpPlayer.points, 1) : "—"}</strong>
+                    <strong><NlCountUpValue value={mvpPlayer.points} format={(value) => formatNlNumber(value, 1)} /></strong>
                     <small>PPs</small>
                   </span>
                   {mvpPlayer.totalBonus != null && mvpPlayer.totalBonus !== 0 ? (

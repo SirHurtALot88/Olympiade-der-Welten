@@ -4,15 +4,18 @@ import { useMemo, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
+  NlBarChart,
   NlCard,
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
+  NlRankingDrawer,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
   NL_AXIS_LABELS,
+  type NlRankingDrawerRow,
   type NlTone,
 } from "@/components/foundation/new-look";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
@@ -64,6 +67,11 @@ export default function FoundationRanksNewLook({
 }: FoundationRanksPanelProps) {
   const [metric, setMetric] = useState<NlRanksMetric>("total");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  // "Neuer Look" (#37, flag-gated, additiv): KPI-Ranking-Drawer statt voller
+  // Team-Profil-Navigation beim Klick auf die "Liga Ø"/"Dein Team"-Chips —
+  // Zeilen kommen aus `rankedRows` (bereits für die aktive Metrik sortiert).
+  const [rankingDrawerOpen, setRankingDrawerOpen] = useState(false);
+  const [rankingDrawerHighlightId, setRankingDrawerHighlightId] = useState<string | null>(null);
 
   const activeMetric = NL_RANKS_METRICS.find((entry) => entry.id === metric) ?? NL_RANKS_METRICS[0];
 
@@ -122,6 +130,43 @@ export default function FoundationRanksNewLook({
   const ownValue = ownEntry ? getMetricValue(ownEntry.row, metric) : null;
   const gapToTop = ownValue != null ? topValue - ownValue : null;
 
+  // Ein Balken je Team für die aktive Metrik, bereits nach `rankedRows`
+  // (rang-)sortiert; eigenes Team über `humanControlled` hervorgehoben.
+  // Kein Verlauf/History hier — die Props liefern keine Vor-Werte.
+  const metricBars = useMemo(
+    () =>
+      rankedRows.map(({ row }) => ({
+        label: row.team.shortCode,
+        value: getMetricValue(row, metric),
+        tone: row.team.humanControlled ? ("accent" as const) : ("neutral" as const),
+      })),
+    [rankedRows, metric],
+  );
+
+  const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(
+    () =>
+      rankedRows.map(({ row, displayRank }) => ({
+        id: row.team.teamId,
+        rank: displayRank,
+        name: row.team.name,
+        sub: row.team.shortCode,
+        value: getMetricValue(row, metric),
+        tone: activeMetric.tone,
+        isOwn: row.team.humanControlled,
+      })),
+    [rankedRows, metric, activeMetric.tone],
+  );
+
+  function openRankingDrawer(highlightTeamId?: string | null) {
+    setRankingDrawerOpen(true);
+    setRankingDrawerHighlightId(highlightTeamId ?? null);
+  }
+
+  function closeRankingDrawer() {
+    setRankingDrawerOpen(false);
+    setRankingDrawerHighlightId(null);
+  }
+
   return (
     <section className="nl-ranks" data-testid="foundation-ranks" id="foundation-ranks" data-new-look="true">
       <NlCard
@@ -150,7 +195,8 @@ export default function FoundationRanksNewLook({
               label={`Liga Ø · ${activeMetric.label}`}
               value={formatNlNumber(metricStats.mean, 1)}
               tone={activeMetric.tone}
-              title={`Durchschnitt über ${formatNlNumber(metricStats.count, 0)} Teams`}
+              onClick={() => openRankingDrawer()}
+              title={`Rangliste ${activeMetric.label} — Durchschnitt über ${formatNlNumber(metricStats.count, 0)} Teams`}
             />
             <StatChip
               label="Spannweite"
@@ -164,8 +210,8 @@ export default function FoundationRanksNewLook({
                 value={formatNlNumber(ownValue, 1)}
                 sub={`Rang ${formatNlNumber(ownEntry.displayRank, 0)} von ${formatNlNumber(rankedRows.length, 0)}`}
                 tone="accent"
-                onClick={() => openTeamProfileById(ownEntry.row.team.teamId)}
-                title={`${ownEntry.row.team.name} · Teamprofil öffnen`}
+                onClick={() => openRankingDrawer(ownEntry.row.team.teamId)}
+                title={`Rangliste ${activeMetric.label} — ${ownEntry.row.team.name}`}
               />
             ) : null}
             {ownEntry && gapToTop != null ? (
@@ -188,6 +234,16 @@ export default function FoundationRanksNewLook({
               )
             ) : null}
           </StatChipRow>
+        ) : null}
+        {metricBars.length > 0 ? (
+          <div className="nl-ranks-metric-chart-scroll">
+            <NlBarChart
+              bars={metricBars}
+              format={(value) => formatNlNumber(value, 1)}
+              aria-label={`PPs ${activeMetric.label} je Team, sortiert (Dein Team hervorgehoben)`}
+              className="nl-ranks-metric-chart"
+            />
+          </div>
         ) : null}
         <p className="nl-ranks-hint">
           Summe aus POW, SPE, MEN und SOC je Team. Formkartenbonus (z.&nbsp;B. +8) ist bereits in den Punkten enthalten.
@@ -312,6 +368,17 @@ export default function FoundationRanksNewLook({
         </ol>
         {rankedRows.length === 0 ? <p className="nl-ranks-empty">Noch keine PP-Daten für diese Saison.</p> : null}
       </NlCard>
+
+      <NlRankingDrawer
+        open={rankingDrawerOpen}
+        onClose={closeRankingDrawer}
+        metricLabel={activeMetric.label}
+        metricKey={metric}
+        subtitle="PPs pro Bereich"
+        rows={rankingDrawerRows}
+        highlightId={rankingDrawerHighlightId}
+        onSelectRow={(row) => openTeamProfileById(row.id)}
+      />
     </section>
   );
 }

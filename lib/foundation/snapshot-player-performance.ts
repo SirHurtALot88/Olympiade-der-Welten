@@ -4,6 +4,67 @@ function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * True when the row already carries the per-area metric data the Historie table
+ * needs (POW/SPE/MEN/SOC). Older snapshots (archived before per-player metric
+ * archival) can have appearances but no axis points and no disciplineBreakdown,
+ * which renders as "—" for every metric column. Those rows are eligible for
+ * re-derivation from the snapshot's archived raw discipline performances.
+ */
+function snapshotPerformanceRowHasAxisData(row: SeasonSnapshotPlayerPerformanceRecord) {
+  return (
+    isFiniteNumber(row.powPoints) ||
+    isFiniteNumber(row.spePoints) ||
+    isFiniteNumber(row.menPoints) ||
+    isFiniteNumber(row.socPoints) ||
+    (row.disciplineBreakdown?.length ?? 0) > 0
+  );
+}
+
+/**
+ * Merge a metric-poor archived row with a row re-derived from raw discipline
+ * performances. Existing non-null values win (never overwrite real archived
+ * metrics, keep ovr/pps/mvs/ranks/economy fields); missing performance fields
+ * are backfilled from the re-derived row using real season data. Idempotent.
+ */
+function mergeRebuiltSnapshotPerformanceRow(
+  existing: SeasonSnapshotPlayerPerformanceRecord,
+  rebuilt: SeasonSnapshotPlayerPerformanceRecord,
+): SeasonSnapshotPlayerPerformanceRecord {
+  const preferNumber = (current: number | null | undefined, fallback: number | null | undefined) =>
+    isFiniteNumber(current) ? current : fallback ?? null;
+  const mergedWarnings = Array.from(
+    new Set([...(existing.warnings ?? []), "snapshot_player_metrics_backfilled_from_discipline_rows"]),
+  );
+  return {
+    ...existing,
+    teamId: existing.teamId ?? rebuilt.teamId,
+    teamCode: existing.teamCode ?? rebuilt.teamCode,
+    teamName: existing.teamName ?? rebuilt.teamName,
+    appearances: (existing.appearances ?? 0) > 0 ? existing.appearances : rebuilt.appearances,
+    totalContribution: preferNumber(existing.totalContribution, rebuilt.totalContribution),
+    totalPoints: preferNumber(existing.totalPoints, rebuilt.totalPoints),
+    averageContribution: preferNumber(existing.averageContribution, rebuilt.averageContribution),
+    averageFinalScore: preferNumber(existing.averageFinalScore, rebuilt.averageFinalScore),
+    powPoints: preferNumber(existing.powPoints, rebuilt.powPoints),
+    spePoints: preferNumber(existing.spePoints, rebuilt.spePoints),
+    menPoints: preferNumber(existing.menPoints, rebuilt.menPoints),
+    socPoints: preferNumber(existing.socPoints, rebuilt.socPoints),
+    top10Count: (existing.top10Count ?? 0) > 0 ? existing.top10Count : rebuilt.top10Count,
+    mvpCount: (existing.mvpCount ?? 0) > 0 ? existing.mvpCount : rebuilt.mvpCount,
+    bestDisciplineId: existing.bestDisciplineId ?? rebuilt.bestDisciplineId,
+    bestDisciplineLabel: existing.bestDisciplineLabel ?? rebuilt.bestDisciplineLabel,
+    bestDisciplineScore: preferNumber(existing.bestDisciplineScore, rebuilt.bestDisciplineScore),
+    disciplineBreakdown:
+      (existing.disciplineBreakdown?.length ?? 0) > 0 ? existing.disciplineBreakdown : rebuilt.disciplineBreakdown,
+    warnings: mergedWarnings,
+  };
+}
+
 export function snapshotPerformanceRowHasData(row: SeasonSnapshotPlayerPerformanceRecord) {
   if ((row.appearances ?? 0) > 0) {
     return true;
@@ -75,7 +136,11 @@ export function resolveSnapshotPlayerPerformanceRow(
     snapshot.playerPerformances?.find((entry) => entry.playerId === playerId) ??
     snapshot.playerPerformanceSnapshots?.find((entry) => entry.playerId === playerId) ??
     null;
-  if (existing && snapshotPerformanceRowHasData(existing)) {
+  const existingHasData = existing != null && snapshotPerformanceRowHasData(existing);
+  // A well-formed archived row (has data AND per-area metrics) is returned as-is.
+  // A metric-poor legacy row (data but no axis metrics) falls through so its
+  // metrics can be backfilled from the archived raw discipline performances.
+  if (existingHasData && snapshotPerformanceRowHasAxisData(existing)) {
     return existing;
   }
 
@@ -95,7 +160,9 @@ export function resolveSnapshotPlayerPerformanceRow(
       ? playerDisciplineEntries.filter((performance) => seasonResultIds.has(performance.matchdayResultId))
       : playerDisciplineEntries;
   if (entries.length === 0) {
-    return existing && snapshotPerformanceRowHasData(existing) ? existing : null;
+    // No raw discipline rows to re-derive from: keep the existing row (honest
+    // "—" for any genuinely-missing metrics) or null when there is nothing.
+    return existingHasData ? existing : null;
   }
 
   const disciplineBreakdownMap = new Map<
@@ -170,7 +237,7 @@ export function resolveSnapshotPlayerPerformanceRow(
     { pow: 0, spe: 0, men: 0, soc: 0 },
   );
 
-  return {
+  const rebuilt: SeasonSnapshotPlayerPerformanceRecord = {
     playerId,
     playerName: player?.name ?? playerId,
     teamId,
@@ -194,6 +261,10 @@ export function resolveSnapshotPlayerPerformanceRow(
     disciplineBreakdown,
     warnings: ["snapshot_player_performance_rebuilt_from_discipline_rows"],
   };
+
+  // Backfill a metric-poor legacy row with real re-derived season data while
+  // preserving any archived rating fields (ovr/pps/mvs/ranks/economy).
+  return existingHasData ? mergeRebuiltSnapshotPerformanceRow(existing, rebuilt) : rebuilt;
 }
 
 export function collectSnapshotPerformancePlayerIds(snapshot: SeasonSnapshotRecord) {

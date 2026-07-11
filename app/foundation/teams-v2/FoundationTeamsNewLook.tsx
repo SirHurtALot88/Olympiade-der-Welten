@@ -18,21 +18,25 @@ import {
   formatNlNumber,
   nlToneClass,
   type NlAxisKey,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { getClassColorClassName } from "@/app/foundation/classVisuals";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
-import type { GameState, Team } from "@/lib/data/olyDataTypes";
+import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data/olyDataTypes";
 import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import { getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import type { TeamsViewRow } from "@/lib/foundation/tabs/teams-view-derivations";
 import type {
   TeamRosterFocusMode,
   TeamRosterRoleFilter,
 } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
+import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 
 /**
  * "Neuer Look" Teams-Ansicht (flag-gated, additiv).
@@ -81,6 +85,12 @@ export type NlTeamsRosterRow = {
   ovrRank?: number | null;
   mvsRank?: number | null;
   ppsRank?: number | null;
+  /** CA/PO-Sterne (Tier-3 Rosterkarten) — fog-korrekt über `buildRosterCaPoStarFields`. */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
 
 export type NlTeamsFilterOption<TId extends string> = {
@@ -100,9 +110,11 @@ export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
   /**
-   * Aktiver Team-Unterreiter aus dem Host: "portraits" öffnet standardmäßig
-   * das Portrait-Grid, "roster" (Kader) die Datentabelle. Steuert nur die
-   * Standard-Ansicht — der In-Card-Umschalter bleibt nutzbar.
+   * Aktiver Team-Unterreiter aus dem Host. Steuert historisch die
+   * Standard-Ansicht der Kaderprofil-Karte — die startet jedoch bewusst
+   * immer auf "Portraits" (siehe `defaultRosterModeForTab`), unabhängig
+   * vom Host-Unterreiter. Der In-Card-Umschalter (Portraits/Tabelle)
+   * bleibt in jedem Fall nutzbar.
    */
   selectedTeamDetailTab: "roster" | "portraits";
   sortedTeamsViewRows: TeamsViewRow[];
@@ -182,12 +194,16 @@ const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }
 ];
 
 /**
- * Standard-Ansicht je Unterreiter: der "Portraits"-Reiter startet im
- * bild-fokussierten Portrait-Grid, der "Kader"-Reiter (roster) in der
- * datenkompetenten Tabelle. So sind die beiden Reiter klar unterscheidbar.
+ * Standard-Ansicht der Kaderprofil-Karte: startet immer im
+ * bild-fokussierten Portrait-Grid ("Portraits" ist der erste Unterreiter
+ * in `NL_TEAMS_ROSTER_MODE_ITEMS` und soll auch die Startansicht sein),
+ * unabhängig davon, über welchen Host-Unterreiter (Kader/Portraits) die
+ * Ansicht geöffnet wurde. Der In-Card-Umschalter (Portraits/Tabelle)
+ * bleibt unverändert nutzbar — Nutzer:innen können jederzeit zur
+ * Tabelle wechseln, es wird nur der Startzustand vereinheitlicht.
  */
-function defaultRosterModeForTab(tab: "roster" | "portraits"): NlTeamsRosterMode {
-  return tab === "portraits" ? "portraits" : "tabelle";
+function defaultRosterModeForTab(_tab: "roster" | "portraits"): NlTeamsRosterMode {
+  return "portraits";
 }
 
 const NL_TEAMS_AXES: Array<{ key: NlAxisKey; label: "POW" | "SPE" | "MEN" | "SOC" }> = [
@@ -282,6 +298,238 @@ function isFiniteNumber(value: number | null | undefined): value is number {
   return value != null && Number.isFinite(value);
 }
 
+// === Disziplin-Profil: Einzeldisziplinen-Radar + Breakdown (#46) ==========
+// Ergänzt die vier POW/SPE/MEN/SOC-Achsen um die realen Einzeldisziplinen
+// (aktuell 20, `gameState.disciplines`). Nutzt für die Team-Stärke dieselbe
+// Top-6-Spieler-Summen-Engine wie die Bereichsränge oben
+// (`team-discipline-rank-engine.ts`, sonst für die POW/SPE/MEN/SOC-Spalten
+// der Saisonstand-Tabelle genutzt) — keine neu erfundene Formel, nur pro
+// Einzeldisziplin statt pro Kategorie ausgewertet.
+
+const DISCIPLINE_CATEGORY_TO_AXIS: Record<DisciplineCategory, NlAxisKey> = {
+  power: "pow",
+  speed: "spe",
+  mental: "men",
+  social: "soc",
+};
+
+/** `NlRadar` im Kit ist hart auf die vier POW/SPE/MEN/SOC-Achsen codiert —
+ * für 20 Einzeldisziplinen ist ein Radar nicht mehr lesbar. Zeigt daher nur
+ * die stärksten N Disziplinen (niedrigster Liga-Rang); die Liste darunter
+ * bleibt vollständig. */
+const NL_TEAMS_DISCIPLINE_RADAR_CAP = 8;
+
+type NlTeamDisciplineEntry = {
+  disciplineId: string;
+  label: string;
+  shortLabel: string;
+  axis: NlAxisKey;
+  score: number | null;
+  rank: number | null;
+  leagueMax: number | null;
+};
+
+/** Kurzlabel wie in der Saisonstand-Tabelle (z. B. "SCH" für Schach) —
+ * fällt auf die ersten drei Buchstaben zurück, falls eine Disziplin-ID mal
+ * nicht im bekannten Season-Discipline-Set steckt. */
+function getDisciplineShortLabel(discipline: Discipline): string {
+  const normalized = normalizeLineupDisciplineFieldName(discipline.id);
+  if (isSeasonDisciplineKey(normalized)) {
+    return SEASON_DISCIPLINE_LABELS[normalized];
+  }
+  return discipline.name.slice(0, 3).toUpperCase();
+}
+
+/**
+ * Team-Disziplin-Breakdown für ein Team: pro Disziplin die reale
+ * Top-6-Spieler-Summe (`scorePack.disciplines`) plus Liga-Rang
+ * (`disciplineRanks`), beides aus `buildTeamDisciplineRankRowsFromGameState`
+ * — derselben Engine, die auch die POW/SPE/MEN/SOC-Bereichsränge speist.
+ * Disziplinen ohne jeglichen ligaweiten Wert (z. B. season-seitig inaktiv)
+ * werden herausgefiltert statt mit 0 aufgefüllt — kein Fake.
+ */
+function buildTeamDisciplineBreakdown(gameState: GameState, teamId: string): NlTeamDisciplineEntry[] | null {
+  const orderedDisciplines = buildOrderedFoundationDisciplines(gameState.disciplines);
+  if (orderedDisciplines.length === 0) {
+    return null;
+  }
+  const rankRows = buildTeamDisciplineRankRowsFromGameState(gameState, orderedDisciplines);
+  const selfRow = rankRows.find((row) => row.teamId === teamId);
+  if (!selfRow) {
+    return null;
+  }
+
+  const entries: NlTeamDisciplineEntry[] = [];
+  for (const discipline of orderedDisciplines) {
+    const leagueMax = rankRows.reduce((max, row) => {
+      const value = row.scorePack.disciplines[discipline.id] ?? 0;
+      return value > max ? value : max;
+    }, 0);
+    if (leagueMax <= 0) {
+      // Ligaweit keine echten Werte in dieser Disziplin — nicht anzeigen.
+      continue;
+    }
+    const score = selfRow.scorePack.disciplines[discipline.id];
+    const rank = selfRow.disciplineRanks[discipline.id];
+    entries.push({
+      disciplineId: discipline.id,
+      label: discipline.name,
+      shortLabel: getDisciplineShortLabel(discipline),
+      axis: DISCIPLINE_CATEGORY_TO_AXIS[discipline.category],
+      score: Number.isFinite(score) ? score : null,
+      rank: rank && rank > 0 ? rank : null,
+      leagueMax,
+    });
+  }
+  return entries.length > 0 ? entries : null;
+}
+
+function compareDisciplineByStrength(left: NlTeamDisciplineEntry, right: NlTeamDisciplineEntry): number {
+  const leftRank = left.rank ?? Number.POSITIVE_INFINITY;
+  const rightRank = right.rank ?? Number.POSITIVE_INFINITY;
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+  return left.label.localeCompare(right.label, "de-DE");
+}
+
+/** Ton nach Liga-Rang-Drittel (oberstes Drittel = good, unterstes = risk) —
+ * dieselbe Drittel-Logik wie andernorts für Rating-Bänder, nur auf Rang
+ * statt Rating angewandt. */
+function getDisciplineRankTone(rank: number | null, teamCount: number): NlTone {
+  if (rank == null || teamCount <= 1) {
+    return "neutral";
+  }
+  const ratio = (rank - 1) / (teamCount - 1);
+  if (ratio <= 1 / 3) return "good";
+  if (ratio <= 2 / 3) return "warn";
+  return "risk";
+}
+
+type NlTeamDisciplineRadarAxis = {
+  key: string;
+  label: string;
+  value: number;
+  tone: NlAxisKey;
+};
+
+const NL_TEAMDISC_RADAR_SIZE = 220;
+const NL_TEAMDISC_RADAR_CENTER = NL_TEAMDISC_RADAR_SIZE / 2;
+const NL_TEAMDISC_RADAR_RADIUS = 66;
+const NL_TEAMDISC_RADAR_RINGS = [0.25, 0.5, 0.75, 1];
+
+function nlTeamDiscRadarPoint(axisIndex: number, axisCount: number, ratio: number) {
+  const angle = (axisIndex / axisCount) * Math.PI * 2 - Math.PI / 2;
+  return {
+    x: NL_TEAMDISC_RADAR_CENTER + Math.cos(angle) * NL_TEAMDISC_RADAR_RADIUS * ratio,
+    y: NL_TEAMDISC_RADAR_CENTER + Math.sin(angle) * NL_TEAMDISC_RADAR_RADIUS * ratio,
+  };
+}
+
+/**
+ * Generisches Mehrachsen-Radar für das Disziplin-Profil. `NlRadar` aus dem
+ * "Neuer Look"-Kit ist bewusst hart auf die vier POW/SPE/MEN/SOC-Achsen
+ * codiert (fester `RADAR_AXIS_ORDER`) und trägt keine variable Achsenzahl —
+ * für die (bis zu `NL_TEAMS_DISCIPLINE_RADAR_CAP`) Einzeldisziplinen hier
+ * braucht es eine eigene, aber optisch identische SVG-Geometrie (Ringe,
+ * Speichen, Polygon, Punkte, Labels — gleiche Klassen-Sprache wie
+ * `.nl-radar-*`, nur unter `.nl-teamdisc-radar-*` neu benannt).
+ */
+function NlTeamDisciplineRadar({
+  axes,
+  max,
+  className,
+  "aria-label": ariaLabel,
+}: {
+  axes: NlTeamDisciplineRadarAxis[];
+  max: number;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  const geometry = useMemo(() => {
+    const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
+    const valid = axes.filter((axis) => Number.isFinite(axis.value));
+    if (valid.length < 3) {
+      return null;
+    }
+    const points = valid.map((axis, index) => {
+      const ratio = Math.max(0, Math.min(axis.value / safeMax, 1));
+      return { ...axis, ...nlTeamDiscRadarPoint(index, valid.length, ratio) };
+    });
+    return {
+      points,
+      polygon: points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
+      rings: NL_TEAMDISC_RADAR_RINGS.map((ring) =>
+        valid.map((_, index) => nlTeamDiscRadarPoint(index, valid.length, ring)),
+      ),
+      spokes: valid.map((_, index) => nlTeamDiscRadarPoint(index, valid.length, 1)),
+      labels: valid.map((axis, index) => ({ ...axis, ...nlTeamDiscRadarPoint(index, valid.length, 1.22) })),
+    };
+  }, [axes, max]);
+
+  if (!geometry) {
+    return <p className="nl-teamdisc-radar-empty">Zu wenige Disziplin-Ränge für ein Radar.</p>;
+  }
+
+  return (
+    <svg
+      className={["nl-teamdisc-radar", className ?? ""].filter(Boolean).join(" ")}
+      viewBox={`0 0 ${NL_TEAMDISC_RADAR_SIZE} ${NL_TEAMDISC_RADAR_SIZE}`}
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label={
+        ariaLabel ??
+        `Disziplin-Radar: ${geometry.points.map((point) => `${point.label} ${formatNlNumber(point.value)}`).join(", ")}`
+      }
+    >
+      {geometry.rings.map((ring, ringIndex) => (
+        <polygon
+          key={`nl-teamdisc-radar-ring-${ringIndex}`}
+          points={ring.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ")}
+          className="nl-teamdisc-radar-ring"
+          fill="none"
+        />
+      ))}
+      {geometry.spokes.map((point, index) => (
+        <line
+          key={`nl-teamdisc-radar-spoke-${index}`}
+          x1={NL_TEAMDISC_RADAR_CENTER}
+          y1={NL_TEAMDISC_RADAR_CENTER}
+          x2={point.x}
+          y2={point.y}
+          className="nl-teamdisc-radar-spoke"
+        />
+      ))}
+      <polygon points={geometry.polygon} className="nl-teamdisc-radar-shape" />
+      {geometry.points.map((point) => (
+        <circle
+          key={`nl-teamdisc-radar-dot-${point.key}`}
+          cx={point.x}
+          cy={point.y}
+          r={3.5}
+          className={`nl-teamdisc-radar-dot ${nlToneClass(point.tone)}`}
+        >
+          <title>
+            {point.label}: {formatNlNumber(point.value)}
+          </title>
+        </circle>
+      ))}
+      {geometry.labels.map((label) => (
+        <text
+          key={`nl-teamdisc-radar-label-${label.key}`}
+          x={label.x}
+          y={label.y}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className={`nl-teamdisc-radar-label ${nlToneClass(label.tone)}`}
+        >
+          {label.label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
 /** "Saison 3" → "S3"; ohne Ziffer bleibt ein kurzer Prefix. */
 function formatNlSeasonShortLabel(seasonName: string, seasonId: string): string {
   const source = seasonName || seasonId;
@@ -352,8 +600,10 @@ export default function FoundationTeamsNewLook({
   }
   const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
+  const [disciplineSort, setDisciplineSort] = useState<"strength" | "category">("strength");
 
   const heroCardRef = useRef<HTMLDivElement | null>(null);
+  const disciplineCardRef = useRef<HTMLDivElement | null>(null);
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
   const leagueCardRef = useRef<HTMLDivElement | null>(null);
@@ -536,6 +786,44 @@ export default function FoundationTeamsNewLook({
     });
   }, [heroRow, teamCount]);
 
+  const teamDisciplineBreakdown = useMemo(
+    () => buildTeamDisciplineBreakdown(gameState, selectedTeam.teamId),
+    [gameState, selectedTeam.teamId],
+  );
+
+  const disciplineRadarAxes = useMemo<NlTeamDisciplineRadarAxis[]>(() => {
+    if (!teamDisciplineBreakdown || teamCount <= 0) {
+      return [];
+    }
+    return [...teamDisciplineBreakdown]
+      .filter((entry) => entry.rank != null)
+      .sort(compareDisciplineByStrength)
+      .slice(0, NL_TEAMS_DISCIPLINE_RADAR_CAP)
+      .map((entry) => ({
+        key: entry.disciplineId,
+        label: entry.shortLabel,
+        value: Math.max(0, teamCount - (entry.rank as number) + 1),
+        tone: entry.axis,
+      }));
+  }, [teamDisciplineBreakdown, teamCount]);
+
+  const sortedDisciplineBreakdown = useMemo(() => {
+    if (!teamDisciplineBreakdown) {
+      return [];
+    }
+    if (disciplineSort === "strength") {
+      return [...teamDisciplineBreakdown].sort(compareDisciplineByStrength);
+    }
+    const axisOrder: NlAxisKey[] = ["pow", "spe", "men", "soc"];
+    return [...teamDisciplineBreakdown].sort((left, right) => {
+      const axisDelta = axisOrder.indexOf(left.axis) - axisOrder.indexOf(right.axis);
+      if (axisDelta !== 0) {
+        return axisDelta;
+      }
+      return compareDisciplineByStrength(left, right);
+    });
+  }, [teamDisciplineBreakdown, disciplineSort]);
+
   const heroLogo = getTeamLogoModel(selectedTeam, { variant: "thumb" });
 
   function renderAxisRankBadges(
@@ -649,6 +937,12 @@ export default function FoundationTeamsNewLook({
               playerClassName={player.className}
               className={getClassColorClassName(player.className, "player-card-class-frame")}
               subMeta={subMeta || null}
+              newLook
+              known={row.known}
+              caStars={row.caStars}
+              poStarRange={row.poStarRange}
+              caScore={row.caScore}
+              poScoreRange={row.poScoreRange}
               onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
               title={`${player.name} öffnen`}
               economyStats={[
@@ -1174,6 +1468,84 @@ export default function FoundationTeamsNewLook({
         </div>
       </NlCard>
       </div>
+
+      {teamDisciplineBreakdown != null && teamDisciplineBreakdown.length > 0 ? (
+        <div ref={disciplineCardRef} className="nl-teams-anchor">
+          <NlCard
+            className="nl-teamdisc-card"
+            eyebrow="Disziplin-Profil"
+            title="Stärken je Disziplin"
+            data-testid="nl-teams-discipline-breakdown"
+            actions={
+              <NlSubTabs
+                items={[
+                  { id: "strength", label: "Stärke" },
+                  { id: "category", label: "Kategorie" },
+                ]}
+                activeId={disciplineSort}
+                onSelect={(id) => setDisciplineSort(id as "strength" | "category")}
+                aria-label="Disziplin-Liste sortieren"
+                className="nl-teamdisc-subtabs"
+              />
+            }
+          >
+            <div className="nl-teamdisc-layout">
+              <figure className="nl-teamdisc-radar-figure">
+                {disciplineRadarAxes.length >= 3 ? (
+                  <>
+                    <NlTeamDisciplineRadar
+                      axes={disciplineRadarAxes}
+                      max={teamCount}
+                      className="nl-teamdisc-radar-svg"
+                      aria-label={`Disziplin-Stärkenprofil von ${selectedTeam.name}: Top ${disciplineRadarAxes.length} Disziplinen, außen = liga-stark`}
+                    />
+                    <figcaption className="nl-teamdisc-radar-caption">
+                      Top {disciplineRadarAxes.length} von {teamDisciplineBreakdown.length} Disziplinen · außen = liga-stark
+                    </figcaption>
+                  </>
+                ) : (
+                  <p className="nl-teams-empty">Zu wenige Disziplin-Ränge für ein Radar.</p>
+                )}
+              </figure>
+              <ul className="nl-teamdisc-list" aria-label={`Disziplin-Breakdown ${selectedTeam.name}`}>
+                {sortedDisciplineBreakdown.map((entry) => {
+                  const tone = getDisciplineRankTone(entry.rank, teamCount);
+                  const axisLabel = NL_TEAMS_AXES.find((axis) => axis.key === entry.axis)?.label ?? entry.axis;
+                  return (
+                    <li key={entry.disciplineId} className="nl-teamdisc-row">
+                      <span
+                        className={`nl-teamdisc-row-axis ${nlToneClass(entry.axis)}`}
+                        aria-hidden="true"
+                        title={`Kategorie ${axisLabel}`}
+                      />
+                      <span className="nl-teamdisc-row-label" title={entry.label}>
+                        {entry.shortLabel}
+                      </span>
+                      <NlProgressBar
+                        value={entry.score ?? 0}
+                        max={entry.leagueMax ?? 100}
+                        tone={tone}
+                        showValue={false}
+                        className="nl-teamdisc-row-bar"
+                        title={`${entry.label}: ${formatNlNumber(entry.score, 1)} · Liga-Max ${formatNlNumber(entry.leagueMax, 1)}`}
+                      />
+                      <span className="nl-teamdisc-row-score nl-tnum">{formatNlNumber(entry.score, 1)}</span>
+                      <span className={`nl-teamdisc-row-rank nl-tnum ${nlToneClass(tone)}`}>
+                        {entry.rank != null ? `#${formatNlNumber(entry.rank, 0)}` : "—"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <p className="nl-teamdisc-footnote">
+              Team-Stärke je Disziplin = Summe der 6 besten scorefähigen Kader-Spieler in dieser Disziplin, gerankt
+              gegen alle {teamCount > 0 ? teamCount : ""} Liga-Teams — dieselbe Formel wie die POW/SPE/MEN/SOC-Bereichsränge, nur pro
+              Einzeldisziplin statt pro Kategorie.
+            </p>
+          </NlCard>
+        </div>
+      ) : null}
 
       {selectedTeamsHistoryData != null ? (
         <div ref={developmentCardRef} className="nl-teams-anchor">
