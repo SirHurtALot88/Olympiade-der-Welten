@@ -47890,3 +47890,205 @@ button.foundation-team-portrait-card {
   content: "AN";
   color: #57d08a;
 }
+
+/* ── Batch b1: Home Hero-KPI-Portale (#26), Spieltag-Rail (#4),
+      Team-Profil-Radar (#50) & Entwicklungs-Highlights (#51) ── */
+
+/* #26 — Rang/Cash als klickbare Portale */
+.is-new-look .nl-home-kpi.is-interactive {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: var(--nl-s2) var(--nl-s3);
+  margin: calc(-1 * var(--nl-s2)) calc(-1 * var(--nl-s3));
+  border-radius: var(--nl-r-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.is-new-look .nl-home-kpi.is-interactive:hover,
+.is-new-look .nl-home-kpi.is-interactive:focus-visible {
+  background: var(--nl-accent-soft);
+  border-color: var(--nl-line-2);
+  transform: translateY(-1px);
+  outline: none;
+}
+.is-new-look .nl-home-kpi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s1);
+}
+.is-new-look .nl-home-kpi-arrow {
+  color: var(--nl-accent);
+  font-size: 12px;
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.is-new-look .nl-home-kpi.is-interactive:hover .nl-home-kpi-arrow,
+.is-new-look .nl-home-kpi.is-interactive:focus-visible .nl-home-kpi-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* #4 — Spieltag-Rail (vergangen · aktuell · kommend) */
+.is-new-look .nl-home-schedule-rail {
+  overflow-x: auto;
+  padding: var(--nl-s1) 0 var(--nl-s2);
+  scrollbar-width: thin;
+}
+.is-new-look .nl-home-schedule-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-width: max-content;
+}
+.is-new-look .nl-home-schedule-node {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+  padding: 0 var(--nl-s4);
+  min-width: 72px;
+  text-align: center;
+}
+.is-new-look .nl-home-schedule-node::before,
+.is-new-look .nl-home-schedule-node::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  height: 2px;
+  background: var(--nl-line);
+  width: 50%;
+}
+.is-new-look .nl-home-schedule-node::before {
+  left: 0;
+}
+.is-new-look .nl-home-schedule-node::after {
+  right: 0;
+}
+.is-new-look .nl-home-schedule-node:first-child::before,
+.is-new-look .nl-home-schedule-node:last-child::after {
+  display: none;
+}
+.is-new-look .nl-home-schedule-node.is-past::before,
+.is-new-look .nl-home-schedule-node.is-past::after,
+.is-new-look .nl-home-schedule-node.is-current::before {
+  background: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+}
+.is-new-look .nl-home-schedule-dot {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--nl-bg-2);
+  border: 2px solid var(--nl-line-2);
+}
+.is-new-look .nl-home-schedule-node.is-past .nl-home-schedule-dot {
+  background: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-bg-2));
+  border-color: var(--nl-accent);
+}
+.is-new-look .nl-home-schedule-node.is-current .nl-home-schedule-dot {
+  background: var(--nl-accent);
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 0 4px var(--nl-accent-soft);
+}
+.is-new-look .nl-home-schedule-label {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+.is-new-look .nl-home-schedule-node.is-current .nl-home-schedule-label {
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+
+/* #50 / #51 — Team-Profil-Radar + Entwicklungs-Highlights */
+.is-new-look .nl-home-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--nl-s4);
+}
+.is-new-look .nl-home-radar-wrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--nl-s2) 0;
+}
+.is-new-look .nl-home-radar-wrap .nl-radar {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+}
+.is-new-look .nl-home-radar-note {
+  margin: var(--nl-s1) 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-home-development-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+.is-new-look .nl-home-development-heading {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 78%, var(--nl-mut));
+  margin-bottom: var(--nl-s1);
+}
+.is-new-look .nl-home-development-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+.is-new-look .nl-home-development-row {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-bg-2);
+  color: var(--nl-ink);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.is-new-look .nl-home-development-row:hover,
+.is-new-look .nl-home-development-row:focus-visible {
+  border-color: var(--nl-line-2);
+  transform: translateY(-1px);
+  outline: none;
+}
+.is-new-look .nl-home-development-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-new-look .nl-home-development-figures {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex: 0 0 auto;
+}
+.is-new-look .nl-home-development-ca {
+  font-size: 12px;
+  color: var(--nl-mut);
+}

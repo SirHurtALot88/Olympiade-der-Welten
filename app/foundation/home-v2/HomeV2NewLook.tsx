@@ -6,11 +6,15 @@ import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import {
   NlCard,
+  NlDeltaChip,
   NlProgressBar,
+  NlRadar,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  type NlAxisKey,
+  type NlRadarAxis,
   type NlTone,
 } from "@/components/foundation/new-look";
 import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
@@ -212,12 +216,14 @@ export default function HomeV2NewLook({
   topPlayers,
   leagueHeatPools,
   facilities,
+  scheduleItems,
   inboxItems,
   inboxCriticalCount = 0,
   todayCards,
   onContinue,
   onOpenLineup,
   onOpenSeason,
+  onOpenOffice,
   onOpenInbox,
   onCompleteInboxItem,
   onOpenBoardObjectives,
@@ -225,6 +231,33 @@ export default function HomeV2NewLook({
 }: HomeV2ClientProps) {
   const visibleTodayCards = todayCards.slice(0, 3);
   const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
+
+  // Team-Achsenprofil (#50): Durchschnitt der vier Spiel-Achsen über die
+  // Top-Kader-Spieler — nur reale, endliche Werte, fehlende Achsen fallen
+  // raus. Radar wird nur gerendert, wenn mindestens eine Achse ableitbar ist.
+  const teamAxisProfile: NlRadarAxis[] = (["pow", "spe", "men", "soc"] as NlAxisKey[])
+    .map((key) => {
+      const values = topPlayers
+        .map((player) => player[key])
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+      if (values.length === 0) {
+        return null;
+      }
+      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+      return { key, value: Math.round(average) } satisfies NlRadarAxis;
+    })
+    .filter((axis): axis is NlRadarAxis => axis !== null);
+
+  // Entwicklungs-Highlights (#51): Aufsteiger = Potenzial deutlich über
+  // aktueller Klasse (CA), Risiken = aktuelle Klasse über Potenzial.
+  // Gleiche Schwellen wie im bestehenden HomeV2Client.
+  const developmentWinners = topPlayers
+    .filter((player) => (player.poRangeMax ?? 0) > (player.caRating ?? 0) + 4)
+    .slice(0, 3);
+  const developmentRisks = topPlayers
+    .filter((player) => (player.caRating ?? 0) > (player.poRangeMax ?? 0) + 2)
+    .slice(0, 3);
+  const hasDevelopmentHighlights = developmentWinners.length > 0 || developmentRisks.length > 0;
 
   // Gleiche Ziel-Zuordnung wie im bestehenden HomeV2Client.
   const handleTodayCardClick = (key: string) => {
@@ -259,14 +292,32 @@ export default function HomeV2NewLook({
         </div>
 
         <div className="nl-home-hero-kpis" aria-label="Team KPIs">
-          <div className="nl-home-kpi">
-            <span className="nl-home-kpi-label">Rang</span>
+          <button
+            type="button"
+            className="nl-home-kpi is-interactive"
+            onClick={onOpenSeason}
+            title="Zum Saisonstand"
+            data-testid="nl-home-hero-kpi-rank"
+          >
+            <span className="nl-home-kpi-label">
+              Rang
+              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
+            </span>
             <strong className="nl-home-kpi-value nl-tnum">{rank != null ? `#${rank}` : "—"}</strong>
-          </div>
-          <div className="nl-home-kpi">
-            <span className="nl-home-kpi-label">Cash</span>
+          </button>
+          <button
+            type="button"
+            className="nl-home-kpi is-interactive"
+            onClick={onOpenOffice}
+            title="Zum Front Office"
+            data-testid="nl-home-hero-kpi-cash"
+          >
+            <span className="nl-home-kpi-label">
+              Cash
+              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
+            </span>
             <strong className="nl-home-kpi-value nl-tnum">{formatNlMoney(cash)}</strong>
-          </div>
+          </button>
         </div>
 
         <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
@@ -290,6 +341,28 @@ export default function HomeV2NewLook({
             <span key={warning} className={`nl-home-warning-chip ${nlToneClass("warn")}`}>{warning}</span>
           ))}
         </div>
+      ) : null}
+
+      {/* --- Spieltag-Rail: Saisonpfad (vergangen · aktuell · kommend) --- */}
+      {scheduleItems.length > 0 ? (
+        <nav className="nl-home-schedule-rail" aria-label="Saisonpfad">
+          <ol className="nl-home-schedule-track">
+            {scheduleItems.map((item) => {
+              const state = item.isCurrent ? "is-current" : item.isPast ? "is-past" : "is-upcoming";
+              return (
+                <li
+                  key={item.matchdayId}
+                  className={`nl-home-schedule-node ${state}`}
+                  aria-current={item.isCurrent ? "step" : undefined}
+                  title={item.label}
+                >
+                  <span className="nl-home-schedule-dot" aria-hidden="true" />
+                  <span className="nl-home-schedule-label">{item.label}</span>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
       ) : null}
 
       {/* --- Heute wichtig: 3 klickbare Entscheidungs-Karten --------- */}
@@ -366,6 +439,95 @@ export default function HomeV2NewLook({
           <p className="nl-home-empty-note">Noch keine Kaderdaten.</p>
         )}
       </section>
+
+      {/* --- Team-Profil (#50) & Entwicklung (#51) ------------------- */}
+      {teamAxisProfile.length > 0 || hasDevelopmentHighlights ? (
+        <section className="nl-home-section" aria-label="Team-Profil und Entwicklung">
+          <div className="nl-home-section-head">
+            <span className="nl-home-section-icon"><IconTarget /></span>
+            <h3 className="nl-home-section-title">Team-Profil &amp; Entwicklung</h3>
+          </div>
+          <div className="nl-home-profile-grid">
+            {teamAxisProfile.length > 0 ? (
+              <NlCard
+                className="nl-home-radar-card"
+                eyebrow={<span className="nl-home-card-eyebrow-icon"><IconUsers /> Achsen-Profil</span>}
+                title="Team-Stärke"
+                data-testid="nl-home-team-radar"
+              >
+                <div className="nl-home-radar-wrap">
+                  <NlRadar axes={teamAxisProfile} showValues aria-label="Team-Achsenprofil POW, SPE, MEN, SOC" />
+                </div>
+                <p className="nl-home-radar-note">Ø der Top-{topPlayers.length} nach POW · SPE · MEN · SOC</p>
+              </NlCard>
+            ) : null}
+
+            {hasDevelopmentHighlights ? (
+              <NlCard
+                className="nl-home-development-card"
+                eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBolt /> Entwicklung</span>}
+                title="Aufsteiger &amp; Risiken"
+                data-testid="nl-home-development"
+              >
+                <div className="nl-home-development-groups">
+                  {developmentWinners.length > 0 ? (
+                    <div className="nl-home-development-group">
+                      <span className={`nl-home-development-heading ${nlToneClass("good")}`}>Aufsteiger</span>
+                      <ul className="nl-home-development-list">
+                        {developmentWinners.map((player) => (
+                          <li key={player.playerId}>
+                            <button
+                              type="button"
+                              className="nl-home-development-row"
+                              onClick={() => onOpenPlayer(player.playerId)}
+                              title={`${player.name} öffnen · CA ${player.caRating ?? "—"} → PO ${player.poRangeMax ?? "—"}`}
+                            >
+                              <span className="nl-home-development-name">{player.name}</span>
+                              <span className="nl-home-development-figures nl-tnum">
+                                <span className="nl-home-development-ca">CA {formatNlNumber(player.caRating, 0)}</span>
+                                <NlDeltaChip
+                                  value={(player.poRangeMax ?? 0) - (player.caRating ?? 0)}
+                                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} PO`}
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {developmentRisks.length > 0 ? (
+                    <div className="nl-home-development-group">
+                      <span className={`nl-home-development-heading ${nlToneClass("risk")}`}>Risiken</span>
+                      <ul className="nl-home-development-list">
+                        {developmentRisks.map((player) => (
+                          <li key={player.playerId}>
+                            <button
+                              type="button"
+                              className="nl-home-development-row"
+                              onClick={() => onOpenPlayer(player.playerId)}
+                              title={`${player.name} öffnen · CA ${player.caRating ?? "—"} über PO ${player.poRangeMax ?? "—"}`}
+                            >
+                              <span className="nl-home-development-name">{player.name}</span>
+                              <span className="nl-home-development-figures nl-tnum">
+                                <span className="nl-home-development-ca">CA {formatNlNumber(player.caRating, 0)}</span>
+                                <NlDeltaChip
+                                  value={(player.poRangeMax ?? 0) - (player.caRating ?? 0)}
+                                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} PO`}
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              </NlCard>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <div className="nl-home-grid">
         {/* --- Board-Ziele: echte current/target als ProgressBar ----- */}

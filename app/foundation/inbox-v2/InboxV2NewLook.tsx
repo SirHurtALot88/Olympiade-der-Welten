@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
@@ -174,7 +174,12 @@ const NL_INBOX_CATEGORY_META: Record<string, { label: string; icon: (props: NlIc
 };
 
 function getCategoryMeta(category: string) {
-  return NL_INBOX_CATEGORY_META[category] ?? { label: category.replaceAll("_", " "), icon: IconDot };
+  // Quell-Items liefern die Kategorie als UPPERCASE-Enum (siehe
+  // use-inbox-v2-derivations: `category.toUpperCase()`); die Vokabular-Map
+  // ist lowercase-keyed. Ohne Normalisierung fiel jede Karte auf den
+  // grauen Punkt + rohes Enum zurück.
+  const key = category.toLowerCase();
+  return NL_INBOX_CATEGORY_META[key] ?? { label: category.replaceAll("_", " "), icon: IconDot };
 }
 
 function getSeverityTone(severity: InboxV2Item["severity"]): NlTone {
@@ -210,23 +215,49 @@ export default function InboxV2NewLook({
   onRunChoice,
   onMarkDone,
   onDismiss,
-  hideCategoryFilters = false,
   onModeChange,
 }: InboxV2ClientProps) {
   const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
   const categoryFilters = mode === "chronicle" ? NL_INBOX_CHRONICLE_CATEGORY_FILTERS : NL_INBOX_DECISION_CATEGORY_FILTERS;
 
+  // Kategorie-Filter als klickbare Portale (#3). Der Mount reicht aktuell
+  // keinen `onCategoryFilterChange`-Handler durch (Host setzt
+  // `hideCategoryFilters`), daher filtert der Neue Look die Liste lokal —
+  // nur echte `item.category`-Werte, keine erfundenen Daten.
+  const [localCategoryFilter, setLocalCategoryFilter] = useState<string>(categoryFilter);
+  const isExternallyFiltered = Boolean(onCategoryFilterChange);
+  const activeCategoryFilter = isExternallyFiltered ? categoryFilter : localCategoryFilter;
+
+  const handleCategoryFilter = (value: string) => {
+    if (onCategoryFilterChange) {
+      onCategoryFilterChange(value);
+    } else {
+      setLocalCategoryFilter(value);
+    }
+  };
+
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const item of items) {
-      counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+      const key = item.category.toLowerCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return counts;
   }, [items]);
 
+  // Wenn der Host bereits vorfiltert (externer Handler), nichts doppelt
+  // filtern; sonst lokal nach der gewählten Kategorie einschränken.
+  const displayedItems = useMemo(() => {
+    if (isExternallyFiltered || activeCategoryFilter === "ALL") {
+      return items;
+    }
+    const wanted = activeCategoryFilter.toLowerCase();
+    return items.filter((item) => item.category.toLowerCase() === wanted);
+  }, [items, isExternallyFiltered, activeCategoryFilter]);
+
   const firstCriticalItem = useMemo(
-    () => items.find((item) => item.severity === "critical") ?? null,
-    [items],
+    () => displayedItems.find((item) => item.severity === "critical") ?? null,
+    [displayedItems],
   );
 
   // Mode-Umschaltung existiert nur, wenn der Mount einen Handler liefert —
@@ -290,30 +321,29 @@ export default function InboxV2NewLook({
         aria-label="Inbox Modus"
       />
 
-      {onCategoryFilterChange && !hideCategoryFilters ? (
-        <div className="nl-inbox-filter-row" role="group" aria-label="Inbox Kategorien">
-          {categoryFilters.map((filter) => {
-            const isActive = categoryFilter === filter.value;
-            const count =
-              filter.value === "ALL"
-                ? items.length
-                : categoryFilter === "ALL" || isActive
-                  ? categoryCounts.get(filter.value) ?? 0
-                  : null;
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                className={`nl-inbox-filter-chip${isActive ? " is-active" : ""}`}
-                onClick={() => onCategoryFilterChange(filter.value)}
-              >
-                <span>{filter.label}</span>
-                {count != null ? <span className="nl-inbox-filter-count nl-tnum">{count}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      <div className="nl-inbox-filter-row" role="group" aria-label="Inbox Kategorien">
+        {categoryFilters.map((filter) => {
+          const isActive = activeCategoryFilter === filter.value;
+          const count = filter.value === "ALL" ? items.length : categoryCounts.get(filter.value) ?? 0;
+          // Kategorien ohne Einträge werden ausgeblendet (kein toter Chip),
+          // "ALL" und der aktive Chip bleiben immer sichtbar.
+          if (filter.value !== "ALL" && !isActive && count === 0) {
+            return null;
+          }
+          return (
+            <button
+              key={filter.value}
+              type="button"
+              className={`nl-inbox-filter-chip${isActive ? " is-active" : ""}`}
+              onClick={() => handleCategoryFilter(filter.value)}
+              aria-pressed={isActive}
+            >
+              <span>{filter.label}</span>
+              <span className="nl-inbox-filter-count nl-tnum">{count}</span>
+            </button>
+          );
+        })}
+      </div>
 
       {onIncludeDoneChange || onIncludeDismissedChange ? (
         <div className="nl-inbox-toggle-row">
@@ -332,9 +362,9 @@ export default function InboxV2NewLook({
         </div>
       ) : null}
 
-      {items.length > 0 ? (
+      {displayedItems.length > 0 ? (
         <ul className="nl-inbox-list" aria-label="Inbox Einträge">
-          {items.map((item) => {
+          {displayedItems.map((item) => {
             const meta = getCategoryMeta(item.category);
             const CategoryIcon = meta.icon;
             const severityTone = getSeverityTone(item.severity);
