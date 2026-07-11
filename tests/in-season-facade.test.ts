@@ -78,28 +78,28 @@ describe("planTransferWindowForTeam — thin facade over buildAiMarketPlanPrevie
   });
 });
 
-describe("isInSeasonEngineV2Enabled — feature flag (default OFF)", () => {
+describe("isInSeasonEngineV2Enabled — feature flag (default ON after cutover)", () => {
   const original = process.env.OLY_INSEASON_ENGINE_V2;
   afterEach(() => {
     if (original === undefined) delete process.env.OLY_INSEASON_ENGINE_V2;
     else process.env.OLY_INSEASON_ENGINE_V2 = original;
   });
 
-  it("is off by default and for falsy values", () => {
+  it("is on by default and for truthy values", () => {
     delete process.env.OLY_INSEASON_ENGINE_V2;
-    expect(isInSeasonEngineV2Enabled()).toBe(false);
-    process.env.OLY_INSEASON_ENGINE_V2 = "0";
-    expect(isInSeasonEngineV2Enabled()).toBe(false);
-    process.env.OLY_INSEASON_ENGINE_V2 = "off";
-    expect(isInSeasonEngineV2Enabled()).toBe(false);
-  });
-
-  it("is on for 1/true/on", () => {
-    process.env.OLY_INSEASON_ENGINE_V2 = "1";
     expect(isInSeasonEngineV2Enabled()).toBe(true);
-    process.env.OLY_INSEASON_ENGINE_V2 = "true";
+    process.env.OLY_INSEASON_ENGINE_V2 = "1";
     expect(isInSeasonEngineV2Enabled()).toBe(true);
     process.env.OLY_INSEASON_ENGINE_V2 = "ON";
     expect(isInSeasonEngineV2Enabled()).toBe(true);
+  });
+
+  it("can be explicitly disabled with 0/false/off", () => {
+    process.env.OLY_INSEASON_ENGINE_V2 = "0";
+    expect(isInSeasonEngineV2Enabled()).toBe(false);
+    process.env.OLY_INSEASON_ENGINE_V2 = "false";
+    expect(isInSeasonEngineV2Enabled()).toBe(false);
+    process.env.OLY_INSEASON_ENGINE_V2 = "off";
+    expect(isInSeasonEngineV2Enabled()).toBe(false);
   });
 });

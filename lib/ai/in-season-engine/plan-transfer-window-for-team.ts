@@ -118,11 +118,16 @@ export async function planTransferWindowForTeam(
 }
 
 /**
- * Feature flag for the in-season clean engine (V2). Mirrors `isUnifiedPickEnabledForMarket()` but
- * DEFAULTS OFF: production keeps running the legacy driver until parity is proven and the default is
- * deliberately flipped in a follow-up cutover commit. Set `OLY_INSEASON_ENGINE_V2=1` to opt in.
+ * Feature flag for the in-season clean engine (V2). Mirrors `isUnifiedPickEnabledForMarket()`:
+ * DEFAULTS ON now that parity with the legacy driver is proven across every tested orchestration
+ * path (the ai-transfer-window-session harness passes identically with the flag on and off), so the
+ * clean-engine entry point is the production default. The V2 driver currently delegates to the
+ * proven legacy orchestration, so this cutover is behaviourally identical; the internal loop rewrite
+ * lands incrementally behind this now-production seam. Set `OLY_INSEASON_ENGINE_V2=0` (or
+ * `false`/`off`) to fall back to reaching the legacy driver directly.
  */
 export function isInSeasonEngineV2Enabled(): boolean {
   const raw = process.env.OLY_INSEASON_ENGINE_V2?.trim().toLowerCase();
-  return raw === "1" || raw === "true" || raw === "on";
+  if (raw === "0" || raw === "false" || raw === "off") return false;
+  return true;
 }
