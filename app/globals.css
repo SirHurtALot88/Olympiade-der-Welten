@@ -50579,3 +50579,95 @@ button.foundation-team-portrait-card {
     transform: none;
   }
 }
+
+/* --- Daten-Ansicht: kompakte klassische Tabelle (POW/SPE/MEN/SOC) + Aufklapp-Disziplinen --- */
+.is-new-look .nl-standings-table.is-compact {
+  min-width: 720px;
+  table-layout: auto;
+}
+
+.is-new-look .nl-standings-th-caret,
+.is-new-look .nl-standings-td-caret {
+  width: 28px;
+  padding-left: 8px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.is-new-look .nl-standings-table-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-table-caret:hover,
+.is-new-look .nl-standings-table-caret:focus-visible {
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-standings-table-row.is-expanded {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-table-row.is-expanded .nl-standings-table-caret {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-standings-th-areacol {
+  color: var(--nl-tone, var(--nl-mut));
+  border-left: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-standings-td-areacol {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-tone, var(--nl-ink));
+  border-left: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-standings-td-bonus,
+.is-new-look .nl-standings-td-mw {
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aufklapp-Zeile: Disziplinen nach Bereich gruppiert */
+.is-new-look .nl-standings-table-detailrow > .nl-standings-table-detailcell {
+  padding: var(--nl-s2) var(--nl-s3) var(--nl-s3);
+  text-align: left;
+  white-space: normal;
+  background: var(--nl-panel-2);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-standings-table-detailtitle {
+  display: block;
+  margin-bottom: var(--nl-s2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-table-detailrow .nl-standings-groups {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-standings-table-detailrow .nl-standings-groups {
+    grid-template-columns: 1fr;
+  }
+}

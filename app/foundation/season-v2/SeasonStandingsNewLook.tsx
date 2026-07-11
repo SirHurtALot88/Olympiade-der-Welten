@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { Fragment, useMemo, useState, type KeyboardEvent } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
@@ -282,6 +282,46 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Disziplinen nach Bereich gruppiert (POW/SPE/MEN/SOC), je Disziplin
+   * Name + Punkte aus `row.disciplineValues` mit dünnem Balken relativ zu
+   * `disciplineMaxByKey`. Geteilt zwischen Board-Expand und Daten-Tabelle.
+   */
+  function renderDisciplineGroups(row: SeasonV2StandingsRow) {
+    return (
+      <div className="nl-standings-groups">
+        {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
+          const areaValue = getAreaValue(row, group.id);
+          return (
+            <div key={group.id} className={`nl-standings-group ${nlToneClass(group.id)}`}>
+              <div className="nl-standings-group-head">
+                <span className="nl-standings-group-label">{group.label}</span>
+                <span className="nl-standings-group-total nl-tnum">{formatNlNumber(areaValue, 1)}</span>
+              </div>
+              <ul className="nl-standings-disc-list">
+                {group.keys.map((key) => {
+                  const value = row.disciplineValues[key];
+                  return (
+                    <li key={key} className="nl-standings-disc" title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}>
+                      <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
+                      <span className="nl-standings-disc-track" aria-hidden="true">
+                        <span
+                          className="nl-standings-disc-fill"
+                          style={{ width: `${getBarPercent(value, disciplineMaxByKey.get(key) ?? 0)}%` }}
+                        />
+                      </span>
+                      <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderExpandedDetails(row: SeasonV2StandingsRow) {
     const history = row.historicalPointsBySeason ?? [];
     const historyRanks = history
@@ -326,36 +366,7 @@ export default function SeasonStandingsNewLook({
             className="nl-standings-radar"
           />
         </div>
-        <div className="nl-standings-groups">
-          {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
-            const areaValue = getAreaValue(row, group.id);
-            return (
-              <div key={group.id} className={`nl-standings-group ${nlToneClass(group.id)}`}>
-                <div className="nl-standings-group-head">
-                  <span className="nl-standings-group-label">{group.label}</span>
-                  <span className="nl-standings-group-total nl-tnum">{formatNlNumber(areaValue, 1)}</span>
-                </div>
-                <ul className="nl-standings-disc-list">
-                  {group.keys.map((key) => {
-                    const value = row.disciplineValues[key];
-                    return (
-                      <li key={key} className="nl-standings-disc" title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}>
-                        <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
-                        <span className="nl-standings-disc-track" aria-hidden="true">
-                          <span
-                            className="nl-standings-disc-fill"
-                            style={{ width: `${getBarPercent(value, disciplineMaxByKey.get(key) ?? 0)}%` }}
-                          />
-                        </span>
-                        <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
+        {renderDisciplineGroups(row)}
         </div>
         {historyRanks.length >= 2 ? (
           <div className="nl-standings-history">
@@ -490,68 +501,93 @@ export default function SeasonStandingsNewLook({
   function renderDatenTable() {
     return (
       <div className="nl-standings-table-shell">
-        <table className="nl-standings-table nl-tnum">
+        <table className="nl-standings-table is-compact nl-tnum">
           <thead>
             <tr>
-              <th rowSpan={2} className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
-              <th rowSpan={2} className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
-              <th rowSpan={2}>{renderTableSortHeader("points", "Punkte")}</th>
-              <th rowSpan={2}>{renderTableSortHeader("bonus", "Bonus")}</th>
+              <th className="nl-standings-th-caret" aria-hidden="true" />
+              <th className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
+              <th className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
+              <th>{renderTableSortHeader("points", "Punkte")}</th>
+              <th>{renderTableSortHeader("bonus", "Bonus")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
-                <th key={group.id} colSpan={group.keys.length + 1} className={`nl-standings-th-area ${nlToneClass(group.id)}`}>
+                <th key={group.id} className={`nl-standings-th-areacol ${nlToneClass(group.id)}`}>
                   {renderTableSortHeader(group.id, group.label)}
                 </th>
               ))}
-              <th rowSpan={2}>{renderTableSortHeader("mw", "MW")}</th>
-            </tr>
-            <tr>
-              {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
-                <SeasonAreaSubHeader key={group.id} groupId={group.id} keys={group.keys} />
-              ))}
+              <th>{renderTableSortHeader("mw", "MW")}</th>
             </tr>
           </thead>
-          <tbody>
-            {sortedTableRows.map((row) => (
-              <tr
-                key={row.teamId}
-                className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}`}
-                onClick={() => onOpenTeam(row.teamId)}
-                title={`${row.teamName} öffnen`}
-              >
-                <td className="nl-standings-td-rank">
-                  <span className="nl-tnum">{row.rank ?? "—"}</span>
-                  {row.rankDiff != null && Number.isFinite(row.rankDiff) && row.rankDiff !== 0 ? (
-                    <NlDeltaChip
-                      value={row.rankDiff}
-                      format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`}
-                      title="Rang-Bewegung seit Saisonstart"
-                    />
-                  ) : null}
-                </td>
-                <td className="nl-standings-td-team">
-                  <button
-                    type="button"
-                    className="nl-standings-table-teamlink"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpenTeam(row.teamId);
-                    }}
-                  >
-                    <span className="nl-standings-teamname">{row.teamName}</span>
-                    <span className="nl-standings-teamcode">{row.teamCode}</span>
-                  </button>
-                </td>
-                <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
-                <td>{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
-                {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
-                  <SeasonAreaCells key={group.id} row={row} groupId={group.id} keys={group.keys} />
-                ))}
-                <td>{formatNlNumber(row.marketValueTotal, 1)}</td>
-              </tr>
-            ))}
-          </tbody>
+          <tbody>{sortedTableRows.map((row) => renderTableRow(row))}</tbody>
         </table>
       </div>
+    );
+  }
+
+  function renderTableRow(row: SeasonV2StandingsRow) {
+    const isExpanded = expandedTeamId === row.teamId;
+    return (
+      <Fragment key={row.teamId}>
+        <tr
+          className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`}
+          onClick={() => toggleExpanded(row.teamId)}
+        >
+          <td className="nl-standings-td-caret">
+            <button
+              type="button"
+              className="nl-standings-table-caret"
+              aria-expanded={isExpanded}
+              aria-controls={`nl-standings-tdetails-${row.teamId}`}
+              aria-label={isExpanded ? `Disziplinen von ${row.teamName} einklappen` : `Disziplinen von ${row.teamName} ausklappen`}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleExpanded(row.teamId);
+              }}
+            >
+              <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span>
+            </button>
+          </td>
+          <td className="nl-standings-td-rank">
+            <span className="nl-tnum">{row.rank ?? "—"}</span>
+            {row.rankDiff != null && Number.isFinite(row.rankDiff) && row.rankDiff !== 0 ? (
+              <NlDeltaChip
+                value={row.rankDiff}
+                format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`}
+                title="Rang-Bewegung seit Saisonstart"
+              />
+            ) : null}
+          </td>
+          <td className="nl-standings-td-team">
+            <button
+              type="button"
+              className="nl-standings-table-teamlink"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenTeam(row.teamId);
+              }}
+              title={`${row.teamName} öffnen`}
+            >
+              <span className="nl-standings-teamname">{row.teamName}</span>
+              <span className="nl-standings-teamcode">{row.teamCode}</span>
+            </button>
+          </td>
+          <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
+          <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
+          {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
+            <td key={group.id} className={`nl-standings-td-areacol ${nlToneClass(group.id)}`}>
+              {formatNlNumber(getAreaValue(row, group.id), 1)}
+            </td>
+          ))}
+          <td className="nl-standings-td-mw">{formatNlNumber(row.marketValueTotal, 1)}</td>
+        </tr>
+        {isExpanded ? (
+          <tr className="nl-standings-table-detailrow">
+            <td className="nl-standings-table-detailcell" colSpan={10} id={`nl-standings-tdetails-${row.teamId}`}>
+              <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
+              {renderDisciplineGroups(row)}
+            </td>
+          </tr>
+        ) : null}
+      </Fragment>
     );
   }
 
@@ -709,42 +745,3 @@ export default function SeasonStandingsNewLook({
   );
 }
 
-/** Zweite Kopfzeile eines Bereichs: Summen-Spalte + 5 Disziplin-Kürzel. */
-function SeasonAreaSubHeader({ groupId, keys }: { groupId: SeasonDisciplineAreaId; keys: SeasonDisciplineKey[] }) {
-  return (
-    <>
-      <th className={`nl-standings-th-area-total ${nlToneClass(groupId)}`} title="Bereichssumme">
-        Σ
-      </th>
-      {keys.map((key) => (
-        <th key={key} className="nl-standings-th-disc">
-          {SEASON_DISCIPLINE_LABELS[key]}
-        </th>
-      ))}
-    </>
-  );
-}
-
-/** Datenzellen eines Bereichs: Summe + 5 Disziplinwerte. */
-function SeasonAreaCells({
-  row,
-  groupId,
-  keys,
-}: {
-  row: SeasonV2StandingsRow;
-  groupId: SeasonDisciplineAreaId;
-  keys: SeasonDisciplineKey[];
-}) {
-  return (
-    <>
-      <td className={`nl-standings-td-area-total ${nlToneClass(groupId)}`}>
-        {formatNlNumber(getAreaValue(row, groupId), 1)}
-      </td>
-      {keys.map((key) => (
-        <td key={key} className="nl-standings-td-disc">
-          {formatNlNumber(row.disciplineValues[key], 1)}
-        </td>
-      ))}
-    </>
-  );
-}
