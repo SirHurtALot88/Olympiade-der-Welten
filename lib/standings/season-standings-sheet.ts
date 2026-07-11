@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   analyzePrizeMoneySheet,
@@ -10,7 +11,15 @@ import {
 export const SEASON_STANDINGS_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1Y4DJWoLBcEAWuS4dXTqnZK_6UXZe7NJtRD-rNjYc8Fk/export?format=csv&gid=589766543";
 
-const WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+// Reference sheets ship in the repo under references/sheets. Historically this pointed at an
+// absolute macOS checkout path; that breaks any other checkout (CI, sandboxes, cloned repos),
+// where the local CSV/JSON can't be found and standings/rank-to-points silently report
+// `points_table_missing` — which aborts the long-run season loop before any matchday standings
+// apply. Prefer the hardcoded path when it actually exists (unchanged behaviour on that machine),
+// otherwise fall back to the current working directory, which is the repo root for every app/script
+// entrypoint (matches how the rest of the codebase resolves references/ and data/).
+const HARDCODED_WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const WORKSPACE_ROOT = existsSync(HARDCODED_WORKSPACE_ROOT) ? HARDCODED_WORKSPACE_ROOT : process.cwd();
 
 export const LOCAL_STANDINGS_CSV_PATH = path.join(
   WORKSPACE_ROOT,

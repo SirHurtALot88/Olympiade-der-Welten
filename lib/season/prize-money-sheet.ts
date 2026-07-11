@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
-const WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+// See season-standings-sheet.ts: prefer the hardcoded macOS checkout path when present (unchanged
+// behaviour there), otherwise fall back to the repo root (process.cwd()) so other checkouts can read
+// the prize-money reference sheets. Missing sheets otherwise surface as `prize_money_table_missing`
+// at season-end and abort the long-run before it can transition to the next season.
+const HARDCODED_WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const WORKSPACE_ROOT = existsSync(HARDCODED_WORKSPACE_ROOT) ? HARDCODED_WORKSPACE_ROOT : process.cwd();
 
 export const PRIZE_MONEY_RAW_CSV_PATH = path.join(
   WORKSPACE_ROOT,
