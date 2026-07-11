@@ -22,12 +22,14 @@ import {
 import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   BOARD_V2_CALIBRATION,
+  BOARD_V2_CAPTAIN,
   BOARD_V2_COMPOSITION,
   BOARD_V2_DISPOSITION,
   BOARD_V2_NET_TRANSFER,
   BOARD_V2_SLATE,
   isBoardObjectivesV2Enabled,
 } from "@/lib/board/board-objectives-config";
+import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -1536,6 +1538,8 @@ export function calculateBoardConfidence(input: {
   previousSeasonBoard?: TeamBoardConfidenceRecord | null;
   gmChangedThisSeason?: boolean;
   neutralPreseasonBoard?: boolean;
+  /** Slice 4 (F2): team captain's leadership score; dampens perceivedPressure under V2. */
+  captainLeadershipScore?: number | null;
 }): TeamBoardConfidenceRecord {
   const boardV2 = isBoardObjectivesV2Enabled();
   if (input.neutralPreseasonBoard) {
@@ -1579,7 +1583,10 @@ export function calculateBoardConfidence(input: {
     // value) lowers it, so a struggling team's board escalates pressure faster.
     const patience = resolveBoardDisposition({ identity: input.identity, previousSeasonBoard: input.previousSeasonBoard }).patience;
     const patienceDamp = 2.5 * patience;
-    perceivedPressure = roundValue(clamp(11 - value + pressureMomentum - patienceDamp, 1, 10), 1);
+    // Slice 4 (F2): a strong captain absorbs pressure — lowers perceivedPressure (and thereby GM-firing
+    // risk + AI panic, which read it). Goals are untouched.
+    const captainDamp = clamp((input.captainLeadershipScore ?? 0) / BOARD_V2_CAPTAIN.leadershipDivisor, 0, BOARD_V2_CAPTAIN.maxDamp);
+    perceivedPressure = roundValue(clamp(11 - value + pressureMomentum - patienceDamp - captainDamp, 1, 10), 1);
   }
 
   const effectivePressure = perceivedPressure ?? pressure;
@@ -1724,6 +1731,11 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
     const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
     const gmAssignment = gameState.seasonState.teamGeneralManagers?.[team.teamId];
     const gmChangedThisSeason = gmAssignment?.assignedSeasonId === gameState.season.id;
+    // Slice 4 (F2): captain leadership dampens perceivedPressure under V2. selectTeamCaptain auto-derives
+    // the top-leadership roster player, so this works even when no captain was manually assigned.
+    const captainLeadershipScore = isBoardObjectivesV2Enabled()
+      ? selectTeamCaptain(gameState, team.teamId)?.leadershipScore ?? null
+      : null;
     const board = calculateBoardConfidence({
       teamId: team.teamId,
       identity,
@@ -1732,6 +1744,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       previousSeasonBoard,
       gmChangedThisSeason,
       neutralPreseasonBoard,
+      captainLeadershipScore,
     });
     boardConfidence[team.teamId] = board;
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives: teamObjectives, board });

@@ -88,3 +88,14 @@ export const BOARD_V2_SLATE = {
   minSize: 3,
   maxSize: 5,
 } as const;
+
+/**
+ * Captain → board channel (Slice 4, F2): a high-leadership team captain absorbs pressure in the
+ * dressing room, lowering the board's *perceived* pressure (and thereby GM-firing risk + AI panic,
+ * which read perceivedPressure). Goals never move — only the felt pressure. captainDamp =
+ * clamp(leadershipScore / leadershipDivisor, 0, maxDamp), subtracted from perceivedPressure.
+ */
+export const BOARD_V2_CAPTAIN = {
+  leadershipDivisor: 40,
+  maxDamp: 2.0,
+} as const;

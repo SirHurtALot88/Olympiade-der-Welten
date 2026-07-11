@@ -139,6 +139,19 @@ describe("Board-Objectives V2 — perceived-pressure layer", () => {
     // Same current (zero) gap, but the team that was under pressure recently still feels more of it.
     expect(lagging.perceivedPressure!).toBeGreaterThan(calm.perceivedPressure!);
   });
+
+  it("a high-leadership captain lowers perceived pressure without touching goals (F2)", () => {
+    const objectives = failedObjectives(3);
+    const noCaptain = withV2(() =>
+      calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives, captainLeadershipScore: 0 }),
+    );
+    const strongCaptain = withV2(() =>
+      calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives, captainLeadershipScore: 80 }),
+    );
+    expect(strongCaptain.perceivedPressure!).toBeLessThan(noCaptain.perceivedPressure!);
+    // Goals (value) are unaffected by the captain — only felt pressure moves.
+    expect(strongCaptain.value).toBe(noCaptain.value);
+  });
 });
 
 describe("Board-Objectives V2 — disposition (F1) + dynamic slate (F4)", () => {
