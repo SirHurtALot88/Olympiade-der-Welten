@@ -60,3 +60,31 @@ export const BOARD_V2_SQUAD_VALUE = {
   /** Required fraction of the league-average squad value the team must retain (1.0 = keep pace). */
   keepPaceFraction: 0.92,
 } as const;
+
+/**
+ * Board disposition (Slice 3): the board's ambition + patience drift with recent results. Derived
+ * from identity temperament plus a normalized "last season vs expectation" signal (the carried board
+ * value relative to neutral 5). F1: disappointment lowers patience (impatient → more GM churn) and
+ * ambition; overperformance raises both (higher bar, calmer board).
+ */
+export const BOARD_V2_DISPOSITION = {
+  /** Neutral board value; results above/below shift disposition. */
+  neutralValue: 5,
+  /** Response of ambition (0–1) per unit of normalized performance signal. */
+  ambitionResponse: 0.25,
+  /** Response of patience (0–1) per unit of normalized performance signal. */
+  patienceResponse: 0.3,
+  ambitionMin: 0.05,
+  ambitionMax: 1.0,
+  patienceMin: 0.1,
+  patienceMax: 0.95,
+} as const;
+
+/**
+ * Dynamic slate size (F4): a calmer/less-ambitious board sets fewer objectives (min), an
+ * ambitious/pressured one more (max). Size = 3 + round(2 * (0.5*ambition + 0.5*(pressure/10))).
+ */
+export const BOARD_V2_SLATE = {
+  minSize: 3,
+  maxSize: 5,
+} as const;

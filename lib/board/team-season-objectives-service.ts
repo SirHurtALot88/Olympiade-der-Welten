@@ -23,7 +23,9 @@ import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/marke
 import {
   BOARD_V2_CALIBRATION,
   BOARD_V2_COMPOSITION,
+  BOARD_V2_DISPOSITION,
   BOARD_V2_NET_TRANSFER,
+  BOARD_V2_SLATE,
   isBoardObjectivesV2Enabled,
 } from "@/lib/board/board-objectives-config";
 
@@ -513,18 +515,51 @@ function resolveExpectedLeagueRank(input: {
 }
 
 /**
+ * Board disposition (Slice 3): ambition + patience that drift with recent results. Derived from
+ * identity temperament plus a normalized "last season vs expectation" signal (the carried board
+ * value relative to neutral). F1: disappointment (low carried value) lowers patience + ambition;
+ * overperformance raises both. Multi-season memory comes for free via the board-value carry.
+ */
+export function resolveBoardDisposition(input: {
+  identity: TeamIdentity | null;
+  previousSeasonBoard?: TeamBoardConfidenceRecord | null;
+}) {
+  const baseAmbition = clamp((input.identity?.ambition ?? 5) / 10, 0, 1);
+  const seed = normalizeBoardConfidence(input.identity?.boardConfidence ?? null);
+  const basePatience = clamp(0.5 * (seed / 10) + 0.5 * ((input.identity?.harmony ?? 5) / 10), 0.1, 0.95);
+  // Performance signal in [-~0.8, +1.0]: previous-season board value above/below neutral.
+  const perf =
+    input.previousSeasonBoard?.value != null
+      ? (input.previousSeasonBoard.value - BOARD_V2_DISPOSITION.neutralValue) / BOARD_V2_DISPOSITION.neutralValue
+      : 0;
+  const ambition = clamp(
+    baseAmbition + perf * BOARD_V2_DISPOSITION.ambitionResponse,
+    BOARD_V2_DISPOSITION.ambitionMin,
+    BOARD_V2_DISPOSITION.ambitionMax,
+  );
+  const patience = clamp(
+    basePatience + perf * BOARD_V2_DISPOSITION.patienceResponse,
+    BOARD_V2_DISPOSITION.patienceMin,
+    BOARD_V2_DISPOSITION.patienceMax,
+  );
+  return { ambition, patience };
+}
+
+/**
  * V2 calibrated sport target: targetRank = expectedRank − stretch(ambition). Replaces the hardcoded
  * tier ladder + per-team shortCode special-cases with a strength-relative goal — weak teams get an
  * achievable "hold your ground" target, strong+ambitious teams get a real climb. Organic, no quotas.
+ * `ambition01` overrides the identity ambition with the dynamic disposition value when provided.
  */
 export function getSportTargetV2(input: {
   identity: TeamIdentity | null;
   teamId: string;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  ambition01?: number;
 }) {
   const leagueSize = Math.max(1, input.rowsByTeamId.size);
   const expectedRank = clamp(resolveExpectedLeagueRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId }), 1, leagueSize);
-  const ambition01 = clamp((input.identity?.ambition ?? 5) / 10, 0, 1);
+  const ambition01 = clamp(input.ambition01 ?? (input.identity?.ambition ?? 5) / 10, 0, 1);
   let maxStretch = BOARD_V2_CALIBRATION.maxStretch;
   if (expectedRank >= BOARD_V2_CALIBRATION.bottomDampFromRank) {
     maxStretch *= BOARD_V2_CALIBRATION.bottomDampFactor;
@@ -1176,15 +1211,18 @@ function pickUrgentObjective(objectives: ObjectiveDraft[], category: TeamSeasonO
   );
 }
 
-function selectBoardObjectiveDrafts(input: {
+export function selectBoardObjectiveDrafts(input: {
   objectives: ObjectiveDraft[];
   profile: TeamStrategyProfile | null;
   identity: TeamIdentity | null;
+  slateSize?: number;
 }) {
+  // F4: slate size is dynamic under V2 (3–5 by disposition); defaults to the legacy fixed 4.
+  const slateSize = input.slateSize ?? 4;
   const picked: ObjectiveDraft[] = [];
   const add = (objective: ObjectiveDraft | null) => {
     if (!objective || picked.some((entry) => entry.objectiveId === objective.objectiveId)) return;
-    if (picked.length < 4) picked.push(objective);
+    if (picked.length < slateSize) picked.push(objective);
   };
 
   add(pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-rank-")));
@@ -1327,9 +1365,24 @@ function buildTeamObjectives(input: {
 }): TeamSeasonObjectiveRecord[] {
   const { gameState, team, row, rowsByTeamId, identity, profile } = input;
   const boardV2 = isBoardObjectivesV2Enabled();
+  const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
+  const storedBoard = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
+  const disposition = boardV2 ? resolveBoardDisposition({ identity, previousSeasonBoard }) : null;
   const sportTarget = boardV2
-    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId })
+    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition })
     : getSportTarget({ team, identity, profile, row, rowsByTeamId });
+  // F4: dynamic slate size 3–5 from disposition ambition + last-known perceived pressure.
+  const slateSize = disposition
+    ? clamp(
+        BOARD_V2_SLATE.minSize +
+          Math.round(
+            (BOARD_V2_SLATE.maxSize - BOARD_V2_SLATE.minSize) *
+              (0.5 * disposition.ambition + 0.5 * ((storedBoard?.perceivedPressure ?? storedBoard?.pressure ?? 5) / 10)),
+          ),
+        BOARD_V2_SLATE.minSize,
+        BOARD_V2_SLATE.maxSize,
+      )
+    : 4;
   const seasonNum = resolveSeasonNumberFromState(gameState) ?? 1;
   const isInitialSeason = seasonNum === 1;
   // C-C and high-profit teams have a transfer target that scales up over seasons.
@@ -1354,6 +1407,7 @@ function buildTeamObjectives(input: {
   const objectiveDrafts = selectBoardObjectiveDrafts({
     identity,
     profile,
+    slateSize,
     objectives: [
       {
         objectiveId: `sport-rank-${sportTarget.rank}`,
@@ -1521,7 +1575,9 @@ export function calculateBoardConfidence(input: {
     const rawGap = failed * 0.8 + atRisk * 0.35;
     const prevMomentum = input.storedBoard?.pressureMomentum ?? rawGap;
     pressureMomentum = roundValue(0.6 * prevMomentum + 0.4 * rawGap, 2);
-    const patience = clamp(0.5 * (identitySeed / 10) + 0.5 * ((input.identity?.harmony ?? 5) / 10), 0.1, 0.95);
+    // Slice 3 (F1): patience is now the dynamic disposition value — disappointment (low carried board
+    // value) lowers it, so a struggling team's board escalates pressure faster.
+    const patience = resolveBoardDisposition({ identity: input.identity, previousSeasonBoard: input.previousSeasonBoard }).patience;
     const patienceDamp = 2.5 * patience;
     perceivedPressure = roundValue(clamp(11 - value + pressureMomentum - patienceDamp, 1, 10), 1);
   }

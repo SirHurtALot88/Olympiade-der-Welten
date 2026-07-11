@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateBoardConfidence, getSportTargetV2 } from "@/lib/board/team-season-objectives-service";
+import {
+  calculateBoardConfidence,
+  getSportTargetV2,
+  resolveBoardDisposition,
+  selectBoardObjectiveDrafts,
+} from "@/lib/board/team-season-objectives-service";
 import { isBoardObjectivesV2Enabled } from "@/lib/board/board-objectives-config";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
-import type { TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
+import type { TeamBoardConfidenceRecord, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
 
 function failedObjectives(count: number): TeamSeasonObjectiveRecord[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -133,5 +138,44 @@ describe("Board-Objectives V2 — perceived-pressure layer", () => {
     );
     // Same current (zero) gap, but the team that was under pressure recently still feels more of it.
     expect(lagging.perceivedPressure!).toBeGreaterThan(calm.perceivedPressure!);
+  });
+});
+
+describe("Board-Objectives V2 — disposition (F1) + dynamic slate (F4)", () => {
+  const id = (ambition: number, boardConfidence: number, harmony: number): TeamIdentity =>
+    ({ ambition, boardConfidence, harmony } as TeamIdentity);
+  const board = (value: number): TeamBoardConfidenceRecord => ({ teamId: "T", value, pressure: 11 - value, warnings: [] });
+
+  it("overperformance raises ambition + patience; disappointment lowers both (F1)", () => {
+    const base = resolveBoardDisposition({ identity: id(5, 5, 5), previousSeasonBoard: null });
+    const over = resolveBoardDisposition({ identity: id(5, 5, 5), previousSeasonBoard: board(9) });
+    const under = resolveBoardDisposition({ identity: id(5, 5, 5), previousSeasonBoard: board(2) });
+    expect(over.ambition).toBeGreaterThan(base.ambition);
+    expect(over.patience).toBeGreaterThan(base.patience);
+    expect(under.ambition).toBeLessThan(base.ambition);
+    expect(under.patience).toBeLessThan(base.patience);
+  });
+
+  it("dynamic disposition ambition sharpens the sport target", () => {
+    const rows = buildLeague();
+    const easy = getSportTargetV2({ identity: identity(5), teamId: "T2", rowsByTeamId: rows, ambition01: 0.1 });
+    const hard = getSportTargetV2({ identity: identity(5), teamId: "T2", rowsByTeamId: rows, ambition01: 1.0 });
+    expect(hard.rank).toBeLessThanOrEqual(easy.rank);
+  });
+
+  it("dynamic slate size caps the number of board objectives (F4)", () => {
+    const objectives = Array.from({ length: 8 }, (_, i) => ({
+      objectiveId: `sport-rank-${i}`,
+      category: "sport",
+      label: "x",
+      targetValue: 1,
+      currentValue: 0,
+      status: "open",
+      source: "test",
+    })) as Parameters<typeof selectBoardObjectiveDrafts>[0]["objectives"];
+    const three = selectBoardObjectiveDrafts({ objectives, profile: null, identity: null, slateSize: 3 });
+    const five = selectBoardObjectiveDrafts({ objectives, profile: null, identity: null, slateSize: 5 });
+    expect(three.length).toBe(3);
+    expect(five.length).toBe(5);
   });
 });
