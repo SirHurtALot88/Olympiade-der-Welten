@@ -6,11 +6,13 @@ import {
   NlBarChart,
   NlCard,
   NlMedalBadge,
+  NlRankingDrawer,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  type NlRankingDrawerRow,
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
@@ -104,6 +106,45 @@ export default function LeagueLeadersNewLook({
   onOpenPlayer,
 }: LeagueLeadersClientProps) {
   const [subTab, setSubTab] = useState<NlLeagueLeadersSubTab>("leaders");
+
+  // "Neuer Look" (#37, flag-gated, additiv): KPI-Ranking-Drawer statt voller
+  // Navigation beim Klick auf die Leader/Median/"Dein Bester"-Chips einer
+  // Kategorie — Zeilen kommen 1:1 aus `category.entries` (Top N ligaweit),
+  // es wird keine neue Rangliste berechnet.
+  const [rankingDrawerCategoryId, setRankingDrawerCategoryId] = useState<string | null>(null);
+  const [rankingDrawerHighlightId, setRankingDrawerHighlightId] = useState<string | null>(null);
+
+  function openCategoryRankingDrawer(categoryId: string, highlightPlayerId?: string | null) {
+    setRankingDrawerCategoryId(categoryId);
+    setRankingDrawerHighlightId(highlightPlayerId ?? null);
+  }
+
+  function closeCategoryRankingDrawer() {
+    setRankingDrawerCategoryId(null);
+    setRankingDrawerHighlightId(null);
+  }
+
+  const rankingDrawerCategory = useMemo(
+    () => categories.find((category) => category.id === rankingDrawerCategoryId) ?? null,
+    [categories, rankingDrawerCategoryId],
+  );
+
+  const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(() => {
+    if (!rankingDrawerCategory) {
+      return [];
+    }
+    const tone = NL_LEADER_TONE_MAP[rankingDrawerCategory.tone] ?? "accent";
+    return rankingDrawerCategory.entries.map((entry) => ({
+      id: entry.playerId,
+      rank: entry.rank,
+      name: entry.name,
+      sub: entry.teamCode ?? entry.teamName,
+      value: entry.value,
+      displayValue: entry.displayValue,
+      tone,
+      isOwn: entry.teamId != null && entry.teamId === selectedTeamId,
+    }));
+  }, [rankingDrawerCategory, selectedTeamId]);
 
   // Optionaler Foundation-State: Rekorde/Hall-of-Fame brauchen den vollen
   // GameState (Season-Snapshots über alle archivierten Saisons). Fehlt der
@@ -239,13 +280,15 @@ export default function LeagueLeadersNewLook({
                     label="Leader"
                     value={leader.displayValue}
                     tone={tone}
-                    title={`#1 ${leader.name} (${leader.teamCode ?? leader.teamName})`}
+                    onClick={() => openCategoryRankingDrawer(category.id, leader.playerId)}
+                    title={`Rangliste ${category.label} — #1 ${leader.name} (${leader.teamCode ?? leader.teamName})`}
                   />
                   {median != null ? (
                     <StatChip
                       label={`Median Top ${formatNlNumber(category.entries.length, 0)}`}
                       value={formatNlNumber(median, statDecimals)}
-                      title={`Median der gelisteten Top-${formatNlNumber(category.entries.length, 0)}-Werte (${category.label})`}
+                      onClick={() => openCategoryRankingDrawer(category.id)}
+                      title={`Rangliste ${category.label} — Median der gelisteten Top-${formatNlNumber(category.entries.length, 0)}-Werte`}
                     />
                   ) : null}
                   {selectedTeamId != null ? (
@@ -255,15 +298,16 @@ export default function LeagueLeadersNewLook({
                         value={ownBest.displayValue}
                         sub={`#${formatNlNumber(ownBest.rank, 0)} · ${ownBest.name}`}
                         tone="accent"
-                        onClick={() => onOpenPlayer(ownBest.playerId)}
-                        title={`${ownBest.name} · Rang ${formatNlNumber(ownBest.rank, 0)} in ${category.label} · Profil öffnen`}
+                        onClick={() => openCategoryRankingDrawer(category.id, ownBest.playerId)}
+                        title={`Rangliste ${category.label} — ${ownBest.name} auf Rang ${formatNlNumber(ownBest.rank, 0)}`}
                       />
                     ) : (
                       <StatChip
                         label="Dein Bester"
                         value="—"
                         sub={`außerhalb Top ${formatNlNumber(category.entries.length, 0)}`}
-                        title={`Kein eigener Spieler unter den gelisteten Top ${formatNlNumber(category.entries.length, 0)} (${category.label})`}
+                        onClick={() => openCategoryRankingDrawer(category.id)}
+                        title={`Rangliste ${category.label} — kein eigener Spieler unter den gelisteten Top ${formatNlNumber(category.entries.length, 0)}`}
                       />
                     )
                   ) : null}
@@ -274,6 +318,17 @@ export default function LeagueLeadersNewLook({
         })}
       </div>
       )}
+
+      <NlRankingDrawer
+        open={rankingDrawerCategory != null}
+        onClose={closeCategoryRankingDrawer}
+        metricLabel={rankingDrawerCategory?.label ?? ""}
+        metricKey={rankingDrawerCategory?.id}
+        subtitle={seasonLabel}
+        rows={rankingDrawerRows}
+        highlightId={rankingDrawerHighlightId}
+        onSelectRow={(row) => onOpenPlayer(row.id)}
+      />
     </section>
   );
 }

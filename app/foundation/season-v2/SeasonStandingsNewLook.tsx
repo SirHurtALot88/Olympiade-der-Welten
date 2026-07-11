@@ -10,6 +10,7 @@ import {
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
+  NlRankingDrawer,
   NlSparkline,
   NlSubTabs,
   StatChip,
@@ -17,6 +18,7 @@ import {
   formatNlNumber,
   nlToneClass,
   type NlBarChartBar,
+  type NlRankingDrawerRow,
   type NlTone,
 } from "@/components/foundation/new-look";
 import {
@@ -143,6 +145,11 @@ export default function SeasonStandingsNewLook({
     key: "rank",
     dir: "asc",
   });
+  // "Neuer Look" (#37, flag-gated, additiv): KPI-Ranking-Drawer statt voller
+  // Navigation beim Klick auf Punkte-/MW-Chips — Zeilen kommen aus `boardRows`,
+  // das hier schon existiert, es wird nichts neu berechnet.
+  const [rankingDrawerMetric, setRankingDrawerMetric] = useState<"points" | "mw" | null>(null);
+  const [rankingDrawerHighlightId, setRankingDrawerHighlightId] = useState<string | null>(null);
 
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
 
@@ -265,6 +272,53 @@ export default function SeasonStandingsNewLook({
 
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
+  }
+
+  /**
+   * Rangliste für den KPI-Ranking-Drawer (#37): "points" folgt derselben
+   * Reihenfolge wie das Board (`boardRows`, bereits nach Rang sortiert),
+   * "mw" sortiert dieselben Zeilen nach Marktwert neu. Keine neue
+   * Datenquelle — nur eine andere Ansicht auf `boardRows`.
+   */
+  const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(() => {
+    if (rankingDrawerMetric === "points") {
+      return boardRows.map((row) => ({
+        id: row.teamId,
+        rank: row.rank ?? 0,
+        name: row.teamName,
+        sub: row.teamCode,
+        value: row.points,
+        tone: "accent",
+        isOwn: row.isSelected,
+      }));
+    }
+    if (rankingDrawerMetric === "mw") {
+      return [...boardRows]
+        .sort(
+          (left, right) =>
+            (right.marketValueTotal ?? Number.NEGATIVE_INFINITY) - (left.marketValueTotal ?? Number.NEGATIVE_INFINITY),
+        )
+        .map((row, index) => ({
+          id: row.teamId,
+          rank: index + 1,
+          name: row.teamName,
+          sub: row.teamCode,
+          value: row.marketValueTotal,
+          tone: "neutral",
+          isOwn: row.isSelected,
+        }));
+    }
+    return [];
+  }, [rankingDrawerMetric, boardRows]);
+
+  function openRankingDrawer(metric: "points" | "mw", highlightTeamId: string) {
+    setRankingDrawerMetric(metric);
+    setRankingDrawerHighlightId(highlightTeamId);
+  }
+
+  function closeRankingDrawer() {
+    setRankingDrawerMetric(null);
+    setRankingDrawerHighlightId(null);
   }
 
   function toggleTableSort(key: NlTableSortKey) {
@@ -560,10 +614,15 @@ export default function SeasonStandingsNewLook({
               label="Punkte"
               value={formatNlNumber(row.points, 1)}
               tone="accent"
-              onClick={() => onOpenTeam(row.teamId)}
-              title={`${row.teamName} öffnen`}
+              onClick={() => openRankingDrawer("points", row.teamId)}
+              title={`Punkte-Rangliste — ${row.teamName}`}
             />
-            <StatChip label="MW" value={formatNlNumber(row.marketValueTotal, 1)} title="Marktwert gesamt" />
+            <StatChip
+              label="MW"
+              value={formatNlNumber(row.marketValueTotal, 1)}
+              onClick={() => openRankingDrawer("mw", row.teamId)}
+              title={`Marktwert-Rangliste — ${row.teamName}`}
+            />
             {renderMomentumChip(row)}
           </StatChipRow>
 
@@ -592,17 +651,27 @@ export default function SeasonStandingsNewLook({
           label="Dein Rang"
           value={selectedTeamSummary.rank != null ? `#${selectedTeamSummary.rank}` : "—"}
           tone="accent"
-          onClick={() => onOpenTeam(selectedTeamSummary.teamId)}
-          title={`${selectedTeamSummary.teamName} öffnen`}
+          onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
+          title="Punkte-Rangliste"
         />
-        <StatChip label="Punkte" value={formatNlNumber(selectedTeamSummary.points, 1)} />
+        <StatChip
+          label="Punkte"
+          value={formatNlNumber(selectedTeamSummary.points, 1)}
+          onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
+          title="Punkte-Rangliste"
+        />
         <StatChip
           label="Rückstand auf #1"
           value={gapLabel}
           tone={ownGapToLeader != null && ownGapToLeader <= 0 ? "good" : "neutral"}
           title="Punkte-Rückstand auf den aktuellen Spitzenreiter"
         />
-        <StatChip label="MW" value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)} title="Marktwert gesamt" />
+        <StatChip
+          label="MW"
+          value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+          onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
+          title="Marktwert-Rangliste"
+        />
       </StatChipRow>
     );
   }
@@ -846,11 +915,21 @@ export default function SeasonStandingsNewLook({
                 label="Rang"
                 value={selectedTeamSummary.rank != null ? `#${selectedTeamSummary.rank}` : "—"}
                 tone="accent"
-                onClick={() => onOpenTeam(selectedTeamSummary.teamId)}
-                title={`${selectedTeamSummary.teamName} öffnen`}
+                onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
+                title="Punkte-Rangliste"
               />
-              <StatChip label="Punkte" value={formatNlNumber(selectedTeamSummary.points, 1)} />
-              <StatChip label="MW" value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)} title="Marktwert gesamt" />
+              <StatChip
+                label="Punkte"
+                value={formatNlNumber(selectedTeamSummary.points, 1)}
+                onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
+                title="Punkte-Rangliste"
+              />
+              <StatChip
+                label="MW"
+                value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+                onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
+                title="Marktwert-Rangliste"
+              />
             </StatChipRow>
           ) : null}
         </div>
@@ -878,6 +957,17 @@ export default function SeasonStandingsNewLook({
       ) : (
         renderDatenMode()
       )}
+
+      <NlRankingDrawer
+        open={rankingDrawerMetric != null}
+        onClose={closeRankingDrawer}
+        metricLabel={rankingDrawerMetric === "mw" ? "MW" : "Punkte"}
+        metricKey={rankingDrawerMetric ?? undefined}
+        subtitle={`Saisonstand — ${selectedSeasonLabel}`}
+        rows={rankingDrawerRows}
+        highlightId={rankingDrawerHighlightId}
+        onSelectRow={(row) => onOpenTeam(row.id)}
+      />
     </div>
   );
 }

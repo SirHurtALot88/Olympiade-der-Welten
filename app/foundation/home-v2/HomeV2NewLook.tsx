@@ -31,6 +31,14 @@ import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-hel
  * zurueck. Konsumiert exakt dieselben Props/Daten wie der alte Client;
  * es gibt keine Zeit-/Uhr-Simulation, daher bewusst keine Countdown- oder
  * "vs. letzte Woche"-Elemente.
+ *
+ * KPI-Ranking-Drawer (#37, `NlRankingDrawer`): bewusst NICHT hier verdrahtet.
+ * "Rang"/"Punkte" sind hier nur der eigene Skalar (kein Zeilen-Array anderer
+ * Teams in `HomeV2ClientProps`), und OVR/PPs/MVS laufen über
+ * `FoundationPlayerPortraitCard` (kein StatChip in dieser Datei, Komponente
+ * gehört nicht zum Wave-4-Scope). Ein Drawer bräuchte hier erfundene Daten —
+ * die Chips bleiben deshalb Navigation zu `onOpenSeason`, das die volle
+ * Rangliste samt Drawer trägt (`SeasonStandingsNewLook`).
  */
 
 function toFiniteNumber(value: string | number | boolean | null | undefined): number | null {
