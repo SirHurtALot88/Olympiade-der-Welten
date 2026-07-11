@@ -8,6 +8,7 @@ import {
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
 import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
+import { isCleanDraftEnabled, runCleanSeasonOneDraft } from "@/lib/ai/clean-draft-engine/run-clean-draft";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
@@ -239,6 +240,21 @@ export async function runSeasonOnePicksDraft(
   const seasonId = save.gameState.season.id;
   const seedSuffix = options?.seedSuffix ?? "long-run";
   persistence.saveSingleplayerState(saveId, withPersistedSeasonDerivations(save.gameState));
+
+  // Isolated, flag-gated clean draft engine (OLY_CLEAN_DRAFT=1). When unset, the old path below runs
+  // exactly as before — this branch never executes and cannot alter its behavior.
+  if (isCleanDraftEnabled()) {
+    console.error(`[long-run] S1 draft via CLEAN engine (OLY_CLEAN_DRAFT=1) (${saveId})`);
+    const cleanStartedAt = Date.now();
+    const clean = await runCleanSeasonOneDraft(saveId, persistence);
+    const latestClean = persistence.getSaveById(saveId) ?? save;
+    const cleanBlockers = [...clean.blockers, ...collectDraftTargetBlockers(latestClean, "season1_topup", "min")];
+    console.error(
+      `[long-run] S1 CLEAN draft done: applied=${clean.result.globalExecution.appliedPickCount} ms=${Date.now() - cleanStartedAt} blockers=${cleanBlockers.length}`,
+    );
+    return { blockers: cleanBlockers, result: clean.result, purchases: clean.purchases };
+  }
+
   console.error(`[long-run] S1 draft via picks-run season1_optimum_execute (${saveId}${options?.teamIds?.length ? ` teams=${options.teamIds.length}` : ""})`);
   const result = await runAiPicksExecutePreview(
     {
