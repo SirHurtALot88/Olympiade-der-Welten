@@ -22,3 +22,14 @@ export {
   IN_SEASON_ENGINE_CONFIG,
   type InSeasonEngineConfig,
 } from "@/lib/ai/golden-master/in-season-engine-config";
+
+export {
+  computeSalaryPressure,
+  computeBoardPressure,
+  evaluateTeamBuyNeed,
+  evaluateTeamSellNeed,
+  evaluateTeamMaintenanceNeed,
+  type TeamBuyNeedInput,
+  type TeamSellNeedInput,
+  type TeamMaintenanceNeedInput,
+} from "@/lib/ai/in-season-engine/need-detection";

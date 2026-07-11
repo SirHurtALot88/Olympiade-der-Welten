@@ -41,6 +41,11 @@ import type {
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
+import {
+  evaluateTeamBuyNeed,
+  evaluateTeamMaintenanceNeed,
+  evaluateTeamSellNeed,
+} from "@/lib/ai/in-season-engine/need-detection";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
 import { getPlayerScoutCertainty } from "@/lib/scouting/facility-scout-pipeline-service";
@@ -1197,9 +1202,13 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       const rosterCount = preflightRosterCounts.get(team.teamId) ?? 0;
       const { playerMin, playerOpt } = resolvePlannerRosterTargets(preflightGameState, team.teamId, team, identity);
       const expiringCount = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId && (entry.contractLength ?? 99) <= 1).length;
-      const rosterAfterExpiry = Math.max(0, rosterCount - expiringCount);
-      if (teamNeedsPostOptUpgradeDeploy(preflightGameState, team.teamId, input.seasonId)) return true;
-      return rosterCount < playerOpt || rosterAfterExpiry < playerOpt || rosterAfterExpiry < playerMin;
+      return evaluateTeamBuyNeed({
+        rosterCount,
+        playerMin,
+        playerOpt,
+        expiringCount,
+        needsPostOptUpgradeDeploy: teamNeedsPostOptUpgradeDeploy(preflightGameState, team.teamId, input.seasonId),
+      }).needsBuy;
     })
     .map((team) => team.teamId);
   const preflightSellNeedTeamIds = preflightGameState.teams
@@ -1210,32 +1219,22 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       const { playerMin, playerOpt } = resolvePlannerRosterTargets(preflightGameState, team.teamId, team, identity);
       const rosterEntries = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const expiringCount = rosterEntries.filter((entry) => (entry.contractLength ?? 99) <= 1).length;
-      const rosterAfterExpiry = Math.max(0, rosterCount - expiringCount);
-      const expiryCreatesOptRisk = expiringCount > 0 && rosterAfterExpiry < playerOpt;
       const salaryTotal = rosterEntries.reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
-      const salaryPressure = team.cash > 0 ? salaryTotal / Math.max(team.cash, 1) : salaryTotal > 0 ? 99 : 0;
-      const boardPressure = 10 - (preflightIdentityByTeamId.get(team.teamId)?.boardConfidence ?? 5);
-      const lowCashBuffer =
-        typeof team.cash === "number" && Number.isFinite(team.cash) && team.cash < Math.max(10, salaryTotal * 0.2);
-      const expiryNeedsDecision =
-        expiringCount > 0 &&
-        rosterCount > 0 &&
-        (expiryCreatesOptRisk || salaryPressure > 0.6 || boardPressure >= 6 || lowCashBuffer);
-      const sellRunway = assessTeamSellRunwayPressure({
-        gameState: preflightGameState,
-        team,
+      return evaluateTeamSellNeed({
+        rosterCount,
+        playerOpt,
+        teamCash: team.cash,
+        expiringCount,
         salaryTotal,
-      });
-      return (
-        rosterCount > playerOpt ||
-        (typeof team.cash === "number" && Number.isFinite(team.cash) && team.cash < 0) ||
-        expiryNeedsDecision ||
-        salaryPressure > 0.75 ||
-        boardPressure >= 6 ||
-        sellRunway.cashPressureScore >= 0.45 ||
-        hasValueSellOpportunity(preflightGameState, team, playerMin, preflightPlayersById) ||
-        hasUpgradeSellOpportunity(preflightGameState, team.teamId, input.seasonId, playerMin)
-      );
+        boardConfidence: preflightIdentityByTeamId.get(team.teamId)?.boardConfidence,
+        sellRunwayPressureScore: assessTeamSellRunwayPressure({
+          gameState: preflightGameState,
+          team,
+          salaryTotal,
+        }).cashPressureScore,
+        hasValueSellOpportunity: hasValueSellOpportunity(preflightGameState, team, playerMin, preflightPlayersById),
+        hasUpgradeSellOpportunity: hasUpgradeSellOpportunity(preflightGameState, team.teamId, input.seasonId, playerMin),
+      }).needsSell;
     })
     .map((team) => team.teamId);
   const preflightMaintenanceTeamIds = preflightGameState.teams
@@ -1245,7 +1244,6 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       const rosterEntries = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const expiringCount = rosterEntries.filter((entry) => (entry.contractLength ?? 99) <= 1).length;
       const salaryTotal = rosterEntries.reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
-      const salaryPressure = team.cash > 0 ? salaryTotal / Math.max(team.cash, 1) : salaryTotal > 0 ? 99 : 0;
       const budgetStatus = getBudgetStatus(team, {
         salaryTotal,
         identityFinances: identity?.finances ?? null,
@@ -1257,7 +1255,12 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
           forceRosterFill: false,
         }),
       });
-      return expiringCount > 0 || salaryPressure > 0.5 || budgetStatus !== "healthy";
+      return evaluateTeamMaintenanceNeed({
+        expiringCount,
+        salaryTotal,
+        teamCash: team.cash,
+        budgetStatus,
+      }).needsMaintenance;
     })
     .map((team) => team.teamId);
   phaseAudit.push(
