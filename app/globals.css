@@ -56422,3 +56422,177 @@ button.is-new-look .nl-thist-season-pill,
     transform: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Liga-Leaders: Rekorde & Hall of Fame (nl-records-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an). Additiv, gehört zum
+   neuen Sub-Tab in app/foundation/league-leaders-v2/LeagueLeadersNewLook.tsx.
+   ============================================================ */
+
+/* Sub-Tab-Leiste unter dem Hint-Text im Header-Card. */
+.is-new-look .nl-leaders-subtabs {
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-records {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-records-empty-text {
+  margin: 0;
+  padding: var(--nl-s2) 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- All-Time-Medaillenspiegel ------------------------------------- */
+.is-new-look .nl-records-champions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-records-champion-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 8px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-records-champion-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-records-champion-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-records-champion-name strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-records-champion-name small {
+  font-size: 10px;
+  color: var(--nl-mut);
+  letter-spacing: 0.05em;
+}
+
+.is-new-look .nl-records-champion-medals {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.is-new-look .nl-records-champions-chart {
+  margin-top: var(--nl-s3);
+  max-width: 100%;
+}
+
+/* --- Rekord-Karten-Grid (Kaderwert / Ablöse / Board / MW-Sprung) ---- */
+.is-new-look .nl-records-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-records-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--nl-tone, var(--nl-accent));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-records-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-records-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nl-ink);
+  text-align: left;
+}
+
+.is-new-look .nl-records-card-body.is-interactive {
+  cursor: pointer;
+  border-radius: var(--nl-r-sm);
+  transition: opacity var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-records-card-body.is-interactive:hover,
+.is-new-look .nl-records-card-body.is-interactive:focus-visible {
+  opacity: 0.82;
+}
+
+.is-new-look .nl-records-card-body.is-interactive:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-records-card-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-records-card-holder {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-records-card-sub {
+  font-size: 11px;
+  color: var(--nl-mut);
+  letter-spacing: 0.02em;
+}
+
+/* --- Karriere-Bestenliste ------------------------------------------- */
+.is-new-look .nl-records-career-stats {
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-records-career-chart {
+  margin-bottom: var(--nl-s3);
+  max-width: 100%;
+}
+
+.is-new-look .nl-records-career-list {
+  gap: 4px;
+}

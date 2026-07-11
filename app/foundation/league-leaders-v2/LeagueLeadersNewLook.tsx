@@ -1,8 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import {
+  NlBarChart,
   NlCard,
   NlMedalBadge,
+  NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -11,6 +15,11 @@ import {
 } from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
 import type { LeagueLeaderCategory, LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import {
+  buildLeagueRecordsHallOfFame,
+  type LeagueRecordsHallOfFame,
+} from "@/lib/foundation/league-records-hall-of-fame";
 
 /**
  * "Neuer Look" Liga-Leaders — Kategorie-Karten mit Leader-Podium (flag-gated, additiv).
@@ -79,6 +88,13 @@ function getCategoryStatDecimals(categoryId: string): number {
   return categoryId === "mvs" || categoryId === "ovr" ? 0 : 1;
 }
 
+type NlLeagueLeadersSubTab = "leaders" | "records";
+
+const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = [
+  { id: "leaders", label: "Liga-Leaders" },
+  { id: "records", label: "Rekorde & Hall of Fame" },
+];
+
 export default function LeagueLeadersNewLook({
   categories,
   selectedTeamId,
@@ -87,6 +103,19 @@ export default function LeagueLeadersNewLook({
   onReturnToPlayer,
   onOpenPlayer,
 }: LeagueLeadersClientProps) {
+  const [subTab, setSubTab] = useState<NlLeagueLeadersSubTab>("leaders");
+
+  // Optionaler Foundation-State: Rekorde/Hall-of-Fame brauchen den vollen
+  // GameState (Season-Snapshots über alle archivierten Saisons). Fehlt der
+  // Kontext (z. B. Isolation/Storybook), fällt die Sektion ehrlich auf den
+  // "noch keine Rekorde"-Leerzustand zurück statt Fake-Daten zu zeigen.
+  const foundationState = useFoundationStateOptional();
+  const foundationGameState = foundationState?.gameState ?? null;
+  const records = useMemo<LeagueRecordsHallOfFame | null>(
+    () => (foundationGameState ? buildLeagueRecordsHallOfFame(foundationGameState) : null),
+    [foundationGameState],
+  );
+
   return (
     <section
       className="nl-leaders"
@@ -110,8 +139,18 @@ export default function LeagueLeadersNewLook({
         <p className="nl-leaders-hint">
           Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick öffnet das Spielerprofil.
         </p>
+        <NlSubTabs
+          items={NL_LEADERS_SUBTABS}
+          activeId={subTab}
+          onSelect={(id) => setSubTab(id as NlLeagueLeadersSubTab)}
+          aria-label="Liga-Leaders Ansicht"
+          className="nl-leaders-subtabs"
+        />
       </NlCard>
 
+      {subTab === "records" ? (
+        <LeagueRecordsPanel records={records} onOpenPlayer={onOpenPlayer} />
+      ) : (
       <div className="nl-leaders-grid">
         {categories.map((category) => {
           const tone = NL_LEADER_TONE_MAP[category.tone] ?? "accent";
@@ -234,6 +273,244 @@ export default function LeagueLeadersNewLook({
           );
         })}
       </div>
+      )}
     </section>
+  );
+}
+
+/**
+ * "Rekorde & Hall of Fame" — Sub-Tab-Panel: ligaweite Superlative über alle
+ * archivierten Saisons. Rein additiv, degradiert bei 0–1 Saisons Historie
+ * ehrlich auf einen Leerzustand statt Platzhalterwerte zu zeigen.
+ */
+function LeagueRecordsPanel({
+  records,
+  onOpenPlayer,
+}: {
+  records: LeagueRecordsHallOfFame | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  if (!records || !records.hasHistory) {
+    return (
+      <NlCard className="nl-records-empty-card" title="Rekorde & Hall of Fame">
+        <p className="nl-records-empty-text">
+          Noch keine Rekorde — sobald die erste Saison archiviert ist, erscheinen hier ligaweite Bestmarken.
+        </p>
+      </NlCard>
+    );
+  }
+
+  const topChampions = records.champions.slice(0, 5);
+  const championBars = records.champions
+    .filter((row) => row.gold > 0)
+    .slice(0, 6)
+    .map((row) => ({ label: row.teamCode, value: row.gold, tone: "warn" as NlTone }));
+  const ppsBars = records.careerLeaderboard.slice(0, 6).map((row) => ({
+    label: getLeaderInitials(row.playerName),
+    value: row.totalPps,
+    tone: "good" as NlTone,
+  }));
+
+  return (
+    <div className="nl-records" data-testid="nl-league-records">
+      <NlCard
+        className="nl-records-champions-card"
+        eyebrow={`${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} archiviert`}
+        title="All-Time-Medaillenspiegel"
+      >
+        {topChampions.length > 0 ? (
+          <>
+            <ol className="nl-records-champions">
+              {topChampions.map((row, index) => (
+                <li key={row.teamId} className="nl-records-champion-row">
+                  <span className="nl-records-champion-rank nl-tnum">{index + 1}</span>
+                  <span className="nl-records-champion-name">
+                    <strong>{row.teamName}</strong>
+                    <small>
+                      {row.teamCode} · {formatNlNumber(row.seasonsPlayed, 0)} Saison{row.seasonsPlayed === 1 ? "" : "en"}
+                    </small>
+                  </span>
+                  <span className="nl-records-champion-medals">
+                    {row.gold > 0 ? <NlMedalBadge kind="gold" count={row.gold} /> : null}
+                    {row.silver > 0 ? <NlMedalBadge kind="silver" count={row.silver} /> : null}
+                    {row.bronze > 0 ? <NlMedalBadge kind="bronze" count={row.bronze} /> : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {championBars.length > 0 ? (
+              <NlBarChart
+                bars={championBars}
+                format={(value) => formatNlNumber(value, 0)}
+                aria-label="Titel je Team"
+                className="nl-records-champions-chart"
+              />
+            ) : null}
+          </>
+        ) : (
+          <p className="nl-records-empty-text">Noch keine abgeschlossene Saison mit Endstand.</p>
+        )}
+      </NlCard>
+
+      <div className="nl-records-grid">
+        <RecordCard
+          label="Höchster Kaderwert"
+          holder={records.peakSquadMarketValue ? records.peakSquadMarketValue.teamName : null}
+          sub={
+            records.peakSquadMarketValue
+              ? `${records.peakSquadMarketValue.teamCode} · ${records.peakSquadMarketValue.seasonLabel}`
+              : null
+          }
+          value={records.peakSquadMarketValue ? formatNlNumber(records.peakSquadMarketValue.value, 0) : null}
+          tone="accent"
+        />
+        <RecordCard
+          label="Rekord-Transferablöse"
+          holder={records.recordTransferFee ? records.recordTransferFee.playerName : null}
+          sub={
+            records.recordTransferFee
+              ? `${records.recordTransferFee.fromTeamName ?? "—"} → ${records.recordTransferFee.toTeamName ?? "—"} · ${records.recordTransferFee.seasonLabel}`
+              : null
+          }
+          value={records.recordTransferFee ? formatNlNumber(records.recordTransferFee.amount, 0) : null}
+          tone="warn"
+          onClick={records.recordTransferFee ? () => onOpenPlayer(records.recordTransferFee!.playerId) : undefined}
+        />
+        <RecordCard
+          label="Höchstes Board-Vertrauen"
+          holder={records.highestBoardConfidence ? records.highestBoardConfidence.teamName : null}
+          sub={
+            records.highestBoardConfidence
+              ? `${records.highestBoardConfidence.gmName} · ${records.highestBoardConfidence.seasonLabel}`
+              : null
+          }
+          value={records.highestBoardConfidence ? formatNlNumber(records.highestBoardConfidence.value, 0) : null}
+          tone="good"
+        />
+        <RecordCard
+          label="Größter Marktwert-Sprung"
+          holder={records.biggestMwJump ? records.biggestMwJump.playerName : null}
+          sub={
+            records.biggestMwJump
+              ? `${formatNlNumber(records.biggestMwJump.fromValue, 0)} → ${formatNlNumber(records.biggestMwJump.toValue, 0)} · ${records.biggestMwJump.seasonLabel}`
+              : null
+          }
+          value={records.biggestMwJump ? `+${formatNlNumber(records.biggestMwJump.delta, 0)}` : null}
+          tone="spe"
+          onClick={records.biggestMwJump ? () => onOpenPlayer(records.biggestMwJump!.playerId) : undefined}
+        />
+      </div>
+
+      <NlCard className="nl-records-career-card" title="Karriere-Bestenliste" eyebrow="Über alle archivierten Saisons">
+        <StatChipRow className="nl-records-career-stats" aria-label="Karriere-Rekordhalter">
+          {records.careerAppearancesLeader ? (
+            <StatChip
+              label="Meiste Auftritte"
+              value={formatNlNumber(records.careerAppearancesLeader.appearances, 0)}
+              sub={records.careerAppearancesLeader.playerName}
+              tone="accent"
+              onClick={() => onOpenPlayer(records.careerAppearancesLeader!.playerId)}
+              title={`${records.careerAppearancesLeader.playerName} öffnen`}
+            />
+          ) : null}
+          {records.careerPpsLeader ? (
+            <StatChip
+              label="Karriere-PPs-Rekord"
+              value={formatNlNumber(records.careerPpsLeader.totalPps, 1)}
+              sub={records.careerPpsLeader.playerName}
+              tone="good"
+              onClick={() => onOpenPlayer(records.careerPpsLeader!.playerId)}
+              title={`${records.careerPpsLeader.playerName} öffnen`}
+            />
+          ) : null}
+          {records.careerMvpLeader ? (
+            <StatChip
+              label="Meiste MVP-Awards"
+              value={formatNlNumber(records.careerMvpLeader.mvpTotal, 0)}
+              sub={records.careerMvpLeader.playerName}
+              tone="warn"
+              onClick={() => onOpenPlayer(records.careerMvpLeader!.playerId)}
+              title={`${records.careerMvpLeader.playerName} öffnen`}
+            />
+          ) : null}
+        </StatChipRow>
+
+        {records.careerLeaderboard.length > 0 ? (
+          <>
+            <NlBarChart
+              bars={ppsBars}
+              format={(value) => formatNlNumber(value, 0)}
+              aria-label="Top Karriere-PPs"
+              className="nl-records-career-chart"
+            />
+            <div className="nl-leaders-list nl-records-career-list">
+              {records.careerLeaderboard.map((row, index) => (
+                <button
+                  key={row.playerId}
+                  type="button"
+                  className="nl-leaders-row"
+                  onClick={() => onOpenPlayer(row.playerId)}
+                  title={`${row.playerName} · Profil öffnen`}
+                >
+                  <span className="nl-leaders-row-rank nl-tnum">{index + 1}</span>
+                  <span className="nl-leaders-row-avatar" aria-hidden="true">
+                    {getLeaderInitials(row.playerName)}
+                  </span>
+                  <span className="nl-leaders-row-player">
+                    <strong>{row.playerName}</strong>
+                    <small>
+                      {row.teamName ?? "—"} · {formatNlNumber(row.appearances, 0)} Einsätze
+                    </small>
+                  </span>
+                  <span className="nl-leaders-row-value nl-tnum">{formatNlNumber(row.totalPps, 1)}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="nl-records-empty-text">Noch keine Karrieredaten aus abgeschlossenen Saisons.</p>
+        )}
+      </NlCard>
+    </div>
+  );
+}
+
+function RecordCard({
+  label,
+  holder,
+  sub,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  holder: string | null;
+  sub: string | null;
+  value: string | null;
+  tone: NlTone;
+  onClick?: () => void;
+}) {
+  const hasData = holder != null && value != null;
+  const bodyContent = (
+    <>
+      <span className="nl-records-card-value nl-tnum">{value}</span>
+      <span className="nl-records-card-holder">{holder}</span>
+      {sub ? <span className="nl-records-card-sub">{sub}</span> : null}
+    </>
+  );
+
+  return (
+    <article className={`nl-records-card ${nlToneClass(tone)}`}>
+      <span className="nl-records-card-label">{label}</span>
+      {!hasData ? (
+        <p className="nl-records-empty-text">Keine Daten</p>
+      ) : onClick ? (
+        <button type="button" className="nl-records-card-body is-interactive" onClick={onClick} title={`${holder} · Profil öffnen`}>
+          {bodyContent}
+        </button>
+      ) : (
+        <div className="nl-records-card-body">{bodyContent}</div>
+      )}
+    </article>
   );
 }
