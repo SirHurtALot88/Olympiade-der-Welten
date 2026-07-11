@@ -130,6 +130,31 @@ export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.344;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.007;
+/**
+ * Financial/value discipline (B): the market-value regression term scaled linearly and UNBOUNDED, so a
+ * near-ceiling high-value star was guaranteed a large negative net — regression fired at full strength
+ * while training growth was throttled to 5-45% at the cap. Two organic softeners (no removal of
+ * regression for ordinary developing players):
+ *  - B2: soft-knee the market value that DRIVES regression, so extreme-value stars aren't penalized
+ *    without bound (above the knee, only a fraction of the excess counts).
+ *  - B1: make regression HEADROOM-AWARE (mirror of the growth throttle, but gentle) — a capped/closing
+ *    attribute plateaus instead of eroding at full speed. Net: a well-managed top star holds/slightly
+ *    grows instead of crashing. Open (still-developing) attributes keep full regression (multiplier 1).
+ */
+export const ORGANIC_MARKET_VALUE_REGRESSION_SOFT_KNEE = 55;
+export const ORGANIC_MARKET_VALUE_REGRESSION_KNEE_SLOPE = 0.35;
+const ORGANIC_REGRESSION_HEADROOM_MULTIPLIER: Record<"open" | "closing" | "capped", number> = {
+  open: 1,
+  closing: 0.7,
+  capped: 0.45,
+};
+function softKneeMarketValueForRegression(marktwertBase: number): number {
+  if (marktwertBase <= ORGANIC_MARKET_VALUE_REGRESSION_SOFT_KNEE) return marktwertBase;
+  return (
+    ORGANIC_MARKET_VALUE_REGRESSION_SOFT_KNEE +
+    (marktwertBase - ORGANIC_MARKET_VALUE_REGRESSION_SOFT_KNEE) * ORGANIC_MARKET_VALUE_REGRESSION_KNEE_SLOPE
+  );
+}
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
 /** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
 export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 0.64;
@@ -657,7 +682,11 @@ export function buildOrganicSeasonProgression(input: {
     playerRating: input.player.rating,
   });
   const marktwertBase = getMarktwertForRegression(input.player);
-  const marketValuePressurePerAttribute = roundValue(marktwertBase * ORGANIC_MARKET_VALUE_PRESSURE_RATE, 3);
+  // B2: soft-knee the market value driving regression so extreme-value stars aren't penalized without bound.
+  const marketValuePressurePerAttribute = roundValue(
+    softKneeMarketValueForRegression(marktwertBase) * ORGANIC_MARKET_VALUE_PRESSURE_RATE,
+    3,
+  );
   const marketValuePressureTotal = roundValue(
     marketValuePressurePerAttribute * PROGRESSION_ATTRIBUTE_ORDER.length,
     2,
@@ -694,7 +723,11 @@ export function buildOrganicSeasonProgression(input: {
       signals: performanceSignals,
       potentialGapStars: starSnapshot.potentialGap,
     });
-    const regression = -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute);
+    // B1: headroom-aware regression — a capped/closing attribute plateaus instead of eroding at full
+    // speed (mirror of the growth throttle, but gentle). Open attributes keep full regression.
+    const regressionHeadroomMultiplier = ORGANIC_REGRESSION_HEADROOM_MULTIPLIER[attributeHeadroom.state] ?? 1;
+    const regression =
+      -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) * regressionHeadroomMultiplier;
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
     const performanceDelta =
       applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *

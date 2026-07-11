@@ -147,13 +147,14 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    // 2026-07-04 balancing pass: ORGANIC_MARKET_VALUE_PRESSURE_RATE reduced 0.0104 -> 0.007
-    // (top-20-MW regression check showed ~all expensive players net-negative even with a solid
-    // season; see progress-log.md for the before/after distribution).
+    // 2026-07-04 balancing pass: ORGANIC_MARKET_VALUE_PRESSURE_RATE reduced 0.0104 -> 0.007.
+    // Financial-discipline B2: the market value driving regression is now soft-kneed above 55, so a
+    // 100-MW star pays regression on softKnee(100)=55+(100-55)*0.35=70.75, not the full 100 — cheap
+    // players (<=55 MW) are unchanged; extreme-value stars are no longer penalized without bound.
     expect(cheapResult.marketValuePressureTotal).toBeCloseTo(1.68, 1);
-    expect(starResult.marketValuePressureTotal).toBeCloseTo(8.4, 1);
+    expect(starResult.marketValuePressureTotal).toBeCloseTo(5.94, 1);
     expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.14, 2);
-    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.7, 2);
+    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.495, 2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });
