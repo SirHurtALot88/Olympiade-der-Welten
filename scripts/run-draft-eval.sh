@@ -8,7 +8,8 @@ OUT="${OUT:-/tmp/draft-eval-$(date +%s)}"; mkdir -p "$OUT"
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 export OLY_LONG_RUN_OUTPUT_DIR="$OUT"
 export OLY_LONG_RUN_ALLOW_DEV_SERVER="${OLY_LONG_RUN_ALLOW_DEV_SERVER:-1}"
-export OLY_ENABLE_EMERGENCY_REPAIR="${OLY_ENABLE_EMERGENCY_REPAIR:-1}"   # avoid a 0/N team halting the draft
+# Emergency repair stays OFF: a 0/N team should be root-caused, not papered over.
+export OLY_ENABLE_EMERGENCY_REPAIR="${OLY_ENABLE_EMERGENCY_REPAIR:-0}"
 export OLY_LONG_RUN_BALANCE_PROFILE=iterate OLY_UNIFIED_PICK=1
 export OLY_LONG_RUN_STOP_AFTER=draft
 

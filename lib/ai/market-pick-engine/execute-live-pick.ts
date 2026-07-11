@@ -282,6 +282,35 @@ function resolveNeedAxisScore(item: TransfermarktFreeAgentItem, bestNeedDiscipli
   return disciplineHit + topStat * 0.22 + (item.mvs ?? item.ovr ?? 0) * 0.12;
 }
 
+/**
+ * Mild value-tilt for the execute pick ranking (G1: milder Tilt, G2: Top-Stars leicht positiv).
+ * Within an MW band the raw quality sort (mvs/ovr desc) always lands on the priciest player in the
+ * band. This discounts a candidate's quality by how far its price sits above the band floor, so a
+ * cheaper comparable player can beat the most expensive one — "hier und da ein 60er/70er". Kept mild
+ * so a genuinely superior star (much higher mvs) still wins its slot.
+ */
+const EXECUTE_VALUE_TILT_STRENGTH = 0.15;
+
+function executeValueAdjustedQuality(input: {
+  quality: number;
+  marketValue: number | null | undefined;
+  slotLane: MarketPickLane;
+  brackets: LeagueMarketBrackets;
+}): number {
+  const price = input.marketValue ?? 0;
+  if (price <= 0 || input.quality <= 0) {
+    return input.quality;
+  }
+  const band = getBracketBandForPickLane(input.slotLane, input.brackets);
+  const floor = band.floorMW;
+  // Superstar has no ceiling — use a nominal band width so the tilt still applies at the top end.
+  const ceiling = Number.isFinite(band.ceilingMW) ? band.ceilingMW : floor * 1.65;
+  const bandRef = Math.max(1, ceiling - floor);
+  const priceExcess = Math.max(0, price - floor);
+  const tilt = EXECUTE_VALUE_TILT_STRENGTH * Math.min(1, priceExcess / bandRef);
+  return input.quality * (1 - tilt);
+}
+
 function isPriceInSlotBand(input: {
   price: number;
   slotLane: MarketPickLane;
@@ -370,12 +399,18 @@ function resolveExecuteLivePickForLane(input: {
     .map((item) => ({
       item,
       needRankScore: resolveNeedAxisScore(item, input.bestNeedDisciplineId),
+      valueAdjustedQuality: executeValueAdjustedQuality({
+        quality: item.mvs ?? item.ovr ?? 0,
+        marketValue: item.marketValue,
+        slotLane: input.slotLane,
+        brackets: input.brackets,
+      }),
     }))
     .sort((left, right) => {
       if (right.needRankScore !== left.needRankScore) {
         return right.needRankScore - left.needRankScore;
       }
-      return (right.item.mvs ?? right.item.ovr ?? 0) - (left.item.mvs ?? left.item.ovr ?? 0);
+      return right.valueAdjustedQuality - left.valueAdjustedQuality;
     });
 
   for (const entry of ranked) {
