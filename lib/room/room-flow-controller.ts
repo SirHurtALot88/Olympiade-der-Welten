@@ -33,6 +33,7 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   { stepId: "facilities", label: "Facilities entscheiden", cta: "Weiter: Training & Gebäude", targetView: "trainingV2", aiAutoStep: true },
   { stepId: "xp_spend", label: "XP verteilen", cta: "Weiter: Entwicklung", targetView: "trainingV2", aiAutoStep: true },
   { stepId: "training", label: "Training prüfen", cta: "Weiter: Training prüfen", targetView: "trainingV2", aiAutoStep: true },
+  { stepId: "finalize_transfers", label: "Transfers finalisieren", cta: "Transfers finalisieren", targetView: "cockpit", aiAutoStep: true },
   { stepId: "lineup", label: "Einsatzliste setzen", cta: "Weiter: Einsatzliste", targetView: "lineup", aiAutoStep: true },
   { stepId: "formcards", label: "Formkarten setzen", cta: "Weiter: Formkarten", targetView: "lineup", aiAutoStep: true },
   { stepId: "arena", label: "Arena starten", cta: "Arena starten", targetView: "matchdayArena", aiAutoStep: false },

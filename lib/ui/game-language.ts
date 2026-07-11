@@ -22,6 +22,9 @@ export const GAME_LANGUAGE = {
     formCardPoolLabel: "Formkarten-Pool pruefen",
     formCardPoolCta: "Weiter: Formkarten-Pool",
     formCardPoolReadyHint: "Pool bereit — Zuweisung optional",
+    finalizeTransfersLabel: "Transfers finalisieren",
+    finalizeTransfersCta: "Transfers finalisieren",
+    finalizeTransfersPendingHint: "Bestaetigen, um die Formkarten zu verteilen",
   },
 } as const;
 
