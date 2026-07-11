@@ -546,7 +546,7 @@ export default function FacilitiesV2NewLook({
                   <small className="nl-facility-unbuilt">{facility.effect}</small>
                 )}
                 <div className="nl-facility-card-stats nl-tnum">
-                  <span title="Effizienz">Eff. {formatNlNumber(facility.efficiencyPct, 0)}%</span>
+                  <span title="Effizienz">Eff. {facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</span>
                   <span title="Unterhalt pro Saison">−{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
                   <span
                     title="Netto (Einnahmen − Unterhalt)"
