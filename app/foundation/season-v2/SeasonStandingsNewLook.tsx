@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type KeyboardEvent } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
+  NlBarChart,
   NlCard,
   NlDeltaChip,
   NlMedalBadge,
@@ -15,6 +16,8 @@ import {
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  type NlBarChartBar,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import {
   getSeasonV2TeamTagStyle,
@@ -37,11 +40,19 @@ import {
  * Layout zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - kein "Titelrennen"-Hero, keine Momentum-/Form-Karten (die alte
- *   "Formkurve" plottete nur die 4 Bereichssummen — kein echter Trend),
+ * - kein "Titelrennen"-Hero,
  * - keine Auf-/Abstiegszonen (kein Zonen-Konzept im Datenmodell),
  * - kein Rang-Verlauf pro Spieltag (existiert nicht) — Rang-Entwicklung
  *   gibt es nur saisonübergreifend aus `historicalPointsBySeason`.
+ *
+ * Momentum/Formtrend im Board: `SeasonV2StandingsRow` (und damit diese
+ * Props) enthält keine Pro-Spieltag-Punktereihe — der Season-Points-Ledger
+ * (`lib/foundation/season-points-ledger.ts`) liefert Punkte nur pro
+ * *Spieler*-Performance, nicht als team-aggregierte Serie über Spieltage,
+ * und wird hier ohnehin nicht durchgereicht. Statt einer erfundenen
+ * Sparkline nutzt der Momentum-Chip pro Zeile deshalb `row.rankDiff`
+ * (Rang-Bewegung seit Saisonstart) — dasselbe Feld, das `momentumTeam` in
+ * `use-season-v2-panel-model.ts` bereits als "Momentum" behandelt.
  */
 
 type NlStandingsMode = "board" | "daten";
@@ -216,6 +227,42 @@ export default function SeasonStandingsNewLook({
     return result;
   }, [boardRows]);
 
+  /** Rückstand des eigenen Teams auf den Spitzenreiter (Punkte). */
+  const ownGapToLeader = useMemo(() => {
+    if (!selectedTeamSummary || selectedTeamSummary.points == null || !Number.isFinite(selectedTeamSummary.points)) {
+      return null;
+    }
+    return leaderPoints - selectedTeamSummary.points;
+  }, [selectedTeamSummary, leaderPoints]);
+
+  /**
+   * Daten-Modus-Balkenchart: folgt standardmäßig `points`, schwenkt aber
+   * auf die Bereichspunkte (POW/SPE/MEN/SOC) um, sobald über die
+   * Tabellen-Sortierung eine dieser Spalten aktiv ist ("Chart folgt Sort").
+   */
+  const datenChartMetric = useMemo(() => {
+    const activeArea = SEASON_DISCIPLINE_AREA_GROUPS.find((group) => group.id === tableSort.key);
+    if (!activeArea) {
+      return null;
+    }
+    return { areaId: activeArea.id, label: activeArea.label, tone: activeArea.id as NlTone };
+  }, [tableSort.key]);
+
+  const datenChartBars = useMemo<NlBarChartBar[]>(
+    () =>
+      sortedTableRows.map((row) => {
+        const isPodium = row.rank != null && row.rank >= 1 && row.rank <= 3;
+        const value = datenChartMetric ? getAreaValue(row, datenChartMetric.areaId) : row.points;
+        const tone: NlTone = row.isSelected ? "accent" : datenChartMetric ? datenChartMetric.tone : isPodium ? "good" : "neutral";
+        return { label: row.teamCode, value: value ?? 0, tone };
+      }),
+    [sortedTableRows, datenChartMetric],
+  );
+
+  const datenChartAriaLabel = datenChartMetric
+    ? `Bereichspunkte ${datenChartMetric.label} je Team, folgt der aktiven Tabellensortierung (dein Team hervorgehoben)`
+    : "Punkte je Team, in der Reihenfolge der Tabelle darunter (dein Team hervorgehoben)";
+
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
   }
@@ -254,6 +301,34 @@ export default function SeasonStandingsNewLook({
       event.preventDefault();
       toggleExpanded(teamId);
     }
+  }
+
+  /**
+   * Momentum-Chip (Board-Zeile): mangels Pro-Spieltag-Punktereihe die
+   * ehrliche leichte Alternative zur Sparkline — `row.rankDiff` (Rang seit
+   * Saisonstart) mit Richtung/Ton, wie auch `momentumTeam` andernorts in
+   * dieser Session dieses Feld als "Momentum" liest.
+   */
+  function renderMomentumChip(row: SeasonV2StandingsRow) {
+    const hasMomentum = row.rankDiff != null && Number.isFinite(row.rankDiff);
+    return (
+      <span
+        className="nl-standings-momentum-chip"
+        title="Formtrend: Rang-Bewegung seit Saisonstart (keine Punkte-Serie pro Spieltag verfügbar)"
+      >
+        <span className="nl-standings-momentum-chip-label">Form</span>
+        {hasMomentum ? (
+          <NlDeltaChip
+            value={row.rankDiff as number}
+            format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
+            title="Rang-Bewegung seit Saisonstart"
+            className="nl-standings-momentum-delta"
+          />
+        ) : (
+          <span className="nl-standings-momentum-delta is-flat nl-tnum">—</span>
+        )}
+      </span>
+    );
   }
 
   function renderAreaMiniBars(row: SeasonV2StandingsRow) {
@@ -489,6 +564,7 @@ export default function SeasonStandingsNewLook({
               title={`${row.teamName} öffnen`}
             />
             <StatChip label="MW" value={formatNlNumber(row.marketValueTotal, 1)} title="Marktwert gesamt" />
+            {renderMomentumChip(row)}
           </StatChipRow>
 
           <span className="nl-standings-caret" aria-hidden="true">
@@ -497,6 +573,65 @@ export default function SeasonStandingsNewLook({
         </div>
         {isExpanded ? renderExpandedDetails(row) : null}
       </li>
+    );
+  }
+
+  /**
+   * KPI-Kacheln über der Daten-Tabelle: Rang/Punkte/Rückstand/MW des
+   * eigenen Teams — nur wenn ein eigenes Team in dieser Saison existiert.
+   */
+  function renderDatenKpis() {
+    if (!selectedTeamSummary) {
+      return null;
+    }
+    const gapLabel =
+      ownGapToLeader == null ? "—" : ownGapToLeader <= 0 ? "Spitze" : formatNlNumber(ownGapToLeader, 1);
+    return (
+      <StatChipRow className="nl-standings-daten-kpis" label="Dein Team" aria-label="Deine Kennzahlen im Datenmodus">
+        <StatChip
+          label="Dein Rang"
+          value={selectedTeamSummary.rank != null ? `#${selectedTeamSummary.rank}` : "—"}
+          tone="accent"
+          onClick={() => onOpenTeam(selectedTeamSummary.teamId)}
+          title={`${selectedTeamSummary.teamName} öffnen`}
+        />
+        <StatChip label="Punkte" value={formatNlNumber(selectedTeamSummary.points, 1)} />
+        <StatChip
+          label="Rückstand auf #1"
+          value={gapLabel}
+          tone={ownGapToLeader != null && ownGapToLeader <= 0 ? "good" : "neutral"}
+          title="Punkte-Rückstand auf den aktuellen Spitzenreiter"
+        />
+        <StatChip label="MW" value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)} title="Marktwert gesamt" />
+      </StatChipRow>
+    );
+  }
+
+  /**
+   * Balkenchart über der Daten-Tabelle: `points` je Team, schwenkt bei
+   * aktiver POW/SPE/MEN/SOC-Spaltensortierung auf die Bereichspunkte
+   * dieser Spalte um (`datenChartMetric`/`datenChartBars`, s.o.).
+   */
+  function renderDatenChart() {
+    return (
+      <div className="nl-standings-daten-chart-scroll">
+        <NlBarChart
+          bars={datenChartBars}
+          format={(value) => formatNlNumber(value, 1)}
+          aria-label={datenChartAriaLabel}
+          className="nl-standings-daten-chart"
+        />
+      </div>
+    );
+  }
+
+  function renderDatenMode() {
+    return (
+      <>
+        {renderDatenKpis()}
+        {renderDatenChart()}
+        {renderDatenTable()}
+      </>
     );
   }
 
@@ -741,7 +876,7 @@ export default function SeasonStandingsNewLook({
           </ol>
         </>
       ) : (
-        renderDatenTable()
+        renderDatenMode()
       )}
     </div>
   );

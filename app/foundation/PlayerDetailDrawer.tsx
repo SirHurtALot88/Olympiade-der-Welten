@@ -43,12 +43,20 @@ import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
-import { NlSparkline } from "@/components/foundation/new-look";
+import {
+  NlDeltaChip,
+  NlProgressBar,
+  NlRadar,
+  NlSparkline,
+  formatNlNumber,
+  type NlRadarAxis,
+} from "@/components/foundation/new-look";
 import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import { useNewLook } from "@/lib/ui/new-look-preference";
+import { getMetricBarPercent, getPoolHeatTone } from "@/lib/foundation/player-league-heat";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -1101,6 +1109,7 @@ function renderTopDisciplineCell(
   columnId: TopDisciplineColumnId,
   isScoutedProfile: boolean,
   scoutingLevel: number,
+  newLookHeat: { enabled: boolean; pool: Record<string, number[]> | null } = { enabled: false, pool: null },
 ): ReactNode {
   switch (columnId) {
     case "discipline": {
@@ -1128,7 +1137,22 @@ function renderTopDisciplineCell(
           )}
         </span>
       ) : (
-        formatDisciplineValue(row.value, row.upgradeDelta)
+        <>
+          {formatDisciplineValue(row.value, row.upgradeDelta)}
+          {/* "Neuer Look" (flag-gated, additiv, #60 FM Data-Hub): Liga-Heat-Bar
+              unter dem Diszi-Wert — echte Pool-Verteilung aus allen Spielern
+              des aktiven Saves (`disciplinePool`), keine erfundene Skala. */}
+          {newLookHeat.enabled && newLookHeat.pool && row.value != null ? (
+            <NlProgressBar
+              className="is-new-look nl-player-discipline-heat-bar"
+              value={getMetricBarPercent(row.value, newLookHeat.pool[row.id] ?? [], 100)}
+              max={100}
+              tone={getPoolHeatTone(row.value, newLookHeat.pool[row.id] ?? [])}
+              showValue={false}
+              title={`${row.label}: ${formatValue(row.value, 0)} · Liga-Verteilung (Rang im Vergleich zu allen Spielern)`}
+            />
+          ) : null}
+        </>
       );
     case "seasonPps":
       return formatPointsWithRank(row.seasonPoints, row.seasonPointsRank ?? null);
@@ -1145,6 +1169,299 @@ function renderTopDisciplineCell(
     default:
       return "—";
   }
+}
+
+// "Neuer Look" (flag-gated, additiv, FM-Vergleichsscreen #60): Zwei-Spieler-
+// Vergleich — siehe `PlayerComparePanel` unten. POW/SPE/MEN/SOC kommen 1:1
+// aus `PlayerDetailDrawerData` (dieselben Felder wie der Hero-Radar).
+function buildRadarAxesFromPlayerData(source: Pick<PlayerDetailDrawerData, "pow" | "spe" | "men" | "soc">): NlRadarAxis[] {
+  return (
+    [
+      ["pow", source.pow],
+      ["spe", source.spe],
+      ["men", source.men],
+      ["soc", source.soc],
+    ] as const
+  )
+    .filter((entry): entry is readonly [NlRadarAxis["key"], number] => entry[1] != null && Number.isFinite(entry[1]))
+    .map(([key, value]) => ({ key, value }));
+}
+
+type ComparePlayerCandidate = {
+  id: string;
+  name: string;
+  className: string | null;
+  teamCode: string | null;
+};
+
+type CompareDisciplineRow = {
+  id: string;
+  label: string;
+  category: DisciplineCategoryLike;
+  entryA: PlayerDetailDrawerData["disciplineValues"][number];
+  entryB: PlayerDetailDrawerData["disciplineValues"][number] | undefined;
+  delta: number | null;
+};
+
+type DisciplineCategoryLike = PlayerDetailDrawerData["disciplineValues"][number]["category"];
+
+function renderComparePlayerLabel(name: string, teamCode: string | null | undefined, isFreeAgent: boolean) {
+  if (teamCode) {
+    return `${name} · ${teamCode}`;
+  }
+  return isFreeAgent ? `${name} · Free Agent` : name;
+}
+
+function renderCompareDisciplineCell(
+  entry: PlayerDetailDrawerData["disciplineValues"][number] | undefined,
+  isScouted: boolean,
+  scoutingLevel: number,
+) {
+  if (!entry) {
+    return <span className="nl-compare-metric-gap">—</span>;
+  }
+  if (isScouted) {
+    const tier = entry.scoutedTier ?? formatDisciplineTier(entry.value);
+    return (
+      <span
+        className={`player-drawer-chip ${getAttributeTierClass(tier)}`}
+        title="Gescoutete Klasse als Range, keine exakte Diszi-Zahl."
+      >
+        {getScoutingTierWindow(tier, resolveScoutingConfidenceFromLevel(scoutingLevel))}
+      </span>
+    );
+  }
+  return <span className="nl-tnum">{formatValue(entry.value, 0)}</span>;
+}
+
+/**
+ * "Vergleichen"-Affordanz im Spieler-Drawer (#60, FM-Vergleichsscreen):
+ * Spieler-Picker (Suche über die reale Spielerliste des Saves) + Vergleichs-
+ * Panel (Radar mit Ghost-Polygon, Kennzahlen-Deltas, Diszi-Tabelle). Für
+ * nicht-eigene/ungescoutete Spieler B werden exakte Diszi-Werte durch die
+ * bestehenden Scouting-Tier-Ranges ersetzt (`scoutedTier` + `getScoutingTierWindow`,
+ * dieselbe Quelle wie die Top-Disziplinen-Tabelle oben) — es wird nichts an
+ * verdeckten Daten erfunden oder vorbeigerechnet.
+ */
+function PlayerComparePanel({
+  dataA,
+  open,
+  onToggleOpen,
+  query,
+  onQueryChange,
+  candidates,
+  selectedPlayerId,
+  onSelectPlayer,
+  onClearSelection,
+  dataB,
+  loadingB,
+}: {
+  dataA: PlayerDetailDrawerData;
+  open: boolean;
+  onToggleOpen: () => void;
+  query: string;
+  onQueryChange: (value: string) => void;
+  candidates: ComparePlayerCandidate[];
+  selectedPlayerId: string | null;
+  onSelectPlayer: (playerId: string) => void;
+  onClearSelection: () => void;
+  dataB: PlayerDetailDrawerData | null;
+  loadingB: boolean;
+}) {
+  const aIsScouted = dataA.attributeVisibility === "scouted";
+  const bIsScouted = dataB != null && dataB.attributeVisibility === "scouted";
+  const bIsFreeAgent = dataB != null && dataB.transferStatus.toLowerCase().includes("free");
+
+  const radarAxesA = buildRadarAxesFromPlayerData(dataA);
+  const radarAxesB = dataB ? buildRadarAxesFromPlayerData(dataB) : [];
+
+  const compareMetrics = dataB
+    ? [
+        { key: "ovr", label: "OVR", aValue: dataA.ovr, bValue: dataB.ovr },
+        { key: "pps", label: "PPs", aValue: dataA.pps ?? dataA.ppsRating, bValue: dataB.pps ?? dataB.ppsRating },
+        { key: "mvs", label: "MVS", aValue: dataA.mvs, bValue: dataB.mvs },
+        { key: "mw", label: "MW", aValue: dataA.marketValue, bValue: dataB.marketValue },
+      ]
+    : [];
+
+  const compareDisciplineRows: CompareDisciplineRow[] = dataB
+    ? (() => {
+        const bById = new Map(dataB.disciplineValues.map((entry) => [entry.id, entry] as const));
+        return [...dataA.disciplineValues]
+          .sort((left, right) => (right.value ?? -1) - (left.value ?? -1))
+          .slice(0, 8)
+          .map((entryA) => {
+            const entryB = bById.get(entryA.id);
+            const delta =
+              !aIsScouted && !bIsScouted && entryA.value != null && entryB?.value != null
+                ? Number((entryA.value - entryB.value).toFixed(1))
+                : null;
+            return { id: entryA.id, label: entryA.label, category: entryA.category, entryA, entryB, delta };
+          });
+      })()
+    : [];
+
+  return (
+    <div className="is-new-look nl-player-compare" data-testid="player-compare-panel">
+      <button
+        type="button"
+        className="nl-player-compare-toggle"
+        aria-expanded={open}
+        aria-controls="player-compare-panel-body"
+        onClick={onToggleOpen}
+      >
+        {open ? "Vergleich schliessen" : "Vergleichen"}
+      </button>
+      <div className="nl-compare-panel" id="player-compare-panel-body" hidden={!open}>
+        {!open ? null : selectedPlayerId == null ? (
+          <div className="nl-compare-picker">
+            <label className="nl-compare-picker-label" htmlFor="player-compare-search">
+              Spieler für Vergleich suchen
+            </label>
+            <input
+              id="player-compare-search"
+              type="search"
+              className="nl-compare-picker-input"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Spielername…"
+              autoComplete="off"
+            />
+            <ul className="nl-compare-picker-list" role="listbox" aria-label="Vergleichs-Kandidaten">
+              {candidates.map((candidate) => (
+                <li key={candidate.id}>
+                  <button
+                    type="button"
+                    className="nl-compare-picker-item"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => onSelectPlayer(candidate.id)}
+                  >
+                    <span className="nl-compare-picker-item-name">{candidate.name}</span>
+                    <span className="nl-compare-picker-item-meta">
+                      {candidate.className ?? "—"}
+                      {candidate.teamCode ? ` · ${candidate.teamCode}` : " · Free Agent"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {candidates.length === 0 ? <li className="nl-compare-picker-empty muted">Keine Treffer.</li> : null}
+            </ul>
+          </div>
+        ) : loadingB ? (
+          <p className="nl-compare-loading muted" role="status" aria-live="polite">
+            Lade Vergleichsprofil…
+          </p>
+        ) : dataB ? (
+          <div className="nl-compare-result">
+            <header className="nl-compare-result-head">
+              <div className="nl-compare-result-players">
+                <strong className="is-a">{dataA.name}</strong>
+                <span className="nl-compare-vs" aria-hidden="true">
+                  vs
+                </span>
+                <strong className="is-b">{renderComparePlayerLabel(dataB.name, dataB.teamCode, bIsFreeAgent)}</strong>
+              </div>
+              <button type="button" className="nl-compare-clear" onClick={onClearSelection}>
+                Anderen Spieler wählen
+              </button>
+            </header>
+
+            <div className="nl-compare-radar-block">
+              <NlRadar
+                axes={radarAxesA}
+                ghostAxes={radarAxesB.length === 4 ? radarAxesB : undefined}
+                ghostLabel={dataB.name}
+                max={100}
+                showValues
+                className="nl-compare-radar"
+                aria-label={`Achsen-Vergleich: ${dataA.name} vs ${dataB.name}`}
+              />
+              <p className="nl-player-hero-radar-legend" aria-label="Radar-Legende">
+                <span className="nl-player-hero-radar-legend-item is-current">
+                  <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+                  {dataA.name}
+                </span>
+                <span className="nl-player-hero-radar-legend-item is-ghost">
+                  <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+                  {dataB.name}
+                </span>
+              </p>
+            </div>
+
+            <div className="nl-compare-metrics" role="group" aria-label="Kennzahlen-Vergleich">
+              {compareMetrics.map((metric) => (
+                <div className="nl-compare-metric-row" key={metric.key}>
+                  <span className="nl-compare-metric-a nl-tnum">{formatNlNumber(metric.aValue, 1)}</span>
+                  <span className="nl-compare-metric-label">{metric.label}</span>
+                  {metric.aValue != null && metric.bValue != null ? (
+                    <NlDeltaChip
+                      value={Number((metric.aValue - metric.bValue).toFixed(1))}
+                      title={`${dataA.name} − ${dataB.name}`}
+                    />
+                  ) : (
+                    <span className="nl-compare-metric-gap">—</span>
+                  )}
+                  <span className="nl-compare-metric-b nl-tnum">{formatNlNumber(metric.bValue, 1)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="table-shell nl-compare-discipline-table-shell">
+              <table className="team-table nl-compare-discipline-table">
+                <thead>
+                  <tr>
+                    <th>Diszi</th>
+                    <th>{dataA.name}</th>
+                    <th>Δ</th>
+                    <th>{dataB.name}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareDisciplineRows.map((row) => {
+                    const areaClass = getDisciplineAreaClass(row.category);
+                    return (
+                      <tr key={`compare-discipline-${row.id}`}>
+                        <td className={`player-drawer-discipline-name-cell ${areaClass}`}>
+                          <DisciplineIcon
+                            disciplineId={row.id}
+                            label={row.label}
+                            className={`discipline-icon-chip-inline player-drawer-discipline-area-chip ${areaClass}`}
+                          />
+                        </td>
+                        <td>{renderCompareDisciplineCell(row.entryA, aIsScouted, dataA.scoutingLevel ?? 0)}</td>
+                        <td>
+                          {row.delta != null ? (
+                            <NlDeltaChip value={row.delta} />
+                          ) : (
+                            <span className="nl-compare-metric-gap">—</span>
+                          )}
+                        </td>
+                        <td>{renderCompareDisciplineCell(row.entryB, bIsScouted, dataB.scoutingLevel ?? 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {bIsScouted ? (
+              <p className="nl-compare-fog-note muted">
+                {dataB.name} ist nicht vollständig gescoutet — Diszi-Werte als Klassen-Range (Scouting L
+                {dataB.scoutingLevel ?? 0}), keine exakten Zahlen.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="nl-compare-error">
+            <p className="muted">Vergleichsprofil nicht verfügbar.</p>
+            <button type="button" className="nl-compare-clear" onClick={onClearSelection}>
+              Anderen Spieler wählen
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function PlayerDetailDrawer({
@@ -1238,6 +1555,117 @@ export default function PlayerDetailDrawer({
         ? buildPlayerCareerSeries(werdegangGameState, werdegangPlayerId)
         : null,
     [newLookEnabled, werdegangGameState, werdegangPlayerId],
+  );
+
+  // "Neuer Look" (flag-gated, additiv, FM Data-Hub #60): Liga-Heat-Pool je
+  // Disziplin — reale disciplineRatings aller Spieler des aktiven Saves, für
+  // die Heat-Bar unter den Top-Disziplinen-Werten. Kein synthetischer Pool.
+  const disciplineHeatPool = useMemo(() => {
+    if (!newLookEnabled || !werdegangGameState) {
+      return null;
+    }
+    const pool: Record<string, number[]> = {};
+    for (const player of werdegangGameState.players) {
+      for (const disciplineId of Object.keys(player.disciplineRatings ?? {})) {
+        const value = player.disciplineRatings[disciplineId];
+        if (value != null && Number.isFinite(value)) {
+          (pool[disciplineId] ??= []).push(value);
+        }
+      }
+    }
+    return pool;
+  }, [newLookEnabled, werdegangGameState]);
+
+  // "Neuer Look" (flag-gated, additiv, FM-Vergleichsscreen #60): Zwei-
+  // Spieler-Vergleich. Spieler B wird über denselben Builder wie Spieler A
+  // geladen (`buildPlayerDrawerDataFromGameState`), damit Scouting-/Fog-of-
+  // war-Regeln identisch angewendet werden — es wird nichts an Spieler B
+  // vorbeigerechnet oder erfunden.
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareQuery, setCompareQuery] = useState("");
+  const [comparePlayerId, setComparePlayerId] = useState<string | null>(null);
+  const [comparePlayerBData, setComparePlayerBData] = useState<PlayerDetailDrawerData | null>(null);
+  const [comparePlayerBLoading, setComparePlayerBLoading] = useState(false);
+
+  useEffect(() => {
+    setCompareOpen(false);
+    setCompareQuery("");
+    setComparePlayerId(null);
+    setComparePlayerBData(null);
+  }, [data?.playerId]);
+
+  useEffect(() => {
+    if (!comparePlayerId || !werdegangGameState) {
+      setComparePlayerBData(null);
+      setComparePlayerBLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setComparePlayerBLoading(true);
+    void (async () => {
+      try {
+        const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+        const nextData = buildPlayerDrawerDataFromGameState({
+          gameState: werdegangGameState,
+          playerId: comparePlayerId,
+          source: data?.source ?? "sqlite",
+          manageableTeamIds: foundationState?.foundationManageableTeamIds ?? null,
+          saveId: foundationState?.activeSaveId ?? null,
+        });
+        if (!cancelled) {
+          setComparePlayerBData(nextData);
+        }
+      } catch {
+        if (!cancelled) {
+          setComparePlayerBData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setComparePlayerBLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comparePlayerId, werdegangGameState, data?.source, foundationState?.foundationManageableTeamIds, foundationState?.activeSaveId]);
+
+  const compareTeamCodeByPlayerId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!compareOpen || !werdegangGameState) {
+      return map;
+    }
+    const teamById = new Map(werdegangGameState.teams.map((team) => [team.teamId, team] as const));
+    for (const roster of werdegangGameState.rosters) {
+      const team = teamById.get(roster.teamId);
+      if (team) {
+        map.set(roster.playerId, team.shortCode || team.name);
+      }
+    }
+    return map;
+  }, [compareOpen, werdegangGameState]);
+
+  const compareCandidates = useMemo(() => {
+    if (!compareOpen || !werdegangGameState || !data) {
+      return [];
+    }
+    const query = compareQuery.trim().toLowerCase();
+    const currentPlayerId = data.playerId;
+    return werdegangGameState.players
+      .filter((player) => player.id !== currentPlayerId && (query.length === 0 || player.name.toLowerCase().includes(query)))
+      .sort((left, right) => left.name.localeCompare(right.name, "de"))
+      .slice(0, 20);
+  }, [compareOpen, werdegangGameState, data, compareQuery]);
+
+  const compareCandidateOptions = useMemo(
+    () =>
+      compareCandidates.map((player) => ({
+        id: player.id,
+        name: player.name,
+        className: player.className ?? null,
+        teamCode: compareTeamCodeByPlayerId.get(player.id) ?? null,
+      })),
+    [compareCandidates, compareTeamCodeByPlayerId],
   );
 
   if (!data) {
@@ -1437,15 +1865,33 @@ export default function PlayerDetailDrawer({
           {/* "Neuer Look" (flag-gated): ersetzt nur den Identitäts-/Ratings-Header.
               Mit Flag OFF rendert exakt der bisherige Header — byte-identisch. */}
           {newLookEnabled ? (
-            <PlayerHeroNewLook
-              data={data}
-              roleLabel={formatRoleTag(transferContext.roleTag)}
-              caStars={newLookCaPo?.caStars ?? null}
-              poStars={newLookCaPo?.poStars ?? null}
-              isFreeAgent={isFreeAgent}
-              onClose={onClose}
-              onOpenLeagueLeaders={onOpenLeagueLeaders}
-            />
+            <>
+              <PlayerHeroNewLook
+                data={data}
+                roleLabel={formatRoleTag(transferContext.roleTag)}
+                caStars={newLookCaPo?.caStars ?? null}
+                poStars={newLookCaPo?.poStars ?? null}
+                isFreeAgent={isFreeAgent}
+                onClose={onClose}
+                onOpenLeagueLeaders={onOpenLeagueLeaders}
+              />
+              <PlayerComparePanel
+                dataA={data}
+                open={compareOpen}
+                onToggleOpen={() => setCompareOpen((value) => !value)}
+                query={compareQuery}
+                onQueryChange={setCompareQuery}
+                candidates={compareCandidateOptions}
+                selectedPlayerId={comparePlayerId}
+                onSelectPlayer={setComparePlayerId}
+                onClearSelection={() => {
+                  setComparePlayerId(null);
+                  setComparePlayerBData(null);
+                }}
+                dataB={comparePlayerBData}
+                loadingB={comparePlayerBLoading}
+              />
+            </>
           ) : (
           <div className="player-drawer-header">
           <div className="player-drawer-hero">
@@ -1858,7 +2304,7 @@ export default function PlayerDetailDrawer({
             {variant === "page" && data.historyRows.length >= 2 ? (
               <div className="player-drawer-stats-chart">
                 <h3>Stat-Entwicklung</h3>
-                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} />
+                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} />
               </div>
             ) : null}
           </section>
@@ -1927,7 +2373,10 @@ export default function PlayerDetailDrawer({
                             key={`discipline-breakdown-${entry.id}-${columnId}`}
                             className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                           >
-                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
+                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel, {
+                              enabled: newLookEnabled,
+                              pool: disciplineHeatPool,
+                            })}
                           </td>
                         ))}
                       </tr>
@@ -2517,7 +2966,7 @@ export default function PlayerDetailDrawer({
           ) : null}
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-training-progress">
-            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} /> : null}
+            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} /> : null}
           </section>
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-market">

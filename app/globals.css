@@ -51836,6 +51836,63 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* --- Board: Momentum-Chip (Rang-Bewegung seit Saisonstart als Formtrend,
+   ehrlicher Ersatz für eine nicht existierende Pro-Spieltag-Sparkline) --- */
+.is-new-look .nl-standings-momentum-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: var(--nl-s2) var(--nl-s3);
+  min-width: 56px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-standings-momentum-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-momentum-delta {
+  font-size: 13px;
+}
+
+.is-new-look .nl-standings-momentum-delta.is-flat {
+  color: var(--nl-mut);
+}
+
+/* --- Daten-Modus: KPI-Kacheln (eigenes Team) + Balkenchart über der
+   sortierbaren Tabelle; Chart-Muster folgt der Prize-Forecast-Karte --- */
+.is-new-look .nl-standings-daten-kpis {
+  margin: 0 0 var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-standings-daten-chart-scroll {
+  overflow-x: auto;
+  margin-bottom: var(--nl-s3);
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-standings-daten-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 900px;
+  height: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-standings-momentum-chip {
+    transition: none;
+  }
+}
+
 /* ============================================================
    NEUER LOOK — Teams: Entwicklung über Saisons, Delta-Chips,
    sortierbare Teamtabelle & Zeilen-Hover (nl-teams-*)
@@ -52216,6 +52273,431 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-player-hero-radar-legend-item.is-ghost .nl-player-hero-radar-legend-swatch {
   border-top-style: dashed;
   border-top-color: color-mix(in srgb, var(--nl-mut, #93a3bd) 75%, transparent);
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Drawer: Liga-Heat-Bar unter Top-Disziplinen-Werten
+   (FM Data-Hub #60). Dünne NlProgressBar, ohne Kopfzeile (kein `label`/
+   `showValue`), direkt unter dem formatierten Diszi-Wert in der Zelle.
+   =================================================================== */
+
+.is-new-look.nl-player-discipline-heat-bar,
+.is-new-look .nl-player-discipline-heat-bar {
+  margin-top: 4px;
+  max-width: 92px;
+}
+
+.is-new-look.nl-player-discipline-heat-bar .nl-progress-track,
+.is-new-look .nl-player-discipline-heat-bar .nl-progress-track {
+  height: 4px;
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Drawer: Zwei-Spieler-Vergleich (FM-Vergleichsscreen
+   #60). Picker (Suche + Ergebnisliste), Vergleichs-Panel (Radar-Ghost,
+   Kennzahlen-Deltas, Diszi-Tabelle mit Fog-of-war-Tier-Ranges).
+   =================================================================== */
+
+.is-new-look.nl-player-compare,
+.is-new-look .nl-player-compare {
+  margin-top: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-player-compare-toggle {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  border-radius: var(--nl-r-pill);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-player-compare-toggle:hover {
+  background: color-mix(in srgb, var(--nl-accent-soft) 70%, var(--nl-accent) 30%);
+}
+
+.is-new-look .nl-compare-panel {
+  margin-top: var(--nl-s3);
+  padding: var(--nl-s4);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e1, none);
+}
+
+.is-new-look .nl-compare-panel[hidden] {
+  display: none;
+}
+
+.is-new-look .nl-compare-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-compare-picker-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-picker-input {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-compare-picker-input:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-compare-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-compare-picker-item {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  padding: 6px 10px;
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.is-new-look .nl-compare-picker-item:hover,
+.is-new-look .nl-compare-picker-item:focus-visible {
+  background: var(--nl-bg-2);
+  border-color: var(--nl-line);
+}
+
+.is-new-look .nl-compare-picker-item-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-compare-picker-item-meta {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-compare-picker-empty {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-compare-loading {
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-compare-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-compare-result-players {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-family: var(--nl-display);
+  font-size: 16px;
+}
+
+.is-new-look .nl-compare-result-players .is-a {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-compare-result-players .is-b {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-vs {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-clear {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+}
+
+.is-new-look .nl-compare-clear:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-compare-radar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-compare-radar {
+  width: 200px;
+  height: auto;
+}
+
+.is-new-look .nl-compare-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-compare-metric-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 10px;
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-compare-metric-a {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-compare-metric-b {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-metric-label {
+  justify-self: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-metric-gap {
+  justify-self: center;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-compare-discipline-table-shell {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.is-new-look .nl-compare-discipline-table th,
+.is-new-look .nl-compare-discipline-table td {
+  text-align: center;
+}
+
+.is-new-look .nl-compare-discipline-table th:first-child,
+.is-new-look .nl-compare-discipline-table td:first-child {
+  text-align: left;
+}
+
+.is-new-look .nl-compare-fog-note {
+  margin-top: var(--nl-s2);
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-compare-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-player-compare-toggle,
+  .is-new-look .nl-compare-picker-item {
+    transition: none;
+  }
+}
+
+/* ===================================================================
+   NEUER LOOK — Spieler-Attribut-Chart: annotierte Entwicklungs-Zeitleiste
+   (FM-Attribut-Graph #60). Season-Spalten mit Ereignis-Marker-Buttons
+   (Transfer/Verletzung/Klassenwechsel/XP-Ausgabe) + Detail-Karte mit
+   Attribut-Deltas der ausgewählten Saison.
+   =================================================================== */
+
+.is-new-look.nl-devtimeline,
+.is-new-look .nl-devtimeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-devtimeline-track {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  padding-bottom: 4px;
+  overflow-x: auto;
+}
+
+.is-new-look .nl-devtimeline-season {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 46px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-devtimeline-season-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-devtimeline-season-label.is-live {
+  color: var(--nl-accent);
+  font-weight: 700;
+}
+
+.is-new-look .nl-devtimeline-markers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+}
+
+.is-new-look .nl-devtimeline-marker {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--nl-ink);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.is-new-look .nl-devtimeline-marker:hover {
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-devtimeline-marker:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-devtimeline-marker.is-transfer {
+  color: var(--nl-men, #5b9bff);
+  border-color: color-mix(in srgb, var(--nl-men, #5b9bff) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-injury {
+  color: var(--nl-risk, #e5615a);
+  border-color: color-mix(in srgb, var(--nl-risk, #e5615a) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-classup {
+  color: var(--nl-good, #4cc56b);
+  border-color: color-mix(in srgb, var(--nl-good, #4cc56b) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-xp {
+  color: var(--nl-warn, #e0a53a);
+  border-color: color-mix(in srgb, var(--nl-warn, #e0a53a) 55%, transparent);
+}
+
+.is-new-look .nl-devtimeline-marker.is-selected {
+  background: var(--nl-accent-soft);
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 0 1px var(--nl-accent);
+}
+
+.is-new-look .nl-devtimeline-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .nl-devtimeline-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-devtimeline-detail-head strong {
+  font-family: var(--nl-display);
+  font-size: 14px;
+}
+
+.is-new-look .nl-devtimeline-detail-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-devtimeline-marker {
+    transition: none;
+  }
 }
 
 /* --- Werdegang: Hover-Scrubber / Fadenkreuz auf den Karriere-Kurven --- */
@@ -55006,8 +55488,278 @@ button.is-new-look .nl-thist-season-pill,
 /* --- Reduced Motion (nl-teamprofile) --------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-teamprofile-action,
-  .is-new-look .nl-teamprofile-table-row {
+  .is-new-look .nl-teamprofile-table-row,
+  .is-new-look .nl-teamprofile-fan-chip,
+  .is-new-look .nl-teamprofile-depth-cell {
     transition: none;
+  }
+}
+
+/* --- Fans & Beliebtheit (nl-teamprofile-fan-*) ----------------------- */
+.is-new-look .nl-teamprofile-fan-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  align-items: center;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-fan-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamprofile-fan-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-teamprofile-fan-chip {
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-line));
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-fan-chip:hover {
+  border-color: var(--nl-accent);
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-teamprofile-fan-consequence {
+  margin-top: var(--nl-s3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+/* --- Board-Vertrauen-Verlauf (nl-teamprofile-board-*) ---------------- */
+.is-new-look .nl-teamprofile-board-lead {
+  grid-column: span 2;
+  min-width: 280px;
+}
+
+.is-new-look .nl-teamprofile-board-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-teamprofile-board-meter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.is-new-look .nl-teamprofile-board-pressure-bar {
+  width: 100%;
+}
+
+.is-new-look .nl-teamprofile-board-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamprofile-board-history-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-board-history-empty {
+  margin: 0;
+  font-size: 12px;
+}
+
+.is-new-look .nl-teamprofile-board-warnings {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-objective-bar {
+  margin-top: 2px;
+  width: 100%;
+}
+
+/* --- Squad Depth Chart (nl-teamprofile-depth-*) ---------------------- */
+.is-new-look .nl-teamprofile-depth-stress-bar {
+  width: 100%;
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-depth-shell {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.is-new-look .nl-teamprofile-depth-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamprofile-depth-table th {
+  position: sticky;
+  top: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+  border-bottom: 1px solid var(--nl-line-2);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-depth-table th.nl-teamprofile-depth-th-discipline {
+  text-align: left;
+}
+
+.is-new-look .nl-teamprofile-depth-table td {
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: center;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-depth-row.is-thin td.nl-teamprofile-depth-discipline {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamprofile-depth-row.is-thin {
+  background: color-mix(in srgb, var(--nl-risk) 6%, transparent);
+}
+
+.is-new-look .nl-teamprofile-depth-discipline {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  text-align: left;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamprofile-depth-axis-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-depth-slots {
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-wrap {
+  padding: var(--nl-s1) var(--nl-s2);
+}
+
+.is-new-look .nl-teamprofile-depth-cell {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 88px;
+  padding: var(--nl-s1) var(--nl-s2);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-line)) 55%, var(--nl-line));
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, var(--nl-panel-2));
+  color: var(--nl-ink);
+  cursor: pointer;
+  transition: transform var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-depth-cell:hover {
+  border-color: var(--nl-tone, var(--nl-accent));
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-teamprofile-depth-cell.is-empty {
+  min-width: 88px;
+  border: 1px dashed var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  color: var(--nl-mut);
+  background: transparent;
+  cursor: default;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamprofile-depth-cell-rating {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-depth-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid var(--nl-panel);
+}
+
+.is-new-look .nl-teamprofile-depth-badge.is-injury {
+  background: var(--nl-risk);
+}
+
+.is-new-look .nl-teamprofile-depth-badge.is-fatigue {
+  background: var(--nl-warn);
+}
+
+/* --- Responsive (nl-teamprofile-fan-/board-/depth-) ------------------ */
+@media (max-width: 900px) {
+  .is-new-look .nl-teamprofile-fan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .nl-teamprofile-board-lead {
+    grid-column: auto;
+  }
+
+  .is-new-look .nl-teamprofile-board-gauge-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

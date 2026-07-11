@@ -9,6 +9,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlGauge,
   NlProgressBar,
   NlRadar,
   NlSparkline,
@@ -18,6 +19,7 @@ import {
   formatNlNumber,
   nlToneClass,
   type NlAxisKey,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import type {
   TeamDetailDrawerData,
@@ -38,6 +40,20 @@ import { groupObjectivesByCategory } from "@/lib/foundation/team-board-objective
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import {
+  BELIEBTHEIT_MAX,
+  BELIEBTHEIT_MIN,
+  FAN_FAVORITE_TRAIT_ID,
+  computeTeamBeliebtheitFromGameState,
+  type BeliebtheitComponents,
+} from "@/lib/economy/team-beliebtheit";
+import type {
+  Discipline,
+  DisciplineCategory,
+  GameState,
+  Player,
+  PlayerInjuryStatus,
+} from "@/lib/data/olyDataTypes";
 
 /**
  * "Neuer Look" Team-Profil (flag-gated, additiv).
@@ -130,6 +146,128 @@ function getDemandStatusTone(status: "open" | "fulfilled" | "at_risk" | "failed"
   return "is-open";
 }
 
+/** Ton für die Board-Ziel-Fortschrittsbar (NlTone statt CSS-Klasse). */
+function getObjectiveProgressTone(status: "open" | "completed" | "failed" | "at_risk"): NlTone {
+  if (status === "completed") return "good";
+  if (status === "failed") return "risk";
+  if (status === "at_risk") return "warn";
+  return "neutral";
+}
+
+/** Ton für den Beliebtheitsfaktor (1.0 = Liga-Durchschnitt, siehe team-beliebtheit.ts). */
+function getBeliebtheitTone(value: number): NlTone {
+  if (value >= 1.1) return "good";
+  if (value <= 0.9) return "risk";
+  return "accent";
+}
+
+/**
+ * "Fähig" für die Depth-Chart-Zählung: Diszplinrating ≥ 60 nutzt die im Spiel
+ * bereits real vorhandene Tier-Schwelle (`Player.disciplineTierCounts.above60`,
+ * Skala 1–100) — kein neu erfundener Cutoff.
+ */
+const DEPTH_CAPABLE_RATING_FLOOR = 60;
+
+/** Erschöpfungs-Badge-Schwelle in der Depth-Chart (Skala wie `Player.fatigue`). */
+const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
+
+function getDepthRatingTone(rating: number): NlTone {
+  if (rating >= 80) return "good";
+  if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "accent";
+  if (rating >= 40) return "warn";
+  return "risk";
+}
+
+const DISCIPLINE_CATEGORY_TO_AXIS: Record<DisciplineCategory, NlAxisKey> = {
+  power: "pow",
+  speed: "spe",
+  mental: "men",
+  social: "soc",
+};
+
+type NlTeamProfileDepthCell = {
+  playerId: string;
+  playerName: string;
+  rating: number;
+  fatigue: number | null;
+  injuryStatus: PlayerInjuryStatus | null;
+};
+
+type NlTeamProfileDepthRow = {
+  disciplineId: string;
+  disciplineLabel: string;
+  axis: NlAxisKey;
+  slotsNeeded: number | null;
+  capableCount: number;
+  isThin: boolean;
+  cells: Array<NlTeamProfileDepthCell | null>;
+};
+
+type NlTeamProfileDepthFallbackRow = {
+  axis: NlAxisKey;
+  label: string;
+  cells: Array<{ playerId: string; playerName: string; rating: number } | null>;
+};
+
+function buildTeamDepthChart(gameState: GameState, teamId: string): NlTeamProfileDepthRow[] | null {
+  const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
+  if (rosterEntries.length === 0) {
+    return null;
+  }
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const rosterPlayers = rosterEntries
+    .map((entry) => playersById.get(entry.playerId))
+    .filter((player): player is Player => Boolean(player));
+  if (rosterPlayers.length === 0) {
+    return null;
+  }
+
+  const availabilityByPlayerId = new Map(
+    (gameState.seasonState.playerAvailabilityState ?? [])
+      .filter((row) => row.teamId === teamId)
+      .map((row) => [row.playerId, row] as const),
+  );
+
+  const disciplines: Discipline[] = [...gameState.disciplines].sort(
+    (left, right) => (left.displayOrder ?? left.originalOrder ?? 0) - (right.displayOrder ?? right.originalOrder ?? 0),
+  );
+
+  return disciplines.map((discipline) => {
+    const ranked = rosterPlayers
+      .map((player) => ({ player, rating: player.disciplineRatings[discipline.id] }))
+      .filter((entry): entry is { player: Player; rating: number } => isFiniteNumber(entry.rating))
+      .sort((left, right) => right.rating - left.rating);
+
+    const capableCount = ranked.filter((entry) => entry.rating >= DEPTH_CAPABLE_RATING_FLOOR).length;
+    const slotsNeeded = isFiniteNumber(discipline.playerCount) ? discipline.playerCount : null;
+
+    const cells: Array<NlTeamProfileDepthCell | null> = [0, 1, 2].map((index) => {
+      const entry = ranked[index];
+      if (!entry) {
+        return null;
+      }
+      const availability = availabilityByPlayerId.get(entry.player.id) ?? null;
+      return {
+        playerId: entry.player.id,
+        playerName: entry.player.name,
+        rating: entry.rating,
+        fatigue: availability?.fatigue ?? (isFiniteNumber(entry.player.fatigue) ? entry.player.fatigue : null),
+        injuryStatus: availability?.injuryStatus ?? null,
+      };
+    });
+
+    return {
+      disciplineId: discipline.id,
+      disciplineLabel: discipline.name,
+      axis: DISCIPLINE_CATEGORY_TO_AXIS[discipline.category],
+      slotsNeeded,
+      capableCount,
+      isThin: slotsNeeded != null && capableCount < slotsNeeded,
+      cells,
+    };
+  });
+}
+
 function comparePlayersByOvr(left: TeamDetailDrawerPlayerCard, right: TeamDetailDrawerPlayerCard) {
   return compareTeamRosterPlayersByOvrOrMarketValue({
     left: {
@@ -206,6 +344,89 @@ export default function TeamProfileNewLook({
   }, [data.players]);
 
   const groupedObjectives = useMemo(() => groupObjectivesByCategory(data.objectives), [data.objectives]);
+
+  // Beliebtheit/Fans: reale Regel aus lib/economy/team-beliebtheit.ts, nur
+  // berechenbar mit dem vollen GameState (Liga-Kontext für Rang/Fan-Anteil/
+  // Starpower). Ohne Foundation-State kein erfundener Platzhalterwert.
+  const beliebtheit: BeliebtheitComponents | null = useMemo(
+    () => (foundationGameState ? computeTeamBeliebtheitFromGameState(foundationGameState, data.teamId) : null),
+    [foundationGameState, data.teamId],
+  );
+
+  const fanFavoritePlayers = useMemo(() => {
+    if (!foundationGameState) {
+      return [];
+    }
+    const rosterPlayerIds = new Set(
+      foundationGameState.rosters.filter((entry) => entry.teamId === data.teamId).map((entry) => entry.playerId),
+    );
+    return foundationGameState.players.filter(
+      (player) => rosterPlayerIds.has(player.id) && player.traitsPositive?.includes(FAN_FAVORITE_TRAIT_ID),
+    );
+  }, [foundationGameState, data.teamId]);
+
+  // Board-Vertrauen-Verlauf: echte archivierte Werte pro Saison stecken im
+  // GM-Assignment jedes Season-Snapshots (`boardConfidenceValue`) — es gibt
+  // kein separates Zeitreihen-Feld auf `TeamDetailDrawerData`. Der Live-Wert
+  // (`data.boardConfidence`) wird als jüngster Punkt angehängt.
+  const boardConfidenceSeries = useMemo(() => {
+    if (!foundationGameState) {
+      return null;
+    }
+    const snapshots = [...(foundationGameState.seasonState.seasonSnapshots ?? [])].sort((left, right) => {
+      const leftValue = Number(left.seasonId.match(/(\d+)$/)?.[1] ?? NaN);
+      const rightValue = Number(right.seasonId.match(/(\d+)$/)?.[1] ?? NaN);
+      if (Number.isFinite(leftValue) && Number.isFinite(rightValue) && leftValue !== rightValue) {
+        return leftValue - rightValue;
+      }
+      return left.seasonId.localeCompare(right.seasonId, "de", { numeric: true });
+    });
+    const points: number[] = [];
+    for (const snapshot of snapshots) {
+      const gmAssignment = snapshot.gmAssignments?.find((entry) => entry.teamId === data.teamId);
+      if (gmAssignment && isFiniteNumber(gmAssignment.boardConfidenceValue)) {
+        points.push(gmAssignment.boardConfidenceValue);
+      }
+    }
+    if (data.boardConfidence != null) {
+      points.push(data.boardConfidence.value);
+    }
+    return points.length >= 2 ? points : null;
+  }, [foundationGameState, data.teamId, data.boardConfidence]);
+
+  const rosterStressRecord = foundationGameState?.seasonState.teamRosterStressByTeamId?.[data.teamId] ?? null;
+
+  // Squad-Depth: reale disciplineRatings pro Spieler + Discipline.playerCount
+  // (Slot-Bedarf) kommen nur aus dem vollen GameState — `data.players` trägt
+  // nur die Top-2-Disziplinen pro Spieler (siehe `topDisciplines`), das reicht
+  // für ein echtes 3-Tiefen-Raster nicht. Ohne Foundation-State fällt die
+  // Depth-Chart auf ein vereinfachtes Achsen-Raster (coreStats) zurück.
+  const depthChart = useMemo(
+    () => (foundationGameState ? buildTeamDepthChart(foundationGameState, data.teamId) : null),
+    [foundationGameState, data.teamId],
+  );
+
+  const depthChartFallback = useMemo<NlTeamProfileDepthFallbackRow[] | null>(() => {
+    if (foundationGameState || visiblePlayers.length === 0) {
+      return null;
+    }
+    return NL_TEAMPROFILE_AXES.map(({ key, label }) => {
+      const ranked = visiblePlayers
+        .map((player) => ({ player, rating: player.coreStats[key] }))
+        .filter((entry): entry is { player: TeamDetailDrawerPlayerCard; rating: number } => isFiniteNumber(entry.rating))
+        .sort((left, right) => right.rating - left.rating);
+      return {
+        axis: key,
+        label,
+        cells: [0, 1, 2].map((index) => {
+          const entry = ranked[index];
+          return entry
+            ? { playerId: entry.player.playerId, playerName: entry.player.name, rating: entry.rating }
+            : null;
+        }),
+      };
+    });
+  }, [foundationGameState, visiblePlayers]);
 
   const liveHistoryRow = useMemo(
     () => data.history.find((row) => row.isLive) ?? data.history[0] ?? null,
@@ -869,6 +1090,221 @@ export default function TeamProfileNewLook({
         </NlCard>
       </div>
 
+      {depthChart != null || depthChartFallback != null ? (
+        <NlCard
+          className="nl-teamprofile-depth-card"
+          eyebrow="Kadertiefe"
+          title="Squad Depth Chart"
+          data-testid="nl-teamprofile-depth"
+          actions={
+            rosterStressRecord != null ? (
+              <span
+                className="nl-teamprofile-count nl-tnum"
+                title={`Engpässe an ${rosterStressRecord.matchdaysWithSlotGaps}/${rosterStressRecord.matchdaysTotal} Spieltagen der Vorsaison`}
+              >
+                Stress {formatNlNumber(rosterStressRecord.depthStressScore, 0)}/4
+              </span>
+            ) : undefined
+          }
+        >
+          {rosterStressRecord != null ? (
+            <NlProgressBar
+              value={rosterStressRecord.depthStressScore}
+              max={4}
+              invert
+              label="Tiefe-Stress (Vorsaison)"
+              format={(value) => `${formatNlNumber(value, 0)}/4 · ${rosterStressRecord.matchdaysWithSlotGaps}/${rosterStressRecord.matchdaysTotal} Spieltage mit Lücken`}
+              className="nl-teamprofile-depth-stress-bar"
+              title="Depth-Stress-Score aus der Vorsaison-Aufstellungshistorie"
+            />
+          ) : null}
+          {depthChart != null ? (
+            <div className="nl-teamprofile-depth-shell">
+              <table className="nl-teamprofile-depth-table nl-tnum">
+                <thead>
+                  <tr>
+                    <th className="nl-teamprofile-depth-th-discipline">Disziplin</th>
+                    <th>Fähig</th>
+                    <th>1.</th>
+                    <th>2.</th>
+                    <th>3.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {depthChart.map((row) => (
+                    <tr
+                      key={row.disciplineId}
+                      className={`nl-teamprofile-depth-row${row.isThin ? " is-thin" : ""}`}
+                    >
+                      <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
+                        <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+                        {row.disciplineLabel}
+                      </td>
+                      <td
+                        className="nl-teamprofile-depth-slots"
+                        title={
+                          row.slotsNeeded != null
+                            ? `${row.capableCount} von ${row.slotsNeeded} Slots mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR} besetzbar`
+                            : `${row.capableCount} Spieler mit Rating ≥ ${DEPTH_CAPABLE_RATING_FLOOR}`
+                        }
+                      >
+                        {row.slotsNeeded != null
+                          ? `${row.capableCount}/${row.slotsNeeded}`
+                          : formatNlNumber(row.capableCount, 0)}
+                      </td>
+                      {row.cells.map((cell, index) => (
+                        <td key={index} className="nl-teamprofile-depth-cell-wrap">
+                          {cell != null ? (
+                            <button
+                              type="button"
+                              className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
+                              onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
+                              title={`${cell.playerName} · ${row.disciplineLabel} ${formatNlNumber(cell.rating, 0)}`}
+                            >
+                              <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
+                              <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                                {formatNlNumber(cell.rating, 0)}
+                              </span>
+                              {cell.injuryStatus === "injured" || cell.injuryStatus === "recovering" ? (
+                                <span
+                                  className="nl-teamprofile-depth-badge is-injury"
+                                  title={cell.injuryStatus === "injured" ? "Verletzt" : "In Reha"}
+                                >
+                                  V
+                                </span>
+                              ) : cell.fatigue != null && cell.fatigue >= DEPTH_FATIGUE_WARN_THRESHOLD ? (
+                                <span
+                                  className="nl-teamprofile-depth-badge is-fatigue"
+                                  title={`Erschöpfung ${formatNlNumber(cell.fatigue, 0)}`}
+                                >
+                                  M
+                                </span>
+                              ) : null}
+                            </button>
+                          ) : (
+                            <span className="nl-teamprofile-depth-cell is-empty">—</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : depthChartFallback != null ? (
+            <>
+              <p className="nl-teamprofile-empty">
+                Vereinfachte Ansicht (Achsen statt Einzeldisziplinen) — volle Disziplin-Tiefe benötigt Spielkontext.
+              </p>
+              <div className="nl-teamprofile-depth-shell">
+                <table className="nl-teamprofile-depth-table nl-tnum">
+                  <thead>
+                    <tr>
+                      <th className="nl-teamprofile-depth-th-discipline">Achse</th>
+                      <th>1.</th>
+                      <th>2.</th>
+                      <th>3.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {depthChartFallback.map((row) => (
+                      <tr key={row.axis} className="nl-teamprofile-depth-row">
+                        <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
+                          <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
+                          {row.label}
+                        </td>
+                        {row.cells.map((cell, index) => (
+                          <td key={index} className="nl-teamprofile-depth-cell-wrap">
+                            {cell != null ? (
+                              <button
+                                type="button"
+                                className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
+                                onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
+                                title={`${cell.playerName} · ${row.label} ${formatNlNumber(cell.rating, 0)}`}
+                              >
+                                <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
+                                <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                                  {formatNlNumber(cell.rating, 0)}
+                                </span>
+                              </button>
+                            ) : (
+                              <span className="nl-teamprofile-depth-cell is-empty">—</span>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </NlCard>
+      ) : null}
+
+      {beliebtheit != null ? (
+        <NlCard
+          className="nl-teamprofile-fan-card"
+          eyebrow="Fans"
+          title="Fans & Beliebtheit"
+          data-testid="nl-teamprofile-fan"
+        >
+          <div className="nl-teamprofile-fan-grid">
+            <NlGauge
+              value={((beliebtheit.value - BELIEBTHEIT_MIN) / (BELIEBTHEIT_MAX - BELIEBTHEIT_MIN)) * 100}
+              max={100}
+              label="Beliebtheit"
+              tone={getBeliebtheitTone(beliebtheit.value)}
+              format={() => `${formatNlNumber(beliebtheit.value, 2)}×`}
+              title={`Beliebtheitsfaktor ${formatNlNumber(beliebtheit.value, 2)}× (1.0× = Liga-Durchschnitt)`}
+            />
+            <div className="nl-teamprofile-fan-bars">
+              <NlProgressBar
+                value={beliebtheit.erfolg * 100}
+                max={100}
+                label="Erfolg"
+                format={(value) => `${formatNlNumber(value, 0)}%`}
+                title="Rang-/Punkte-Perzentil in der Liga"
+              />
+              <NlProgressBar
+                value={beliebtheit.favShare * 100}
+                max={100}
+                label="Fan-Favoriten"
+                format={(value) => `${formatNlNumber(value, 0)}%`}
+                title="Anteil Fan-Favoriten-Kader ggü. Liga-Maximum"
+              />
+              <NlProgressBar
+                value={beliebtheit.starpower * 100}
+                max={100}
+                label="Starpower"
+                format={(value) => `${formatNlNumber(value, 0)}%`}
+                title="Top-6-OVR-Perzentil in der Liga"
+              />
+            </div>
+          </div>
+          {fanFavoritePlayers.length > 0 ? (
+            <div className="nl-teamprofile-fan-chips" aria-label="Fan-Favoriten im Kader">
+              {fanFavoritePlayers.map((player) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  className="nl-teamprofile-fan-chip"
+                  onClick={() => onOpenPlayer(player.id, player.id)}
+                  title={`${player.name} öffnen`}
+                >
+                  {player.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="nl-teamprofile-empty">Keine Fan-Favoriten im aktuellen Kader.</p>
+          )}
+          <p className="nl-teamprofile-fan-consequence nl-tnum">
+            Arena-Einnahmen ×{formatNlNumber(beliebtheit.value, 2)}
+          </p>
+        </NlCard>
+      ) : null}
+
       <div ref={boardCardRef} className="nl-teamprofile-anchor">
         <NlCard
           className="nl-teamprofile-board-card"
@@ -878,21 +1314,54 @@ export default function TeamProfileNewLook({
         >
           <div className="nl-teamprofile-lead-grid">
             {data.boardConfidence != null ? (
-              <article className={`nl-teamprofile-lead-card is-${boardTone}`}>
+              <article className={`nl-teamprofile-lead-card is-${boardTone} nl-teamprofile-board-lead`}>
                 <span className="nl-teamprofile-lead-label">Board-Vertrauen</span>
-                <strong className="nl-tnum">{formatNlNumber(data.boardConfidence.value, 1)}/10</strong>
-                <NlProgressBar
-                  value={data.boardConfidence.value}
-                  max={10}
-                  tone={boardTone === "neutral" ? "accent" : boardTone}
-                  showValue={false}
-                  className="nl-teamprofile-lead-bar"
-                  title={`Board-Vertrauen ${formatNlNumber(data.boardConfidence.value, 1)}/10`}
-                />
-                <small className="nl-tnum">
-                  Druck {formatNlNumber(data.boardConfidence.pressure, 1)} · {data.boardConfidence.warnings.length}{" "}
-                  Warnungen
-                </small>
+                <div className="nl-teamprofile-board-gauge-row">
+                  <NlGauge
+                    value={data.boardConfidence.value}
+                    max={10}
+                    label="Vertrauen"
+                    tone={boardTone === "neutral" ? "accent" : boardTone}
+                    format={(value) => formatNlNumber(value, 1)}
+                    title={`Board-Vertrauen ${formatNlNumber(data.boardConfidence.value, 1)}/10`}
+                  />
+                  <div className="nl-teamprofile-board-meter-stack">
+                    <NlProgressBar
+                      value={data.boardConfidence.pressure}
+                      max={10}
+                      label="Druck"
+                      invert
+                      format={(value) => `${formatNlNumber(value, 1)}/10`}
+                      className="nl-teamprofile-board-pressure-bar"
+                      title={`Board-Druck ${formatNlNumber(data.boardConfidence.pressure, 1)}/10`}
+                    />
+                    {boardConfidenceSeries != null ? (
+                      <div className="nl-teamprofile-board-history">
+                        <span className="nl-teamprofile-board-history-label nl-tnum">
+                          Verlauf · {boardConfidenceSeries.length} Saisons
+                        </span>
+                        <NlSparkline
+                          points={boardConfidenceSeries}
+                          tone={boardTone === "neutral" ? "accent" : boardTone}
+                          className="nl-teamprofile-board-spark"
+                          aria-label={`Board-Vertrauen-Verlauf von ${data.teamName} über ${boardConfidenceSeries.length} Saisons`}
+                        />
+                      </div>
+                    ) : (
+                      <p className="nl-teamprofile-empty nl-teamprofile-board-history-empty">
+                        Kein Mehrsaison-Verlauf archiviert.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <small className="nl-tnum">{data.boardConfidence.warnings.length} Warnungen</small>
+                {data.boardConfidence.warnings.length > 0 ? (
+                  <ul className="nl-teamprofile-board-warnings">
+                    {data.boardConfidence.warnings.slice(0, 3).map((warning, index) => (
+                      <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </article>
             ) : null}
             {teamCaptain != null ? (
@@ -961,9 +1430,20 @@ export default function TeamProfileNewLook({
                         </span>
                         <span className="nl-teamprofile-objective-copy">
                           <strong>{objective.label}</strong>
-                          <span className="nl-teamprofile-objective-progress nl-tnum">
-                            {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
-                          </span>
+                          {typeof objective.currentValue === "number" && typeof objective.targetValue === "number" ? (
+                            <NlProgressBar
+                              value={objective.currentValue}
+                              max={objective.targetValue}
+                              tone={getObjectiveProgressTone(objective.status)}
+                              format={(value, max) => `${formatNlNumber(value, 1)} / ${formatNlNumber(max, 1)}`}
+                              className="nl-teamprofile-objective-bar"
+                              title={`${objective.label}: ${formatNlNumber(objective.currentValue, 1)} / ${formatNlNumber(objective.targetValue, 1)}`}
+                            />
+                          ) : (
+                            <span className="nl-teamprofile-objective-progress nl-tnum">
+                              {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
+                            </span>
+                          )}
                         </span>
                       </li>
                     ))}

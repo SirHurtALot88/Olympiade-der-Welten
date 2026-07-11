@@ -1,23 +1,31 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import {
   buildAttributeHistoryDelta,
+  buildPlayerCareerEventMarkers,
   PLAYER_ATTRIBUTE_CHART_KEYS,
   PLAYER_ATTRIBUTE_CHART_LABELS,
   type PlayerAttributeHistoryRow,
+  type PlayerCareerEventMarker,
 } from "@/lib/foundation/player-attribute-history";
-import type { PlayerDrawerHistoryRow } from "@/lib/foundation/player-detail-drawer";
+import type { PlayerDetailDrawerData, PlayerDrawerHistoryRow } from "@/lib/foundation/player-detail-drawer";
 import {
   buildPlayerProgressSummary,
   formatProgressDelta,
   sortPlayerProgressHistoryRows,
 } from "@/lib/foundation/player-progress-summary";
+import { NlDeltaChip } from "@/components/foundation/new-look";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 type PlayerAttributeProgressChartProps = {
   historyRows: PlayerDrawerHistoryRow[];
   attributeHistoryRows?: PlayerAttributeHistoryRow[];
+  /** "Neuer Look" Entwicklungs-Zeitleiste (#60): reale Klassenwechsel-Events. */
+  classHistory?: PlayerDetailDrawerData["classHistory"];
+  /** "Neuer Look" Entwicklungs-Zeitleiste (#60): reale XP-Ausgabe-Events. */
+  progressionEvents?: PlayerDetailDrawerData["progressionEvents"];
 };
 
 const PP_METRICS = [
@@ -141,6 +149,97 @@ function formatSeasonShortLabel(seasonName: string, seasonId: string | null) {
   return seasonName.replace(/^Season\s+/i, "S");
 }
 
+/** "Neuer Look" Entwicklungs-Zeitleiste (#60): Marker-Vokabular je Ereignistyp. */
+function getMarkerKindClass(kind: PlayerCareerEventMarker["kind"]) {
+  switch (kind) {
+    case "transfer":
+      return "is-transfer";
+    case "injury":
+      return "is-injury";
+    case "class_change":
+      return "is-classup";
+    case "xp_spend":
+      return "is-xp";
+    default:
+      return "";
+  }
+}
+
+function getMarkerIcon(marker: PlayerCareerEventMarker) {
+  switch (marker.kind) {
+    case "transfer":
+      return marker.transferType === "buy" ? "↘" : marker.transferType === "sell" ? "↗" : "⏏";
+    case "injury":
+      return "✚";
+    case "class_change":
+      return "⇧";
+    case "xp_spend":
+      return "⚡";
+    default:
+      return "•";
+  }
+}
+
+function formatMarkerTransferKindLabel(transferType: "buy" | "sell" | "contract_exit") {
+  if (transferType === "buy") return "Transfer (Kauf)";
+  if (transferType === "sell") return "Transfer (Verkauf)";
+  return "Vertragsende";
+}
+
+function buildMarkerLabel(marker: PlayerCareerEventMarker): string {
+  switch (marker.kind) {
+    case "transfer":
+      return formatMarkerTransferKindLabel(marker.transferType);
+    case "injury":
+      return marker.injuriesCount > 1 ? `${marker.injuriesCount} Verletzungen` : "Verletzung";
+    case "class_change":
+      return `Klassenwechsel: ${marker.previousClassName ?? "—"} → ${marker.className}`;
+    case "xp_spend":
+      return `XP-Ausgabe (${marker.upgradeCount} Upgrade${marker.upgradeCount === 1 ? "" : "s"})`;
+    default:
+      return "Ereignis";
+  }
+}
+
+function buildMarkerDetail(marker: PlayerCareerEventMarker): string {
+  switch (marker.kind) {
+    case "transfer":
+      return marker.fee != null && marker.fee > 0
+        ? `${formatMarkerTransferKindLabel(marker.transferType)} · Ablöse ${formatChartValue(marker.fee)}`
+        : formatMarkerTransferKindLabel(marker.transferType);
+    case "injury":
+      return marker.matchdaysMissed != null && marker.matchdaysMissed > 0
+        ? `${buildMarkerLabel(marker)} · ${formatChartValue(marker.matchdaysMissed)} Spieltage verpasst`
+        : buildMarkerLabel(marker);
+    case "class_change":
+      return buildMarkerLabel(marker);
+    case "xp_spend":
+      return `${buildMarkerLabel(marker)} · ${formatChartValue(marker.xpSpent)} XP investiert`;
+    default:
+      return "";
+  }
+}
+
+type CareerEventTimelineRow = { seasonKey: string; seasonName: string; isActiveSeason: boolean };
+
+function buildCareerEventTimelineRows(
+  attributeHistoryRows: PlayerAttributeHistoryRow[],
+  sortedHistoryRows: PlayerDrawerHistoryRow[],
+): CareerEventTimelineRow[] {
+  if (attributeHistoryRows.length > 0) {
+    return attributeHistoryRows.map((row) => ({
+      seasonKey: row.seasonId,
+      seasonName: row.seasonName,
+      isActiveSeason: row.isActiveSeason,
+    }));
+  }
+  return sortedHistoryRows.map((row) => ({
+    seasonKey: row.seasonId ?? row.seasonName,
+    seasonName: row.seasonName,
+    isActiveSeason: row.isActiveSeason,
+  }));
+}
+
 function buildPpMetricBlockChartsGeometry(rows: PlayerDrawerHistoryRow[]) {
   const width = 280;
   const height = 148;
@@ -246,7 +345,12 @@ function buildAttributeLineChartGeometry(rows: PlayerAttributeHistoryRow[]) {
 export default function PlayerAttributeProgressChart({
   historyRows,
   attributeHistoryRows = [],
+  classHistory = [],
+  progressionEvents = [],
 }: PlayerAttributeProgressChartProps) {
+  const [newLookEnabled] = useNewLook();
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+
   const sortedRows = useMemo(() => sortPlayerProgressHistoryRows(historyRows), [historyRows]);
   const summary = useMemo(() => buildPlayerProgressSummary(sortedRows), [sortedRows]);
   const ppMetricCharts = useMemo(
@@ -261,6 +365,54 @@ export default function PlayerAttributeProgressChart({
     () => (attributeHistoryRows.length >= 2 ? buildFocusedAttributeLineGeometry(attributeHistoryRows, "power") : null),
     [attributeHistoryRows],
   );
+
+  // "Neuer Look" (flag-gated, additiv, #60 FM-Attribut-Graph): annotierte
+  // Entwicklungs-Zeitleiste — season-verortete Marker aus real vorhandenen
+  // Feldern (`historyRows.transferType`/`injuriesCount`, `classHistory`,
+  // `progressionEvents`). Ohne Ereignisse in den Daten bleibt die Zeile leer
+  // (kein Marker wird erfunden).
+  const eventTimelineRows = useMemo(
+    () => (newLookEnabled ? buildCareerEventTimelineRows(attributeHistoryRows, sortedRows) : []),
+    [newLookEnabled, attributeHistoryRows, sortedRows],
+  );
+  const eventMarkers = useMemo(
+    () =>
+      newLookEnabled
+        ? buildPlayerCareerEventMarkers({
+            historyRows: sortedRows,
+            classHistory,
+            progressionEvents,
+          })
+        : [],
+    [newLookEnabled, sortedRows, classHistory, progressionEvents],
+  );
+  const eventMarkersBySeasonKey = useMemo(() => {
+    const map = new Map<string, PlayerCareerEventMarker[]>();
+    for (const marker of eventMarkers) {
+      const bucket = map.get(marker.seasonKey) ?? [];
+      bucket.push(marker);
+      map.set(marker.seasonKey, bucket);
+    }
+    return map;
+  }, [eventMarkers]);
+  const selectedMarker = useMemo(
+    () => (selectedMarkerId ? eventMarkers.find((marker) => `${marker.seasonKey}-${marker.kind}` === selectedMarkerId) ?? null : null),
+    [selectedMarkerId, eventMarkers],
+  );
+  const selectedMarkerRowIndex = selectedMarker
+    ? eventTimelineRows.findIndex((row) => row.seasonKey === selectedMarker.seasonKey)
+    : -1;
+  const selectedMarkerRow = selectedMarkerRowIndex >= 0 ? eventTimelineRows[selectedMarkerRowIndex] : null;
+  const selectedSeasonAttributeDeltas =
+    selectedMarker && selectedMarkerRowIndex > 0 && attributeHistoryRows.length === eventTimelineRows.length
+      ? PLAYER_ATTRIBUTE_CHART_KEYS.map((attribute) => ({
+          attribute,
+          delta: buildAttributeHistoryDelta(
+            [attributeHistoryRows[selectedMarkerRowIndex - 1]!, attributeHistoryRows[selectedMarkerRowIndex]!],
+            attribute,
+          ),
+        })).filter((entry): entry is { attribute: (typeof PLAYER_ATTRIBUTE_CHART_KEYS)[number]; delta: number } => entry.delta != null && entry.delta !== 0)
+      : [];
 
   if (sortedRows.length === 0 || !summary) {
     return (
@@ -299,6 +451,73 @@ export default function PlayerAttributeProgressChart({
           </span>
         </div>
       </div>
+
+      {newLookEnabled && eventTimelineRows.length > 0 && eventMarkers.length > 0 ? (
+        <div data-testid="player-attribute-progress-event-timeline">
+          <ProgressChartCollapsible
+            testId="player-attribute-progress-event-timeline"
+            title="Karriere-Ereignisse"
+            subtitle="Transfers, Verletzungen, Klassenwechsel und XP-Ausgaben je Saison."
+            shellClassName="nl-devtimeline-shell"
+            defaultOpen
+          >
+            <div className="is-new-look nl-devtimeline" role="group" aria-label="Karriere-Ereignis-Zeitleiste">
+              <div className="nl-devtimeline-track">
+                {eventTimelineRows.map((row) => {
+                  const markers = eventMarkersBySeasonKey.get(row.seasonKey) ?? [];
+                  return (
+                    <div key={`devtimeline-season-${row.seasonKey}`} className="nl-devtimeline-season">
+                      <span className={`nl-devtimeline-season-label${row.isActiveSeason ? " is-live" : ""}`}>
+                        {formatSeasonShortLabel(row.seasonName, row.seasonKey)}
+                      </span>
+                      <div className="nl-devtimeline-markers">
+                        {markers.map((marker) => {
+                          const markerId = `${marker.seasonKey}-${marker.kind}`;
+                          const isSelected = selectedMarkerId === markerId;
+                          return (
+                            <button
+                              key={markerId}
+                              type="button"
+                              className={`nl-devtimeline-marker ${getMarkerKindClass(marker.kind)}${isSelected ? " is-selected" : ""}`}
+                              title={`${row.seasonName} · ${buildMarkerDetail(marker)}`}
+                              aria-expanded={isSelected}
+                              aria-label={`${buildMarkerLabel(marker)} — ${row.seasonName}`}
+                              onClick={() => setSelectedMarkerId(isSelected ? null : markerId)}
+                            >
+                              <span aria-hidden="true">{getMarkerIcon(marker)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedMarker && selectedMarkerRow ? (
+                <div className="nl-devtimeline-detail" aria-live="polite" data-testid="player-attribute-progress-event-detail">
+                  <div className="nl-devtimeline-detail-head">
+                    <strong>{selectedMarkerRow.seasonName}</strong>
+                    <span>{buildMarkerDetail(selectedMarker)}</span>
+                  </div>
+                  {selectedSeasonAttributeDeltas.length > 0 ? (
+                    <div className="nl-devtimeline-detail-deltas">
+                      {selectedSeasonAttributeDeltas.map((entry) => (
+                        <NlDeltaChip
+                          key={entry.attribute}
+                          value={entry.delta}
+                          format={(value) => `${PLAYER_ATTRIBUTE_CHART_LABELS[entry.attribute]} ${value > 0 ? "+" : ""}${formatChartValue(value)}`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">Keine Attribut-Änderung zur Vorsaison gespeichert.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </ProgressChartCollapsible>
+        </div>
+      ) : null}
 
       {strChart ? (
         <div data-testid="player-attribute-progress-str-line">
