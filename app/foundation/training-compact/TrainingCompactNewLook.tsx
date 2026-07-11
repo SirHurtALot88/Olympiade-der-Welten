@@ -361,6 +361,14 @@ function NlTrainingPlayerCard({
     () => buildTrainingClassSuggestion(row, trainingClassOptions),
     [row, trainingClassOptions],
   );
+  // Label der Klasse, die aktuell tatsächlich trainiert wird (row.trainingClass — kann von
+  // row.player.className abweichen, siehe "Trainingsklasse"-Select unten). Wird explizit als
+  // "Trainiert:"-Seite im Vorschlags-Chip gezeigt, damit die Klasse nicht mit der oben gezeigten
+  // Statprofil-Entwicklung (classBefore/classAfter) verwechselt werden kann.
+  const currentTrainingClassLabel = useMemo(
+    () => trainingClassOptions.find((option) => option.value === row.trainingClass)?.label ?? row.trainingClass,
+    [row.trainingClass, trainingClassOptions],
+  );
   const sortedForecast = useMemo(
     () => sortTrainingAttributeForecastByClassProfile(row.attributeForecast, row.trainingClass, row.adminBalancingConfig),
     [row.adminBalancingConfig, row.attributeForecast, row.trainingClass],
@@ -392,7 +400,14 @@ function NlTrainingPlayerCard({
         </span>
         <div className="nl-training-player-copy">
           <strong className="nl-training-player-name">{row.player.name}</strong>
-          <small className="nl-training-player-class">
+          <small
+            className="nl-training-player-class"
+            title={
+              row.organicForecast.classBefore === row.organicForecast.classAfter
+                ? undefined
+                : `Statprofil-Entwicklung über die Saison (nicht die Trainingsklasse): ${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`
+            }
+          >
             {row.organicForecast.classBefore === row.organicForecast.classAfter
               ? row.player.className
               : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
@@ -432,9 +447,9 @@ function NlTrainingPlayerCard({
             <span
               className="nl-training-chip is-class-suggest"
               data-testid="training-class-suggestion"
-              title={`Klassen-Vorschlag: ${classSuggestion.label} passt am besten zu den Signature-Attributen ${classSuggestion.attributes.join(" + ")}. Aktuell: ${row.trainingClass}.`}
+              title={`Klassen-Vorschlag: ${classSuggestion.label} passt am besten zu den Signature-Attributen ${classSuggestion.attributes.join(" + ")}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`}
             >
-              <NlTrainingGlyph kind="signature" /> Klassen-Vorschlag: {classSuggestion.label}
+              <NlTrainingGlyph kind="signature" /> Trainiert: {currentTrainingClassLabel} → Vorschlag: {classSuggestion.label}
             </span>
           ) : null}
           {showRecommendation && recommendedPresentation ? (
