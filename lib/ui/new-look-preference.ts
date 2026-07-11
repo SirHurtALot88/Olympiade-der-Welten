@@ -4,21 +4,28 @@ import { useCallback, useEffect, useState } from "react";
 
 export const NEW_LOOK_STORAGE_KEY = "oly-new-look-v1";
 
+/**
+ * "Neuer Look" ist der Standard-Look. Ohne gespeicherte Präferenz ist er an;
+ * wer ihn abwählt, bekommt weiterhin den klassischen Look (Opt-out bleibt bestehen).
+ */
+export const NEW_LOOK_DEFAULT = true;
+
 export function loadNewLookEnabled(): boolean {
   if (typeof window === "undefined") {
-    return false;
+    return NEW_LOOK_DEFAULT;
   }
 
   try {
     const raw = window.localStorage.getItem(NEW_LOOK_STORAGE_KEY);
     if (!raw) {
-      return false;
+      // Keine gespeicherte Wahl → Standard (Neuer Look an).
+      return NEW_LOOK_DEFAULT;
     }
 
     const parsed = JSON.parse(raw) as unknown;
     return parsed === true;
   } catch {
-    return false;
+    return NEW_LOOK_DEFAULT;
   }
 }
 
@@ -37,12 +44,15 @@ export function saveNewLookEnabled(enabled: boolean): void {
 /**
  * "Neuer Look" runtime flag as a React hook.
  *
- * SSR renders `false` (no visual change), then syncs to the stored preference
- * after hydration to avoid hydration mismatches. Changes are persisted to
- * localStorage and broadcast within the tab so multiple consumers stay in sync.
+ * The New Look is the default. Both SSR and the first client render start from
+ * `NEW_LOOK_DEFAULT`, so the initial render is deterministic (no hydration
+ * mismatch) and there is no default-look flash. After hydration the effect reads
+ * the stored preference: only a user who explicitly opted out flips to the
+ * classic look. Changes are persisted to localStorage and broadcast within the
+ * tab so multiple consumers stay in sync.
  */
 export function useNewLook(): [boolean, (value: boolean) => void] {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(NEW_LOOK_DEFAULT);
 
   useEffect(() => {
     setEnabled(loadNewLookEnabled());
