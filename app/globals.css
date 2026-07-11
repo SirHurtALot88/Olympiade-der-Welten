@@ -41255,16 +41255,19 @@ button.foundation-team-portrait-card {
   font-family: var(--nl-sans);
 }
 
-.is-new-look .nl-home-hero {
+.is-new-look .nl-home-hero-card {
+  padding: var(--nl-s5);
+}
+
+.is-new-look .nl-home-hero-card .nl-card-head {
+  align-items: center;
+}
+
+.is-new-look .nl-home-hero-body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--nl-s5);
-  padding: var(--nl-s5);
-  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
-  border: 1px solid var(--nl-line);
-  border-radius: var(--nl-r-lg);
-  box-shadow: var(--nl-e2);
 }
 
 .is-new-look .nl-home-hero-identity {
@@ -41315,27 +41318,6 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-home-hero-kpis {
   display: flex;
   gap: var(--nl-s5);
-}
-
-.is-new-look .nl-home-kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.is-new-look .nl-home-kpi-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-home-kpi-value {
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.05;
-  color: var(--nl-ink);
 }
 
 .is-new-look .nl-home-hero-chips {
@@ -42217,18 +42199,10 @@ button.foundation-team-portrait-card {
   color: var(--nl-tone, var(--nl-mut));
 }
 
-.is-new-look .nl-standings-area-track {
+.is-new-look .nl-standings-area-bar .nl-progress-track {
   height: 6px;
-  border-radius: var(--nl-r-pill);
   background: var(--nl-panel-2);
-  overflow: hidden;
-}
-
-.is-new-look .nl-standings-area-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--nl-tone, var(--nl-accent));
+  border: none;
 }
 
 .is-new-look .nl-standings-area-value {
@@ -42334,18 +42308,13 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-standings-disc-track {
+.is-new-look .nl-standings-disc-bar .nl-progress-track {
   height: 5px;
-  border-radius: var(--nl-r-pill);
   background: var(--nl-panel);
-  overflow: hidden;
+  border: none;
 }
 
-.is-new-look .nl-standings-disc-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--nl-tone, var(--nl-accent));
+.is-new-look .nl-standings-disc-bar .nl-progress-fill {
   opacity: 0.85;
 }
 
@@ -43081,6 +43050,11 @@ button.foundation-team-portrait-card {
   margin: 0;
   font-size: 13px;
   color: var(--nl-mut);
+}
+
+/* Story-/Champion-Karten mit Team-Ziel sind klickbare Portale. */
+.is-new-look .nl-prize-story-card.is-interactive {
+  cursor: pointer;
 }
 
 .is-new-look .nl-prize-champion-card {
@@ -46756,6 +46730,17 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Erfolgs-Banner nach Sponsorwahl — im Token-System (--nl-good). */
+.is-new-look .nl-sponsor-banner {
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 40%, var(--nl-line));
+  border-radius: var(--nl-r-md);
+  background: color-mix(in srgb, var(--nl-good) 12%, transparent);
+  color: var(--nl-good);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .is-new-look .nl-sponsor-rating-drivers {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -47901,25 +47886,23 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-result-scorebar {
   position: relative;
-  display: flex;
-  align-items: center;
-  height: 10px;
-  border-radius: var(--nl-r-pill);
-  background: var(--nl-panel-2);
-  overflow: hidden;
 }
 
-.is-new-look .nl-result-scorebar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--nl-tone, var(--nl-accent));
+.is-new-look .nl-result-scorebar-progress .nl-progress-track {
+  height: 10px;
+  background: var(--nl-panel-2);
+  border: none;
+}
+
+.is-new-look .nl-result-scorebar-progress .nl-progress-fill {
   opacity: 0.75;
-  transition: width 420ms var(--nl-ease);
 }
 
 .is-new-look .nl-result-scorebar-value {
   position: absolute;
   right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 8px;
   line-height: 1;
   color: var(--nl-mut);
@@ -48197,18 +48180,13 @@ button.foundation-team-portrait-card {
   min-width: 60px;
 }
 
-.is-new-look .nl-spreview-scorebar {
+.is-new-look .nl-spreview-scorebar .nl-progress-track {
   height: 6px;
-  border-radius: var(--nl-r-pill);
   background: var(--nl-panel-2);
-  overflow: hidden;
+  border: none;
 }
 
-.is-new-look .nl-spreview-scorebar-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--nl-tone, var(--nl-accent));
+.is-new-look .nl-spreview-scorebar .nl-progress-fill {
   opacity: 0.75;
 }
 
@@ -48244,8 +48222,7 @@ button.foundation-team-portrait-card {
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-arena-row,
   .is-new-look .nl-arena-track-stack,
-  .is-new-look .nl-arena-track-fill,
-  .is-new-look .nl-result-scorebar-fill {
+  .is-new-look .nl-arena-track-fill {
     transition: none;
   }
 
@@ -48302,42 +48279,7 @@ button.foundation-team-portrait-card {
 /* ── Batch b1: Home Hero-KPI-Portale (#26), Spieltag-Rail (#4),
       Team-Profil-Radar (#50) & Entwicklungs-Highlights (#51) ── */
 
-/* #26 — Rang/Cash als klickbare Portale */
-.is-new-look .nl-home-kpi.is-interactive {
-  appearance: none;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: var(--nl-s2) var(--nl-s3);
-  margin: calc(-1 * var(--nl-s2)) calc(-1 * var(--nl-s3));
-  border-radius: var(--nl-r-md);
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-}
-.is-new-look .nl-home-kpi.is-interactive:hover,
-.is-new-look .nl-home-kpi.is-interactive:focus-visible {
-  background: var(--nl-accent-soft);
-  border-color: var(--nl-line-2);
-  transform: translateY(-1px);
-  outline: none;
-}
-.is-new-look .nl-home-kpi-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nl-s1);
-}
-.is-new-look .nl-home-kpi-arrow {
-  color: var(--nl-accent);
-  font-size: 12px;
-  opacity: 0;
-  transform: translateX(-2px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-.is-new-look .nl-home-kpi.is-interactive:hover .nl-home-kpi-arrow,
-.is-new-look .nl-home-kpi.is-interactive:focus-visible .nl-home-kpi-arrow {
-  opacity: 1;
-  transform: translateX(0);
-}
+/* #26 — Rang/Cash sind kanonische StatChip-Portale (kein Bespoke mehr). */
 
 /* #4 — Spieltag-Rail (vergangen · aktuell · kommend) */
 .is-new-look .nl-home-schedule-rail {

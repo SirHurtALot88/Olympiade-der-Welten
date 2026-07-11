@@ -276,64 +276,57 @@ export default function HomeV2NewLook({
 
   return (
     <div className="nl-home" data-testid="foundation-home-v2" id="foundation-home-v2" data-new-look="true">
-      {/* --- Hero: 2 KPIs gross (Rang, Cash), Rest als StatChipRow --- */}
-      <header className="nl-home-hero">
-        <div className="nl-home-hero-identity">
-          {teamLogoUrl ? (
-            <OptimizedMediaImage className="nl-home-hero-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={56} height={56} />
-          ) : (
-            <span className="nl-home-hero-logo nl-home-hero-logo-fallback">{teamLogoInitials}</span>
-          )}
-          <div className="nl-home-hero-copy">
-            <span className="nl-home-eyebrow">{seasonName} · {matchdayLabel}</span>
-            <h2 className="nl-home-hero-title">{teamName}</h2>
-            <p className="nl-home-hero-meta">{teamCode} · {controlModeLabel}</p>
+      {/* --- Hero: NlCard-Kopfkarte, KPIs als StatChip-Portale --- */}
+      <NlCard
+        className="nl-home-hero-card"
+        data-testid="nl-home-hero"
+        actions={
+          <div className="nl-home-hero-next">
+            <button type="button" className="nl-home-continue" onClick={onContinue}>
+              Weiter · {nextStepLabel}
+            </button>
+            <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
           </div>
-        </div>
+        }
+      >
+        <div className="nl-home-hero-body">
+          <div className="nl-home-hero-identity">
+            {teamLogoUrl ? (
+              <OptimizedMediaImage className="nl-home-hero-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={56} height={56} />
+            ) : (
+              <span className="nl-home-hero-logo nl-home-hero-logo-fallback">{teamLogoInitials}</span>
+            )}
+            <div className="nl-home-hero-copy">
+              <span className="nl-home-eyebrow">{seasonName} · {matchdayLabel}</span>
+              <h2 className="nl-home-hero-title">{teamName}</h2>
+              <p className="nl-home-hero-meta">{teamCode} · {controlModeLabel}</p>
+            </div>
+          </div>
 
-        <div className="nl-home-hero-kpis" aria-label="Team KPIs">
-          <button
-            type="button"
-            className="nl-home-kpi is-interactive"
-            onClick={onOpenSeason}
-            title="Zum Saisonstand"
-            data-testid="nl-home-hero-kpi-rank"
-          >
-            <span className="nl-home-kpi-label">
-              Rang
-              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
-            </span>
-            <strong className="nl-home-kpi-value nl-tnum">{rank != null ? `#${rank}` : "—"}</strong>
-          </button>
-          <button
-            type="button"
-            className="nl-home-kpi is-interactive"
-            onClick={onOpenOffice}
-            title="Zum Front Office"
-            data-testid="nl-home-hero-kpi-cash"
-          >
-            <span className="nl-home-kpi-label">
-              Cash
-              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
-            </span>
-            <strong className="nl-home-kpi-value nl-tnum">{formatNlMoney(cash)}</strong>
-          </button>
-        </div>
+          <StatChipRow className="nl-home-hero-kpis" aria-label="Team KPIs">
+            <StatChip
+              label="Rang"
+              value={rank != null ? `#${rank}` : "—"}
+              tone="accent"
+              onClick={onOpenSeason}
+              title="Zum Saisonstand"
+            />
+            <StatChip
+              label="Cash"
+              value={formatNlMoney(cash)}
+              onClick={onOpenOffice}
+              title="Zum Front Office"
+            />
+          </StatChipRow>
 
-        <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-          <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
-          <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
-          <StatChip label="Kader" value={formatNlNumber(rosterCount, 0)} />
-          <StatChip label="Gehalt" value={formatNlMoney(salaryTotal)} />
-        </StatChipRow>
-
-        <div className="nl-home-hero-next">
-          <button type="button" className="nl-home-continue" onClick={onContinue}>
-            Weiter · {nextStepLabel}
-          </button>
-          <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
+          <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
+            <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
+            <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
+            <StatChip label="Kader" value={formatNlNumber(rosterCount, 0)} />
+            <StatChip label="Gehalt" value={formatNlMoney(salaryTotal)} />
+          </StatChipRow>
         </div>
-      </header>
+      </NlCard>
 
       {relevantWarnings.length > 0 ? (
         <div className="nl-home-warning-row" aria-label="Hinweise">
@@ -591,11 +584,8 @@ export default function HomeV2NewLook({
           data-testid="nl-home-league-card"
         >
           <div className="nl-home-league-body">
-            <div className="nl-home-kpi">
-              <span className="nl-home-kpi-label">Rang</span>
-              <strong className="nl-home-kpi-value nl-tnum">{rank != null ? `#${rank}` : "—"}</strong>
-            </div>
             <StatChipRow aria-label="Liga-Kennzahlen">
+              <StatChip label="Rang" value={rank != null ? `#${rank}` : "—"} tone="accent" />
               <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" />
               <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} />
             </StatChipRow>

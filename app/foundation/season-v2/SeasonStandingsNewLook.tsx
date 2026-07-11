@@ -268,12 +268,13 @@ export default function SeasonStandingsNewLook({
               title={`${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`}
             >
               <span className="nl-standings-area-label">{group.label}</span>
-              <span className="nl-standings-area-track" aria-hidden="true">
-                <span
-                  className="nl-standings-area-fill"
-                  style={{ width: `${getBarPercent(value, areaMaxById[group.id])}%` }}
-                />
-              </span>
+              <NlProgressBar
+                className="nl-standings-area-bar"
+                value={getBarPercent(value, areaMaxById[group.id])}
+                max={100}
+                tone={group.id}
+                showValue={false}
+              />
               <span className="nl-standings-area-value nl-tnum">{formatNlNumber(value, 0)}</span>
             </span>
           );
@@ -304,12 +305,13 @@ export default function SeasonStandingsNewLook({
                   return (
                     <li key={key} className="nl-standings-disc" title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}>
                       <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
-                      <span className="nl-standings-disc-track" aria-hidden="true">
-                        <span
-                          className="nl-standings-disc-fill"
-                          style={{ width: `${getBarPercent(value, disciplineMaxByKey.get(key) ?? 0)}%` }}
-                        />
-                      </span>
+                      <NlProgressBar
+                        className="nl-standings-disc-bar"
+                        value={getBarPercent(value, disciplineMaxByKey.get(key) ?? 0)}
+                        max={100}
+                        tone={group.id}
+                        showValue={false}
+                      />
                       <span className="nl-standings-disc-value nl-tnum">{formatNlNumber(value, 1)}</span>
                     </li>
                   );
