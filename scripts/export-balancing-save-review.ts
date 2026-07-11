@@ -14,6 +14,7 @@ import { loadEnvConfig } from "@next/env";
 import type { PlayerProgressionSpendEventRecord, SeasonSnapshotTeamRecord } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityEfficiency, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -256,6 +257,34 @@ export function buildBalancingSaveReviewMarkdown(input: {
       `| ${index + 1} | ${entry.name} | ${entry.team} | ${entry.ovr != null ? round(entry.ovr, 1) : "—"} | ${mioRaw(entry.mv)} |`,
     );
   });
+  lines.push("");
+
+  // Rollen / Tier-Verteilung (Live, Saisonende): classify each rostered player's market value into
+  // the same league brackets the pick engine uses (superstar/star/core/depth/backup/reserve). The
+  // "Kern%" column (Star+Core+Depth share) is the anti-clustering signal — a low Kern% with high
+  // Backup+Reserve is exactly the "too much backup/reserve" shape to watch per team.
+  const leagueBrackets = buildLeagueMarketBrackets(
+    gs.players.map((player) => player.displayMarketValue ?? player.marketValue ?? null),
+  );
+  lines.push("## Rollen · Tier-Verteilung (Live · Saisonende)", "");
+  lines.push(
+    "| Team | Kader | Superstar | Star | Core | Depth | Backup | Reserve | Kern% |",
+    "|---|--:|--:|--:|--:|--:|--:|--:|--:|",
+  );
+  for (const team of [...gs.teams].sort((left, right) => left.shortCode.localeCompare(right.shortCode, "de"))) {
+    const roster = gs.rosters.filter((entry) => entry.teamId === team.teamId);
+    const counts: Record<string, number> = { Superstar: 0, Star: 0, Core: 0, Depth: 0, Backup: 0, Reserve: 0 };
+    for (const entry of roster) {
+      const player = playerById.get(entry.playerId);
+      const mv = player?.displayMarketValue ?? player?.marketValue ?? entry.currentValue ?? null;
+      counts[classifyMarketBracket(mv, leagueBrackets)] += 1;
+    }
+    const total = roster.length;
+    const kernShare = total > 0 ? Math.round(((counts.Star + counts.Core + counts.Depth) / total) * 100) : 0;
+    lines.push(
+      `| ${team.shortCode} | ${total} | ${counts.Superstar} | ${counts.Star} | ${counts.Core} | ${counts.Depth} | ${counts.Backup} | ${counts.Reserve} | ${kernShare}% |`,
+    );
+  }
   lines.push("");
 
   const organicEvents = (gs.playerProgressionEvents ?? []).filter(
