@@ -37,11 +37,6 @@ const FoundationPlayerPortraitCard = dynamic(
   { ssr: false },
 );
 
-const FoundationPlayerPortraitPreview = dynamic(
-  () => import("@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview"),
-  { ssr: false },
-);
-
 function PlayerPortrait({
   src,
   initials,
