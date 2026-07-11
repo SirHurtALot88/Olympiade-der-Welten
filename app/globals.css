@@ -44052,9 +44052,30 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  flex-wrap: wrap;
   margin: var(--nl-s2) 0 0;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md, 10px);
+  border: 1px solid color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 10%, transparent);
   font-size: 13px;
   color: var(--nl-risk);
+}
+
+.is-new-look .nl-market-error-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-error-copy small {
+  color: color-mix(in srgb, var(--nl-risk) 70%, var(--nl-mut));
+  word-break: break-word;
 }
 
 /* Signing-Moment: "VERPFLICHTET" */
@@ -46176,14 +46197,14 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-facility-ladder-step.is-reached {
-  background: var(--nl-accent-soft);
-  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-good) 16%, transparent);
+  border-color: var(--nl-good);
   color: var(--nl-ink);
 }
 
 .is-new-look .nl-facility-ladder-step.is-next {
-  border-color: var(--nl-accent);
-  color: var(--nl-accent);
+  border-color: var(--nl-warn);
+  color: var(--nl-warn);
   animation: nl-facility-next-pulse 1.8s ease-in-out infinite;
 }
 
