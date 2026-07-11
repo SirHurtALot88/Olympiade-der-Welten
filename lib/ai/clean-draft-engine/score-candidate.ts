@@ -1,10 +1,18 @@
 import type { Player } from "@/lib/data/olyDataTypes";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
-// Reuse the EXACT existing spam-regression mechanism (no re-derivation, no drift):
-// computeColorspamPenalty = first 5 same form-color free, then -4 per extra (6th onward);
-// computeClassspamPenalty = first 3 same class free, then -4 per extra (4th onward).
-import { computeColorspamPenalty, computeClassspamPenalty } from "@/lib/ai/ai-needs-picks-compare-service";
+// Class stacking reuses the existing mechanism (first 3 same class free, then -4 per extra).
+import { computeClassspamPenalty } from "@/lib/ai/ai-needs-picks-compare-service";
+
+// Form-color anti-monoculture (clean engine, tuned stronger than the legacy -4/step): first 5 of a
+// form-color are free, then a STEEP quadratic ramp so no team realistically exceeds ~7 of one color
+// (6th -5, 7th -20, 8th -45, 9th -80 …). This is well above the per-candidate quality/theme spread,
+// so the 8th same-color pick only survives if literally nothing else is affordable.
+function cleanColorspamPenalty(existingCountBeforePick: number): number {
+  const next = existingCountBeforePick + 1;
+  if (next <= 5) return 0;
+  return -((next - 5) ** 2) * 5;
+}
 
 import { resolveCleanTeamTraits, type CleanTeamTraits } from "./plan-team-lanes";
 import type { CleanThemeTarget, ScoreCandidateInput, ScoreCandidateResult } from "./types";
@@ -207,7 +215,7 @@ export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult
     if (candidateColor != null && getPlayerClassColor(player) === candidateColor) sameColorCount += 1;
     if (String(player.className ?? "").toLowerCase() === candidateClass) sameClassCount += 1;
   }
-  const spamPenalty = computeColorspamPenalty(sameColorCount) + computeClassspamPenalty(sameClassCount);
+  const spamPenalty = cleanColorspamPenalty(sameColorCount) + computeClassspamPenalty(sameClassCount);
 
   return {
     score: quality + need + identity + value + discipline + potential + theme + spamPenalty,

@@ -25,7 +25,9 @@ export const CLEAN_DRAFT_TRANSFER_SOURCE = "ai_roster_fill";
 
 /** The single flag that gates this entire isolated engine. */
 export function isCleanDraftEnabled(): boolean {
-  return process.env.OLY_CLEAN_DRAFT === "1";
+  // Default ON — the clean engine is now the S1 draft. Opt out to the legacy path with
+  // OLY_CLEAN_DRAFT=0 (kept as an escape hatch while the legacy path is retired).
+  return process.env.OLY_CLEAN_DRAFT !== "0" && process.env.OLY_CLEAN_DRAFT !== "false";
 }
 
 /**

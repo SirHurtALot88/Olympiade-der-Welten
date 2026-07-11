@@ -241,10 +241,10 @@ export async function runSeasonOnePicksDraft(
   const seedSuffix = options?.seedSuffix ?? "long-run";
   persistence.saveSingleplayerState(saveId, withPersistedSeasonDerivations(save.gameState));
 
-  // Isolated, flag-gated clean draft engine (OLY_CLEAN_DRAFT=1). When unset, the old path below runs
-  // exactly as before — this branch never executes and cannot alter its behavior.
+  // Clean draft engine is the DEFAULT S1 draft. Set OLY_CLEAN_DRAFT=0 to fall back to the legacy path
+  // below (kept as an escape hatch while the legacy path is retired).
   if (isCleanDraftEnabled()) {
-    console.error(`[long-run] S1 draft via CLEAN engine (OLY_CLEAN_DRAFT=1) (${saveId})`);
+    console.error(`[long-run] S1 draft via CLEAN engine (default; OLY_CLEAN_DRAFT=0 to opt out) (${saveId})`);
     const cleanStartedAt = Date.now();
     const clean = await runCleanSeasonOneDraft(saveId, persistence);
     const latestClean = persistence.getSaveById(saveId) ?? save;

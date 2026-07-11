@@ -38,6 +38,9 @@ function itemToPseudoPlayer(item: TransfermarktFreeAgentItem): Player {
   return {
     id: item.playerId,
     race: item.race,
+    // className is REQUIRED for form-color tracking (getPlayerClassColor -> CLASS_COLOR_MAP[className]);
+    // without it the color/class anti-monoculture penalty never fires on the accumulating roster.
+    className: item.className,
     coreStats: {
       pow: item.pow ?? 0,
       spe: item.spe ?? 0,
