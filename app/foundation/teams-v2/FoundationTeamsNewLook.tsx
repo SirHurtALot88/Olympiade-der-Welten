@@ -57,7 +57,7 @@ import type {
  * Bereichs-Ränge die Hover-Karte (Mini-Radar + Saison-Sparkline).
  */
 
-type NlTeamsRosterMode = "kader" | "tabelle";
+type NlTeamsRosterMode = "portraits" | "tabelle";
 
 export type NlTeamsRosterRow = {
   entry: {
@@ -99,6 +99,12 @@ type NlTeamsPortraitModel = {
 export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
+  /**
+   * Aktiver Team-Unterreiter aus dem Host: "portraits" öffnet standardmäßig
+   * das Portrait-Grid, "roster" (Kader) die Datentabelle. Steuert nur die
+   * Standard-Ansicht — der In-Card-Umschalter bleibt nutzbar.
+   */
+  selectedTeamDetailTab: "roster" | "portraits";
   sortedTeamsViewRows: TeamsViewRow[];
   /**
    * Vom Host bereits berechnete Team-Historie (Live-Saison + echte
@@ -163,12 +169,26 @@ export type FoundationTeamsNewLookProps = {
     playerName: string;
     contractLength: number;
   }) => void | Promise<unknown>;
+  /**
+   * Öffnet die Saisonstand-Seite (seasonV2). Portal-Ziel der Rang-Kachel.
+   * Optional: fehlt der Handler, bleibt die Rang-Kachel beim Team-Profil.
+   */
+  onOpenSeason?: () => void;
 };
 
 const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }> = [
-  { id: "kader", label: "Kader" },
+  { id: "portraits", label: "Portraits" },
   { id: "tabelle", label: "Tabelle" },
 ];
+
+/**
+ * Standard-Ansicht je Unterreiter: der "Portraits"-Reiter startet im
+ * bild-fokussierten Portrait-Grid, der "Kader"-Reiter (roster) in der
+ * datenkompetenten Tabelle. So sind die beiden Reiter klar unterscheidbar.
+ */
+function defaultRosterModeForTab(tab: "roster" | "portraits"): NlTeamsRosterMode {
+  return tab === "portraits" ? "portraits" : "tabelle";
+}
 
 const NL_TEAMS_AXES: Array<{ key: NlAxisKey; label: "POW" | "SPE" | "MEN" | "SOC" }> = [
   { key: "pow", label: "POW" },
@@ -289,6 +309,7 @@ function compareBoardRows(left: TeamsViewRow, right: TeamsViewRow): number {
 export default function FoundationTeamsNewLook({
   selectedTeam,
   gameState,
+  selectedTeamDetailTab,
   sortedTeamsViewRows,
   selectedTeamsHistoryData,
   filteredSelectedRosterTableRows,
@@ -316,8 +337,19 @@ export default function FoundationTeamsNewLook({
   contractRenewalBusy,
   openMarketSellModal,
   openContractRenewalNegotiation,
+  onOpenSeason,
 }: FoundationTeamsNewLookProps) {
-  const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>("kader");
+  const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>(() =>
+    defaultRosterModeForTab(selectedTeamDetailTab),
+  );
+  // Wechselt der Host-Unterreiter (Kader ↔ Portraits), ohne dass die
+  // Komponente neu mountet, die Standard-Ansicht angleichen — React-Muster
+  // „State beim Prop-Wechsel während des Renderns anpassen" (kein Effekt).
+  const [syncedRosterTab, setSyncedRosterTab] = useState<"roster" | "portraits">(selectedTeamDetailTab);
+  if (syncedRosterTab !== selectedTeamDetailTab) {
+    setSyncedRosterTab(selectedTeamDetailTab);
+    setRosterMode(defaultRosterModeForTab(selectedTeamDetailTab));
+  }
   const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
 
@@ -355,6 +387,23 @@ export default function FoundationTeamsNewLook({
       return compareBoardRows(left, right);
     });
   }, [boardSort, sortedTeamsViewRows]);
+
+  // Mini-Tabellen-Vorschau der Rang-Kachel: echte Nachbar-Zeilen um das
+  // eigene Team herum (Rang · Team · Punkte), immer nach Gesamtrang geordnet
+  // — unabhängig von der aktuellen Board-Sortierung.
+  const rankPreviewRows = useMemo(() => {
+    const ordered = [...sortedTeamsViewRows].sort(compareBoardRows);
+    if (ordered.length === 0) {
+      return [];
+    }
+    const selfIndex = ordered.findIndex((row) => row.team.teamId === selectedTeam.teamId);
+    if (selfIndex < 0) {
+      return [];
+    }
+    const windowSize = Math.min(5, ordered.length);
+    const start = Math.max(0, Math.min(selfIndex - 2, ordered.length - windowSize));
+    return ordered.slice(start, start + windowSize);
+  }, [selectedTeam.teamId, sortedTeamsViewRows]);
 
   // Team-Entwicklung: Host liefert [Live, jüngste Saison, …] — für die
   // Verlaufs-Charts chronologisch drehen (älteste zuerst, Live zuletzt).
@@ -931,13 +980,38 @@ export default function FoundationTeamsNewLook({
               <span className="nl-teams-hero-eyebrow">Team Fokus</span>
               <h2 className="nl-teams-hero-name">{selectedTeam.name}</h2>
               <StatChipRow className="nl-teams-hero-chips" aria-label={`Kennzahlen ${selectedTeam.name}`}>
-                <StatChip
-                  label="Rang"
-                  value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
-                  tone="accent"
-                  onClick={() => openTeamProfileById(selectedTeam.teamId)}
-                  title={`${selectedTeam.name} Profil öffnen`}
-                />
+                <span className="nl-teams-rank-portal">
+                  <StatChip
+                    label="Rang"
+                    value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
+                    tone="accent"
+                    onClick={onOpenSeason ?? (() => openTeamProfileById(selectedTeam.teamId))}
+                    title={onOpenSeason ? "Zum Saisonstand springen" : `${selectedTeam.name} Profil öffnen`}
+                  />
+                  {rankPreviewRows.length > 0 ? (
+                    <div className="nl-teams-rank-preview" aria-hidden="true">
+                      <span className="nl-teams-rank-preview-title">Saisonstand</span>
+                      <ol className="nl-teams-rank-preview-list nl-tnum">
+                        {rankPreviewRows.map((row) => {
+                          const isSelf = row.team.teamId === selectedTeam.teamId;
+                          const previewRank = getBoardRank(row);
+                          return (
+                            <li
+                              key={row.team.teamId}
+                              className={`nl-teams-rank-preview-row${isSelf ? " is-self" : ""}`}
+                            >
+                              <span className="nl-teams-rank-preview-rank">
+                                {previewRank != null ? `#${formatNlNumber(previewRank, 0)}` : "—"}
+                              </span>
+                              <span className="nl-teams-rank-preview-team">{row.teamName}</span>
+                              <span className="nl-teams-rank-preview-points">{formatNlNumber(row.points, 1)}</span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ) : null}
+                </span>
                 <StatChip
                   label="Punkte"
                   value={formatNlNumber(heroRow?.points, 1)}
@@ -948,10 +1022,10 @@ export default function FoundationTeamsNewLook({
                   label="Kader"
                   value={heroRow != null ? formatNlNumber(heroRow.rosterCount, 0) : "—"}
                   onClick={() => {
-                    setRosterMode("kader");
+                    setRosterMode("tabelle");
                     scrollToSection(rosterCardRef);
                   }}
-                  title="Zum Kader springen"
+                  title="Zur Kadertabelle springen"
                 />
                 <StatChip
                   label="Cash"
@@ -1180,7 +1254,7 @@ export default function FoundationTeamsNewLook({
           <NlSubTabs
             items={NL_TEAMS_ROSTER_MODE_ITEMS.map((item) => ({
               ...item,
-              count: item.id === "kader" ? filteredSelectedRosterTableRows.length : undefined,
+              count: filteredSelectedRosterTableRows.length,
             }))}
             activeId={rosterMode}
             onSelect={(id) => setRosterMode(id as NlTeamsRosterMode)}
@@ -1196,7 +1270,7 @@ export default function FoundationTeamsNewLook({
             <span>{selectedTeamRosterActionHint}</span>
           </p>
         ) : null}
-        {rosterMode === "kader" ? renderRosterGrid() : renderRosterTable()}
+        {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
       </NlCard>
       </div>
 

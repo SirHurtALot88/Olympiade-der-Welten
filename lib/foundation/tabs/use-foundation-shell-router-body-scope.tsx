@@ -9183,6 +9183,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     scheduleActiveManagerTeam,
     openTeamProfileById,
+    onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
     formatLocalePoints,
     getSeasonCashHeatClass,
     formatWholeNumber,

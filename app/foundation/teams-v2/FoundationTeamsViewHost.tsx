@@ -97,6 +97,8 @@ type FoundationTeamsViewHostProps = Omit<
   showTeamContractPreviewRows: boolean;
   showSelectedRosterPpsBreakdown: boolean;
   showTeamDisciplines: boolean;
+  /** Öffnet die Saisonstand-Seite (seasonV2) — Portal-Ziel der Rang-Kachel im Neuen Look. */
+  onOpenSeason?: () => void;
 };
 
 export type { FoundationTeamsViewHostProps };
@@ -135,6 +137,7 @@ export default function FoundationTeamsViewHost({
   showTeamContractPreviewRows,
   showSelectedRosterPpsBreakdown,
   showTeamDisciplines,
+  onOpenSeason,
   ...panelProps
 }: FoundationTeamsViewHostProps) {
   // "Neuer Look" Flag (additiv): entscheidet erst ganz unten am Return,
@@ -281,6 +284,8 @@ export default function FoundationTeamsViewHost({
       <FoundationTeamsNewLook
         selectedTeam={selectedTeam}
         gameState={gameState}
+        selectedTeamDetailTab={selectedTeamDetailTab === "portraits" ? "portraits" : "roster"}
+        onOpenSeason={onOpenSeason}
         sortedTeamsViewRows={sortedTeamsViewRows}
         selectedTeamsHistoryData={selectedTeamsHistoryData}
         filteredSelectedRosterTableRows={

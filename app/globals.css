@@ -52231,3 +52231,104 @@ button.is-new-look .nl-thist-season-pill,
     transition: none;
   }
 }
+
+/* --- Rang-Kachel als Portal: Klick → Saisonstand, Hover → Mini-Tabelle -- */
+.is-new-look .nl-teams-rank-portal {
+  position: relative;
+  display: inline-flex;
+}
+
+.is-new-look .nl-teams-rank-preview {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: min(280px, 84vw);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e3);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--nl-t-fast) var(--nl-ease),
+    transform var(--nl-t-fast) var(--nl-ease),
+    visibility var(--nl-t-fast) var(--nl-ease);
+  pointer-events: none;
+}
+
+.is-new-look .nl-teams-rank-portal:hover .nl-teams-rank-preview,
+.is-new-look .nl-teams-rank-portal:focus-within .nl-teams-rank-preview {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.is-new-look .nl-teams-rank-preview-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-rank-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-teams-rank-preview-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 3px 6px;
+  border-radius: var(--nl-r-sm);
+  font-size: 12px;
+}
+
+.is-new-look .nl-teams-rank-preview-row.is-self {
+  background: var(--nl-panel-2);
+  font-weight: 700;
+}
+
+.is-new-look .nl-teams-rank-preview-rank {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-rank-preview-row.is-self .nl-teams-rank-preview-rank {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-teams-rank-preview-team {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-rank-preview-points {
+  color: var(--nl-mut);
+}
+
+@media (hover: none) {
+  .is-new-look .nl-teams-rank-preview {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-teams-rank-preview {
+    transition: none;
+    transform: none;
+  }
+}
