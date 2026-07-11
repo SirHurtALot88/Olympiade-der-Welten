@@ -10,6 +10,7 @@ import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/Foun
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
+import type { RoomParticipant } from "@/types/game";
 import {
   BudgetedMediaImage,
   ClassColorChip,
@@ -1327,6 +1328,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <div className="foundation-ai-preseason-copy">
               <span className="eyebrow">Multiplayer-Room</span>
               <strong>Raum {roomContext.roomCode}</strong>
+              {(() => {
+                const roomIdentity = roomLiveState?.roomParticipants.find(
+                  (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
+                );
+                return roomIdentity ? (
+                  <span className="pill" data-testid="foundation-room-participant-identity">
+                    Participant {roomIdentity.displayName}
+                  </span>
+                ) : null;
+              })()}
               <span className="muted">
                 Save {formatShortSaveId(roomContext.saveId)}
                 {roomLiveState
