@@ -305,7 +305,7 @@ function NlTrainingIntensityProjection({
           <div
             key={`intensity-${row.player.id}-${entry.mode}`}
             className={`nl-training-intensity-row${entry.isCurrent ? " is-current" : ""}`}
-            title={`${entry.label}: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)}`}
+            title={`${entry.label}: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)} · Regeneration ${formatSignedPercent(entry.recoveryDeltaPct)}`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -320,6 +320,12 @@ function NlTrainingIntensityProjection({
             <span className="nl-training-intensity-gain nl-tnum" title="Erwarteter Zuwachs durch Training bei dieser Intensität">
               +{formatVeloNumber(entry.trainingGain, 1)} <small>Training</small>
             </span>
+            <span
+              className={`nl-training-intensity-recovery nl-tnum${entry.recoveryDeltaPct < 0 ? " is-negative" : entry.recoveryDeltaPct > 0 ? " is-positive" : ""}`}
+              title="Regenerations-Delta dieser Intensität (Erholung ↔ Verletzungsrisiko-Trade-off)"
+            >
+              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Reg</small>
+            </span>
             <NlDeltaChip
               value={entry.net}
               format={(n) => `${formatVeloSignedNumber(n, 1)} SP`}
@@ -330,7 +336,7 @@ function NlTrainingIntensityProjection({
       </div>
       <small className="nl-training-intensity-foot nl-tnum">
         Regression konstant {formatVeloSignedNumber(projection[0]?.regression ?? 0, 1)} · höheres Potential ⇒ größerer
-        Trainings-Zuwachs
+        Trainings-Zuwachs · höhere Intensität kostet Regeneration (Verletzungsrisiko steigt)
       </small>
     </div>
   );

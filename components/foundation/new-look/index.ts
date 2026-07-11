@@ -43,3 +43,4 @@ export {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look/nl-tones";
+export { formatNlMoney } from "@/components/foundation/new-look/nl-format";

@@ -256,7 +256,7 @@ export default function PlayerHeroNewLook({
         ) : null}
       </div>
       <button className="nl-player-hero-close" type="button" onClick={onClose}>
-        Schliessen
+        Schließen
       </button>
     </section>
   );

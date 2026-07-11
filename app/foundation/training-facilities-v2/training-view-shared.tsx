@@ -76,6 +76,8 @@ export type TrainingIntensityProjectionEntry = {
   net: number;
   isCurrent: boolean;
   fatigueLoad: number;
+  /** Regenerations-Delta dieser Intensität in % (echtes Feld aus `trainingModeOptions`, z. B. Recovery/Verletzungsschutz-Trade-off). */
+  recoveryDeltaPct: number;
 };
 
 /**
@@ -124,6 +126,7 @@ export function buildTrainingIntensityProjection(
       net: roundTo(net, 1),
       isCurrent: option.value === row.mode,
       fatigueLoad: option.fatigueLoad,
+      recoveryDeltaPct: option.recoveryDeltaPct,
     };
   });
 }

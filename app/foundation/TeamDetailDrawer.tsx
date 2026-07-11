@@ -878,7 +878,7 @@ export default function TeamDetailDrawer({
             </div>
           </div>
           <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Schliessen
+            Schließen
           </button>
         </div>
         {profileBody}

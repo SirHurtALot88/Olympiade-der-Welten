@@ -2025,7 +2025,7 @@ export default function PlayerDetailDrawer({
             </div>
           </div>
           <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Schliessen
+            Schließen
           </button>
         </div>
           )}
@@ -2219,7 +2219,7 @@ export default function PlayerDetailDrawer({
                         <p>Top 5 Diszis dieser Achse mit Spielerwert, Einsatzslot, PPs und Mutator-Anteil.</p>
                       </div>
                       <button type="button" className="ghost-button" onClick={() => setSelectedAxisId(null)}>
-                        Schliessen
+                        Schließen
                       </button>
                     </div>
                     <div className="table-shell player-drawer-axis-detail-table-shell">

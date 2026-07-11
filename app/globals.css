@@ -40871,6 +40871,15 @@ button.foundation-team-portrait-card {
   --nl-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
   --nl-t-fast: 120ms;
   --nl-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* Font-Size-Skala (Design-System-Grundlage): fasst vormals verstreute,
+     nahezu identische Werte (9.5–10.5px / 11–11.5px / 12–12.5px …) in
+     der Kit-Basis zu einer kleinen Skala zusammen. Bewusst NICHT auf
+     NlGauge/NlMedalBadge angewandt — deren Größen bleiben eigenständig. */
+  --nl-fs-xs: 10px;
+  --nl-fs-sm: 11px;
+  --nl-fs-md: 12px;
+  --nl-fs-lg: 13px;
+  --nl-fs-xl: 17px;
 
   /* Sanfte, sichere Basis — kein Restyling bestehender Markup-Elemente. */
   accent-color: var(--nl-accent);
@@ -40941,14 +40950,14 @@ button.foundation-team-portrait-card {
   text-decoration: none;
 }
 .is-new-look .nl-stat-chip-label {
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
 }
 .is-new-look .nl-stat-chip-value {
-  font-size: 17px;
+  font-size: var(--nl-fs-xl);
   line-height: 1.15;
   font-weight: 700;
   font-family: var(--nl-display);
@@ -40956,7 +40965,7 @@ button.foundation-team-portrait-card {
   color: var(--nl-ink);
 }
 .is-new-look .nl-stat-chip-sub {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   color: var(--nl-mut);
   font-variant-numeric: tabular-nums;
 }
@@ -40970,7 +40979,7 @@ button.foundation-team-portrait-card {
   position: absolute;
   top: var(--nl-s2);
   right: var(--nl-s2);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   color: var(--nl-mut-2);
   opacity: 0;
   transform: translateX(-3px);
@@ -41001,7 +41010,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-stat-chip-row-label {
   align-self: center;
   font-family: var(--nl-sans);
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -41048,7 +41057,7 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 .is-new-look .nl-card-eyebrow {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -41057,7 +41066,7 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-card-title {
   margin: 0;
   font-family: var(--nl-display);
-  font-size: 17px;
+  font-size: var(--nl-fs-xl);
   line-height: 1.25;
   font-weight: 600;
   color: var(--nl-ink);
@@ -41098,7 +41107,7 @@ button.foundation-team-portrait-card {
   background: transparent;
   color: var(--nl-mut);
   font-family: var(--nl-sans);
-  font-size: 12.5px;
+  font-size: var(--nl-fs-md);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -41128,7 +41137,7 @@ button.foundation-team-portrait-card {
   background: var(--nl-panel);
   border: 1px solid var(--nl-line);
   color: var(--nl-mut);
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   line-height: 16px;
 }
@@ -41145,7 +41154,7 @@ button.foundation-team-portrait-card {
   padding: 1px var(--nl-s2);
   border-radius: var(--nl-r-pill);
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   font-weight: 700;
   background: rgba(255, 255, 255, 0.05);
   color: var(--nl-mut);
@@ -41177,14 +41186,14 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 .is-new-look .nl-progress-label {
-  font-size: 10.5px;
+  font-size: var(--nl-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nl-mut);
 }
 .is-new-look .nl-progress-value {
-  font-size: 11.5px;
+  font-size: var(--nl-fs-sm);
   font-weight: 600;
   color: var(--nl-ink);
   font-variant-numeric: tabular-nums;
@@ -41259,7 +41268,7 @@ button.foundation-team-portrait-card {
   width: auto;
   color: var(--nl-mut-2);
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
 }
 .is-new-look .nl-barchart {
   display: block;
@@ -41272,7 +41281,7 @@ button.foundation-team-portrait-card {
   margin: 0;
   color: var(--nl-mut-2);
   font-family: var(--nl-sans);
-  font-size: 12px;
+  font-size: var(--nl-fs-md);
 }
 .is-new-look .nl-barchart-axis {
   stroke: var(--nl-line-2);
@@ -41281,14 +41290,14 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-barchart-value {
   fill: var(--nl-ink);
   font-family: var(--nl-sans);
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .is-new-look .nl-barchart-label {
   fill: var(--nl-mut);
   font-family: var(--nl-sans);
-  font-size: 9.5px;
+  font-size: var(--nl-fs-xs);
   font-variant-numeric: tabular-nums;
 }
 .is-new-look .nl-radar {
@@ -41313,21 +41322,21 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-radar-label {
   font-family: var(--nl-sans);
-  font-size: 11px;
+  font-size: var(--nl-fs-sm);
   font-weight: 700;
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
 }
 
 .is-new-look .nl-radar-label-name {
-  font-size: 10px;
+  font-size: var(--nl-fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.85;
 }
 
 .is-new-look .nl-radar-label-value {
-  font-size: 13px;
+  font-size: var(--nl-fs-lg);
   font-weight: 800;
 }
 
@@ -46542,7 +46551,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-intensity-row {
   display: grid;
-  grid-template-columns: 66px 1fr auto auto;
+  grid-template-columns: 66px 1fr auto auto auto;
   align-items: center;
   gap: var(--nl-s2);
   font-size: 12px;
@@ -46599,6 +46608,27 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-training-intensity-gain small {
   font-weight: 500;
   color: var(--nl-mut);
+  margin-left: 2px;
+}
+
+.is-new-look .nl-training-intensity-recovery {
+  font-weight: 600;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-intensity-recovery.is-positive {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-training-intensity-recovery.is-negative {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-training-intensity-recovery small {
+  font-weight: 500;
+  color: inherit;
+  opacity: 0.75;
   margin-left: 2px;
 }
 
@@ -57042,4 +57072,122 @@ button.is-new-look .nl-thist-season-pill,
   font-size: 0.88rem;
   line-height: 1.45;
   color: var(--nl-mut);
+}
+
+/**
+ * Wave 3 — Spieler-Verzeichnis ("Neuer Look"), additive CSS.
+ *
+ * Scope: `app/foundation/players-table/FoundationPlayersTableNewLook.tsx`.
+ * Alles unter `.is-new-look`, alle NEUEN Klassen mit `nl-ptable-*` Präfix
+ * (bestehende `.nl-players-*`-Klassen bleiben unverändert — sie werden hier
+ * nur als Layout-Container weiterverwendet, nie neu definiert).
+ *
+ * Tasks:
+ * 1) Liga-Perzentil-Chips (OVR/PPs/MVS + Achsen) — `.nl-ptable-percentile`,
+ *    `.nl-ptable-axis-percentile`.
+ * 2) Nächster-Spieltag Disziplin-Eignungs-Strip — `.nl-ptable-discipline-*`.
+ * 3) CA/PO-Sterne-Spalte (NlAbilityStars) — `.nl-ptable-td-ability`.
+ * 4) MW-Bracket-Histogramm (NlBarChart) — `.nl-ptable-bracket-*`.
+ */
+
+/* --- 1) Liga-Perzentil-Chips (OVR/PPs/MVS) --------------------------- */
+.is-new-look .nl-ptable-metric-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.is-new-look .nl-ptable-percentile {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* --- 1) Achsen-Perzentil-Badge (kompakt, "T8%") ---------------------- */
+.is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
+  grid-template-columns: 28px minmax(40px, 1fr) 26px 30px;
+}
+
+.is-new-look .nl-ptable-axis-percentile {
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--nl-tone, var(--nl-mut));
+  white-space: nowrap;
+}
+
+.is-new-look .nl-ptable-axis-percentile.is-empty {
+  visibility: hidden;
+}
+
+/* --- 2) Disziplin-Eignungs-Strip (nächster Spieltag) ----------------- */
+.is-new-look .nl-ptable-td-disciplines {
+  min-width: 76px;
+}
+
+.is-new-look .nl-ptable-discipline-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-ptable-discipline-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+}
+
+.is-new-look .nl-ptable-discipline-chip .nl-ptable-discipline-icon.discipline-icon-chip {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.is-new-look .nl-ptable-discipline-chip .nl-ptable-discipline-icon .discipline-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- 3) CA/PO-Sterne-Spalte ------------------------------------------ */
+.is-new-look .nl-ptable-td-ability {
+  min-width: 96px;
+  vertical-align: middle;
+}
+
+.is-new-look .nl-ptable-td-ability .nl-ability-stars {
+  justify-content: flex-start;
+}
+
+/* --- 4) MW-Bracket-Histogramm ----------------------------------------- */
+.is-new-look .nl-ptable-bracket-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-ptable-bracket-barchart {
+  max-width: 440px;
+  max-height: 132px;
+}
+
+.is-new-look .nl-ptable-bracket-legend {
+  margin: 0;
+  color: var(--nl-mut-2);
+  font-size: 10px;
+  line-height: 1.5;
 }

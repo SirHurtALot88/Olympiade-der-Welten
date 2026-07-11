@@ -13,6 +13,7 @@ import {
   NlRadar,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   nlToneClass,
   useCountUp,
@@ -31,17 +32,6 @@ import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-hel
  * es gibt keine Zeit-/Uhr-Simulation, daher bewusst keine Countdown- oder
  * "vs. letzte Woche"-Elemente.
  */
-
-/* --- Geld: kompakt in "Mio"/"k" (Werte liegen bereits in Mio vor) --- */
-function formatNlMoney(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  if (Math.abs(value) < 1 && value !== 0) {
-    return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value * 1000)}k`;
-  }
-  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)} Mio`;
-}
 
 function toFiniteNumber(value: string | number | boolean | null | undefined): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
