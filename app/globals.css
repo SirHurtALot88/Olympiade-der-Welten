@@ -51476,3 +51476,122 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-facility-overview-income-curve small {
   color: var(--nl-mut);
 }
+
+/* =======================================================================
+   Batch b8 — Transfermarkt & Scouting NewLook (flag-gated, additiv)
+   ======================================================================= */
+
+/* --- Transfermarkt #68: Achsen-Radar im Scouting-Profil --- */
+.is-new-look .nl-market-focus-radar {
+  display: flex;
+  justify-content: center;
+  margin: var(--nl-s2) 0;
+}
+.is-new-look .nl-market-focus-radar .nl-market-axis-radar {
+  width: 210px;
+  max-width: 100%;
+}
+
+/* --- Transfermarkt #18: Potenzial-Sterne & Entwicklungs-Trend --- */
+.is-new-look .nl-market-talent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin: var(--nl-s2) 0;
+}
+.is-new-look .nl-market-talent-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+.is-new-look .nl-market-talent-key {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-market-talent-line strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Transfermarkt #69: Top-Disziplinen als Balken-Chart --- */
+.is-new-look .nl-market-diszi-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  margin-top: var(--nl-s2);
+}
+.is-new-look .nl-market-diszi-chart .nl-market-diszi-barchart {
+  width: 100%;
+  max-width: 340px;
+}
+.is-new-look .nl-market-diszi-hint {
+  margin-top: var(--nl-s2);
+}
+
+/* --- Transfermarkt #17: Vorsaison-Entwicklung an den Kader-Achsen --- */
+.is-new-look .nl-market-axis-prev {
+  font-size: 8.5px;
+  line-height: 1.1;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Scouting #70: Live-Fortschritts-Strip Fokus --- */
+.is-new-look .nl-scout-focus-progress {
+  margin: 0 0 var(--nl-s1);
+}
+
+/* --- Scouting #71: Achsen-Mini-Radar auf Kaufbereit-Karten --- */
+.is-new-look .nl-scout-player-radar {
+  display: flex;
+  justify-content: center;
+  padding: var(--nl-s1) 0;
+}
+.is-new-look .nl-scout-player-radar .nl-radar {
+  width: 168px;
+}
+
+/* --- Scouting #19: Top-6-Impact Vorher/Nachher-Balkendiagramm --- */
+.is-new-look .nl-scout-impact-mirror {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+.is-new-look .nl-scout-impact-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+.is-new-look .nl-scout-impact-summary {
+  font-size: 13px;
+  font-weight: 700;
+}
+.is-new-look .nl-scout-impact-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nl-s3);
+}
+.is-new-look .nl-scout-impact-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+}
+.is-new-look .nl-scout-impact-chart-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}

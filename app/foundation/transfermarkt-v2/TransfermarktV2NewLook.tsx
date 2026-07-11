@@ -5,9 +5,11 @@ import type { ReactNode } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
 import {
+  NlBarChart,
   NlCard,
   NlDeltaChip,
   NlProgressBar,
+  NlRadar,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -70,6 +72,20 @@ const NL_MARKET_SORT_LABELS: Record<TransfermarktNewLookSortMode, string> = {
 
 const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = ["need", "fit", "value", "potential", "cheap", "salary"];
 const NL_MARKET_AXES: NlAxisKey[] = ["pow", "spe", "men", "soc"];
+
+/** Achse → Vorsaison-Feld (Performance-Punkte + Rang) auf RosterRow.previousSeasonAxis. */
+const NL_PREV_SEASON_AXIS_KEYS: Record<
+  NlAxisKey,
+  {
+    points: "ppPow" | "ppSpe" | "ppMen" | "ppSoc";
+    rank: "ppPowRank" | "ppSpeRank" | "ppMenRank" | "ppSocRank";
+  }
+> = {
+  pow: { points: "ppPow", rank: "ppPowRank" },
+  spe: { points: "ppSpe", rank: "ppSpeRank" },
+  men: { points: "ppMen", rank: "ppMenRank" },
+  soc: { points: "ppSoc", rank: "ppSocRank" },
+};
 
 export type TransfermarktV2NewLookProps = {
   // Kopf & Status
@@ -182,6 +198,42 @@ function getNlNeedTone(score: number | null | undefined): NlTone {
   if (score >= 48) return "good";
   if (score >= 26) return "warn";
   return "neutral";
+}
+
+/** Entwicklungs-Trend-Label (Spiegel von PlayerDetailDrawer.formatDevelopmentTrend). */
+const NL_DEV_TREND_LABEL: Record<string, string> = {
+  strong_positive: "stark positiv",
+  positive: "positiv",
+  neutral: "Stagnation",
+  negative: "leicht negativ",
+  strong_negative: "Regression-Risiko",
+};
+const NL_DEV_TREND_TONE: Record<string, NlTone> = {
+  strong_positive: "good",
+  positive: "good",
+  neutral: "neutral",
+  negative: "warn",
+  strong_negative: "risk",
+};
+
+/**
+ * In-Page-Portal: scrollt sanft zur passenden Markt-Sektion (Board-Kachel →
+ * Deal-Desk/Kader/Wishlist). Respektiert prefers-reduced-motion, läuft nur im
+ * Event-Handler (kein Render-Seiteneffekt).
+ */
+function scrollToNlMarketSection(selector: string) {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const target = document.querySelector(selector);
+  if (!target) {
+    return;
+  }
+  const prefersReduced =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
+  target.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
 }
 
 function getNlInitials(name: string) {
@@ -337,13 +389,21 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         }
       >
         <StatChipRow className="nl-market-board" aria-label="Transfer-Entscheidungsboard">
-          <StatChip label="Cash" value={teamCash != null ? formatNlNumber(teamCash, 1) : "—"} tone="good" />
+          <StatChip
+            label="Cash"
+            value={teamCash != null ? formatNlNumber(teamCash, 1) : "—"}
+            tone="good"
+            onClick={() => scrollToNlMarketSection(".nl-market-deal-card")}
+            title="Zum Deal-Desk springen"
+          />
           <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatNlNumber(teamSalaryTotal, 1) : "—"} tone="accent" />
           <StatChip
             label="Kader"
             value={`${rosterCount ?? "—"} / ${rosterLimit ?? "—"}`}
             tone={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? "warn" : "neutral"}
             sub={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? `${rosterGapOpenCount} Plätze offen` : undefined}
+            onClick={() => scrollToNlMarketSection(".nl-market-roster-card")}
+            title="Zum eigenen Kader springen"
           />
           <StatChip
             label="Wunschliste"
@@ -354,6 +414,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 ? `${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max ?? "∞"} Scouting`
                 : "Kandidaten"
             }
+            onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
+            title="Zur Wishlist springen"
           />
           <StatChip label="Filter aktiv" value={activeFilterCount} tone={activeFilterCount > 0 ? "warn" : "neutral"} />
         </StatChipRow>
@@ -450,6 +512,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                           Bedarf {formatNlNumber(item.needMatchScore, 0)}
                         </span>
                       ) : null}
+                      {/* Rohdiamant-/Potenzial-Signal — nur wenn Scouting den Sterne-Gap real freigibt. */}
+                      {item.potentialGapStars != null && Number.isFinite(item.potentialGapStars) && item.potentialGapStars > 0 ? (
+                        <span
+                          className={`nl-market-signal-chip ${nlToneClass(item.potentialGapStars >= 2 ? "good" : "accent")}`}
+                          title={item.potentialStarsDisplay ?? "Sterne-Abstand aktuell → Potenzial"}
+                        >
+                          {item.potentialGapStars >= 2 ? "Rohdiamant" : "Potenzial"} +{item.potentialGapStars}★
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                   <span className="nl-market-candidate-numbers nl-tnum">
@@ -525,22 +596,91 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </div>
                 </div>
 
-                <div className="nl-market-axis-grid" aria-label="Kandidaten-Achsen">
-                  {NL_MARKET_AXES.map((axis) => {
-                    const value = selectedPlayer[axis];
-                    return (
-                      <NlProgressBar
-                        key={`nl-focus-axis-${axis}`}
-                        value={typeof value === "number" && Number.isFinite(value) ? value : 0}
-                        max={100}
-                        label={NL_AXIS_LABELS[axis]}
-                        tone={axis}
-                        format={(current) => formatNlNumber(current, 0)}
-                        className="nl-market-axis-bar"
-                      />
-                    );
-                  })}
+                {/* #68 — Achsen-Radar statt vier linearer Balken. Werte fog-gated (scoutedPow/…). */}
+                <div className="nl-market-focus-radar" aria-label="Kandidaten-Achsen">
+                  <NlRadar
+                    axes={NL_MARKET_AXES.flatMap((axis) => {
+                      const value = selectedPlayer[axis];
+                      return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
+                    })}
+                    max={100}
+                    showValues
+                    aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
+                    className="nl-market-axis-radar"
+                  />
                 </div>
+
+                {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels). */}
+                {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay || selectedPlayer.developmentTrend ? (
+                  <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
+                    {selectedPlayer.axisStarsDisplay ? (
+                      <span className="nl-market-talent-line">
+                        <span className="nl-market-talent-key">Aktuell</span>
+                        <strong>{selectedPlayer.axisStarsDisplay}</strong>
+                      </span>
+                    ) : null}
+                    {selectedPlayer.potentialStarsDisplay ? (
+                      <span className="nl-market-talent-line">
+                        <span className="nl-market-talent-key">Potenzial</span>
+                        <strong>{selectedPlayer.potentialStarsDisplay}</strong>
+                        {selectedPlayer.potentialGapStars != null && Number.isFinite(selectedPlayer.potentialGapStars) ? (
+                          <span
+                            className={`nl-market-signal-chip ${nlToneClass(
+                              selectedPlayer.potentialGapStars >= 2 ? "good" : "neutral",
+                            )}`}
+                          >
+                            Gap {selectedPlayer.potentialGapStars}★
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                    {selectedPlayer.developmentTrend ? (
+                      <span
+                        className={`nl-market-signal-chip ${nlToneClass(
+                          NL_DEV_TREND_TONE[selectedPlayer.developmentTrend] ?? "neutral",
+                        )}`}
+                        title="Entwicklungs-Trend aus dem Trainings-Forecast"
+                      >
+                        Trend {NL_DEV_TREND_LABEL[selectedPlayer.developmentTrend] ?? "—"}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore). */}
+                {(() => {
+                  const disciplineBars = selectedPlayer.topDisciplineScores
+                    .filter(
+                      (entry) => typeof entry.displayedScore === "number" && Number.isFinite(entry.displayedScore),
+                    )
+                    .slice(0, 5)
+                    .map((entry) => ({
+                      label: entry.disciplineName.length > 7 ? `${entry.disciplineName.slice(0, 6)}…` : entry.disciplineName,
+                      value: entry.displayedScore as number,
+                      tone: "accent" as NlTone,
+                    }));
+                  if (disciplineBars.length > 0) {
+                    return (
+                      <div className="nl-market-diszi-chart" aria-label="Top-Disziplinen des Kandidaten">
+                        <span className="nl-market-eyebrow">Top-Disziplinen (gescoutet)</span>
+                        <NlBarChart
+                          bars={disciplineBars}
+                          format={(value) => formatNlNumber(value, 0)}
+                          aria-label={`${selectedPlayer.name} Top-Disziplinen`}
+                          className="nl-market-diszi-barchart"
+                        />
+                      </div>
+                    );
+                  }
+                  if (selectedPlayer.topDisciplineScores.length > 0) {
+                    return (
+                      <p className="nl-market-muted nl-market-diszi-hint">
+                        Disziplin-Werte noch verdeckt — weiter scouten für exakte Scores.
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <div className="nl-market-focus-actions">
                   <button
@@ -936,13 +1076,35 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       <StatChip label="MVS" value={formatNullablePps(row.mvs)} tone="neutral" />
                       <StatChip label="MW" value={formatTransfermarktCurrency(row.marketValue)} tone="soc" />
                     </StatChipRow>
-                    <span className="nl-market-roster-axes" aria-label={`${row.name} Achsen`}>
-                      {NL_MARKET_AXES.map((axis) => (
-                        <span key={`nl-roster-axis-${row.activePlayerId}-${axis}`} className={`nl-market-axis-chip ${nlToneClass(axis)}`}>
-                          <b>{NL_AXIS_LABELS[axis]}</b>
-                          <span className="nl-tnum">{formatNlNumber(row[axis], 0)}</span>
-                        </span>
-                      ))}
+                    {/* #17 — Achsen mit Vorsaison-Entwicklung: aktueller Achswert + Vorsaison-PPs & -Rang. */}
+                    <span className="nl-market-roster-axes" aria-label={`${row.name} Achsen mit Vorsaison`}>
+                      {NL_MARKET_AXES.map((axis) => {
+                        const prev = row.previousSeasonAxis ?? null;
+                        const prevKeys = NL_PREV_SEASON_AXIS_KEYS[axis];
+                        const prevPoints = prev ? prev[prevKeys.points] : null;
+                        const prevRank = prev ? prev[prevKeys.rank] : null;
+                        const hasPrev = prevPoints != null && Number.isFinite(prevPoints);
+                        return (
+                          <span
+                            key={`nl-roster-axis-${row.activePlayerId}-${axis}`}
+                            className={`nl-market-axis-chip ${nlToneClass(axis)}`}
+                          >
+                            <b>{NL_AXIS_LABELS[axis]}</b>
+                            <span className="nl-tnum">{formatNlNumber(row[axis], 0)}</span>
+                            {hasPrev ? (
+                              <small
+                                className="nl-market-axis-prev nl-tnum"
+                                title={`${prev?.seasonId ?? "Vorsaison"}: ${formatNullablePps(prevPoints)} PPs${
+                                  prevRank != null ? ` · Rang #${prevRank}` : ""
+                                }`}
+                              >
+                                VS {formatNullablePps(prevPoints)}
+                                {prevRank != null ? ` · #${prevRank}` : ""}
+                              </small>
+                            ) : null}
+                          </span>
+                        );
+                      })}
                     </span>
                     {onSellRow ? (
                       <button

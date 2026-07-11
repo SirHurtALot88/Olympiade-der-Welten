@@ -6,7 +6,20 @@ import type { ScoutingHubV2ClientProps, ScoutingHubV2TabId } from "@/app/foundat
 import ScoutingPriorityQueue from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
 import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingReportPanel";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import { NlCard, NlGauge, NlProgressBar, NlSubTabs, StatChip, StatChipRow } from "@/components/foundation/new-look";
+import {
+  NlBarChart,
+  NlCard,
+  NlGauge,
+  NlProgressBar,
+  NlRadar,
+  NlSubTabs,
+  StatChip,
+  StatChipRow,
+  NL_AXIS_LABELS,
+  type NlAxisKey,
+  type NlRadarAxis,
+  type NlTone,
+} from "@/components/foundation/new-look";
 import { VeloStarRating } from "@/components/foundation/velo-ui/VeloStarRating";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 
@@ -54,6 +67,7 @@ function NlScoutPortraitCard({
   statusLabel,
   statusTone,
   etaLabel,
+  radarAxes,
   onOpenPlayer,
   onOpenReport,
 }: {
@@ -61,6 +75,8 @@ function NlScoutPortraitCard({
   statusLabel: string;
   statusTone: "ready" | "focus";
   etaLabel?: string | null;
+  /** Fog-of-War-safe: nur für voll gescoutete Ziele gesetzt (Achsen dann real freigegeben). */
+  radarAxes?: NlRadarAxis[];
   onOpenPlayer: (playerId: string) => void;
   onOpenReport: () => void;
 }) {
@@ -114,6 +130,11 @@ function NlScoutPortraitCard({
           />
         </div>
       </div>
+      {radarAxes && radarAxes.length > 0 ? (
+        <div className="nl-scout-player-radar" aria-label={`${entry.playerName} Achsen-Radar`}>
+          <NlRadar axes={radarAxes} max={100} showValues aria-label={`${entry.playerName} Achsen POW/SPE/MEN/SOC`} />
+        </div>
+      ) : null}
       <div className="nl-scout-player-card-foot">
         <span className={`nl-scout-status-pill ${statusTone === "ready" ? "is-ready" : "is-focus"}`}>
           {statusLabel}
@@ -139,6 +160,7 @@ export default function ScoutingCenterV2NewLook({
   visibleAtTier,
   hiddenAtTier,
   baseInfoAlwaysVisible,
+  activeScoutTargets = [],
   scoutPipeline = null,
   activeTab: controlledActiveTab,
   onActiveTabChange,
@@ -167,6 +189,25 @@ export default function ScoutingCenterV2NewLook({
   const rosterGap = rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
   const readyToBuyEntries = queueEntries.filter((entry) => entry.isFullyScouted);
   const focusEntry = queueEntries.find((entry) => entry.isFocusTarget && !entry.isFullyScouted) ?? null;
+
+  // #71 — Achsen-Mini-Radar nur für VOLL gescoutete Ziele (Fog-of-War-safe: bei
+  // L5 sind die Achswerte real freigegeben, decken sich mit den Roh-Achsen).
+  // Teil-gescoutete Ziele bekommen bewusst kein Radar (kein Leak verdeckter Werte).
+  const axisTargetById = new Map(activeScoutTargets.map((target) => [target.playerId, target] as const));
+  const getReadyRadarAxes = (playerId: string): NlRadarAxis[] => {
+    const target = axisTargetById.get(playerId);
+    if (!target) {
+      return [];
+    }
+    const axes: NlRadarAxis[] = [];
+    for (const key of ["pow", "spe", "men", "soc"] as NlAxisKey[]) {
+      const value = target[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        axes.push({ key, value });
+      }
+    }
+    return axes.length === 4 ? axes : [];
+  };
 
   return (
     <div className="nl-scout" data-testid="foundation-scouting-hub-v2" id="foundation-scouting-hub-v2" data-new-look="true">
@@ -202,7 +243,14 @@ export default function ScoutingCenterV2NewLook({
 
       {activeTab === "overview" || activeTab === "recommended" ? (
         <StatChipRow className="nl-scout-stats" aria-label="Scouting-Kennzahlen">
-          <StatChip label="Budget" value={recruitmentBudget} tone="accent" title={draftContextNote} />
+          {/* #31 — Header-StatChips als Portale: Budget → Markt, Stufe → Facilities. */}
+          <StatChip
+            label="Budget"
+            value={recruitmentBudget}
+            tone="accent"
+            title={draftContextNote ? `${draftContextNote} · Zum Transfermarkt` : "Zum Transfermarkt"}
+            onClick={onOpenMarket}
+          />
           <StatChip
             label="Kader"
             value={rosterMinimum != null ? `${rosterCount}/${rosterMinimum}` : rosterCount}
@@ -215,7 +263,12 @@ export default function ScoutingCenterV2NewLook({
             value={`L${disclosureLevel}/5`}
             tone="men"
             sub={scoutingFacilityLabel}
-            title="Progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar."
+            title={
+              onOpenFacilities
+                ? "Zu den Facilities — Scouting Office upgraden für schnellere Enthüllung."
+                : "Progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar."
+            }
+            onClick={onOpenFacilities}
           />
         </StatChipRow>
       ) : null}
@@ -343,6 +396,52 @@ export default function ScoutingCenterV2NewLook({
 
       {activeTab === "reports" ? (
         <NlCard className="nl-scout-report-card">
+          {/* #19 — Top-6-Impact als Vorher/Nachher-Balkendiagramm (Spiegel), echte report.axisImpact-Werte. */}
+          {report && report.axisImpact.length > 0 ? (
+            <div className="nl-scout-impact-mirror" aria-label="Top-6 Achsen-Impact vorher und nach dem Kauf">
+              <div className="nl-scout-impact-head">
+                <span className="nl-scout-eyebrow">Top-6 Achsen-Impact (dein Team)</span>
+                {report.axisImpactComposite.before != null && report.axisImpactComposite.after != null ? (
+                  <span className="nl-scout-impact-summary nl-tnum">
+                    Ø {report.axisImpactComposite.before.toFixed(1)} → {report.axisImpactComposite.after.toFixed(1)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="nl-scout-impact-charts">
+                <div className="nl-scout-impact-chart">
+                  <span className="nl-scout-impact-chart-label">Vorher</span>
+                  <NlBarChart
+                    bars={report.axisImpact.map((row) => ({
+                      label: NL_AXIS_LABELS[row.axis as NlAxisKey] ?? row.axis,
+                      value: row.before ?? Number.NaN,
+                      tone: row.axis as NlTone,
+                    }))}
+                    max={100}
+                    format={(value) => value.toFixed(1)}
+                    aria-label="Top-6 Achsen-Schnitt vorher"
+                  />
+                </div>
+                <div className="nl-scout-impact-chart">
+                  <span className="nl-scout-impact-chart-label">Mit Kauf</span>
+                  <NlBarChart
+                    bars={report.axisImpact.map((row) => ({
+                      label: NL_AXIS_LABELS[row.axis as NlAxisKey] ?? row.axis,
+                      value: row.after ?? Number.NaN,
+                      tone: row.axis as NlTone,
+                    }))}
+                    max={100}
+                    format={(value) => value.toFixed(1)}
+                    aria-label="Top-6 Achsen-Schnitt mit Kauf"
+                  />
+                </div>
+              </div>
+              {!report.impactIsExact ? (
+                <small className="nl-scout-muted">
+                  Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
+                </small>
+              ) : null}
+            </div>
+          ) : null}
           <ScoutingReportPanel
             report={report}
             onOpenPlayer={onOpenPlayer}
@@ -387,6 +486,15 @@ export default function ScoutingCenterV2NewLook({
           {focusEntry ? (
             <div className="nl-scout-focus-strip">
               <span className="nl-scout-eyebrow">Aktueller Fokus</span>
+              {/* #70 — Live-Fortschritts-Strip mit ETA: echtes certainty% + Fokus-ETA. */}
+              <NlProgressBar
+                value={Math.max(0, Math.min(100, focusEntry.certainty))}
+                max={100}
+                label="Fokus-Intel bis Vollbild"
+                tone="accent"
+                format={(value) => `${Math.round(value)}%${focusEtaLabel ? ` · noch ${focusEtaLabel}` : ""}`}
+                className="nl-scout-focus-progress"
+              />
               <NlScoutPortraitCard
                 entry={focusEntry}
                 statusLabel={`${focusEntry.certainty}% Intel`}
@@ -411,6 +519,7 @@ export default function ScoutingCenterV2NewLook({
                     entry={entry}
                     statusLabel="Kaufbereit"
                     statusTone="ready"
+                    radarAxes={getReadyRadarAxes(entry.playerId)}
                     onOpenPlayer={onOpenPlayer}
                     onOpenReport={() => {
                       onSelectReportPlayer?.(entry.playerId);
