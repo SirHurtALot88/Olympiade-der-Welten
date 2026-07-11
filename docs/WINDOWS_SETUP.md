@@ -41,6 +41,27 @@ zwingend. Für alle Funktionen (Prisma/Supabase-gestützte Teile) kopiere deine 
 `.env.local` vom Mac in den Projekt-Ordner auf dem PC (gleiches Verzeichnis wie diese Datei
 liegt im Repo-Root). Werte siehe `ENV_SETUP.md`. **Keine Passwörter in dieses Dokument.**
 
+## Schritt 4b — Spieler- und Team-Bilder anzeigen
+
+Die Bild-Zuordnungen speichern **absolute Mac-Pfade** aus der Original-Dropbox
+(`/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/...`).
+Auf dem Windows-PC existiert dieser Pfad nicht → ohne Einstellung siehst du nur
+Initialen statt Bildern.
+
+**Lösung:** In der `.env.local` (im Repo-Root) den lokalen Dropbox-Ordner angeben — also
+den Ordner, der `Chris\Olympiade der Welten\...` enthält:
+
+```env
+OLY_MEDIA_DROPBOX_ROOT=B:\Dropbox\Dropbox
+```
+
+(Beispiel für die Struktur `B:\Dropbox\Dropbox\Chris\Olympiade der Welten\Mark VI Cardgame\Spieler\...`.)
+
+Die App rechnet den Mac-Pfad dann automatisch auf deinen lokalen Ordner um. Wenn du die
+`.env.local` änderst, den Server einmal neu starten. Ist die Variable nicht gesetzt, bleibt
+alles wie auf dem Mac (unveränderte Pfade). Ein paar wenige Sonder-Portraits liegen außerhalb
+der Dropbox und bleiben ggf. als Initialen.
+
 ## Schritt 5 — Spielstand (Long-Run) übertragen
 
 Der Save wird als portables Backup-Paket übertragen.

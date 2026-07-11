@@ -20,6 +20,20 @@ const MIME_TYPE_BY_EXT: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+// Portrait/logo maps store absolute paths captured on the original macOS machine
+// (under the user's Dropbox). On other machines (e.g. Windows) set
+// OLY_MEDIA_DROPBOX_ROOT to the local Dropbox root so those Mac paths resolve to
+// the local copy. When unset (the macOS original), paths are used unchanged.
+const MAC_DROPBOX_PREFIX = "/Users/chrisfalk/Library/CloudStorage/Dropbox/";
+
+function resolveMediaSourcePath(sourcePath: string): string {
+  const root = process.env.OLY_MEDIA_DROPBOX_ROOT?.trim();
+  if (root && sourcePath.startsWith(MAC_DROPBOX_PREFIX)) {
+    return path.join(root, sourcePath.slice(MAC_DROPBOX_PREFIX.length));
+  }
+  return sourcePath;
+}
+
 function getVariantCachePath(kind: string, assetId: string, variant: MediaImageVariant, mtimeMs: number) {
   const cacheRoot = path.join(process.cwd(), ".cache", "media-thumbs", kind);
   return path.join(cacheRoot, `${assetId}-${variant}-${Math.floor(mtimeMs)}.${MEDIA_THUMB_FORMAT}`);
@@ -56,7 +70,8 @@ export async function serveMediaAsset(options: {
   sourcePath: string;
 }) {
   const variant: MediaImageVariant = parseMediaImageVariant(options.request);
-  const fileStat = await stat(options.sourcePath);
+  const sourcePath = resolveMediaSourcePath(options.sourcePath);
+  const fileStat = await stat(sourcePath);
   const mtimeToken = Math.floor(fileStat.mtimeMs);
 
   if (isResizedMediaVariant(variant)) {
@@ -73,7 +88,7 @@ export async function serveMediaAsset(options: {
       });
     }
 
-    const variantBuffer = await readOrCreateVariantBuffer(options.sourcePath, cachePath, variant);
+    const variantBuffer = await readOrCreateVariantBuffer(sourcePath, cachePath, variant);
 
     return new NextResponse(new Uint8Array(variantBuffer), {
       headers: {
@@ -96,8 +111,8 @@ export async function serveMediaAsset(options: {
     });
   }
 
-  const fileBuffer = await readFile(options.sourcePath);
-  const ext = path.extname(options.sourcePath).toLocaleLowerCase();
+  const fileBuffer = await readFile(sourcePath);
+  const ext = path.extname(sourcePath).toLocaleLowerCase();
   const mimeType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
 
   return new NextResponse(new Uint8Array(fileBuffer), {
