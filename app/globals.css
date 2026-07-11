@@ -53401,3 +53401,1366 @@ button.is-new-look .nl-thist-season-pill,
     transition: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Team-Profil (nl-teamprofile-*)
+   ------------------------------------------------------------
+   Flag-gated, additiv: greift nur unterhalb von `.is-new-look`
+   und nur für die NewLook-Variante der Team-Profil-Seite
+   (app/foundation/team-profile/TeamProfileNewLook.tsx).
+   Ohne Flag ändert sich an der bestehenden Seite nichts.
+   ============================================================ */
+.is-new-look .nl-teamprofile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+/* Anker-Wrapper für Scroll-Ziele der KPI-Chips */
+.is-new-look .nl-teamprofile-anchor {
+  scroll-margin-top: var(--nl-s5);
+}
+
+/* --- Hero: Crest + Identität + KPIs + Achsen/Radar ---------------- */
+.is-new-look .nl-teamprofile-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s5);
+  justify-content: space-between;
+}
+
+.is-new-look .nl-teamprofile-hero-identity {
+  display: flex;
+  gap: var(--nl-s4);
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1 1 480px;
+}
+
+.is-new-look .nl-teamprofile-crest {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  object-fit: contain;
+}
+
+.is-new-look .nl-teamprofile-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--nl-display);
+  font-size: 22px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamprofile-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-hero-name {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamprofile-hero-chips {
+  flex-wrap: wrap;
+}
+
+/* Vorsaison-Deltas unter den KPI-Chips */
+.is-new-look .nl-teamprofile-hero-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2) var(--nl-s3);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-hero-deltas-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-teamprofile-hero-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s1);
+}
+
+/* Rechte Hero-Spalte: Aktionen + Achsen-Ränge + Radar */
+.is-new-look .nl-teamprofile-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--nl-s3);
+  flex: 0 1 auto;
+}
+
+.is-new-look .nl-teamprofile-hero-actions {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamprofile-action {
+  padding: 7px 14px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-action:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-teamprofile-action.is-primary {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, var(--nl-line-2));
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-teamprofile-action:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-teamprofile-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  justify-content: flex-end;
+}
+
+.is-new-look .nl-teamprofile-axis {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 56px;
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 40%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teamprofile-axis-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-axis-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamprofile-radar-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamprofile-radar {
+  width: 190px;
+  max-width: 100%;
+}
+
+.is-new-look .nl-teamprofile-radar-caption {
+  font-size: 11px;
+  color: var(--nl-mut-2);
+}
+
+/* --- Allgemeine Bausteine (Zähler, Leerzustand, Playerlink) -------- */
+.is-new-look .nl-teamprofile-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  padding: 2px 10px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .nl-teamprofile-empty {
+  margin: 0;
+  padding: var(--nl-s3);
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-playerlink {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nl-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-teamprofile-playerlink.is-inline {
+  display: inline-flex;
+  color: var(--nl-accent);
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamprofile-playerlink:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-teamprofile-playername {
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamprofile-playermeta {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+/* --- Entwicklung: 4-Metrik-Raster + Saison-Chips ------------------- */
+.is-new-look .nl-teamprofile-development-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-development-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-development-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-teamprofile-development-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-development-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-teamprofile-development-spark {
+  width: 100%;
+  height: 40px;
+}
+
+.is-new-look .nl-teamprofile-development-bars {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.is-new-look .nl-teamprofile-development-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-development-seasons {
+  list-style: none;
+  margin: var(--nl-s4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamprofile-development-season {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s1) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-teamprofile-development-season.is-live {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-development-season-name {
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-development-season-live {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+/* --- Kader: Zusammenfassung, Portrait-Grid & Tabelle ---------------- */
+.is-new-look .nl-teamprofile-roster-summary {
+  margin: 0 0 var(--nl-s3);
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-demand-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamprofile-demand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-demand.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-teamprofile-demand.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, var(--nl-line-2));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamprofile-demand.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+/* Breite Inhalte scrollen im eigenen Rahmen — die Seite selbst nie. */
+.is-new-look .nl-teamprofile-table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .nl-teamprofile-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamprofile-table th {
+  position: sticky;
+  top: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+  border-bottom: 1px solid var(--nl-line-2);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-table th.nl-teamprofile-th-player,
+.is-new-look .nl-teamprofile-table th.nl-teamprofile-th-role,
+.is-new-look .nl-teamprofile-table th.nl-teamprofile-th-disciplines {
+  text-align: left;
+}
+
+.is-new-look .nl-teamprofile-table td {
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: right;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamprofile-table td.nl-teamprofile-td-player,
+.is-new-look .nl-teamprofile-table td.nl-teamprofile-td-role,
+.is-new-look .nl-teamprofile-table td.nl-teamprofile-td-disciplines {
+  text-align: left;
+}
+
+.is-new-look .nl-teamprofile-table-row {
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamprofile-table-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-table-row.is-contract-expiring td {
+  border-bottom-color: color-mix(in srgb, var(--nl-warn) 40%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-money-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-teamprofile-money-stack small {
+  font-size: 11px;
+}
+
+/* --- Board & Führung ------------------------------------------------ */
+.is-new-look .nl-teamprofile-lead-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-lead-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-lead-card.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 35%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-lead-card.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 35%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-lead-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-lead-card small {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-lead-bar {
+  width: 100%;
+}
+
+.is-new-look .nl-teamprofile-gm-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamprofile-gm-axes span {
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamprofile-gm-doctrine {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-relations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-relations-column {
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-relations-column.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 30%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-relations-column.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 30%, var(--nl-line));
+}
+
+.is-new-look .nl-teamprofile-relations-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--nl-s2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-relations-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamprofile-relations-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamprofile-relations-row em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-objectives {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-objective-category h4 {
+  margin: 0 0 var(--nl-s2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-objective-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamprofile-objective {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-objective-status {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-objective.is-good .nl-teamprofile-objective-status {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-teamprofile-objective.is-warn .nl-teamprofile-objective-status {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line-2));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamprofile-objective.is-risk .nl-teamprofile-objective-status {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamprofile-objective-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamprofile-objective-progress {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Transfers & Historie ------------------------------------------ */
+.is-new-look .nl-teamprofile-transfer-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+  margin-bottom: var(--nl-s4);
+}
+
+.is-new-look .nl-teamprofile-transfer-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamprofile-transfer-card > span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamprofile-transfer-card small {
+  color: var(--nl-mut);
+}
+
+/* Wiederverwendete Drawer-History-Tabelle: eigener Scroll-Rahmen. */
+.is-new-look .nl-teamprofile-history-shell {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 900px) {
+  .is-new-look .nl-teamprofile-hero {
+    flex-direction: column;
+  }
+
+  .is-new-look .nl-teamprofile-hero-side {
+    align-items: flex-start;
+  }
+
+  .is-new-look .nl-teamprofile-axes {
+    justify-content: flex-start;
+  }
+}
+
+/* --- Reduced Motion (nl-teamprofile) --------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-teamprofile-action,
+  .is-new-look .nl-teamprofile-table-row {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   NEUER LOOK — Team-Einstellungen (nl-teamsettings-*)
+   ------------------------------------------------------------
+   Flag-gated, additiv: greift nur unterhalb von `.is-new-look`
+   und nur für die NewLook-Variante des Team-Settings-Tabs
+   (app/foundation/team-settings/FoundationTeamSettingsNewLook.tsx).
+   Formular-lastige Seite: Feld-Raster, Kennzahl-Kacheln,
+   Team-Karten und Tabellen in eigenen Scroll-Rahmen.
+   ============================================================ */
+.is-new-look .nl-teamsettings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+/* --- Header-Karte ---------------------------------------------------- */
+.is-new-look .nl-teamsettings-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.is-new-look .nl-teamsettings-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+  flex: 1 1 480px;
+}
+
+.is-new-look .nl-teamsettings-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-title {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamsettings-header-chips {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-teamsettings-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  align-items: flex-start;
+}
+
+/* --- Karten & Unterbereiche ------------------------------------------ */
+.is-new-look .nl-teamsettings-card .nl-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-teamsettings-subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teamsettings-subpanel.is-nested {
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-teamsettings-subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  justify-content: space-between;
+}
+
+.is-new-look .nl-teamsettings-subhead h4 {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 16px;
+  color: var(--nl-ink);
+}
+
+/* --- Text-Bausteine --------------------------------------------------- */
+.is-new-look .nl-teamsettings-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  padding: 2px 10px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-hint.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamsettings-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamsettings-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-status.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-teamsettings-status.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line-2));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamsettings-status.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamsettings-status.is-info {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-teamsettings-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamsettings-msg {
+  margin: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teamsettings-msg strong {
+  margin-right: var(--nl-s2);
+}
+
+.is-new-look .nl-teamsettings-msg.is-good {
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-teamsettings-msg.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 45%, var(--nl-line));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamsettings-msg.is-risk {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamsettings-empty {
+  margin: 0;
+  padding: var(--nl-s3);
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* --- Buttons ---------------------------------------------------------- */
+.is-new-look .nl-teamsettings-btn {
+  padding: 7px 14px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamsettings-btn:hover:not(:disabled) {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-teamsettings-btn:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-teamsettings-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-teamsettings-btn.is-primary {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, var(--nl-line-2));
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-teamsettings-btn.is-danger {
+  border-color: color-mix(in srgb, var(--nl-risk) 60%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-teamsettings-btn.is-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-teamsettings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamsettings-actions.is-compact {
+  gap: var(--nl-s1);
+}
+
+/* --- Formularfelder ----------------------------------------------------
+   Ein Muster für alle Controls: Label oben, Control darunter. */
+.is-new-look .nl-teamsettings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.is-new-look .nl-teamsettings-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-field input,
+.is-new-look .nl-teamsettings-field select,
+.is-new-look .nl-teamsettings-field textarea {
+  padding: 7px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-family: inherit;
+  max-width: 100%;
+}
+
+.is-new-look .nl-teamsettings-field textarea {
+  resize: vertical;
+}
+
+.is-new-look .nl-teamsettings-field input:focus-visible,
+.is-new-look .nl-teamsettings-field select:focus-visible,
+.is-new-look .nl-teamsettings-field textarea:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-teamsettings-field input:disabled,
+.is-new-look .nl-teamsettings-field select:disabled,
+.is-new-look .nl-teamsettings-field textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-teamsettings-check {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 13px;
+  color: var(--nl-ink);
+  align-self: end;
+  padding-bottom: 7px;
+}
+
+.is-new-look .nl-teamsettings-check input:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-teamsettings-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nl-s3);
+  align-items: start;
+}
+
+.is-new-look .nl-teamsettings-field-grid.is-wide {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.is-new-look .nl-teamsettings-field-grid.is-selector {
+  grid-template-columns: minmax(220px, 1.3fr) minmax(200px, 1fr) auto auto;
+  align-items: end;
+}
+
+/* --- Kennzahl-Kacheln --------------------------------------------------- */
+.is-new-look .nl-teamsettings-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamsettings-metric.is-wide {
+  grid-column: 1 / -1;
+}
+
+.is-new-look .nl-teamsettings-metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-metric-value {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-teamsettings-metric-sub {
+  font-size: 12px;
+  color: var(--nl-mut);
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-teamsettings-metric-sub.is-warn {
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-teamsettings-savecontext {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+/* --- Team-Karten (Auswahl & Ownership) ---------------------------------- */
+.is-new-look .nl-teamsettings-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-team-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  text-align: left;
+  min-width: 0;
+}
+
+.is-new-look button.nl-teamsettings-team-card.is-selectable {
+  cursor: pointer;
+  font: inherit;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look button.nl-teamsettings-team-card.is-selectable:hover {
+  border-color: var(--nl-accent);
+  transform: translateY(-1px);
+}
+
+.is-new-look button.nl-teamsettings-team-card.is-selectable:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-teamsettings-team-card.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-teamsettings-team-card.is-owned-chris {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line));
+}
+
+.is-new-look .nl-teamsettings-team-card.is-owned-franky {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+}
+
+.is-new-look .nl-teamsettings-team-card strong {
+  font-size: 14px;
+}
+
+.is-new-look .nl-teamsettings-team-card span {
+  font-size: 12px;
+  color: var(--nl-mut);
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-teamsettings-team-card small {
+  font-size: 11px;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-teamsettings-team-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.is-new-look button.nl-teamsettings-team-card-main {
+  cursor: pointer;
+}
+
+.is-new-look button.nl-teamsettings-team-card-main:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-teamsettings-team-card-actions {
+  display: flex;
+  gap: var(--nl-s1);
+}
+
+/* --- Save-Liste ---------------------------------------------------------- */
+.is-new-look .nl-teamsettings-savelist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-save-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamsettings-save-card.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-teamsettings-save-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teamsettings-flag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+  margin: var(--nl-s1) 0;
+}
+
+/* --- Tabellen: eigener Scroll-Rahmen, Seite scrollt nie horizontal. ------ */
+.is-new-look .nl-teamsettings-table-shell {
+  overflow-x: auto;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  max-width: 100%;
+}
+
+.is-new-look .nl-teamsettings-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-teamsettings-table th {
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+  border-bottom: 1px solid var(--nl-line-2);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamsettings-table td {
+  padding: var(--nl-s2) var(--nl-s3);
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teamsettings-table tr.is-clickable {
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-teamsettings-table tr.is-clickable:hover {
+  background: var(--nl-panel-2);
+}
+
+/* --- GM-Panel im Team-Fokus ---------------------------------------------- */
+.is-new-look .nl-teamsettings-gm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-gm-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teamsettings-gm-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-teamsettings-gm-axes span {
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-teamsettings-gm-bias-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-teamsettings-gm-bias-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-teamsettings-gm-bias-row span {
+  flex: 1 1 auto;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-gm-bias-row small {
+  color: var(--nl-mut-2);
+}
+
+/* --- Legacy/Debug-Details -------------------------------------------------- */
+.is-new-look .nl-teamsettings-details {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  padding: var(--nl-s3);
+}
+
+.is-new-look .nl-teamsettings-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teamsettings-details summary:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-teamsettings-details > .nl-teamsettings-note {
+  margin: var(--nl-s2) 0;
+}
+
+.is-new-look .nl-teamsettings-details > .nl-teamsettings-field-grid {
+  margin-top: var(--nl-s3);
+}
+
+/* --- Responsive ------------------------------------------------------------ */
+@media (max-width: 900px) {
+  .is-new-look .nl-teamsettings-header {
+    flex-direction: column;
+  }
+
+  .is-new-look .nl-teamsettings-field-grid.is-selector {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+/* --- Reduced Motion (nl-teamsettings) --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-teamsettings-btn,
+  .is-new-look button.nl-teamsettings-team-card.is-selectable,
+  .is-new-look .nl-teamsettings-table tr.is-clickable {
+    transition: none;
+    transform: none;
+  }
+}
