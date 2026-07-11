@@ -62,12 +62,16 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlMedalBadge,
+  NlRankingDrawer,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
   type NlAxisKey,
+  type NlRankingDrawerRow,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import { NlAbilityStars } from "@/components/foundation/velo-ui/NlAbilityStars";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
@@ -107,6 +111,73 @@ const NL_PLAYERS_SCOPE_ITEMS: Array<{ id: PlayerTableScope; label: string }> = [
   { id: "free_agents", label: "Free Agents" },
   { id: "all", label: "Alle Spieler" },
 ];
+
+/** Verzeichnis (bestehende Tabelle) vs. Analyse-Hub (#47, additiv). */
+type NlPlayersView = "directory" | "hub";
+
+const NL_PLAYERS_VIEW_ITEMS: Array<{ id: NlPlayersView; label: string }> = [
+  { id: "directory", label: "Verzeichnis" },
+  { id: "hub", label: "Analyse-Hub" },
+];
+
+/**
+ * Kennzahlenkatalog des Hub-Leaderboards (#47). `pool` verweist auf den
+ * passenden `LeaguePlayerHeatPools`-Schlüssel für den echten ligaweiten Rang
+ * (nicht nur Rang innerhalb der aktuellen Auswahl) — MW und Potenzial haben
+ * keinen Heat-Pool, dort bleibt der Perzentil-Chip leer statt erfunden.
+ */
+type NlPhubMetricKey = "ovr" | "pps" | "mvs" | "mw" | "potential" | "pow" | "spe" | "men" | "soc";
+
+const NL_PHUB_METRICS: ReadonlyArray<{
+  key: NlPhubMetricKey;
+  label: string;
+  tone: NlTone;
+  digits: number;
+  pool?: Exclude<keyof LeaguePlayerHeatPools, "disciplines">;
+}> = [
+  { key: "ovr", label: "OVR", tone: "accent", digits: 1, pool: "ovr" },
+  { key: "pps", label: "PPs", tone: "spe", digits: 1, pool: "pps" },
+  { key: "mvs", label: "MVS", tone: "soc", digits: 1, pool: "mvs" },
+  { key: "mw", label: "Marktwert", tone: "neutral", digits: 2 },
+  { key: "potential", label: "Potenzial", tone: "good", digits: 0 },
+  { key: "pow", label: "POW", tone: "pow", digits: 0, pool: "pow" },
+  { key: "spe", label: "SPE", tone: "spe", digits: 0, pool: "spe" },
+  { key: "men", label: "MEN", tone: "men", digits: 0, pool: "men" },
+  { key: "soc", label: "SOC", tone: "soc", digits: 0, pool: "soc" },
+];
+
+/** Rohwert einer Hub-Kennzahl für eine Zeile — `null`, wenn nicht bekannt (keine Erfindung). */
+function getPhubMetricValue(row: FoundationPlayerScopeRow, metric: NlPhubMetricKey): number | null {
+  switch (metric) {
+    case "ovr":
+      return row.playerOvr;
+    case "pps":
+      return row.playerPps;
+    case "mvs":
+      return row.playerMvs;
+    case "mw":
+      return getPlayerDisplayMarketValue(row.player);
+    case "potential":
+      return row.player.potential != null && Number.isFinite(row.player.potential) ? row.player.potential : null;
+    case "pow":
+    case "spe":
+    case "men":
+    case "soc":
+      return row.player.coreStats[metric] ?? null;
+    default:
+      return null;
+  }
+}
+
+function formatPhubMetricValue(value: number | null, metric: { key: NlPhubMetricKey; digits: number }): string {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  if (metric.key === "mw") {
+    return formatLocalePoints(value, 2);
+  }
+  return formatNlNumber(value, metric.digits);
+}
 
 /** Gleiche MW-Brackets wie die alte Bracket-Leiste (Transfermarkt-Logik). */
 const NL_PLAYERS_BRACKETS: ReadonlyArray<{ bracket: number; range: string }> = [
@@ -247,6 +318,8 @@ export default function FoundationPlayersTableNewLook({
   const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_PAGE_SIZE);
   /** Welche Zeile ist gerade per PPs-Klick aufgeklappt (max. eine gleichzeitig). */
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  /** Verzeichnis (bestehende Tabelle) vs. ligaweiter Analyse-Hub (#47). */
+  const [playersView, setPlayersView] = useState<NlPlayersView>("directory");
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
@@ -856,6 +929,13 @@ export default function FoundationPlayersTableNewLook({
           </div>
         }
       >
+        <NlSubTabs
+          items={NL_PLAYERS_VIEW_ITEMS}
+          activeId={playersView}
+          onSelect={(id) => setPlayersView(id as NlPlayersView)}
+          aria-label="Spieler-Ansicht"
+          className="nl-phub-view-tabs"
+        />
         <div className="nl-players-header-row">
           <NlSubTabs
             items={NL_PLAYERS_SCOPE_ITEMS.map((item) => ({ id: item.id, label: item.label }))}
@@ -891,62 +971,74 @@ export default function FoundationPlayersTableNewLook({
             />
           </StatChipRow>
         </div>
-        <StatChipRow label="Leader" className="nl-players-leader-chips" aria-label="Leader der Auswahl">
-          {renderLeaderChip(
-            "Top OVR",
-            summary.topOvr,
-            summary.topOvr?.playerOvr ?? null,
-            leaguePlayerHeatPools.ovr,
-            "accent",
-            1,
-            "Bestes Overall-Rating der Auswahl",
-          )}
-          {renderLeaderChip(
-            "Top PPs",
-            summary.topPps,
-            summary.topPps?.playerPps ?? null,
-            leaguePlayerHeatPools.pps,
-            "spe",
-            1,
-            "Meiste Performance-Punkte der Auswahl",
-          )}
-          {renderLeaderChip(
-            "Top MVS",
-            summary.topMvs,
-            summary.topMvs?.playerMvs ?? null,
-            leaguePlayerHeatPools.mvs,
-            "soc",
-            1,
-            "Bester Market Value Score der Auswahl",
-          )}
-          {renderLeaderChip(
-            "Top MW",
-            summary.topMw,
-            summary.topMwValue,
-            [],
-            "neutral",
-            2,
-            "Höchster Marktwert der Auswahl",
-          )}
-        </StatChipRow>
-        <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl">
-          <NlBarChart
-            bars={NL_PLAYERS_BRACKETS.map(({ bracket }) => ({
-              label: `B${bracket}`,
-              value: playerBracketCounts[bracket] ?? 0,
-              tone: "accent",
-            }))}
-            format={(value) => formatNlNumber(value, 0)}
-            aria-label="Marktwert-Brackets der Auswahl (Spieleranzahl je Bracket)"
-            className="nl-ptable-bracket-barchart"
-          />
-          <p className="nl-ptable-bracket-legend">
-            {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => `B${bracket} ${range}`).join(" · ")}
-          </p>
-        </div>
+        {playersView === "directory" ? (
+          <>
+            <StatChipRow label="Leader" className="nl-players-leader-chips" aria-label="Leader der Auswahl">
+              {renderLeaderChip(
+                "Top OVR",
+                summary.topOvr,
+                summary.topOvr?.playerOvr ?? null,
+                leaguePlayerHeatPools.ovr,
+                "accent",
+                1,
+                "Bestes Overall-Rating der Auswahl",
+              )}
+              {renderLeaderChip(
+                "Top PPs",
+                summary.topPps,
+                summary.topPps?.playerPps ?? null,
+                leaguePlayerHeatPools.pps,
+                "spe",
+                1,
+                "Meiste Performance-Punkte der Auswahl",
+              )}
+              {renderLeaderChip(
+                "Top MVS",
+                summary.topMvs,
+                summary.topMvs?.playerMvs ?? null,
+                leaguePlayerHeatPools.mvs,
+                "soc",
+                1,
+                "Bester Market Value Score der Auswahl",
+              )}
+              {renderLeaderChip(
+                "Top MW",
+                summary.topMw,
+                summary.topMwValue,
+                [],
+                "neutral",
+                2,
+                "Höchster Marktwert der Auswahl",
+              )}
+            </StatChipRow>
+            <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl">
+              <NlBarChart
+                bars={NL_PLAYERS_BRACKETS.map(({ bracket }) => ({
+                  label: `B${bracket}`,
+                  value: playerBracketCounts[bracket] ?? 0,
+                  tone: "accent",
+                }))}
+                format={(value) => formatNlNumber(value, 0)}
+                aria-label="Marktwert-Brackets der Auswahl (Spieleranzahl je Bracket)"
+                className="nl-ptable-bracket-barchart"
+              />
+              <p className="nl-ptable-bracket-legend">
+                {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => `B${bracket} ${range}`).join(" · ")}
+              </p>
+            </div>
+          </>
+        ) : null}
       </NlCard>
 
-      {rows.length === 0 ? (
+      {playersView === "hub" ? (
+        <FoundationPlayersHub
+          rows={rows}
+          gameState={gameState}
+          leaguePlayerHeatPools={leaguePlayerHeatPools}
+          openPlayerDrawerById={openPlayerDrawerById}
+          openTeamProfileById={openTeamProfileById}
+        />
+      ) : rows.length === 0 ? (
         <NlCard className="nl-players-empty-card">
           <p className="nl-players-empty-text">
             Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen.
@@ -1012,6 +1104,486 @@ export default function FoundationPlayersTableNewLook({
           </p>
         </NlCard>
       )}
+    </div>
+  );
+}
+
+/**
+ * Ligaweiter Analyse-/Ranking-Hub (#47, additiv, "Neuer Look").
+ *
+ * Zweite Ansicht neben dem bestehenden Spieler-Verzeichnis (Toggle über
+ * `NL_PLAYERS_VIEW_ITEMS` oben) — dieselben `rows` wie die Tabelle
+ * (respektiert also Umfang-/Team-/Klassen-Filter genau wie die
+ * Leader-Chips/Bracket-Leiste im Verzeichnis), nur als Leaderboard- und
+ * Analyse-Lens statt Zeilentabelle. Es wird kein zusätzlicher, ungefilterter
+ * Liga-Pool angenommen, der dieser Komponente nicht als Prop vorliegt.
+ *
+ * Kacheln:
+ * - Leaderboard: wählbare Kennzahl (OVR/PPs/MVS/MW/Potenzial/POW/SPE/MEN/SOC),
+ *   Top 10 der Auswahl mit Medaillen für die ersten drei, eigene Spieler
+ *   (`team.humanControlled`) markiert, Perzentil-Chip aus dem echten
+ *   ligaweiten Heat-Pool (`leaguePlayerHeatPools`) wo vorhanden. "Volle
+ *   Rangliste" öffnet `NlRankingDrawer` mit der kompletten Auswahl-Rangliste.
+ * - Bestes Preis-Leistungs-Verhältnis: OVR pro investierter Marktwert-Million
+ *   (`getPlayerDisplayMarketValue`), Top 5 Schnäppchen.
+ * - Auf-/Absteiger: Marktwert-Delta gegenüber der Baseline
+ *   (`getPlayerDisplayMarketValueDelta`, dieselbe Quelle wie die
+ *   Delta-Chips in der Tabellenzeile), Top 5 je Richtung.
+ * - Größtes Potenzial-Polster: `player.potential − playerOvr`, Top 5.
+ * - Spezialisierungs-Verteilung: Anzahl Spieler je stärkster Disziplin
+ *   (`row.bestDiscipline`, dieselbe Quelle wie die "Beste Diszi"-Spalte).
+ *
+ * Bewusst weggelassen: keine Alters-/Entwicklungskurve — `Player` trägt kein
+ * Altersfeld, daher tritt das Potenzial-Polster (CA→PO-Abstand) an dessen
+ * Stelle als echte, im Datenmodell vorhandene Entwicklungs-Kennzahl.
+ */
+function FoundationPlayersHub({
+  rows,
+  gameState,
+  leaguePlayerHeatPools,
+  openPlayerDrawerById,
+  openTeamProfileById,
+}: {
+  rows: FoundationPlayerScopeRow[];
+  gameState: GameState;
+  leaguePlayerHeatPools: LeaguePlayerHeatPools;
+  openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
+  openTeamProfileById: (teamId: string) => void;
+}) {
+  const [metric, setMetric] = useState<NlPhubMetricKey>("ovr");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerHighlightId, setDrawerHighlightId] = useState<string | null>(null);
+
+  const activeMetric = NL_PHUB_METRICS.find((entry) => entry.key === metric) ?? NL_PHUB_METRICS[0];
+  const activePool = activeMetric.pool ? leaguePlayerHeatPools[activeMetric.pool] : [];
+
+  const rankedRows = useMemo(() => {
+    const withValue = rows
+      .map((row) => ({ row, value: getPhubMetricValue(row, metric) }))
+      .filter((entry): entry is { row: FoundationPlayerScopeRow; value: number } => entry.value != null);
+    withValue.sort((left, right) => right.value - left.value);
+    return withValue.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }, [rows, metric]);
+
+  const topBoardRows = rankedRows.slice(0, 10);
+
+  const ownBoardEntry = useMemo(
+    () => rankedRows.find((entry) => entry.row.team?.humanControlled) ?? null,
+    [rankedRows],
+  );
+
+  const drawerRows: NlRankingDrawerRow[] = useMemo(
+    () =>
+      rankedRows.map(({ row, value, rank }) => ({
+        id: row.player.id,
+        rank,
+        name: row.player.name,
+        sub: row.team?.name ?? "Free Agent",
+        value,
+        displayValue: formatPhubMetricValue(value, activeMetric),
+        tone: activeMetric.tone,
+        isOwn: row.team?.humanControlled ?? false,
+      })),
+    [rankedRows, activeMetric],
+  );
+
+  function openDrawer(highlightId?: string | null) {
+    setDrawerOpen(true);
+    setDrawerHighlightId(highlightId ?? null);
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+    setDrawerHighlightId(null);
+  }
+
+  /** Bestes Preis-Leistungs-Verhältnis: OVR je investierter Marktwert-Million. */
+  const valueRows = useMemo(() => {
+    return rows
+      .map((row) => {
+        const mw = getPlayerDisplayMarketValue(row.player);
+        const ovr = row.playerOvr;
+        if (mw == null || !Number.isFinite(mw) || mw <= 0 || ovr == null || !Number.isFinite(ovr)) {
+          return null;
+        }
+        return { row, mw, ovr, ratio: ovr / mw };
+      })
+      .filter(
+        (entry): entry is { row: FoundationPlayerScopeRow; mw: number; ovr: number; ratio: number } =>
+          entry != null,
+      )
+      .sort((left, right) => right.ratio - left.ratio);
+  }, [rows]);
+  const topValueRows = valueRows.slice(0, 5);
+  const medianRatio = valueRows.length > 0 ? valueRows[Math.floor(valueRows.length / 2)]!.ratio : null;
+
+  /** Marktwert-Bewegung gegenüber der Baseline — dieselbe Quelle wie die Delta-Chips in der Tabelle. */
+  const movers = useMemo(() => {
+    return rows
+      .map((row) => {
+        const delta = getPlayerDisplayMarketValueDelta(row.player, row.roster, gameState);
+        if (delta == null || delta === 0 || !Number.isFinite(delta)) {
+          return null;
+        }
+        return { row, delta };
+      })
+      .filter((entry): entry is { row: FoundationPlayerScopeRow; delta: number } => entry != null);
+  }, [rows, gameState]);
+  const risers = useMemo(
+    () => movers.filter((entry) => entry.delta > 0).sort((left, right) => right.delta - left.delta).slice(0, 5),
+    [movers],
+  );
+  const fallers = useMemo(
+    () => movers.filter((entry) => entry.delta < 0).sort((left, right) => left.delta - right.delta).slice(0, 5),
+    [movers],
+  );
+
+  /** Größtes Potenzial-Polster: PO minus aktuelles OVR. */
+  const headroomRows = useMemo(() => {
+    return rows
+      .map((row) => {
+        const potential = row.player.potential;
+        const ovr = row.playerOvr;
+        if (potential == null || !Number.isFinite(potential) || ovr == null || !Number.isFinite(ovr)) {
+          return null;
+        }
+        const headroom = potential - ovr;
+        if (headroom <= 0) {
+          return null;
+        }
+        return { row, potential, ovr, headroom };
+      })
+      .filter(
+        (entry): entry is { row: FoundationPlayerScopeRow; potential: number; ovr: number; headroom: number } =>
+          entry != null,
+      )
+      .sort((left, right) => right.headroom - left.headroom)
+      .slice(0, 5);
+  }, [rows]);
+
+  /** Spezialisierungs-Verteilung nach stärkster Disziplin ("Beste Diszi"). */
+  const disciplineCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.bestDiscipline) {
+        continue;
+      }
+      counts.set(row.bestDiscipline, (counts.get(row.bestDiscipline) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((left, right) => right[1] - left[1]);
+  }, [rows]);
+  const scarcestDiscipline = disciplineCounts.length > 0 ? disciplineCounts[disciplineCounts.length - 1]! : null;
+
+  return (
+    <div className="nl-phub" data-testid="nl-players-hub">
+      <NlCard
+        className="nl-phub-board-card"
+        eyebrow="Ranking · aktuelle Auswahl"
+        title="Liga-Leaderboard"
+        actions={
+          <div className="nl-phub-metric-bar" role="group" aria-label="Kennzahl wählen">
+            {NL_PHUB_METRICS.map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                className={`nl-phub-metric-btn ${nlToneClass(entry.tone)}${metric === entry.key ? " is-active" : ""}`}
+                onClick={() => setMetric(entry.key)}
+                aria-pressed={metric === entry.key}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        {topBoardRows.length === 0 ? (
+          <p className="nl-phub-empty">Keine Werte für {activeMetric.label} in der aktuellen Auswahl.</p>
+        ) : (
+          <>
+            <StatChipRow className="nl-phub-board-stats" aria-label={`Kennzahlen ${activeMetric.label}`}>
+              <StatChip
+                label={`Spitze · ${activeMetric.label}`}
+                value={formatPhubMetricValue(topBoardRows[0]!.value, activeMetric)}
+                sub={topBoardRows[0]!.row.player.name}
+                tone={activeMetric.tone}
+                onClick={() => openPlayerDrawerById(topBoardRows[0]!.row.player.id, topBoardRows[0]!.row.roster?.id)}
+                title={`Beste(r) ${activeMetric.label} der Auswahl — ${topBoardRows[0]!.row.player.name} öffnen`}
+              />
+              {ownBoardEntry ? (
+                <StatChip
+                  label="Bester eigener Spieler"
+                  value={formatPhubMetricValue(ownBoardEntry.value, activeMetric)}
+                  sub={`${ownBoardEntry.row.player.name} · Rang ${formatNlNumber(ownBoardEntry.rank, 0)}`}
+                  tone="accent"
+                  onClick={() => openPlayerDrawerById(ownBoardEntry.row.player.id, ownBoardEntry.row.roster?.id)}
+                  title={`${activeMetric.label} — ${ownBoardEntry.row.player.name} öffnen`}
+                />
+              ) : null}
+              <StatChip
+                label="Volle Rangliste"
+                value={formatNlNumber(rankedRows.length, 0)}
+                sub="Spieler in Auswahl"
+                tone="neutral"
+                onClick={() => openDrawer(ownBoardEntry?.row.player.id ?? topBoardRows[0]?.row.player.id ?? null)}
+                title={`Vollständige ${activeMetric.label}-Rangliste der aktuellen Auswahl öffnen`}
+              />
+            </StatChipRow>
+            <ol className={`nl-phub-board-list ${nlToneClass(activeMetric.tone)}`} aria-label={`Top ${activeMetric.label}`}>
+              {topBoardRows.map(({ row, value, rank }) => {
+                const medalKind = rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : null;
+                const isOwn = row.team?.humanControlled ?? false;
+                const leagueRank = activeMetric.pool ? getLeagueRank(value, activePool) : null;
+                const percentileLabel = activeMetric.pool ? formatLeaguePercentile(leagueRank, activePool.length) : null;
+                const percentileTone = activeMetric.pool ? getPoolHeatTone(value, activePool) : "neutral";
+                return (
+                  <li key={row.player.id} className={`nl-phub-board-row${isOwn ? " is-own" : ""}`}>
+                    <span className="nl-phub-board-rank">
+                      {medalKind ? (
+                        <NlMedalBadge kind={medalKind} title={`Rang ${rank}`} />
+                      ) : (
+                        <span className="nl-phub-board-ranknum nl-tnum">{rank}</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      className="nl-phub-board-name-btn"
+                      onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
+                      title={`${row.player.name} öffnen`}
+                    >
+                      {row.player.name}
+                      {isOwn ? <span className="nl-phub-own-tag">Dein Spieler</span> : null}
+                    </button>
+                    {row.team ? (
+                      <button
+                        type="button"
+                        className="nl-phub-board-team-btn"
+                        onClick={() => openTeamProfileById(row.team!.teamId)}
+                        title={`${row.team.name} öffnen`}
+                      >
+                        {row.team.name}
+                      </button>
+                    ) : (
+                      <span className="nl-phub-board-team-btn is-free-agent">Free Agent</span>
+                    )}
+                    <span className={`nl-phub-board-value nl-tnum ${nlToneClass(activeMetric.tone)}`}>
+                      {formatPhubMetricValue(value, activeMetric)}
+                    </span>
+                    {percentileLabel ? (
+                      <span
+                        className={`nl-phub-board-percentile ${nlToneClass(percentileTone)}`}
+                        title={`Liga-Perzentil: ${percentileLabel} (Rang #${leagueRank} von ${activePool.length})`}
+                      >
+                        {percentileLabel}
+                      </span>
+                    ) : (
+                      <span className="nl-phub-board-percentile is-empty" aria-hidden="true" />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </>
+        )}
+      </NlCard>
+
+      <div className="nl-phub-grid">
+        <NlCard className="nl-phub-value-card" eyebrow="Kader-Ökonomie" title="Bestes Preis-Leistungs-Verhältnis">
+          {topValueRows.length === 0 ? (
+            <p className="nl-phub-empty">Keine Marktwert-/OVR-Daten in der aktuellen Auswahl.</p>
+          ) : (
+            <>
+              <StatChipRow aria-label="Preis-Leistungs-Überblick">
+                <StatChip
+                  label="Bestes Verhältnis"
+                  value={`${formatNlNumber(topValueRows[0]!.ratio, 2)} OVR/M`}
+                  sub={topValueRows[0]!.row.player.name}
+                  tone="good"
+                  onClick={() => openPlayerDrawerById(topValueRows[0]!.row.player.id, topValueRows[0]!.row.roster?.id)}
+                  title="OVR pro investierter Marktwert-Million — bester Wert der Auswahl"
+                />
+                {medianRatio != null ? (
+                  <StatChip
+                    label="Median Auswahl"
+                    value={`${formatNlNumber(medianRatio, 2)} OVR/M`}
+                    tone="neutral"
+                    title="Median OVR pro Marktwert-Million über die Auswahl"
+                  />
+                ) : null}
+              </StatChipRow>
+              <ol className="nl-phub-list" aria-label="Top Preis-Leistungs-Spieler">
+                {topValueRows.map(({ row, mw, ovr, ratio }, index) => (
+                  <li key={row.player.id} className="nl-phub-list-row">
+                    <span className="nl-phub-list-rank nl-tnum">{index + 1}</span>
+                    <button
+                      type="button"
+                      className="nl-phub-list-name-btn"
+                      onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
+                      title={`${row.player.name} öffnen`}
+                    >
+                      {row.player.name}
+                    </button>
+                    {row.team ? (
+                      <button
+                        type="button"
+                        className="nl-phub-list-team-btn"
+                        onClick={() => openTeamProfileById(row.team!.teamId)}
+                        title={`${row.team.name} öffnen`}
+                      >
+                        {row.team.name}
+                      </button>
+                    ) : (
+                      <span className="nl-phub-list-team-btn is-free-agent">Free Agent</span>
+                    )}
+                    <span className="nl-phub-list-metrics">
+                      <span className="nl-tnum">{formatNlNumber(ovr, 1)} OVR</span>
+                      <span className="nl-tnum">{formatLocalePoints(mw, 2)} MW</span>
+                      <span className={`nl-phub-list-ratio nl-tnum ${nlToneClass("good")}`}>
+                        {formatNlNumber(ratio, 2)} OVR/M
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </NlCard>
+
+        <NlCard className="nl-phub-movers-card" eyebrow="Marktwert-Bewegung" title="Auf- und Absteiger">
+          {movers.length === 0 ? (
+            <p className="nl-phub-empty">Keine Marktwert-Bewegung gegenüber der Baseline in der aktuellen Auswahl.</p>
+          ) : (
+            <div className="nl-phub-movers-grid">
+              <div className="nl-phub-movers-col">
+                <span className="nl-phub-movers-col-label">Aufsteiger</span>
+                {risers.length === 0 ? (
+                  <p className="nl-phub-empty-inline">Keine Aufsteiger in der Auswahl.</p>
+                ) : (
+                  <ol className="nl-phub-list">
+                    {risers.map(({ row, delta }) => (
+                      <li key={row.player.id} className="nl-phub-list-row">
+                        <button
+                          type="button"
+                          className="nl-phub-list-name-btn"
+                          onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
+                          title={`${row.player.name} öffnen`}
+                        >
+                          {row.player.name}
+                        </button>
+                        <NlDeltaChip
+                          value={delta}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                          title="Marktwert-Entwicklung gegenüber der Baseline"
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+              <div className="nl-phub-movers-col">
+                <span className="nl-phub-movers-col-label">Absteiger</span>
+                {fallers.length === 0 ? (
+                  <p className="nl-phub-empty-inline">Keine Absteiger in der Auswahl.</p>
+                ) : (
+                  <ol className="nl-phub-list">
+                    {fallers.map(({ row, delta }) => (
+                      <li key={row.player.id} className="nl-phub-list-row">
+                        <button
+                          type="button"
+                          className="nl-phub-list-name-btn"
+                          onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
+                          title={`${row.player.name} öffnen`}
+                        >
+                          {row.player.name}
+                        </button>
+                        <NlDeltaChip
+                          value={delta}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 2)}`}
+                          title="Marktwert-Entwicklung gegenüber der Baseline"
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </div>
+          )}
+        </NlCard>
+
+        <NlCard className="nl-phub-potential-card" eyebrow="Entwicklung" title="Größtes Potenzial-Polster">
+          {headroomRows.length === 0 ? (
+            <p className="nl-phub-empty">Keine Spieler mit Potenzial über dem aktuellen OVR in der Auswahl.</p>
+          ) : (
+            <ol className="nl-phub-list">
+              {headroomRows.map(({ row, ovr, potential, headroom }, index) => (
+                <li key={row.player.id} className="nl-phub-list-row">
+                  <span className="nl-phub-list-rank nl-tnum">{index + 1}</span>
+                  <button
+                    type="button"
+                    className="nl-phub-list-name-btn"
+                    onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
+                    title={`${row.player.name} öffnen`}
+                  >
+                    {row.player.name}
+                  </button>
+                  {row.team ? (
+                    <button
+                      type="button"
+                      className="nl-phub-list-team-btn"
+                      onClick={() => openTeamProfileById(row.team!.teamId)}
+                      title={`${row.team.name} öffnen`}
+                    >
+                      {row.team.name}
+                    </button>
+                  ) : (
+                    <span className="nl-phub-list-team-btn is-free-agent">Free Agent</span>
+                  )}
+                  <span className="nl-phub-list-metrics">
+                    <span className="nl-tnum">{formatNlNumber(ovr, 1)} OVR</span>
+                    <span className="nl-tnum">{formatNlNumber(potential, 0)} PO</span>
+                    <span className={`nl-phub-list-ratio nl-tnum ${nlToneClass("good")}`}>
+                      +{formatNlNumber(headroom, 1)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </NlCard>
+
+        <NlCard className="nl-phub-scarcity-card" eyebrow="Beste Disziplin" title="Spezialisierungs-Verteilung">
+          {disciplineCounts.length === 0 ? (
+            <p className="nl-phub-empty">Keine "Beste Diszi"-Daten in der aktuellen Auswahl.</p>
+          ) : (
+            <>
+              <div className="nl-phub-scarcity-chart-scroll">
+                <NlBarChart
+                  bars={disciplineCounts.map(([label, value]) => ({ label, value, tone: "accent" as const }))}
+                  format={(value) => formatNlNumber(value, 0)}
+                  aria-label="Anzahl Spieler je stärkster Disziplin"
+                  className="nl-phub-scarcity-chart"
+                />
+              </div>
+              {scarcestDiscipline ? (
+                <p className="nl-phub-hint">
+                  Seltenste Spezialisierung in der Auswahl: <strong>{scarcestDiscipline[0]}</strong> (
+                  {formatNlNumber(scarcestDiscipline[1], 0)} Spieler).
+                </p>
+              ) : null}
+            </>
+          )}
+        </NlCard>
+      </div>
+
+      <NlRankingDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        metricLabel={activeMetric.label}
+        metricKey={metric}
+        subtitle="Rangliste der aktuellen Auswahl (Umfang-/Team-/Klassenfilter)"
+        rows={drawerRows}
+        highlightId={drawerHighlightId}
+        onSelectRow={(row) => openPlayerDrawerById(row.id)}
+      />
     </div>
   );
 }
