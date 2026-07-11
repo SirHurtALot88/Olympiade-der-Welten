@@ -7,6 +7,7 @@ import {
   NlCard,
   NlMedalBadge,
   NlProgressBar,
+  NlRadar,
   StatChip,
   formatNlNumber,
   nlToneClass,
@@ -56,8 +57,22 @@ export default function FoundationRanksNewLook({
   openTeamProfileById,
 }: FoundationRanksPanelProps) {
   const [metric, setMetric] = useState<NlRanksMetric>("total");
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
 
   const activeMetric = NL_RANKS_METRICS.find((entry) => entry.id === metric) ?? NL_RANKS_METRICS[0];
+
+  const areaRadarMax = useMemo(() => {
+    let max = 1;
+    for (const row of sortedPpAreaRows) {
+      for (const areaId of ["pow", "spe", "men", "soc"] as const) {
+        const value = row.pps[areaId];
+        if (Number.isFinite(value) && value > max) {
+          max = value;
+        }
+      }
+    }
+    return max;
+  }, [sortedPpAreaRows]);
 
   const rankedRows = useMemo(() => {
     const rows = [...sortedPpAreaRows].sort((left, right) => {
@@ -113,14 +128,17 @@ export default function FoundationRanksNewLook({
             const medalKind =
               displayRank === 1 ? "gold" : displayRank === 2 ? "silver" : displayRank === 3 ? "bronze" : null;
 
+            const isExpanded = expandedTeamId === row.team.teamId;
+            const radarAxes = (["pow", "spe", "men", "soc"] as const).map((areaId) => ({
+              key: areaId,
+              value: row.pps[areaId],
+            }));
+
             return (
               <li key={row.team.teamId}>
-                <button
-                  type="button"
-                  className={`nl-ranks-row${medalKind ? " is-podium" : ""}`}
+                <div
+                  className={`nl-ranks-row${medalKind ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
                   style={getSeasonV2TeamTagStyle(row.team.shortCode)}
-                  onClick={() => openTeamProfileById(row.team.teamId)}
-                  title={`${row.team.name} öffnen`}
                 >
                   <span className="nl-ranks-rank">
                     {medalKind ? (
@@ -129,7 +147,12 @@ export default function FoundationRanksNewLook({
                       <span className="nl-ranks-ranknum nl-tnum">{displayRank}</span>
                     )}
                   </span>
-                  <span className="nl-ranks-team">
+                  <button
+                    type="button"
+                    className="nl-ranks-team"
+                    onClick={() => openTeamProfileById(row.team.teamId)}
+                    title={`${row.team.name} öffnen`}
+                  >
                     <BudgetedMediaImage
                       src={logo.src}
                       alt={`${row.team.name} Logo`}
@@ -143,7 +166,7 @@ export default function FoundationRanksNewLook({
                       <span className="nl-ranks-teamname">{row.team.name}</span>
                       <span className="nl-ranks-teamcode">{row.team.shortCode}</span>
                     </span>
-                  </span>
+                  </button>
                   <span className="nl-ranks-value">
                     <span className="nl-ranks-value-number nl-tnum">
                       {formatNlNumber(value, 1)}
@@ -173,12 +196,39 @@ export default function FoundationRanksNewLook({
                         label={NL_AXIS_LABELS[areaId]}
                         value={formatNlNumber(row.pps[areaId], 0)}
                         tone={areaId}
+                        onClick={() => setMetric(areaId)}
                         className={`nl-ranks-area-chip${metric === areaId ? " is-active" : ""}`}
-                        title={`${NL_AXIS_LABELS[areaId]}: ${formatNlNumber(row.pps[areaId], 1)} PPs`}
+                        title={`Nach ${NL_AXIS_LABELS[areaId]} sortieren · ${formatNlNumber(row.pps[areaId], 1)} PPs`}
                       />
                     ))}
                   </span>
-                </button>
+                  <button
+                    type="button"
+                    className="nl-ranks-expand-toggle"
+                    aria-expanded={isExpanded}
+                    aria-controls={`nl-ranks-details-${row.team.teamId}`}
+                    onClick={() =>
+                      setExpandedTeamId((current) => (current === row.team.teamId ? null : row.team.teamId))
+                    }
+                    title={isExpanded ? "Stärkeprofil schließen" : "Stärkeprofil zeigen"}
+                  >
+                    {isExpanded ? "▾" : "▸"}
+                  </button>
+                </div>
+                {isExpanded ? (
+                  <div className="nl-ranks-expand" id={`nl-ranks-details-${row.team.teamId}`}>
+                    <span className="nl-ranks-expand-label">Stärkeprofil (POW · SPE · MEN · SOC)</span>
+                    <NlRadar
+                      axes={radarAxes}
+                      max={areaRadarMax}
+                      showValues
+                      aria-label={`Stärkeprofil ${row.team.name}: ${radarAxes
+                        .map((axis) => `${NL_AXIS_LABELS[axis.key]} ${formatNlNumber(axis.value, 0)}`)
+                        .join(", ")}`}
+                      className="nl-ranks-radar"
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}

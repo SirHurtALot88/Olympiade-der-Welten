@@ -8,6 +8,7 @@ import {
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
+  NlRadar,
   NlSparkline,
   NlSubTabs,
   StatChip,
@@ -50,6 +51,40 @@ const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string }> = [
   { id: "daten", label: "Daten" },
 ];
 
+/** Board-Sortierung: nach Rang oder nach einem der vier Bereiche. */
+type NlBoardSortKey = "rank" | SeasonDisciplineAreaId;
+
+const NL_BOARD_SORT_ITEMS: Array<{ id: NlBoardSortKey; label: string }> = [
+  { id: "rank", label: "Rang" },
+  ...SEASON_DISCIPLINE_AREA_GROUPS.map((group) => ({ id: group.id, label: group.label })),
+];
+
+/** Spalten der Daten-Tabelle, die per Klick sortierbar sind. */
+type NlTableSortKey = "rank" | "team" | "points" | "bonus" | SeasonDisciplineAreaId | "mw";
+
+function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): number | string {
+  switch (key) {
+    case "rank":
+      return row.rank != null && Number.isFinite(row.rank) ? row.rank : Number.POSITIVE_INFINITY;
+    case "team":
+      return row.teamName;
+    case "points":
+      return row.points != null && Number.isFinite(row.points) ? row.points : Number.NEGATIVE_INFINITY;
+    case "bonus": {
+      const bonus = row.disciplineValues.bonuspunkte;
+      return bonus != null && Number.isFinite(bonus) ? bonus : Number.NEGATIVE_INFINITY;
+    }
+    case "mw":
+      return row.marketValueTotal != null && Number.isFinite(row.marketValueTotal)
+        ? row.marketValueTotal
+        : Number.NEGATIVE_INFINITY;
+    default: {
+      const value = getAreaValue(row, key);
+      return value != null && Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+    }
+  }
+}
+
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
@@ -84,14 +119,61 @@ export default function SeasonStandingsNewLook({
   seasonOptions,
   selectedTeamSummary,
   standingsRows,
+  topPlayers,
   onChangeSeason,
   onOpenTeam,
+  onOpenPlayer,
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const [mode, setMode] = useState<NlStandingsMode>("board");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [boardSort, setBoardSort] = useState<NlBoardSortKey>("rank");
+  const [tableSort, setTableSort] = useState<{ key: NlTableSortKey; dir: "asc" | "desc" }>({
+    key: "rank",
+    dir: "asc",
+  });
 
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
+
+  const displayBoardRows = useMemo(() => {
+    if (boardSort === "rank") {
+      return boardRows;
+    }
+    return [...boardRows].sort((left, right) => {
+      const leftValue = getAreaValue(left, boardSort);
+      const rightValue = getAreaValue(right, boardSort);
+      const delta =
+        (rightValue != null && Number.isFinite(rightValue) ? rightValue : Number.NEGATIVE_INFINITY) -
+        (leftValue != null && Number.isFinite(leftValue) ? leftValue : Number.NEGATIVE_INFINITY);
+      if (delta !== 0) {
+        return delta;
+      }
+      return left.teamName.localeCompare(right.teamName, "de-DE");
+    });
+  }, [boardRows, boardSort]);
+
+  const sortedTableRows = useMemo(() => {
+    const direction = tableSort.dir === "asc" ? 1 : -1;
+    return [...boardRows].sort((left, right) => {
+      const leftValue = getTableSortValue(left, tableSort.key);
+      const rightValue = getTableSortValue(right, tableSort.key);
+      let result =
+        typeof leftValue === "string" || typeof rightValue === "string"
+          ? String(leftValue).localeCompare(String(rightValue), "de-DE")
+          : leftValue - rightValue;
+      if (result === 0) {
+        result = (left.rank ?? Number.POSITIVE_INFINITY) - (right.rank ?? Number.POSITIVE_INFINITY);
+      }
+      return result * direction;
+    });
+  }, [boardRows, tableSort]);
+
+  const podiumRows = useMemo(
+    () => boardRows.filter((row) => row.rank != null && row.rank >= 1 && row.rank <= 3).slice(0, 3),
+    [boardRows],
+  );
+
+  const topPlayersStrip = useMemo(() => topPlayers.slice(0, 10), [topPlayers]);
 
   const leaderPoints = useMemo(
     () =>
@@ -115,6 +197,8 @@ export default function SeasonStandingsNewLook({
     return result;
   }, [boardRows]);
 
+  const areaRadarMax = useMemo(() => Math.max(1, ...Object.values(areaMaxById)), [areaMaxById]);
+
   const disciplineMaxByKey = useMemo(() => {
     const result = new Map<SeasonDisciplineKey, number>();
     for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
@@ -134,6 +218,35 @@ export default function SeasonStandingsNewLook({
 
   function toggleExpanded(teamId: string) {
     setExpandedTeamId((current) => (current === teamId ? null : teamId));
+  }
+
+  function toggleTableSort(key: NlTableSortKey) {
+    setTableSort((current) =>
+      current.key === key
+        ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "rank" || key === "team" ? "asc" : "desc" },
+    );
+  }
+
+  function tableSortArrow(key: NlTableSortKey) {
+    if (tableSort.key !== key) {
+      return "↕";
+    }
+    return tableSort.dir === "asc" ? "↑" : "↓";
+  }
+
+  function renderTableSortHeader(key: NlTableSortKey, label: string) {
+    return (
+      <button
+        type="button"
+        className={`nl-standings-sort-th${tableSort.key === key ? " is-active" : ""}`}
+        onClick={() => toggleTableSort(key)}
+        aria-label={`Nach ${label} sortieren`}
+      >
+        <span>{label}</span>
+        <b aria-hidden="true">{tableSortArrow(key)}</b>
+      </button>
+    );
   }
 
   function handleRowKeyDown(event: KeyboardEvent<HTMLDivElement>, teamId: string) {
@@ -170,10 +283,18 @@ export default function SeasonStandingsNewLook({
   }
 
   function renderExpandedDetails(row: SeasonV2StandingsRow) {
-    const historyRanks = (row.historicalPointsBySeason ?? [])
+    const history = row.historicalPointsBySeason ?? [];
+    const historyRanks = history
       .filter((entry) => entry.rank != null && Number.isFinite(entry.rank))
       .map((entry) => entry.rank as number);
+    const historyPoints = history
+      .filter((entry) => entry.points != null && Number.isFinite(entry.points))
+      .map((entry) => entry.points as number);
     const bonusValue = row.disciplineValues.bonuspunkte;
+    const radarAxes = SEASON_DISCIPLINE_AREA_GROUPS.map((group) => ({
+      key: group.id,
+      value: getAreaValue(row, group.id) ?? 0,
+    }));
 
     return (
       <div className="nl-standings-expand" id={`nl-standings-details-${row.teamId}`}>
@@ -191,6 +312,19 @@ export default function SeasonStandingsNewLook({
               title={`${row.teamName} öffnen`}
             />
           </div>
+        </div>
+        <div className="nl-standings-expand-body">
+        <div className="nl-standings-radar-wrap">
+          <span className="nl-standings-radar-label">Stärkeprofil (POW · SPE · MEN · SOC)</span>
+          <NlRadar
+            axes={radarAxes}
+            max={areaRadarMax}
+            showValues
+            aria-label={`Stärkeprofil ${row.teamName}: ${radarAxes
+              .map((axis) => `${axis.key.toUpperCase()} ${formatNlNumber(axis.value, 0)}`)
+              .join(", ")}`}
+            className="nl-standings-radar"
+          />
         </div>
         <div className="nl-standings-groups">
           {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => {
@@ -222,6 +356,7 @@ export default function SeasonStandingsNewLook({
             );
           })}
         </div>
+        </div>
         {historyRanks.length >= 2 ? (
           <div className="nl-standings-history">
             <span className="nl-standings-history-label">
@@ -235,6 +370,22 @@ export default function SeasonStandingsNewLook({
             />
             <span className="nl-standings-history-values nl-tnum">
               {historyRanks.map((rank) => `#${rank}`).join(" · ")}
+            </span>
+          </div>
+        ) : null}
+        {historyPoints.length >= 2 ? (
+          <div className="nl-standings-history">
+            <span className="nl-standings-history-label">
+              Punkte über {historyPoints.length} archivierte Saisons
+            </span>
+            <NlSparkline
+              points={historyPoints}
+              tone="good"
+              aria-label={`Punkte-Verlauf von ${row.teamName} über ${historyPoints.length} Saisons`}
+              className="nl-standings-history-spark"
+            />
+            <span className="nl-standings-history-values nl-tnum">
+              {historyPoints.map((points) => formatNlNumber(points, 0)).join(" · ")}
             </span>
           </div>
         ) : null}
@@ -342,16 +493,16 @@ export default function SeasonStandingsNewLook({
         <table className="nl-standings-table nl-tnum">
           <thead>
             <tr>
-              <th rowSpan={2} className="nl-standings-th-rank">Rang</th>
-              <th rowSpan={2} className="nl-standings-th-team">Team</th>
-              <th rowSpan={2}>Punkte</th>
-              <th rowSpan={2}>Bonus</th>
+              <th rowSpan={2} className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
+              <th rowSpan={2} className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
+              <th rowSpan={2}>{renderTableSortHeader("points", "Punkte")}</th>
+              <th rowSpan={2}>{renderTableSortHeader("bonus", "Bonus")}</th>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
                 <th key={group.id} colSpan={group.keys.length + 1} className={`nl-standings-th-area ${nlToneClass(group.id)}`}>
-                  {group.label}
+                  {renderTableSortHeader(group.id, group.label)}
                 </th>
               ))}
-              <th rowSpan={2}>MW</th>
+              <th rowSpan={2}>{renderTableSortHeader("mw", "MW")}</th>
             </tr>
             <tr>
               {SEASON_DISCIPLINE_AREA_GROUPS.map((group) => (
@@ -360,7 +511,7 @@ export default function SeasonStandingsNewLook({
             </tr>
           </thead>
           <tbody>
-            {boardRows.map((row) => (
+            {sortedTableRows.map((row) => (
               <tr
                 key={row.teamId}
                 className={`nl-standings-table-row${row.isSelected ? " is-selected" : ""}`}
@@ -400,6 +551,91 @@ export default function SeasonStandingsNewLook({
             ))}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  function renderPodium() {
+    if (podiumRows.length === 0) {
+      return null;
+    }
+    return (
+      <ol className="nl-standings-podium" aria-label="Podium — Top 3">
+        {podiumRows.map((row) => {
+          const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : "bronze";
+          const gap = row.points != null && Number.isFinite(row.points) ? row.points - leaderPoints : null;
+          return (
+            <li key={row.teamId} className={`nl-standings-podium-card is-${medalKind}`} style={getSeasonV2TeamTagStyle(row.teamCode)}>
+              <button
+                type="button"
+                className="nl-standings-podium-btn"
+                onClick={() => onOpenTeam(row.teamId)}
+                title={`${row.teamName} öffnen`}
+              >
+                <span className="nl-standings-podium-medal">
+                  <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
+                </span>
+                <span className="nl-standings-podium-copy">
+                  <span className="nl-standings-podium-name">{row.teamName}</span>
+                  <span className="nl-standings-podium-points nl-tnum">{formatNlNumber(row.points, 1)} Pkt</span>
+                </span>
+                <span className="nl-standings-podium-gap nl-tnum">
+                  {gap == null || gap >= 0 ? "Spitze" : `${formatNlNumber(gap, 1)} zum 1.`}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
+  function renderTopPlayersStrip() {
+    if (topPlayersStrip.length === 0) {
+      return null;
+    }
+    return (
+      <NlCard className="nl-standings-players-card" eyebrow="Spieler-Highlights" title="Top-Spieler der Saison">
+        <ol className="nl-standings-players" aria-label="Top-Spieler der Saison">
+          {topPlayersStrip.map((player) => (
+            <li key={player.playerId}>
+              <button
+                type="button"
+                className="nl-standings-player"
+                onClick={() => onOpenPlayer(player.playerId)}
+                title={`${player.name} öffnen`}
+              >
+                <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
+                <span className="nl-standings-player-copy">
+                  <span className="nl-standings-player-name">{player.name}</span>
+                  <span className="nl-standings-player-team">{player.teamCode ?? player.teamName ?? "—"}</span>
+                </span>
+                <span className="nl-standings-player-pps nl-tnum">{formatNlNumber(player.pps, 1)}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </NlCard>
+    );
+  }
+
+  function renderBoardSortBar() {
+    return (
+      <div className="nl-standings-sortbar" role="group" aria-label="Board sortieren">
+        <span className="nl-standings-sortbar-label">Sortieren</span>
+        {NL_BOARD_SORT_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`nl-standings-sortchip ${nlToneClass(item.id === "rank" ? "accent" : item.id)}${
+              boardSort === item.id ? " is-active" : ""
+            }`}
+            onClick={() => setBoardSort(item.id)}
+            aria-pressed={boardSort === item.id}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     );
   }
@@ -458,9 +694,14 @@ export default function SeasonStandingsNewLook({
           <p className="nl-standings-empty-text">Für diese Saison liegen noch keine Tabellendaten vor.</p>
         </NlCard>
       ) : mode === "board" ? (
-        <ol className="nl-standings-board" aria-label="Liga-Board">
-          {boardRows.map((row) => renderBoardRow(row))}
-        </ol>
+        <>
+          {renderPodium()}
+          {renderTopPlayersStrip()}
+          {renderBoardSortBar()}
+          <ol className="nl-standings-board" aria-label="Liga-Board">
+            {displayBoardRows.map((row) => renderBoardRow(row))}
+          </ol>
+        </>
       ) : (
         renderDatenTable()
       )}

@@ -48305,3 +48305,414 @@ button.foundation-team-portrait-card {
     transition: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Batch b4: Saisonstand / Ranks / Preisgeld
+   Nur aktiv unterhalb von `.is-new-look` (Flag an). Additiv.
+   ============================================================ */
+
+/* --- #54 Top-3-Podium-Header -------------------------------------- */
+.is-new-look .nl-standings-podium {
+  list-style: none;
+  margin: 0 0 var(--nl-s2);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-podium-card {
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-md);
+  background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-standings-podium-card.is-gold {
+  border-top-color: color-mix(in srgb, #f4c430 70%, var(--nl-line-2));
+}
+.is-new-look .nl-standings-podium-card.is-silver {
+  border-top-color: color-mix(in srgb, #c7ccd4 70%, var(--nl-line-2));
+}
+.is-new-look .nl-standings-podium-card.is-bronze {
+  border-top-color: color-mix(in srgb, #cd7f32 70%, var(--nl-line-2));
+}
+
+.is-new-look .nl-standings-podium-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--nl-ink);
+  cursor: pointer;
+  text-align: left;
+  border-radius: inherit;
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-podium-btn:hover,
+.is-new-look .nl-standings-podium-btn:focus-visible {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-standings-podium-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.is-new-look .nl-standings-podium-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-standings-podium-points {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-podium-gap {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-accent);
+  white-space: nowrap;
+}
+
+/* --- #23 Top-Spieler-Streifen ------------------------------------- */
+.is-new-look .nl-standings-players-card {
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--nl-s2);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.is-new-look .nl-standings-player {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 8px 12px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-player:hover,
+.is-new-look .nl-standings-player:focus-visible {
+  border-color: var(--nl-accent);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-standings-player-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-player-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .nl-standings-player-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-standings-player-team {
+  font-size: 11px;
+  color: var(--nl-mut);
+  letter-spacing: 0.05em;
+}
+
+.is-new-look .nl-standings-player-pps {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--nl-accent);
+}
+
+/* --- #8 Board-Sortleiste (klickbare Bereichs-Kacheln) ------------- */
+.is-new-look .nl-standings-sortbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-sortbar-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-sortchip {
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-standings-sortchip:hover,
+.is-new-look .nl-standings-sortchip:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-standings-sortchip.is-active {
+  color: var(--nl-tone, var(--nl-accent));
+  border-color: var(--nl-tone, var(--nl-accent));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 14%, transparent);
+}
+
+/* --- #9 Radar im ausgeklappten Board-Eintrag ---------------------- */
+.is-new-look .nl-standings-expand-body {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-standings-radar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-radar-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-standings-radar {
+  width: 100%;
+  max-width: 200px;
+}
+
+/* --- #53 Sortierbare Tabellenköpfe -------------------------------- */
+.is-new-look .nl-standings-sort-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.is-new-look .nl-standings-sort-th b {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.is-new-look .nl-standings-sort-th.is-active {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-standings-sort-th.is-active b {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-standings-expand-body {
+    grid-template-columns: 1fr;
+  }
+  .is-new-look .nl-standings-radar-wrap {
+    order: 2;
+  }
+}
+
+/* --- #10 / #40 Ranks: Expand + klickbare Bereichs-Chips ----------- */
+.is-new-look .nl-ranks-row {
+  grid-template-columns: 44px minmax(160px, 1.1fr) minmax(180px, 1.2fr) auto 22px;
+  cursor: default;
+}
+
+.is-new-look .nl-ranks-row .nl-ranks-team {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-ranks-row .nl-ranks-team:hover .nl-ranks-teamname,
+.is-new-look .nl-ranks-row .nl-ranks-team:focus-visible .nl-ranks-teamname {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-ranks-expand-toggle {
+  justify-self: end;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-ranks-expand-toggle:hover,
+.is-new-look .nl-ranks-expand-toggle:focus-visible {
+  color: var(--nl-accent);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-ranks-expand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s1, 4px);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-ranks-expand-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ranks-radar {
+  width: 100%;
+  max-width: 220px;
+}
+
+@media (max-width: 900px) {
+  .is-new-look .nl-ranks-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto 22px;
+  }
+}
+
+/* --- #56 Preisgeld-Verteilung: anklickbare Balken ----------------- */
+.is-new-look .nl-prize-dist-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 168px;
+}
+
+.is-new-look .nl-prize-dist-bar {
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-prize-dist-hit {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.is-new-look .nl-prize-dist-hit.is-static {
+  cursor: default;
+}
+
+.is-new-look .nl-prize-dist-fill-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 40px;
+}
+
+.is-new-look .nl-prize-dist-value {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-dist-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 120px;
+}
+
+.is-new-look .nl-prize-dist-fill {
+  display: block;
+  width: 20px;
+  border-radius: 3px 3px 0 0;
+  background: var(--nl-mut);
+  transition: background-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-prize-dist-bar.is-own .nl-prize-dist-fill {
+  background: var(--nl-accent);
+}
+
+.is-new-look .nl-prize-dist-hit:not(.is-static):hover .nl-prize-dist-fill,
+.is-new-look .nl-prize-dist-hit:not(.is-static):focus-visible .nl-prize-dist-fill {
+  background: var(--nl-accent);
+  transform: scaleY(1.03);
+  transform-origin: bottom;
+}
+
+.is-new-look .nl-prize-dist-label {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+/* --- Reduced Motion (Batch b4) ------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-standings-podium-btn,
+  .is-new-look .nl-standings-player,
+  .is-new-look .nl-standings-sortchip,
+  .is-new-look .nl-ranks-expand-toggle,
+  .is-new-look .nl-prize-dist-fill {
+    transition: none;
+  }
+  .is-new-look .nl-prize-dist-hit:not(.is-static):hover .nl-prize-dist-fill,
+  .is-new-look .nl-prize-dist-hit:not(.is-static):focus-visible .nl-prize-dist-fill {
+    transform: none;
+  }
+}

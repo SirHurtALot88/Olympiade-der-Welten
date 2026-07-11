@@ -104,14 +104,13 @@ export default function FoundationPrizeV2NewLook({
     return items;
   }, [prizePreviewFeed]);
 
-  const distributionBars = useMemo<NlBarChartBar[]>(
+  const maxDistributionMoney = useMemo(
     () =>
-      distributionItems.map((item) => ({
-        label: `#${item.rank}`,
-        value: item.prizeMoney as number,
-        tone: item.teamId === selectedTeamId ? "accent" : "neutral",
-      })),
-    [distributionItems, selectedTeamId],
+      distributionItems.reduce(
+        (max, item) => (item.prizeMoney != null && Number.isFinite(item.prizeMoney) && item.prizeMoney > max ? item.prizeMoney : max),
+        0,
+      ),
+    [distributionItems],
   );
 
   const ownDistributionItem = useMemo(
@@ -296,14 +295,47 @@ export default function FoundationPrizeV2NewLook({
             ) : null
           }
         >
-          {distributionBars.length > 0 ? (
+          {distributionItems.length > 0 ? (
             <div className="nl-prize-distribution-scroll">
-              <NlBarChart
-                bars={distributionBars}
-                format={(value) => formatNlNumber(value, 0)}
-                aria-label="Preisgeld-Verteilung über die Endplätze 1 bis 32"
-                className="nl-prize-distribution-chart"
-              />
+              <ol
+                className="nl-prize-dist-bars"
+                aria-label="Preisgeld-Verteilung über die Endplätze — Balken öffnen das Teamprofil"
+              >
+                {distributionItems.map((item) => {
+                  const money = item.prizeMoney as number;
+                  const heightPct = maxDistributionMoney > 0 ? Math.max(3, (money / maxDistributionMoney) * 100) : 0;
+                  const isOwn = item.teamId === selectedTeamId;
+                  const clickable = item.teamId != null && teamsById.has(item.teamId);
+                  const barTitle = `#${item.rank} ${item.teamName}: ${formatLocalePoints(money, 1)}${clickable ? " · Teamprofil öffnen" : ""}`;
+                  const fill = (
+                    <span className="nl-prize-dist-fill-wrap" aria-hidden="true">
+                      <span className="nl-prize-dist-value nl-tnum">{formatNlNumber(money, 0)}</span>
+                      <span className="nl-prize-dist-track">
+                        <span className="nl-prize-dist-fill" style={{ height: `${heightPct}%` }} />
+                      </span>
+                      <span className="nl-prize-dist-label nl-tnum">#{item.rank}</span>
+                    </span>
+                  );
+                  return (
+                    <li key={`${item.rank}-${item.teamId ?? "na"}`} className={`nl-prize-dist-bar${isOwn ? " is-own" : ""}`}>
+                      {clickable ? (
+                        <button
+                          type="button"
+                          className="nl-prize-dist-hit"
+                          onClick={() => openTeamProfileById(item.teamId as string)}
+                          title={barTitle}
+                        >
+                          {fill}
+                        </button>
+                      ) : (
+                        <span className="nl-prize-dist-hit is-static" title={barTitle}>
+                          {fill}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
             </div>
           ) : (
             <p className="nl-prize-empty">Verteilung wartet auf Preisgeld-Preview mit Rängen.</p>
