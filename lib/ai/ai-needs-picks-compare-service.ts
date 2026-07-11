@@ -7135,14 +7135,16 @@ function scoreCandidate(input: {
       // in-lane option. That regression made teams grab only the most expensive star; folding
       // valueScore back in lets a strong, well-priced 60-70 star beat a marginally-better outlier
       // priced multiples higher. Ability still counts (playerQualityScore); value now breaks the tie.
+      // Star/superstar value weight lifted to 0.55 — the strongest historical value lane (cheap_fill)
+      // — so value bites against the uncapped raw-quality term instead of being overshadowed by it.
       input.budgetLane.lane === "superstar"
-        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + valueScore * 0.4
+        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + valueScore * 0.55
         : input.budgetLane.lane === "star"
-          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + valueScore * 0.4 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
+          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + valueScore * 0.55 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
           : input.budgetLane.lane === "core"
             ? needMatchScore * 0.18 +
               rosterBalanceScore * 0.28 +
-              valueScore * 0.1 +
+              valueScore * 0.24 +
               (price != null && price >= resolveMarketBracketFloorMw("core")
                 ? price <= (MARKET_BRACKET_DEFINITIONS.find((entry) => entry.lane === "core")?.ceilingMw ?? 45)
                   ? 8
