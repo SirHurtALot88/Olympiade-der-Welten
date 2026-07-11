@@ -282,6 +282,7 @@ export default function FoundationTeamsViewHost({
         selectedTeam={selectedTeam}
         gameState={gameState}
         sortedTeamsViewRows={sortedTeamsViewRows}
+        selectedTeamsHistoryData={selectedTeamsHistoryData}
         filteredSelectedRosterTableRows={
           rosterDerivations.filteredSelectedRosterTableRows as unknown as FoundationTeamsNewLookProps["filteredSelectedRosterTableRows"]
         }

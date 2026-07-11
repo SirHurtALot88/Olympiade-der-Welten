@@ -50671,3 +50671,319 @@ button.foundation-team-portrait-card {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Teams: Entwicklung über Saisons, Delta-Chips,
+   sortierbare Teamtabelle & Zeilen-Hover (nl-teams-*)
+   Additiv angehängt; nur aktiv unterhalb von `.is-new-look`.
+   ============================================================ */
+
+/* Anker-Wrapper für Hero-Portale (scrollIntoView-Ziele) */
+.is-new-look .nl-teams-anchor {
+  min-width: 0;
+  scroll-margin-top: var(--nl-s4);
+}
+
+/* --- Hero: Saison-Delta-Chips (ggü. Vorsaison) ---------------------- */
+.is-new-look .nl-teams-hero-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-teams-hero-deltas-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-hero-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Entwicklungs-Karte (Rang/Punkte/MW über Saisons) --------------- */
+.is-new-look .nl-teams-development-count {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-development-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teams-development-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-teams-development-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-teams-development-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-development-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-teams-development-spark {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+
+.is-new-look .nl-teams-development-bars {
+  max-width: 100%;
+}
+
+.is-new-look .nl-teams-development-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-teams-development-seasons {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin: var(--nl-s3) 0 0;
+  padding: 0;
+}
+
+.is-new-look .nl-teams-development-season {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  background: var(--nl-panel-2);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-development-season.is-live {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-development-season-rank {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-development-season-live {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+/* --- Sortierbare Teamtabelle ---------------------------------------- */
+.is-new-look .nl-teams-sortbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-teams-sortbar-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.is-new-look .nl-teams-sort:hover,
+.is-new-look .nl-teams-sort:focus-visible {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 60%, var(--nl-line));
+}
+
+.is-new-look .nl-teams-sort:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-teams-sort.is-active {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 60%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 14%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teams-sort-dir {
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* --- Klickbare Bereichs-Badges (Hero → Liga-Sortierung) -------------- */
+.is-new-look button.nl-teams-axis {
+  font: inherit;
+  text-align: left;
+}
+
+.is-new-look .nl-teams-axis.is-clickable {
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.is-new-look .nl-teams-axis.is-clickable:hover,
+.is-new-look .nl-teams-axis.is-clickable:focus-visible {
+  border-color: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 60%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teams-axis.is-clickable:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-teams-axis.is-sorted {
+  border-color: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 65%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 12%, var(--nl-panel-2));
+}
+
+/* --- Hover-Karte auf Teamtabellen-Zeilen ----------------------------- */
+.is-new-look .nl-teams-boardrow {
+  position: relative;
+}
+
+.is-new-look .nl-teams-board-hover {
+  position: absolute;
+  left: 48px;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: min(340px, 88vw);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e3);
+  pointer-events: none;
+}
+
+/* Für die ersten Zeilen nach unten aufklappen, damit nichts über die
+   Karte hinaus abgeschnitten wird. */
+.is-new-look .nl-teams-boardrow:nth-child(-n + 3) .nl-teams-board-hover {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+.is-new-look .nl-teams-board-hover-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-teams-board-hover-body {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-teams-board-hover-radar {
+  width: 128px;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-teams-board-hover-trends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-teams-board-hover-caption {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-board-hover-trend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-teams-board-hover-trend small {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-board-hover-trend .nl-sparkline {
+  width: 150px;
+}
+
+@media (hover: none) {
+  .is-new-look .nl-teams-board-hover {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .is-new-look .nl-teams-development-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-teams-sort,
+  .is-new-look .nl-teams-axis.is-clickable {
+    transition: none;
+  }
+
+  .is-new-look .nl-teams-anchor {
+    scroll-behavior: auto;
+  }
+}

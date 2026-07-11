@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import {
+  NlBarChart,
   NlCard,
+  NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
+  NlSparkline,
   NlSubTabs,
   StatChip,
   StatChipRow,
@@ -16,6 +19,7 @@ import {
   nlToneClass,
   type NlAxisKey,
 } from "@/components/foundation/new-look";
+import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import { getClassColorClassName } from "@/app/foundation/classVisuals";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
@@ -44,6 +48,13 @@ import type {
  * - keine Formkurve/kein Trend pro Spieltag (existiert nicht im Modell),
  * - keine erfundenen Team-Gesamtwerte — Bereichs-RÄNGE (`currentPowRank` …)
  *   und Bereichs-PUNKTE (`ppsPow` …) sind die einzigen echten Achsen-Werte.
+ *
+ * Team-Entwicklung über Saisons: der Host reicht die bereits berechnete
+ * `selectedTeamsHistoryData` (Live-Saison + echte Season-Snapshots) durch —
+ * daraus speisen sich Saison-Verlauf (Rang/Punkte/MW) und die
+ * Vorsaison-Delta-Chips im Hero. Pro Teamtabellen-Zeile liefern
+ * `historicalPointsBySeason` (Punkte + Rang je Saison) und die aktuellen
+ * Bereichs-Ränge die Hover-Karte (Mini-Radar + Saison-Sparkline).
  */
 
 type NlTeamsRosterMode = "kader" | "tabelle";
@@ -89,6 +100,12 @@ export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
   sortedTeamsViewRows: TeamsViewRow[];
+  /**
+   * Vom Host bereits berechnete Team-Historie (Live-Saison + echte
+   * Season-Snapshots) — Basis für Saison-Verlauf und Vorsaison-Deltas.
+   * `null`, solange die Ableitung (Hydration) noch nicht gebaut wurde.
+   */
+  selectedTeamsHistoryData: TeamDetailDrawerData | null;
   filteredSelectedRosterTableRows: NlTeamsRosterRow[];
   teamRosterRoleFilter: TeamRosterRoleFilter;
   setTeamRosterRoleFilter: (value: TeamRosterRoleFilter) => void;
@@ -184,6 +201,78 @@ function getBoardRank(row: TeamsViewRow): number | null {
   return row.overallRank ?? row.rank;
 }
 
+type NlTeamsBoardSortKey =
+  | "rank"
+  | "points"
+  | "cash"
+  | "mw"
+  | "salary"
+  | "roster"
+  | "medals"
+  | NlAxisKey;
+
+type NlTeamsBoardSortDir = "asc" | "desc";
+
+type NlTeamsBoardSort = { key: NlTeamsBoardSortKey; dir: NlTeamsBoardSortDir };
+
+const NL_TEAMS_BOARD_SORTS: Array<{
+  key: Exclude<NlTeamsBoardSortKey, NlAxisKey>;
+  label: string;
+  defaultDir: NlTeamsBoardSortDir;
+  title: string;
+}> = [
+  { key: "rank", label: "Rang", defaultDir: "asc", title: "Nach Gesamtrang sortieren" },
+  { key: "points", label: "Punkte", defaultDir: "desc", title: "Nach Saisonpunkten sortieren" },
+  { key: "cash", label: "Cash", defaultDir: "desc", title: "Nach Cash sortieren" },
+  { key: "mw", label: "MW", defaultDir: "desc", title: "Nach Team-Marktwert sortieren" },
+  { key: "salary", label: "Gehalt", defaultDir: "desc", title: "Nach Gehaltsblock sortieren" },
+  { key: "roster", label: "Kader", defaultDir: "desc", title: "Nach Kadergröße sortieren" },
+  { key: "medals", label: "Medaillen", defaultDir: "desc", title: "Nach Gold/Silber/Bronze sortieren" },
+];
+
+function isNlAxisSortKey(key: NlTeamsBoardSortKey): key is NlAxisKey {
+  return key === "pow" || key === "spe" || key === "men" || key === "soc";
+}
+
+function getBoardSortValue(row: TeamsViewRow, key: NlTeamsBoardSortKey): number | null {
+  if (isNlAxisSortKey(key)) {
+    return getAxisRank(row, key);
+  }
+  switch (key) {
+    case "rank":
+      return getBoardRank(row);
+    case "points":
+      return row.points;
+    case "cash":
+      return row.cash;
+    case "mw":
+      return row.marketValueTotal;
+    case "salary":
+      return row.salaryTotal;
+    case "roster":
+      return row.rosterCount;
+    case "medals":
+      return row.goldCount * 1_000_000 + row.silverCount * 1_000 + row.bronzeCount;
+    default:
+      return null;
+  }
+}
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value);
+}
+
+/** "Saison 3" → "S3"; ohne Ziffer bleibt ein kurzer Prefix. */
+function formatNlSeasonShortLabel(seasonName: string, seasonId: string): string {
+  const source = seasonName || seasonId;
+  const match = source.match(/(\d+)/);
+  return match ? `S${match[1]}` : source.slice(0, 6);
+}
+
+function formatSignedNlNumber(value: number, digits: number): string {
+  return `${value > 0 ? "+" : ""}${formatNlNumber(value, digits)}`;
+}
+
 function compareBoardRows(left: TeamsViewRow, right: TeamsViewRow): number {
   const leftRank = getBoardRank(left) ?? Number.POSITIVE_INFINITY;
   const rightRank = getBoardRank(right) ?? Number.POSITIVE_INFINITY;
@@ -201,6 +290,7 @@ export default function FoundationTeamsNewLook({
   selectedTeam,
   gameState,
   sortedTeamsViewRows,
+  selectedTeamsHistoryData,
   filteredSelectedRosterTableRows,
   teamRosterRoleFilter,
   setTeamRosterRoleFilter,
@@ -228,6 +318,12 @@ export default function FoundationTeamsNewLook({
   openContractRenewalNegotiation,
 }: FoundationTeamsNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>("kader");
+  const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
+  const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
+
+  const developmentCardRef = useRef<HTMLDivElement | null>(null);
+  const rosterCardRef = useRef<HTMLDivElement | null>(null);
+  const leagueCardRef = useRef<HTMLDivElement | null>(null);
 
   const teamCount = gameState.teams.length;
   const heroRow = useMemo(
@@ -235,7 +331,122 @@ export default function FoundationTeamsNewLook({
     [selectedTeam.teamId, sortedTeamsViewRows],
   );
 
-  const boardRows = useMemo(() => [...sortedTeamsViewRows].sort(compareBoardRows), [sortedTeamsViewRows]);
+  const boardRows = useMemo(() => {
+    const base = [...sortedTeamsViewRows].sort(compareBoardRows);
+    if (boardSort.key === "rank" && boardSort.dir === "asc") {
+      return base;
+    }
+    const factor = boardSort.dir === "asc" ? 1 : -1;
+    return base.sort((left, right) => {
+      const leftValue = getBoardSortValue(left, boardSort.key);
+      const rightValue = getBoardSortValue(right, boardSort.key);
+      if (leftValue == null && rightValue == null) {
+        return compareBoardRows(left, right);
+      }
+      if (leftValue == null) {
+        return 1;
+      }
+      if (rightValue == null) {
+        return -1;
+      }
+      if (leftValue !== rightValue) {
+        return (leftValue - rightValue) * factor;
+      }
+      return compareBoardRows(left, right);
+    });
+  }, [boardSort, sortedTeamsViewRows]);
+
+  // Team-Entwicklung: Host liefert [Live, jüngste Saison, …] — für die
+  // Verlaufs-Charts chronologisch drehen (älteste zuerst, Live zuletzt).
+  const developmentRows = useMemo(
+    () => [...(selectedTeamsHistoryData?.history ?? [])].reverse(),
+    [selectedTeamsHistoryData],
+  );
+
+  const liveHistoryRow = useMemo(
+    () => (selectedTeamsHistoryData?.history ?? []).find((row) => row.isLive) ?? null,
+    [selectedTeamsHistoryData],
+  );
+
+  const previousSeasonRow = useMemo(
+    () => (selectedTeamsHistoryData?.history ?? []).find((row) => !row.isLive) ?? null,
+    [selectedTeamsHistoryData],
+  );
+
+  // Saison-Deltas (Live vs. jüngste abgeschlossene Saison) — nur echte Werte.
+  const seasonDeltas = useMemo(() => {
+    if (!liveHistoryRow || !previousSeasonRow) {
+      return null;
+    }
+    const rankDelta =
+      isFiniteNumber(liveHistoryRow.rank) && isFiniteNumber(previousSeasonRow.rank)
+        ? previousSeasonRow.rank - liveHistoryRow.rank
+        : null;
+    const pointsDelta =
+      isFiniteNumber(liveHistoryRow.points) && isFiniteNumber(previousSeasonRow.points)
+        ? liveHistoryRow.points - previousSeasonRow.points
+        : null;
+    const marketValueDelta =
+      isFiniteNumber(liveHistoryRow.marketValue) && isFiniteNumber(previousSeasonRow.marketValue)
+        ? liveHistoryRow.marketValue - previousSeasonRow.marketValue
+        : null;
+    if (rankDelta == null && pointsDelta == null && marketValueDelta == null) {
+      return null;
+    }
+    return { rankDelta, pointsDelta, marketValueDelta };
+  }, [liveHistoryRow, previousSeasonRow]);
+
+  const developmentSeries = useMemo(() => {
+    if (developmentRows.length < 2) {
+      return null;
+    }
+    const rankValues = developmentRows.map((row) => row.rank).filter(isFiniteNumber);
+    // Rang 1 = beste Saison → für die Sparkline invertieren (oben = besser).
+    const rankSpark =
+      teamCount > 0 ? developmentRows.filter((row) => isFiniteNumber(row.rank)).map((row) => teamCount - (row.rank as number) + 1) : [];
+    const pointValues = developmentRows.map((row) => row.points).filter(isFiniteNumber);
+    const pointBars = developmentRows
+      .filter((row) => isFiniteNumber(row.points))
+      .slice(-10)
+      .map((row) => ({
+        label: formatNlSeasonShortLabel(row.seasonName, row.seasonId),
+        value: row.points as number,
+        tone: row.isLive ? ("accent" as const) : ("neutral" as const),
+      }));
+    const marketValueSpark = developmentRows.filter((row) => isFiniteNumber(row.marketValue)).map((row) => row.marketValue as number);
+    return {
+      rankSpark,
+      bestRank: rankValues.length > 0 ? Math.min(...rankValues) : null,
+      avgRank: rankValues.length > 0 ? rankValues.reduce((sum, value) => sum + value, 0) / rankValues.length : null,
+      pointBars,
+      pointsTotal: pointValues.length > 0 ? pointValues.reduce((sum, value) => sum + value, 0) : null,
+      pointsAvg: pointValues.length > 0 ? pointValues.reduce((sum, value) => sum + value, 0) / pointValues.length : null,
+      marketValueSpark,
+      marketValueFirst: marketValueSpark.length > 0 ? marketValueSpark[0] : null,
+      marketValueLast: marketValueSpark.length > 0 ? marketValueSpark[marketValueSpark.length - 1] : null,
+    };
+  }, [developmentRows, teamCount]);
+
+  function scrollToSection(ref: { current: HTMLDivElement | null }) {
+    const node = ref.current;
+    if (!node || typeof window === "undefined") {
+      return;
+    }
+    const reduceMotion =
+      typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  }
+
+  function handleBoardSortToggle(key: NlTeamsBoardSortKey, defaultDir: NlTeamsBoardSortDir) {
+    setBoardSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: defaultDir },
+    );
+  }
+
+  function handleHeroAxisSortSelect(key: NlAxisKey) {
+    setBoardSort({ key, dir: "asc" });
+    scrollToSection(leagueCardRef);
+  }
 
   const leaderPoints = useMemo(
     () =>
@@ -262,7 +473,12 @@ export default function FoundationTeamsNewLook({
 
   const heroLogo = getTeamLogoModel(selectedTeam, { variant: "thumb" });
 
-  function renderAxisRankBadges(row: TeamsViewRow | null, teamName: string, compact: boolean) {
+  function renderAxisRankBadges(
+    row: TeamsViewRow | null,
+    teamName: string,
+    compact: boolean,
+    onSelectAxis?: (key: NlAxisKey) => void,
+  ) {
     return (
       <div
         className={`nl-teams-axes${compact ? " is-compact" : ""}`}
@@ -276,13 +492,34 @@ export default function FoundationTeamsNewLook({
             rank != null
               ? `${getTeamAxisRankTooltip(label)}${points != null ? ` · ${formatNlNumber(points, 1)} Bereichspunkte` : ""}`
               : getTeamAxisRankTooltip(label);
-          return (
-            <span key={key} className={`nl-teams-axis ${nlToneClass(key)}`} title={title}>
+          const isSortAxis = boardSort.key === key;
+          const axisClassName = `nl-teams-axis ${nlToneClass(key)}${isSortAxis ? " is-sorted" : ""}`;
+          const body = (
+            <>
               <span className="nl-teams-axis-label">{label}</span>
               <span className="nl-teams-axis-rank nl-tnum">{rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}</span>
               {!compact && points != null ? (
                 <span className="nl-teams-axis-points nl-tnum">{formatNlNumber(points, 1)} PP</span>
               ) : null}
+            </>
+          );
+          if (onSelectAxis) {
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`${axisClassName} is-clickable`}
+                title={`${title} — Klick sortiert die Teamtabelle nach ${label}`}
+                aria-pressed={isSortAxis}
+                onClick={() => onSelectAxis(key)}
+              >
+                {body}
+              </button>
+            );
+          }
+          return (
+            <span key={key} className={axisClassName} title={title}>
+              {body}
             </span>
           );
         })}
@@ -542,6 +779,62 @@ export default function FoundationTeamsNewLook({
     );
   }
 
+  // Hover-Karte pro Teamtabellen-Zeile: Mini-Radar aus den aktuellen
+  // Bereichs-Rängen + Saison-Sparklines aus `historicalPointsBySeason`
+  // (echte Snapshot-Punkte/-Ränge, chronologisch) plus Live-Saison.
+  function renderBoardHoverCard(row: TeamsViewRow) {
+    const radarAxes =
+      teamCount > 0
+        ? NL_TEAMS_AXES.flatMap(({ key }) => {
+            const rank = getAxisRank(row, key);
+            if (!isFiniteNumber(rank)) {
+              return [];
+            }
+            return [{ key, value: Math.max(0, teamCount - rank + 1) }];
+          })
+        : [];
+    const historicalSeasons = row.historicalPointsBySeason ?? [];
+    const seasonPointsSpark = [...historicalSeasons.map((entry) => entry.points), row.points].filter(isFiniteNumber);
+    const seasonRankSpark =
+      teamCount > 0
+        ? [...historicalSeasons.map((entry) => entry.rank), row.rank]
+            .filter(isFiniteNumber)
+            .map((rank) => teamCount - rank + 1)
+        : [];
+    const hasTrend = seasonPointsSpark.length >= 2;
+    if (radarAxes.length === 0 && !hasTrend) {
+      return null;
+    }
+    return (
+      <div className="nl-teams-board-hover" aria-hidden="true">
+        <span className="nl-teams-board-hover-title">{row.teamName}</span>
+        <div className="nl-teams-board-hover-body">
+          {radarAxes.length > 0 ? (
+            <NlRadar axes={radarAxes} max={teamCount} className="nl-teams-board-hover-radar" />
+          ) : null}
+          {hasTrend ? (
+            <div className="nl-teams-board-hover-trends">
+              <span className="nl-teams-board-hover-caption nl-tnum">
+                {historicalSeasons.length + 1} Saisons
+                {isFiniteNumber(row.historicalBestRank) ? ` · Best #${formatNlNumber(row.historicalBestRank, 0)}` : ""}
+              </span>
+              <span className="nl-teams-board-hover-trend">
+                <small>Punkte</small>
+                <NlSparkline points={seasonPointsSpark} tone="accent" />
+              </span>
+              {seasonRankSpark.length >= 2 ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Rang (oben = besser)</small>
+                  <NlSparkline points={seasonRankSpark} tone="good" />
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   function renderBoardRow(row: TeamsViewRow) {
     const isSelected = row.team.teamId === selectedTeam.teamId;
     const boardRank = getBoardRank(row);
@@ -552,7 +845,12 @@ export default function FoundationTeamsNewLook({
         key={row.team.teamId}
         className={`nl-teams-boardrow${isSelected ? " is-selected" : ""}${medalKind ? " is-podium" : ""}`}
         style={getSeasonV2TeamTagStyle(row.teamCode)}
+        onMouseEnter={() => setHoveredBoardTeamId(row.team.teamId)}
+        onMouseLeave={() => setHoveredBoardTeamId((prev) => (prev === row.team.teamId ? null : prev))}
+        onFocusCapture={() => setHoveredBoardTeamId(row.team.teamId)}
+        onBlurCapture={() => setHoveredBoardTeamId((prev) => (prev === row.team.teamId ? null : prev))}
       >
+        {hoveredBoardTeamId === row.team.teamId ? renderBoardHoverCard(row) : null}
         <button
           type="button"
           className="nl-teams-boardrow-main"
@@ -640,18 +938,43 @@ export default function FoundationTeamsNewLook({
                   onClick={() => openTeamProfileById(selectedTeam.teamId)}
                   title={`${selectedTeam.name} Profil öffnen`}
                 />
-                <StatChip label="Punkte" value={formatNlNumber(heroRow?.points, 1)} />
-                <StatChip label="Kader" value={heroRow != null ? formatNlNumber(heroRow.rosterCount, 0) : "—"} />
+                <StatChip
+                  label="Punkte"
+                  value={formatNlNumber(heroRow?.points, 1)}
+                  onClick={selectedTeamsHistoryData != null ? () => scrollToSection(developmentCardRef) : undefined}
+                  title={selectedTeamsHistoryData != null ? "Zum Saison-Verlauf springen" : undefined}
+                />
+                <StatChip
+                  label="Kader"
+                  value={heroRow != null ? formatNlNumber(heroRow.rosterCount, 0) : "—"}
+                  onClick={() => {
+                    setRosterMode("kader");
+                    scrollToSection(rosterCardRef);
+                  }}
+                  title="Zum Kader springen"
+                />
                 <StatChip
                   label="Cash"
                   value={heroRow?.cash != null ? formatMoney(heroRow.cash) : "—"}
                   tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
                 />
-                <StatChip label="MW" value={formatNlNumber(heroRow?.marketValueTotal, 2)} title="Marktwert gesamt" />
+                <StatChip
+                  label="MW"
+                  value={formatNlNumber(heroRow?.marketValueTotal, 2)}
+                  title="Marktwert gesamt — öffnet die Kadertabelle"
+                  onClick={() => {
+                    setRosterMode("tabelle");
+                    scrollToSection(rosterCardRef);
+                  }}
+                />
                 <StatChip
                   label="Gehalt"
                   value={heroRow != null ? formatNlNumber(heroRow.salaryTotal, 2) : "—"}
-                  title="Gehaltsblock des aktiven Kaders"
+                  title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
+                  onClick={() => {
+                    setRosterMode("tabelle");
+                    scrollToSection(rosterCardRef);
+                  }}
                 />
                 {heroRow?.needScore != null ? (
                   <StatChip
@@ -662,10 +985,49 @@ export default function FoundationTeamsNewLook({
                   />
                 ) : null}
               </StatChipRow>
+              {seasonDeltas != null && previousSeasonRow != null ? (
+                <div
+                  className="nl-teams-hero-deltas"
+                  role="group"
+                  aria-label={`Veränderung gegenüber ${previousSeasonRow.seasonName}`}
+                >
+                  <span className="nl-teams-hero-deltas-label">ggü. {previousSeasonRow.seasonName}</span>
+                  {seasonDeltas.rankDelta != null ? (
+                    <span className="nl-teams-hero-delta">
+                      Rang
+                      <NlDeltaChip
+                        value={seasonDeltas.rankDelta}
+                        format={(n) => formatSignedNlNumber(n, 0)}
+                        title={`Rang: #${formatNlNumber(previousSeasonRow.rank, 0)} → #${formatNlNumber(liveHistoryRow?.rank, 0)}`}
+                      />
+                    </span>
+                  ) : null}
+                  {seasonDeltas.pointsDelta != null ? (
+                    <span className="nl-teams-hero-delta">
+                      Punkte
+                      <NlDeltaChip
+                        value={seasonDeltas.pointsDelta}
+                        format={(n) => formatSignedNlNumber(n, 1)}
+                        title={`Punkte: ${formatNlNumber(previousSeasonRow.points, 1)} → ${formatNlNumber(liveHistoryRow?.points, 1)}`}
+                      />
+                    </span>
+                  ) : null}
+                  {seasonDeltas.marketValueDelta != null ? (
+                    <span className="nl-teams-hero-delta">
+                      MW
+                      <NlDeltaChip
+                        value={seasonDeltas.marketValueDelta}
+                        format={(n) => formatSignedNlNumber(n, 2)}
+                        title={`Marktwert: ${formatNlNumber(previousSeasonRow.marketValue, 2)} → ${formatNlNumber(liveHistoryRow?.marketValue, 2)}`}
+                      />
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="nl-teams-hero-axes">
-            {renderAxisRankBadges(heroRow, selectedTeam.name, false)}
+            {renderAxisRankBadges(heroRow, selectedTeam.name, false, handleHeroAxisSortSelect)}
             {heroRadarAxes.length > 0 ? (
               <NlRadar
                 axes={heroRadarAxes}
@@ -678,6 +1040,138 @@ export default function FoundationTeamsNewLook({
         </div>
       </NlCard>
 
+      {selectedTeamsHistoryData != null ? (
+        <div ref={developmentCardRef} className="nl-teams-anchor">
+          <NlCard
+            className="nl-teams-development-card"
+            eyebrow="Entwicklung"
+            title="Saison-Verlauf"
+            data-testid="nl-teams-development"
+            actions={
+              <span className="nl-teams-development-count nl-tnum">
+                {developmentRows.length} {developmentRows.length === 1 ? "Saison" : "Saisons"}
+              </span>
+            }
+          >
+            {developmentSeries != null ? (
+              <>
+                <div className="nl-teams-development-grid">
+                  <article className="nl-teams-development-metric">
+                    <header className="nl-teams-development-head">
+                      <span className="nl-teams-development-label">Rang</span>
+                      <span className="nl-teams-development-value nl-tnum">
+                        {liveHistoryRow?.rank != null ? `#${formatNlNumber(liveHistoryRow.rank, 0)}` : "—"}
+                      </span>
+                      {seasonDeltas?.rankDelta != null ? (
+                        <NlDeltaChip
+                          value={seasonDeltas.rankDelta}
+                          format={(n) => formatSignedNlNumber(n, 0)}
+                          title={`Rang ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
+                        />
+                      ) : null}
+                    </header>
+                    {developmentSeries.rankSpark.length >= 2 ? (
+                      <NlSparkline
+                        points={developmentSeries.rankSpark}
+                        tone="accent"
+                        className="nl-teams-development-spark"
+                        aria-label={`Rang-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons (oben = besser)`}
+                      />
+                    ) : (
+                      <p className="nl-teams-empty">Kein Rang-Verlauf vorhanden.</p>
+                    )}
+                    <p className="nl-teams-development-meta">
+                      {developmentSeries.bestRank != null ? `Best #${formatNlNumber(developmentSeries.bestRank, 0)}` : "—"}
+                      {developmentSeries.avgRank != null ? ` · Ø #${formatNlNumber(developmentSeries.avgRank, 1)}` : ""}
+                    </p>
+                  </article>
+                  <article className="nl-teams-development-metric is-points">
+                    <header className="nl-teams-development-head">
+                      <span className="nl-teams-development-label">Punkte</span>
+                      <span className="nl-teams-development-value nl-tnum">{formatNlNumber(liveHistoryRow?.points, 1)}</span>
+                      {seasonDeltas?.pointsDelta != null ? (
+                        <NlDeltaChip
+                          value={seasonDeltas.pointsDelta}
+                          format={(n) => formatSignedNlNumber(n, 1)}
+                          title={`Punkte ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
+                        />
+                      ) : null}
+                    </header>
+                    {developmentSeries.pointBars.length > 0 ? (
+                      <NlBarChart
+                        bars={developmentSeries.pointBars}
+                        format={(value) => formatNlNumber(value, 0)}
+                        className="nl-teams-development-bars"
+                        aria-label={`Punkte pro Saison von ${selectedTeam.name}`}
+                      />
+                    ) : (
+                      <p className="nl-teams-empty">Keine Punktedaten vorhanden.</p>
+                    )}
+                    <p className="nl-teams-development-meta">
+                      {developmentSeries.pointsTotal != null ? `Σ ${formatNlNumber(developmentSeries.pointsTotal, 1)}` : "—"}
+                      {developmentSeries.pointsAvg != null ? ` · Ø ${formatNlNumber(developmentSeries.pointsAvg, 1)}` : ""}
+                    </p>
+                  </article>
+                  <article className="nl-teams-development-metric">
+                    <header className="nl-teams-development-head">
+                      <span className="nl-teams-development-label">Marktwert</span>
+                      <span className="nl-teams-development-value nl-tnum">{formatNlNumber(liveHistoryRow?.marketValue, 2)}</span>
+                      {seasonDeltas?.marketValueDelta != null ? (
+                        <NlDeltaChip
+                          value={seasonDeltas.marketValueDelta}
+                          format={(n) => formatSignedNlNumber(n, 2)}
+                          title={`Marktwert ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
+                        />
+                      ) : null}
+                    </header>
+                    {developmentSeries.marketValueSpark.length >= 2 ? (
+                      <NlSparkline
+                        points={developmentSeries.marketValueSpark}
+                        tone="good"
+                        className="nl-teams-development-spark"
+                        aria-label={`Marktwert-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons`}
+                      />
+                    ) : (
+                      <p className="nl-teams-empty">Kein Marktwert-Verlauf vorhanden.</p>
+                    )}
+                    <p className="nl-teams-development-meta">
+                      {developmentSeries.marketValueFirst != null && developmentSeries.marketValueLast != null
+                        ? `von ${formatNlNumber(developmentSeries.marketValueFirst, 2)} auf ${formatNlNumber(developmentSeries.marketValueLast, 2)}`
+                        : "—"}
+                    </p>
+                  </article>
+                </div>
+                <ol className="nl-teams-development-seasons" aria-label="Saisons im Verlauf">
+                  {developmentRows.map((row) => (
+                    <li
+                      key={row.seasonId}
+                      className={`nl-teams-development-season${row.isLive ? " is-live" : ""}`}
+                      title={`${row.seasonName}${row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""}${
+                        row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""
+                      }${row.marketValue != null ? ` · MW ${formatNlNumber(row.marketValue, 2)}` : ""}`}
+                    >
+                      <span className="nl-teams-development-season-name">
+                        {formatNlSeasonShortLabel(row.seasonName, row.seasonId)}
+                      </span>
+                      <span className="nl-teams-development-season-rank nl-tnum">
+                        {row.rank != null ? `#${formatNlNumber(row.rank, 0)}` : "—"}
+                      </span>
+                      {row.isLive ? <span className="nl-teams-development-season-live">Live</span> : null}
+                    </li>
+                  ))}
+                </ol>
+              </>
+            ) : (
+              <p className="nl-teams-empty">
+                Noch keine abgeschlossenen Saisons — der Verlauf entsteht ab der zweiten Saison
+                {liveHistoryRow?.rank != null ? ` (aktuell Rang #${formatNlNumber(liveHistoryRow.rank, 0)})` : ""}.
+              </p>
+            )}
+          </NlCard>
+        </div>
+      ) : null}
+
+      <div ref={rosterCardRef} className="nl-teams-anchor">
       <NlCard
         className="nl-teams-roster-card"
         eyebrow="Kaderprofil"
@@ -704,16 +1198,64 @@ export default function FoundationTeamsNewLook({
         ) : null}
         {rosterMode === "kader" ? renderRosterGrid() : renderRosterTable()}
       </NlCard>
+      </div>
 
+      <div ref={leagueCardRef} className="nl-teams-anchor">
       <NlCard className="nl-teams-league-card" eyebrow="Teams · Liga" title="Teamtabelle">
         {boardRows.length > 0 ? (
-          <ol className="nl-teams-board" aria-label="Teamtabelle">
-            {boardRows.map((row) => renderBoardRow(row))}
-          </ol>
+          <>
+            <div className="nl-teams-sortbar" role="group" aria-label="Teamtabelle sortieren">
+              <span className="nl-teams-sortbar-label">Sortieren</span>
+              {NL_TEAMS_BOARD_SORTS.map((option) => {
+                const isActive = boardSort.key === option.key;
+                return (
+                  <button
+                    key={`nl-teams-sort-${option.key}`}
+                    type="button"
+                    className={`nl-teams-sort${isActive ? " is-active" : ""}`}
+                    onClick={() => handleBoardSortToggle(option.key, option.defaultDir)}
+                    title={option.title}
+                    aria-pressed={isActive}
+                  >
+                    {option.label}
+                    {isActive ? (
+                      <span className="nl-teams-sort-dir" aria-hidden="true">
+                        {boardSort.dir === "asc" ? "▲" : "▼"}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {NL_TEAMS_AXES.map(({ key, label }) => {
+                const isActive = boardSort.key === key;
+                return (
+                  <button
+                    key={`nl-teams-sort-${key}`}
+                    type="button"
+                    className={`nl-teams-sort nl-teams-sort-axis ${nlToneClass(key)}${isActive ? " is-active" : ""}`}
+                    onClick={() => handleBoardSortToggle(key, "asc")}
+                    title={`Liga nach ${label}-Bereichsrang sortieren`}
+                    aria-pressed={isActive}
+                  >
+                    {label}
+                    {isActive ? (
+                      <span className="nl-teams-sort-dir" aria-hidden="true">
+                        {boardSort.dir === "asc" ? "▲" : "▼"}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <ol className="nl-teams-board" aria-label="Teamtabelle">
+              {boardRows.map((row) => renderBoardRow(row))}
+            </ol>
+          </>
         ) : (
           <p className="nl-teams-empty">Noch keine Teamdaten für diese Saison.</p>
         )}
       </NlCard>
+      </div>
     </div>
   );
 }
