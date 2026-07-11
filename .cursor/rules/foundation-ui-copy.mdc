@@ -1,0 +1,54 @@
+---
+description: Foundation UI Copy — FM-Stil, keine Erklär-Blöcke im Layout
+globs: app/foundation/**/*.{tsx,ts},components/foundation/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Foundation UI Copy (Football-Manager-Stil)
+
+**Referenz:** Football Manager, Velo, klassische Sports-Management-UIs.
+
+## Pflicht
+
+Jeder Screen braucht **eine klare Überschrift** (`h1`/`h2`). Fachbegriffe dürfen über **`TooltipHeading`**, **`GameTerm`** oder **`title`-Attribute** erklärt werden.
+
+## Verboten (keine neuen Vorkommen, bestehendes schrittweise entfernen)
+
+- Marketing-Sätze und Coach-Texte als sichtbare Fließtexte unter der Überschrift  
+  (z. B. „Kader entwickeln, ohne den Screen zu ueberladen.“)
+- Kicker/Eyebrow-Zeilen, die den Screen erklären statt zu benennen  
+  (z. B. „Training & Gebaeude“, „Spielertraining“ als Prosa)
+- Dauerhafte `.muted`-Absätze, die Funktion oder Flow beschreiben
+- Mehrzeilige Erklär-Karten unter KPIs („Top Steigerer“-Storytexte mit Ratgeber-Satz)
+- Sichtbare `foundation-flow-coach`-Detailtexte auf Standard-Screens (nur Debug/Onboarding, falls überhaupt)
+
+## Erlaubt
+
+- **Datenzeilen:** `TEAM · Modus · Saison` (Fakten, keine Prosa)
+- **Status/Fehler:** Blocker, Warnungen, „Warum nicht“ bei disabled Actions
+- **Leere Zustände:** ein kurzer Satz (max. eine Zeile)
+- **Tooltips:** ausführliche Erklärung nur on hover / Fokus
+
+## Pattern
+
+```tsx
+// ✅ Richtig
+<TooltipHeading as="h2" tooltip="Trainingsmodus und Klasse pro Spieler.">
+  Training
+</TooltipHeading>
+<p>{team.shortCode} · {seasonLabel}</p>
+
+// ❌ Falsch
+<span className="training-v2-kicker">Training & Gebaeude</span>
+<h2>Kader entwickeln, ohne den Screen zu ueberladen.</h2>
+<p className="muted">Verteilung im sichtbaren Kader — pro Spieler unten feinjustieren.</p>
+```
+
+## Navigation
+
+- **Spieler** in der Sidebar = Spielerliste (`players`), nicht leeres Profil.
+- Spielerprofil (`playerProfile`) nur über Klick auf einen Spieler oder Deep-Link `?playerId=`.
+
+## Bei Refactors
+
+Text entfernen, nicht umformulieren. Wenn Erklärung nötig: in Tooltip verschieben, nicht als sichtbaren Absatz stehen lassen.

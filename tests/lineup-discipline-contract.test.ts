@@ -75,6 +75,34 @@ describe("lineup discipline contract", () => {
     expect(first.totalDisciplineSidesInSeason).toBe(20);
   });
 
+  it("uses matchday schedule player counts instead of catalog defaults when they differ", () => {
+    const disciplineSchedule = buildLegacySeedSeasonDisciplineSchedule({
+      seasonId: foundationSeedSeason.id,
+      disciplines: foundationSeedDisciplines,
+      matchdayIds: foundationSeedSeason.matchdayIds,
+    }).map((entry) =>
+      entry.matchdayId === "matchday-1" && entry.discipline2
+        ? {
+            ...entry,
+            discipline2: {
+              ...entry.discipline2,
+              playerCount: 6,
+            },
+          }
+        : entry,
+    );
+
+    const matchdayOne = buildMatchdayLineupContract({
+      season: foundationSeedSeason,
+      matchday: foundationSeedMatchdays[0]!,
+      disciplines: foundationSeedDisciplines,
+      disciplineSchedule,
+    });
+
+    expect(matchdayOne.discipline2?.disciplineId).toBe("fechten");
+    expect(matchdayOne.discipline2?.requiredPlayers).toBe(6);
+  });
+
   it("does not silently fall back to index pairing when a stored season schedule misses a matchday entry", () => {
     const disciplineSchedule = buildLegacySeedSeasonDisciplineSchedule({
       seasonId: foundationSeedSeason.id,

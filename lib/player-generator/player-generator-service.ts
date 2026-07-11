@@ -23,6 +23,7 @@ import { normalizePlayerOvr } from "@/lib/data/player-ovr-scale";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { resolveSlotRolesForDiscipline, type MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 import { officialDisciplineWeightMatrix, playerGeneratorAttributeKeys, type PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
 import { playerGeneratorArchetypes, type PlayerGeneratorArchetypeConstraint } from "@/lib/player-generator/player-generator-archetypes";
@@ -702,32 +703,35 @@ function deriveAxesFromAttributes(attributes: PlayerGeneratorAttributes) {
   };
 }
 
+const DRAFT_DISCIPLINE_PLAYER_ID = "__player_generator_draft__";
+
 function deriveDisciplineRatings(
   disciplines: Discipline[],
   attributes: PlayerGeneratorAttributes,
+  catalogPlayers: Player[],
   warnings: string[],
 ) {
-  const ratings: Record<string, number> = {};
-
-  for (const discipline of disciplines) {
-    const weights = officialDisciplineWeightMatrix[discipline.id as keyof typeof officialDisciplineWeightMatrix];
-    if (!weights) {
-      warnings.push(`Keine offizielle Diszi-Gewichtung fuer ${discipline.name}.`);
-      continue;
-    }
-
-    const entries = Object.entries(weights) as Array<[PlayerGeneratorAttributeKey, number]>;
-    const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-    if (totalWeight <= 0) {
-      warnings.push(`Leere Diszi-Gewichtung fuer ${discipline.name}.`);
-      continue;
-    }
-
-    const weightedValue = entries.reduce((sum, [attributeKey, weight]) => sum + attributes[attributeKey] * weight, 0);
-    ratings[discipline.id] = roundValue(clamp(weightedValue / totalWeight, 1, 99), 1);
+  if (catalogPlayers.length === 0) {
+    warnings.push("Kein Liga-Katalog fuer Disziplin-Ranking vorhanden.");
+    return Object.fromEntries(disciplines.map((discipline) => [discipline.id, 50]));
   }
 
-  return ratings;
+  const template = catalogPlayers[0];
+  const draftPlayer: Player = {
+    ...template,
+    id: DRAFT_DISCIPLINE_PLAYER_ID,
+    attributeSheetStats: {
+      ...(template.attributeSheetStats ?? {}),
+      ...attributes,
+    },
+  };
+
+  const ratingsByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+    [...catalogPlayers, draftPlayer],
+    { [DRAFT_DISCIPLINE_PLAYER_ID]: attributes },
+  );
+
+  return ratingsByPlayerId.get(DRAFT_DISCIPLINE_PLAYER_ID) ?? {};
 }
 
 function derivePps(disciplineRatings: Record<string, number>) {
@@ -1572,7 +1576,7 @@ function buildCandidate(input: {
   const subclasses = pickSubclasses(catalog, generatorInput, classSuggestion.className, roleProfile, archetypeConstraint, rng);
   const traits = pickTraits(catalog, generatorInput, roleProfile, archetypeConstraint, rng);
   const disciplineWarnings: string[] = [];
-  const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, disciplineWarnings);
+  const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, input.players, disciplineWarnings);
   const pps = derivePps(disciplineRatings);
   const ovr = deriveGeneratorOvr(axes);
   const generatedEconomy = deriveGeneratedEconomy({
@@ -1807,7 +1811,7 @@ export function recalculatePlayerGeneratorDraft(input: {
   const disciplineWarnings: string[] = [];
   const attributes = input.draft.generated.attributes;
   const axes = deriveAxesFromAttributes(attributes);
-  const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, disciplineWarnings);
+  const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, input.players, disciplineWarnings);
   const pps = derivePps(disciplineRatings);
   const ovr = deriveGeneratorOvr(axes);
   const generatedEconomy = deriveGeneratedEconomy({

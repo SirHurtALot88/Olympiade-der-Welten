@@ -1,0 +1,300 @@
+Der Spielstand konnte nicht geladen werden.
+Neu laden
+Spielstände
+Oly Manager
+FOUNDATION LAEDT · MD 1
+SPIELTAG
+⋮⋮
+⌂
+Home
+⋮⋮
+✉
+Inbox
+⋮⋮
+▣
+Einsatzliste
+⋮⋮
+◉
+Arena
+⋮⋮
+▤
+Saisonstand
+TEAM
+⋮⋮
+◈
+Teams
+⋮⋮
+◎
+Spieler
+⋮⋮
+↑
+Training
+⋮⋮
+▦
+Gebäude
+MARKT
+⋮⋮
+⇄
+Transfermarkt
+⋮⋮
+◐
+Scouting
+⋮⋮
+↺
+Historie
+WELT
+⋮⋮
+▥
+Ranks
+⋮⋮
+◫
+Diszis
+⋮⋮
+€
+Sponsoren
+⋮⋮
+?
+Lexikon
+ADMIN
+⋮⋮
+⏵
+Spieltag
+⋮⋮
++
+Generator
+⋮⋮
+⚙
+Settings
+⋮⋮
+⚒
+Admin
+Weiter
+Scouting prüfen
+Leertaste
+Suchen
+Einsatzliste
+Formplan
+SPIELSTAND
+Singleplayer Foundation
+LOAD
+AKTIVES TEAM
+Alle 32 Teams anzeigen
+LOAD · Foundation laedt
+Einsatzliste
+?
+Audit (4)
+AI-Planung · Armageddon Aftermath
+BEREITS GENUTZT
+7 Formkarten
++2 Punkte · POW
++8 Punkte · SPE
++8 Punkte · SPE
++2 Punkte · SPE
++2 Punkte · SPE
++4 Punkte · MEN
++4 Punkte · SOC
+MATCHDAY PREP
+Armageddon Aftermath · Spieltag 1 · Spurt 0/4 · Schach 0/3 · Lineup 0/7 · Captain 3/3 (0 heute)
+Noch 1 Ding offen · Slots füllen
+Slots 0/7
+Captain 3/3
+Form ok
+Score 0,0
+Fatigue 0.0
+Blocker 1
+Risiko hoch
+?
+Tastatur
+↑↓ Slots wechseln
+⌫ Slot leeren
+1–4 Kandidat zuweisen
+Enter Top-Pick setzen
+Slots füllen
+Nächster Slot
+Auto-Fill
+Noch 1 offen
+Spieltag
+✓ Spieltag 1 · Spurt (4) / Schach (3)
+✓ Spieltag 2 · Wettessen (2) / I Spy (4)
+✓ Spieltag 3 · Hockey (6) / TDM (3)
+✓ Spieltag 4 · Takeshi (5) / Breaking (4)
+✓ Spieltag 5 · Tennis (6) / Football (4)
+✓ Spieltag 6 · Battlefield (6) / Basketball (2)
+✓ Spieltag 7 · Mini DM (5) / Showcase (5)
+✓ Spieltag 8 · Time Trial (5) / Fechten (3)
+✓ Spieltag 9 · Staffel (6) / Eiskunst (3)
+✓ Spieltag 10 · Climbing (2) / Gewichtheben (2)
+Team
+✓ A-A (Armageddon Aftermath) · Lineup 20/20 · Captain 3/3
+D1
+Spurt
+Rank 17 · 0/4 Slots
+Schonen
+Normal
+Push
+D1-1
+Block Start
+Offen
+Base —
+Slot 58.5
+F 0
+Offen
+Jill Rayner · 58.5
+Hier weiter
+D1-1 wartet noch auf einen Spieler.
+D1-2
+Acceleration
+Offen
+Base —
+Slot 56.9
+F 0
+Offen
+Jill Rayner · 56.9
+Spieler fehlt
+D1-2 wartet noch auf einen Spieler.
+D2
+Schach
+Rank 24 · 0/3 Slots
+Schonen
+Normal
+Push
+D2-1
+Opening Prep
+Offen
+Base —
+Slot 65.1
+F 0
+Offen
+Nestinats · 65.1
+Spieler fehlt
+D2-1 wartet noch auf einen Spieler.
+D2-2
+Pattern Read
+Offen
+Base —
+Slot 64.4
+F 0
+Offen
+Nestinats · 64.4
+Spieler fehlt
+D2-2 wartet noch auf einen Spieler.
+D1-1
+Block Start
+Explodiert aus dem Start ueber Speed und Determination.
+Top Pick
+Nächster
+SPD —
+DET —
+WIL —
+Alle (11)
+Sofort (2)
+Alternative (9)
+Blockiert (0)
+
+Slot-Score · gemeinsame Skala 19.6–60.4
+
+1
+Jill Rayner
+Base 54.4 · Passt sofort · Wunsch · direkt
+Passt direkt sauber in den Slot.
+58.5
+🎯
+📌
+2
+Maru
+Base 54.1 · Passt sofort · Wunsch · direkt
+Passt direkt sauber in den Slot.
+58.2
+🎯
+📌
+3
+Draven
+Base 44.4 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-2 (+1.0)
+44.5
+🎯
+📌
+4
+Tommy Rourke
+Base 40.3 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-2 (+1.4)
+44.3
+🎯
+📌
+Adam Tricky
+Base 39.8 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+42.2
+🎯
+📌
+Bongo Skydrop
+Base 33.5 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+42
+🎯
+📌
+Belandria
+Base 27.4 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+11.3)
+32.1
+🎯
+📌
+Nestinats
+Base 26.5 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+33.2)
+31.9
+🎯
+📌
+Aquilla
+Base 19.4 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+26.7
+🎯
+📌
+Chana
+Base 19.3 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+14.0)
+25.5
+🎯
+📌
+Gourmatron
+Base 22.4 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+21.5
+🎯
+📌
+Freier Slot
+Jill Rayner
+Passt direkt sauber in den Slot.
+BASE
+—
+ROLLE
+0.0
+SLOT
+—
+FATIGUE
++0.0
+MALUS
+0.0
+Captain D1
+Kein Captain
+0 frei heute
+Taktik · Form & Team-Power
+READY CHECK
+Noch 1 Ding offen
+7 Slots offen
+Slots
+7 offen
+Captain
+Optional · beide offen
+Forderungen
+11 offen · -103,3
+Preview
+6 Hinweise
+Noch 1 offen
+Klick zeigt genau, was noch fehlt.

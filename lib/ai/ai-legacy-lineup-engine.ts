@@ -6,17 +6,17 @@ import type {
   AiLegacyLineupSuggestion,
   AiLegacyLineupSuggestionSide,
   AiNeedAxis,
-  AiSideSelectionReason,
 } from "@/lib/ai/ai-needs-types";
-import type { DisciplineCategory } from "@/lib/data/olyDataTypes";
+import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
+import { playerNeedsLineupRestFromTrainingLoad } from "@/lib/ai/ai-player-training-load-service";
 import { evaluateLegacyAiNeeds } from "@/lib/ai/ai-needs-engine";
+import type { AiLineupStrategy } from "@/lib/data/olyDataTypes";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
+import { getFatiguePerformanceMultiplier, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { buildLegacyLineupAggregateScore } from "@/lib/lineups/legacy-score-engine";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
-import { calculateMatchdayProjectedPreview, resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
-import { buildLineupPlayerDemandMap } from "@/lib/morale/player-demands-service";
 
 type CaptainSuggestionCandidate = {
   disciplineId: string;
@@ -33,99 +33,6 @@ type CaptainDecision = {
   status: AiCaptainSelectionStatus;
   warnings: string[];
 };
-
-function formatAiReasonScore(value: number | null | undefined, digits = 1) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  return value.toFixed(digits).replace(/\\.0$/, "");
-}
-
-function formatCaptainReasonToken(value: string) {
-  const labels: Record<string, string> = {
-    front_defense: "Toprang verteidigen",
-    podium_attack: "Podium angreifen",
-    top10_pressure: "Top-10-Druck",
-    rank_climb_window: "Rank-Fenster",
-    outside_push_window: "Aufholfenster",
-    large_discipline_leverage: "große Diszi absichern",
-    captain_budget_pressure: "Captain-Budget nutzen",
-    specialist_upset_95: "Elite-Upset in kleiner Diszi",
-    specialist_upset_90: "Elite-Spezialist in kleiner Diszi",
-    specialist_upset_85: "starker Spezialist in kleiner Diszi",
-    specialist_upset_80: "Upset-Chance in kleiner Diszi",
-    huge_bonus: "sehr hoher Captain-Bonus",
-    strong_bonus: "starker Captain-Bonus",
-    late_season: "späte Saison",
-    season_pressure: "Saisondruck",
-  };
-  return labels[value] ?? value;
-}
-
-function buildAiLineupDemandMap(context: LegacyLineupLoadedContext) {
-  const disciplineScoresByPlayerId = new Map<string, Record<string, number>>();
-  for (const score of context.disciplineScores) {
-    const ratings = disciplineScoresByPlayerId.get(score.playerId) ?? {};
-    ratings[score.disciplineId] = score.score;
-    disciplineScoresByPlayerId.set(score.playerId, ratings);
-  }
-
-  const matchdayDisciplines = [context.matchdayContract?.discipline1, context.matchdayContract?.discipline2]
-    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-    .map((entry) => ({
-      id: entry.disciplineId,
-      name: entry.displayName,
-      category: entry.category as DisciplineCategory,
-      playerCount: entry.requiredPlayers,
-    }));
-
-  return buildLineupPlayerDemandMap({
-    seasonId: context.seasonId,
-    teamId: context.teamId,
-    rosterPlayers: context.rosterPlayers.map((player) => ({
-      id: player.id,
-      name: player.name,
-      traitsPositive: player.traitsPositive ?? [],
-      traitsNegative: player.traitsNegative ?? [],
-      disciplineRatings: disciplineScoresByPlayerId.get(player.id) ?? {},
-      coreStats: player.coreStats,
-      attributeSheetStats: player.attributeStats ?? undefined,
-      pps: player.pps ?? null,
-      ovr: player.ovr ?? null,
-    })),
-    matchdayDisciplines,
-  });
-}
-
-function getLineupDemandScore(input: {
-  context: LegacyLineupLoadedContext;
-  demandMap: ReturnType<typeof buildAiLineupDemandMap>;
-  playerId: string;
-  disciplineId: string;
-  captainIntent?: boolean;
-}) {
-  const demands = input.demandMap.get(input.playerId) ?? [];
-  let bonus = 0;
-  const reasons: string[] = [];
-  for (const demand of demands) {
-    if (demand.status === "fulfilled" || demand.status === "failed") continue;
-    const priorityBonus = demand.priority === "high" ? 3.5 : demand.priority === "medium" ? 2 : 1;
-    if (demand.type === "discipline_start" && demand.targetDisciplineId === input.disciplineId) {
-      bonus += priorityBonus;
-      reasons.push(`Forderung ${demand.label} +${priorityBonus}`);
-    } else if (demand.type === "appearances") {
-      bonus += Math.max(0.5, priorityBonus * 0.5);
-      reasons.push(`Einsatzforderung +${Math.max(0.5, priorityBonus * 0.5)}`);
-    } else if (input.captainIntent && demand.type === "captaincy" && (!demand.targetDisciplineId || demand.targetDisciplineId === input.disciplineId)) {
-      bonus += priorityBonus;
-      reasons.push(`Captain-Forderung +${priorityBonus}`);
-    }
-  }
-  return {
-    bonus,
-    reasons,
-  };
-}
 
 function getIdentityTieBreakScore(
   context: LegacyLineupLoadedContext,
@@ -152,102 +59,161 @@ function getIdentityTieBreakScore(
   return focusAxes.reduce((sum, axis) => sum + axisScores[axis], 0);
 }
 
+type RosterHealthSnapshot = {
+  fatigue: number;
+  injuryRiskPercent: number;
+};
+
+function getRosterHealth(context: LegacyLineupLoadedContext, playerId: string): RosterHealthSnapshot {
+  const roster = context.rosterPlayers?.find((entry) => entry.id === playerId);
+  const fatigue =
+    roster?.fatigue ??
+    context.fatigueByPlayerId?.[playerId]?.count ??
+    0;
+  const injuryRiskPercent = roster?.injuryRiskPercent ?? getInjuryRiskPercent(fatigue);
+  return { fatigue, injuryRiskPercent };
+}
+
+function inferLineupStrategyFromRoster(context: LegacyLineupLoadedContext): AiLineupStrategy {
+  const players = context.rosterPlayers ?? [];
+  const highFatigue = players.filter((player) => (player.fatigue ?? 0) >= 70).length;
+  const criticalFatigue = players.filter((player) => (player.fatigue ?? 0) >= 85).length;
+  const highInjuryRisk = players.filter(
+    (player) => (player.injuryRiskPercent ?? getInjuryRiskPercent(player.fatigue ?? 0)) >= 12,
+  ).length;
+  if (criticalFatigue >= 2 || highInjuryRisk >= 3) return "avoid_injury";
+  if (highFatigue >= 3) return "rotate_depth";
+  return "best_score_now";
+}
+
+function resolveLineupStrategy(context: LegacyLineupLoadedContext): AiLineupStrategy {
+  if (context.lineupStrategy) {
+    return context.lineupStrategy;
+  }
+  if (context.gameState) {
+    return resolveLineupStrategyForTeam(context.gameState, context.teamId);
+  }
+  return inferLineupStrategyFromRoster(context);
+}
+
+function getHealthLineupPenalty(strategy: AiLineupStrategy, health: RosterHealthSnapshot) {
+  const { fatigue, injuryRiskPercent } = health;
+  let penalty = 0;
+
+  if (fatigue >= 85) penalty += 12;
+  else if (fatigue >= 70) penalty += 9;
+  else if (fatigue >= 55) penalty += 3;
+
+  if (injuryRiskPercent >= 25) penalty += 10;
+  else if (injuryRiskPercent >= 12) penalty += 5;
+  else if (injuryRiskPercent >= 8) penalty += 2;
+
+  if (strategy === "avoid_injury") {
+    penalty *= 2;
+    if (fatigue >= 65 || injuryRiskPercent >= 10) penalty += 14;
+    if (fatigue >= 80 || injuryRiskPercent >= 20) penalty += 8;
+  } else if (strategy === "rotate_depth") {
+    penalty *= 1.6;
+    if (fatigue >= 70) penalty += 8;
+  } else if (strategy === "protect_stars" || strategy === "captain_safe") {
+    if (fatigue >= 60) penalty += 4;
+  }
+
+  return penalty;
+}
+
+function playerNeedsLineupRest(context: LegacyLineupLoadedContext, playerId: string) {
+  if (context.gameState) {
+    return playerNeedsLineupRestFromTrainingLoad({
+      gameState: context.gameState,
+      teamId: context.teamId,
+      playerId,
+    });
+  }
+  const health = getRosterHealth(context, playerId);
+  return health.fatigue >= 85 || health.injuryRiskPercent >= 25;
+}
+
+function getSelectionScore(
+  context: LegacyLineupLoadedContext,
+  playerId: string,
+  rawScore: number,
+  strategy: AiLineupStrategy,
+) {
+  if (!Number.isFinite(rawScore) || rawScore === Number.NEGATIVE_INFINITY) {
+    return rawScore;
+  }
+  const health = getRosterHealth(context, playerId);
+  const fatigueAdjusted = rawScore * getFatiguePerformanceMultiplier(health.fatigue);
+  let score = fatigueAdjusted - getHealthLineupPenalty(strategy, health);
+  if (playerNeedsLineupRest(context, playerId)) {
+    score -= 28;
+  }
+  return score;
+}
+
 function buildEntriesForDisciplineSide(
   context: LegacyLineupLoadedContext,
   disciplineId: string | null,
   disciplineSide: DisciplineSide,
   usedPlayerIds: Set<string>,
   focusAxes: AiNeedAxis[],
-): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[]; selectionReasons: AiSideSelectionReason[] } {
+): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[] } {
   if (!disciplineId) {
     return {
       entries: [],
       warnings: [`No discipline configured for ${disciplineSide}.`],
       reasoning: [],
-      selectionReasons: [],
     };
   }
 
-  const demandMap = buildAiLineupDemandMap(context);
-  const playerCount = context.disciplinePlayerCounts[disciplineId] ?? 0;
-  const slotRoles = resolveSlotRolesForDiscipline(disciplineId, disciplineId, playerCount);
-  const rosterById = new Map((context.rosterPlayers ?? []).map((player) => [player.id, player]));
-  const picked: Array<{
-    activePlayerId: string;
-    playerId: string;
-    score: number;
-    demandBonus: number;
-    demandReasons: string[];
-    hasScore: boolean;
-    tieBreak: number;
-    slotFitBonus: number;
-    slotIndex: number;
-  }> = [];
+  const playerCount =
+    context.disciplineSidePlayerCounts?.[`${disciplineId}::${disciplineSide}`] ??
+    context.disciplinePlayerCounts[disciplineId] ??
+    0;
+  const lineupStrategy = resolveLineupStrategy(context);
+  const candidates = context.activePlayers
+    .filter((player) => !usedPlayerIds.has(player.playerId))
+    .map((player) => {
+      const disciplineScore = context.disciplineScores.find(
+        (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
+      );
+      const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
+      const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
+      const health = getRosterHealth(context, player.playerId);
+      const selectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
 
-  for (let slotIndex = 0; slotIndex < playerCount; slotIndex += 1) {
-    const role = slotRoles[slotIndex] ?? null;
-    const candidates = context.activePlayers
-      .filter((player) => !usedPlayerIds.has(player.playerId))
-      .map((player) => {
-        const disciplineScore = context.disciplineScores.find(
-          (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
-        );
-        const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
-        const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
-        const demand = getLineupDemandScore({ context, demandMap, playerId: player.playerId, disciplineId });
-        const rosterPlayer = rosterById.get(player.playerId) ?? null;
-        const slotFitBonus =
-          disciplineScore?.score != null
-            ? calculateMatchdayProjectedPreview({
-                baseScore: disciplineScore.score,
-                role,
-                attributeStats: rosterPlayer?.attributeStats ?? null,
-                currentFatigueCount: context.fatigueByPlayerId?.[player.playerId]?.count ?? 0,
-                requiredPlayers: playerCount,
-                intensity: "normal",
-              }).roleModifier
-            : 0;
+      return {
+        activePlayerId: player.id,
+        playerId: player.playerId,
+        score,
+        selectionScore,
+        hasScore: disciplineScore != null,
+        tieBreak,
+        health,
+      };
+    })
+    .sort((left, right) => {
+      if (left.hasScore !== right.hasScore) {
+        return left.hasScore ? -1 : 1;
+      }
+      if (right.selectionScore !== left.selectionScore) {
+        return right.selectionScore - left.selectionScore;
+      }
+      if (right.tieBreak !== left.tieBreak) {
+        return right.tieBreak - left.tieBreak;
+      }
+      return left.playerId.localeCompare(right.playerId);
+    });
 
-        return {
-          activePlayerId: player.id,
-          playerId: player.playerId,
-          score,
-          demandBonus: demand.bonus,
-          demandReasons: demand.reasons,
-          hasScore: disciplineScore != null,
-          tieBreak,
-          slotFitBonus,
-          slotIndex,
-        };
-      })
-      .sort((left, right) => {
-        if (left.hasScore !== right.hasScore) {
-          return left.hasScore ? -1 : 1;
-        }
-        const leftEffectiveScore = left.score + left.demandBonus + left.slotFitBonus;
-        const rightEffectiveScore = right.score + right.demandBonus + right.slotFitBonus;
-        if (rightEffectiveScore !== leftEffectiveScore) {
-          return rightEffectiveScore - leftEffectiveScore;
-        }
-        if (right.tieBreak !== left.tieBreak) {
-          return right.tieBreak - left.tieBreak;
-        }
-        return left.playerId.localeCompare(right.playerId);
-      });
-
-    const selected = candidates[0];
-    if (!selected) {
-      break;
-    }
-    picked.push(selected);
-    usedPlayerIds.add(selected.playerId);
-  }
+  const picked = candidates.slice(0, playerCount);
+  picked.forEach((player) => usedPlayerIds.add(player.playerId));
 
   return {
-    entries: picked.map((player) => ({
+    entries: picked.map((player, index) => ({
       disciplineId,
       disciplineSide,
-      slotIndex: player.slotIndex,
+      slotIndex: index,
       playerId: player.playerId,
       activePlayerId: player.activePlayerId,
     })),
@@ -257,27 +223,10 @@ function buildEntriesForDisciplineSide(
         .filter((player) => !player.hasScore)
         .map((player) => `Missing discipline score for player ${player.playerId} in ${disciplineId} (${disciplineSide}).`),
     ],
-    reasoning: picked.map((player) => {
-      return `${disciplineSide.toUpperCase()} Slot ${player.slotIndex + 1}: Score ${formatAiReasonScore(player.hasScore ? player.score : null)} + Bedarf ${formatAiReasonScore(player.demandBonus)} + Slot-Fit ${formatAiReasonScore(player.slotFitBonus)} + Teamfit ${formatAiReasonScore(player.tieBreak)}${player.demandReasons.length ? ` (${player.demandReasons.join(", ")})` : ""}`;
-    }),
-    selectionReasons: picked.map((player) => {
-      const disciplineScore = player.hasScore ? player.score : null;
-      const selectionScore = disciplineScore == null ? null : disciplineScore + player.demandBonus + player.slotFitBonus;
-      const demandText = player.demandReasons.length > 0
-        ? `, dazu ${player.demandReasons.join(", ")}`
-        : "";
-      return {
-        playerId: player.playerId,
-        activePlayerId: player.activePlayerId,
-        slotIndex: player.slotIndex,
-        disciplineScore,
-        selectionScore,
-        demandBonus: player.demandBonus,
-        identityTieBreak: player.tieBreak,
-        demandReasons: player.demandReasons,
-        reason: `Eingesetzt wegen ${formatAiReasonScore(disciplineScore)} Diszi-Score, Slot-Fit ${formatAiReasonScore(player.slotFitBonus)}${demandText}. Teamfit/Tiebreak ${formatAiReasonScore(player.tieBreak)}.`,
-      };
-    }),
+    reasoning: picked.map(
+      (player, index) =>
+        `${disciplineSide.toUpperCase()} slot ${index + 1}: ${player.playerId} via selectionScore=${player.hasScore ? player.selectionScore.toFixed(2) : "missing"} disciplineScore=${player.hasScore ? player.score.toFixed(2) : "missing"} fatigue=${player.health.fatigue.toFixed(0)} injuryRisk=${player.health.injuryRiskPercent.toFixed(1)}% strategy=${lineupStrategy} tieBreak=${player.tieBreak.toFixed(2)}`,
+    ),
   };
 }
 
@@ -342,8 +291,8 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
     needsSummary,
     warnings: [...needsSummary.warnings, ...d1.warnings, ...d2.warnings, ...validation.errors],
     debugReasoning: [...d1.reasoning, ...d2.reasoning],
-    d1SelectionReasons: d1.selectionReasons,
-    d2SelectionReasons: d2.selectionReasons,
+    d1SelectionReasons: [],
+    d2SelectionReasons: [],
   };
 }
 
@@ -478,12 +427,7 @@ function suggestCaptainForSide(
   const bestEntry =
     [...scorePreview.entries]
       .filter((entry) => entry.finalContribution != null)
-      .sort((left, right) => {
-        const demandMap = buildAiLineupDemandMap(context);
-        const leftDemand = getLineupDemandScore({ context, demandMap, playerId: left.playerId, disciplineId, captainIntent: true }).bonus;
-        const rightDemand = getLineupDemandScore({ context, demandMap, playerId: right.playerId, disciplineId, captainIntent: true }).bonus;
-        return ((right.finalContribution ?? 0) + rightDemand) - ((left.finalContribution ?? 0) + leftDemand);
-      })[0] ?? null;
+      .sort((left, right) => (right.finalContribution ?? 0) - (left.finalContribution ?? 0))[0] ?? null;
 
   if (!bestEntry) {
     return {
@@ -564,145 +508,6 @@ function getCaptainUsageBeforeCurrentDraft(context: LegacyLineupLoadedContext) {
   };
 }
 
-function evaluateAiCaptainOpportunity(
-  context: LegacyLineupLoadedContext,
-  captainSlotsRemaining: number,
-  candidate: CaptainSuggestionCandidate,
-) {
-  const rank = context.teamDisciplineRanks?.[candidate.disciplineId]?.rank ?? null;
-  const requiredPlayers =
-    context.disciplineSidePlayerCounts?.[`${candidate.disciplineId}::${candidate.disciplineSide}`] ??
-    context.disciplinePlayerCounts[candidate.disciplineId] ??
-    0;
-  const contribution = Number.isFinite(candidate.estimatedContribution) ? candidate.estimatedContribution : 0;
-  const captainBonusEstimate = contribution * 0.5;
-  const totalMatchdays = Math.max(1, Math.ceil((context.matchdayContract?.totalDisciplineSidesInSeason ?? 20) / 2));
-  const matchdayIndex = Math.max(1, context.matchdayContract?.matchdayIndex ?? context.matchday.index ?? 1);
-  const remainingMatchdaysIncludingCurrent = Math.max(1, totalMatchdays - matchdayIndex + 1);
-  const earlySeason = matchdayIndex <= Math.ceil(totalMatchdays * 0.3);
-  const midSeason = matchdayIndex <= Math.ceil(totalMatchdays * 0.65);
-  let score = 0;
-  const reasons: string[] = [];
-
-  if (rank != null) {
-    if (rank <= 3) {
-      score += 5;
-      reasons.push("front_defense");
-    } else if (rank <= 6) {
-      score += 4;
-      reasons.push("podium_attack");
-    } else if (rank <= 10) {
-      score += 3;
-      reasons.push("top10_pressure");
-    } else if (rank <= 16) {
-      score += 2;
-      reasons.push("rank_climb_window");
-    } else if (rank <= 24) {
-      score += 1;
-      reasons.push("outside_push_window");
-    }
-  }
-
-  if (requiredPlayers >= 5 && (rank == null || rank <= 18)) {
-    score += 2;
-    reasons.push("large_discipline_leverage");
-  }
-  if (requiredPlayers >= 5 && rank != null && rank > 18 && contribution >= 88) {
-    score += 1;
-    reasons.push("large_discipline_leverage");
-  }
-
-  if (requiredPlayers <= 3 && contribution >= 95) {
-    score += 8;
-    reasons.push("specialist_upset_95");
-  } else if (requiredPlayers <= 3 && contribution >= 90) {
-    score += 6;
-    reasons.push("specialist_upset_90");
-  } else if (requiredPlayers <= 3 && contribution >= 85) {
-    score += 4;
-    reasons.push("specialist_upset_85");
-  } else if (requiredPlayers <= 3 && contribution >= 80) {
-    score += 3;
-    reasons.push("specialist_upset_80");
-  }
-
-  if (captainBonusEstimate >= 45) {
-    score += 2;
-    reasons.push("huge_bonus");
-  } else if (captainBonusEstimate >= 35) {
-    score += 1;
-    reasons.push("strong_bonus");
-  }
-
-  if (matchdayIndex >= totalMatchdays - 1) {
-    score += 2;
-    reasons.push("late_season");
-  } else if (matchdayIndex >= Math.ceil(totalMatchdays * 0.6)) {
-    score += 1;
-    reasons.push("season_pressure");
-  }
-
-  if (captainSlotsRemaining >= remainingMatchdaysIncludingCurrent) {
-    score += 2;
-    reasons.push("captain_budget_pressure");
-  } else if (captainSlotsRemaining > remainingMatchdaysIncludingCurrent / 2) {
-    score += 1;
-    reasons.push("captain_budget_pressure");
-  }
-
-  const threshold =
-    earlySeason
-      ? 9
-      : midSeason
-        ? 8
-        : 6;
-  const hasEliteSpecialistCase = requiredPlayers <= 3 && contribution >= 95;
-  const hasTopSixLargeDisciplineCase =
-    !earlySeason && rank != null && rank <= 6 && requiredPlayers >= 5 && captainBonusEstimate >= 32;
-  const hasTopTenLateCase =
-    !midSeason && rank != null && rank <= 10 && captainBonusEstimate >= 30;
-  const hasClearCaptainCase =
-    score >= threshold + 1 ||
-    hasEliteSpecialistCase ||
-    hasTopSixLargeDisciplineCase ||
-    hasTopTenLateCase ||
-    (!earlySeason && rank != null && rank <= 3 && captainBonusEstimate >= 40);
-
-  return {
-    score,
-    threshold,
-    isWorthUsing: captainSlotsRemaining > 0 && score >= threshold && hasClearCaptainCase,
-    isEliteWindow: score >= threshold + 4,
-    reasons,
-  };
-}
-
-function getAiCaptainNewSlotBudget(
-  context: LegacyLineupLoadedContext,
-  captainSlotsRemaining: number,
-  captainOpportunities: Array<ReturnType<typeof evaluateAiCaptainOpportunity>>,
-) {
-  if (captainSlotsRemaining <= 0) {
-    return 0;
-  }
-
-  const worthUsingCount = captainOpportunities.filter((entry) => entry.isWorthUsing).length;
-  if (worthUsingCount <= 0) {
-    return 0;
-  }
-
-  const matchdayIndex = Math.max(1, context.matchdayContract?.matchdayIndex ?? context.matchday.index ?? 1);
-  const totalMatchdays = Math.max(1, Math.ceil((context.matchdayContract?.totalDisciplineSidesInSeason ?? 20) / 2));
-  const eliteWindowCount = captainOpportunities.filter((entry) => entry.isEliteWindow).length;
-  const lateSeason = matchdayIndex >= Math.max(1, totalMatchdays - 2);
-  const canDoubleCommit =
-    captainSlotsRemaining >= 2 &&
-    worthUsingCount >= 2 &&
-    (lateSeason || (eliteWindowCount >= 2 && matchdayIndex >= Math.ceil(totalMatchdays * 0.7)));
-
-  return Math.min(canDoubleCommit ? 2 : 1, captainSlotsRemaining, worthUsingCount);
-}
-
 function buildCaptainDecisions(
   context: LegacyLineupLoadedContext,
   entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>,
@@ -720,26 +525,14 @@ function buildCaptainDecisions(
     suggestCaptainForSide(context, entries, input.d1DisciplineId, "d1"),
     suggestCaptainForSide(context, entries, input.d2DisciplineId, "d2"),
   ].filter((candidate): candidate is CaptainSuggestionCandidate => Boolean(candidate));
-  const opportunityBySideKey = new Map<string, ReturnType<typeof evaluateAiCaptainOpportunity>>(
-    candidates.map((candidate) => [
-      `${candidate.disciplineId}::${candidate.disciplineSide}`,
-      evaluateAiCaptainOpportunity(context, captainSlotsRemaining, candidate),
-    ] as const),
-  );
 
   const selectedCandidateKeys = new Set<string>();
   let newlyConsumedCaptainSlots = 0;
-  const newCaptainSlotBudget = getAiCaptainNewSlotBudget(
-    context,
-    captainSlotsRemaining,
-    Array.from(opportunityBySideKey.values()),
-  );
   for (const candidate of [...candidates].sort((left, right) => right.estimatedContribution - left.estimatedContribution)) {
     const sideKey = `${candidate.disciplineId}::${candidate.disciplineSide}`;
     const alreadyConsumedThisSeason = captainUsage.hasExactSideKeys && captainUsage.sideKeys.has(sideKey);
-    const opportunity = opportunityBySideKey.get(sideKey);
 
-    if (alreadyConsumedThisSeason || (opportunity?.isWorthUsing && newlyConsumedCaptainSlots < newCaptainSlotBudget)) {
+    if (alreadyConsumedThisSeason || newlyConsumedCaptainSlots < captainSlotsRemaining) {
       selectedCandidateKeys.add(sideKey);
       if (!alreadyConsumedThisSeason) {
         newlyConsumedCaptainSlots += 1;
@@ -782,33 +575,18 @@ function buildCaptainDecisions(
     }
 
     if (selectedCandidateKeys.has(sideKey)) {
-      const opportunity = opportunityBySideKey.get(sideKey);
       decisionsBySide.set(side, {
         candidate,
         status: "selected",
-        warnings: [
-          ...candidate.warnings,
-          ...(opportunity?.reasons.length
-            ? [`Captain genutzt: ${opportunity.score}/${opportunity.threshold} · ${opportunity.reasons.map(formatCaptainReasonToken).join(", ")}`]
-            : []),
-        ],
+        warnings: candidate.warnings,
       });
       continue;
     }
 
-    const opportunity = opportunityBySideKey.get(sideKey);
     decisionsBySide.set(side, {
       candidate,
-      status: captainSlotsRemaining <= 0 ? "skipped_limit_reached" : "skipped_not_needed",
-      warnings:
-        captainSlotsRemaining <= 0
-          ? ["captain_limit_reached", ...candidate.warnings]
-          : [
-              ...candidate.warnings,
-              ...(opportunity
-                ? [`Captain gespart: ${opportunity.score}/${opportunity.threshold} · ${opportunity.reasons.map(formatCaptainReasonToken).join(", ") || "kein klares Fenster"}`]
-                : []),
-            ],
+      status: "skipped_limit_reached",
+      warnings: ["captain_limit_reached", ...candidate.warnings],
     });
   }
 
@@ -818,7 +596,7 @@ function buildCaptainDecisions(
   return {
     entries: nextEntries,
     captainSlotsUsed,
-    captainSlotsRemaining: Math.max(0, captainSlotsRemaining - newlyConsumedCaptainSlots),
+    captainSlotsRemaining,
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsage.sideKeys),
     d1: decisionsBySide.get("d1")!,
     d2: decisionsBySide.get("d2")!,
@@ -834,7 +612,6 @@ function buildPreviewSide(
   captainDecision: CaptainDecision,
   captainSlotsUsed: number,
   captainSlotsRemaining: number,
-  selectionReasons: AiSideSelectionReason[],
 ): AiLegacyLineupSuggestionSide {
   const requiredPlayers =
     (disciplineId
@@ -907,32 +684,18 @@ function buildPreviewSide(
         !warning.includes("Missing discipline score") && !warning.includes("is incomplete"),
     ),
   ];
-  const reasonByEntryKey = new Map(
-    selectionReasons.map((reason) => [
-      `${reason.playerId}::${reason.activePlayerId}::${reason.slotIndex}`,
-      reason,
-    ]),
-  );
-  const selectedEntries: AiLegacyLineupSelectedPlayer[] = scorePreview.entries.map((entry) => {
-    const reason = reasonByEntryKey.get(`${entry.playerId}::${entry.activePlayerId ?? ""}::${entry.slotIndex}`) ?? null;
-    return {
-      selectionScore: reason?.selectionScore ?? null,
-      demandBonus: reason?.demandBonus ?? null,
-      identityTieBreak: reason?.identityTieBreak ?? null,
-      demandReasons: reason?.demandReasons ?? [],
-      selectionReason: reason?.reason ?? null,
-      playerId: entry.playerId,
-      activePlayerId: entry.activePlayerId ?? null,
-      name: entry.name ?? null,
-      isCaptain: Boolean(entry.isCaptain),
-      baseScore: entry.baseDisciplineScore ?? null,
-      fatigueCount: entry.fatigueCount ?? null,
-      fatigueMultiplier: entry.fatigueMultiplier ?? null,
-      fatigueAdjustedScore: entry.fatigueAdjustedScore ?? null,
-      captainBonus: entry.captainBonus ?? null,
-      finalContribution: entry.finalContribution ?? null,
-    };
-  });
+  const selectedEntries: AiLegacyLineupSelectedPlayer[] = scorePreview.entries.map((entry) => ({
+    playerId: entry.playerId,
+    activePlayerId: entry.activePlayerId ?? null,
+    name: entry.name ?? null,
+    isCaptain: Boolean(entry.isCaptain),
+    baseScore: entry.baseDisciplineScore ?? null,
+    fatigueCount: entry.fatigueCount ?? null,
+    fatigueMultiplier: entry.fatigueMultiplier ?? null,
+    fatigueAdjustedScore: entry.fatigueAdjustedScore ?? null,
+    captainBonus: entry.captainBonus ?? null,
+    finalContribution: entry.finalContribution ?? null,
+  }));
   const selectedPlayers = scorePreview.selectedPlayers ?? scorePreview.entries.length;
   const missingSlots = Math.max(0, requiredPlayers - selectedPlayers);
   const rankEntry = context.teamDisciplineRanks?.[disciplineId] ?? null;
@@ -972,8 +735,6 @@ function buildPreviewSide(
         ? [`Captain: ${captainDecision.candidate.captainName}`]
         : captainDecision.status === "skipped_limit_reached"
           ? ["Captain uebersprungen: Saisonlimit erreicht"]
-          : captainDecision.status === "skipped_reserved"
-            ? ["Captain gespart: Saisonbudget fuer spaetere Matchdays reserviert"]
           : ["Kein Captain-Vorschlag"]),
     ],
   };
@@ -1010,7 +771,6 @@ export function buildAiLegacyLineupPreview(
     captainPlan.d1,
     captainPlan.captainSlotsUsed,
     captainPlan.captainSlotsRemaining,
-    suggestion.d1SelectionReasons,
   );
   const d2 = buildPreviewSide(
     context,
@@ -1021,7 +781,6 @@ export function buildAiLegacyLineupPreview(
     captainPlan.d2,
     captainPlan.captainSlotsUsed,
     captainPlan.captainSlotsRemaining,
-    suggestion.d2SelectionReasons,
   );
 
   const validation = validateLegacyLineupContext(

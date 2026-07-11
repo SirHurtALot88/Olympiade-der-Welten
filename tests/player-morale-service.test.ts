@@ -170,6 +170,44 @@ function createGameState(input: {
 }
 
 describe("player morale service", () => {
+  it("caps discipline start demands so one matchday discipline does not flood the lineup", () => {
+    const players = Array.from({ length: 8 }, (_, index) =>
+      createPlayer(`breaker-${index + 1}`, {
+        name: `Breaker ${index + 1}`,
+        ovr: 92 - index,
+        pps: 24 - index,
+        traitsPositive: index < 4 ? ["Ambitious"] : [],
+        traitsNegative: index % 2 === 0 ? ["Diva"] : [],
+        disciplineRatings: { breaking: 88 - index, dummy: 40 },
+      }),
+    );
+    const gameState = createGameState({
+      player: players[0],
+      teammate: players[1],
+    });
+    gameState.players = players;
+    gameState.rosters = players.map((player) => createRosterEntry(player.id));
+    gameState.seasonState.disciplineSchedule = [
+      {
+        seasonId: gameState.season.id,
+        matchdayId: gameState.matchdayState.matchdayId,
+        matchdayIndex: 4,
+        matchdayLabel: "MD 4",
+        discipline1: { disciplineId: "dummy", displayName: "Dummy", order: 1, playerCount: 2, category: "mental" },
+        discipline2: { disciplineId: "breaking", displayName: "Breaking", order: 2, playerCount: 4, category: "power" },
+        sourceStatus: "season_seed",
+        sourceNote: null,
+      },
+    ];
+
+    const disciplineDemands = Array.from(buildTeamPlayerDemandMap(gameState, "M-M").values())
+      .flat()
+      .filter((demand) => demand.type === "discipline_start" && demand.targetDisciplineId === "breaking");
+
+    expect(disciplineDemands.length).toBeLessThanOrEqual(2);
+    expect(disciplineDemands.every((demand) => demand.source === "player_demands_v2_scarce_discipline_window")).toBe(true);
+  });
+
   it("keeps captain demands rare because only three season captains exist", () => {
     const players = [
       createPlayer("leader-1", {

@@ -12,6 +12,7 @@ export type GamePhaseAction =
   | "renew_contract"
   | "set_training"
   | "facility_apply"
+  | "sponsor_choice"
   | "set_lineup"
   | "resolve_matchday"
   | "complete_season"
@@ -85,9 +86,10 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
   } else if (
     action === "renew_contract" ||
     action === "set_training" ||
-    action === "facility_apply"
+    action === "facility_apply" ||
+    action === "sponsor_choice"
   ) {
-    allowed = isPreseasonManagementOpen(gameState);
+    allowed = isPreseasonManagementOpen(gameState) || isEarlySeasonSetup(gameState);
     reason = allowed ? null : `phase_blocked:${action}:${phase}`;
   } else if (action === "set_lineup") {
     allowed = phase === "season_active" || phase === "lineup_setup" || phase === "next_season_ready";
@@ -105,7 +107,7 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
 
   if (
     isEarlySeasonSetup(gameState) &&
-    ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply"].includes(action)
+    ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply", "sponsor_choice"].includes(action)
   ) {
     warnings.push("early_season_setup_allowed_before_first_result");
   }
@@ -121,4 +123,19 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     reason,
     warnings,
   };
+}
+
+/**
+ * Training intensity (leicht/mittel/hart) feeds a single season-end batch
+ * calculation (see lib/training/organic-season-progression.ts), so it must be
+ * fixed for the whole season once matches are underway — otherwise a team
+ * could run "leicht" all season for low fatigue/injury risk and switch to
+ * "hart" right before the season-end XP is booked. This reuses the existing
+ * "set_training" preseason-management gate (same window as facility/transfer
+ * setup) as the single source of truth for the lock: open during preseason
+ * and until the season's first matchday result is recorded, sealed for the
+ * rest of the season afterwards. See docs/training-intensity-season-lock.md.
+ */
+export function isTrainingIntensityLockedForSeason(gameState: GameState): boolean {
+  return !evaluateGamePhaseAction(gameState, "set_training").allowed;
 }

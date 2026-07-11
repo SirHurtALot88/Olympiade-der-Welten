@@ -1,0 +1,30 @@
+name: CI Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  full-season-playthrough:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set CI SQLite path
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-nightly.sqlite" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - name: Start dev server
+        run: |
+          npm run dev &
+          echo $! > .dev-server.pid
+      - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
+      - run: npm run season:full-ui-playthrough -- --skip-ui --no-start
+      - name: Stop dev server
+        if: always()
+        run: kill "$(cat .dev-server.pid)" 2>/dev/null || true

@@ -11,14 +11,32 @@ import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-seaso
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { countTeamInjuredPlayers, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
-import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
+import {
+  ensureLeagueMarketValueSnapshot,
+  resolveLeagueMarketValueMap,
+} from "@/lib/player-formulas/market-value-apply";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
+import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
+import {
+  buildTeamPlayerTrainingLoadPlans,
+  countTeamHardTrainingDemandPressure,
+  type AiPlayerTrainingLoadPlan,
+} from "@/lib/ai/ai-player-training-load-service";
+import {
+  buildTeamPlayerTrainingClassPlans,
+  type AiPlayerTrainingClassPlan,
+} from "@/lib/ai/ai-player-training-class-service";
+import {
+  projectExpectedSalaryAtPlannerTarget,
+  resolveCombinedLiquidityReserve,
+} from "@/lib/ai/ai-team-cash-reserve-service";
 
 export type AiManagementStrategicIntent =
   | "win_now"
@@ -120,6 +138,8 @@ export type AiTeamTrainingPlanPreview = {
   expectedInjuryRiskEffect: number;
   reasons: string[];
   warnings: string[];
+  playerTrainingPlans: AiPlayerTrainingLoadPlan[];
+  playerTrainingClassPlans: AiPlayerTrainingClassPlan[];
 };
 
 export type AiTeamManagementPreview = {
@@ -152,6 +172,9 @@ type TeamContext = {
   fatigueHighCount: number;
   fatigueCriticalCount: number;
   injuryCount: number;
+  injuryRiskHighCount: number;
+  injuryRiskCriticalCount: number;
+  projectedHardTrainingRiskCount: number;
   moraleAvg: number;
   lowMoraleCount: number;
   lowBoardTrustCount: number;
@@ -162,6 +185,9 @@ type TeamContext = {
   lastSeasonPrizeMoney: number;
   upcomingCategoryCounts: Record<DisciplineCategory, number>;
   objectiveAiBias: TeamObjectiveAiBias | null;
+  prevSeasonInjuryCount: number;
+  prevSeasonAvgMatchdayFatigue: number;
+  chronicInjuryPlayerCount: number;
 };
 
 type CalculatedPlayerEconomy = {
@@ -191,6 +217,42 @@ const RAW_SALARY_TO_BUDGET_UNIT = 1000;
 
 function identitySignal(value: number) {
   return value <= 10 ? value * 10 : value;
+}
+
+const REBUILD_BUILDING_BOTTOM_TIER = 8;
+const REBUILD_BUILDING_BOTTOM_MIN = 0;
+const REBUILD_BUILDING_BOTTOM_MAX = 5;
+const REBUILD_BUILDING_TOP_MAX = 25;
+const REBUILD_BUILDING_BOTTOM_CEILING = 10;
+const REBUILD_BUILDING_SEASON_GROWTH = 0.04;
+
+function parseSeasonNumber(seasonId: string | null | undefined) {
+  const match = (seasonId ?? "season-1").match(/(\d+)/);
+  return match ? Number(match[1]) : 1;
+}
+
+/** Rebuild-phase facility cap by cash rank — bottom ~8 teams land in a soft 0–5 corridor (≤10). */
+function resolveRebuildBuildingCap(gameState: GameState, teamId: string) {
+  const ranked = gameState.teams
+    .map((team) => ({ teamId: team.teamId, cash: team.cash ?? 0 }))
+    .sort((left, right) => left.cash - right.cash || left.teamId.localeCompare(right.teamId));
+  const rank = ranked.findIndex((entry) => entry.teamId === teamId);
+  if (rank < 0) return 0;
+
+  const seasonFactor = 1 + (Math.max(1, parseSeasonNumber(gameState.season?.id)) - 1) * REBUILD_BUILDING_SEASON_GROWTH;
+  let baseCap = 0;
+  if (rank < REBUILD_BUILDING_BOTTOM_TIER) {
+    const tierSpan = Math.max(1, REBUILD_BUILDING_BOTTOM_TIER - 1);
+    const tierProgress = rank / tierSpan;
+    baseCap = REBUILD_BUILDING_BOTTOM_MIN + tierProgress * (REBUILD_BUILDING_BOTTOM_MAX - REBUILD_BUILDING_BOTTOM_MIN);
+    return round(Math.min(baseCap * seasonFactor, REBUILD_BUILDING_BOTTOM_CEILING * seasonFactor), 2);
+  }
+
+  const upperStart = REBUILD_BUILDING_BOTTOM_TIER;
+  const upperSpan = Math.max(1, ranked.length - upperStart - 1);
+  const upperProgress = (rank - upperStart) / upperSpan;
+  baseCap = REBUILD_BUILDING_BOTTOM_MAX + upperProgress * (REBUILD_BUILDING_TOP_MAX - REBUILD_BUILDING_BOTTOM_MAX);
+  return round(Math.min(baseCap * seasonFactor, REBUILD_BUILDING_TOP_MAX * seasonFactor), 2);
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -226,20 +288,8 @@ function getPlayerMwChangeFix(player: Player) {
 
 function buildCalculatedEconomyByPlayer(gameState: GameState) {
   const formulaSources = loadPlayerFormulaSources();
-  const marketValueResult = calculateMarketValueFromRankTable({
-    players: gameState.players
-      .filter((player) => Object.values(player.disciplineRatings ?? {}).some((value) => isFiniteNumber(value)))
-      .map((player) => ({
-        playerId: player.id,
-        scores: player.disciplineRatings ?? {},
-        mwChangeFix: getPlayerMwChangeFix(player) ?? undefined,
-      })),
-    rankToDisciplineMarketValue: formulaSources.rankToDisciplineMarketValue,
-  });
-  const marketValueByPlayerId =
-    marketValueResult.status === "ready"
-      ? new Map(marketValueResult.players.map((entry) => [entry.playerId, entry.marketValueNew] as const))
-      : new Map<string, number>();
+  const snapshotGameState = ensureLeagueMarketValueSnapshot(gameState);
+  const marketValueByPlayerId = resolveLeagueMarketValueMap(snapshotGameState);
 
   return new Map(
     gameState.players.map((player) => {
@@ -292,6 +342,51 @@ function getControlMode(gameState: GameState, teamId: string) {
   return gameState.seasonState.teamControlSettings?.[teamId]?.controlMode ?? "ai";
 }
 
+function getPreviousSeasonId(gameState: GameState) {
+  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
+  if (snapshots.length > 0) {
+    return snapshots.at(-1)?.seasonId ?? null;
+  }
+  const match = gameState.season.id.match(/season-(\d+)/);
+  if (!match) return null;
+  const seasonNumber = Number.parseInt(match[1] ?? "", 10);
+  return Number.isFinite(seasonNumber) && seasonNumber > 1 ? `season-${seasonNumber - 1}` : null;
+}
+
+function buildPrevSeasonHealthMetrics(gameState: GameState, teamId: string, players: Player[]) {
+  const prevSeasonId = getPreviousSeasonId(gameState);
+  if (!prevSeasonId) {
+    return { prevSeasonInjuryCount: 0, prevSeasonAvgMatchdayFatigue: 0, chronicInjuryPlayerCount: 0 };
+  }
+  let prevSeasonInjuryCount = 0;
+  let chronicInjuryPlayerCount = 0;
+  const fatigueSamples: number[] = [];
+  for (const player of players) {
+    const prevEvents = (player.injuryHistory ?? []).filter(
+      (entry) => entry.teamId === teamId && entry.seasonId === prevSeasonId,
+    );
+    prevSeasonInjuryCount += prevEvents.length;
+    if (prevEvents.length >= 2) chronicInjuryPlayerCount += 1;
+    for (const event of prevEvents) {
+      if (Number.isFinite(event.fatigueBefore)) fatigueSamples.push(event.fatigueBefore);
+    }
+  }
+  for (const event of gameState.seasonState.injuryEvents ?? []) {
+    if (event.teamId !== teamId || event.seasonId !== prevSeasonId || event.result !== "injured") continue;
+    if (Number.isFinite(event.fatigueBefore)) fatigueSamples.push(event.fatigueBefore);
+  }
+  const prevSeasonAvgMatchdayFatigue = fatigueSamples.length > 0 ? round(average(fatigueSamples), 2) : 0;
+  return { prevSeasonInjuryCount, prevSeasonAvgMatchdayFatigue, chronicInjuryPlayerCount };
+}
+
+function isPrevSeasonHealthStressed(context: TeamContext) {
+  return (
+    context.prevSeasonAvgMatchdayFatigue >= 55 ||
+    context.prevSeasonInjuryCount >= 10 ||
+    context.chronicInjuryPlayerCount >= 2
+  );
+}
+
 function buildTeamContext(
   gameState: GameState,
   teamId: string,
@@ -318,8 +413,11 @@ function buildTeamContext(
   const fatigueAvg = round(average(fatigueValues), 2);
   const fatigueHighCount = players.filter((player) => (player.fatigue ?? 0) >= 70).length;
   const fatigueCriticalCount = players.filter((player) => (player.fatigue ?? 0) >= 85).length;
-  const injuryCount = (gameState.seasonState.playerAvailabilityState ?? []).filter(
-    (entry) => entry.teamId === teamId && entry.injuryStatus === "injured",
+  const injuryCount = countTeamInjuredPlayers(gameState, teamId);
+  const injuryRiskHighCount = players.filter((player) => getInjuryRiskPercent(player.fatigue ?? 0) >= 12).length;
+  const injuryRiskCriticalCount = players.filter((player) => getInjuryRiskPercent(player.fatigue ?? 0) >= 25).length;
+  const projectedHardTrainingRiskCount = players.filter(
+    (player) => getInjuryRiskPercent((player.fatigue ?? 0) + FATIGUE_LOAD_BY_MODE.hart) >= 18,
   ).length;
   const moraleAvg = round(average(morale.map((entry) => entry.morale)), 2);
   const lowMoraleCount = morale.filter((entry) => entry.morale < 45).length;
@@ -353,6 +451,7 @@ function buildTeamContext(
       }
     }
   }
+  const prevSeasonHealth = buildPrevSeasonHealthMetrics(gameState, teamId, players);
   return {
     team,
     identity,
@@ -367,6 +466,9 @@ function buildTeamContext(
     fatigueHighCount,
     fatigueCriticalCount,
     injuryCount,
+    injuryRiskHighCount,
+    injuryRiskCriticalCount,
+    projectedHardTrainingRiskCount,
     moraleAvg,
     lowMoraleCount,
     lowBoardTrustCount,
@@ -377,6 +479,7 @@ function buildTeamContext(
     lastSeasonPrizeMoney,
     upcomingCategoryCounts,
     objectiveAiBias: getTeamObjectiveAiBias(gameState, teamId),
+    ...prevSeasonHealth,
   };
 }
 
@@ -388,7 +491,9 @@ function deriveStrategicIntent(context: TeamContext) {
   if (context.team.cash < 0) return "cash_recovery" as const;
   if (rosterGap > 0 || context.rosterCount < context.identity.playerMin) return "roster_repair" as const;
   if ((context.objectiveAiBias?.rosterUrgency ?? 0) >= 0.78 && context.rosterCount < context.identity.playerOpt) return "roster_repair" as const;
-  if (context.injuryCount >= 2 || context.fatigueCriticalCount >= 2) return "injury_recovery" as const;
+  if (context.injuryCount >= 1 || context.fatigueCriticalCount >= 1 || context.injuryRiskHighCount >= 2) {
+    return "injury_recovery" as const;
+  }
   if (salaryPressure >= 1.18 && finances <= 45) return "salary_control" as const;
   if ((context.objectiveAiBias?.budgetConservatism ?? 0) >= 0.7 && context.team.cash <= 25) return "conservative_hold" as const;
   if ((context.objectiveAiBias?.facilityPriority ?? 0) >= 0.7 && context.team.cash >= 35) return "facility_push" as const;
@@ -430,6 +535,7 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
   if (context.team.cash < 10) warnings.push("cash_low");
   if (context.injuryCount > 0) warnings.push("injury_load");
   if (context.fatigueCriticalCount > 0) warnings.push("fatigue_critical");
+  if (context.injuryRiskHighCount >= 2) warnings.push("injury_risk_cluster");
   if (context.lowMoraleCount >= 2) warnings.push("morale_cluster_low");
   if (context.contractExitCount >= 2) warnings.push("contract_exit_wave");
   warnings.push(...(objectiveBias?.warnings ?? []).map((warning) => `board_objective:${warning}`));
@@ -442,7 +548,14 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
     riskProfile,
     boardPressure: Math.max(clamp(100 - boardConfidence, 0, 100), (objectiveBias?.pressure ?? 0) * 10),
     youthShare: round(ratio(context.youthCount, context.rosterCount) * 100, 2),
-    injuryPressure: clamp(context.injuryCount * 22 + context.fatigueCriticalCount * 12, 0, 100),
+    injuryPressure: clamp(
+      context.injuryCount * 22 +
+        context.fatigueCriticalCount * 12 +
+        context.injuryRiskHighCount * 8 +
+        context.injuryRiskCriticalCount * 10,
+      0,
+      100,
+    ),
     fatiguePressure: clamp(context.fatigueAvg + context.fatigueHighCount * 5, 0, 100),
     moralePressure: clamp((100 - context.moraleAvg) + context.lowMoraleCount * 8, 0, 100),
     boardTrustPressure: clamp(context.lowBoardTrustCount * 18 + (100 - boardConfidence) * 0.35, 0, 100),
@@ -451,6 +564,21 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
     facilityOpportunity: clamp(context.team.cash * 0.8 + finances * 0.4 + ambition * 0.35, 0, 100),
     warnings,
   };
+}
+
+function resolveTeamSeasonSponsorSurplus(gameState: GameState, teamId: string, seasonId: string) {
+  return round(
+    (gameState.seasonState.sponsorPayoutLogs ?? [])
+      .filter(
+        (log) =>
+          log.teamId === teamId &&
+          log.seasonId === seasonId &&
+          log.componentId !== "salary_deduct" &&
+          (log.cashDelta ?? 0) > 0,
+      )
+      .reduce((sum, log) => sum + (log.cashDelta ?? 0), 0),
+    2,
+  );
 }
 
 function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudgetPlanPreview {
@@ -480,22 +608,37 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
   const objectiveBias = context.objectiveAiBias;
-  const salaryReserve = round(Math.max(context.salarySumBudget * 0.5, context.expectedSalarySum * 0.35), 2);
+  // While rebuilding (roster below identity Opt — e.g. Season 1 draft), the player draft always
+  // wins over facility spend: buckets must not lock cash into buildings before the roster exists.
+  const rosterBelowOpt = context.rosterCount < context.identity.playerOpt;
+  const expectedSalaryAtPlan = projectExpectedSalaryAtPlannerTarget(
+    gameState,
+    context.team.teamId,
+    context.identity.playerOpt ?? undefined,
+  );
+  const liquidityReserve = resolveCombinedLiquidityReserve({
+    gameState,
+    teamId: context.team.teamId,
+    expectedSalaryAfterPlan: Math.max(context.expectedSalarySum, expectedSalaryAtPlan),
+    rosterBelowOpt,
+    buyAggression: objectiveBias?.buyAggression,
+  });
+  const salaryReserve = liquidityReserve.salaryReserve;
   const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, facilityMaintenanceCost, 0), 2);
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
-  const cashReserveRate = clamp(
-    0.13 +
-      Math.max(0, finances - 55) / 450 -
-      Math.max(0, ambition - 65) / 900 +
-      (objectiveBias?.budgetConservatism ?? 0) * 0.05,
-    0.1,
-    0.3,
-  );
-  const cashReserve = round(Math.max(8, cash * cashReserveRate), 2);
+  const cashReserve = liquidityReserve.cashReserve;
   const rawFreeCash = Math.max(0, cash - salaryReserve - maintenanceBudget - emergencyBudget - cashReserve);
-  const recoveryBuildingNeed = context.injuryCount > 0 || context.fatigueHighCount >= 2 ? 0.08 : 0;
+  const recoveryBuildingNeed =
+    context.injuryCount > 0 || context.fatigueHighCount >= 2 || context.fatigueAvg >= 60 ? 0.12 : 0;
+  const recoveryBudgetReserve =
+    context.fatigueAvg >= 60 ||
+    context.prevSeasonAvgMatchdayFatigue >= 55 ||
+    context.injuryCount >= 3 ||
+    context.prevSeasonInjuryCount >= 8
+      ? round(Math.min(14, Math.max(8, rawFreeCash * 0.12)), 2)
+      : 0;
   const buildingBias =
-    0.24 +
+    0.31 +
     (ambition >= 65 ? 0.08 : 0) +
     (finances >= 70 ? 0.04 : 0) +
     (context.youthCount >= 2 ? 0.04 : 0) +
@@ -508,11 +651,20 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
     (finances >= 65 ? 0.03 : 0) +
     (objectiveBias?.buyAggression ?? 0) * 0.12 -
     (objectiveBias?.budgetConservatism ?? 0) * 0.05;
-  const investmentRate = clamp(0.6 + ambition / 600 + finances / 900, 0.58, 0.82);
-  const investableCash = rawFreeCash * investmentRate;
+  // Salary / emergency / cash reserves are the only liquidity buffers — do not haircut again.
+  const investableCash = Math.max(0, rawFreeCash - recoveryBudgetReserve);
   const totalBias = Math.max(0.01, buildingBias + transferBias);
-  const buildingBudget = round(investableCash * (buildingBias / totalBias), 2);
-  const transferBudget = round(investableCash * (transferBias / totalBias), 2);
+  // During rebuild, cap facility spend by cash rank — bottom ~8 teams in a soft 0–5 corridor (≤10),
+  // richer teams up to 25; grows ~4 % per season so the band can rise over time.
+  const rebuildBuildingCap = resolveRebuildBuildingCap(gameState, context.team.teamId);
+  let buildingBudget = rosterBelowOpt
+    ? round(Math.min(rebuildBuildingCap, investableCash), 2)
+    : round(investableCash * (buildingBias / totalBias), 2);
+  const sponsorSurplus = resolveTeamSeasonSponsorSurplus(gameState, context.team.teamId, gameState.season.id);
+  if (!rosterBelowOpt && sponsorSurplus > 0) {
+    buildingBudget = round(Math.min(buildingBudget, sponsorSurplus), 2);
+  }
+  const transferBudget = round(Math.max(0, investableCash - buildingBudget), 2);
   const warnings: string[] = [];
   if (maintenanceBudget > 0 && maintenanceBudget > buildingBudget && rawFreeCash < maintenanceBudget + 5) {
     warnings.push("maintenance_priority_over_upgrades");
@@ -590,6 +742,12 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (context.injuryCount > 0) negative.push("Verletzungen machen XP-Push riskanter");
     } else if (facility.facilityId === "recovery_center") {
       score += context.injuryCount * 18 + context.fatigueCriticalCount * 14 + context.fatigueHighCount * 6;
+      score += countTeamHardTrainingDemandPressure(gameState, context.team.teamId) * 8;
+      if (context.injuryCount >= 3) score += 22;
+      if (context.prevSeasonInjuryCount >= 8) score += 20;
+      if (context.prevSeasonAvgMatchdayFatigue >= 55) score += 18;
+      if (context.fatigueAvg >= 60) score += 12;
+      if (context.chronicInjuryPlayerCount >= 2) score += 10;
       if (context.rosterCount >= context.identity.playerOpt + 2) score -= 6;
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
@@ -600,6 +758,10 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (context.team.cash < 15) negative.push("Cash ist für Scouts/Forecasts knapp");
     } else if (facility.facilityId === "fan_shop" || facility.facilityId === "arena_upgrade") {
       score += finances * 0.25 + (context.team.cash < 20 ? 8 : 0);
+      if (currentLevel === 0) {
+        score += facility.facilityId === "fan_shop" ? 24 : 16;
+        positive.push("Income-Gebäude fehlt komplett");
+      }
       if (profile.strategicIntent === "roster_repair") score -= 10;
       positive.push("langfristiger Cashflow hilft Reserven");
       if (profile.strategicIntent === "roster_repair") negative.push("akute Kaderbaustellen sind wichtiger");
@@ -625,17 +787,27 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       hasCashPressure &&
       lowStrategicValue &&
       !isNetPositiveIncomeFacility;
-    const action: AiManagementBuildingAction =
-      shouldDowngrade
-        ? "downgrade_or_ignore_if_no_cash"
-        : maintenanceCost > 0 && budgetPlan.bucketsBefore.maintenanceBudget >= maintenanceCost
-        ? score >= 52 && currentLevel < facility.maxLevel && canSpend
-          ? currentLevel > 0
-            ? "upgrade_existing"
-            : "build_new"
-          : "maintain"
-        : score >= 52
-          ? "downgrade_or_ignore_if_no_cash"
+    const buildScoreThreshold =
+      facility.facilityId === "recovery_center" &&
+      (context.fatigueAvg >= 60 ||
+        context.fatigueHighCount >= 2 ||
+        context.injuryCount >= 3 ||
+        context.prevSeasonAvgMatchdayFatigue >= 55 ||
+        context.prevSeasonInjuryCount >= 8)
+        ? 28
+        : 45;
+    const wantsBuildOrUpgrade =
+      score >= buildScoreThreshold && currentLevel < facility.maxLevel && canSpend;
+    const action: AiManagementBuildingAction = shouldDowngrade
+      ? "downgrade_or_ignore_if_no_cash"
+      : wantsBuildOrUpgrade
+        ? currentLevel === 0
+          ? "build_new"
+          : "upgrade_existing"
+        : maintenanceCost > 0 &&
+            currentLevel > 0 &&
+            budgetPlan.bucketsBefore.maintenanceBudget >= maintenanceCost
+          ? "maintain"
           : "skip";
     if (action === "upgrade_existing" || action === "build_new") {
       spendCursor += upgradeCost;
@@ -678,6 +850,21 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
   });
 }
 
+function isTeamHealthStressed(context: TeamContext, profile: AiTeamManagementProfile) {
+  return (
+    isPrevSeasonHealthStressed(context) ||
+    context.injuryCount >= 1 ||
+    context.fatigueCriticalCount >= 1 ||
+    context.fatigueHighCount >= 3 ||
+    context.fatigueAvg >= 68 ||
+    context.injuryRiskHighCount >= 2 ||
+    context.injuryRiskCriticalCount >= 1 ||
+    context.projectedHardTrainingRiskCount >= 3 ||
+    profile.injuryPressure >= 45 ||
+    profile.fatiguePressure >= 62
+  );
+}
+
 function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: AiTeamManagementProfile) {
   const ambition = identitySignal(context.identity.ambition);
   const harmony = identitySignal(context.identity.harmony);
@@ -703,12 +890,13 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
   ];
   axisPriority.sort((left, right) => right.score - left.score);
   const topAxis = axisPriority[0]?.key ?? "BALANCED";
-  const selectedTrainingFocus: AiManagementTrainingFocus =
-    context.injuryCount >= 2 || context.fatigueCriticalCount >= 2 || context.fatigueAvg >= 72
-      ? "RECOVERY"
-      : axisPriority.length >= 2 && Math.abs((axisPriority[0]?.score ?? 0) - (axisPriority[1]?.score ?? 0)) <= 6
-        ? "BALANCED"
-        : topAxis;
+  const healthStress = isTeamHealthStressed(context, profile);
+  const prevSeasonStress = isPrevSeasonHealthStressed(context);
+  const selectedTrainingFocus: AiManagementTrainingFocus = healthStress
+    ? "RECOVERY"
+    : axisPriority.length >= 2 && Math.abs((axisPriority[0]?.score ?? 0) - (axisPriority[1]?.score ?? 0)) <= 6
+      ? "BALANCED"
+      : topAxis;
   const identityTrainingDrive = clamp(
     ambition * 0.45 +
       harmony * 0.18 +
@@ -723,14 +911,18 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
     0,
     100,
   );
-  const selectedTrainingIntensity: AiManagementTrainingIntensity =
-    context.injuryCount >= 2 || context.fatigueCriticalCount >= 2 || profile.injuryPressure >= 55
-      ? "light"
-      : identityTrainingDrive >= 54 && context.fatigueHighCount === 0
+  const selectedTrainingIntensity: AiManagementTrainingIntensity = healthStress
+    ? "light"
+    : prevSeasonStress
+      ? "normal"
+      : identityTrainingDrive >= 54 &&
+          context.fatigueHighCount === 0 &&
+          context.injuryRiskHighCount === 0 &&
+          context.projectedHardTrainingRiskCount === 0
         ? "hard"
         : context.rosterCount <= context.identity.playerMin && identityTrainingDrive < 45
           ? "light"
-        : "normal";
+          : "normal";
   const mode = normalizeMode(selectedTrainingIntensity);
   const baseXp = PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode[mode];
   const facilities = getTeamFacilityState(gameState, context.team.teamId);
@@ -739,7 +931,8 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
   const recoveryAdjusted = applyTrainingRecoveryImpact(recoveryBase.after, mode);
   const reasons: string[] = [];
   const warnings: string[] = [];
-  if (selectedTrainingFocus === "RECOVERY") reasons.push("Verletzungen/Fatigue priorisieren Erholung");
+  if (selectedTrainingFocus === "RECOVERY") reasons.push("Verletzungen/Fatigue/Injury-Risiko priorisieren Erholung");
+  else if (prevSeasonStress) reasons.push("Vorsaison-Belastung → kein Hard-Training");
   else if (selectedTrainingFocus === "BALANCED") reasons.push("keine klare Einzelachse, gemischte Needs");
   else reasons.push(`Team-Identity und kommende Disziplinen ziehen Richtung ${selectedTrainingFocus}`);
   const selectedAxisKey =
@@ -756,10 +949,20 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
     reasons.push("Board-Achsenziel erhoeht Trainingsprioritaet");
   }
   if (selectedTrainingIntensity === "hard") reasons.push("großer oder stabiler Kader erlaubt härteres Training");
-  if (selectedTrainingIntensity === "light") reasons.push("kleiner Kader oder Injury-Krise braucht Schonung");
+  if (selectedTrainingIntensity === "light") reasons.push("kleiner Kader, Verletzungen oder hohes Injury-Risiko brauchen Schonung");
   if (identityTrainingDrive >= 54) reasons.push("Team-Identity spricht fuer aktiveres Training");
   if (selectedTrainingIntensity === "hard") warnings.push("Recovery sinkt, Rotation wichtiger");
   if (selectedTrainingIntensity === "light") warnings.push("weniger XP als Normal/Hart");
+  if (context.injuryRiskHighCount >= 2) warnings.push("mehrere Spieler mit erhoehtem Verletzungsrisiko");
+  const avgInjuryRisk = round(average(context.players.map((player) => getInjuryRiskPercent(player.fatigue ?? 0))), 2);
+  const projectedAvgInjuryRisk = round(
+    average(
+      context.players.map((player) =>
+        getInjuryRiskPercent((player.fatigue ?? 0) + FATIGUE_LOAD_BY_MODE[mode]),
+      ),
+    ),
+    2,
+  );
   return {
     teamId: context.team.teamId,
     teamCode: context.team.shortCode,
@@ -767,10 +970,20 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
     selectedTrainingIntensity,
     expectedXpEffect: round(facilityXp.after),
     expectedRecoveryEffect: round(recoveryAdjusted.after),
-    expectedInjuryRiskEffect:
-      selectedTrainingIntensity === "hard" ? 18 : selectedTrainingIntensity === "light" ? -10 : 0,
+    expectedInjuryRiskEffect: round(projectedAvgInjuryRisk - avgInjuryRisk, 2),
     reasons,
     warnings,
+    playerTrainingPlans: buildTeamPlayerTrainingLoadPlans({
+      gameState,
+      teamId: context.team.teamId,
+      teamBaselineIntensity: selectedTrainingIntensity,
+      prevSeasonStress,
+    }),
+    playerTrainingClassPlans: buildTeamPlayerTrainingClassPlans({
+      gameState,
+      teamId: context.team.teamId,
+      trainingFocus: selectedTrainingFocus,
+    }),
   } satisfies AiTeamTrainingPlanPreview;
 }
 

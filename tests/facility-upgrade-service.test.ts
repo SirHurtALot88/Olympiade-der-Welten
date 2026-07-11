@@ -98,9 +98,17 @@ describe("facility upgrade service", () => {
     expect(preview.upgradeCost).toBe(8);
     expect(preview.currentUpkeep).toBe(0);
     expect(preview.newUpkeep).toBe(0.8);
+    expect(preview.warnings).not.toContain("income_source_missing");
     expect(preview.cashBefore).toBe(100);
     expect(preview.cashAfter).toBe(92);
     expect(preview.confirmToken).toEqual(expect.any(String));
+  });
+
+  it("does not warn income_source_missing for non-income facilities like recovery_center", () => {
+    const preview = previewFacilityUpgrade(save(), "team-1", "recovery_center");
+
+    expect(preview.ok).toBe(true);
+    expect(preview.warnings).not.toContain("income_source_missing");
   });
 
   it("blocks preview when cash is insufficient", () => {

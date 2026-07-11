@@ -1,7 +1,17 @@
-import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerDisciplinePerformanceRecord, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
+import { applyTrainingXpFacilityModifiers, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { getCombinedAttributeTrainingMultiplier, getPotentialGapXpFactor } from "@/lib/foundation/player-potential-display-service";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
+import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
+import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
+import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
+import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import {
   DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
   DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN,
@@ -20,23 +30,60 @@ import type {
   PlayerTrainingMode,
 } from "@/lib/training/training-plan-types";
 
+// WeakMap caches keyed on gameState to avoid O(n²) rebuilds per player within the same state.
+const matchdayResultSeasonCache = new WeakMap<GameState, Map<string, string>>();
+const seasonPerformancesByPlayerCache = new WeakMap<GameState, Map<string, PlayerDisciplinePerformanceRecord[]>>();
+// Cache for full forecast results: keyed on gameState → playerId. Only used when all inputs
+// are derivable from gameState + player (i.e., no custom boardTrustScore or facilities override).
+const forecastResultCache = new WeakMap<GameState, Map<string, PlayerProgressionForecast>>();
+
+function getMatchdayResultSeasonIndex(gameState: GameState): Map<string, string> {
+  const cached = matchdayResultSeasonCache.get(gameState);
+  if (cached) return cached;
+  const index = new Map<string, string>(
+    (gameState.seasonState.matchdayResults ?? []).map((result) => [result.id, result.seasonId ?? gameState.season.id] as const),
+  );
+  matchdayResultSeasonCache.set(gameState, index);
+  return index;
+}
+
+function getSeasonPerformancesByPlayer(gameState: GameState): Map<string, PlayerDisciplinePerformanceRecord[]> {
+  const cached = seasonPerformancesByPlayerCache.get(gameState);
+  if (cached) return cached;
+  const seasonId = gameState.season.id;
+  const resultSeasonIndex = getMatchdayResultSeasonIndex(gameState);
+  const index = new Map<string, PlayerDisciplinePerformanceRecord[]>();
+  for (const entry of (gameState.seasonState.playerDisciplinePerformances ?? [])) {
+    const resultSeasonId = resultSeasonIndex.get(entry.matchdayResultId) ?? seasonId;
+    if (resultSeasonId !== seasonId) continue;
+    const existing = index.get(entry.playerId);
+    if (existing) {
+      existing.push(entry);
+    } else {
+      index.set(entry.playerId, [entry]);
+    }
+  }
+  seasonPerformancesByPlayerCache.set(gameState, index);
+  return index;
+}
+
 export const PLAYER_PROGRESSION_XP_CONSTANTS = {
   trainingByMode: {
     leicht: 40,
     mittel: 70,
     hart: 110,
   } satisfies Record<PlayerTrainingMode, number>,
-  appearanceXp: 15,
+  appearanceXp: 20,
   mvsMultiplier: 4,
   ppsBonusMultiplier: 4,
   ppsBonusCapPctOfMvsXp: 0.35,
   ppsBonusNoMvsCap: 35,
-  top10BonusMin: 8,
+  top10BonusMin: 10,
   top10BonusMax: 35,
-  rank1BonusMin: 35,
+  rank1BonusMin: 42,
   rank1BonusMax: 70,
   highlightBonusMin: 10,
-  highlightBonusMax: 35,
+  highlightBonusMax: 42,
   ratingTierUpgradeCost: {
     F: 45,
     E: 55,
@@ -122,20 +169,6 @@ function calculateHighlightXp(input: {
       input.highlightCount * PLAYER_PROGRESSION_XP_CONSTANTS.highlightBonusMin,
     0,
   );
-}
-
-function buildUpgradeSummary(totalXp: number) {
-  const costs = PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost;
-  const fd = costs.D ?? 70;
-  const cb = costs.B ?? 130;
-  const as = costs.S ?? 250;
-  const low = Math.max(1, Math.floor(totalXp / fd));
-  const mid = Math.max(0, Math.floor(totalXp / cb));
-  const high = Math.max(0, Math.floor(totalXp / as));
-  if (totalXp < (costs.F ?? 45)) {
-    return "unter 1 niedriges Upgrade";
-  }
-  return `ca. ${low} F/D-Upgrades, ${mid} C/B-Upgrades oder ${high} A/S-Upgrades`;
 }
 
 function buildFatigueStrain(input: {
@@ -372,6 +405,7 @@ function buildNetDevelopment(input: {
   gameState: GameState;
   currentAbility: number | null;
   potentialRating: number | null;
+  potentialGapStars?: number | null;
   trainingFormTier: PlayerTrainingFormTier;
   traitMultiplier: number;
   appearances: number;
@@ -412,7 +446,18 @@ function buildNetDevelopment(input: {
     1.38,
   );
   const trainingFormFactor = getTierFactor(input.trainingFormTier);
-  const potentialGapFactor = potentialGap >= 28 ? 1.18 : potentialGap >= 14 ? 1.1 : potentialGap >= 5 ? 1.02 : potentialGap >= -2 ? 0.82 : 0.62;
+  const potentialGapFactor =
+    input.potentialGapStars != null
+      ? getPotentialGapXpFactor(input.potentialGapStars)
+      : potentialGap >= 28
+        ? 1.18
+        : potentialGap >= 14
+          ? 1.1
+          : potentialGap >= 5
+            ? 1.02
+            : potentialGap >= -2
+              ? 0.82
+              : 0.62;
   const traitFactor = clamp(input.traitMultiplier, 0.9, 1.1);
   const routeConflict = input.player.traitsNegative.some((trait) => ["Mercenary", "Renegade", "Diva", "Egomaniac"].includes(trait));
   const routeFitFactor = routeConflict ? 0.92 : 1;
@@ -546,24 +591,72 @@ export function buildPlayerProgressionForecast(input: {
   spentXP?: number | null;
   lifetimeXP?: number | null;
   boardTrustScore?: number | null;
-}) {
+  facilities?: TeamFacilityCollection | null;
+}): PlayerProgressionForecast {
+  // Short-circuit with cached result when called repeatedly for the same player within the same
+  // gameState (e.g. previewSeasonEndXpAvailability + previewSeasonEndXpSpend both call this).
+  // Only cache when no custom overrides are in play.
+  const canCache = input.boardTrustScore == null && input.facilities == null;
+
   const mode = getTrainingMode(input.player, input.trainingModeByPlayerId);
+  const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id);
+  const facilities =
+    input.facilities ??
+    (rosterEntry ? getTeamFacilityState(input.gameState, rosterEntry.teamId) : null);
+  const trainingCenterLevel = getFacilityLevel(facilities, "training_center");
   const traitSignal = buildTrainingTraitSignal({
     traitsPositive: input.player.traitsPositive,
     traitsNegative: input.player.traitsNegative,
   });
   const traitMultiplier = traitSignal.trainingTraitMultiplier;
   const traitModifierPct = getTraitModifierPct(traitMultiplier);
+  const cacheKey = `${input.player.id}:${mode}`;
+  if (canCache) {
+    const perState = forecastResultCache.get(input.gameState);
+    const hit = perState?.get(cacheKey);
+    if (hit) return hit;
+  }
+
   const scoutPotential = buildPlayerScoutPotentialFromGameState({
     gameState: input.gameState,
     player: input.player,
     saveId: input.gameState.season.id,
   });
-  const potentialTrainingMultiplier = scoutPotential.trainingSpeedMultiplier;
-  const performances = (input.gameState.seasonState.playerDisciplinePerformances ?? []).filter((entry) => {
-    const result = (input.gameState.seasonState.matchdayResults ?? []).find((candidate) => candidate.id === entry.matchdayResultId);
-    return entry.playerId === input.player.id && (result?.seasonId ?? input.gameState.season.id) === input.gameState.season.id;
+  const potentialRecord =
+    resolvePlayerPotentialRecordForProgression({
+      gameState: input.gameState,
+      player: input.player,
+    }) ??
+    resolvePlayerPotentialRecordFromGameState({
+      gameState: input.gameState,
+      playerId: input.player.id,
+    });
+  const axisStars = buildPlayerAxisStarProfile({
+    gameState: input.gameState,
+    player: input.player,
+    disciplines: input.gameState.disciplines,
   });
+  const axisPoStars = potentialRecord?.hiddenPotentialCeilingByAxis ?? null;
+  const ceilingTrainingMultiplier =
+    potentialRecord != null
+      ? roundValue(
+          playerGeneratorAttributeKeys.reduce((sum, attribute) => {
+            return (
+              sum +
+              getCombinedAttributeTrainingMultiplier({
+                player: input.player,
+                attribute: attribute as PlayerGeneratorAttributeName,
+                record: potentialRecord,
+                axisCaStars: axisStars,
+                axisPoStars,
+              })
+            );
+          }, 0) / playerGeneratorAttributeKeys.length,
+          3,
+        )
+      : 1;
+  const potentialTrainingMultiplier = scoutPotential.trainingSpeedMultiplier * ceilingTrainingMultiplier;
+  const performances = getSeasonPerformancesByPlayer(input.gameState).get(input.player.id) ?? [];
   const appearances = input.seasonPerformance?.appearances ?? performances.length;
   const mvs = input.playerRating?.mvs ?? null;
   const pps = input.playerRating?.ppsSeason ?? input.seasonPerformance?.totalPoints ?? null;
@@ -576,6 +669,13 @@ export function buildPlayerProgressionForecast(input: {
 
   const baseTrainingXPBeforePotential = PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode[mode];
   const baseTrainingXP = roundValue(baseTrainingXPBeforePotential * potentialTrainingMultiplier, 0);
+  const developmentTrainingBonusPct = rosterEntry
+    ? getTeamDevelopmentTrainingBonusPct(input.gameState, rosterEntry.teamId)
+    : 0;
+  const facilityTrainingXp = applyTrainingXpFacilityModifiers(baseTrainingXP, facilities, {
+    developmentTrainingBonusPct,
+  });
+  const facilityTrainingDelta = facilityTrainingXp.after - facilityTrainingXp.before;
   const appearanceXP = appearances * PLAYER_PROGRESSION_XP_CONSTANTS.appearanceXp;
   const mvsXP = isFiniteNumber(mvs) ? roundValue(mvs * PLAYER_PROGRESSION_XP_CONSTANTS.mvsMultiplier, 0) : 0;
   const ppsBonusXP = calculatePpsBonusXp(pps, mvsXP);
@@ -588,7 +688,7 @@ export function buildPlayerProgressionForecast(input: {
       label:
         potentialTrainingMultiplier === 1
           ? `${mode} Training`
-          : `${mode} Training · Scout Potential x${potentialTrainingMultiplier.toFixed(2)}`,
+          : `${mode} Training · Potential x${potentialTrainingMultiplier.toFixed(2)}`,
       xpBeforeTraits: baseTrainingXP,
       traitModifierPct,
       traitMultiplier,
@@ -644,11 +744,14 @@ export function buildPlayerProgressionForecast(input: {
     }),
     buildEvent({
       type: "facility_modifier",
-      label: "Facility-Modifikatoren",
-      xpBeforeTraits: 0,
-      traitModifierPct: 0,
-      traitMultiplier: 1,
-      sourceStatus: "future_source",
+      label:
+        facilityTrainingXp.modifierPct > 0
+          ? `Training Center +${facilityTrainingXp.modifierPct}%`
+          : "Kein Training-Center-Bonus",
+      xpBeforeTraits: facilityTrainingDelta,
+      traitModifierPct,
+      traitMultiplier,
+      sourceStatus: trainingCenterLevel > 0 ? "ready" : "missing_source",
     }),
   ];
 
@@ -656,7 +759,30 @@ export function buildPlayerProgressionForecast(input: {
   const xpAfterTraits = withTraits(xpBeforeTraits, traitMultiplier);
   const performanceXP = withTraits(appearanceXP + mvsXP + ppsBonusXP + topPlayerXP + highlightXP, traitMultiplier);
   const currentAbilityRating = getCurrentAbility({ player: input.player, playerRating: input.playerRating });
-  const potentialRating = scoutPotential.scoutRating ?? (input.player.potential > 0 ? input.player.potential : currentAbilityRating);
+  const potentialRating =
+    potentialRecord?.hiddenPotentialScore ??
+    scoutPotential.scoutRating ??
+    (input.player.potential > 0 ? input.player.potential : currentAbilityRating);
+  const scoutingTeamId = rosterEntry?.teamId ?? null;
+  const internalStarSnapshot =
+    potentialRecord != null
+      ? buildPlayerStarScoutingSnapshot({
+          gameState: input.gameState,
+          player: input.player,
+          saveId: input.gameState.season.id,
+          scoutingLevel: 5,
+        })
+      : null;
+  const axisStarSnapshot =
+    scoutingTeamId != null && getEffectiveScoutingLevel(input.gameState, scoutingTeamId, input.player.id) > 0
+      ? buildPlayerStarScoutingSnapshot({
+          gameState: input.gameState,
+          player: input.player,
+          saveId: input.gameState.season.id,
+          scoutingLevel: getEffectiveScoutingLevel(input.gameState, scoutingTeamId, input.player.id),
+        })
+      : internalStarSnapshot;
+  const potentialGapStars = internalStarSnapshot?.potentialGap ?? axisStarSnapshot?.potentialGap ?? null;
   const trainingFormTier = getTrainingFormTier(buildTrainingFormScore(input.player, mode));
   const developmentLevelProgress = getDevelopmentLevelProgress(
     input.lifetimeXP ?? input.player.lifetimeXP ?? (input.currentXP ?? input.player.currentXP ?? 0) + (input.spentXP ?? input.player.spentXP ?? 0),
@@ -666,6 +792,7 @@ export function buildPlayerProgressionForecast(input: {
     gameState: input.gameState,
     currentAbility: currentAbilityRating,
     potentialRating,
+    potentialGapStars: potentialRecord != null ? potentialGapStars : null,
     trainingFormTier,
     traitMultiplier,
     appearances,
@@ -689,7 +816,7 @@ export function buildPlayerProgressionForecast(input: {
   });
   const spendableProjectedXP = Math.max(0, balancedNetDevelopmentXP);
 
-  return {
+  const result: PlayerProgressionForecast = {
     playerId: input.player.id,
     trainingMode: mode,
     currentXP: input.currentXP ?? 0,
@@ -706,10 +833,10 @@ export function buildPlayerProgressionForecast(input: {
     developmentRoute,
     currentAbilityRating,
     currentAbilityTier: getRatingTier(currentAbilityRating),
-    currentAbilityStars: getStarLabel(currentAbilityRating),
+    currentAbilityStars: axisStarSnapshot?.revealedCurrentStars.displayLabel ?? getStarLabel(currentAbilityRating),
     potentialRating,
     potentialTier: getRatingTier(potentialRating),
-    potentialStars: getStarLabel(potentialRating),
+    potentialStars: axisStarSnapshot?.revealedPotentialStars.displayLabel ?? getStarLabel(potentialRating),
     developmentFactors: netDevelopment.developmentFactors,
     maintenanceBreakdown: netDevelopment.maintenanceBreakdown,
     regressionBreakdown: netDevelopment.regressionBreakdown,
@@ -727,8 +854,6 @@ export function buildPlayerProgressionForecast(input: {
     xpBeforeTraits,
     xpAfterTraits,
     xpEvents: events,
-    possibleUpgradeSummary: buildUpgradeSummary(spendableProjectedXP),
-    ratingTierCosts: PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost,
     fatigueStrain: buildFatigueStrain({
       mode,
       appearances,
@@ -740,7 +865,7 @@ export function buildPlayerProgressionForecast(input: {
       mvs: isFiniteNumber(mvs) ? "ready" : "missing_source",
       pps: isFiniteNumber(pps) ? "ready" : "missing_source",
       highlights: mvpCount > 0 || highlightCount > 0 ? "ready" : "missing_source",
-      facilities: "future_source",
+      facilities: trainingCenterLevel > 0 ? "ready" : "missing_source",
       writes: "preview_only",
     },
 	    audit: {
@@ -766,5 +891,15 @@ export function buildPlayerProgressionForecast(input: {
 	        ...(regressionRisk === "high" ? ["regression_risk_high"] : []),
 	      ],
     },
-  } satisfies PlayerProgressionForecast;
+  };
+
+  if (canCache) {
+    let perState = forecastResultCache.get(input.gameState);
+    if (!perState) {
+      perState = new Map();
+      forecastResultCache.set(input.gameState, perState);
+    }
+    perState.set(cacheKey, result);
+  }
+  return result;
 }

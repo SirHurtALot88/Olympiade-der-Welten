@@ -1,0 +1,305 @@
+Der Spielstand konnte nicht geladen werden.
+Neu laden
+Spielstände
+Oly Manager
+FOUNDATION LAEDT · MD 1
+SPIELTAG
+⋮⋮
+⌂
+Home
+⋮⋮
+✉
+Inbox
+⋮⋮
+▣
+Einsatzliste
+⋮⋮
+◉
+Arena
+⋮⋮
+▤
+Saisonstand
+TEAM
+⋮⋮
+◈
+Teams
+⋮⋮
+◎
+Spieler
+⋮⋮
+↑
+Training
+⋮⋮
+▦
+Gebäude
+MARKT
+⋮⋮
+⇄
+Transfermarkt
+⋮⋮
+◐
+Scouting
+⋮⋮
+↺
+Historie
+WELT
+⋮⋮
+▥
+Ranks
+⋮⋮
+◫
+Diszis
+⋮⋮
+€
+Sponsoren
+⋮⋮
+?
+Lexikon
+ADMIN
+⋮⋮
+⏵
+Spieltag
+⋮⋮
++
+Generator
+⋮⋮
+⚙
+Settings
+⋮⋮
+⚒
+Admin
+Weiter
+Scouting prüfen
+Leertaste
+Suchen
+Einsatzliste
+Formplan
+SPIELSTAND
+Singleplayer Foundation
+LOAD
+AKTIVES TEAM
+Alle 32 Teams anzeigen
+LOAD · Foundation laedt
+Einsatzliste
+?
+Audit (4)
+AI-Planung · Armageddon Aftermath
+BEREITS GENUTZT
+7 Formkarten
++2 Punkte · POW
++8 Punkte · SPE
++8 Punkte · SPE
++2 Punkte · SPE
++2 Punkte · SPE
++4 Punkte · MEN
++4 Punkte · SOC
+MATCHDAY PREP
+Armageddon Aftermath · Spieltag 1 · Spurt 1/4 · Schach 0/3 · Lineup 1/7 · Captain 3/3 (0 heute)
+Noch 1 Ding offen · Slots füllen
+Slots 1/7
+Captain 3/3
+Form ok
+Score 61,3–67,7
+Fatigue 5.0
+Blocker 1
+Risiko hoch
+?
+Tastatur
+↑↓ Slots wechseln
+⌫ Slot leeren
+1–4 Kandidat zuweisen
+Enter Top-Pick setzen
+Slots füllen
+Nächster Slot
+Auto-Fill
+Noch 1 offen
+Spieltag
+✓ Spieltag 1 · Spurt (4) / Schach (3)
+✓ Spieltag 2 · Wettessen (2) / I Spy (4)
+✓ Spieltag 3 · Hockey (6) / TDM (3)
+✓ Spieltag 4 · Takeshi (5) / Breaking (4)
+✓ Spieltag 5 · Tennis (6) / Football (4)
+✓ Spieltag 6 · Battlefield (6) / Basketball (2)
+✓ Spieltag 7 · Mini DM (5) / Showcase (5)
+✓ Spieltag 8 · Time Trial (5) / Fechten (3)
+✓ Spieltag 9 · Staffel (6) / Eiskunst (3)
+✓ Spieltag 10 · Climbing (2) / Gewichtheben (2)
+Team
+✓ A-A (Armageddon Aftermath) · Lineup 20/20 · Captain 3/3
+D1
+Spurt
+Rank 17 · 1/4 Slots
+Schonen
+Normal
+Push
+D1-1
+Block Start
+Jill Rayner
+Base 54.4
+Slot 64.5
+F 0
+Schwach
+×
+Forderung erfüllt
+Jill Rayner: 5 Einsätze (+6,9 Moral)
+D1-2
+Acceleration
+Offen
+Base —
+Slot 54.2
+F 0
+Offen
+Maru · 54.2
+Hier weiter
+D1-2 wartet noch auf einen Spieler.
+D2
+Schach
+Rank 24 · 0/3 Slots
+Schonen
+Normal
+Push
+D2-1
+Opening Prep
+Offen
+Base —
+Slot 65.1
+F 0
+Offen
+Nestinats · 65.1
+Spieler fehlt
+D2-1 wartet noch auf einen Spieler.
+D2-2
+Pattern Read
+Offen
+Base —
+Slot 64.4
+F 0
+Offen
+Nestinats · 64.4
+Spieler fehlt
+D2-2 wartet noch auf einen Spieler.
+D1-2
+Acceleration
+Baut Tempo ueber Speed und Torment auf.
+Top Pick
+Nächster
+SPD —
+TOR —
+DET —
+Alle (11)
+Sofort (1)
+Alternative (9)
+Blockiert (1)
+
+Slot-Score · gemeinsame Skala 16.1–58.8
+
+1
+Maru
+Base 54.1 · Passt sofort · Wunsch · direkt
+Passt direkt sauber in den Slot.
+Bester Slot: D1-1 (+4.0)
+54.2
+🎯
+📌
+2
+Tommy Rourke
+Base 40.3 · Gute Alternative · Wunsch · Alternative
+Gute Alternative, falls du bewusst variieren willst.
+45.7
+🎯
+📌
+3
+Draven
+Base 44.4 · Gute Alternative · Wunsch · Alternative
+Gute Alternative, falls du bewusst variieren willst.
+45.5
+🎯
+📌
+4
+Jill Rayner
+Base 54.4 · Blockiert / schon eingesetzt · Wunsch · D1
+Schon in D1 eingesetzt.
+Bester Slot: D1-1 (+1.6)
+56.9
+🎯
+📌
+Adam Tricky
+Base 39.8 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-1 (+0.5)
+41.7
+🎯
+📌
+Bongo Skydrop
+Base 33.5 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-1 (+3.6)
+38.4
+🎯
+📌
+Aquilla
+Base 19.4 · Nur Notfall · Wunsch · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-1 (+1.1)
+25.6
+🎯
+📌
+Nestinats
+Base 26.5 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+39.8)
+25.3
+🎯
+📌
+Belandria
+Base 27.4 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+20.4)
+23
+🎯
+📌
+Chana
+Base 19.3 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D2-1 (+20.9)
+18.6
+🎯
+📌
+Gourmatron
+Base 22.4 · Nur Notfall · Notfall
+Nur als Notfall-Pick sinnvoll.
+Bester Slot: D1-1 (+3.5)
+18
+🎯
+📌
+Freier Slot
+Maru
+Passt direkt sauber in den Slot.
+BASE
+—
+ROLLE
+0.0
+SLOT
+—
+FATIGUE
++0.0
+MALUS
+0.0
+Captain D1
+Kein Captain
+Jill Rayner · +32.3
+0 frei heute
+Taktik · Form & Team-Power
+READY CHECK
+Noch 1 Ding offen
+6 Slots offen
+Slots
+6 offen
+Captain
+Optional · beide offen
+Forderungen
+10 offen · -80,3
+Preview
+6 Hinweise
+Noch 1 offen
+Klick zeigt genau, was noch fehlt.

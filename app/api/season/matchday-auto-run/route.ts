@@ -6,6 +6,8 @@ import {
   MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
   runLocalMatchdayAutoRun,
 } from "@/lib/season/matchday-auto-run-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type MatchdayAutoRunBody = {
   saveId?: string;
@@ -15,6 +17,10 @@ type MatchdayAutoRunBody = {
   dryRun?: boolean;
   execute?: boolean;
   confirmToken?: string;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
   options?: {
     includeWarningLineups?: boolean;
     overwriteExistingLineups?: boolean;
@@ -58,6 +64,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      action: "matchday_resolve",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+      expectedConfirmToken: dryRun ? null : MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: writeAuth.reason,
+          warnings: writeAuth.warnings,
+          blockingReasons: [writeAuth.reason],
+        },
+        { status: writeAuth.status },
+      );
+    }
+
     const result = await runLocalMatchdayAutoRun({
       saveId,
       seasonId,
@@ -86,12 +116,21 @@ export async function POST(request: Request) {
       );
     }
 
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "matchday_auto_run",
+      eventType: "matchday_resolved",
+      affectedViews: ["home", "season", "matchday", "arena", "lineup"],
+      dryRun,
+      success: result.executed === true || dryRun,
+    });
+
     return NextResponse.json({
       success: true,
       summary: result,
       dryRun: result.dryRun,
       executed: result.executed,
-      warnings: result.warnings,
+      warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
     return NextResponse.json(

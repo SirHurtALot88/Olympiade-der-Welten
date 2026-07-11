@@ -1,4 +1,5 @@
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
@@ -7,6 +8,7 @@ import {
   calculateMutatorModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
+  autoFillFormCardModifiers,
   getFormCardColorForDisciplineCategory,
   getTeamFormCardOptions,
   buildLegacyMutatorTraitOptionsForRoster,
@@ -37,8 +39,12 @@ import type {
   LegacyLineupValidationOptions,
 } from "@/lib/lineups/legacy-lineup-types";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
+import { getFatiguePerformanceMultiplier } from "@/lib/fatigue/fatigue-calibration";
 import { getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
+import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
+import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 
@@ -47,17 +53,7 @@ function roundScore(value: number) {
 }
 
 function resolveLocalSave(saveId?: string, persistence: PersistenceService = createPersistenceService()) {
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    (saveId ? persistence.getSaveById(saveId) : null) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
-    throw new Error("SQLite save could not be loaded.");
-  }
-
-  return { persistence, save };
+  return resolveLocalPersistedSave(persistence, saveId);
 }
 
 function toLegacyDraft(draft: LineupDraft): LegacyLineupDraft {
@@ -166,51 +162,23 @@ function buildLocalFatigueMap(gameState: GameState, params: LegacyLineupKeyParam
     return null;
   }
 
-  const currentIndex = season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId);
-  if (currentIndex <= 0) {
-    return {};
-  }
-
-  const previousMatchdayIds = season.matchdayIds.slice(Math.max(0, currentIndex - 4), currentIndex);
-  const drafts = (normalizedGameState.seasonState.lineupDrafts ?? [])
-    .filter((draft) => draft.seasonId === params.seasonId && draft.teamId === params.teamId)
-    .filter((draft) => previousMatchdayIds.includes(draft.matchdayId));
-  const matchdayOrder = new Map(season.matchdayIds.map((matchdayId, index) => [matchdayId, index]));
-  const playerByMatchday = new Map<string, Set<number>>();
-
-  for (const draft of drafts) {
-    const order = matchdayOrder.get(draft.matchdayId);
-    if (order == null) {
+  const fatigueMap: Record<string, { count: number; multiplier: number }> = {};
+  for (const roster of normalizedGameState.rosters.filter((entry) => entry.teamId === params.teamId)) {
+    const player = normalizedGameState.players.find((entry) => entry.id === roster.playerId);
+    if (!player) {
       continue;
     }
-    for (const playerId of new Set(draft.entries.map((entry) => entry.playerId))) {
-      const used = playerByMatchday.get(playerId) ?? new Set<number>();
-      used.add(order);
-      playerByMatchday.set(playerId, used);
-    }
-  }
-
-  const fatigueMap: Record<string, { count: number; multiplier: number }> = {};
-  for (const [playerId, orders] of playerByMatchday.entries()) {
-    const sorted = Array.from(orders).sort((left, right) => right - left);
-    let count = 0;
-    let cursor = currentIndex - 1;
-    for (const order of sorted) {
-      if (order === cursor) {
-        count += 1;
-        cursor -= 1;
-      } else if (order < cursor) {
-        break;
-      }
-    }
-
-    let multiplier = 1;
-    if (count >= 4) multiplier = 0.8;
-    else if (count >= 3) multiplier = 0.85;
-    else if (count >= 2) multiplier = 0.9;
-    else if (count >= 1) multiplier = 0.95;
-
-    fatigueMap[playerId] = { count, multiplier };
+    const availability = getPlayerAvailabilityView(
+      normalizedGameState,
+      roster.playerId,
+      params.teamId,
+      params.matchdayId,
+    );
+    const fatigue = availability.fatigue ?? player.fatigue ?? 0;
+    fatigueMap[roster.playerId] = {
+      count: fatigue,
+      multiplier: getFatiguePerformanceMultiplier(fatigue),
+    };
   }
 
   return fatigueMap;
@@ -600,6 +568,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
+      lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(
         lineupContract.map((entry) => [entry.disciplineId, entry.requiredPlayers ?? 0]),
@@ -773,6 +742,28 @@ export function loadLocalLegacyLineupContextFromGameState(
   return buildContextFromGameState(gameState, params);
 }
 
+export function loadAllLocalLegacyLineupContexts(
+  input: {
+    saveId: string;
+    seasonId: string;
+    matchdayId: string;
+    teamIds?: string[];
+  },
+  persistence: PersistenceService = createPersistenceService(),
+): LegacyLineupContextLoadResult[] {
+  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const teamIds = input.teamIds ?? save.gameState.teams.map((team) => team.teamId);
+
+  return teamIds.map((teamId) =>
+    loadLocalLegacyLineupContextFromGameState(save.gameState, {
+      saveId: save.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      teamId,
+    }),
+  );
+}
+
 function normalizeEntries(entries: LegacyLineupEntryInput[]) {
   return [...entries]
     .map((entry) => ({
@@ -793,7 +784,7 @@ function normalizeEntries(entries: LegacyLineupEntryInput[]) {
     });
 }
 
-function buildValidationOptions(context: LegacyLineupLoadedContext): LegacyLineupValidationOptions {
+function buildValidationOptions(context: LegacyLineupLoadedContext, forSubmit = false): LegacyLineupValidationOptions {
   const previousCaptainKeys = new Set(
     (context.existingDraft?.entries ?? [])
       .filter((entry) => entry.isCaptain)
@@ -805,7 +796,7 @@ function buildValidationOptions(context: LegacyLineupLoadedContext): LegacyLineu
   }
 
   return {
-    enforceCompleteness: false,
+    enforceCompleteness: forSubmit,
     seasonCaptainLimit: SEASON_CAPTAIN_SLOTS,
     captainUsedBeforeCurrentDraft: Math.max(0, (context.teamStatus?.captainUsedCount ?? 0) - previousCaptainKeys.size),
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsedBeforeCurrentDraftSides),
@@ -1095,7 +1086,8 @@ export function saveLocalLegacyLineupDraft(
       warnings: ["Only the active local matchday can be edited. Older matchdays stay locked after progress."],
     };
   }
-  const contextResult = buildContextFromGameState(save.gameState, effectiveParams);
+  const gameStateWithFormCards = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
+  const contextResult = buildContextFromGameState(gameStateWithFormCards, effectiveParams);
   if (!contextResult.ok) {
     return { ok: false, errors: contextResult.errors, warnings: contextResult.warnings };
   }
@@ -1121,7 +1113,7 @@ export function saveLocalLegacyLineupDraft(
 
   const now = new Date().toISOString();
   const lineupId = createLineupDraftId(effectiveParams);
-  const existingDrafts = getStoredDrafts(save.gameState);
+  const existingDrafts = getStoredDrafts(gameStateWithFormCards);
   const existing = existingDrafts.find((draft) => draft.lineupId === lineupId) ?? null;
   if (existing && ["locked", "resolved"].includes(existing.status)) {
     return {
@@ -1130,6 +1122,13 @@ export function saveLocalLegacyLineupDraft(
       warnings: ["This lineup is already locked/resolved and can no longer be overwritten."],
     };
   }
+  const resolvedModifiers = autoFillFormCardModifiers({
+    gameState: gameStateWithFormCards,
+    seasonId: effectiveParams.seasonId,
+    teamId: effectiveParams.teamId,
+    lineupId,
+    modifiers,
+  });
   const nextDraft: LineupDraft = {
     lineupId,
     saveId: effectiveParams.saveId,
@@ -1138,15 +1137,23 @@ export function saveLocalLegacyLineupDraft(
     teamId: effectiveParams.teamId,
     status: "submitted",
     entries: normalizedEntries,
-    modifiers: normalizeLineupDraftModifiers(modifiers),
+    modifiers: normalizeLineupDraftModifiers(resolvedModifiers),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
 
+  if (!isTeamMatchdayLineupOperationallyReady(gameStateWithFormCards, effectiveParams.teamId, nextDraft)) {
+    return {
+      ok: false,
+      errors: ["lineup_not_operationally_ready"],
+      warnings: ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Einsatzliste gespeichert wird."],
+    };
+  }
+
   const nextGameState: GameState = {
-    ...save.gameState,
+    ...gameStateWithFormCards,
     seasonState: {
-      ...save.gameState.seasonState,
+      ...gameStateWithFormCards.seasonState,
       lineupDrafts: [
         ...existingDrafts.filter((draft) => draft.lineupId !== lineupId),
         nextDraft,
@@ -1235,19 +1242,25 @@ export function saveLocalLegacyLineupDraftBatch(
       continue;
     }
 
-    nextDraftIds.add(lineupId);
-    nextDrafts.push({
+    const candidateDraft: LineupDraft = {
       lineupId,
       saveId: draftInput.params.saveId,
       seasonId: draftInput.params.seasonId,
       matchdayId: draftInput.params.matchdayId,
       teamId: draftInput.params.teamId,
-      status: "draft",
+      status: "submitted",
       entries: normalizedEntries,
       modifiers: draftInput.modifiers,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-    });
+    };
+    if (!isTeamMatchdayLineupOperationallyReady(save.gameState, draftInput.params.teamId, candidateDraft)) {
+      errors.push("lineup_not_operationally_ready");
+      continue;
+    }
+
+    nextDraftIds.add(lineupId);
+    nextDrafts.push(candidateDraft);
   }
 
   if (errors.length > 0) {
@@ -1286,169 +1299,20 @@ export function calculateLocalLegacyLineupPreview(
   modifiers?: LegacyLineupDraft["modifiers"],
   persistence?: PersistenceService,
 ): LegacyLineupPreviewResult {
-  const contextResult = loadLocalLegacyLineupContext(params, persistence);
+  const persistenceService = persistence ?? createPersistenceService();
+  const contextResult = loadLocalLegacyLineupContext(params, persistenceService);
   if (!contextResult.ok) {
     return contextResult;
   }
+  const { save } = resolveLocalPersistedSave(persistenceService, params.saveId);
 
-  const { save } = resolveLocalSave(params.saveId, persistence);
-  const fatigueMap = buildLocalFatigueMap(save.gameState, {
-    ...params,
-    saveId: save.saveId,
-  });
-
-  return calculateLocalLegacyLineupPreviewFromContext(contextResult.context, entries, modifiers, fatigueMap);
+  return calculateLocalLegacyLineupPreviewFromContext(
+    contextResult.context,
+    entries,
+    modifiers,
+    contextResult.context.fatigueByPlayerId ?? null,
+    save.gameState,
+  );
 }
 
-export function calculateLocalLegacyLineupPreviewFromContext(
-  context: LegacyLineupLoadedContext,
-  entries?: LegacyLineupEntryInput[],
-  modifiers?: LegacyLineupDraft["modifiers"],
-  fatigueMap: ReturnType<typeof buildLocalFatigueMap> = context.fatigueByPlayerId ?? null,
-): LegacyLineupPreviewResult {
-  const previewEntries = normalizeEntries(entries ?? context.existingDraft?.entries ?? []);
-  const previewPlayerIds = new Set(previewEntries.map((entry) => entry.playerId));
-  const moraleByPlayerId = buildPlayerMoralePerformanceMap({
-    gameState: context.gameState,
-    teamId: context.teamId,
-    rosterEntries:
-      context.gameState?.rosters.filter((entry) => entry.teamId === context.teamId && previewPlayerIds.has(entry.playerId)) ??
-      null,
-  });
-  const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? context.existingDraft?.modifiers);
-  const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
-    saveId: context.saveId,
-    seasonId: context.seasonId,
-    matchdayId: context.matchdayId,
-    d1DisciplineId: context.contextMeta.d1DisciplineId,
-    d2DisciplineId: context.contextMeta.d2DisciplineId,
-  });
-  const validation = validateLegacyLineupContext(
-    {
-      ...context,
-      entries: previewEntries,
-      disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(context),
-      disciplineSideCaptainCounts: context.disciplineSideCaptainCounts,
-    },
-    buildValidationOptions(context),
-  );
-
-  const previewPairs = [
-    context.matchdayContract?.discipline1
-      ? `${context.matchdayContract.discipline1.disciplineId}::${context.matchdayContract.discipline1.disciplineSide}`
-      : null,
-    context.matchdayContract?.discipline2
-      ? `${context.matchdayContract.discipline2.disciplineId}::${context.matchdayContract.discipline2.disciplineSide}`
-      : null,
-    ...previewEntries.map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`),
-  ].filter((value): value is string => Boolean(value));
-  const uniquePairs = Array.from(new Set(previewPairs));
-  const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
-  const scorePartsWithModifierWarnings = uniquePairs.map((pair) => {
-    const [disciplineId, disciplineSide] = pair.split("::") as [string, "d1" | "d2"];
-    const sideEntries = previewEntries.filter(
-      (entry) => entry.disciplineId === disciplineId && entry.disciplineSide === disciplineSide,
-    );
-    const disciplineMeta =
-      disciplineSide === "d1"
-        ? context.matchdayContract?.discipline1 ?? null
-        : context.matchdayContract?.discipline2 ?? null;
-    const formResult = calculateFormModifierForSide({
-      modifiers: previewModifiers,
-      disciplineSide,
-      disciplineColor: getFormCardColorForDisciplineCategory(disciplineMeta?.category),
-      playerCount: sideEntries.length,
-      formCards: context.formCards ?? [],
-    });
-    const mutatorResult = calculateMutatorModifierForSide({
-      modifiers: previewModifiers,
-      disciplineSide,
-      entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
-      rosterPlayers: context.rosterPlayers,
-      matchdayMutatorTraits: matchdayMutatorTraitsBySide[disciplineSide],
-    });
-    const teamPowerResult = calculateTeamPowerModifierForSide({
-      modifiers: previewModifiers,
-      disciplineSide,
-      disciplineId,
-      disciplineCategory: disciplineMeta?.category,
-      teamPowers: context.teamPowers ?? [],
-      teamCaptainPowerModifierPct: teamCaptain?.effects.teamPowerModifierPct ?? null,
-      conditionalBonusPct: (() => {
-        const selectedPower = context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId) ?? null;
-        if (!selectedPower?.conditionalTrigger || !selectedPower.conditionalBonusPct) {
-          return 0;
-        }
-        if (selectedPower.conditionalTrigger === "rival_top8_discipline") {
-          return (context.teamPowerWindows?.[disciplineId]?.top8Rivals.length ?? 0) > 0 ? selectedPower.conditionalBonusPct : 0;
-        }
-        return 0;
-      })(),
-    });
-    const effectiveMutatorModifier =
-      context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
-    const effectiveMutatorBonuses =
-      context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
-    const effectiveTeamPowerModifier =
-      context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null;
-    return {
-      score: scoreLegacyLineupDisciplineSide({
-        disciplineId,
-        disciplineSide,
-        entries: previewEntries,
-        disciplineScores: context.disciplineScores,
-        activePlayers: context.activePlayers,
-        rosterPlayers: context.rosterPlayers,
-        requiredPlayers:
-          context.disciplineSidePlayerCounts?.[pair] ??
-          context.disciplinePlayerCounts[disciplineId] ??
-          null,
-        fatigueByPlayerId: fatigueMap,
-        moraleByPlayerId,
-        fatigueSourceStatus: fatigueMap ? "mapped" : "missing_source",
-        intensity: previewModifiers[disciplineSide].intensity,
-        formCardsAvailable: formResult.formCardsAvailable,
-        formCardsSelected: formResult.formCardsSelected,
-        formCardLabel: formResult.formCardLabel,
-        formModifier: formResult.formModifier,
-        mutatorText: mutatorResult.mutatorText,
-        mutatorModifier: effectiveMutatorModifier,
-        mutatorBonusByPlayerId: effectiveMutatorBonuses,
-        teamPowerSelected: teamPowerResult.teamPowerSelected,
-        teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
-        teamPowerLabel: teamPowerResult.teamPowerLabel,
-        teamPowerModifier: effectiveTeamPowerModifier,
-        teamPowerImpact: teamPowerResult.teamPowerImpact,
-        teamPowerBasePct: teamPowerResult.teamPowerBasePct,
-        teamPowerConditionalPct: teamPowerResult.teamPowerConditionalPct,
-        teamPowerAttributeFitPct: teamPowerResult.teamPowerAttributeFitPct,
-        teamPowerEffectType: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.effectType ?? null,
-        teamPowerTargetMode: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.targetMode ?? null,
-        teamPowerTargetLimit: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.targetLimit ?? null,
-      }),
-      modifierWarnings: [...formResult.warnings, ...mutatorResult.warnings, ...teamPowerResult.warnings],
-    };
-  });
-  const scoreParts = scorePartsWithModifierWarnings.map((entry) => entry.score);
-  const scorePreview = buildLegacyLineupAggregateScore(scoreParts);
-  const modifierWarnings = Array.from(
-    new Set(scorePartsWithModifierWarnings.flatMap((entry) => entry.modifierWarnings)),
-  );
-
-  return {
-    ok: true,
-    contextMeta: context.contextMeta,
-    validation,
-    disciplineSideScores: scoreParts,
-    scorePreview: {
-      ...scorePreview,
-      validationWarnings: [
-        ...validation.warnings,
-        ...scorePreview.validationWarnings,
-        ...modifierWarnings,
-      ],
-      modifierWarnings: [...(scorePreview.modifierWarnings ?? []), ...modifierWarnings],
-    },
-    warnings: [],
-  };
-}
+export { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";

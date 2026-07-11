@@ -123,8 +123,6 @@ export type PlayerProgressionForecast = {
   xpBeforeTraits: number;
   xpAfterTraits: number;
   xpEvents: PlayerProgressionXpEvent[];
-  possibleUpgradeSummary: string;
-  ratingTierCosts: Record<PlayerProgressionRatingTier, number | null>;
   fatigueStrain: {
     label: "niedrig" | "mittel" | "hoch";
     score: number;
@@ -135,7 +133,7 @@ export type PlayerProgressionForecast = {
     mvs: "ready" | "missing_source";
     pps: "ready" | "missing_source";
     highlights: "ready" | "missing_source";
-    facilities: "future_source";
+    facilities: "ready" | "missing_source" | "future_source";
     writes: "preview_only";
   };
   audit: {

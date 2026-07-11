@@ -175,6 +175,70 @@ describe("room store", () => {
     }
   });
 
+  it("advances from d1 slots through d2 into total result phases", () => {
+    const created = createRoom("socket-arena-d1d2-a", { displayName: "Chris", preset: "chris_4_franky_4_rest_ai", saveId: "arena-d1d2-save" });
+    const joined = joinRoom(created.room.roomCode, "socket-arena-d1d2-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const limits = { d1: 2, d2: 2 };
+    const started = startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+      seasonId: "season-2",
+      matchdayId: "season-2-matchday-1",
+      maxSlotRevealCountByDiscipline: limits,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    expect(setRoomArenaReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+    expect(setRoomArenaReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+
+    let roomState = started.room.state;
+    for (let slot = 0; slot < limits.d1; slot += 1) {
+      const advanced = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+        maxSlotRevealCountByDiscipline: limits,
+      });
+      expect(advanced.ok).toBe(true);
+      if (!advanced.ok) return;
+      roomState = advanced.room.state;
+      expect(roomState.arenaSyncState.activeDisciplinePhase).toBe("d1");
+    }
+
+    const intoPush = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+      maxSlotRevealCountByDiscipline: limits,
+    });
+    expect(intoPush.ok).toBe(true);
+    if (!intoPush.ok) return;
+    expect(intoPush.room.state.arenaSyncState.phaseId).not.toBe("slots");
+
+    let current = intoPush.room.state;
+    while (current.arenaSyncState.activeDisciplinePhase === "d1" && current.arenaSyncState.phaseId !== "result") {
+      const advanced = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken, {
+        maxSlotRevealCountByDiscipline: limits,
+        force: true,
+      });
+      expect(advanced.ok).toBe(true);
+      if (!advanced.ok) return;
+      current = advanced.room.state;
+    }
+
+    expect(current.arenaSyncState.activeDisciplinePhase === "d2" || current.arenaSyncState.activeDisciplinePhase === "total").toBe(true);
+
+    const recorded = recordRoomGameplayWrite({
+      roomCode: created.room.roomCode,
+      saveId: "arena-d1d2-save",
+      participantId: created.room.state.roomParticipants[0]!.participantId,
+      action: "matchday_apply",
+      eventType: "matchday_applied",
+      affectedViews: ["arena", "standings"],
+    });
+    expect(recorded.ok).toBe(true);
+    if (recorded.ok) {
+      expect(recorded.room.state.arenaSyncState.status).toBe("result_applied");
+      expect(recorded.room.state.arenaSyncState.phaseId).toBe("result");
+    }
+  });
+
   it("marks arena result state when a matchday write is applied", () => {
     const created = createRoom("socket-arena-result-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-result-save" });
     const chris = created.room.state.roomParticipants[0];

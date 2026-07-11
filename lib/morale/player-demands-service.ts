@@ -9,11 +9,25 @@ import type {
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildTrainingModeDemandRecord } from "@/lib/training/training-mode-demand-service";
 
 type DemandPlayerLike = Pick<
   Player,
-  "id" | "name" | "traitsPositive" | "traitsNegative" | "disciplineRatings" | "coreStats" | "attributeSheetStats" | "pps" | "ovr"
->;
+  | "id"
+  | "name"
+  | "traitsPositive"
+  | "traitsNegative"
+  | "disciplineRatings"
+  | "coreStats"
+  | "attributeSheetStats"
+  | "pps"
+  | "ovr"
+> & {
+  trainingMode?: Player["trainingMode"];
+  fatigue?: number;
+  potential?: number;
+  age?: number | null;
+};
 
 type DemandDisciplineLike = Pick<Discipline, "id" | "name" | "category"> & { playerCount?: number | null };
 
@@ -37,6 +51,10 @@ const FACILITY_TRAITS = new Set(["diligent", "disciplined", "motivated", "resour
 const MAX_CAPTAIN_DEMANDS_PER_TEAM = 1;
 const CAPTAIN_DEMAND_ELITE_SCORE = 96;
 const CAPTAIN_DEMAND_RARE_WINDOW_PERCENT = 8;
+const MAX_DISCIPLINE_START_DEMANDS_PER_DISCIPLINE = 2;
+const MAX_DISCIPLINE_START_DEMANDS_PER_TEAM = 4;
+const DISCIPLINE_DEMAND_MIN_SCORE = 62;
+const DISCIPLINE_DEMAND_RARE_WINDOW_PERCENT = 18;
 
 function normalizeTrait(value: string | null | undefined) {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -90,6 +108,115 @@ function isCaptainDemandRareWindow(input: {
     "captain-demand-v2",
   ].join(":");
   return stableDemandHash(key) % 100 < CAPTAIN_DEMAND_RARE_WINDOW_PERCENT;
+}
+
+function isDisciplineDemandRareWindow(input: {
+  context: DemandContext;
+  playerId: string;
+  disciplineId: string;
+}) {
+  const key = [
+    input.context.seasonId,
+    input.context.teamId,
+    input.context.matchdayId ?? `md-${input.context.matchdayIndex ?? "unknown"}`,
+    input.playerId,
+    input.disciplineId,
+    "discipline-demand-v2",
+  ].join(":");
+  return stableDemandHash(key) % 100 < DISCIPLINE_DEMAND_RARE_WINDOW_PERCENT;
+}
+
+function getDisciplineDemandContextDisciplines(context: DemandContext, player: DemandPlayerLike) {
+  return context.matchdayDisciplines?.length
+    ? context.matchdayDisciplines
+    : Object.keys(player.disciplineRatings).map((id) => ({ id, name: id, category: "power" as const }));
+}
+
+function scoreDisciplineDemandCandidate(input: {
+  context: DemandContext;
+  player: DemandPlayerLike;
+  rosterRank: number;
+  disciplineId: string;
+  disciplineRank: number;
+  disciplineScore: number;
+  requiredPlayers: number;
+}) {
+  if (input.disciplineScore < DISCIPLINE_DEMAND_MIN_SCORE) return null;
+  if (input.disciplineRank > input.requiredPlayers + 1) return null;
+  if (hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && input.rosterRank > 4) return null;
+
+  const hasDemandTrait = hasAnyTrait(input.player, DEMAND_TRAITS);
+  const isBubble = input.disciplineRank === input.requiredPlayers + 1;
+  const isContender = input.disciplineRank <= input.requiredPlayers;
+  const isEliteContender =
+    input.rosterRank <= 2 ||
+    (input.disciplineRank === 1 && input.disciplineScore >= 72) ||
+    (isContender && input.rosterRank <= 3 && hasDemandTrait);
+  const isTraitBubble = isBubble && hasDemandTrait && input.rosterRank <= 6;
+  const isRareVoice =
+    isDisciplineDemandRareWindow({
+      context: input.context,
+      playerId: input.player.id,
+      disciplineId: input.disciplineId,
+    }) && (hasDemandTrait || input.rosterRank <= 5);
+
+  if (!isEliteContender && !isTraitBubble && !isRareVoice) return null;
+
+  return round(
+    input.disciplineScore * 0.52 +
+      Math.max(0, 7 - input.disciplineRank) * 7 +
+      Math.max(0, 6 - input.rosterRank) * 4 +
+      (hasDemandTrait ? 9 : 0) +
+      (isBubble ? 4 : 0),
+    2,
+  );
+}
+
+function selectDisciplineDemandPlayerIds(context: DemandContext, rosterRankMap = buildRosterRankMap(context)) {
+  const candidates: Array<{ playerId: string; disciplineId: string; score: number }> = [];
+
+  for (const player of context.rosterPlayers) {
+    const rosterRank = rosterRankMap.get(player.id) ?? 99;
+    const disciplines = getDisciplineDemandContextDisciplines(context, player);
+    const top = getTopDiscipline(player, disciplines);
+    if (!top) continue;
+
+    const rankMap = new Map(rankPlayersForDiscipline(context.rosterPlayers, top.discipline.id));
+    const disciplineRank = rankMap.get(player.id) ?? 99;
+    const requiredPlayers = top.discipline.playerCount ?? 2;
+    const score = scoreDisciplineDemandCandidate({
+      context,
+      player,
+      rosterRank,
+      disciplineId: top.discipline.id,
+      disciplineRank,
+      disciplineScore: top.score,
+      requiredPlayers,
+    });
+    if (score == null) continue;
+    candidates.push({ playerId: player.id, disciplineId: top.discipline.id, score });
+  }
+
+  const byDiscipline = new Map<string, Array<{ playerId: string; disciplineId: string; score: number }>>();
+  for (const candidate of candidates) {
+    const entries = byDiscipline.get(candidate.disciplineId) ?? [];
+    entries.push(candidate);
+    byDiscipline.set(candidate.disciplineId, entries);
+  }
+
+  const picked: Array<{ playerId: string; disciplineId: string; score: number }> = [];
+  for (const entries of byDiscipline.values()) {
+    picked.push(
+      ...entries.sort((left, right) => right.score - left.score || left.playerId.localeCompare(right.playerId, "de")).slice(0, MAX_DISCIPLINE_START_DEMANDS_PER_DISCIPLINE),
+    );
+  }
+
+  return new Set(
+    picked
+      .sort((left, right) => right.score - left.score || left.playerId.localeCompare(right.playerId, "de"))
+      .slice(0, MAX_DISCIPLINE_START_DEMANDS_PER_TEAM)
+      .map((entry) => entry.playerId),
+  );
 }
 
 function getTopDiscipline(player: DemandPlayerLike, disciplines: DemandDisciplineLike[]) {
@@ -202,20 +329,27 @@ function buildDisciplineDemand(input: {
   context: DemandContext;
   player: DemandPlayerLike;
   rosterRank: number;
+  disciplineDemandAllowedPlayerIds?: Set<string>;
 }): PlayerDemandRecord | null {
-  const disciplines = input.context.matchdayDisciplines?.length
-    ? input.context.matchdayDisciplines
-    : Object.keys(input.player.disciplineRatings).map((id) => ({ id, name: id, category: "power" as const }));
+  if (input.disciplineDemandAllowedPlayerIds && !input.disciplineDemandAllowedPlayerIds.has(input.player.id)) {
+    return null;
+  }
+  const disciplines = getDisciplineDemandContextDisciplines(input.context, input.player);
   const top = getTopDiscipline(input.player, disciplines);
-  if (!top || top.score < 58) return null;
+  if (!top) return null;
   const rankMap = new Map(rankPlayersForDiscipline(input.context.rosterPlayers, top.discipline.id));
   const disciplineRank = rankMap.get(input.player.id) ?? 99;
   const requiredPlayers = top.discipline.playerCount ?? 2;
-  const wantsSpot =
-    disciplineRank <= Math.max(requiredPlayers + 1, 3) ||
-    input.rosterRank <= 4 ||
-    hasAnyTrait(input.player, DEMAND_TRAITS);
-  if (!wantsSpot || hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && input.rosterRank > 5) return null;
+  const candidateScore = scoreDisciplineDemandCandidate({
+    context: input.context,
+    player: input.player,
+    rosterRank: input.rosterRank,
+    disciplineId: top.discipline.id,
+    disciplineRank,
+    disciplineScore: top.score,
+    requiredPlayers,
+  });
+  if (candidateScore == null) return null;
 
   return {
     demandId: `${input.context.seasonId}:${input.context.teamId}:${input.player.id}:discipline:${top.discipline.id}`,
@@ -234,7 +368,7 @@ function buildDisciplineDemand(input: {
     moraleReward: input.rosterRank <= 3 ? 10 : 7,
     moralePenalty: input.rosterRank <= 3 ? -16 : -10,
     priority: input.rosterRank <= 3 || disciplineRank <= requiredPlayers + 1 ? "high" : "medium",
-    source: "player_demands_v1_discipline_fit",
+    source: "player_demands_v2_scarce_discipline_window",
   };
 }
 
@@ -274,10 +408,11 @@ function buildAppearanceDemand(input: {
   player: DemandPlayerLike;
   rosterRank: number;
 }): PlayerDemandRecord | null {
-  if (input.rosterRank > 8 && !hasAnyTrait(input.player, DEMAND_TRAITS)) return null;
+  if (input.rosterRank > 6 && !hasAnyTrait(input.player, DEMAND_TRAITS)) return null;
+  if (input.rosterRank > 3 && !hasAnyTrait(input.player, DEMAND_TRAITS)) return null;
   const current = input.context.playerSeasonAppearances?.[input.player.id] ?? 0;
   const target = input.rosterRank <= 3 ? 5 : input.rosterRank <= 6 ? 3 : 2;
-  if (current >= target || hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && current >= 1) return null;
+  if (current >= target || (hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && current >= 1)) return null;
   return {
     demandId: `${input.context.seasonId}:${input.context.teamId}:${input.player.id}:appearances`,
     seasonId: input.context.seasonId,
@@ -294,6 +429,31 @@ function buildAppearanceDemand(input: {
     priority: input.rosterRank <= 3 ? "high" : "medium",
     source: "player_demands_v1_role_usage",
   };
+}
+
+function buildTrainingModePlayerDemand(input: {
+  context: DemandContext;
+  player: DemandPlayerLike;
+  rosterRank: number;
+}): PlayerDemandRecord | null {
+  return buildTrainingModeDemandRecord({
+    context: {
+      seasonId: input.context.seasonId,
+      teamId: input.context.teamId,
+      matchdayIndex: input.context.matchdayIndex ?? null,
+    },
+    player: {
+      id: input.player.id,
+      name: input.player.name,
+      traitsPositive: input.player.traitsPositive,
+      traitsNegative: input.player.traitsNegative,
+      trainingMode: input.player.trainingMode ?? "mittel",
+      fatigue: input.player.fatigue ?? 0,
+      potential: input.player.potential ?? 0,
+      age: input.player.age,
+    },
+    rosterRank: input.rosterRank,
+  });
 }
 
 function buildFacilityDemand(input: {
@@ -352,24 +512,33 @@ export function buildPlayerDemandsForContext(
   options?: {
     rosterRankMap?: Map<string, number>;
     captainDemandAllowedPlayerIds?: Set<string>;
+    disciplineDemandAllowedPlayerIds?: Set<string>;
   },
 ): PlayerDemandRecord[] {
   const rosterRankMap = options?.rosterRankMap ?? buildRosterRankMap(context);
   const captainDemandAllowedPlayerIds = options?.captainDemandAllowedPlayerIds ?? selectCaptainDemandPlayerIds(context, rosterRankMap);
+  const disciplineDemandAllowedPlayerIds =
+    options?.disciplineDemandAllowedPlayerIds ?? selectDisciplineDemandPlayerIds(context, rosterRankMap);
   const rosterRank = rosterRankMap.get(player.id) ?? 99;
   const demandCandidates = [
-    buildDisciplineDemand({ context, player, rosterRank }),
+    buildDisciplineDemand({ context, player, rosterRank, disciplineDemandAllowedPlayerIds }),
     buildCaptainDemand({ context, player, rosterRank, captainDemandAllowedPlayerIds }),
     buildAppearanceDemand({ context, player, rosterRank }),
+    buildTrainingModePlayerDemand({ context, player, rosterRank }),
     buildFacilityDemand({ context, player }),
   ].filter((entry): entry is PlayerDemandRecord => Boolean(entry));
 
-  return demandCandidates
-    .sort((left, right) => {
-      const priorityScore = { high: 3, medium: 2, low: 1 };
-      return priorityScore[right.priority] - priorityScore[left.priority] || left.label.localeCompare(right.label, "de");
-    })
-    .slice(0, 2);
+  const priorityScore = { high: 3, medium: 2, low: 1 } as const;
+  const sortDemands = (left: PlayerDemandRecord, right: PlayerDemandRecord) =>
+    priorityScore[right.priority] - priorityScore[left.priority] || left.label.localeCompare(right.label, "de");
+  const captainDemand = demandCandidates.find((demand) => demand.type === "captaincy") ?? null;
+  const otherDemands = demandCandidates.filter((demand) => demand.type !== "captaincy").sort(sortDemands);
+
+  if (captainDemand) {
+    return [captainDemand, ...otherDemands.slice(0, 1)];
+  }
+
+  return otherDemands.slice(0, 1);
 }
 
 export function buildPlayerDemands(gameState: GameState, playerId: string, teamId: string): PlayerDemandRecord[] {
@@ -387,6 +556,7 @@ export function buildTeamPlayerDemandMap(gameState: GameState, teamId: string) {
   const context = buildDemandContext(gameState, teamId);
   const rosterRankMap = buildRosterRankMap(context);
   const captainDemandAllowedPlayerIds = selectCaptainDemandPlayerIds(context, rosterRankMap);
+  const disciplineDemandAllowedPlayerIds = selectDisciplineDemandPlayerIds(context, rosterRankMap);
   return new Map(
     context.rosterPlayers.map(
       (player) => [
@@ -394,6 +564,7 @@ export function buildTeamPlayerDemandMap(gameState: GameState, teamId: string) {
         buildPlayerDemandsForContext(context, player, {
           rosterRankMap,
           captainDemandAllowedPlayerIds,
+          disciplineDemandAllowedPlayerIds,
         }),
       ] as const,
     ),
@@ -418,6 +589,7 @@ export function buildLineupPlayerDemandMap(input: {
   };
   const rosterRankMap = buildRosterRankMap(context);
   const captainDemandAllowedPlayerIds = selectCaptainDemandPlayerIds(context, rosterRankMap);
+  const disciplineDemandAllowedPlayerIds = selectDisciplineDemandPlayerIds(context, rosterRankMap);
   return new Map(
     input.rosterPlayers.map(
       (player) => [
@@ -425,6 +597,7 @@ export function buildLineupPlayerDemandMap(input: {
         buildPlayerDemandsForContext(context, player, {
           rosterRankMap,
           captainDemandAllowedPlayerIds,
+          disciplineDemandAllowedPlayerIds,
         }),
       ] as const,
     ),

@@ -1745,7 +1745,6 @@ async function runSingleAudit(run: number) {
       applySellSteps: true,
       applyBuySteps: true,
       maxBuysPerTeam: null,
-      maxSellsPerTeam: 5,
       previewBuyLimit: 160,
       previewSellLimit: 16,
       performanceBudgetMs: 15_000,

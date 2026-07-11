@@ -19,7 +19,7 @@ export function activeTeamHasFormCardPool(gameState: GameState, activeTeamId: st
   );
 }
 
-export function activeTeamHasFormCardSelections(gameState: GameState, activeTeamId: string | null) {
+export function activeTeamHasFormCardModifierSelections(gameState: GameState, activeTeamId: string | null) {
   const draft = getActiveTeamLineupDraft(gameState, activeTeamId);
   const modifiers = draft?.modifiers;
   if (!modifiers) return false;
@@ -28,13 +28,42 @@ export function activeTeamHasFormCardSelections(gameState: GameState, activeTeam
   );
 }
 
+export function activeTeamHasFormCardPlanSelections(gameState: GameState, activeTeamId: string | null) {
+  if (!activeTeamId) return false;
+  const matchdayId = gameState.matchdayState.matchdayId;
+  return (gameState.seasonState.formCardPlans ?? []).some(
+    (plan) =>
+      plan.teamId === activeTeamId &&
+      plan.matchdayId === matchdayId &&
+      Boolean(plan.primaryFormCardId || plan.secondaryFormCardId),
+  );
+}
+
 export function getFormCardFlowStatus(gameState: GameState, activeTeamId: string | null) {
   const hasPool = activeTeamHasFormCardPool(gameState, activeTeamId);
-  const hasSelections = activeTeamHasFormCardSelections(gameState, activeTeamId);
+  const hasModifierSelections = activeTeamHasFormCardModifierSelections(gameState, activeTeamId);
+  const hasPlanSelections = activeTeamHasFormCardPlanSelections(gameState, activeTeamId);
+  const hasSelections = hasModifierSelections || hasPlanSelections;
   return {
     hasPool,
+    hasModifierSelections,
+    hasPlanSelections,
     hasSelections,
-    isReady: hasSelections,
-    blocker: !hasPool ? "missing_formcard_pool" : !hasSelections ? "missing_formcard_selections" : null,
+    skipped: hasPool && !hasSelections,
+    isReady: hasPool,
+    blocker: !hasPool ? "missing_formcard_pool" : null,
   };
+}
+
+export function isFormCardFlowReadyForMatchday(
+  gameState: GameState,
+  activeTeamId: string | null,
+  _options?: { lineupSubmitted?: boolean },
+) {
+  return getFormCardFlowStatus(gameState, activeTeamId).isReady;
+}
+
+/** @deprecated Use activeTeamHasFormCardModifierSelections */
+export function activeTeamHasFormCardSelections(gameState: GameState, activeTeamId: string | null) {
+  return activeTeamHasFormCardModifierSelections(gameState, activeTeamId);
 }

@@ -42,7 +42,6 @@ import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
 import { applySeasonEndXpSpend, previewSeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { MATCHDAY_AUTO_RUN_CONFIRM_TOKEN, runLocalMatchdayAutoRun } from "@/lib/season/matchday-auto-run-service";
@@ -368,6 +367,23 @@ function createSingleSavePersistenceHarness(initialSave: PersistedSaveGame) {
     },
     getSaveById(saveId) {
       return currentSave.saveId === saveId ? currentSave : null;
+    },
+    getSaveVersionMetadata(saveId) {
+      if (currentSave.saveId !== saveId) {
+        return null;
+      }
+      return {
+        saveId: currentSave.saveId,
+        updatedAt: currentSave.updatedAt,
+        seasonId: currentSave.gameState.season.id,
+        matchdayId: currentSave.gameState.matchdayState.matchdayId,
+        matchdayResults: currentSave.gameState.seasonState.matchdayResults ?? [],
+        standingsApplyLogs: currentSave.gameState.seasonState.standingsApplyLogs ?? [],
+        seasonSnapshots: currentSave.gameState.seasonState.seasonSnapshots ?? [],
+        disciplineResults: currentSave.gameState.seasonState.disciplineResults ?? [],
+        lineupDraftCount: 0,
+        transferHistoryCount: 0,
+      };
     },
     saveSingleplayerState(saveId, gameState) {
       if (currentSave.saveId !== saveId) {
@@ -1494,7 +1510,8 @@ function runFormCards(run: AdminSeasonSimulationRunState, save: PersistedSaveGam
       updatedAt: nowIso(),
     };
     for (const playerId of rosterPlayerIdsByTeamId.get(team.teamId) ?? []) {
-      trainingModeByPlayerId.set(playerId, trainingPreview.playerTrainingMode);
+      const plan = preview.trainingPlan.playerTrainingPlans.find((entry) => entry.playerId === playerId);
+      trainingModeByPlayerId.set(playerId, plan?.selectedMode ?? trainingPreview.playerTrainingMode);
     }
     trainingSettingsApplied += 1;
   }
@@ -1655,7 +1672,7 @@ async function runSeasonEndCash(run: AdminSeasonSimulationRunState, save: Persis
     markBlocked(run, "season_end_cash", result.blockingReasons[0] ?? "Season-End Cash blockiert.", "season_end_cash_blocked");
     return;
   }
-  log(run, "info", "season_end_cash", `Cash Apply: ${result.plannedChanges.length} Teams.`);
+  log(run, "info", "season_end_cash", `Preisgeld-Benchmark: ${result.plannedChanges.length} Teams (kein Cash-Payout).`);
   advanceUnit(run);
   run.cursor.phaseIndex += 1;
 }
@@ -1677,28 +1694,17 @@ function runXpDevelopment(run: AdminSeasonSimulationRunState, save: PersistedSav
       ...currentSave,
       status: "active",
     };
-    const team = xpPreviewSave.gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
-    const aiPlan = team?.humanControlled === false ? previewAiSeasonEndXpSpend(xpPreviewSave, teamId) : null;
-    if (aiPlan?.confirmToken && aiPlan.blockers.length === 0) {
-      const applied = applySeasonEndXpSpend(xpPreviewSave, teamId, aiPlan.plannedUpgrades, aiPlan.confirmToken, persistence, { allowAiTeams: true });
+
+    const preview = previewSeasonEndXpSpend(xpPreviewSave, teamId);
+    if (preview.confirmToken) {
+      const applied = applySeasonEndXpSpend(xpPreviewSave, teamId, preview.confirmToken, persistence, { allowAiTeams: true });
       if (applied.applied) {
         appliedPlayers += applied.players.length;
         appliedUpgrades += applied.plannedUpgrades.length;
       } else {
         applied.blockingReasons.forEach((reason) => log(run, "yellow", "xp_development", `${teamId}: ${reason}`, "xp_apply_warning"));
       }
-      continue;
-    }
-
-    const preview = previewSeasonEndXpSpend(xpPreviewSave, teamId, []);
-    if (preview.confirmToken) {
-      const applied = applySeasonEndXpSpend(xpPreviewSave, teamId, [], preview.confirmToken, persistence, { allowAiTeams: true });
-      if (applied.applied) appliedPlayers += applied.players.length;
-      else applied.blockingReasons.forEach((reason) => log(run, "yellow", "xp_development", `${teamId}: ${reason}`, "xp_apply_warning"));
-    } else if ((aiPlan?.blockers.length ?? 0) > 0 || preview.blockingReasons.length > 0) {
-      (aiPlan?.blockers ?? [])
-        .slice(0, 3)
-        .forEach((reason) => log(run, "yellow", "xp_development", `${teamId}: ${reason}`, "ai_xp_preview_warning"));
+    } else if (preview.blockingReasons.length > 0) {
       preview.blockingReasons
         .slice(0, 3)
         .forEach((reason) => log(run, "yellow", "xp_development", `${teamId}: ${reason}`, "xp_preview_warning"));

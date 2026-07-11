@@ -6,6 +6,18 @@ import type {
   PlayerPotentialSource,
 } from "@/lib/data/olyDataTypes";
 
+// Cache buildPlayerScoutPotentialFromGameState results per (gameState, playerId) to avoid
+// repeated O(n) scans through playerPotential for the same player in the same state.
+const scoutPotentialCache = new WeakMap<GameState, Map<string, PlayerScoutPotential>>();
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildHiddenAttributeCeilingsFromPotentialScore } from "@/lib/scouting/player-attribute-ceiling-service";
+import {
+  attachPotentialCeilingToRecord,
+  applyAxisCeilingSeasonDrift,
+  buildPlayerPotentialCeilingProfile,
+  buildPotentialRecordWithCeilings,
+} from "@/lib/scouting/player-potential-ceiling-service";
+
 export type PlayerPotentialCertainty = "missing_source" | "low" | "medium" | "high";
 
 export type PlayerScoutPotential = {
@@ -134,21 +146,52 @@ function getScoutingConfidencePct(level: number | null | undefined) {
   return 35;
 }
 
-function getPotentialBand(potential: number): PlayerPotentialBand {
+export function getPotentialBand(potential: number): PlayerPotentialBand {
   if (potential >= 88) return "elite";
   if (potential >= 78) return "high";
   if (potential >= 62) return "medium";
   return "low";
 }
 
+export function potentialScoreToStars(score: number) {
+  const normalized = clamp(Math.round(score), 35, 99);
+  if (normalized >= 94) return 5.0;
+  if (normalized >= 88) return 4.5;
+  if (normalized >= 80) return 4.0;
+  if (normalized >= 72) return 3.5;
+  if (normalized >= 64) return 3.0;
+  if (normalized >= 56) return 2.5;
+  return 2.0;
+}
+
+export type PotentialRangeStarSlot = {
+  index: number;
+  minFill: number;
+  maxFill: number;
+  showUncertain: boolean;
+};
+
+export function buildPotentialRangeStarSlots(minScore: number, maxScore: number): PotentialRangeStarSlot[] {
+  const minStars = potentialScoreToStars(minScore);
+  const maxStars = potentialScoreToStars(maxScore);
+  return [0, 1, 2, 3, 4].map((index) => {
+    const minFill = Math.max(0, Math.min(1, minStars - index));
+    const maxFill = Math.max(0, Math.min(1, maxStars - index));
+    return {
+      index,
+      minFill,
+      maxFill,
+      showUncertain: maxFill > minFill,
+    };
+  });
+}
+
+export function shouldShowPotentialRangeStars(minScore: number, maxScore: number) {
+  return potentialScoreToStars(maxScore) > potentialScoreToStars(minScore);
+}
+
 function getStarRating(potential: number) {
-  if (potential >= 94) return "5.0 Sterne";
-  if (potential >= 88) return "4.5 Sterne";
-  if (potential >= 80) return "4.0 Sterne";
-  if (potential >= 72) return "3.5 Sterne";
-  if (potential >= 64) return "3.0 Sterne";
-  if (potential >= 56) return "2.5 Sterne";
-  return "2.0 Sterne";
+  return `${potentialScoreToStars(potential).toFixed(1)} Sterne`;
 }
 
 function getTrainingSpeedMultiplier(potential: number) {
@@ -185,41 +228,53 @@ function getPlayerSeedValue(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-function getAverageAttributePotentialBase(player: Player) {
+/** Returns the highest single core stat value. */
+function getMaxAxisValue(player: Player): number {
   const coreValues = Object.values(player.coreStats ?? {}).filter(isFiniteNumber);
-  if (coreValues.length > 0) {
-    return coreValues.reduce((sum, value) => sum + value, 0) / coreValues.length;
-  }
+  if (coreValues.length > 0) return Math.max(...coreValues);
   const disciplineValues = Object.values(player.disciplineRatings ?? {}).filter(
     (value): value is number => isFiniteNumber(value),
   );
-  if (disciplineValues.length > 0) {
-    return disciplineValues.reduce((sum, value) => sum + value, 0) / disciplineValues.length;
-  }
-  return 62;
+  if (disciplineValues.length > 0) return Math.max(...disciplineValues);
+  return 35;
 }
 
-function getTraitPotentialModifier(player: Pick<Player, "traitsPositive" | "traitsNegative">) {
+/** Specialist-weighted ability estimate for headroom checks. */
+function getSpecialistAbilityEstimate(player: Player): number {
+  const coreValues = Object.values(player.coreStats ?? {}).filter(isFiniteNumber);
+  if (coreValues.length === 0) return getMaxAxisValue(player);
+  const sorted = [...coreValues].sort((left, right) => right - left);
+  while (sorted.length < 4) sorted.push(sorted[sorted.length - 1] ?? 35);
+  return (
+    (sorted[0] ?? 35) * 0.45 +
+    (sorted[1] ?? 35) * 0.30 +
+    (sorted[2] ?? 35) * 0.15 +
+    (sorted[3] ?? 35) * 0.10
+  );
+}
+
+/**
+ * Talent traits: raw ceiling, nothing to do with work ethic.
+ * Positive = natural gift; Negative = hard ceiling that limits growth.
+ */
+function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" | "traitsNegative">) {
   const positives = new Set((player.traitsPositive ?? []).map((entry) => entry.toLowerCase()));
   const negatives = new Set((player.traitsNegative ?? []).map((entry) => entry.toLowerCase()));
   let modifier = 0;
-  for (const trait of ["ambitious", "diligent", "motivated", "disciplined", "flexible", "resourceful"]) {
-    if (positives.has(trait)) modifier += 1.8;
+  for (const trait of ["prodigy", "gifted", "natural", "talented", "late bloomer", "wonder kid"]) {
+    if (positives.has(trait)) modifier += 5;
   }
-  for (const trait of ["lazy", "fainthearted", "paranoid", "renegade", "gambler", "obsessive"]) {
-    if (negatives.has(trait)) modifier -= 1.6;
+  for (const trait of ["limited ceiling", "plateaued", "slow developer", "ceiling limited", "stagnant"]) {
+    if (negatives.has(trait)) modifier -= 4;
   }
-  if (negatives.has("diva") || negatives.has("egomaniac")) modifier -= 0.8;
-  return modifier;
+  return clamp(modifier, -8, 10);
 }
 
 function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
-  const base = getAverageAttributePotentialBase(input.player);
-  const importedPotential = isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null;
-  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v1`);
-  const jitter = (seed - 0.5) * 16;
-  const baseline = importedPotential == null ? base + 8 : importedPotential * 0.72 + (base + 8) * 0.28;
-  return roundValue(clamp(baseline + getTraitPotentialModifier(input.player) + jitter, 35, 99), 0);
+  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v3`);
+  const rawRoll = roundValue(35 + seed * 64, 0);
+  const traitBonus = getTalentTraitPotentialModifier(input.player);
+  return clamp(rawRoll + traitBonus, 35, 99);
 }
 
 export function buildPlayerPotentialRecord(input: {
@@ -230,20 +285,48 @@ export function buildPlayerPotentialRecord(input: {
   if (input.existing?.hiddenPotentialScore != null) {
     return input.existing;
   }
-  const importedPotential = isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null;
-  const hiddenPotentialScore = importedPotential ?? deriveHiddenPotentialScore(input);
+  const hiddenPotentialScore = deriveHiddenPotentialScore(input);
   return {
     playerId: input.player.id,
     potentialBand: getPotentialBand(hiddenPotentialScore),
     hiddenPotentialScore,
     revealedPotentialRange: undefined,
     confidence: 0,
-    source: importedPotential == null ? "generated" : "imported",
+    source: "generated",
   };
 }
 
-export function buildPlayerPotentialRecordsForSave(input: { saveId: string; players: Player[] }) {
-  return input.players.map((player) => buildPlayerPotentialRecord({ saveId: input.saveId, player }));
+export function buildPlayerPotentialRecordsForSave(input: {
+  saveId: string;
+  players: Player[];
+  gameState?: GameState | null;
+}) {
+  return input.players.map((player) => {
+    const record = buildPlayerPotentialRecord({
+      saveId: input.saveId,
+      player,
+    });
+    if (!input.gameState) {
+      return record;
+    }
+    const currentStars = buildPlayerAxisStarProfile({
+      gameState: input.gameState,
+      player,
+      disciplines: input.gameState.disciplines,
+    });
+    const ceiling = buildPlayerPotentialCeilingProfile({
+      saveId: input.saveId,
+      player,
+      currentStars,
+      hiddenPotentialScore: record.hiddenPotentialScore,
+    });
+    return attachPotentialCeilingToRecord({
+      record,
+      ceiling,
+      player,
+      saveId: input.saveId,
+    });
+  });
 }
 
 function resolvePlayerPotentialRecord(input: {
@@ -388,6 +471,26 @@ export function buildPlayerScoutPotentialFromGameState(input: {
   saveId?: string | null;
   scoutingLevel?: number | null;
 }): PlayerScoutPotential {
+  // Cache when there's no custom scoutingLevel override (the common season-end path).
+  const gs = input.gameState;
+  if (gs && input.scoutingLevel == null) {
+    let perState = scoutPotentialCache.get(gs);
+    if (!perState) {
+      perState = new Map();
+      scoutPotentialCache.set(gs, perState);
+    }
+    const hit = perState.get(input.player.id);
+    if (hit) return hit;
+    const record = resolvePlayerPotentialRecord(input);
+    const result = buildScoutPotentialFromScore({
+      potentialScore: record.hiddenPotentialScore ?? null,
+      scoutingLevel: input.scoutingLevel,
+      source: record.source,
+      sourceWarning: record.source === "missing" ? "potential_source_missing" : null,
+    });
+    perState.set(input.player.id, result);
+    return result;
+  }
   const record = resolvePlayerPotentialRecord(input);
   return buildScoutPotentialFromScore({
     potentialScore: record.hiddenPotentialScore ?? null,
@@ -509,7 +612,9 @@ export function buildPlayerDevelopmentInsight(input: {
               trainingForm === "D" ? 0.88 :
                 trainingForm === "E" ? 0.78 :
                   0.64;
-  const routeFitFactor = route === "RECOVERY" ? 0.9 : highRiskTraits ? 0.92 : 1;
+  const routeFitFactor =
+    (route === "RECOVERY" ? 0.9 : highRiskTraits ? 0.92 : 1) *
+    (route !== "BALANCED" && route !== "RECOVERY" ? 1.08 : 1);
   const regressionPressure = roundValue(
     (gap != null && gap < 0 ? Math.abs(gap) * 8 : 0) +
       (highRiskTraits ? 24 : 0) +
@@ -664,4 +769,135 @@ export function buildPotentialAiUsagePreview(input: {
       input.context,
     ].filter((entry): entry is string => Boolean(entry)),
   } satisfies PotentialAiUsagePreview;
+}
+
+/**
+ * Season-end potential update — snapshot, gentle bidirectional drift, rebuild ceilings.
+ */
+export function applySeasonEndPotentialUpdate(input: {
+  saveId: string;
+  seasonId: string;
+  player: Player;
+  record: PlayerPotentialRecord;
+  growthOutlook?: PlayerGrowthOutlook | null;
+  gameState?: GameState | null;
+}): PlayerPotentialRecord {
+  const currentScore = input.record.hiddenPotentialScore;
+  if (!isFiniteNumber(currentScore)) return input.record;
+
+  const outlook = input.growthOutlook ?? "stable";
+  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${input.seasonId}:pot-update-v2`);
+  let scoreDelta = roundValue((seed - 0.5) * 4, 0);
+  if (outlook === "breakout") scoreDelta += 1;
+  else if (outlook === "growth" && scoreDelta < 0) scoreDelta = 0;
+  else if (outlook === "stagnation" && scoreDelta > 0) scoreDelta = 0;
+  else if (outlook === "regression_risk") scoreDelta -= 1;
+  if (scoreDelta === 0) scoreDelta = seed >= 0.5 ? 1 : -1;
+
+  const newScore = clamp(currentScore + scoreDelta, 35, 99);
+  const baseRecord: PlayerPotentialRecord = {
+    ...input.record,
+    hiddenPotentialScore: newScore,
+    potentialBand: getPotentialBand(newScore),
+  };
+
+  if (!input.gameState) {
+    return baseRecord;
+  }
+
+  const currentStars = buildPlayerAxisStarProfile({
+    gameState: input.gameState,
+    player: input.player,
+    disciplines: input.gameState.disciplines,
+  });
+
+  const currentCeiling =
+    input.record.hiddenPotentialCeilingByAxis && input.record.hiddenPotentialOverallStars != null
+      ? {
+          pow: input.record.hiddenPotentialCeilingByAxis.pow,
+          spe: input.record.hiddenPotentialCeilingByAxis.spe,
+          men: input.record.hiddenPotentialCeilingByAxis.men,
+          soc: input.record.hiddenPotentialCeilingByAxis.soc,
+          overall: input.record.hiddenPotentialOverallStars,
+        }
+      : buildPlayerPotentialCeilingProfile({
+          saveId: input.saveId,
+          player: input.player,
+          currentStars,
+          hiddenPotentialScore: currentScore,
+        });
+
+  const snapshot = {
+    seasonId: input.seasonId,
+    hiddenPotentialScore: currentScore,
+    overallStars: currentCeiling.overall,
+    byAxis: {
+      pow: currentCeiling.pow,
+      spe: currentCeiling.spe,
+      men: currentCeiling.men,
+      soc: currentCeiling.soc,
+    },
+  };
+
+  const currentAttributeCeiling =
+    input.record.hiddenAttributeCeiling ??
+    buildHiddenAttributeCeilingsFromPotentialScore({
+      saveId: input.saveId,
+      player: input.player,
+      currentStars,
+      hiddenPotentialScore: currentScore,
+    });
+
+  const drifted = applyAxisCeilingSeasonDrift({
+    ceiling: currentCeiling,
+    attributeCeilings: currentAttributeCeiling,
+    currentStars,
+    saveId: input.saveId,
+    playerId: input.player.id,
+    seasonId: input.seasonId,
+    growthOutlook: outlook,
+  });
+
+  return buildPotentialRecordWithCeilings({
+    saveId: input.saveId,
+    player: input.player,
+    record: {
+      ...baseRecord,
+      lastSeasonSnapshot: snapshot,
+    },
+    currentStars,
+    attributeCeilingOverride: drifted.attributeCeilings,
+  });
+}
+
+/**
+ * Batch version — applies season-end potential updates to all players in a GameState.
+ * Returns the updated playerPotential array (does not mutate the state).
+ */
+export function applySeasonEndPotentialUpdates(input: {
+  saveId: string;
+  seasonId: string;
+  gameState: GameState;
+}): PlayerPotentialRecord[] {
+  const existingRecords = new Map(
+    (input.gameState.playerPotential ?? []).map((record) => [record.playerId, record] as const),
+  );
+  return input.gameState.players.map((player) => {
+    const record = existingRecords.get(player.id) ?? buildPlayerPotentialRecord({
+      saveId: input.saveId,
+      player,
+    });
+    const insight = buildPlayerDevelopmentInsight({
+      gameState: input.gameState,
+      player,
+    });
+    return applySeasonEndPotentialUpdate({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      player,
+      record,
+      growthOutlook: insight.growthOutlook,
+      gameState: input.gameState,
+    });
+  });
 }

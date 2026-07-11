@@ -135,7 +135,6 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
   const actualScore = input.averageFinalScore ?? null;
   const expiring = (input.contractLength ?? 99) <= 1;
   const lowBoardConfidence = boardConfidence < 42;
-  const veryLowBoardConfidence = boardConfidence < 28;
   const expectedRank = getExpectedCompositeRank(input);
   const actualRank = getActualCompositeRank(input);
   const rankGap = expectedRank != null && actualRank != null ? actualRank - expectedRank : null;
@@ -248,13 +247,12 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
   trustScore = roundValue(clamp(trustScore, 0, 100));
   const mood = getMood(trustScore);
 
+  // Der harte "do_not_renew"-Tier wurde entfernt: das Board blockt keine Verlängerung
+  // und erzwingt keine Verkäufe mehr. Verkauf/Entlassung liegt allein beim Team/GM.
+  // Die weicheren Tiers bleiben rein informativ (kein Einfluss auf Sell-Priority).
   let renewalPolicy: PlayerBoardTrustRenewalPolicy = "normal";
   let salaryCapMultiplier: number | null = null;
-  if (trustScore < 25 || (veryLowBoardConfidence && badlyMissesExpectation && expiring)) {
-    renewalPolicy = "do_not_renew";
-    salaryCapMultiplier = 0;
-    warnings.push("board_blocks_renewal");
-  } else if (trustScore < 38 || (lowBoardConfidence && missesExpectation && expiring)) {
+  if (trustScore < 38 || (lowBoardConfidence && missesExpectation && expiring)) {
     renewalPolicy = "renewal_warning";
     salaryCapMultiplier = 0.7;
     warnings.push("board_warns_against_full_renewal");

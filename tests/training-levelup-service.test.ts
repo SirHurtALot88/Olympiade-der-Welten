@@ -126,8 +126,6 @@ function forecast(overrides: Partial<PlayerProgressionForecast> = {}): PlayerPro
     xpBeforeTraits: 0,
     xpAfterTraits: 0,
     xpEvents: [],
-    possibleUpgradeSummary: "test",
-    ratingTierCosts: { F: 1, E: 1, D: 1, C: 1, B: 1, A: 1, S: 1, "S+": 1, "99": null },
     fatigueStrain: { label: "niedrig", score: 0, warning: "" },
     sourceStatus: {
       appearances: "missing_source",
@@ -376,5 +374,40 @@ describe("training-levelup-service", () => {
     expect(firstImprovement?.contractSalaryStable).toBe(true);
     expect(firstImprovement?.marketValuePreviewDelta).not.toBeNull();
     expect(firstImprovement?.expectedSalaryPreviewDelta).not.toBeNull();
+  });
+
+  it("blocks attribute upgrades when hidden ceiling is reached", () => {
+    const testPlayer = player({
+      attributeSheetStats: attributes({ power: 72 }),
+    });
+    const model = buildPlayerDevelopmentLevelupModel({
+      player: testPlayer,
+      potentialRecord: {
+        playerId: testPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 72,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: {
+          power: 72,
+          health: 75,
+          stamina: 70,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    });
+    const powerPreview = model.upgradePreview.find((row) => row.attribute === "power");
+
+    expect(powerPreview?.blocked).toBe(true);
+    expect(powerPreview?.blockReason).toBe("potential_ceiling_reached");
+    expect(powerPreview?.ceilingState).toBe("capped");
   });
 });

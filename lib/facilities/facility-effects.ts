@@ -89,26 +89,52 @@ export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection |
   );
 }
 
-export function applyTrainingXpFacilityModifiers(baseTrainingXp: number, facilities: TeamFacilityCollection | null | undefined) {
+export function applyTrainingXpFacilityModifiers(
+  baseTrainingXp: number,
+  facilities: TeamFacilityCollection | null | undefined,
+  options?: { developmentTrainingBonusPct?: number },
+) {
   const level = getFacilityLevel(facilities, "training_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "training_center").efficiencyPct;
   const modifierPct = roundValue(((getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
+  const developmentBonusPct = options?.developmentTrainingBonusPct ?? 0;
+  const totalModifierPct = modifierPct + developmentBonusPct;
   return {
     before: baseTrainingXp,
-    modifierPct,
-    after: roundValue(baseTrainingXp * (1 + modifierPct / 100), 0),
+    modifierPct: totalModifierPct,
+    after: roundValue(baseTrainingXp * (1 + totalModifierPct / 100), 0),
   };
 }
 
-export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
+/** Cumulative flat recovery bonus by REHA level (Basis 20 → L1=22, L2=24, L3=26, L4=29, L5=32 at 100% condition). */
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 3, 5, 7, 10, 13] as const;
+
+export function getRecoveryFlatBonusAtLevel(level: number) {
+  return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;
+}
+
+export function getRecoveryFlatBonus(facilities: TeamFacilityCollection | null | undefined) {
   const level = getFacilityLevel(facilities, "recovery_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "recovery_center").efficiencyPct;
-  const modifierPct = roundValue(((getFacilityLevelDefinition("recovery_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
+  return roundValue(getRecoveryFlatBonusAtLevel(level) * (efficiencyPct / 100));
+}
+
+export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
+  const flatBonus = getRecoveryFlatBonus(facilities);
+  const modifierPct =
+    baseRecovery > 0 ? roundValue((flatBonus / baseRecovery) * 100) : flatBonus > 0 ? flatBonus * 5 : 0;
   return {
     before: baseRecovery,
     modifierPct,
-    after: roundValue(baseRecovery * (1 + modifierPct / 100), 2),
+    flatBonus,
+    after: roundValue(baseRecovery + flatBonus, 2),
   };
+}
+
+/** Reduces season-end training fatigue load (on top of matchday fatigue) by REHA flat bonus vs basis 20. */
+export function getRecoveryTrainingFatigueReductionPct(facilities: TeamFacilityCollection | null | undefined) {
+  const flatBonus = getRecoveryFlatBonus(facilities);
+  return roundValue((flatBonus / 20) * 100);
 }
 
 function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, facilities: TeamFacilityCollection | null | undefined) {

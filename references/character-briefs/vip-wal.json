@@ -1,0 +1,29 @@
+{
+  "name": "VIP Wal",
+  "id": "player-2984-vip-wal",
+  "className": "Bard",
+  "race": "Fish",
+  "alignment": "C-G",
+  "gender": "m",
+  "subclasses": ["Aquatic", "Trickster", "Lord", "Pirate"],
+  "traitsPositive": ["Cool", "Flexible", "Eloquent"],
+  "traitsNegative": ["Gambler", "Egomaniac", "Scandalous"],
+  "attributes": {
+    "power": 72,
+    "health": 78,
+    "stamina": 74,
+    "intelligence": 74,
+    "awareness": 58,
+    "determination": 58,
+    "speed": 44,
+    "dexterity": 38,
+    "charisma": 91,
+    "will": 94,
+    "spirit": 62,
+    "torment": 55
+  },
+  "flavorDe": "In den tiefsten Abgründen von Luniras Meeren betreibt VIP Wal ein illegales Unterwasser-Casino, das nur die Reichsten und Rücksichtslosesten betreten. Einst ein simpler Wal, der Schiffsbesatzungen ausraubte, hat er sein Glück am Spieltisch entdeckt — und nie wieder losgelassen. Heute ist er der undiskutierte König der Abyssal High Rollers: Goldketten, Samt, Knochenkarten und ein Lächeln, das teurer ist als dein Leben. In der Olympiade setzt er nicht nur Geld, sondern alles auf eine Karte — denn für ihn ist jede Disziplin ein neues Spiel.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/VIP Wal.jpg",
+  "cost": 68,
+  "upkeepBase": 5
+}

@@ -8,11 +8,32 @@ import type {
   TeamIdentity,
   TeamStrategyBias,
   TeamStrategyProfile,
+  TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
 
 export const GM_INFLUENCE_PCT = 30;
 export const GM_WILDCARD_ASSIGNMENT_CHANCE_PCT = 7;
 const GM_WILDCARD_MAX_SCORE_GAP = 75;
+/** Score-Band um den Best-Fit, aus dem ein Seed-Salt einen GM wählen darf (Audit-Varianz). */
+const GM_SEED_VARIATION_SCORE_GAP = 60;
+const GM_SEED_VARIATION_POOL_SIZE = 6;
+const GM_ARCHETYPE_DIVERSITY_THRESHOLD = 3;
+const GM_ARCHETYPE_DIVERSITY_BASE_MALUS = 12;
+const GM_ARCHETYPE_DIVERSITY_STEP_MALUS = 4;
+const GM_ARCHETYPE_DIVERSITY_MAX_MALUS = 20;
+
+/**
+ * Optionales, prozessweites Seed-Salt für die GM-Zuweisung. Wird (z.B. von Audits) pro Lauf
+ * gesetzt, damit frische Saves desselben Season-IDs unterschiedliche, aber fit-nahe GMs ziehen.
+ * Greift nur bei Neuzuweisung (fresh saves); bestehende Zuweisungen bleiben unberührt.
+ */
+let gmAssignmentSeedSalt: string | null = null;
+export function setGmAssignmentSeedSalt(salt: string | null | undefined) {
+  gmAssignmentSeedSalt = salt && salt.trim().length > 0 ? salt.trim() : null;
+}
+export function getGmAssignmentSeedSalt() {
+  return gmAssignmentSeedSalt;
+}
 export const GM_BOARD_REPLACEMENT_CONFIDENCE_THRESHOLD = 2.5;
 export const GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD = 9;
 
@@ -487,6 +508,12 @@ function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function resolveGmInfluencePct(identity: TeamIdentity | null | undefined, isReplacement: boolean) {
+  const boardConfidence = identity?.boardConfidence ?? 5;
+  const base = Math.max(20, Math.min(50, Math.round(20 + boardConfidence * 3)));
+  return isReplacement ? Math.min(50, base + 3) : base;
+}
+
 function blend(base: number, target: number, influencePct = GM_INFLUENCE_PCT) {
   const weight = influencePct / 100;
   return clamp(base * (1 - weight) + target * weight, 0, 20);
@@ -574,11 +601,27 @@ function chooseProfileForTeam(team: Team, seasonId: string, index: number) {
   return TEAM_GENERAL_MANAGER_PROFILES[profileIndex];
 }
 
+function getArchetypeDiversityMalus(
+  archetype: TeamGeneralManagerArchetype,
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null,
+) {
+  const count = assignedArchetypeCounts?.get(archetype) ?? 0;
+  if (count < GM_ARCHETYPE_DIVERSITY_THRESHOLD) {
+    return 0;
+  }
+  const overflow = count - GM_ARCHETYPE_DIVERSITY_THRESHOLD + 1;
+  return Math.min(
+    GM_ARCHETYPE_DIVERSITY_MAX_MALUS,
+    GM_ARCHETYPE_DIVERSITY_BASE_MALUS + (overflow - 1) * GM_ARCHETYPE_DIVERSITY_STEP_MALUS,
+  );
+}
+
 function scoreGeneralManagerFit(
   team: Team,
   identity: TeamIdentity | null,
   profile: TeamGeneralManagerProfile,
   seasonId: string,
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null,
 ) {
   const fallbackIdentity: TeamIdentity = identity ?? {
     teamId: team.teamId,
@@ -637,8 +680,18 @@ function scoreGeneralManagerFit(
         ? 5
         : 0;
   const teamSeedTieBreaker = (hashString(`${seasonId}:${team.teamId}:${profile.gmId}`) % 1000) / 1000;
+  const diversityMalus = getArchetypeDiversityMalus(profile.archetype, assignedArchetypeCounts);
 
-  return axisFit * 3 + managementFit * 2 + rosterFit + financeBonus + ambitionBonus + harmonyBonus + teamSeedTieBreaker;
+  return (
+    axisFit * 3 +
+    managementFit * 2 +
+    rosterFit +
+    financeBonus +
+    ambitionBonus +
+    harmonyBonus +
+    teamSeedTieBreaker -
+    diversityMalus
+  );
 }
 
 type PickedGeneralManager = {
@@ -659,12 +712,81 @@ function getBoardReplacementReason(board: TeamBoardConfidenceRecord | null | und
   return null;
 }
 
+// Returns a probability (0–1) that the board will replace the GM this season rollover.
+// Hard floor: confidence <= 2.0 or pressure >= 9.5 → always fires (p=1).
+// Safe zone: confidence >= 6.5 and pressure <= 4 → never fires (p=0).
+// Between those zones: gradual curve modified by team identity traits.
+export function getBoardReplacementProbability(
+  board: TeamBoardConfidenceRecord | null | undefined,
+  identity: TeamIdentity | null | undefined,
+): number {
+  if (!board) return 0;
+  const confidence = Number(board.value ?? 5);
+  const pressure = Number(board.pressure ?? 0);
+
+  // Always safe
+  if (confidence >= 6.5 && pressure <= 4) return 0;
+  // Hard floor — always fire
+  if (confidence <= 2.0 || pressure >= 9.5) return 1.0;
+
+  // Gradual curves for the zone between safe and hard floor
+  const confidenceProb = confidence <= 4.5 ? Math.max(0, Math.min(0.9, (4.5 - confidence) / 2.5)) : 0;
+  const pressureProb = pressure >= 7.0 ? Math.max(0, Math.min(0.9, (pressure - 7.0) / 2.5)) : 0;
+  let prob = Math.max(confidenceProb, pressureProb);
+
+  // Identity modifiers — team personality shapes board patience
+  const ambition = identity?.ambition ?? 5;
+  const harmony = identity?.harmony ?? 5;
+  const boardSeed = identity?.boardConfidence ?? 5;
+
+  if (ambition >= 8) prob += 0.15;       // impatient board, fires sooner
+  else if (ambition <= 3) prob -= 0.10;  // gives trainer more time
+  if (harmony >= 8) prob -= 0.15;        // loyal culture, waits longer
+  else if (harmony <= 3) prob += 0.10;   // volatile board
+  if (boardSeed <= 4) prob += 0.10;      // structurally unstable board relationship
+
+  return Math.max(0, Math.min(1, prob));
+}
+
+export function applyTransferBalanceRiskToReplacementProbability(
+  baseProbability: number,
+  input: { sellCount: number; buyCount: number; netTransferCash: number; isHotSeat: boolean },
+) {
+  const atRisk =
+    input.isHotSeat &&
+    input.sellCount >= 2 &&
+    input.buyCount === 0 &&
+    input.netTransferCash > 0;
+
+  if (!atRisk) {
+    return baseProbability;
+  }
+
+  return Math.max(baseProbability, Math.min(1, baseProbability + 0.2));
+}
+
+function getTeamSeasonTransferStats(transferHistory: TransferHistoryEntry[] | null | undefined, seasonId: string, teamId: string) {
+  const transfers = (transferHistory ?? []).filter((entry) => entry.seasonId === seasonId);
+  const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
+  const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
+  const buyFees = buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
+  const sellProceeds = sells.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
+  return {
+    buyCount: buys.length,
+    sellCount: sells.length,
+    netTransferCash: sellProceeds - buyFees,
+  };
+}
+
 function pickBestUnusedGeneralManager(input: {
   team: Team;
   teamIndex: number;
   seasonId: string;
   identity: TeamIdentity | null;
   usedGmIds: Set<string>;
+  excludedArchetypes?: Iterable<TeamGeneralManagerArchetype>;
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null;
+  seedSalt?: string | null;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
     const preferred =
@@ -678,11 +800,23 @@ function pickBestUnusedGeneralManager(input: {
     }
   }
 
-  const candidates = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
-  const scoredCandidates = candidates
+  const excludedArchetypeSet = new Set(input.excludedArchetypes ?? []);
+  const availableProfiles = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  const candidates =
+    excludedArchetypeSet.size > 0
+      ? availableProfiles.filter((profile) => !excludedArchetypeSet.has(profile.archetype))
+      : availableProfiles;
+  const candidatePool = candidates.length > 0 ? candidates : availableProfiles;
+  const scoredCandidates = candidatePool
     .map((profile) => ({
       profile,
-      score: scoreGeneralManagerFit(input.team, input.identity, profile, input.seasonId),
+      score: scoreGeneralManagerFit(
+        input.team,
+        input.identity,
+        profile,
+        input.seasonId,
+        input.assignedArchetypeCounts,
+      ),
     }))
     .sort((left, right) => {
       if (right.score !== left.score) {
@@ -693,6 +827,22 @@ function pickBestUnusedGeneralManager(input: {
   const best = scoredCandidates[0];
   if (!best) {
     return { profile: chooseProfileForTeam(input.team, input.seasonId, input.teamIndex), source: "auto_generated" };
+  }
+
+  // Seed-Salt (Audit-Varianz): wähle fit-nah aus dem Top-Band, damit verschiedene Läufe
+  // unterschiedliche – aber weiterhin sinnvolle – GMs zuweisen.
+  const seedSalt = input.seedSalt && input.seedSalt.trim().length > 0 ? input.seedSalt.trim() : null;
+  if (seedSalt) {
+    const variationPool = scoredCandidates
+      .filter((candidate) => candidate.score >= best.score - GM_SEED_VARIATION_SCORE_GAP)
+      .slice(0, GM_SEED_VARIATION_POOL_SIZE);
+    if (variationPool.length > 0) {
+      const chosen =
+        variationPool[hashString(`${seedSalt}:${input.seasonId}:${input.team.teamId}:gm-seed-variation`) % variationPool.length];
+      if (chosen) {
+        return { profile: chosen.profile, source: "auto_generated" };
+      }
+    }
   }
 
   const wildcardRoll = hashString(`${input.seasonId}:${input.team.teamId}:${input.team.shortCode}:gm-wildcard-v8`) % 100;
@@ -727,32 +877,52 @@ export function buildTeamGeneralManagerAssignments(
   existing?: Record<string, TeamGeneralManagerAssignment> | null,
   teamIdentities?: TeamIdentity[] | null,
   boardConfidenceByTeamId?: Record<string, TeamBoardConfidenceRecord> | null,
+  transferHistory?: TransferHistoryEntry[] | null,
+  seedSalt?: string | null,
 ) {
+  const effectiveSeedSalt =
+    seedSalt && seedSalt.trim().length > 0 ? seedSalt.trim() : gmAssignmentSeedSalt;
   const identityByTeamId = new Map((teamIdentities ?? []).map((identity) => [identity.teamId, identity] as const));
   const usedGmIds = new Set<string>();
+  const assignedArchetypeCounts = new Map<TeamGeneralManagerArchetype, number>();
   const assignments: Record<string, TeamGeneralManagerAssignment> = {};
 
   teams.forEach((team) => {
     const current = existing?.[team.teamId] ?? null;
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
-    const boardReplacementReason =
-      current?.assignedSeasonId && current.assignedSeasonId !== seasonId
-        ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
-        : null;
+    const identity = identityByTeamId.get(team.teamId) ?? null;
+    const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
+    let boardReplacementProbability = shouldEvaluateReplacement
+      ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
+      : 0;
+    if (transferHistory && shouldEvaluateReplacement) {
+      const statsSeasonId = current?.assignedSeasonId ?? seasonId;
+      const stats = getTeamSeasonTransferStats(transferHistory, statsSeasonId, team.teamId);
+      boardReplacementProbability = applyTransferBalanceRiskToReplacementProbability(boardReplacementProbability, {
+        ...stats,
+        isHotSeat: boardReplacementProbability >= 0.55,
+      });
+    }
+    const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
+    const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
     if (!current || !currentProfile || usedGmIds.has(currentProfile.gmId)) {
       return;
     }
-    if (boardReplacementReason && !team.humanControlled) {
+    if (isFired) {
       usedGmIds.add(currentProfile.gmId);
       return;
     }
 
     usedGmIds.add(currentProfile.gmId);
+    assignedArchetypeCounts.set(
+      currentProfile.archetype,
+      (assignedArchetypeCounts.get(currentProfile.archetype) ?? 0) + 1,
+    );
     assignments[team.teamId] = {
       teamId: team.teamId,
       gmId: currentProfile.gmId,
-      assignedSeasonId: current.assignedSeasonId ?? seasonId,
-      influencePct: current.influencePct ?? GM_INFLUENCE_PCT,
+      assignedSeasonId: seasonId,
+      influencePct: current.influencePct ?? resolveGmInfluencePct(identity, false),
       source: current.source ?? (team.humanControlled ? "human_slot" : "auto_generated"),
     };
   });
@@ -764,27 +934,47 @@ export function buildTeamGeneralManagerAssignments(
 
     const current = existing?.[team.teamId] ?? null;
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
-    const boardReplacementReason =
-      current?.assignedSeasonId && current.assignedSeasonId !== seasonId
-        ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
-        : null;
+    const identity = identityByTeamId.get(team.teamId) ?? null;
+    const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
+    let boardReplacementProbability = shouldEvaluateReplacement
+      ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
+      : 0;
+    if (transferHistory && shouldEvaluateReplacement) {
+      const statsSeasonId = current?.assignedSeasonId ?? seasonId;
+      const stats = getTeamSeasonTransferStats(transferHistory, statsSeasonId, team.teamId);
+      boardReplacementProbability = applyTransferBalanceRiskToReplacementProbability(boardReplacementProbability, {
+        ...stats,
+        isHotSeat: boardReplacementProbability >= 0.55,
+      });
+    }
+    const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
+    const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
+    // Determine dismissal reason only if the team is actually being replaced
+    const boardReplacementReason = isFired
+      ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
+      : null;
     const picked = pickBestUnusedGeneralManager({
       team,
       teamIndex: index,
       seasonId,
-      identity: identityByTeamId.get(team.teamId) ?? null,
+      identity,
       usedGmIds,
+      excludedArchetypes:
+        isFired && currentProfile ? [currentProfile.archetype] : undefined,
+      assignedArchetypeCounts,
+      seedSalt: effectiveSeedSalt,
     });
     const profile = picked.profile;
     usedGmIds.add(profile.gmId);
+    assignedArchetypeCounts.set(profile.archetype, (assignedArchetypeCounts.get(profile.archetype) ?? 0) + 1);
     assignments[team.teamId] = {
       teamId: team.teamId,
       gmId: profile.gmId,
       assignedSeasonId: seasonId,
-      influencePct: existing?.[team.teamId]?.influencePct ?? GM_INFLUENCE_PCT,
-      source: boardReplacementReason && currentProfile && !team.humanControlled ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
-      previousGmId: boardReplacementReason && currentProfile && !team.humanControlled ? currentProfile.gmId : undefined,
-      dismissalReason: boardReplacementReason && currentProfile && !team.humanControlled ? boardReplacementReason : undefined,
+      influencePct: resolveGmInfluencePct(identity, isFired),
+      source: isFired && currentProfile ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
+      previousGmId: isFired && currentProfile ? currentProfile.gmId : undefined,
+      dismissalReason: boardReplacementReason ?? undefined,
     };
   });
 
@@ -864,13 +1054,37 @@ export function applyGeneralManagerStrategyProfileEffect(
   };
 }
 
-export function withNormalizedTeamGeneralManagers(gameState: GameState): GameState {
+export function resolveGmAssignmentSeedSalt(
+  gameState: GameState,
+  options?: { saveId?: string | null },
+): string {
+  if (options?.saveId && options.saveId.trim().length > 0) {
+    return options.saveId.trim();
+  }
+  if (gameState.scenarioMeta?.sourceSaveId?.trim()) {
+    return gameState.scenarioMeta.sourceSaveId.trim();
+  }
+  if (gmAssignmentSeedSalt) {
+    return gmAssignmentSeedSalt;
+  }
+  if (gameState.scenarioMeta?.createdAt?.trim()) {
+    return `${gameState.season.id}:${gameState.scenarioMeta.createdAt.trim()}`;
+  }
+  return gameState.season.id;
+}
+
+export function withNormalizedTeamGeneralManagers(
+  gameState: GameState,
+  options?: { saveId?: string | null },
+): GameState {
   const assignments = buildTeamGeneralManagerAssignments(
     gameState.teams,
     gameState.season.id,
     gameState.seasonState.teamGeneralManagers,
     gameState.teamIdentities,
     gameState.seasonState.boardConfidence,
+    gameState.transferHistory,
+    resolveGmAssignmentSeedSalt(gameState, options),
   );
 
   return {

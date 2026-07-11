@@ -11,12 +11,28 @@ import {
   type AiManagementTrainingFocus,
   type AiManagementTrainingIntensity,
 } from "@/lib/ai/ai-team-management-preview-service";
+import {
+  isTeamRosterBelowOpt,
+  projectExpectedSalaryAtPlannerTarget,
+  resolveCombinedLiquidityReserve,
+  resolveTeamCashRunwayReserve,
+} from "@/lib/ai/ai-team-cash-reserve-service";
+import {
+  PLANNER_LIQUIDITY_BUFFER_MIN,
+  resolveTeamSpendableCashForPlanning,
+  usesSingleCashPlanningPolicy,
+} from "@/lib/ai/planner-cash-buffer-policy";
+import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { applyTeamTrainingSettings, previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
+import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import { applyTeamTrainingSettings, applyPlayerTrainingModes, previewPlayerTrainingModes, previewTeamTrainingSettings, applyPlayerTrainingClasses, previewPlayerTrainingClasses } from "@/lib/training/training-settings-service";
+import { applyAiTeamPlayerDemandFulfillment } from "@/lib/ai/ai-player-demand-fulfillment-service";
 
 export type AiManagerActionType =
   | "maintain_building"
@@ -25,6 +41,8 @@ export type AiManagerActionType =
   | "downgrade_building"
   | "set_training_focus"
   | "set_training_intensity"
+  | "set_player_training_modes"
+  | "set_player_training_classes"
   | "reserve_transfer_budget"
   | "reserve_salary_budget"
   | "reserve_maintenance_budget"
@@ -196,20 +214,37 @@ function buildBudgetActions(input: {
 
 function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManagementPreview, sourcePlanId: string) {
   const actions: AiManagerAction[] = [];
+  const maintenanceCache = new Map<string, ReturnType<typeof previewFacilityMaintenance>>();
+  const upgradeCache = new Map<string, ReturnType<typeof previewFacilityUpgrade>>();
+  const getMaintenance = (teamId: string, facilityId: FacilityId) => {
+    const key = `${teamId}:${facilityId}:maintain`;
+    if (!maintenanceCache.has(key)) maintenanceCache.set(key, previewFacilityMaintenance(save, teamId, facilityId));
+    return maintenanceCache.get(key)!;
+  };
+  const getUpgrade = (teamId: string, facilityId: FacilityId, variant?: string | null, action?: "upgrade" | "downgrade") => {
+    const key = `${teamId}:${facilityId}:${action ?? "upgrade"}:${variant ?? ""}`;
+    if (!upgradeCache.has(key)) {
+      upgradeCache.set(
+        key,
+        previewFacilityUpgrade(save, teamId, facilityId, facilityId === "specialist_wing" ? "mind_lab" : variant, action),
+      );
+    }
+    return upgradeCache.get(key)!;
+  };
   for (const teamPlan of preview.teams) {
     const buckets = teamPlan.budgetPlan.bucketsBefore;
     let remainingMaintenanceBudget = buckets.maintenanceBudget;
     let remainingBuildingBudget = buckets.buildingBudget;
     const maintenancePlans = teamPlan.buildingPlan.filter((row) => {
       if (row.action === "downgrade_or_ignore_if_no_cash") return false;
-      const maintenance = previewFacilityMaintenance(save, row.teamId, row.buildingType);
+      const maintenance = getMaintenance(row.teamId, row.buildingType);
       return maintenance.ok || (!maintenance.blockingReasons.includes("facility_not_built") && !maintenance.blockingReasons.includes("facility_condition_already_full"));
     });
     const downgradePlans = teamPlan.buildingPlan.filter((row) => row.action === "downgrade_or_ignore_if_no_cash" && row.currentLevel > 0);
     const upgradePlans = teamPlan.buildingPlan.filter((row) => row.action === "upgrade_existing" || row.action === "build_new");
 
     for (const row of maintenancePlans) {
-      const maintenance = previewFacilityMaintenance(save, row.teamId, row.buildingType);
+      const maintenance = getMaintenance(row.teamId, row.buildingType);
       if (!maintenance.ok && maintenance.blockingReasons.includes("facility_condition_already_full")) continue;
       const cost = maintenance.maintenanceCost;
       const budgetBlockers = cost > remainingMaintenanceBudget ? ["maintenance_budget_exceeded"] : [];
@@ -237,7 +272,7 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
     }
 
     for (const row of downgradePlans) {
-      const downgrade = previewFacilityUpgrade(save, row.teamId, row.buildingType, null, "downgrade");
+      const downgrade = getUpgrade(row.teamId, row.buildingType, null, "downgrade");
       const refund = downgrade.refundAmount ?? Math.max(0, -row.cost);
       const blockers = downgrade.blockingReasons;
       const canApply = blockers.length === 0;
@@ -261,8 +296,13 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       });
     }
 
-    for (const row of upgradePlans) {
-      const upgrade = previewFacilityUpgrade(save, row.teamId, row.buildingType, row.buildingType === "specialist_wing" ? "mind_lab" : undefined);
+    for (const row of [...upgradePlans].sort((left, right) => {
+      const leftRecovery = left.buildingType === "recovery_center" && left.currentLevel === 0 ? 1 : 0;
+      const rightRecovery = right.buildingType === "recovery_center" && right.currentLevel === 0 ? 1 : 0;
+      if (leftRecovery !== rightRecovery) return rightRecovery - leftRecovery;
+      return (right.score ?? 0) - (left.score ?? 0);
+    })) {
+      const upgrade = getUpgrade(row.teamId, row.buildingType, row.buildingType === "specialist_wing" ? "mind_lab" : undefined);
       const cost = upgrade.upgradeCost ?? row.cost;
       const budgetBlockers = [
         cost > remainingBuildingBudget ? "building_budget_exceeded" : null,
@@ -296,6 +336,7 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
 }
 
 function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManagementPreview, sourcePlanId: string) {
+  const longRunFast = isLongRunFastProfile();
   return preview.teams.flatMap((teamPlan) => {
     const training = previewTeamTrainingSettings({
       save,
@@ -303,6 +344,7 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       trainingFocus: teamPlan.trainingPlan.selectedTrainingFocus,
       trainingIntensity: teamPlan.trainingPlan.selectedTrainingIntensity,
     });
+    const trainingWarnings = longRunFast ? [] : [...training.warnings, ...teamPlan.trainingPlan.warnings];
     const base = {
       teamId: teamPlan.teamId,
       teamCode: teamPlan.teamCode,
@@ -313,7 +355,7 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
       sourcePlanId,
       canApply: training.ok,
       blockers: training.blockingReasons,
-      warnings: [...training.warnings, ...teamPlan.trainingPlan.warnings],
+      warnings: trainingWarnings,
     };
     return [
       {
@@ -333,6 +375,36 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
         reason: teamPlan.trainingPlan.reasons.join(" | ") || "Manager Training Plan",
         risk: riskFromWarnings(training.blockingReasons, training.warnings),
         trainingIntensity: training.trainingIntensity,
+      },
+      {
+        ...base,
+        actionId: actionId([sourcePlanId, teamPlan.teamId, "player_training_modes"]),
+        actionType: "set_player_training_modes" as const,
+        expectedEffect: `${teamPlan.trainingPlan.playerTrainingPlans.length} individuelle Trainingsmodi`,
+        reason:
+          teamPlan.trainingPlan.playerTrainingPlans
+            .filter((plan) => plan.selectedMode !== plan.teamBaselineMode || plan.needsLineupRest)
+            .slice(0, 3)
+            .map((plan) => `${plan.playerName}: ${plan.selectedMode}${plan.needsLineupRest ? " +Pause" : ""}`)
+            .join(" | ") || "Per-Player Load Plan",
+        risk: riskFromWarnings(
+          training.blockingReasons,
+          teamPlan.trainingPlan.playerTrainingPlans.some((plan) => plan.needsLineupRest)
+            ? [...training.warnings, "lineup_rest_recommended"]
+            : training.warnings,
+        ),
+      },
+      {
+        ...base,
+        actionId: actionId([sourcePlanId, teamPlan.teamId, "player_training_classes"]),
+        actionType: "set_player_training_classes" as const,
+        expectedEffect: `${teamPlan.trainingPlan.playerTrainingClassPlans.length} individuelle Trainingsklassen`,
+        reason:
+          teamPlan.trainingPlan.playerTrainingClassPlans
+            .slice(0, 3)
+            .map((plan) => `${plan.playerName}: ${plan.trainingClass}`)
+            .join(" | ") || "Per-Player Class Plan",
+        risk: riskFromWarnings(training.blockingReasons, training.warnings),
       },
     ];
   });
@@ -471,7 +543,11 @@ function writeManagerPlanState(
     const sourcePlanId = teamActions[0]?.sourcePlanId ?? buildPlanId(save);
     const byType = new Map(teamActions.map((action) => [action.actionType, action] as const));
     const budgetPreview = preview.teams.find((team) => team.teamId === teamId)?.budgetPlan.bucketsBefore;
-    if (budgetPreview && (byType.has("reserve_transfer_budget") || byType.has("reserve_salary_budget") || byType.has("reserve_maintenance_budget"))) {
+    if (
+      isSeasonOne(save.gameState.season.id) &&
+      budgetPreview &&
+      (byType.has("reserve_transfer_budget") || byType.has("reserve_salary_budget") || byType.has("reserve_maintenance_budget"))
+    ) {
       budgetReservations[teamId] = {
         teamId,
         seasonId: save.gameState.season.id,
@@ -515,17 +591,26 @@ export function applyAiManagerPlan(input: {
   actionTypes?: AiManagerActionType[];
   teamIds?: string[] | null;
   persistence?: PersistenceService;
+  longRunFast?: boolean;
 }): AiManagerApplyPreview {
   const dryRun = input.dryRun ?? true;
+  const longRunFast = input.longRunFast ?? isLongRunFastProfile();
   const persistence = input.persistence ?? createPersistenceService();
   const preview = buildAiManagerApplyPreview(input.save, input.teamIds);
   const allowedTypes = input.actionTypes ? new Set(input.actionTypes) : null;
-  const selectedActions = allowedTypes ? preview.actions.filter((action) => allowedTypes.has(action.actionType)) : preview.actions;
+  let selectedActions = allowedTypes ? preview.actions.filter((action) => allowedTypes.has(action.actionType)) : preview.actions;
+  if (longRunFast) {
+    selectedActions = selectedActions.filter(
+      (action) =>
+        !action.warnings.some((warning) => warning === "income_source_missing" || warning.includes("income_source_missing")),
+    );
+  }
   if (dryRun) {
     return { ...preview, dryRun: true, actions: selectedActions };
   }
 
-  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, buildAiLeagueManagementPreview(input.save.gameState));
+  const leaguePlanPreview = buildAiLeagueManagementPreview(input.save.gameState);
+  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, leaguePlanPreview);
   const appliedIds = new Set<string>();
   const orderedFacilityActions = selectedActions.filter(
     (action) =>
@@ -542,7 +627,7 @@ export function applyAiManagerPlan(input: {
       const result = applyFacilityMaintenance(currentSave, action.teamId, action.facilityId, maintenancePreview.confirmToken, persistence);
       if (result.applied) {
         appliedIds.add(action.actionId);
-        currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+        currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
       }
       continue;
     }
@@ -559,7 +644,7 @@ export function applyAiManagerPlan(input: {
       );
       if (result.applied) {
         appliedIds.add(action.actionId);
-        currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+        currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
       }
       continue;
     }
@@ -574,7 +659,7 @@ export function applyAiManagerPlan(input: {
     );
     if (result.applied) {
       appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }
 
@@ -586,11 +671,84 @@ export function applyAiManagerPlan(input: {
     const focus = actions.find((action) => action.trainingFocus)?.trainingFocus;
     const intensity = actions.find((action) => action.trainingIntensity)?.trainingIntensity;
     if (!focus || !intensity) continue;
+    const existing = currentSave.gameState.seasonState.aiManagerTrainingSettings?.[teamId];
+    if (longRunFast && existing?.trainingFocus === focus && existing?.trainingIntensity === intensity) {
+      for (const action of actions) appliedIds.add(action.actionId);
+      continue;
+    }
     const trainingPreview = previewTeamTrainingSettings({ save: currentSave, teamId, trainingFocus: focus, trainingIntensity: intensity });
     const result = applyTeamTrainingSettings(currentSave, teamId, focus, intensity, trainingPreview.confirmToken, preview.sourcePlanId, persistence);
     if (result.applied) {
       for (const action of actions) appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
+    }
+  }
+
+  const playerModeActions = selectedActions.filter(
+    (action) => action.canApply && action.actionType === "set_player_training_modes",
+  );
+  for (const action of playerModeActions) {
+    const teamPlan = leaguePlanPreview.teams.find((team) => team.teamId === action.teamId);
+    if (!teamPlan) continue;
+    const assignments = teamPlan.trainingPlan.playerTrainingPlans.map((plan) => ({
+      playerId: plan.playerId,
+      trainingMode: plan.selectedMode,
+    }));
+    const modesPreview = previewPlayerTrainingModes({
+      save: currentSave,
+      teamId: action.teamId,
+      assignments,
+    });
+    const modesResult = applyPlayerTrainingModes(
+      currentSave,
+      action.teamId,
+      assignments,
+      modesPreview.confirmToken,
+      persistence,
+    );
+    if (modesResult.applied) {
+      appliedIds.add(action.actionId);
+      currentSave = modesResult.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
+    }
+  }
+
+  const playerClassActions = selectedActions.filter(
+    (action) => action.canApply && action.actionType === "set_player_training_classes",
+  );
+  for (const action of playerClassActions) {
+    const teamPlan = leaguePlanPreview.teams.find((team) => team.teamId === action.teamId);
+    if (!teamPlan) continue;
+    const assignments = teamPlan.trainingPlan.playerTrainingClassPlans.map((plan) => ({
+      playerId: plan.playerId,
+      trainingClass: plan.trainingClass,
+    }));
+    const classesPreview = previewPlayerTrainingClasses({
+      save: currentSave,
+      teamId: action.teamId,
+      assignments,
+    });
+    const classesResult = applyPlayerTrainingClasses(
+      currentSave,
+      action.teamId,
+      assignments,
+      classesPreview.confirmToken,
+      persistence,
+    );
+    if (classesResult.applied) {
+      appliedIds.add(action.actionId);
+      currentSave = classesResult.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
+    }
+  }
+
+  const aiControlledTeamIds = new Set(
+    leaguePlanPreview.teams
+      .filter((team) => (currentSave.gameState.seasonState.teamControlSettings?.[team.teamId]?.controlMode ?? "ai") === "ai")
+      .map((team) => team.teamId),
+  );
+  for (const teamId of aiControlledTeamIds) {
+    const demandResult = applyAiTeamPlayerDemandFulfillment({ gameState: currentSave.gameState, teamId });
+    if (demandResult.fulfilledDemandIds.length > 0) {
+      currentSave = persistence.saveSingleplayerState(currentSave.saveId, demandResult.gameState);
     }
   }
 
@@ -608,24 +766,139 @@ export function applyAiManagerPlan(input: {
   };
 }
 
-export function getAiManagerMarketSpendableCash(gameState: GameState, teamId: string, fallbackCash: number | null | undefined) {
+export function getAiManagerMarketSpendableCash(
+  gameState: GameState,
+  teamId: string,
+  fallbackCash: number | null | undefined,
+  opts?: { includeFallbackPools?: boolean },
+) {
   const cash = fallbackCash ?? gameState.teams.find((team) => team.teamId === teamId)?.cash ?? null;
   if (cash == null) return null;
   const reservation = gameState.seasonState.aiManagerBudgetReservations?.[teamId];
   if (!reservation) return cash;
-  return round(
-    clamp(
-      Math.min(
-        reservation.transferBudget,
-        cash -
-          reservation.cashReserve -
-          reservation.salaryReserve -
-          reservation.buildingBudget -
-          reservation.maintenanceBudget -
-          reservation.emergencyBudget,
-      ),
+
+  if (opts?.includeFallbackPools) {
+    // Rebuild/draft: transfer + building + combined liquidity reserve are spendable; only emergency
+    // and maintenance stay hard-protected. Buckets are pre-sized by buildBudgetPlan with a low
+    // reserveFactor for aggressive / cash-poor teams.
+    const drawablePools =
+      reservation.transferBudget +
+      reservation.buildingBudget +
+      reservation.cashReserve +
+      reservation.salaryReserve;
+    const availableAfterProtected = Math.max(
       0,
-      cash,
-    ),
-  );
+      cash - reservation.emergencyBudget - reservation.maintenanceBudget,
+    );
+    return round(clamp(Math.min(drawablePools, availableAfterProtected), 0, cash), 2);
+  }
+
+  // Outside rebuild: only the transferBudget pool is spendable. salaryReserve / maintenanceBudget /
+  // emergencyBudget are protected buffers — but unspent buildingBudget/cashReserve still physically
+  // sit in team.cash and must not be phantom-subtracted from the transfer pool.
+  const protectedReserve = reservation.salaryReserve + reservation.maintenanceBudget + reservation.emergencyBudget;
+  const availableAfterProtected = Math.max(0, cash - protectedReserve);
+  return round(clamp(Math.min(reservation.transferBudget, availableAfterProtected), 0, cash), 2);
+}
+
+export function applyTransferBudgetSpend(gameState: GameState, teamId: string, fee: number): GameState {
+  const reservation = gameState.seasonState.aiManagerBudgetReservations?.[teamId];
+  if (!reservation || fee <= 0) return gameState;
+
+  // Spend cascades through the buckets in priority order — transferBudget first, then the fallback
+  // pools (buildingBudget, cashReserve, salaryReserve, maintenanceBudget) — so the recorded
+  // reservation never drifts from the cash actually spent. emergencyBudget is never touched here.
+  let remaining = fee;
+  const take = (available: number) => {
+    const amount = remaining > 0 ? Math.min(remaining, Math.max(0, available)) : 0;
+    remaining = round(remaining - amount, 2);
+    return amount;
+  };
+  const fromTransfer = take(reservation.transferBudget);
+  const fromBuilding = take(reservation.buildingBudget);
+  const fromCashReserve = take(reservation.cashReserve);
+  const fromSalaryReserve = take(reservation.salaryReserve);
+  const fromMaintenance = take(reservation.maintenanceBudget);
+
+  if (fromTransfer <= 0 && fromBuilding <= 0 && fromCashReserve <= 0 && fromSalaryReserve <= 0 && fromMaintenance <= 0) {
+    return gameState;
+  }
+
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      aiManagerBudgetReservations: {
+        ...(gameState.seasonState.aiManagerBudgetReservations ?? {}),
+        [teamId]: {
+          ...reservation,
+          transferBudget: round(Math.max(0, reservation.transferBudget - fromTransfer), 2),
+          buildingBudget: round(Math.max(0, reservation.buildingBudget - fromBuilding), 2),
+          cashReserve: round(Math.max(0, reservation.cashReserve - fromCashReserve), 2),
+          salaryReserve: round(Math.max(0, reservation.salaryReserve - fromSalaryReserve), 2),
+          maintenanceBudget: round(Math.max(0, reservation.maintenanceBudget - fromMaintenance), 2),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    },
+  };
+}
+
+export function resolveMarketSpendableCashForPlanner(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number | null | undefined;
+  rosterBelowMin: boolean;
+  forceRosterFill?: boolean;
+}) {
+  const teamCash = input.teamCash ?? input.gameState.teams.find((entry) => entry.teamId === input.teamId)?.cash ?? 0;
+  const reservation = input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId];
+  const belowOpt = isTeamRosterBelowOpt(input.gameState, input.teamId);
+  const rebuildMode = belowOpt || Boolean(input.forceRosterFill) || input.rosterBelowMin;
+
+  // Hard-min fill must not be capped by stale draft-era GM buckets after season-end sells
+  // inflated team cash — spend almost all current cash to reach playerMin first.
+  if (input.rosterBelowMin) {
+    const minPad = round(Math.max(3, Math.min(15, teamCash * 0.05)), 2);
+    return round(Math.max(0, teamCash - minPad), 2);
+  }
+
+  // S2+: single cash pool — soft liquidity pad only while rebuilding toward Opt/Min.
+  if (usesSingleCashPlanningPolicy(input.gameState)) {
+    const minPad = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, Math.min(8, teamCash * 0.04)), 2);
+    if (belowOpt || input.forceRosterFill || input.rosterBelowMin) {
+      return round(Math.max(0, teamCash - minPad), 2);
+    }
+    return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, teamCash);
+  }
+
+  // S1 draft: buckets + rebuild liquidity reserves. In rebuild mode the draft may also draw on
+  // buildingBudget and cashReserve as a fallback pool.
+  if (reservation) {
+    return (
+      getAiManagerMarketSpendableCash(input.gameState, input.teamId, teamCash, {
+        includeFallbackPools: rebuildMode,
+      }) ?? 0
+    );
+  }
+
+  if (rebuildMode) {
+    const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
+    const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+    const { playerOpt } = deriveRosterTargets(team, identity);
+    const expectedSalary = projectExpectedSalaryAtPlannerTarget(input.gameState, input.teamId, playerOpt);
+    const objectiveBias = getTeamObjectiveAiBias(input.gameState, input.teamId);
+    const liquidity = resolveCombinedLiquidityReserve({
+      gameState: input.gameState,
+      teamId: input.teamId,
+      expectedSalaryAfterPlan: expectedSalary,
+      rosterBelowOpt: true,
+      buyAggression: objectiveBias?.buyAggression,
+    });
+    const emergencyPad = round(Math.max(5, teamCash * 0.08), 2);
+    return round(Math.max(0, teamCash - liquidity.salaryReserve - liquidity.cashReserve - emergencyPad), 2);
+  }
+
+  const reserve = resolveTeamCashRunwayReserve(input.gameState, input.teamId);
+  return round(Math.max(0, teamCash - reserve), 2);
 }

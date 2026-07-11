@@ -107,6 +107,31 @@ export function getPlayerImportedRatingPps(player: Pick<Player, "disciplineRatin
   return roundValue(ratings.reduce((sum, value) => sum + value, 0) / ratings.length, 2);
 }
 
+export function resolvePlayerDisplayPps(input: {
+  playerRating?: Pick<PlayerRatingContractRow, "ppsSeason"> | null;
+  seasonPointsLedger?: Pick<SeasonPointsLedger, "playerSummariesByPlayerId"> | null;
+  playerId: string;
+}) {
+  if (input.playerRating?.ppsSeason != null && Number.isFinite(input.playerRating.ppsSeason)) {
+    return input.playerRating.ppsSeason;
+  }
+  const ledgerPoints = input.seasonPointsLedger?.playerSummariesByPlayerId.get(input.playerId)?.totalPoints ?? null;
+  if (ledgerPoints != null && Number.isFinite(ledgerPoints)) {
+    return roundValue(ledgerPoints, 1);
+  }
+  return null;
+}
+
+export function resolvePlayerDisplayMvs(input: {
+  playerRating?: Pick<PlayerRatingContractRow, "mvs"> | null;
+}) {
+  const mvs = input.playerRating?.mvs;
+  if (mvs == null || !Number.isFinite(mvs) || mvs <= 0) {
+    return null;
+  }
+  return mvs;
+}
+
 function buildSharedRankMap(values: Array<{ playerId: string; value: number | null }>) {
   const sorted = [...values].sort((left, right) => {
     const leftValue = left.value ?? Number.NEGATIVE_INFINITY;
@@ -307,12 +332,14 @@ function buildRetoolMvsByPlayerId(input: {
 
 export function buildPlayerRatingContractRows(input: {
   players: Player[];
+  mvsPlayers?: Player[] | null;
   seasonPointsLedger?: SeasonPointsLedger | null;
   mvsPerformances?: PlayerDisciplinePerformanceRecord[] | null;
   normalizationPoolPlayerIds?: string[] | null;
   rankPoolPlayerIds?: string[] | null;
 }) {
   const players = input.players;
+  const mvsPlayers = input.mvsPlayers ?? players;
   const seasonPointsLedger = input.seasonPointsLedger ?? null;
   const normalizationPoolPlayerIds = input.normalizationPoolPlayerIds ?? null;
   const normalizationPoolIdSet =
@@ -342,7 +369,7 @@ export function buildPlayerRatingContractRows(input: {
   const mvsByPlayerId =
     performanceRows != null
       ? buildRetoolMvsByPlayerId({
-          players,
+          players: mvsPlayers,
           seasonPointsLedger,
           mvsPerformances: performanceRows,
         })
@@ -353,7 +380,10 @@ export function buildPlayerRatingContractRows(input: {
     const mvs =
       performanceRows == null
         ? null
-        : roundValue(mvsByPlayerId.get(row.player.id) ?? 0, 2);
+        : (() => {
+            const rawMvs = mvsByPlayerId.get(row.player.id);
+            return rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null;
+          })();
 
     return {
       ...row,
@@ -539,12 +569,23 @@ export function buildPlayerRatingContractRows(input: {
   }));
 }
 
-export function buildPlayerRatingContractMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
+export function buildPlayerRatingContractMap(
+  gameState: GameState,
+  seasonPointsLedger?: SeasonPointsLedger,
+  options?: { playerIds?: string[] | null },
+) {
   const pointsLedger = seasonPointsLedger ?? buildSeasonPointsLedger(gameState);
   const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
+  const outputPlayerIdSet =
+    options?.playerIds != null ? new Set(options.playerIds.filter(Boolean)) : null;
+  const rowPlayers = outputPlayerIdSet
+    ? gameState.players.filter((player) => outputPlayerIdSet.has(player.id))
+    : gameState.players;
+
   return new Map(
     buildPlayerRatingContractRows({
-      players: gameState.players,
+      players: rowPlayers,
+      mvsPlayers: gameState.players,
       seasonPointsLedger: pointsLedger,
       mvsPerformances: gameState.seasonState.playerDisciplinePerformances ?? [],
       normalizationPoolPlayerIds: activePlayerIds,

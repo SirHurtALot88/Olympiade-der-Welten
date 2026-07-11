@@ -12,32 +12,35 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityState, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
-import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import {
+  buildPlayerEconomyCompareReport,
+  resolveRankTableMarketValueFromCompareRow,
+} from "@/lib/foundation/player-economy-compare-service";
+import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
+import {
+  applyRankTableMarketValuesToGameState,
+  patchSeasonProgressionEventMarketValues,
+  syncRosterMarketValuesWithPlayerEconomy,
+} from "@/lib/player-formulas/market-value-apply";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
-import { buildPlayerDevelopmentLevelupModel } from "@/lib/training/training-levelup-service";
+import { buildPlayerDevelopmentLevelupModel, type DevelopmentRegressionEventPreview } from "@/lib/training/training-levelup-service";
 import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
+import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildCoreStatsFromDisciplineRatings,
   buildPreviewDisciplineRatingsFromAttributes,
   buildSeasonEndDisciplineDeltas,
   getProgressionRatingTier,
-  getSeasonEndUpgradeCost,
   type SeasonEndProgressionDisciplineDelta,
   type SeasonEndProgressionEconomyAudit,
 } from "@/lib/training/season-end-progression-preview";
-
-export type SeasonEndXpSpendPlannedUpgradeInput = {
-  playerId: string;
-  attribute: PlayerGeneratorAttributeName;
-  fromValue?: number | null;
-  toValue?: number | null;
-  cost?: number | null;
-  source?: "manual_xp_spend_preview";
-};
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndXpSpendPreviewPlayer = {
   playerId: string;
@@ -98,6 +101,10 @@ export type SeasonEndXpSpendApplyResult = Omit<SeasonEndXpSpendPreview, "dryRun"
 
 export type SeasonEndXpSpendApplyOptions = {
   allowAiTeams?: boolean;
+  skipAfterEconomyAudit?: boolean;
+  deferLeagueWideMarketValueRecalc?: boolean;
+  /** Long-run batch: rank discipline stats on roster players only (~400), not full FA universe (~3000). */
+  fastDisciplineLeague?: boolean;
 };
 
 export type SeasonEndXpAvailabilityPlayer = {
@@ -117,11 +124,31 @@ export type SeasonEndXpAvailabilityPreview = {
   blockingReasons: string[];
 };
 
-type EconomyPreviewContext = {
+export type EconomyPreviewContext = {
   beforeReport: ReturnType<typeof buildPlayerEconomyCompareReport>;
   beforeRowsByPlayerId: Map<string, ReturnType<typeof buildPlayerEconomyCompareReport>["players"][number]>;
   beforeRatings: ReturnType<typeof buildPlayerRatingContractMap>;
   rosterByPlayerId: Map<string, GameState["rosters"][number]>;
+  /** Unique rostered players — used for fast discipline league reranks in long-run batch. */
+  rosterLeaguePlayers: Player[];
+};
+
+/**
+ * Pre-computed per-player season XP data derived from the initial (unmodified) gameState.
+ * Passed through the call chain to avoid re-running expensive per-player computations
+ * (buildPlayerProgressionForecast, buildOrganicSeasonProgression) on each team iteration
+ * when the cloned gameState invalidates WeakMap caches.
+ */
+export type PreComputedSeasonXpEntry = {
+  earnedSeasonXP: number;
+  trainingXPAfterFacilities: number;
+  performanceXP: number;
+  forecast: ReturnType<typeof buildPlayerProgressionForecast> | null;
+  regressionEvent: DevelopmentRegressionEventPreview | null;
+  warnings: string[];
+  organicProgression: OrganicSeasonProgressionResult | null;
+  /** Season appearance count, pre-computed from the initial gameState to avoid per-team cache rebuilds. */
+  appearances: number | null;
 };
 
 const economyPreviewContextCache = new WeakMap<GameState, EconomyPreviewContext>();
@@ -189,18 +216,71 @@ function getPlayerRatingContext(gameState: GameState) {
   return ratings;
 }
 
+function buildRosterLeaguePlayers(gameState: GameState): Player[] {
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const seen = new Set<string>();
+  const rosterPlayers: Player[] = [];
+  for (const entry of gameState.rosters) {
+    if (seen.has(entry.playerId)) continue;
+    const player = playerById.get(entry.playerId);
+    if (!player) continue;
+    seen.add(entry.playerId);
+    rosterPlayers.push(player);
+  }
+  return rosterPlayers;
+}
+
 function getEconomyPreviewContext(gameState: GameState): EconomyPreviewContext {
   const cached = economyPreviewContextCache.get(gameState);
   if (cached) return cached;
-  const beforeReport = buildPlayerEconomyCompareReport({ gameState });
+  const warmedGameState = ensureLeagueMarketValueSnapshot(gameState);
+  const beforeReport = buildPlayerEconomyCompareReport({ gameState: warmedGameState });
   const context: EconomyPreviewContext = {
     beforeReport,
     beforeRowsByPlayerId: new Map(beforeReport.players.map((row) => [row.playerId, row] as const)),
     beforeRatings: getPlayerRatingContext(gameState),
     rosterByPlayerId: new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const)),
+    rosterLeaguePlayers: buildRosterLeaguePlayers(warmedGameState),
   };
   economyPreviewContextCache.set(gameState, context);
   return context;
+}
+
+export function buildEconomyPreviewContext(gameState: GameState): EconomyPreviewContext {
+  return getEconomyPreviewContext(gameState);
+}
+
+/**
+ * Pre-computes per-player season XP and organic progression for all rostered players
+ * using the provided save's gameState. Call this ONCE before the team loop and pass the
+ * resulting map into preview/apply functions to skip O(n²) re-computation caused by
+ * WeakMap cache misses when the gameState is cloned on each iteration.
+ */
+export function buildPreComputedSeasonXpMap(save: PersistedSaveGame): Map<string, PreComputedSeasonXpEntry> {
+  const gameState = save.gameState;
+  const result = new Map<string, PreComputedSeasonXpEntry>();
+  const playerById = new Map(gameState.players.map((p) => [p.id, p] as const));
+  const facilitiesByTeamId = new Map<string, TeamFacilityCollection>();
+  const ratings = getPlayerRatingContext(gameState);
+
+  for (const rosterEntry of gameState.rosters) {
+    if (result.has(rosterEntry.playerId)) continue;
+    const player = playerById.get(rosterEntry.playerId);
+    if (!player) continue;
+
+    if (!facilitiesByTeamId.has(rosterEntry.teamId)) {
+      facilitiesByTeamId.set(rosterEntry.teamId, getTeamFacilities(gameState, rosterEntry.teamId));
+    }
+    const facilities = facilitiesByTeamId.get(rosterEntry.teamId)!;
+
+    const seasonXp = getSeasonXp({ save, player, teamId: rosterEntry.teamId, facilities, playerRating: ratings.get(player.id) ?? null });
+    const organicProgression = buildOrganicSeasonProgression({ gameState, player, facilities });
+    const seasonPerf = buildPlayerSeasonPerformance(gameState, player.id);
+
+    result.set(player.id, { ...seasonXp, organicProgression, appearances: seasonPerf?.appearances ?? null });
+  }
+
+  return result;
 }
 
 function getLifetimeXPBefore(player: Player) {
@@ -244,13 +324,16 @@ function getSeasonXp(input: {
     spentXP: input.player.spentXP ?? 0,
     lifetimeXP: input.player.lifetimeXP ?? null,
   });
-  const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities);
+  const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities, {
+    developmentTrainingBonusPct: getTeamDevelopmentTrainingBonusPct(gameState, input.teamId),
+  });
   const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
   const earnedSeasonXP = Math.max(0, forecast.netDevelopmentXP + facilityTrainingDelta);
   const development = buildPlayerDevelopmentLevelupModel({
     gameState,
     player: input.player,
     forecast,
+    potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null,
   });
   return {
     earnedSeasonXP,
@@ -265,12 +348,21 @@ function getSeasonXp(input: {
 function buildEconomyAudit(input: {
   gameState: GameState;
   player: Player;
+  baselinePlayer?: Player;
   previewPlayer: Player;
   context: EconomyPreviewContext;
   hasAttributeChanges: boolean;
 }): SeasonEndProgressionEconomyAudit {
-  const beforeReport = input.context.beforeReport;
-  const beforeRow = input.context.beforeRowsByPlayerId.get(input.player.id) ?? null;
+  const cachedBeforeRow = input.context.beforeRowsByPlayerId.get(input.player.id) ?? null;
+  const beforeRow =
+    input.hasAttributeChanges && input.baselinePlayer
+      ? (buildPlayerEconomyCompareReport({
+          gameState: input.gameState,
+          playerOverridesById: new Map([[input.baselinePlayer.id, input.baselinePlayer]]),
+          playerIds: [input.baselinePlayer.id],
+          includeSummary: false,
+        }).players.find((entry) => entry.playerId === input.baselinePlayer!.id) ?? cachedBeforeRow)
+      : cachedBeforeRow;
   const afterReport = input.hasAttributeChanges
     ? buildPlayerEconomyCompareReport({
         gameState: input.gameState,
@@ -278,14 +370,31 @@ function buildEconomyAudit(input: {
         playerIds: [input.previewPlayer.id],
         includeSummary: false,
       })
-    : beforeReport;
+    : input.context.beforeReport;
   const afterRow = afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
   const rosterEntry = input.context.rosterByPlayerId.get(input.player.id) ?? null;
-  const beforeRating = input.context.beforeRatings.get(input.player.id) ?? null;
-  const afterRating = input.hasAttributeChanges
-    ? beforeRating
-      ? { ...beforeRating, ovrNormalized: afterRow?.ovr ?? beforeRating.ovrNormalized ?? null }
-      : null
+  const baselineGameState =
+    input.hasAttributeChanges && input.baselinePlayer
+      ? {
+          ...input.gameState,
+          players: input.gameState.players.map((entry) => (entry.id === input.baselinePlayer!.id ? input.baselinePlayer! : entry)),
+        }
+      : null;
+  const beforeRating = baselineGameState
+    ? buildPlayerRatingContractMap(baselineGameState).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
+    : input.context.beforeRatings.get(input.player.id) ?? null;
+  const rankTableMarketValueBefore = resolveRankTableMarketValueFromCompareRow(beforeRow);
+  const rankTableMarketValueAfter = input.hasAttributeChanges
+    ? resolveRankTableMarketValueFromCompareRow(afterRow)
+    : rankTableMarketValueBefore;
+  const afterGameState = input.hasAttributeChanges
+    ? {
+        ...input.gameState,
+        players: input.gameState.players.map((entry) => (entry.id === input.previewPlayer.id ? input.previewPlayer : entry)),
+      }
+    : null;
+  const afterRating = afterGameState
+    ? buildPlayerRatingContractMap(afterGameState).get(input.player.id) ?? null
     : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && input.player.marketValue != null
@@ -328,10 +437,10 @@ function buildEconomyAudit(input: {
 
   return {
     importedMarketValue: input.player.marketValue ?? null,
-    calculatedMarketValue: beforeRow?.calculatedMarketValue ?? null,
+    calculatedMarketValue: rankTableMarketValueBefore ?? beforeRow?.calculatedMarketValue ?? null,
     displayedMarketValue: input.player.displayMarketValue ?? input.player.marketValue ?? null,
-    previewMarketValueAfterUpgrade: afterRow?.calculatedMarketValue ?? beforeRow?.calculatedMarketValue ?? null,
-    marketValueAfterUpgradePreview: afterRow?.calculatedMarketValue ?? beforeRow?.calculatedMarketValue ?? null,
+    previewMarketValueAfterUpgrade: rankTableMarketValueAfter ?? rankTableMarketValueBefore ?? beforeRow?.calculatedMarketValue ?? null,
+    marketValueAfterUpgradePreview: rankTableMarketValueAfter ?? rankTableMarketValueBefore ?? beforeRow?.calculatedMarketValue ?? null,
     importedSalary: input.player.salaryDemand ?? null,
     calculatedSalary: beforeRow?.calculatedSalary ?? null,
     displayedSalary: input.player.displaySalary ?? input.player.salaryDemand ?? null,
@@ -343,7 +452,7 @@ function buildEconomyAudit(input: {
     ovrBefore: beforeRating?.ovrNormalized ?? input.player.ovr ?? input.player.rating ?? null,
     ovrAfterPreview: afterRating?.ovrNormalized ?? input.previewPlayer.ovr ?? input.previewPlayer.rating ?? null,
     mvsBefore: beforeRating?.mvs ?? null,
-    mvsAfterPreview: beforeRating?.mvs ?? null,
+    mvsAfterPreview: afterRating?.mvs ?? beforeRating?.mvs ?? null,
     bracketBefore: input.player.bracketLabel ?? getProgressionRatingTier(beforeRating?.ovrNormalized ?? input.player.ovr ?? input.player.rating ?? null),
     bracketAfterPreview: input.player.bracketLabel ?? getProgressionRatingTier(afterRating?.ovrNormalized ?? input.previewPlayer.ovr ?? input.previewPlayer.rating ?? null),
     marketValueDeltaAbs,
@@ -405,7 +514,10 @@ function summarizeOrganicProgression(progress: OrganicSeasonProgressionResult | 
     facilityModifierPct: progress.facilityModifierPct,
     marketValuePressureTotal: progress.marketValuePressureTotal,
     trainingSetpoints: progress.trainingSetpoints,
-    performanceSetpoints: progress.performanceSetpoints,
+    appliedTrainingSetpoints: progress.appliedTrainingSetpoints,
+    performanceSetpoints: progress.appliedPerformanceSetpoints,
+    appliedPerformanceSetpoints: progress.appliedPerformanceSetpoints,
+    regressionCombinedTotal: progress.regressionBreakdown.combinedTotal,
     netSetpoints: progress.netSetpoints,
     fatigueLoad: progress.fatigueLoad,
     topGains: sorted.filter((entry) => entry.delta > 0).slice(0, 3).map((entry) => ({ attribute: entry.attribute, delta: entry.delta })),
@@ -423,9 +535,11 @@ function buildPreviewPlayer(input: {
   save: PersistedSaveGame;
   teamId: string;
   player: Player;
-  plannedInputs: SeasonEndXpSpendPlannedUpgradeInput[];
   facilities: TeamFacilityCollection;
   economyContext: EconomyPreviewContext;
+  skipAfterEconomyAudit?: boolean;
+  fastDisciplineLeague?: boolean;
+  preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>;
 }): SeasonEndXpSpendPreviewPlayer {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -435,7 +549,7 @@ function buildPreviewPlayer(input: {
     blockers.push(`attribute_source_missing:${input.player.id}`);
   }
 
-  const seasonXp = getSeasonXp({
+  const seasonXp = input.preComputedSeasonXp?.get(input.player.id) ?? getSeasonXp({
     save: input.save,
     player: input.player,
     teamId: input.teamId,
@@ -444,23 +558,25 @@ function buildPreviewPlayer(input: {
   });
   warnings.push(...seasonXp.warnings.map((warning) => `${input.player.id}:${warning}`));
 
+  const plannedXP = 0;
+  const plannedUpgrades: PlayerProgressionSpendUpgradeRecord[] = [];
+  const organicProgression = attributesAfter
+    ? (input.preComputedSeasonXp?.get(input.player.id)?.organicProgression ?? buildOrganicSeasonProgression({
+        gameState: input.save.gameState,
+        player: input.player,
+        facilities: input.facilities,
+      }))
+    : null;
   const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));
-  const availableXP = currentXPBefore + seasonXp.earnedSeasonXP;
+  const earnedSeasonXP = organicProgression ? 0 : seasonXp.earnedSeasonXP;
+  const availableXP = currentXPBefore + earnedSeasonXP;
   const lifetimeXPBefore = getLifetimeXPBefore(input.player);
   const lifetimeXPAfter =
-    lifetimeXPBefore == null && seasonXp.earnedSeasonXP <= 0
-      ? null
-      : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(seasonXp.earnedSeasonXP));
-  let plannedXP = 0;
-  const plannedUpgrades: PlayerProgressionSpendUpgradeRecord[] = [];
-  const organicProgression =
-    input.plannedInputs.length === 0 && attributesAfter
-      ? buildOrganicSeasonProgression({
-          gameState: input.save.gameState,
-          player: input.player,
-          facilities: input.facilities,
-        })
-      : null;
+    organicProgression
+      ? lifetimeXPBefore
+      : lifetimeXPBefore == null && earnedSeasonXP <= 0
+        ? null
+        : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(earnedSeasonXP));
   if (organicProgression && attributesAfter) {
     for (const attribute of ATTRIBUTE_KEYS) {
       attributesAfter[attribute] = organicProgression.attributesAfter[attribute];
@@ -483,7 +599,7 @@ function buildPreviewPlayer(input: {
     }
   }
   const regressionEvent = seasonXp.regressionEvent;
-  if (!organicProgression && input.plannedInputs.length === 0 && attributesAfter && regressionEvent?.attribute && regressionEvent.delta < 0) {
+  if (!organicProgression && attributesAfter && regressionEvent?.attribute && regressionEvent.delta < 0) {
     const currentValue = attributesAfter[regressionEvent.attribute];
     if (isFiniteNumber(currentValue) && currentValue > 0) {
       const toValue = Math.max(0, currentValue + regressionEvent.delta);
@@ -502,60 +618,34 @@ function buildPreviewPlayer(input: {
     }
   }
 
-  for (const upgrade of input.plannedInputs) {
-    if (!attributesAfter) {
-      continue;
-    }
-    const currentValue = attributesAfter[upgrade.attribute];
-    if (!isFiniteNumber(currentValue)) {
-      blockers.push(`attribute_source_missing:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-    if (currentValue >= 99) {
-      blockers.push(`attribute_at_99:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-
-    const cost = getSeasonEndUpgradeCost({
-      tier: getProgressionRatingTier(currentValue),
-      attribute: upgrade.attribute,
-      facilities: { teamFacilities: input.facilities },
-    });
-    if (cost.costAfterFacility == null) {
-      blockers.push(`upgrade_cost_unavailable:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-
-    const toValue = Math.min(99, currentValue + 1);
-    attributesAfter[upgrade.attribute] = toValue;
-    plannedXP += cost.costAfterFacility;
-    plannedUpgrades.push({
-      playerId: input.player.id,
-      attribute: upgrade.attribute,
-      fromValue: currentValue,
-      toValue,
-      cost: cost.costAfterFacility,
-      source: "manual_xp_spend_preview",
-    });
-  }
-
-  if (plannedXP > availableXP) {
-    blockers.push(`xp_insufficient:${input.player.id}`);
-  }
-
+  const leaguePlayers = input.fastDisciplineLeague
+    ? input.economyContext.rosterLeaguePlayers
+    : input.save.gameState.players;
   const previewDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
     player: input.player,
     attributesAfter,
+    leaguePlayers,
   });
   const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
     player: input.player,
     attributesAfter: attributesBefore,
+    leaguePlayers,
   });
   const disciplineDeltas = buildSeasonEndDisciplineDeltas({
     disciplines: input.save.gameState.disciplines,
     lastSeasonDisciplineValues: baselineDisciplineRatings,
     currentDisciplineValues: previewDisciplineRatings,
   });
+  const baselinePreviewPlayer: Player = {
+    ...input.player,
+    attributeSheetStats: attributesBefore ? { ...input.player.attributeSheetStats, ...attributesBefore } : input.player.attributeSheetStats,
+    disciplineRatings: baselineDisciplineRatings,
+    coreStats: buildCoreStatsFromDisciplineRatings({
+      disciplines: input.save.gameState.disciplines,
+      disciplineRatings: baselineDisciplineRatings,
+      fallback: input.player.coreStats,
+    }),
+  };
   const previewPlayer: Player = {
     ...input.player,
     attributeSheetStats: attributesAfter ? { ...input.player.attributeSheetStats, ...attributesAfter } : input.player.attributeSheetStats,
@@ -565,23 +655,24 @@ function buildPreviewPlayer(input: {
       disciplineRatings: previewDisciplineRatings,
       fallback: input.player.coreStats,
     }),
-    previousDisciplineRatings: input.player.disciplineRatings,
+    previousDisciplineRatings: baselineDisciplineRatings,
     disciplineRatings: previewDisciplineRatings,
   };
   const economyAudit = buildEconomyAudit({
     gameState: input.save.gameState,
     player: input.player,
+    baselinePlayer: baselinePreviewPlayer,
     previewPlayer,
     context: input.economyContext,
-    hasAttributeChanges: plannedUpgrades.length > 0,
+    hasAttributeChanges: !input.skipAfterEconomyAudit && plannedUpgrades.length > 0,
   });
   const progressionSnapshotBefore = buildProgressionSnapshot({
     player: input.player,
     attributes: attributesBefore ?? {},
-    disciplineRatings: input.player.disciplineRatings ?? {},
+    disciplineRatings: baselineDisciplineRatings,
     ovr: economyAudit.ovrBefore,
     mvs: economyAudit.mvsBefore,
-    marketValue: economyAudit.displayedMarketValue,
+    marketValue: economyAudit.calculatedMarketValue ?? economyAudit.displayedMarketValue,
     salary: economyAudit.currentContractSalary ?? economyAudit.displayedSalary,
     bracket: economyAudit.bracketBefore,
   });
@@ -606,7 +697,7 @@ function buildPreviewPlayer(input: {
     playerName: input.player.name,
     teamId: input.teamId,
     availableXP,
-    earnedSeasonXP: seasonXp.earnedSeasonXP,
+    earnedSeasonXP,
     currentXPBefore,
     plannedXP,
     remainingXP: availableXP - plannedXP,
@@ -626,7 +717,7 @@ function buildPreviewPlayer(input: {
   };
 }
 
-export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: string): SeasonEndXpAvailabilityPreview {
+export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: string, cachedEconomyContext?: EconomyPreviewContext, preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>): SeasonEndXpAvailabilityPreview {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   const warnings: string[] = [];
@@ -634,7 +725,7 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
   if (!team) blockingReasons.push("team_not_found");
 
   const facilities = getTeamFacilities(gameState, teamId);
-  const ratings = getPlayerRatingContext(gameState);
+  const ratings = cachedEconomyContext ? cachedEconomyContext.beforeRatings : getPlayerRatingContext(gameState);
   const baselinePlayerIds = new Set((gameState.playerBaselines ?? []).map((baseline) => baseline.playerId));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const rosterPlayerIds = gameState.rosters
@@ -652,7 +743,7 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
       blockingReasons.push(`player_not_found:${playerId}`);
       continue;
     }
-    const seasonXp = getSeasonXp({
+    const seasonXp = preComputedSeasonXp?.get(player.id) ?? getSeasonXp({
       save,
       player,
       teamId,
@@ -688,7 +779,9 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
 export function previewSeasonEndXpSpend(
   save: PersistedSaveGame,
   teamId: string,
-  plannedUpgrades: SeasonEndXpSpendPlannedUpgradeInput[],
+  cachedEconomyContext?: EconomyPreviewContext,
+  options?: { skipAfterEconomyAudit?: boolean; fastDisciplineLeague?: boolean },
+  preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>,
 ): SeasonEndXpSpendPreview {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
@@ -702,36 +795,23 @@ export function previewSeasonEndXpSpend(
   if (team && team.humanControlled === false) warnings.push("ai_xp_spend_apply_not_enabled_v1");
 
   const rosterPlayerIds = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId));
+  const materializedPlayerIds = new Set(
+    (gameState.playerProgressionEvents ?? [])
+      .filter((event) => event.seasonId === gameState.season.id && rosterPlayerIds.has(event.playerId))
+      .map((event) => event.playerId),
+  );
   const baselinePlayerIds = new Set((gameState.playerBaselines ?? []).map((baseline) => baseline.playerId));
-  const inputsByPlayerId = new Map<string, SeasonEndXpSpendPlannedUpgradeInput[]>();
-  for (const upgrade of plannedUpgrades) {
-    if (!rosterPlayerIds.has(upgrade.playerId)) {
-      blockingReasons.push(`player_not_on_team:${upgrade.playerId}`);
+  const eligiblePlayerIds: string[] = [];
+  for (const playerId of rosterPlayerIds) {
+    if (materializedPlayerIds.has(playerId)) continue;
+    if (!baselinePlayerIds.has(playerId)) {
+      blockingReasons.push(`player_baseline_missing:${playerId}`);
       continue;
     }
-    if (!baselinePlayerIds.has(upgrade.playerId)) {
-      blockingReasons.push(`player_baseline_missing:${upgrade.playerId}`);
-      continue;
-    }
-    inputsByPlayerId.set(upgrade.playerId, [...(inputsByPlayerId.get(upgrade.playerId) ?? []), upgrade]);
+    eligiblePlayerIds.push(playerId);
   }
 
-  if (plannedUpgrades.length === 0) {
-    for (const playerId of rosterPlayerIds) {
-      if (!baselinePlayerIds.has(playerId)) {
-        blockingReasons.push(`player_baseline_missing:${playerId}`);
-        continue;
-      }
-      inputsByPlayerId.set(playerId, []);
-    }
-  }
-
-  if (plannedUpgrades.length === 0 && rosterPlayerIds.size > 0 && blockingReasons.length === 0) {
-    const materializedPlayerIds = new Set(
-      (gameState.playerProgressionEvents ?? [])
-        .filter((event) => event.seasonId === gameState.season.id && rosterPlayerIds.has(event.playerId))
-        .map((event) => event.playerId),
-    );
+  if (rosterPlayerIds.size > 0 && blockingReasons.length === 0) {
     if (materializedPlayerIds.size >= rosterPlayerIds.size) {
       const hardBlockingReasons = ["season_xp_no_unmaterialized_xp"];
       return {
@@ -763,23 +843,30 @@ export function previewSeasonEndXpSpend(
 
   const facilities = getTeamFacilities(gameState, teamId);
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  let previewEntries = [...inputsByPlayerId.entries()];
 
-  const economyContext = getEconomyPreviewContext(gameState);
-  const players = previewEntries.map(([playerId, inputs]) => {
+  const economyContext = cachedEconomyContext ?? getEconomyPreviewContext(gameState);
+  const players = eligiblePlayerIds.map((playerId) => {
     const player = playerById.get(playerId) ?? null;
     if (!player) {
       blockingReasons.push(`player_not_found:${playerId}`);
       return null;
     }
-    return buildPreviewPlayer({ save, teamId, player, plannedInputs: inputs, facilities, economyContext });
+    return buildPreviewPlayer({
+      save,
+      teamId,
+      player,
+      facilities,
+      economyContext,
+      skipAfterEconomyAudit: options?.skipAfterEconomyAudit,
+      fastDisciplineLeague: options?.fastDisciplineLeague,
+      preComputedSeasonXp,
+    });
   }).filter((entry): entry is SeasonEndXpSpendPreviewPlayer => {
     if (!entry) return false;
-    if (plannedUpgrades.length > 0) return true;
     return entry.earnedSeasonXP > 0 || (entry.organicProgression?.attributeBreakdown.length ?? 0) > 0;
   });
 
-  if (plannedUpgrades.length === 0 && players.length === 0 && blockingReasons.length === 0) {
+  if (players.length === 0 && blockingReasons.length === 0) {
     blockingReasons.push("season_xp_no_unmaterialized_xp");
   }
 
@@ -831,12 +918,27 @@ export function previewSeasonEndXpSpend(
 export function applySeasonEndXpSpend(
   save: PersistedSaveGame,
   teamId: string,
-  plannedUpgrades: SeasonEndXpSpendPlannedUpgradeInput[],
   confirmToken: string | null | undefined,
   persistence: PersistenceService = createPersistenceService(),
   options: SeasonEndXpSpendApplyOptions = {},
+  cachedEconomyContext?: EconomyPreviewContext,
+  preComputedPreview?: SeasonEndXpSpendPreview,
+  preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>,
 ): SeasonEndXpSpendApplyResult {
-  const preview = previewSeasonEndXpSpend(save, teamId, plannedUpgrades);
+  // Use the pre-computed preview if it matches the confirmToken — avoids re-running all per-player work.
+  const preview =
+    preComputedPreview && confirmToken && confirmToken === preComputedPreview.confirmToken
+      ? preComputedPreview
+      : previewSeasonEndXpSpend(
+          save,
+          teamId,
+          cachedEconomyContext,
+          {
+            skipAfterEconomyAudit: options.skipAfterEconomyAudit,
+            fastDisciplineLeague: options.fastDisciplineLeague,
+          },
+          preComputedSeasonXp,
+        );
   const applyBlockers: string[] = [];
   if (!confirmToken) applyBlockers.push("confirm_token_missing");
   if (confirmToken && confirmToken !== preview.confirmToken) applyBlockers.push("xp_spend_preview_stale");
@@ -867,7 +969,7 @@ export function applySeasonEndXpSpend(
       playerId: playerPreview.playerId,
       upgrades: playerPreview.plannedUpgrades,
       xpSpent: playerPreview.plannedXP,
-      xpEarned: playerPreview.earnedSeasonXP,
+      xpEarned: playerPreview.organicProgression ? 0 : playerPreview.earnedSeasonXP,
       currentXPBefore: playerPreview.currentXPBefore,
       currentXPAfter: playerPreview.remainingXP,
       lifetimeXPBefore: playerPreview.lifetimeXP,
@@ -877,34 +979,89 @@ export function applySeasonEndXpSpend(
       economyWarnings: playerPreview.economyAudit.warnings,
       timestamp,
       source: playerPreview.organicProgression ? "organic_season_progression" : "manual_season_end_xp_spend",
+      organicMeta: playerPreview.organicProgression
+        ? {
+            trainingClass: playerPreview.organicProgression.primaryTrainingClass,
+            secondaryTrainingClass: playerPreview.organicProgression.secondaryTrainingClass,
+            trainingMode: playerPreview.organicProgression.trainingMode,
+            classBefore: playerPreview.organicProgression.classBefore,
+            classAfter: playerPreview.organicProgression.classAfter,
+            netSetpoints: playerPreview.organicProgression.netSetpoints,
+            trainingSetpoints: playerPreview.organicProgression.trainingSetpoints,
+            performanceSetpoints: playerPreview.organicProgression.appliedPerformanceSetpoints,
+            traitModifierPct: playerPreview.organicProgression.traitModifierPct,
+          }
+        : undefined,
     };
   });
 
+  const attributeOverridesAfter: Record<string, PlayerGeneratorAttributes> = {};
+  const attributeOverridesBefore: Record<string, PlayerGeneratorAttributes> = {};
+  for (const [playerId, playerPreview] of playersById.entries()) {
+    const player = save.gameState.players.find((entry) => entry.id === playerId);
+    if (!player) continue;
+    const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
+    const normalizedAfter = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
+    const normalizedBefore = normalizeAttributes(player);
+    if (normalizedAfter) {
+      attributeOverridesAfter[playerId] = normalizedAfter;
+    }
+    if (normalizedBefore) {
+      attributeOverridesBefore[playerId] = normalizedBefore;
+    }
+  }
+  let disciplineRatingsAfterByPlayerId: Map<string, Record<string, number>>;
+  let disciplineRatingsBeforeByPlayerId: Map<string, Record<string, number>>;
+  if (options.deferLeagueWideMarketValueRecalc) {
+    disciplineRatingsAfterByPlayerId = new Map();
+    disciplineRatingsBeforeByPlayerId = new Map();
+    for (const playerPreview of preview.players) {
+      disciplineRatingsAfterByPlayerId.set(
+        playerPreview.playerId,
+        playerPreview.progressionSnapshotAfter.disciplineRatings,
+      );
+      disciplineRatingsBeforeByPlayerId.set(
+        playerPreview.playerId,
+        playerPreview.progressionSnapshotBefore.disciplineRatings,
+      );
+    }
+  } else {
+    disciplineRatingsAfterByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+      save.gameState.players,
+      attributeOverridesAfter,
+    );
+    disciplineRatingsBeforeByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+      save.gameState.players,
+      attributeOverridesBefore,
+    );
+  }
+
+  const affectedPlayerIds = new Set(playersById.keys());
   const nextPlayers = save.gameState.players.map((player) => {
     const playerPreview = playersById.get(player.id);
-    if (!playerPreview) return player;
+    if (!playerPreview || !affectedPlayerIds.has(player.id)) return player;
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
-    const nextDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player),
-    });
-    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: normalizeAttributes(player),
-    });
+    const nextDisciplineRatings = disciplineRatingsAfterByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
+    const baselineDisciplineRatings = disciplineRatingsBeforeByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
     const disciplineDelta = Object.fromEntries(
       Object.entries(nextDisciplineRatings).map(([disciplineId, current]) => [
         disciplineId,
         roundValue(current - (baselineDisciplineRatings[disciplineId] ?? current), 2),
       ]),
     );
-    const materializedMarketValue = playerPreview.economyAudit.marketValueAfterUpgradePreview;
+    const materializedMarketValue = options.deferLeagueWideMarketValueRecalc
+      ? null
+      : playerPreview.economyAudit.marketValueAfterUpgradePreview;
     const materializedSalaryExpectation = playerPreview.economyAudit.salaryExpectation;
     return {
       ...player,
       className: playerPreview.organicProgression?.classAfter ?? player.className,
-      marketValue: materializedMarketValue ?? player.marketValue,
-      displayMarketValue: materializedMarketValue ?? player.displayMarketValue,
+      ...(materializedMarketValue != null
+        ? {
+            marketValue: materializedMarketValue,
+            displayMarketValue: materializedMarketValue,
+          }
+        : {}),
       salaryDemand: materializedSalaryExpectation ?? player.salaryDemand,
       displaySalary: materializedSalaryExpectation ?? player.displaySalary,
       attributeSheetStats: attributesAfter,
@@ -953,7 +1110,9 @@ export function applySeasonEndXpSpend(
 
   const nextRosters = save.gameState.rosters.map((entry) => {
     const playerPreview = playersById.get(entry.playerId);
-    const materializedMarketValue = playerPreview?.economyAudit.marketValueAfterUpgradePreview;
+    const materializedMarketValue = options.deferLeagueWideMarketValueRecalc
+      ? null
+      : playerPreview?.economyAudit.marketValueAfterUpgradePreview;
     if (materializedMarketValue == null) return entry;
     return {
       ...entry,
@@ -962,12 +1121,32 @@ export function applySeasonEndXpSpend(
     };
   });
 
-  const nextGameState: GameState = {
+  let nextGameState: GameState = {
     ...save.gameState,
     players: nextPlayers,
     rosters: nextRosters,
     playerProgressionEvents: [...events, ...(save.gameState.playerProgressionEvents ?? [])],
+    playerPotential: reconcilePlayerPotentialRecordsForGameState({
+      gameState: {
+        ...save.gameState,
+        players: nextPlayers,
+        rosters: nextRosters,
+        playerProgressionEvents: [...events, ...(save.gameState.playerProgressionEvents ?? [])],
+      },
+      playerIds: preview.players.map((player) => player.playerId),
+    }),
   };
+
+  if (!options.deferLeagueWideMarketValueRecalc) {
+    nextGameState = applyRankTableMarketValuesToGameState(nextGameState);
+    nextGameState = patchSeasonProgressionEventMarketValues({
+      gameState: nextGameState,
+      seasonId: save.gameState.season.id,
+      playerIds: preview.players.map((player) => player.playerId),
+    });
+    nextGameState = withPersistedSeasonDerivations(nextGameState);
+  }
+
   persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return {
@@ -979,4 +1158,226 @@ export function applySeasonEndXpSpend(
     eventIds,
     blockingReasons: [],
   };
+}
+
+export type SeasonEndProgressionTeamApply = {
+  teamId: string;
+  preview: SeasonEndXpSpendPreview;
+};
+
+export type SeasonEndProgressionMutationsResult = {
+  gameState: GameState;
+  eventIds: string[];
+  progressedPlayerIds: string[];
+  disciplineBaselinesBefore: Map<string, Record<string, number>>;
+};
+
+function buildSeasonEndProgressionSpendEvent(input: {
+  eventId: string;
+  seasonId: string;
+  teamId: string;
+  playerPreview: SeasonEndXpSpendPreviewPlayer;
+  timestamp: string;
+}): PlayerProgressionSpendEventRecord {
+  return {
+    eventId: input.eventId,
+    seasonId: input.seasonId,
+    teamId: input.teamId,
+    playerId: input.playerPreview.playerId,
+    upgrades: input.playerPreview.plannedUpgrades,
+    xpSpent: input.playerPreview.plannedXP,
+    xpEarned: input.playerPreview.organicProgression ? 0 : input.playerPreview.earnedSeasonXP,
+    currentXPBefore: input.playerPreview.currentXPBefore,
+    currentXPAfter: input.playerPreview.remainingXP,
+    lifetimeXPBefore: input.playerPreview.lifetimeXP,
+    lifetimeXPAfter: input.playerPreview.lifetimeXPAfter,
+    progressionSnapshotBefore: input.playerPreview.progressionSnapshotBefore,
+    progressionSnapshotAfter: input.playerPreview.progressionSnapshotAfter,
+    economyWarnings: input.playerPreview.economyAudit.warnings,
+    timestamp: input.timestamp,
+    source: input.playerPreview.organicProgression ? "organic_season_progression" : "manual_season_end_xp_spend",
+    organicMeta: input.playerPreview.organicProgression
+      ? {
+          trainingClass: input.playerPreview.organicProgression.primaryTrainingClass,
+          secondaryTrainingClass: input.playerPreview.organicProgression.secondaryTrainingClass,
+          trainingMode: input.playerPreview.organicProgression.trainingMode,
+          classBefore: input.playerPreview.organicProgression.classBefore,
+          classAfter: input.playerPreview.organicProgression.classAfter,
+          netSetpoints: input.playerPreview.organicProgression.netSetpoints,
+          trainingSetpoints: input.playerPreview.organicProgression.trainingSetpoints,
+          performanceSetpoints: input.playerPreview.organicProgression.appliedPerformanceSetpoints,
+          traitModifierPct: input.playerPreview.organicProgression.traitModifierPct,
+        }
+      : undefined,
+  };
+}
+
+/** Apply all team progression previews in one pass — no per-team discipline or market-value recalc. */
+export function applySeasonEndProgressionMutations(input: {
+  gameState: GameState;
+  teamApplies: SeasonEndProgressionTeamApply[];
+}): SeasonEndProgressionMutationsResult {
+  const playerPreviewById = new Map<string, SeasonEndXpSpendPreviewPlayer>();
+  for (const { preview } of input.teamApplies) {
+    for (const playerPreview of preview.players) {
+      playerPreviewById.set(playerPreview.playerId, playerPreview);
+    }
+  }
+
+  const timestamp = new Date().toISOString();
+  const seasonId = input.gameState.season.id;
+  const eventIds: string[] = [];
+  const events: PlayerProgressionSpendEventRecord[] = [];
+  for (const { teamId, preview } of input.teamApplies) {
+    for (const playerPreview of preview.players) {
+      const eventId = `player-progression-${randomUUID()}`;
+      eventIds.push(eventId);
+      events.push(
+        buildSeasonEndProgressionSpendEvent({
+          eventId,
+          seasonId,
+          teamId,
+          playerPreview,
+          timestamp,
+        }),
+      );
+    }
+  }
+
+  const disciplineBaselinesBefore = new Map<string, Record<string, number>>();
+  const progressedPlayerIds: string[] = [];
+
+  const nextPlayers = input.gameState.players.map((player) => {
+    const playerPreview = playerPreviewById.get(player.id);
+    if (!playerPreview) return player;
+
+    progressedPlayerIds.push(player.id);
+    disciplineBaselinesBefore.set(player.id, { ...(player.disciplineRatings ?? {}) });
+
+    const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
+    const materializedSalaryExpectation = playerPreview.economyAudit.salaryExpectation;
+
+    return {
+      ...player,
+      className: playerPreview.organicProgression?.classAfter ?? player.className,
+      salaryDemand: materializedSalaryExpectation ?? player.salaryDemand,
+      displaySalary: materializedSalaryExpectation ?? player.displaySalary,
+      attributeSheetStats: attributesAfter,
+      currentXP: Math.max(0, playerPreview.remainingXP),
+      spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
+      lifetimeXP: playerPreview.lifetimeXPAfter,
+      fatigue: Math.min(
+        100,
+        Math.max(0, roundValue((player.fatigue ?? 0) + (playerPreview.organicProgression?.fatigueLoad ?? 0), 1)),
+      ),
+      classHistory: playerPreview.organicProgression?.classChanged
+        ? [
+            ...(player.classHistory ?? []),
+            {
+              seasonId,
+              previousClassName: playerPreview.organicProgression.classBefore,
+              className: playerPreview.organicProgression.classAfter,
+              reason: "organic_progression" as const,
+              createdAt: timestamp,
+            },
+          ]
+        : player.classHistory,
+      lastOrganicProgression: summarizeOrganicProgression(playerPreview.organicProgression),
+      economyAfterUpgradePreview: {
+        marketValuePreview: playerPreview.economyAudit.marketValueAfterUpgradePreview,
+        salaryExpectation: playerPreview.economyAudit.salaryExpectation,
+        renewalSalaryPreview: playerPreview.economyAudit.renewalSalaryPreview,
+        currentContractSalary: playerPreview.economyAudit.currentContractSalary,
+        ovrPreview: playerPreview.economyAudit.ovrAfterPreview,
+        mvsUnchanged: playerPreview.economyAudit.mvsBefore,
+        marketValueWarnings: playerPreview.economyAudit.marketValueWarnings,
+        salaryWarnings: playerPreview.economyAudit.salaryWarnings,
+        warningLevel: playerPreview.economyAudit.warningLevel,
+        updatedAt: timestamp,
+        source: "season_end_xp_spend_preview",
+      },
+    } satisfies Player;
+  });
+
+  const nextGameState: GameState = {
+    ...input.gameState,
+    players: nextPlayers,
+    playerProgressionEvents: [...events, ...(input.gameState.playerProgressionEvents ?? [])],
+    playerPotential: reconcilePlayerPotentialRecordsForGameState({
+      gameState: {
+        ...input.gameState,
+        players: nextPlayers,
+        playerProgressionEvents: [...events, ...(input.gameState.playerProgressionEvents ?? [])],
+      },
+      playerIds: progressedPlayerIds,
+    }),
+  };
+
+  return {
+    gameState: nextGameState,
+    eventIds,
+    progressedPlayerIds,
+    disciplineBaselinesBefore,
+  };
+}
+
+/** One league-wide discipline + market-value pass after all progression mutations are merged. */
+export function finalizeSeasonEndProgressionLeagueEconomy(input: {
+  gameState: GameState;
+  seasonId: string;
+  progressedPlayerIds: Iterable<string>;
+  disciplineBaselinesBefore?: Map<string, Record<string, number>>;
+}): GameState {
+  const progressedSet = new Set(input.progressedPlayerIds);
+  const disciplineRatingsByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(input.gameState.players, {});
+
+  const nextPlayers = input.gameState.players.map((player) => {
+    const nextDisciplineRatings = disciplineRatingsByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
+    const nextCoreStats = buildCoreStatsFromDisciplineRatings({
+      disciplines: input.gameState.disciplines,
+      disciplineRatings: nextDisciplineRatings,
+      fallback: player.coreStats,
+    });
+
+    if (!progressedSet.has(player.id)) {
+      return {
+        ...player,
+        disciplineRatings: nextDisciplineRatings,
+        coreStats: nextCoreStats,
+        currentDisciplineValues: nextDisciplineRatings,
+      };
+    }
+
+    const baselineDisciplineRatings =
+      input.disciplineBaselinesBefore?.get(player.id) ?? player.previousDisciplineRatings ?? player.disciplineRatings ?? {};
+    const disciplineDelta = Object.fromEntries(
+      Object.entries(nextDisciplineRatings).map(([disciplineId, current]) => [
+        disciplineId,
+        roundValue(current - (baselineDisciplineRatings[disciplineId] ?? current), 2),
+      ]),
+    );
+
+    return {
+      ...player,
+      disciplineRatings: nextDisciplineRatings,
+      coreStats: nextCoreStats,
+      previousDisciplineRatings: baselineDisciplineRatings,
+      lastSeasonDisciplineValues: baselineDisciplineRatings,
+      currentDisciplineValues: nextDisciplineRatings,
+      disciplineDelta,
+    } satisfies Player;
+  });
+
+  let nextGameState: GameState = {
+    ...input.gameState,
+    players: nextPlayers,
+  };
+  nextGameState = applyRankTableMarketValuesToGameState(nextGameState);
+  nextGameState = patchSeasonProgressionEventMarketValues({
+    gameState: nextGameState,
+    seasonId: input.seasonId,
+    playerIds: [...progressedSet],
+  });
+  nextGameState = syncRosterMarketValuesWithPlayerEconomy(nextGameState);
+  return withPersistedSeasonDerivations(nextGameState);
 }

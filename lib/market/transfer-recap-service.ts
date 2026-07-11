@@ -1,6 +1,6 @@
 import type { GameState, Player, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { listTransferHistory, type TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
@@ -400,7 +400,7 @@ function buildLocalTransferRecap(params: TransferRecapParams): TransferRecapResu
     };
   }
 
-  const playerRatings = buildPlayerRatingContractMap(gameState);
+  const playerRatings = getSeasonDerivations({ gameState, saveId: save.saveId }).ratingsById;
   const teamStateById = buildCurrentTeamStateMap(gameState);
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const historyEntries = gameState.transferHistory

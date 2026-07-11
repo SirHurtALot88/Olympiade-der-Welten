@@ -62,3 +62,17 @@ Die Server-Backups sichern die ganze Maschine. Zusaetzlich muss die Spielstand-D
 4. SSH-Key oder API-Token bereitstellen.
 5. Eine guenstige `.de` Domain kaufen oder auswaehlen.
 6. Danach kann Codex beim Server-Setup, Deployment und Verlinken helfen.
+
+## Local Docker Smoke
+
+Lokal vor dem ersten Hetzner-Deploy:
+
+```sh
+cp deploy/hetzner/.env.example deploy/hetzner/.env
+docker compose -f deploy/hetzner/docker-compose.yml --env-file deploy/hetzner/.env build
+docker compose -f deploy/hetzner/docker-compose.yml --env-file deploy/hetzner/.env up -d
+curl -fsS http://localhost:3000/api/health
+docker compose -f deploy/hetzner/docker-compose.yml --env-file deploy/hetzner/.env down
+```
+
+Erwartung: `/api/health` antwortet mit HTTP 200. Die SQLite-Datei liegt im Compose-Volume und bleibt ueber `down`/`up` erhalten, solange das Volume nicht geloescht wird.

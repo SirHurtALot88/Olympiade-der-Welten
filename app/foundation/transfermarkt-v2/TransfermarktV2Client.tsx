@@ -2,11 +2,18 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { FoundationCard } from "@/components/foundation/FoundationCard";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
+import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
-import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { resolvePortraitVariantForDisplayPx } from "@/lib/media/mediaThumbnailConfig";
 import type { ContractShape, Discipline, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
   formatTransfermarktCurrency,
@@ -14,20 +21,36 @@ import {
   getConfirmedTierStyle,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
+import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryItem, TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
+import {
+  filterTransfermarktFreeAgentsByBracket,
+  type TransfermarktPoolBracketBucket,
+} from "@/lib/market/transfermarkt-pool-audit";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import {
   buildTransfermarktScoutedAttributeRows,
+  getScoutingTierWindow,
   getTransfermarktScoutingDisclosure,
   getTransfermarktScoutingVisibilityBuckets,
   normalizeTransfermarktScoutingLevel,
   getTransfermarktTrainingAffinityVisibility,
+  resolveScoutingConfidenceFromLevel,
+  formatScoutedImpactDelta,
+  isScoutedImpactExact,
   type TransfermarktAttributeRatings,
   type TransfermarktAttributeKey,
   type TransfermarktScoutedAttributeRow,
 } from "@/lib/market/transfermarkt-scouting";
+import {
+  computeCompositeTopSixAverage,
+  computeDisciplineTopSixImpact,
+  computeTopSixAxisImpact,
+  computeCandidateAxisTeamRankEstimates,
+  formatTeamRankEstimateLabel,
+} from "@/lib/market/transfermarkt-roster-impact";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightOrder,
@@ -39,13 +62,17 @@ import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
   withRoomContextBody,
+  type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
-type TransfermarktV2ClientProps = {
+export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
   defaultSeasonId: string;
+  bootstrapReady?: boolean;
   defaultTeamId?: string | null;
   source?: "sqlite" | "prisma";
   activeOwnerId?: string | null;
@@ -55,16 +82,30 @@ type TransfermarktV2ClientProps = {
   teams: Team[];
   disciplines?: Discipline[];
   rosterRows?: TransfermarktV2RosterRow[];
+  playerRatingsById?: Map<
+    string,
+    { ovrRank?: number | null; ppsSeasonRank?: number | null; mvsRank?: number | null; ppsSeason?: number | null }
+  >;
   wishlistEntries?: TransferWishlistEntry[];
   wishlistPlayerIds?: string[];
   boardObjectiveHighlights?: TeamSeasonObjectiveRecord[];
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   onOpenHistory?: (() => void) | null;
-  onOpenClassicMarket?: (() => void) | null;
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
+  scoutingWatchPlayerIds?: string[];
+  scoutingIntelByPlayerId?: Record<string, number>;
+  scoutingPipelineCapacity?: { occupied: number; max: number | null; draftSuspended?: boolean } | null;
+  scoutingActiveWishlistPlayerIds?: string[];
+  onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
+  initialPlayerId?: string | null;
+  onInitialPlayerFocusConsumed?: (() => void) | null;
+  offerPanelActive?: boolean;
+  onOpenOfferPanel?: (playerId: string) => void;
+  onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
+  roomContext?: FoundationRoomContext | null;
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -81,14 +122,6 @@ type MarketBuyResponse = {
 type MarketHistoryResponse = TransferHistoryReadResult & {
   error?: string;
 };
-type MarketNegotiationOutcome = {
-  status: "accepted" | "countered" | "rejected";
-  title: string;
-  message: string;
-  tone: "success" | "warning" | "error";
-  counterSalary?: number | null;
-};
-
 type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary";
 type MarketAxisKey = keyof typeof AXIS_META;
 type MarketClassAxisFilter = "pow" | "spe" | "men" | "soc";
@@ -114,8 +147,13 @@ type MarketFilterPreset = {
   updatedAt: string;
 };
 type WishlistSortKey = "createdAt" | "playerName" | "className" | "marketValue" | "salary" | "bracket" | "pow" | "spe" | "men" | "soc";
+type PoolBracketSortKey = "playerName" | "className" | "race" | "marketValue" | "salary" | "fit" | "ovr" | MarketAxisKey;
 type WishlistSortState = {
   key: WishlistSortKey;
+  direction: "asc" | "desc";
+};
+type PoolBracketSortState = {
+  key: PoolBracketSortKey;
   direction: "asc" | "desc";
 };
 type TransfermarktV2RosterRow = {
@@ -138,6 +176,17 @@ type TransfermarktV2RosterRow = {
   men: number | null;
   soc: number | null;
   disciplineRatings?: Record<string, number | null>;
+  previousSeasonAxis?: {
+    seasonId: string;
+    ppPow: number | null;
+    ppSpe: number | null;
+    ppMen: number | null;
+    ppSoc: number | null;
+    ppPowRank: number | null;
+    ppSpeRank: number | null;
+    ppMenRank: number | null;
+    ppSocRank: number | null;
+  } | null;
 };
 
 const MARKET_PAGE_LIMIT = 250;
@@ -198,7 +247,7 @@ const MARKET_CLASS_DISPLAY_ORDER = [
   "Tactician",
 ] as const;
 
-const SCOUT_TIER_ORDER = ["F", "E", "D", "C", "B", "A", "S", "S+"] as const;
+const MARKET_RAIL_PORTRAIT_PX = 108;
 const DISCIPLINE_ABBREVIATIONS: Record<string, string> = {
   tdm: "TDM",
   "mini-dm": "MDM",
@@ -617,25 +666,6 @@ function getScoutingClarityLabel(confidence: number | null | undefined) {
   return "roh";
 }
 
-function getScoutingTierWindow(tier: string | null | undefined, confidence: number | null | undefined) {
-  if (!tier) {
-    return "—";
-  }
-  const normalizedTier = tier.toUpperCase();
-  const index = SCOUT_TIER_ORDER.indexOf(normalizedTier as (typeof SCOUT_TIER_ORDER)[number]);
-  if (index === -1) {
-    return normalizedTier;
-  }
-  if (confidence != null && confidence >= 75) {
-    return normalizedTier;
-  }
-
-  const radius = confidence != null && confidence >= 50 ? 1 : 2;
-  const lower = SCOUT_TIER_ORDER[Math.max(0, index - radius)];
-  const upper = SCOUT_TIER_ORDER[Math.min(SCOUT_TIER_ORDER.length - 1, index + radius)];
-  return lower === upper ? lower : `${upper}-${lower}`;
-}
-
 function normalizeDisciplineLookup(value: string | null | undefined) {
   return (value ?? "")
     .toLowerCase()
@@ -788,6 +818,17 @@ function getRatioTone(value: number | null | undefined) {
   return "negative" as const;
 }
 
+function getFitReasonChips(item: TransfermarktFreeAgentItem): string[] {
+  const chips: string[] = [];
+  const fit = item.fit ?? -99;
+  if (fit >= 18) chips.push("Rolle passt");
+  else if (fit >= 10) chips.push("Solider Fit");
+  if ((item.pow ?? 0) >= 70 || (item.spe ?? 0) >= 70) chips.push("Achse stark");
+  if ((item.marketValueSalaryRatio ?? 0) >= 4) chips.push("Value-Deal");
+  if (item.doubleLoadWarnings?.length) chips.push("Doppelbelastung");
+  return chips.slice(0, 3);
+}
+
 function getFitSignal(item: TransfermarktFreeAgentItem) {
   const fit = item.fit ?? -99;
   if (fit >= 18) {
@@ -886,7 +927,7 @@ function formatNegotiationSignalLabel(value: string) {
     negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
     previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
-    preview_only_contract_negotiation: "Nur Vorschau, noch kein finaler Abschluss.",
+    preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
     player_not_found: "Spieler wurde nicht gefunden.",
@@ -898,7 +939,7 @@ function formatNegotiationSignalLabel(value: string) {
   return labels[value] ?? value.replaceAll("_", " ");
 }
 
-function getNegotiationOutcomeToneClass(tone: MarketNegotiationOutcome["tone"]) {
+function getNegotiationOutcomeToneClass(tone: MarketBuyNegotiationOutcome["tone"]) {
   if (tone === "success") return "is-success";
   if (tone === "warning") return "is-warning";
   return "is-error";
@@ -940,8 +981,29 @@ function sortClassNames(left: string, right: string) {
   return left.localeCompare(right, "de");
 }
 
-function getAxisValue(item: TransfermarktFreeAgentItem, axis: MarketAxisKey) {
-  return item[axis] ?? Number.NEGATIVE_INFINITY;
+function passesMarketMinFitFilter(item: TransfermarktFreeAgentItem, minFit: number) {
+  if (minFit <= 0) {
+    return true;
+  }
+  return (item.fit ?? Number.NEGATIVE_INFINITY) >= minFit;
+}
+
+function passesMarketAxisFilters(
+  item: TransfermarktFreeAgentItem,
+  selectedAxes: MarketAxisKey[],
+  axisMinimums: Record<MarketAxisKey, number>,
+) {
+  if (selectedAxes.length === 0) {
+    return true;
+  }
+  return selectedAxes.every((axis) => {
+    const minimum = axisMinimums[axis];
+    if (minimum <= 0) {
+      return true;
+    }
+    const value = item[axis];
+    return typeof value === "number" && Number.isFinite(value) && value >= minimum;
+  });
 }
 
 function getWishlistAxisValue(
@@ -1019,6 +1081,41 @@ function buildTeamSelectOptions(teams: Team[]) {
   return [...teams].sort((left, right) => left.name.localeCompare(right.name, "de"));
 }
 
+function formatPreviousSeasonAxisSubline(points: number | null | undefined, rank: number | null | undefined) {
+  if (points == null || !Number.isFinite(points)) {
+    return null;
+  }
+  return rank != null ? `${formatNullablePps(points)} · #${rank}` : formatNullablePps(points);
+}
+
+function renderMarketRosterAxisCell(
+  axisClass: "is-pow" | "is-spe" | "is-men" | "is-soc",
+  statValue: number | null,
+  previousSeasonAxis: TransfermarktV2RosterRow["previousSeasonAxis"],
+  axisKey: "ppPow" | "ppSpe" | "ppMen" | "ppSoc",
+  rankKey: "ppPowRank" | "ppSpeRank" | "ppMenRank" | "ppSocRank",
+) {
+  const prevPoints = previousSeasonAxis?.[axisKey] ?? null;
+  const prevRank = previousSeasonAxis?.[rankKey] ?? null;
+  const subline = formatPreviousSeasonAxisSubline(prevPoints, prevRank);
+
+  return (
+    <td>
+      <div className="market-v2-roster-axis-cell">
+        <span className={`market-v2-axis-chip ${axisClass}`}>{formatCompactNumber(statValue, 0)}</span>
+        {subline ? (
+          <small
+            className="market-v2-roster-axis-prev"
+            title={`${previousSeasonAxis?.seasonId ?? "Vorjahr"}: ${subline}`}
+          >
+            {subline}
+          </small>
+        ) : null}
+      </div>
+    </td>
+  );
+}
+
 function MarketAxisBar({
   axis,
   value,
@@ -1041,6 +1138,7 @@ function MarketAxisBar({
 export default function TransfermarktV2Client({
   defaultSaveId,
   defaultSeasonId,
+  bootstrapReady = true,
   defaultTeamId = null,
   source = "sqlite",
   activeOwnerId = null,
@@ -1050,19 +1148,45 @@ export default function TransfermarktV2Client({
   teams,
   disciplines = [],
   rosterRows = [],
+  playerRatingsById = new Map(),
   wishlistEntries = [],
   wishlistPlayerIds = [],
   boardObjectiveHighlights = [],
   onOpenPlayerDetails,
   onOpenHistory,
-  onOpenClassicMarket,
   onToggleWishlist,
   onRemoveWishlist,
+  scoutingWatchPlayerIds = [],
+  scoutingIntelByPlayerId = {},
+  scoutingPipelineCapacity = null,
+  scoutingActiveWishlistPlayerIds = [],
+  onToggleScoutingWatch,
   onBuyCompleted,
+  initialPlayerId = null,
+  onInitialPlayerFocusConsumed = null,
+  offerPanelActive = false,
+  onOpenOfferPanel,
+  onCloseOfferPanel,
   onSell,
+  roomContext: roomContextProp = null,
 }: TransfermarktV2ClientProps) {
-  const roomContextRef = useRef(readFoundationRoomContextFromLocation());
+  const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
+  useEffect(() => {
+    roomContextRef.current = roomContextProp ?? readFoundationRoomContextFromLocation();
+  }, [roomContextProp]);
+  const marketCacheRef = useRef(
+    new Map<
+      string,
+      {
+        items: TransfermarktFreeAgentItem[];
+        feed: MarketFeedResponse | null;
+        total: number;
+        hasMore: boolean;
+      }
+    >(),
+  );
   const marketAbortRef = useRef<AbortController | null>(null);
+  const poolBracketAbortRef = useRef<AbortController | null>(null);
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewVersionRef = useRef(0);
@@ -1092,6 +1216,11 @@ export default function TransfermarktV2Client({
     return ids;
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
+  const scoutingActiveWishlistPlayerIdSet = useMemo(
+    () => new Set(scoutingActiveWishlistPlayerIds),
+    [scoutingActiveWishlistPlayerIds],
+  );
+  const scoutingWatchPlayerIdSet = useMemo(() => new Set(scoutingWatchPlayerIds), [scoutingWatchPlayerIds]);
   const selectedTeamId = defaultTeamId ?? "";
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
@@ -1129,8 +1258,20 @@ export default function TransfermarktV2Client({
   const [buySuccess, setBuySuccess] = useState<string | null>(null);
   const [buyPreview, setBuyPreview] = useState<TransfermarktBuyPreview | null>(null);
   const [buyPreviewRefreshNonce, setBuyPreviewRefreshNonce] = useState(0);
-  const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketBuyNegotiationOutcome | null>(null);
+  const buyModalOpen = offerPanelActive;
+
+  function activateOfferPanel(playerId?: string) {
+    const targetId = playerId ?? selectedPlayer?.playerId ?? buyModalWishlistEntry?.playerId;
+    if (targetId) {
+      onOpenOfferPanel?.(targetId);
+    }
+  }
+
+  function deactivateOfferPanel() {
+    onCloseOfferPanel?.();
+  }
+
   const [buyModalWishlistEntry, setBuyModalWishlistEntry] = useState<TransferWishlistEntry | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [filterStorageReady, setFilterStorageReady] = useState(false);
@@ -1140,6 +1281,10 @@ export default function TransfermarktV2Client({
   const [selectedDisciplineLens, setSelectedDisciplineLens] = useState<OfficialDisciplineWeightId | "">("");
   const [showRosterDisciplines, setShowRosterDisciplines] = useState(false);
   const [wishlistSort, setWishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
+  const [poolBracketPanel, setPoolBracketPanel] = useState<TransfermarktPoolBracketBucket | null>(null);
+  const [poolBracketItems, setPoolBracketItems] = useState<TransfermarktFreeAgentItem[]>([]);
+  const [poolBracketBusy, setPoolBracketBusy] = useState(false);
+  const [poolBracketSort, setPoolBracketSort] = useState<PoolBracketSortState>({ key: "marketValue", direction: "desc" });
 
   useEffect(() => () => {
     if (wishlistClickTimerRef.current != null) {
@@ -1243,6 +1388,23 @@ export default function TransfermarktV2Client({
     );
   }
 
+  function togglePoolBracketSort(key: PoolBracketSortKey) {
+    setPoolBracketSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: key === "playerName" || key === "className" || key === "race" ? "asc" : "desc" },
+    );
+  }
+
+  function togglePoolBracketPanel(bucket: TransfermarktPoolBracketBucket) {
+    setPoolBracketPanel((current) => (current?.bracket === bucket.bracket ? null : bucket));
+  }
+
+  function focusPoolBracketPlayer(item: TransfermarktFreeAgentItem) {
+    setSelectedPlayerId(item.playerId);
+    shouldFocusSelectedCandidateRef.current = true;
+  }
+
   const availableClassNames = useMemo(
     () =>
       Array.from(
@@ -1317,7 +1479,7 @@ export default function TransfermarktV2Client({
       if (item.marketValueSalaryRatio != null && item.marketValueSalaryRatio < effectiveMinRatio) {
         return false;
       }
-      if ((item.fit ?? -99) < minFit) {
+      if (!passesMarketMinFitFilter(item, minFit)) {
         return false;
       }
       if (selectedClassNames.length > 0 && !selectedClassNames.includes(item.className)) {
@@ -1332,7 +1494,7 @@ export default function TransfermarktV2Client({
           return false;
         }
       }
-      if (selectedAxes.length > 0 && !selectedAxes.every((axis) => getAxisValue(item, axis) >= axisMinimums[axis])) {
+      if (!passesMarketAxisFilters(item, selectedAxes, axisMinimums)) {
         return false;
       }
       return true;
@@ -1363,6 +1525,39 @@ export default function TransfermarktV2Client({
     [effectiveRenderedCandidateCount, visibleItems],
   );
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
+  const selectedPlayerScoutingWatched = Boolean(selectedPlayer && scoutingWatchPlayerIdSet.has(selectedPlayer.playerId));
+  const selectedPlayerScoutCertainty =
+    selectedPlayer && scoutingIntelByPlayerId[selectedPlayer.playerId] != null
+      ? scoutingIntelByPlayerId[selectedPlayer.playerId]!
+      : null;
+  const wishlistSlotsFull = Boolean(
+    scoutingPipelineCapacity &&
+      !scoutingPipelineCapacity.draftSuspended &&
+      scoutingPipelineCapacity.max != null &&
+      scoutingPipelineCapacity.max > 0 &&
+      scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
+      !selectedPlayerWishlisted,
+  );
+  const wishlistDisabledReason =
+    scoutingPipelineCapacity?.draftSuspended
+      ? null
+      : wishlistSlotsFull
+        ? `Wishlist voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`
+        : null;
+  const scoutingPipelineFull = Boolean(
+    scoutingPipelineCapacity &&
+      !scoutingPipelineCapacity.draftSuspended &&
+      scoutingPipelineCapacity.max != null &&
+      scoutingPipelineCapacity.max > 0 &&
+      scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
+      !selectedPlayerScoutingWatched,
+  );
+  const scoutingWatchDisabledReason =
+    scoutingPipelineCapacity?.draftSuspended
+      ? null
+      : scoutingPipelineFull
+        ? `Scouting voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Ziel entfernen oder Scouting Office upgraden.`
+        : null;
   const activeBoardObjectiveHighlights = useMemo(
     () => boardObjectiveHighlights.filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed").slice(0, 3),
     [boardObjectiveHighlights],
@@ -1409,6 +1604,61 @@ export default function TransfermarktV2Client({
     () => new Map(marketItems.map((item) => [item.playerId, item] as const)),
     [marketItems],
   );
+  const sortedPoolBracketItems = useMemo(() => {
+    const directionFactor = poolBracketSort.direction === "asc" ? 1 : -1;
+    const compareNumber = (a: number | null | undefined, b: number | null | undefined) => {
+      const safeA = typeof a === "number" && Number.isFinite(a) ? a : Number.NEGATIVE_INFINITY;
+      const safeB = typeof b === "number" && Number.isFinite(b) ? b : Number.NEGATIVE_INFINITY;
+      return (safeA - safeB) * directionFactor;
+    };
+    const compareText = (a: string | null | undefined, b: string | null | undefined) =>
+      (a ?? "").localeCompare(b ?? "", "de", { numeric: true, sensitivity: "base" }) * directionFactor;
+
+    return [...poolBracketItems].sort((left, right) => {
+      let delta = 0;
+      switch (poolBracketSort.key) {
+        case "playerName":
+          delta = compareText(left.name, right.name);
+          break;
+        case "className":
+          delta = compareText(left.className, right.className);
+          break;
+        case "race":
+          delta = compareText(left.race, right.race);
+          break;
+        case "marketValue":
+          delta = compareNumber(left.marketValue, right.marketValue);
+          break;
+        case "salary":
+          delta = compareNumber(left.salary, right.salary);
+          break;
+        case "fit":
+          delta = compareNumber(left.fit, right.fit);
+          break;
+        case "ovr":
+          delta = compareNumber(left.ovr, right.ovr);
+          break;
+        case "pow":
+          delta = compareNumber(left.pow, right.pow);
+          break;
+        case "spe":
+          delta = compareNumber(left.spe, right.spe);
+          break;
+        case "men":
+          delta = compareNumber(left.men, right.men);
+          break;
+        case "soc":
+          delta = compareNumber(left.soc, right.soc);
+          break;
+        default:
+          delta = 0;
+      }
+      if (delta !== 0) {
+        return delta;
+      }
+      return compareText(left.name, right.name);
+    });
+  }, [poolBracketItems, poolBracketSort.direction, poolBracketSort.key]);
   const selectedWishlistEntries = useMemo(() => {
     const rows = wishlistEntries
       .filter((entry) => entry.saveId === defaultSaveId && (!selectedTeamId || !entry.teamId || entry.teamId === selectedTeamId))
@@ -1560,8 +1810,84 @@ export default function TransfermarktV2Client({
       }),
     [marketContext?.axisAverages, selectedPlayer, wishlistAxes],
   );
+  const selectedTeamRosterRows = useMemo(
+    () => rosterRows.filter((row) => row.teamId === selectedTeamId),
+    [rosterRows, selectedTeamId],
+  );
+  const topSixCount = Math.min(6, marketContext?.playerOpt ?? 6);
+  const topSixAxisImpact = useMemo(
+    () =>
+      computeTopSixAxisImpact(
+        selectedTeamRosterRows,
+        selectedPlayer
+          ? {
+              pow: selectedPlayer.pow,
+              spe: selectedPlayer.spe,
+              men: selectedPlayer.men,
+              soc: selectedPlayer.soc,
+            }
+          : null,
+        topSixCount,
+      ),
+    [selectedPlayer, selectedTeamRosterRows, topSixCount],
+  );
+  const topSixCompositeBefore = useMemo(
+    () => computeCompositeTopSixAverage(topSixAxisImpact, "before"),
+    [topSixAxisImpact],
+  );
+  const topSixCompositeAfter = useMemo(
+    () => computeCompositeTopSixAverage(topSixAxisImpact, "after"),
+    [topSixAxisImpact],
+  );
+  const topSixCompositeDelta = useMemo(() => {
+    if (topSixCompositeBefore == null || topSixCompositeAfter == null) {
+      return null;
+    }
+    return Number((topSixCompositeAfter - topSixCompositeBefore).toFixed(1));
+  }, [topSixCompositeAfter, topSixCompositeBefore]);
+  const selectedScoutingConfidence = useMemo(
+    () =>
+      selectedPlayer?.scoutingConfidence ??
+      resolveScoutingConfidenceFromLevel(selectedPlayer?.scoutingLevel ?? 0),
+    [selectedPlayer?.scoutingConfidence, selectedPlayer?.scoutingLevel],
+  );
+  const topSixAxisRankEstimates = useMemo(
+    () =>
+      computeCandidateAxisTeamRankEstimates(
+        selectedTeamRosterRows,
+        selectedPlayer
+          ? {
+              pow: selectedPlayer.pow,
+              spe: selectedPlayer.spe,
+              men: selectedPlayer.men,
+              soc: selectedPlayer.soc,
+            }
+          : null,
+        selectedScoutingConfidence,
+      ),
+    [selectedPlayer, selectedScoutingConfidence, selectedTeamRosterRows],
+  );
+  const selectedTopDisciplineImpact = useMemo(() => {
+    if (!selectedPlayer) {
+      return [];
+    }
+    const confidence =
+      selectedPlayer.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(selectedPlayer.scoutingLevel);
+    return computeDisciplineTopSixImpact(
+      selectedTeamRosterRows,
+      selectedPlayer.topDisciplineScores.slice(0, 3).map((entry) => ({
+        disciplineId: entry.disciplineId,
+        disciplineName: entry.disciplineName,
+        displayedScore: entry.displayedScore ?? null,
+        tierWindow: getScoutingTierWindow(entry.scoreTier, confidence),
+      })),
+      topSixCount,
+    );
+  }, [selectedPlayer, selectedTeamRosterRows, topSixCount]);
   const selectedPortrait = selectedPlayer ? getTransfermarktPortraitModel(selectedPlayer) : null;
   const fitSignal = selectedPlayer ? getFitSignal(selectedPlayer) : null;
+  const selectedPlayerRating = selectedPlayer ? playerRatingsById.get(selectedPlayer.playerId) ?? null : null;
+  const fitReasonChips = selectedPlayer ? getFitReasonChips(selectedPlayer) : [];
   const growthSignal = selectedPlayer ? getGrowthSignal(selectedPlayer) : null;
   const selectedScoutingLevel = normalizeTransfermarktScoutingLevel(selectedPlayer?.scoutingLevel ?? 0);
   const selectedAttributeRows = useMemo(
@@ -1600,30 +1926,9 @@ export default function TransfermarktV2Client({
   const hiddenTrainingNegative = Math.max(0, (selectedTrainingImpact?.negative.length ?? 0) - visibleTrainingNegative.length);
   const effectiveOfferedSalary = salaryEditedManually ? offeredSalary : null;
   const previewPlayerId = selectedPlayer?.playerId ?? (buyModalOpen ? buyModalWishlistEntry?.playerId ?? null : null);
-  const contractPreference = buyPreview?.contractPreference ?? null;
-  const activeContractLength = contractLength ?? buyPreview?.contractLength ?? contractPreference?.idealLength ?? 1;
-  const activeContractShape = contractShape ?? buyPreview?.contractShape ?? contractPreference?.shapePreference ?? "balanced";
-  const contractSalaryAdjustmentPct = contractPreference?.salaryAdjustmentPct ?? null;
-  const contractScoreAdjustment = contractPreference?.scoreAdjustment ?? null;
   const fitSalaryDiscountActive = (buyPreview?.teamFit ?? selectedPlayer?.fit ?? null) != null
     ? Number(buyPreview?.teamFit ?? selectedPlayer?.fit) >= 25
     : false;
-  const contractLengthOutsidePreference = contractPreference
-    ? activeContractLength < contractPreference.preferredMinLength || activeContractLength > contractPreference.preferredMaxLength
-    : false;
-  const contractShapeMismatch = contractPreference
-    ? activeContractShape !== contractPreference.shapePreference
-    : false;
-  const contractPressureTone =
-    (contractSalaryAdjustmentPct ?? 0) > 0 || (contractScoreAdjustment ?? 0) < 0
-      ? "negative"
-      : (contractSalaryAdjustmentPct ?? 0) < 0 || (contractScoreAdjustment ?? 0) > 0
-        ? "positive"
-        : "neutral";
-  const marketAndFitDelta =
-    buyPreview?.expectedSalary != null && buyPreview.baseExpectedSalary != null
-      ? buyPreview.expectedSalary - buyPreview.baseExpectedSalary
-      : null;
 
   function setCandidateButtonRef(playerId: string, node: HTMLButtonElement | null) {
     if (node) {
@@ -1637,6 +1942,58 @@ export default function TransfermarktV2Client({
     shouldFocusSelectedCandidateRef.current = true;
     setSelectedPlayerId(playerId);
   }
+
+  function moveCandidateSelection(key: "ArrowDown" | "ArrowUp" | "Home" | "End") {
+    if (!visibleItems.length) {
+      return;
+    }
+
+    const currentIndex = visibleItems.findIndex((item) => item.playerId === selectedPlayerId);
+    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
+    const targetIndex =
+      key === "Home"
+        ? 0
+        : key === "End"
+          ? visibleItems.length - 1
+          : Math.min(
+              Math.max(fallbackIndex + (key === "ArrowDown" ? 1 : -1), 0),
+              visibleItems.length - 1,
+            );
+    selectCandidateFromKeyboard(visibleItems[targetIndex].playerId);
+  }
+
+  function handleCandidateKeyDown(event: KeyboardEvent<HTMLButtonElement>, playerId: string) {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+    if (!visibleItems.length) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    moveCandidateSelection(event.key as "ArrowDown" | "ArrowUp" | "Home" | "End");
+  }
+
+  useEffect(() => {
+    if (buyModalOpen || !visibleItems.length) {
+      return undefined;
+    }
+
+    function onGlobalCandidateKeyDown(event: globalThis.KeyboardEvent) {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      event.preventDefault();
+      moveCandidateSelection(event.key as "ArrowDown" | "ArrowUp" | "Home" | "End");
+    }
+
+    window.addEventListener("keydown", onGlobalCandidateKeyDown);
+    return () => window.removeEventListener("keydown", onGlobalCandidateKeyDown);
+  }, [buyModalOpen, selectedPlayerId, visibleItems]);
 
   async function ensureWishlistCandidateVisible(playerId: string, playerName: string) {
     if (marketItems.some((item) => item.playerId === playerId)) {
@@ -1697,7 +2054,7 @@ export default function TransfermarktV2Client({
       setOfferedSalary(null);
       setSalaryEditedManually(false);
       setBuyModalWishlistEntry(entry);
-      setBuyModalOpen(true);
+      activateOfferPanel(entry.playerId);
       setBuyPreviewRefreshNonce((current) => current + 1);
       void ensureWishlistCandidateVisible(entry.playerId, entry.playerName);
       return;
@@ -1737,29 +2094,6 @@ export default function TransfermarktV2Client({
   function openWishlistDeal(entry: TransferWishlistEntry) {
     clearWishlistClickTimer();
     void focusWishlistEntry(entry, { openDeal: true });
-  }
-
-  function handleCandidateKeyDown(event: KeyboardEvent<HTMLButtonElement>, playerId: string) {
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      return;
-    }
-    if (!visibleItems.length) {
-      return;
-    }
-    event.preventDefault();
-
-    const currentIndex = visibleItems.findIndex((item) => item.playerId === playerId);
-    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
-    const targetIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? visibleItems.length - 1
-          : Math.min(
-              Math.max(fallbackIndex + (event.key === "ArrowDown" ? 1 : -1), 0),
-              visibleItems.length - 1,
-            );
-    selectCandidateFromKeyboard(visibleItems[targetIndex].playerId);
   }
 
   useEffect(() => {
@@ -1830,6 +2164,19 @@ export default function TransfermarktV2Client({
   }, [selectedPlayerId, selectedTeamId]);
 
   useEffect(() => {
+    if (!initialPlayerId || marketBusy) {
+      return;
+    }
+    const hasCandidate = marketItems.some((item) => item.playerId === initialPlayerId);
+    if (!hasCandidate && marketItems.length === 0) {
+      return;
+    }
+    setSelectedPlayerId(initialPlayerId);
+    shouldFocusSelectedCandidateRef.current = true;
+    onInitialPlayerFocusConsumed?.();
+  }, [initialPlayerId, marketBusy, marketItems, onInitialPlayerFocusConsumed]);
+
+  useEffect(() => {
     if (!buyModalOpen) {
       return;
     }
@@ -1842,10 +2189,28 @@ export default function TransfermarktV2Client({
   }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
   useEffect(() => {
+    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId) {
+      return;
+    }
+
     let cancelled = false;
     const controller = new AbortController();
     marketAbortRef.current?.abort();
     marketAbortRef.current = controller;
+    const marketCacheKey = `${defaultSaveId}:${defaultSeasonId}:${selectedTeamId}:${deferredSearch.trim()}`;
+    const cachedMarket = marketCacheRef.current.get(marketCacheKey);
+    if (cachedMarket) {
+      setMarketFeed(cachedMarket.feed);
+      setMarketItems(cachedMarket.items);
+      setMarketTotal(cachedMarket.total);
+      setMarketHasMore(cachedMarket.hasMore);
+      setMarketBusy(false);
+      setMarketError(null);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
 
     async function loadFullMarketInPages() {
       setMarketBusy(true);
@@ -1861,6 +2226,8 @@ export default function TransfermarktV2Client({
         let nextOffset = 0;
         let hasMore = true;
 
+        const searchActive = deferredSearch.trim().length > 0;
+
         while (hasMore) {
           const params = appendRoomContextToParams(new URLSearchParams({
             saveId: defaultSaveId,
@@ -1869,7 +2236,7 @@ export default function TransfermarktV2Client({
             teamId: selectedTeamId,
             limit: String(MARKET_PAGE_LIMIT),
             offset: String(nextOffset),
-            ...(deferredSearch.trim() ? { search: deferredSearch.trim() } : {}),
+            ...(searchActive ? { search: deferredSearch.trim() } : {}),
           }), roomContextRef.current);
           const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
             cache: "no-store",
@@ -1927,6 +2294,20 @@ export default function TransfermarktV2Client({
           setMarketItems([]);
           setMarketTotal(0);
           setMarketHasMore(false);
+        } else {
+          const finalHasMore = hasMore;
+          marketCacheRef.current.set(marketCacheKey, {
+            items: [...mergedItems],
+            feed: {
+              ...latestPayload,
+              items: mergedItems,
+              offset: 0,
+              returned: mergedItems.length,
+              hasMore: finalHasMore,
+            },
+            total: latestPayload.total,
+            hasMore: finalHasMore,
+          });
         }
       } catch (error) {
         if (cancelled || controller.signal.aborted || isAbortError(error)) {
@@ -1953,7 +2334,111 @@ export default function TransfermarktV2Client({
         marketAbortRef.current = null;
       }
     };
-  }, [defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
+  }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
+
+  useEffect(() => {
+    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSeasonId === "loading") {
+      setPoolBracketItems([]);
+      setPoolBracketBusy(false);
+      return;
+    }
+    const activePoolBracketPanel = poolBracketPanel;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    poolBracketAbortRef.current?.abort();
+    poolBracketAbortRef.current = controller;
+
+    async function loadPoolBracketPlayers() {
+      setPoolBracketBusy(true);
+      try {
+        if (deferredSearch.trim().length === 0 && !marketHasMore && marketItems.length > 0) {
+          const filtered = filterTransfermarktFreeAgentsByBracket(marketItems, activePoolBracketPanel.bracket);
+          if (!cancelled) {
+            setPoolBracketItems(filtered);
+          }
+          return;
+        }
+
+        const mergedItems: TransfermarktFreeAgentItem[] = [];
+        const seen = new Set<string>();
+        let nextOffset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const params = appendRoomContextToParams(
+            new URLSearchParams({
+              saveId: defaultSaveId,
+              seasonId: defaultSeasonId,
+              source,
+              teamId: selectedTeamId,
+              limit: String(MARKET_PAGE_LIMIT),
+              offset: String(nextOffset),
+            }),
+            roomContextRef.current,
+          );
+          const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          const payload = (await response.json()) as MarketFeedResponse;
+          if (cancelled || controller.signal.aborted) {
+            return;
+          }
+          if (!response.ok || payload.error) {
+            if (!cancelled) {
+              setPoolBracketItems([]);
+            }
+            return;
+          }
+
+          payload.items.forEach((item) => {
+            if (!seen.has(item.playerId)) {
+              mergedItems.push(item);
+              seen.add(item.playerId);
+            }
+          });
+          nextOffset += payload.returned;
+          hasMore = Boolean(payload.hasMore && payload.returned > 0);
+        }
+
+        if (!cancelled) {
+          setPoolBracketItems(filterTransfermarktFreeAgentsByBracket(mergedItems, activePoolBracketPanel.bracket));
+        }
+      } catch (error) {
+        if (cancelled || controller.signal.aborted || isAbortError(error)) {
+          return;
+        }
+        if (!cancelled) {
+          setPoolBracketItems([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setPoolBracketBusy(false);
+        }
+      }
+    }
+
+    void loadPoolBracketPlayers();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (poolBracketAbortRef.current === controller) {
+        poolBracketAbortRef.current = null;
+      }
+    };
+  }, [
+    bootstrapReady,
+    defaultSaveId,
+    defaultSeasonId,
+    deferredSearch,
+    marketHasMore,
+    marketItems,
+    poolBracketPanel,
+    selectedTeamId,
+    source,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1965,9 +2450,9 @@ export default function TransfermarktV2Client({
       try {
         const params = appendRoomContextToParams(new URLSearchParams({
           saveId: defaultSaveId,
-          seasonId: defaultSeasonId,
           source,
-          limit: "8",
+          allSeasons: "1",
+          limit: "12",
           ...(selectedTeamId ? { teamId: selectedTeamId } : {}),
         }), roomContextRef.current);
         const response = await fetch(`/api/transfermarkt/history?${params.toString()}`, {
@@ -1995,7 +2480,7 @@ export default function TransfermarktV2Client({
         historyAbortRef.current = null;
       }
     };
-  }, [defaultSaveId, defaultSeasonId, reloadToken, selectedTeamId, source]);
+  }, [defaultSaveId, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
     if (!previewPlayerId || !selectedTeamId) {
@@ -2128,7 +2613,7 @@ export default function TransfermarktV2Client({
       setBuySuccess(
         `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
       );
-      setBuyModalOpen(false);
+      deactivateOfferPanel();
       setBuyNegotiationOutcome(null);
       await onBuyCompleted?.(selectedTeamId);
       setOfferedSalary(null);
@@ -2228,7 +2713,7 @@ export default function TransfermarktV2Client({
     setOfferedSalary(null);
     setSalaryEditedManually(false);
     setBuyModalWishlistEntry(null);
-    setBuyModalOpen(true);
+    activateOfferPanel();
     setBuyPreviewRefreshNonce((current) => current + 1);
   }
 
@@ -2245,23 +2730,29 @@ export default function TransfermarktV2Client({
     if (buyBusy) {
       return;
     }
+    const hadPreview = Boolean(buyPreview?.player?.id);
+    const negotiationAccepted = buyNegotiationOutcome?.status === "accepted";
     const shouldApplyAbortMalus =
       source === "sqlite" &&
       selectedTeamCanManage &&
-      Boolean(buyPreview?.player?.id && buyNegotiationOutcome) &&
-      buyNegotiationOutcome?.status !== "accepted";
-    setBuyModalOpen(false);
+      hadPreview &&
+      buyNegotiationOutcome?.status === "countered";
+    deactivateOfferPanel();
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
-    if (shouldApplyAbortMalus && buyPreview) {
-      const playerName = buyPreview.player?.name ?? "dem Spieler";
-      void persistNegotiationOutcome(
-        buyPreview,
-        "rejected_bad_experience",
-        ["negotiation_cancelled_after_contact"],
-      );
+    if (hadPreview && !negotiationAccepted && selectedTeamCanManage) {
+      const playerName = buyPreview?.player?.name ?? "dem Spieler";
+      if (shouldApplyAbortMalus && buyPreview) {
+        void persistNegotiationOutcome(
+          buyPreview,
+          "rejected_bad_experience",
+          ["negotiation_cancelled_after_contact"],
+        );
+      }
       setPreviewError(
-        `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`,
+        shouldApplyAbortMalus
+          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
+          : `Kauf von ${playerName} abgebrochen.`,
       );
       window.requestAnimationFrame(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2291,8 +2782,6 @@ export default function TransfermarktV2Client({
     buyPreview?.expectedSalary != null
       ? `${formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(buyPreview.expectedSalary)}`
       : formatTransfermarktCurrency(previewAnnualSalary);
-  const activeOfferLabel =
-    buyPreview?.offeredSalary != null ? formatTransfermarktCurrency(buyPreview.offeredSalary) : "auto";
   const dealOpenDisabledReason =
     !selectedTeamId
       ? "Bitte erst ein Team wählen."
@@ -2301,116 +2790,6 @@ export default function TransfermarktV2Client({
         : !selectedTeamCanManage
           ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
           : null;
-  const finalBuyDisabledReason =
-    source !== "sqlite"
-      ? "Im Referenzmodus ist nur Vorschau möglich."
-      : !selectedTeamCanManage
-        ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
-        : previewBusy
-          ? "Die Deal-Vorschau rechnet gerade noch."
-          : buyBusy
-            ? "Der Kauf wird gerade verarbeitet."
-            : !selectedPlayer || !selectedTeamId
-              ? "Bitte erst Team und Kandidat wählen."
-              : !buyPreview?.canBuy
-                ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                : buyNegotiationOutcome?.status !== "accepted"
-                  ? "Erst verhandeln, dann final bestätigen."
-                : null;
-  const modalPlayerName = buyPreview?.player?.name ?? selectedPlayer?.name ?? buyModalWishlistEntry?.playerName ?? "Unbekannt";
-  const modalPlayerClass = buyPreview?.player?.className ?? selectedPlayer?.className ?? buyModalWishlistEntry?.className ?? "—";
-  const modalPlayerRace = buyPreview?.player?.race ?? selectedPlayer?.race ?? buyModalWishlistEntry?.race ?? "—";
-  const modalPlayerBracket = buyPreview?.bracket ?? selectedPlayer?.bracket ?? buyModalWishlistEntry?.bracket ?? null;
-  const modalPlayerMarketValue = buyPreview?.currentValue ?? selectedPlayer?.marketValue ?? buyModalWishlistEntry?.marketValue ?? null;
-  const modalPlayerSalary = buyPreview?.salary ?? selectedPlayer?.salary ?? buyModalWishlistEntry?.salary ?? null;
-  const modalOfferValue = salaryEditedManually
-    ? offeredSalary
-    : buyPreview?.offeredSalary ?? selectedPlayer?.salary ?? null;
-  const modalSalarySliderMin =
-    buyPreview?.expectedSalary != null
-      ? Math.max(0.1, Number((buyPreview.expectedSalary * 0.7).toFixed(1)))
-      : 0.1;
-  const modalSalarySliderMax =
-    buyPreview?.expectedSalary != null
-      ? Math.max(modalSalarySliderMin + 0.1, Number((buyPreview.expectedSalary * 1.3).toFixed(1)))
-      : Math.max(1, Number(((modalOfferValue ?? selectedPlayer?.salary ?? 1) * 1.3).toFixed(1)));
-  const compactNegotiationFeedback = useMemo(() => {
-    const likes: string[] = [];
-    const concerns: string[] = [];
-
-    if (contractPreference) {
-      if (contractLengthOutsidePreference) {
-        concerns.push(
-          activeContractLength < contractPreference.preferredMinLength
-            ? `Laufzeit zu kurz fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`
-            : `Laufzeit zu lang fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`,
-        );
-      } else {
-        likes.push(`Laufzeit passt in sein Wunschfenster (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength})`);
-      }
-
-      if (contractShapeMismatch) {
-        concerns.push(
-          `Vertragsform mag er weniger (${formatContractShapeLabel(activeContractShape)} statt ${formatContractShapeLabel(contractPreference.shapePreference)})`,
-        );
-      } else {
-        likes.push(`Vertragsform passt (${formatContractShapeLabel(activeContractShape)})`);
-      }
-    }
-
-    if (buyPreview?.expectedSalary != null && modalOfferValue != null) {
-      const salaryDelta = Number((modalOfferValue - buyPreview.expectedSalary).toFixed(1));
-      if (salaryDelta >= 0) {
-        likes.push(
-          salaryDelta === 0
-            ? "Gehalt trifft genau seine aktuelle Forderung"
-            : `Gehalt liegt ${formatTransfermarktCurrency(salaryDelta)} ueber seiner Forderung`,
-        );
-      } else {
-        concerns.push(`Gehalt liegt ${formatTransfermarktCurrency(Math.abs(salaryDelta))} unter seiner Forderung`);
-      }
-    }
-
-    const breakdown = buyPreview?.negotiationScoreBreakdown ?? [];
-    for (const entry of breakdown) {
-      if (entry.tone === "positive" && likes.length < 3) {
-        likes.push(`${entry.label}: ${entry.reason}`);
-      }
-      if (entry.tone === "negative" && concerns.length < 3) {
-        concerns.push(`${entry.label}: ${entry.reason}`);
-      }
-      if (likes.length >= 3 && concerns.length >= 3) {
-        break;
-      }
-    }
-
-    return {
-      likes: likes.slice(0, 3),
-      concerns: concerns.slice(0, 3),
-    };
-  }, [
-    activeContractLength,
-    activeContractShape,
-    buyPreview?.expectedSalary,
-    buyPreview?.negotiationScoreBreakdown,
-    contractLengthOutsidePreference,
-    contractPreference,
-    contractShapeMismatch,
-    modalOfferValue,
-  ]);
-  const priorBadExperienceDemandEntry = useMemo(
-    () => buyPreview?.demandBreakdown?.find((entry) => entry.key === "prior_bad_experience") ?? null,
-    [buyPreview?.demandBreakdown],
-  );
-  const priorBadExperienceScoreEntry = useMemo(
-    () => buyPreview?.negotiationScoreBreakdown?.find((entry) => entry.key === "bad_experience") ?? null,
-    [buyPreview?.negotiationScoreBreakdown],
-  );
-  const priorBadExperienceActive = Boolean(
-    buyPreview?.warnings?.includes("previous_rejected_offer_reduces_trust") ||
-    priorBadExperienceDemandEntry ||
-    priorBadExperienceScoreEntry,
-  );
   const needBreakdownSummary = useMemo(() => {
     const breakdown = selectedPlayer?.needMatchBreakdown;
     if (!breakdown) {
@@ -2436,7 +2815,7 @@ export default function TransfermarktV2Client({
   }, [selectedPlayer]);
 
   return (
-    <section className="market-v2-shell">
+    <section className={`market-v2-shell${buyModalOpen ? " is-offer-mode" : ""}`}>
       <section className="market-v2-topbar">
         <div className="filter-field">
           <span>Aktives Team</span>
@@ -2463,21 +2842,13 @@ export default function TransfermarktV2Client({
             <option value="salary">Niedriges Gehalt</option>
           </select>
         </label>
-        <div className="market-v2-topbar-actions">
-          <button className="secondary-button inline-button" type="button" onClick={() => onOpenClassicMarket?.()}>
-            Klassischer Markt
-          </button>
-          <button className="secondary-button inline-button" type="button" onClick={() => onOpenHistory?.()}>
-            Historie
-          </button>
-        </div>
+        <div className="market-v2-topbar-actions" />
       </section>
 
       <section className="market-v2-filter-board">
-        <div className="market-v2-filter-panel">
+        <div className="market-v2-filter-panel market-v2-class-filter-panel">
           <div className="market-v2-filter-head">
             <strong>Klassen</strong>
-            <small>nach Farbe gruppiert</small>
           </div>
           <div className="market-v2-class-group-grid">
             {groupedClassNames.map((group) => (
@@ -2492,7 +2863,9 @@ export default function TransfermarktV2Client({
                     {group.meta.label}
                   </button>
                 ) : (
-                  <span className="market-v2-class-axis-label">Weitere</span>
+                  <span className="market-v2-class-axis-label" title="Weitere Klassen">
+                    ···
+                  </span>
                 )}
                 <div className="market-v2-class-group-chips">
                   {group.classes.map((className) => {
@@ -2502,12 +2875,13 @@ export default function TransfermarktV2Client({
                     return (
                       <button
                         key={className}
-                        className={`market-v2-filter-chip ${classAxisMeta?.className ?? "is-neutral"}${active ? " is-active" : ""}`}
+                        className={`market-v2-filter-chip is-icon-only ${classAxisMeta?.className ?? "is-neutral"}${active ? " is-active" : ""}`}
                         type="button"
+                        title={className}
+                        aria-label={className}
                         onClick={() => setSelectedClassNames((current) => toggleSelection(current, className))}
                       >
                         <ClassIcon classNameValue={className} showLabel={false} className="market-v2-filter-icon-chip" iconClassName="market-v2-filter-icon" />
-                        <span>{className}</span>
                       </button>
                     );
                   })}
@@ -2519,20 +2893,20 @@ export default function TransfermarktV2Client({
         <div className="market-v2-filter-panel market-v2-race-filter-panel">
           <div className="market-v2-filter-head">
             <strong>Rassen</strong>
-            <small>inkl. Icon</small>
           </div>
-          <div className="market-v2-chip-row">
+          <div className="market-v2-chip-row market-v2-race-chip-row">
             {availableRaceNames.map((raceName) => {
               const active = selectedRaceNames.includes(raceName);
               return (
                 <button
                   key={raceName}
-                  className={`market-v2-filter-chip is-race${active ? " is-active" : ""}`}
+                  className={`market-v2-filter-chip is-icon-only is-race${active ? " is-active" : ""}`}
                   type="button"
+                  title={raceName}
+                  aria-label={raceName}
                   onClick={() => setSelectedRaceNames((current) => toggleSelection(current, raceName))}
                 >
                   <RaceIcon race={raceName} showLabel={false} className="market-v2-filter-icon-chip" iconClassName="market-v2-filter-icon" />
-                  <span>{raceName}</span>
                 </button>
               );
             })}
@@ -2541,7 +2915,6 @@ export default function TransfermarktV2Client({
         <div className="market-v2-filter-panel market-v2-discipline-lens-panel">
           <div className="market-v2-filter-head">
             <strong>Diszi-Linse</strong>
-            <small>zeigt nur, worauf du achten solltest</small>
           </div>
           <label className="filter-field">
             <span>Ziel-Diszi</span>
@@ -2567,8 +2940,8 @@ export default function TransfermarktV2Client({
               ))}
             </div>
           ) : (
-            <p className="market-v2-lens-copy">
-              Waehle eine Diszi, dann markieren wir dir die vier wichtigsten Attribute als Orientierung. Kein Auto-Finder, nur bessere Scouting-Hilfe.
+            <p className="market-v2-lens-copy muted">
+              Diszi wählen → relevante Attribute markieren.
             </p>
           )}
         </div>
@@ -2746,17 +3119,38 @@ export default function TransfermarktV2Client({
         </div>
       ) : null}
 
-      <section className="market-v2-budget-strip">
-        <strong>{selectedTeam ? selectedTeam.name : "Liga-Überblick"}</strong>
-        <span className="is-cash">Cash {marketContext ? formatCompactNumber(marketContext.teamCash, 1) : "—"}</span>
-        <span className="is-salary">Gehalt {marketContext ? formatCompactNumber(marketContext.teamSalary, 1) : "—"}</span>
-        <span className="is-roster">
-          Kader {marketContext?.rosterCount ?? "—"} / {selectedTeam?.rosterLimit ?? "—"}
-        </span>
-        <span className="is-market">MW max {formatCompactNumber(valueSliderMax, 1)}</span>
-        <span className="is-salary">Gehalt max {formatCompactNumber(salarySliderMax, 1)}</span>
-        <span className="is-market">Ratio top {formatCompactNumber(ratioSliderMax, 1)}</span>
-        <span className="is-feed">{visibleItems.length} sichtbar · {availabilityLabel}</span>
+      <section className="market-v2-budget-strip modern-game-decision-board market-v2-decision-board" data-testid="market-v2-decision-board">
+        <div className="modern-game-decision-board-head">
+          <div>
+            <span className="modern-game-decision-kicker">Transfer-Entscheidungen</span>
+            <p className="muted modern-game-decision-subtitle">{selectedTeam ? selectedTeam.name : "Liga-Überblick"}</p>
+          </div>
+        </div>
+        <div className="modern-game-decision-stats market-v2-decision-stats">
+          <article className="modern-game-decision-stat is-cash">
+            <span>Cash</span>
+            <strong>{marketContext ? formatCompactNumber(marketContext.teamCash, 1) : "—"}</strong>
+          </article>
+          <article className="modern-game-decision-stat is-info">
+            <span>Gehalt</span>
+            <strong>{marketContext ? formatCompactNumber(marketContext.teamSalary, 1) : "—"}</strong>
+          </article>
+          <article className="modern-game-decision-stat is-default">
+            <span>Kader</span>
+            <strong>{marketContext?.rosterCount ?? "—"} / {selectedTeam?.rosterLimit ?? "—"}</strong>
+            {rosterGapOpenCount != null && rosterGapOpenCount > 0 ? <small>{rosterGapOpenCount} Plätze offen</small> : null}
+          </article>
+          <article className="modern-game-decision-stat is-ready">
+            <span>Wunschliste</span>
+            <strong>{wishlistEntries.length}</strong>
+            <small>{scoutingPipelineCapacity ? `${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max} Scouting` : "Kandidaten"}</small>
+          </article>
+          <article className="modern-game-decision-stat is-warning">
+            <span>Filter aktiv</span>
+            <strong>{selectedClassNames.length + selectedRaceNames.length + selectedAxes.length}</strong>
+            <small>MW max {formatCompactNumber(valueSliderMax, 1)}</small>
+          </article>
+        </div>
       </section>
       <section className="market-v2-main-grid">
         <aside className="market-v2-candidate-rail">
@@ -2775,16 +3169,20 @@ export default function TransfermarktV2Client({
           <div className="market-v2-candidate-list">
             {renderedVisibleItems.map((item, index) => {
               const portrait = getTransfermarktPortraitModel(item);
+              const portraitVariant = resolvePortraitVariantForDisplayPx(MARKET_RAIL_PORTRAIT_PX);
               const isSelected = selectedPlayer?.playerId === item.playerId;
               const fitInfo = getFitSignal(item);
-              const needInfo = getNeedSignal(item);
-              const ratioTone = getRatioTone(item.marketValueSalaryRatio);
-              const focusAxes = getCandidateFocusAxes(item);
+              const scoutingConfidence = item.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(item.scoutingLevel);
+              const railDisciplineTags = item.topDisciplineScores.slice(0, 2).map((entry) =>
+                formatDisciplineScoutTag(entry, scoutingConfidence),
+              );
+              const playerRating = playerRatingsById.get(item.playerId) ?? null;
               return (
                 <button
                   className={`market-v2-candidate-card${isSelected ? " is-selected" : ""}`}
                   key={item.playerId}
                   type="button"
+                  data-testid="transfer-candidate-card"
                   ref={(node) => {
                     setCandidateButtonRef(item.playerId, node);
                   }}
@@ -2794,78 +3192,77 @@ export default function TransfermarktV2Client({
                     shouldFocusSelectedCandidateRef.current = false;
                     setSelectedPlayerId(item.playerId);
                   }}
-                  onDoubleClick={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
                   onKeyDown={(event) => handleCandidateKeyDown(event, item.playerId)}
                 >
-                  <div className="market-v2-candidate-media" style={getCandidateFrameStyle(item.className)}>
-                    {portrait.src ? (
-                      <OptimizedMediaImage
-                        src={portrait.src}
-                        alt={item.name}
-                        width={68}
-                        height={68}
-                        className="market-v2-candidate-image"
-                        loading={isSelected || index < 6 ? "eager" : "lazy"}
-                        fetchPriority={isSelected || index < 3 ? "high" : "low"}
-                      />
-                    ) : (
-                      <span className="market-v2-candidate-placeholder">{portrait.initials}</span>
-                    )}
-                  </div>
-                  <div className="market-v2-candidate-copy">
-                    <div className="market-v2-candidate-head">
-                      <strong title={item.name}>{item.name}</strong>
-                      <span className={`${getClassColorClassName(item.className)} market-v2-class-mini`}>{item.className}</span>
-                    </div>
-                    <small>
-                      {item.race} · {item.alignment}
-                      {item.mercenary ? " · Mercenary" : ""}
-                    </small>
-                    <div className="market-v2-candidate-metric-row">
-                      <span>
-                        <b>{formatTransfermarktCurrency(item.marketValue)}</b>
-                        <small>MW</small>
-                      </span>
-                      <span>
-                        <b>{formatTransfermarktCurrency(item.salary)}</b>
-                        <small>Gehalt</small>
-                      </span>
-                      <span className={getToneClass(ratioTone)}>
-                        <b>{formatTransfermarktRatio(item.marketValueSalaryRatio)}</b>
-                        <small>MW/Geh</small>
-                      </span>
-                      <span className={getToneClass(fitInfo.tone)}>
-                        <b>{item.fitDisplay}</b>
-                        <small>Fit</small>
-                      </span>
-                      <span className={getToneClass(needInfo.tone)}>
-                        <b>{item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : "—"}</b>
-                        <small>Bedarf</small>
-                      </span>
-                    </div>
-                    {item.doubleLoadWarnings?.length ? (
-                      <div className="market-v2-candidate-read-row">
-                        <span className="market-v2-signal-badge is-negative" title={getDoubleLoadTooltip(item)}>
-                          Doppelbelastung
-                        </span>
-                      </div>
-                    ) : null}
-                    <div className="market-v2-candidate-axis-row">
-                      {focusAxes.map((entry) => (
-                        <span className={`market-v2-axis-chip ${AXIS_META[entry.axis].className}`} key={`${item.playerId}-${entry.axis}`}>
-                          {AXIS_META[entry.axis].label} {formatCompactNumber(entry.value, 0)}
-                        </span>
-                      ))}
-                    </div>
+                  <FoundationPlayerPortraitCard
+                    playerId={item.playerId}
+                    name={item.name}
+                    portraitUrl={
+                      appendMediaImageVariant(portrait.src, portraitVariant) ?? portrait.src
+                    }
+                    portraitInitials={portrait.initials}
+                    playerOvr={item.ovr ?? null}
+                    playerMvs={item.mvs ?? null}
+                    ovrRank={playerRating?.ovrRank ?? null}
+                    ppsRank={playerRating?.ppsSeasonRank ?? null}
+                    mvsRank={playerRating?.mvsRank ?? null}
+                    pow={item.pow ?? null}
+                    spe={item.spe ?? null}
+                    men={item.men ?? null}
+                    soc={item.soc ?? null}
+                    leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                    variant="team"
+                    context="market"
+                    density="compact"
+                    portraitLayout="rail"
+                    selected={isSelected}
+                    interactive={false}
+                    className={getClassColorClassName(item.className, "player-card-class-frame")}
+                    subMeta={item.className}
+                    highlight={item.doubleLoadWarnings?.length ? "Doppelbelastung" : null}
+                    contextData={{
+                      market: {
+                        fitDisplay: item.fitDisplay,
+                        marketValue: formatTransfermarktCurrency(item.marketValue),
+                        salary: formatTransfermarktCurrency(item.salary),
+                        ratio: formatTransfermarktRatio(item.marketValueSalaryRatio),
+                        needScore: item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : null,
+                        ovr: item.ovr ?? null,
+                        fitToneClass: getToneClass(fitInfo.tone),
+                        needToneClass: getToneClass(getNeedSignal(item).tone),
+                        ratioToneClass: getToneClass(getRatioTone(item.marketValueSalaryRatio)),
+                      },
+                    }}
+                    railSummarySlot={
+                      railDisciplineTags.length > 0 ? (
+                        <div className="market-v2-candidate-rail-tags" aria-label={`${item.name} Top-Disziplinen`}>
+                          {railDisciplineTags.map((tag) => (
+                            <span className="market-v2-candidate-rail-tag" key={`${item.playerId}-${tag}`}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null
+                    }
+                    onOpen={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
+                  />
+                  <div className="market-v2-candidate-decision-chips" aria-hidden={!isSelected}>
+                    <span className="market-v2-candidate-chip is-value">Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}</span>
+                    <span className={`market-v2-candidate-chip is-risk ${getToneClass(getNeedSignal(item).tone)}`}>Risiko {formatCompactNumber(item.needMatchScore ?? 0, 0)}</span>
+                    <span className="market-v2-candidate-chip is-salary">{formatTransfermarktCurrency(item.salary)}</span>
                   </div>
                 </button>
               );
             })}
-            {visibleItems.length === 0 ? (
-              <div className="market-v2-empty">
-                <strong>Keine Kandidaten im aktuellen Filter.</strong>
-                <p>Suchbegriff, MW-Limit oder Fit etwas weiter stellen.</p>
+            {marketBusy && visibleItems.length === 0 ? (
+              <div className="market-v2-candidate-skeleton" aria-busy="true" aria-live="polite">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <div className="market-v2-candidate-skeleton__card" key={`market-skeleton-${index}`} />
+                ))}
               </div>
+            ) : null}
+            {!marketBusy && visibleItems.length === 0 ? (
+              <EmptyState title="Keine Kandidaten im aktuellen Filter" text="Suchbegriff, MW-Limit oder Fit etwas weiter stellen." />
             ) : null}
           </div>
           {renderedVisibleItems.length < visibleItems.length ? (
@@ -2878,29 +3275,65 @@ export default function TransfermarktV2Client({
           ) : null}
         </aside>
 
+        <div className="market-v2-focus-deal-column">
         <section className="market-v2-focus-panel">
           {selectedPlayer ? (
             <>
               <div className="market-v2-player-hero">
-                <div className="market-v2-player-media">
-                  {selectedPortrait?.src ? (
-                    <OptimizedMediaImage src={selectedPortrait.src} alt={selectedPlayer.name} width={240} height={240} className="market-v2-player-image" />
-                  ) : (
-                    <div className="market-v2-player-placeholder">{selectedPortrait?.initials ?? "FA"}</div>
-                  )}
-                </div>
+                <FoundationPlayerPortraitCard
+                  playerId={selectedPlayer.playerId}
+                  name={selectedPlayer.name}
+                  portraitUrl={selectedPortrait?.src ?? null}
+                  portraitInitials={selectedPortrait?.initials ?? "FA"}
+                  playerOvr={selectedPlayer.ovr ?? null}
+                  playerMvs={selectedPlayer.mvs ?? null}
+                  playerPps={selectedPlayerRating?.ppsSeason ?? null}
+                  ovrRank={selectedPlayerRating?.ovrRank ?? null}
+                  mvsRank={selectedPlayerRating?.mvsRank ?? null}
+                  ppsRank={selectedPlayerRating?.ppsSeasonRank ?? null}
+                  pow={selectedPlayer.pow ?? null}
+                  spe={selectedPlayer.spe ?? null}
+                  men={selectedPlayer.men ?? null}
+                  soc={selectedPlayer.soc ?? null}
+                  leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                  variant="team"
+                  playerClassName={selectedPlayer.className}
+                  subMeta={`${selectedPlayer.className} · ${selectedPlayer.race}`}
+                  economyStats={[
+                    {
+                      label: "MW",
+                      value: formatTransfermarktCurrency(selectedPlayer.marketValue),
+                    },
+                    {
+                      label: "Gehalt",
+                      value: formatTransfermarktCurrency(selectedPlayer.salary),
+                    },
+                    {
+                      label: "Ratio",
+                      value: formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio),
+                      title: `MW/Gehalt ${formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio)}`,
+                    },
+                  ]}
+                  interactive={Boolean(onOpenPlayerDetails)}
+                  portraitLoading="eager"
+                  portraitFetchPriority="high"
+                  onOpen={onOpenPlayerDetails ? () => onOpenPlayerDetails({ playerId: selectedPlayer.playerId }) : undefined}
+                  title={onOpenPlayerDetails ? `${selectedPlayer.name} Profil öffnen` : undefined}
+                  className={`market-v2-selected-portrait-card ${getClassColorClassName(selectedPlayer.className, "player-card-class-frame")}`}
+                />
                 <div className="market-v2-player-copy">
                   <span className="market-v2-kicker" title={scoutingProfileTooltip}>
                     Scouting-Profil
                   </span>
-                  <h3>{selectedPlayer.name}</h3>
-                  <p>{selectedPlayer.className} · {selectedPlayer.race} · {selectedPlayer.alignment}</p>
+                  <button
+                    type="button"
+                    className="table-link-button market-v2-player-name-link"
+                    onClick={() => onOpenPlayerDetails?.({ playerId: selectedPlayer.playerId })}
+                  >
+                    {selectedPlayer.name}
+                  </button>
+                  <p>{selectedPlayer.alignment}</p>
                   <div className="market-v2-pill-row">
-                    <span className="pill">{formatTransfermarktCurrency(selectedPlayer.marketValue)} MW</span>
-                    <span className="pill">{formatTransfermarktCurrency(selectedPlayer.salary)} Gehalt</span>
-                    <span className={`pill ${getToneClass(getRatioTone(selectedPlayer.marketValueSalaryRatio))}`}>
-                      Ratio {formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio)}
-                    </span>
                     <span className="pill">Bracket {selectedPlayer.bracket ?? "—"}</span>
                     <span
                       className={`pill ${fitSignal ? getToneClass(fitSignal.tone) : ""}${fitSalaryDiscountActive ? " market-v2-fit-bonus-pill" : ""}`}
@@ -2918,23 +3351,27 @@ export default function TransfermarktV2Client({
                       </span>
                     ) : null}
                   </div>
-                  <div className="market-v2-link-row">
-                    <button
-                      className="secondary-button inline-button"
-                      type="button"
-                      onClick={() => onOpenPlayerDetails?.({ playerId: selectedPlayer.playerId })}
-                    >
-                      Spieler öffnen
-                    </button>
-                  </div>
+                  {fitReasonChips.length > 0 ? (
+                    <div className="market-v2-fit-chip-row" aria-label="Fit-Begründung">
+                      {fitReasonChips.map((chip) => (
+                        <span key={chip} className="pill is-info">
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {selectedPlayer.axisStarsDisplay ? (
+                    <p className="market-v2-star-row muted" title="Achsen-Sterne (aktuell) — je nach Scouting-Level unscharf bis exakt.">
+                      Aktuell: {selectedPlayer.axisStarsDisplay}
+                    </p>
+                  ) : null}
+                  {selectedPlayer.potentialStarsDisplay ? (
+                    <p className="market-v2-star-row muted" title="Potential-Decke — baut sich über Beobachtung/Spieltage enger auf.">
+                      {selectedPlayer.potentialStarsDisplay}
+                      {selectedPlayer.potentialGapStars != null ? ` · Gap ${selectedPlayer.potentialGapStars}★` : ""}
+                    </p>
+                  ) : null}
                 </div>
-              </div>
-
-              <div className="market-v2-axis-grid">
-                <MarketAxisBar axis="pow" value={selectedPlayer.pow} />
-                <MarketAxisBar axis="spe" value={selectedPlayer.spe} />
-                <MarketAxisBar axis="men" value={selectedPlayer.men} />
-                <MarketAxisBar axis="soc" value={selectedPlayer.soc} />
               </div>
 
               <div
@@ -2972,18 +3409,39 @@ export default function TransfermarktV2Client({
                   className="market-v2-info-card market-v2-info-card-top-diszi"
                   title={`Scouting ${getScoutingClarityLabel(selectedPlayer.scoutingConfidence)}: ${getScoutedDisciplineLine(selectedPlayer)}`}
                 >
-                  <div className="market-v2-card-eyebrow">Top-5 Diszis</div>
+                  <div className="market-v2-card-eyebrow">Top-3 Diszis</div>
                   <div className="market-v2-diszi-list">
-                    {selectedPlayer.topDisciplineScores.slice(0, 5).map((entry) => (
-                      <div
-                        className={`market-v2-diszi-row ${getDisciplineCategoryClass(entry)}`}
-                        title={`${entry.disciplineName} · Slots ${entry.playerCount ?? "—"} · Teamrank ${entry.teamRank ?? "—"}`}
-                        key={`${selectedPlayer.playerId}-${entry.disciplineId ?? entry.disciplineName}`}
-                      >
-                        <span>{formatDisciplineContextLabel(entry)}</span>
-                        <strong>{getScoutingTierWindow(entry.scoreTier ?? null, selectedPlayer.scoutingConfidence)}</strong>
-                      </div>
-                    ))}
+                    {selectedPlayer.topDisciplineScores.slice(0, 3).map((entry) => {
+                      const impact = selectedTopDisciplineImpact.find((row) => row.disciplineId === entry.disciplineId);
+                      const impactTone =
+                        impact?.delta == null
+                          ? "is-neutral"
+                          : impact.delta >= 1.5
+                            ? "is-positive"
+                            : impact.delta <= -1.5
+                              ? "is-negative"
+                              : "is-neutral";
+                      return (
+                        <div
+                          className={`market-v2-diszi-row ${getDisciplineCategoryClass(entry)}`}
+                          title={`${entry.disciplineName} · Slots ${entry.playerCount ?? "—"} · Teamrank ${entry.teamRank ?? "—"}`}
+                          key={`${selectedPlayer.playerId}-${entry.disciplineId ?? entry.disciplineName}`}
+                        >
+                          <span>{formatDisciplineContextLabel(entry)}</span>
+                          <strong>{getScoutingTierWindow(entry.scoreTier ?? null, selectedPlayer.scoutingConfidence)}</strong>
+                          {impact ? (
+                            <small className={`market-v2-diszi-impact ${impactTone}`}>
+                              Top-6 Ø {impact.beforeTopSixAvg != null ? formatCompactNumber(impact.beforeTopSixAvg, 1) : "—"}
+                              {" → "}
+                              {impact.afterTopSixAvg != null ? formatCompactNumber(impact.afterTopSixAvg, 1) : "—"}
+                              {impact.delta != null
+                                ? ` (${formatScoutedImpactDelta(impact.delta, selectedScoutingConfidence, formatCompactNumber)})`
+                                : ""}
+                            </small>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                     {selectedPlayer.topDisciplineScores.length === 0 ? <span className="pill">keine Top-Diszis</span> : null}
                   </div>
                   {selectedPlayer.doubleLoadWarnings?.length ? (
@@ -2992,7 +3450,7 @@ export default function TransfermarktV2Client({
                     </span>
                   ) : null}
                   <div className="market-v2-inline-training" title={`Scouting L${selectedScoutingLevel}: Trainingsprofil wird schrittweise klarer.`}>
-                    <div className="market-v2-card-eyebrow">Training</div>
+                    <div className="market-v2-card-eyebrow">Attribut-Wirkung</div>
                     <div className="market-v2-training-affinity-grid">
                       {visibleTrainingPositive.map((entry) => (
                         <span
@@ -3078,48 +3536,121 @@ export default function TransfermarktV2Client({
                       {needBreakdownSummary}
                     </div>
                   ) : null}
-                  <div className="market-v2-axis-compare-mini" aria-label="Achsenvergleich mit dem aktuellen Kader">
-                    {axisComparisonRows.map((row) => (
-                      <span className={`market-v2-axis-compare-pill ${AXIS_META[row.axis].className} ${row.toneClass}`} key={`team-match-axis-${row.axis}`}>
-                        <b>{AXIS_META[row.axis].label}</b>
-                        <small>
-                          {row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"} · Δ {formatAxisComparisonDelta(row.delta)}
-                        </small>
-                      </span>
-                    ))}
+                  <div className="market-v2-top-six-impact" aria-label="Top-6 Achsen-Schnitt mit Kauf">
+                    <p className="market-v2-top-six-impact-summary">
+                      Top-{topSixCount} Schnitt aktuell{" "}
+                      <strong>{topSixCompositeBefore != null ? formatCompactNumber(topSixCompositeBefore, 1) : "—"}</strong>
+                      {topSixCompositeDelta != null ? (
+                        <>
+                          {" · mit Kauf "}
+                          <strong className={topSixCompositeDelta >= 0 ? "text-positive" : "text-negative"}>
+                            {formatScoutedImpactDelta(topSixCompositeDelta, selectedScoutingConfidence, formatCompactNumber)}
+                          </strong>
+                        </>
+                      ) : null}
+                    </p>
+                    {!isScoutedImpactExact(selectedScoutingConfidence) ? (
+                      <small className="market-v2-top-six-impact-note">
+                        Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
+                      </small>
+                    ) : null}
+                    <div className="market-v2-axis-compare-mini">
+                      {topSixAxisImpact.map((row) => {
+                        const rankEstimate = topSixAxisRankEstimates.find((entry) => entry.axis === row.axis);
+                        const rankLabel = formatTeamRankEstimateLabel(rankEstimate, selectedScoutingConfidence);
+                        return (
+                        <span
+                          className={`market-v2-axis-compare-pill ${AXIS_META[row.axis].className} ${getAxisComparisonTone(row.delta, wishlistAxes.includes(row.axis))}`}
+                          key={`team-top6-${row.axis}`}
+                        >
+                          <b>{AXIS_META[row.axis].label}</b>
+                          <small>
+                            Ø {row.before != null ? formatCompactNumber(row.before, 1) : "—"}
+                            {" → "}
+                            {row.after != null ? formatCompactNumber(row.after, 1) : "—"}
+                            {row.delta != null
+                              ? ` (${formatScoutedImpactDelta(row.delta, selectedScoutingConfidence, formatCompactNumber)})`
+                              : ""}
+                            {rankLabel ? (
+                              <>
+                                <em className="market-v2-axis-rank-estimate"> · Rang {rankLabel}</em>
+                              </>
+                            ) : null}
+                          </small>
+                        </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </article>
               </div>
 
               <div className="market-v2-focus-actions">
-                <button
-                  className="primary-button"
-                  type="button"
+                <FoundationButton
+                  data-testid="transfer-deal-open-button"
                   disabled={!selectedPlayer || !selectedTeamId || !selectedTeamCanManage}
                   onClick={openBuyModal}
                   title={dealOpenDisabledReason ?? "Öffnet das Kaufmodal mit Vertragsrahmen, Forderung und Teamwirkung."}
                 >
                   {buyBusy ? "kauft..." : "Deal prüfen"}
-                </button>
-                <button
-                  className={`secondary-button${selectedPlayerWishlisted ? " is-active" : ""}`}
-                  type="button"
-                  disabled={!selectedPlayer}
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={selectedPlayerWishlisted ? "is-active" : ""}
+                  disabled={!selectedPlayer || Boolean(wishlistDisabledReason && !selectedPlayerWishlisted)}
                   onClick={() => {
                     if (selectedPlayer) {
                       onToggleWishlist?.(selectedPlayer);
                     }
                   }}
-                  title={selectedPlayerWishlisted ? "Spieler wieder aus der Wishlist nehmen." : "Spieler auf die Wishlist setzen."}
+                  title={
+                    selectedPlayerWishlisted
+                      ? "Von der Wishlist nehmen — Scouting-Slot wird frei."
+                      : wishlistDisabledReason ??
+                        (scoutingPipelineCapacity?.draftSuspended
+                          ? "Setup-Draft — Wishlist-Limit ausgesetzt, frei vergleichen und merken."
+                          : scoutingPipelineCapacity
+                            ? `Wishlist-Scouting (${scoutingPipelineCapacity.occupied}/${scoutingPipelineCapacity.max ?? "∞"} Slots, 4 + 3/Stufe) — bevorzugt Stück für Stück aufgedeckt.`
+                            : "Spieler auf die Wishlist setzen und bevorzugt scouten.")
+                  }
                 >
                   {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
-                </button>
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={selectedPlayerScoutingWatched ? "is-active" : ""}
+                  disabled={!selectedPlayer || Boolean(scoutingWatchDisabledReason && !selectedPlayerScoutingWatched)}
+                  onClick={() => {
+                    if (selectedPlayer) {
+                      onToggleScoutingWatch?.(selectedPlayer);
+                    }
+                  }}
+                  title={
+                    selectedPlayerScoutingWatched
+                      ? "Spieler aus der aktiven Beobachtung nehmen."
+                      : scoutingWatchDisabledReason ?? "Spieler aktiv beobachten — Intel baut sich über Spieltage auf."
+                  }
+                >
+                  {selectedPlayerScoutingWatched ? "Nicht mehr beobachten" : "Beobachten"}
+                </FoundationButton>
               </div>
+              {selectedPlayerScoutCertainty != null ? (
+                <div className="market-v2-scout-certainty" title="Fortschritt der aktiven Beobachtung — höhere Certainty verbessert die Scouting-Disclosure.">
+                  <span>Scouting {selectedPlayerScoutCertainty}%</span>
+                  <div className="market-v2-scout-certainty-bar" aria-hidden="true">
+                    <span style={{ width: `${Math.max(0, Math.min(100, selectedPlayerScoutCertainty))}%` }} />
+                  </div>
+                </div>
+              ) : null}
+              {scoutingWatchDisabledReason && !selectedPlayerScoutingWatched ? (
+                <p className="foundation-screen-action-reason market-v2-focus-action-reason">{scoutingWatchDisabledReason}</p>
+              ) : null}
               {dealOpenDisabledReason ? (
                 <p className="foundation-screen-action-reason market-v2-focus-action-reason">Warum nicht: {dealOpenDisabledReason}</p>
               ) : null}
 
-              <div
+              <FoundationCard
+                variant="panel"
                 className="market-v2-traits-card"
                 title={
                   selectedPlayer.scoutingWarnings.length
@@ -3137,16 +3668,23 @@ export default function TransfermarktV2Client({
                   ))}
                   {selectedPlayer.hiddenPositiveTraitCount > 0 ? (
                     <span className="pill market-v2-trait-pill is-neutral">
-                      +{selectedPlayer.hiddenPositiveTraitCount} verdeckt
+                      Trait verdeckt
                     </span>
                   ) : null}
                   {selectedPlayer.hiddenNegativeTraitCount > 0 ? (
                     <span className="pill market-v2-trait-pill is-neutral">
-                      {selectedPlayer.hiddenNegativeTraitCount} Risiko verdeckt
+                      Risiko verdeckt
                     </span>
                   ) : null}
-                  {selectedPlayer.traitsPositive.length === 0 && selectedPlayer.traitsNegative.length === 0 ? (
-                    <span className="pill">keine markanten Traits</span>
+                  {selectedPlayer.traitsPositive.length === 0 &&
+                  selectedPlayer.traitsNegative.length === 0 &&
+                  selectedPlayer.hiddenPositiveTraitCount === 0 &&
+                  selectedPlayer.hiddenNegativeTraitCount === 0 ? (
+                    selectedScoutingLevel >= 4 ? (
+                      <span className="pill">keine markanten Traits</span>
+                    ) : (
+                      <span className="pill market-v2-trait-pill is-neutral">Traits noch nicht gescoutet</span>
+                    )
                   ) : null}
                   {selectedPlayer.scoutingWarnings.length ? (
                     <span className="pill" title={selectedPlayer.scoutingWarnings.slice(0, 3).join(" · ")}>
@@ -3154,13 +3692,13 @@ export default function TransfermarktV2Client({
                     </span>
                   ) : null}
                 </div>
-              </div>
+              </FoundationCard>
             </>
           ) : (
-            <div className="market-v2-empty">
-              <strong>Wähle links einen Kandidaten.</strong>
-              <p>Dann bekommst du Scouting-Profil, Achsen, Top-Diszis und Vertragsvorschau an einer Stelle.</p>
-            </div>
+            <EmptyState
+              title="Wähle links einen Kandidaten"
+              text="Dann bekommst du Scouting-Profil, Achsen, Top-Diszis und Vertragsvorschau an einer Stelle."
+            />
           )}
         </section>
 
@@ -3180,6 +3718,31 @@ export default function TransfermarktV2Client({
               {formatDealPreviewErrorLabel(previewError)}
             </span>
           ) : null}
+
+          <div className="market-v2-contract-segmented" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
+            {[1, 2, 3].map((length) => (
+              <button
+                key={`contract-length-${length}`}
+                type="button"
+                className={`secondary-button inline-button${contractLength === length ? " is-selected" : ""}`}
+                onClick={() => setContractLength(length)}
+              >
+                {length} Saison{length === 1 ? "" : "en"}
+              </button>
+            ))}
+          </div>
+
+          <div className="market-v2-rejection-meter" data-testid="market-v2-rejection-meter" aria-label="Ablehnungsrisiko">
+            <span>Ablehnungsrisiko</span>
+            <div className="market-v2-rejection-meter-track">
+              <span
+                style={{
+                  width: `${Math.min(100, ((buyPreview?.blockingReasons?.length ?? 0) * 25 + (buyPreview?.warnings?.length ?? 0) * 10 + (buyPreview?.canBuy ? 0 : 35)))}%`,
+                }}
+              />
+            </div>
+            <small>{buyPreview?.canBuy ? "Deal wahrscheinlich" : buyPreview?.blockingReasons?.[0] ?? "Verhandlung nötig"}</small>
+          </div>
 
           <div className="market-v2-buy-summary">
             <div>
@@ -3214,10 +3777,6 @@ export default function TransfermarktV2Client({
             <div>
               <span>Forderung p.a.</span>
               <strong>{previewSalaryLabel}</strong>
-            </div>
-            <div>
-              <span>MW/Gehalt</span>
-              <strong>{selectedPlayer ? formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio) : "—"}</strong>
             </div>
             <div>
               <span>Potenzial vs MW</span>
@@ -3282,17 +3841,38 @@ export default function TransfermarktV2Client({
             </div>
           ) : null}
         </aside>
+        </div>
       </section>
+
+      {selectedPlayer ? (
+        <div className="market-v2-mobile-preview-sheet" data-testid="market-v2-mobile-preview-sheet" aria-label="Mobile Spielervorschau">
+          <strong>{selectedPlayer.name}</strong>
+          <span>{formatTransfermarktCurrency(selectedPlayer.marketValue)} MW · {formatTransfermarktCurrency(selectedPlayer.salary)} Gehalt</span>
+          <span className="market-v2-candidate-chip is-value">Fit {selectedPlayer.fitDisplay}</span>
+        </div>
+      ) : null}
 
       <section className="market-v2-context-grid" aria-label="Team- und Wishlist-Kontext">
         <article className="market-v2-context-panel">
           <details className="market-v2-context-details" open>
             <summary className="market-v2-context-summary">
               <span>
-                <strong>Wishlist & Bedarf</strong>
-                <small>{selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen</small>
+                <strong>Wishlist & Scouting</strong>
+                <small>
+                  {scoutingPipelineCapacity?.draftSuspended
+                    ? `${selectedWishlistEntries.length} gemerkt · Draft — kein Slot-Limit`
+                    : scoutingPipelineCapacity
+                      ? `${selectedWishlistEntries.length}/${scoutingPipelineCapacity.max} Scouting-Slots · progressive Enthüllung`
+                      : `${selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen`}
+                </small>
               </span>
-              <b>{selectedWishlistEntries.length} Spieler</b>
+              <b>
+                {scoutingPipelineCapacity?.draftSuspended
+                  ? `${selectedWishlistEntries.length} · Draft`
+                  : scoutingPipelineCapacity
+                    ? `${selectedWishlistEntries.length}/${scoutingPipelineCapacity.max}`
+                    : `${selectedWishlistEntries.length} Spieler`}
+              </b>
             </summary>
             <div className="market-v2-context-details-body">
               <div className="market-v2-need-summary">
@@ -3394,7 +3974,12 @@ export default function TransfermarktV2Client({
                 {selectedWishlistEntries.map((entry) => {
                   const marketItem = marketItemByPlayerId.get(entry.playerId);
                   const portrait = marketItem ? getTransfermarktPortraitModel(marketItem) : null;
-                  const wishlistPortraitSrc = portrait?.src ?? getPlayerPortraitBrowserUrl(entry.playerId);
+                  const wishlistPortraitBase = portrait?.src ?? getPlayerPortraitBrowserUrl(entry.playerId);
+                  const wishlistPortraitThumb = appendMediaImageVariant(wishlistPortraitBase, "thumb") ?? wishlistPortraitBase;
+                  const wishlistPortraitPreview = appendMediaImageVariant(wishlistPortraitBase, "preview") ?? wishlistPortraitBase;
+                  const fitInfo = marketItem ? getFitSignal(marketItem) : null;
+                  const needInfo = marketItem ? getNeedSignal(marketItem) : null;
+                  const ratioTone = marketItem ? getRatioTone(marketItem.marketValueSalaryRatio) : "neutral";
                   return (
                     <tr
                       key={entry.id}
@@ -3403,35 +3988,84 @@ export default function TransfermarktV2Client({
                       onDoubleClick={() => openWishlistDeal(entry)}
                     >
                       <td>
-                        {wishlistPortraitSrc ? (
-                          <OptimizedMediaImage
-                            src={wishlistPortraitSrc}
-                            alt={entry.playerName}
-                            width={42}
-                            height={42}
-                            className="market-v2-roster-context-portrait"
-                          />
-                        ) : (
-                          <div className="market-v2-roster-context-placeholder">
-                            {(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
-                          </div>
-                        )}
+                        <FoundationPlayerPortraitPreview
+                          playerId={entry.playerId}
+                          name={entry.playerName}
+                          portraitUrl={wishlistPortraitPreview}
+                          portraitInitials={(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
+                          playerOvr={marketItem?.ovr ?? null}
+                          playerMvs={marketItem?.mvs ?? null}
+                          pow={marketItem?.pow ?? null}
+                          spe={marketItem?.spe ?? null}
+                          men={marketItem?.men ?? null}
+                          soc={marketItem?.soc ?? null}
+                          leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                          variant="team"
+                          context="market"
+                          playerClassName={entry.className}
+                          subMeta={entry.race}
+                          contextData={{
+                            market: {
+                              fitDisplay: marketItem?.fitDisplay ?? null,
+                              marketValue: formatTransfermarktCurrency(entry.marketValue),
+                              salary: formatTransfermarktCurrency(entry.salary),
+                              ratio: marketItem ? formatTransfermarktRatio(marketItem.marketValueSalaryRatio) : "—",
+                              needScore: marketItem?.needMatchScore != null ? formatCompactNumber(marketItem.needMatchScore, 0) : null,
+                              ovr: marketItem?.ovr ?? null,
+                              fitToneClass: fitInfo ? getToneClass(fitInfo.tone) : undefined,
+                              needToneClass: needInfo ? getToneClass(needInfo.tone) : undefined,
+                              ratioToneClass: getToneClass(ratioTone),
+                            },
+                          }}
+                        >
+                          {wishlistPortraitThumb ? (
+                            <OptimizedMediaImage
+                              src={wishlistPortraitThumb}
+                              alt={entry.playerName}
+                              width={42}
+                              height={42}
+                              className="market-v2-roster-context-portrait"
+                            />
+                          ) : (
+                            <div className="market-v2-roster-context-placeholder">
+                              {(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
+                            </div>
+                          )}
+                        </FoundationPlayerPortraitPreview>
                       </td>
                       <td>
-                        <button
-                          className="table-link-button market-v2-context-player"
-                          type="button"
-                          onClick={() => queueWishlistFocus(entry)}
-                          onDoubleClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            openWishlistDeal(entry);
-                          }}
-                          title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
-                        >
-                          <strong>{entry.playerName}</strong>
-                          <small>{entry.race} · Doppelklick Deal</small>
-                        </button>
+                        <div className="market-v2-wishlist-player-cell">
+                          <button
+                            className="table-link-button market-v2-context-player"
+                            type="button"
+                            onClick={() => queueWishlistFocus(entry)}
+                            onDoubleClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openWishlistDeal(entry);
+                            }}
+                            title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
+                          >
+                            <strong>{entry.playerName}</strong>
+                            <small>{entry.race}</small>
+                          </button>
+                          {scoutingPipelineCapacity?.draftSuspended ? (
+                            <span className="transfer-status-pill is-info" title="Setup-Draft — kein Slot-Limit">
+                              Draft
+                            </span>
+                          ) : scoutingActiveWishlistPlayerIdSet.has(entry.playerId) ? (
+                            <span
+                              className="transfer-status-pill is-ready"
+                              title={`Aktiv gescoutet — Intel ${scoutingIntelByPlayerId[entry.playerId] ?? 0}%`}
+                            >
+                              Scout aktiv {scoutingIntelByPlayerId[entry.playerId] ?? 0}%
+                            </span>
+                          ) : (
+                            <span className="transfer-status-pill" title="Nur gemerkt — kein Scout-Slot">
+                              Nur gemerkt
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>{entry.className}</td>
                       <td>{formatTransfermarktCurrency(entry.marketValue)}</td>
@@ -3467,10 +4101,16 @@ export default function TransfermarktV2Client({
               </tbody>
             </table>
             {selectedWishlistEntries.length === 0 ? (
-              <div className="market-v2-empty">
-                <strong>Wishlist leer.</strong>
-                <p>Nutze die Bedarfssignale oben als Einkaufsliste und merke Kandidaten im Markt, wenn du später vergleichen willst.</p>
-              </div>
+              <EmptyState
+                title="Wishlist leer"
+                text={
+                  scoutingPipelineCapacity?.draftSuspended
+                    ? "Im Setup-Draft kannst du unbegrenzt merken und vergleichen. Nach dem Draft gelten 4 Wishlist-Slots (+3 pro Scouting-Stufe)."
+                    : scoutingPipelineCapacity && scoutingPipelineCapacity.max != null
+                      ? `Bis zu ${scoutingPipelineCapacity.max} Spieler auf die Wishlist — bevorzugt gescoutet und Stück für Stück aufgedeckt.`
+                      : "Merke Kandidaten im Markt, um sie später gezielt zu scouten."
+                }
+              />
             ) : null}
               </div>
             </div>
@@ -3528,19 +4168,44 @@ export default function TransfermarktV2Client({
               </thead>
               <tbody>
                 {selectedRosterRows.map((row) => (
-                  <tr key={row.activePlayerId} onDoubleClick={() => onOpenPlayerDetails?.({ playerId: row.playerId, activePlayerId: row.activePlayerId })}>
+                  <tr key={row.activePlayerId}>
                     <td>
-                      {row.portraitUrl ? (
-                        <OptimizedMediaImage
-                          src={row.portraitUrl}
-                          alt={row.name}
-                          width={42}
-                          height={42}
-                          className="market-v2-roster-context-portrait"
-                        />
-                      ) : (
-                        <div className="market-v2-roster-context-placeholder">{row.name.slice(0, 2).toUpperCase()}</div>
-                      )}
+                      {(() => {
+                        const rosterPortraitBase = row.portraitUrl ?? getPlayerPortraitBrowserUrl(row.playerId);
+                        const rosterPortraitThumb = appendMediaImageVariant(rosterPortraitBase, "thumb") ?? rosterPortraitBase;
+                        const rosterPortraitPreview = appendMediaImageVariant(rosterPortraitBase, "preview") ?? rosterPortraitBase;
+                        return (
+                      <FoundationPlayerPortraitPreview
+                        playerId={row.playerId}
+                        name={row.name}
+                        portraitUrl={rosterPortraitPreview}
+                        portraitInitials={row.name.slice(0, 2).toUpperCase()}
+                        playerOvr={row.ovr ?? null}
+                        playerMvs={row.mvs ?? null}
+                        pow={row.pow ?? null}
+                        spe={row.spe ?? null}
+                        men={row.men ?? null}
+                        soc={row.soc ?? null}
+                        leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                        variant="team"
+                        context="roster"
+                        playerClassName={row.className}
+                        subMeta={row.race ?? undefined}
+                      >
+                        {rosterPortraitThumb ? (
+                          <OptimizedMediaImage
+                            src={rosterPortraitThumb}
+                            alt={row.name}
+                            width={42}
+                            height={42}
+                            className="market-v2-roster-context-portrait"
+                          />
+                        ) : (
+                          <div className="market-v2-roster-context-placeholder">{row.name.slice(0, 2).toUpperCase()}</div>
+                        )}
+                      </FoundationPlayerPortraitPreview>
+                        );
+                      })()}
                     </td>
                     <td>
                       <button
@@ -3548,8 +4213,7 @@ export default function TransfermarktV2Client({
                         type="button"
                         onClick={() => onOpenPlayerDetails?.({ playerId: row.playerId, activePlayerId: row.activePlayerId })}
                       >
-                        <strong>{row.name}</strong>
-                        <small>Doppelklick Details</small>
+                        {row.name}
                       </button>
                     </td>
                     <td>
@@ -3564,17 +4228,17 @@ export default function TransfermarktV2Client({
                         <small>{row.race ?? "—"}</small>
                       </span>
                     </td>
-                    <td>{formatCompactNumber(row.pps, 1)}</td>
+                    <td>{formatNullablePps(row.pps)}</td>
                     <td>{formatCompactNumber(row.ovr, 0)}</td>
-                    <td>{formatCompactNumber(row.mvs, 1)}</td>
+                    <td>{formatNullablePps(row.mvs)}</td>
                     <td>{formatTransfermarktCurrency(row.marketValue)}</td>
                     <td>{formatTransfermarktCurrency(row.salary)}</td>
                     <td>{formatTransfermarktRatio(row.valueScore ?? null)}</td>
                     <td>{row.contractLength ?? "—"}</td>
-                    <td><span className="market-v2-axis-chip is-pow">{formatCompactNumber(row.pow, 0)}</span></td>
-                    <td><span className="market-v2-axis-chip is-spe">{formatCompactNumber(row.spe, 0)}</span></td>
-                    <td><span className="market-v2-axis-chip is-men">{formatCompactNumber(row.men, 0)}</span></td>
-                    <td><span className="market-v2-axis-chip is-soc">{formatCompactNumber(row.soc, 0)}</span></td>
+                    {renderMarketRosterAxisCell("is-pow", row.pow, row.previousSeasonAxis, "ppPow", "ppPowRank")}
+                    {renderMarketRosterAxisCell("is-spe", row.spe, row.previousSeasonAxis, "ppSpe", "ppSpeRank")}
+                    {renderMarketRosterAxisCell("is-men", row.men, row.previousSeasonAxis, "ppMen", "ppMenRank")}
+                    {renderMarketRosterAxisCell("is-soc", row.soc, row.previousSeasonAxis, "ppSoc", "ppSocRank")}
                     {showRosterDisciplines
                       ? orderedDisciplines.map((discipline) => (
                           <td className={`market-v2-roster-discipline-cell is-${discipline.category}`} key={`roster-discipline-${row.activePlayerId}-${discipline.id}`}>
@@ -3587,6 +4251,7 @@ export default function TransfermarktV2Client({
                         <button
                           className="secondary-button inline-button"
                           type="button"
+                          data-testid="transfer-roster-sell-button"
                           title={`${row.name} verkaufen`}
                           onClick={() =>
                             onSell({
@@ -3622,8 +4287,8 @@ export default function TransfermarktV2Client({
       <section className="market-v2-bottom-grid">
         <article className="market-v2-activity-panel">
           <div className="market-v2-section-head">
-            <strong>Aktuelle Season-Deals</strong>
-            <small>{historyItems.length} sichtbar</small>
+            <strong>Letzte Deals (alle Seasons)</strong>
+            <small>{historyItems.length} sichtbar{historyFeed?.total != null && historyFeed.total > historyItems.length ? ` · ${historyFeed.total} gesamt` : ""}</small>
           </div>
           <div className="market-v2-activity-list">
             {historyItems.map((entry) => (
@@ -3649,8 +4314,8 @@ export default function TransfermarktV2Client({
             ))}
             {historyItems.length === 0 ? (
               <div className="market-v2-empty">
-                <strong>Noch keine Deals im aktuellen Scope.</strong>
-                <p>Hier landen die Käufe und Verkäufe der gewählten Season direkt im Spielfluss.</p>
+                <strong>Noch keine Deals im Save.</strong>
+                <p>Hier erscheinen Käufe und Verkäufe aus allen Seasons — auch nach dem Saisonwechsel.</p>
               </div>
             ) : null}
           </div>
@@ -3663,13 +4328,201 @@ export default function TransfermarktV2Client({
           </div>
           <div className="market-v2-bucket-grid">
             {(marketFeed?.poolAudit.marketValueBrackets ?? []).map((bucket) => (
-              <div className="market-v2-bucket-card" key={bucket.label}>
+              <button
+                type="button"
+                className={`market-v2-bucket-card${poolBracketPanel?.bracket === bucket.bracket ? " is-selected" : ""}`}
+                key={bucket.label}
+                aria-pressed={poolBracketPanel?.bracket === bucket.bracket}
+                data-testid={`market-v2-bucket-card-${bucket.bracket}`}
+                title={`${bucket.label}: ${bucket.count} Spieler · MW ${bucket.rangeLabel}`}
+                onClick={() => togglePoolBracketPanel(bucket)}
+              >
                 <span>{bucket.label}</span>
                 <strong>{bucket.count}</strong>
                 <small>MW {bucket.rangeLabel}</small>
-              </div>
+              </button>
             ))}
           </div>
+          {poolBracketPanel ? (
+            <div className="market-v2-pool-bracket-panel" data-testid="market-v2-pool-bracket-panel">
+              <div className="market-v2-section-head">
+                <div>
+                  <strong>{poolBracketPanel.label}</strong>
+                  <small>
+                    MW {poolBracketPanel.rangeLabel}
+                    {poolBracketBusy ? " · lädt…" : ` · ${sortedPoolBracketItems.length} Spieler`}
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button inline-button"
+                  onClick={() => setPoolBracketPanel(null)}
+                >
+                  Schließen
+                </button>
+              </div>
+              <div className="market-v2-context-table-shell">
+                <table className="team-table market-v2-context-table market-v2-pool-bracket-table">
+                  <thead>
+                    <tr>
+                      <th>Bild</th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "playerName" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("playerName")}>
+                          <span>Spieler</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "playerName" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "className" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("className")}>
+                          <span>Klasse</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "className" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "race" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("race")}>
+                          <span>Rasse</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "race" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "marketValue" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("marketValue")}>
+                          <span>MW</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "marketValue" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "salary" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("salary")}>
+                          <span>Gehalt</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "salary" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "fit" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("fit")}>
+                          <span>Fit</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "fit" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      <th>
+                        <button className={`sortable-header${poolBracketSort.key === "ovr" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("ovr")}>
+                          <span>OVR</span>
+                          <span className="sortable-arrow">{poolBracketSort.key === "ovr" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                        </button>
+                      </th>
+                      {MARKET_AXIS_ORDER.map((axis) => (
+                        <th key={`pool-bracket-head-${axis}`}>
+                          <button className={`sortable-header${poolBracketSort.key === axis ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort(axis)}>
+                            <span>{AXIS_META[axis].label}</span>
+                            <span className="sortable-arrow">{poolBracketSort.key === axis ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
+                          </button>
+                        </th>
+                      ))}
+                      <th aria-label="Aktion" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedPoolBracketItems.map((item) => {
+                      const portrait = getTransfermarktPortraitModel(item);
+                      const portraitThumb = appendMediaImageVariant(portrait.src, "thumb") ?? portrait.src;
+                      const portraitPreview = appendMediaImageVariant(portrait.src, "preview") ?? portrait.src;
+                      const fitInfo = getFitSignal(item);
+                      return (
+                        <tr
+                          className={`market-v2-pool-bracket-row${selectedPlayerId === item.playerId ? " is-selected" : ""}`}
+                          key={`pool-bracket-${item.playerId}`}
+                          title="Klick: Kandidat in der Liste fokussieren"
+                          onClick={() => focusPoolBracketPlayer(item)}
+                        >
+                          <td>
+                            <FoundationPlayerPortraitPreview
+                              playerId={item.playerId}
+                              name={item.name}
+                              portraitUrl={portraitPreview}
+                              portraitInitials={portrait.initials}
+                              playerOvr={item.ovr ?? null}
+                              playerMvs={item.mvs ?? null}
+                              pow={item.pow ?? null}
+                              spe={item.spe ?? null}
+                              men={item.men ?? null}
+                              soc={item.soc ?? null}
+                              leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                              variant="team"
+                              context="market"
+                              previewDensity="compact"
+                              playerClassName={item.className}
+                              subMeta={item.race}
+                              contextData={{
+                                market: {
+                                  fitDisplay: item.fitDisplay,
+                                  marketValue: formatTransfermarktCurrency(item.marketValue),
+                                  salary: formatTransfermarktCurrency(item.salary),
+                                  ratio: formatTransfermarktRatio(item.marketValueSalaryRatio),
+                                  needScore: item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : null,
+                                  ovr: item.ovr ?? null,
+                                  fitToneClass: getToneClass(fitInfo.tone),
+                                },
+                              }}
+                            >
+                              {portraitThumb ? (
+                                <OptimizedMediaImage
+                                  src={portraitThumb}
+                                  alt={item.name}
+                                  width={42}
+                                  height={42}
+                                  className="market-v2-roster-context-portrait"
+                                />
+                              ) : (
+                                <div className="market-v2-roster-context-placeholder">{portrait.initials}</div>
+                              )}
+                            </FoundationPlayerPortraitPreview>
+                          </td>
+                          <td>
+                            <button
+                              className="table-link-button market-v2-context-player"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                focusPoolBracketPlayer(item);
+                              }}
+                            >
+                              {item.name}
+                            </button>
+                          </td>
+                          <td>{item.className}</td>
+                          <td>{item.race}</td>
+                          <td>{formatTransfermarktCurrency(item.marketValue)}</td>
+                          <td>{formatTransfermarktCurrency(item.salary)}</td>
+                          <td>{item.fitDisplay}</td>
+                          <td>{formatCompactNumber(item.ovr, 0)}</td>
+                          {MARKET_AXIS_ORDER.map((axis) => (
+                            <td key={`pool-bracket-axis-${item.playerId}-${axis}`}>
+                              <span className={`market-v2-axis-chip ${AXIS_META[axis].className}`}>
+                                {formatCompactNumber(item[axis], 0)}
+                              </span>
+                            </td>
+                          ))}
+                          <td>
+                            <button
+                              className="secondary-button inline-button"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenPlayerDetails?.({ playerId: item.playerId });
+                              }}
+                            >
+                              Profil
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {!poolBracketBusy && sortedPoolBracketItems.length === 0 ? (
+                <EmptyState title="Keine Spieler in diesem Bracket" text="Der Marktpool enthält aktuell keine Free Agents in dieser MW-Klasse." />
+              ) : null}
+            </div>
+          ) : null}
           <p className="muted">
             Sichtbare Kandidaten {marketFeed?.poolAudit.visibleFeedCount ?? 0} · aktiver Marktpool{" "}
             {marketFeed?.poolAudit.activeFreeAgentCount ?? 0}
@@ -3677,522 +4530,47 @@ export default function TransfermarktV2Client({
         </article>
       </section>
 
-      {buyModalOpen ? (
-        <div className="foundation-modal-backdrop" onClick={closeBuyModal}>
-          <div className="foundation-modal transfer-buy-modal" ref={buyModalRef} onClick={(event) => event.stopPropagation()}>
-            <div className="foundation-modal-header">
-              <div>
-                <span className="market-v2-kicker">Kaufdialog</span>
-                <h3>{selectedPlayer?.name ?? "Spieler prüfen"}</h3>
-                <p className="muted">
-                  {selectedPlayer
-                    ? `${selectedPlayer.className} · ${selectedPlayer.race} · ${selectedPlayer.alignment || "ohne Fraktion"}`
-                    : buyModalWishlistEntry
-                      ? `${buyModalWishlistEntry.className} · ${buyModalWishlistEntry.race}`
-                      : "Bitte zuerst einen Kandidaten wählen."}
-                </p>
-              </div>
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Schließen
-              </button>
-            </div>
-
-            <div className="foundation-modal-body transfer-buy-modal-body" ref={buyModalBodyRef}>
-              <div className="transfer-buy-player-line">
-                <div className="transfer-modal-player-hero">
-                  {selectedPortrait?.src ? (
-                    <OptimizedMediaImage
-                      src={selectedPortrait.src}
-                      alt={modalPlayerName}
-                      width={72}
-                      height={72}
-                      className="transfermarkt-portrait"
-                    />
-                  ) : buyModalWishlistEntry ? (
-                    <OptimizedMediaImage
-                      src={getPlayerPortraitBrowserUrl(buyModalWishlistEntry.playerId)}
-                      alt={modalPlayerName}
-                      width={72}
-                      height={72}
-                      className="transfermarkt-portrait"
-                    />
-                  ) : (
-                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${modalPlayerName} placeholder`}>
-                      {(selectedPortrait?.initials ?? modalPlayerName.slice(0, 2)).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="transfer-modal-player-summary">
-                    <div className="transfer-modal-player-head">
-                      <strong>{modalPlayerName}</strong>
-                      <div className="transfer-modal-player-meta">
-                        <ClassIcon classNameValue={modalPlayerClass} showLabel={false} />
-                        <span className="muted">{modalPlayerClass}</span>
-                        <span className="muted">{modalPlayerRace}</span>
-                        <span className="pill">Bracket {modalPlayerBracket != null ? formatCompactNumber(modalPlayerBracket, 0) : "—"}</span>
-                        <span className="pill">{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team gewählt"}</span>
-                      </div>
-                    </div>
-                    <div className="transfer-modal-player-kpis">
-                      <article className="transfer-modal-kpi">
-                        <span>Marktwert</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerMarketValue)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Basisgehalt</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerSalary)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Aktuelle Forderung</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Zusage</span>
-                        <strong>{formatPercentLabel(buyPreview?.acceptChance)}</strong>
-                      </article>
-                    </div>
-                  </div>
-                </div>
-                <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
-                </span>
-              </div>
-
-              {previewBusy && !buyPreview ? (
-                <div className="transfer-feedback-banner">
-                  <strong>Kaufvorschau lädt</strong>
-                  <span>Forderung, Vertrag und Teamwirkung werden gerade berechnet.</span>
-                </div>
-              ) : null}
-              {previewError ? (
-                <div className="transfer-feedback-banner is-error">
-                  <strong>Vorschau blockiert</strong>
-                  <span>{previewError}</span>
-                </div>
-              ) : null}
-              {buySuccess ? (
-                <div className="transfer-feedback-banner is-success">
-                  <strong>Kauf erfolgreich</strong>
-                  <span>{buySuccess}</span>
-                </div>
-              ) : null}
-              {source !== "sqlite" ? (
-                <div className="transfer-feedback-banner is-info">
-                  <strong>Read-only</strong>
-                  <span>Hier kannst du alles prüfen, aber in diesem Modus keinen Kauf final schreiben.</span>
-                </div>
-              ) : null}
-              {priorBadExperienceActive ? (
-                <div className="transfer-feedback-banner is-warning">
-                  <strong>Spieler ist noch angefressen</strong>
-                  <span>
-                    {priorBadExperienceDemandEntry
-                      ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spuerbar schlechter.`
-                      : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
-                  </span>
-                </div>
-              ) : null}
-
-              <div className="transfer-modal-section">
-                <div className="transfer-callout-title">
-                  <strong>Vertrag</strong>
-                  <span className="muted">Die Forderung reagiert live auf Laufzeit, Form und Gehalt.</span>
-                </div>
-                <div className="transfer-negotiation-grid">
-                  <label className="filter-field">
-                    <span>Vertragslaenge</span>
-                    <select className="input" value={activeContractLength} onChange={(event) => {
-                      setBuyNegotiationOutcome(null);
-                      setContractLength(Number(event.target.value));
-                    }}>
-                      {[1, 2, 3, 4, 5].map((value) => (
-                        <option key={`modal-contract-${value}`} value={value}>
-                          {value} Saison{value > 1 ? "en" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="filter-field">
-                    <span>Vertragsform</span>
-                    <select className="input" value={activeContractShape} onChange={(event) => {
-                      setBuyNegotiationOutcome(null);
-                      setContractShape(event.target.value as ContractShape);
-                    }}>
-                      <option value="balanced">Ausgeglichen</option>
-                      <option value="front_loaded">Vorne schwer</option>
-                      <option value="back_loaded">Hinten schwer</option>
-                    </select>
-                  </label>
-                  <label className="filter-field">
-                    <span>Gehaltsangebot</span>
-                    <input
-                      className="input"
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={salaryEditedManually ? offeredSalary ?? "" : buyPreview?.offeredSalary ?? ""}
-                      placeholder="auto"
-                      onChange={(event) => {
-                        setBuyNegotiationOutcome(null);
-                        if (event.target.value === "") {
-                          setOfferedSalary(null);
-                          setSalaryEditedManually(false);
-                          return;
-                        }
-                        const next = Number(event.target.value);
-                        setOfferedSalary(Number.isFinite(next) ? next : null);
-                        setSalaryEditedManually(true);
-                      }}
-                    />
-                  </label>
-                  <label className="filter-field transfer-slider-field">
-                    <span>Gehaltsregler</span>
-                    <input
-                      type="range"
-                      min={modalSalarySliderMin}
-                      max={modalSalarySliderMax}
-                      step={0.1}
-                      value={Math.min(Math.max(modalOfferValue ?? modalSalarySliderMin, modalSalarySliderMin), modalSalarySliderMax)}
-                      onChange={(event) => {
-                        setBuyNegotiationOutcome(null);
-                        const next = Number(event.target.value);
-                        setOfferedSalary(Number.isFinite(next) && next >= 0 ? next : null);
-                        setSalaryEditedManually(true);
-                      }}
-                    />
-                    <small className="muted">
-                      Forderung {formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)} · Angebot {formatTransfermarktCurrency(modalOfferValue)}
-                    </small>
-                  </label>
-                </div>
-                <div className="transfer-negotiation-actions">
-                  <button className="secondary-button inline-button" type="button" onClick={resetBuyDemandFrame}>
-                    Auto-Angebot
-                  </button>
-                  <span className="muted">Auto-Angebot setzt Laufzeit, Form und Gehalt auf die aktuelle Spielerforderung zurueck.</span>
-                </div>
-                {buyNegotiationOutcome ? (
-                  <div className={`transfer-feedback-banner ${getNegotiationOutcomeToneClass(buyNegotiationOutcome.tone)}`} style={{ marginTop: 12 }}>
-                    <strong>{buyNegotiationOutcome.title}</strong>
-                    <span>{buyNegotiationOutcome.message}</span>
-                  </div>
-                ) : null}
-
-                <div className="transfer-callout is-info transfer-compact-feedback-callout">
-                  <div className="transfer-callout-title">
-                    <strong>Kompakt: Was er am Vertrag mag</strong>
-                    <span className="muted">schneller Check ohne Scrollen</span>
-                  </div>
-                  <div className="transfer-compact-feedback-grid">
-                    <div className="transfer-compact-feedback-column">
-                      <span className="muted">Passt gut</span>
-                      <div className="negotiation-factor-list">
-                        {compactNegotiationFeedback.likes.length ? (
-                          compactNegotiationFeedback.likes.map((entry) => (
-                            <span className="negotiation-factor is-positive" key={`buy-like-${entry}`}>
-                              {entry}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="negotiation-factor is-neutral">Noch kein klarer Pluspunkt sichtbar</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="transfer-compact-feedback-column">
-                      <span className="muted">Stoert ihn</span>
-                      <div className="negotiation-factor-list">
-                        {compactNegotiationFeedback.concerns.length ? (
-                          compactNegotiationFeedback.concerns.map((entry) => (
-                            <span className="negotiation-factor is-negative" key={`buy-concern-${entry}`}>
-                              {entry}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="negotiation-factor is-positive">Aktuell kein klarer Vertrags-Nachteil</span>
-                        )}
-                        {priorBadExperienceScoreEntry ? (
-                          <span className="negotiation-factor is-negative">
-                            {priorBadExperienceScoreEntry.label}: {priorBadExperienceScoreEntry.reason}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {contractPreference ? (
-                  <div className={`contract-preference-card is-${contractPreference.matchQuality}`}>
-                    <div>
-                      <span className="eyebrow">Spielerwunsch</span>
-                      <strong>{formatContractLengthPreference(contractPreference.lengthPreference)}</strong>
-                      <p className="muted">
-                        Wunschfenster {contractPreference.preferredMinLength}-{contractPreference.preferredMaxLength} Saisons · am liebsten{" "}
-                        {contractPreference.idealLength} · Form {formatContractShapeLabel(contractPreference.shapePreference)}
-                      </p>
-                      <p className="muted">
-                        {formatContractPreferenceCurrentStatus(
-                          contractPreference,
-                          activeContractLength,
-                          activeContractShape,
-                        )}
-                      </p>
-                    </div>
-                    <div className="contract-preference-impact">
-                      <span className={contractSalaryAdjustmentPct != null && contractSalaryAdjustmentPct <= 0 ? "positive-value" : "negative-value"}>
-                        {formatSignedPercentDelta(contractSalaryAdjustmentPct)} Gehalt
-                      </span>
-                      <span className={contractScoreAdjustment != null && contractScoreAdjustment >= 0 ? "positive-value" : "negative-value"}>
-                        {formatSignedPoints(contractScoreAdjustment)} Score
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="metric-grid compact">
-                  <article className="metric-card">
-                    <span>Basisforderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.baseExpectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Aktuelle Forderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Forderungsfaktor</span>
-                    <strong>{buyPreview?.demandMultiplier != null ? `${formatCompactNumber(buyPreview.demandMultiplier * 100, 0)}%` : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Angebotsquote</span>
-                    <strong>{buyPreview?.offerRatio != null ? formatCompactNumber(buyPreview.offerRatio, 2) : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Zusage-Score</span>
-                    <strong>{buyPreview?.acceptanceScore != null ? formatCompactNumber(buyPreview.acceptanceScore, 0) : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Zusage / Nachf. / Absage</span>
-                    <strong className="negotiation-chance-row">
-                      <span className="is-positive">{formatPercentLabel(buyPreview?.acceptChance)}</span>
-                      <span className="is-warning">{formatPercentLabel(buyPreview?.counterChance)}</span>
-                      <span className="is-negative">{formatPercentLabel(buyPreview?.rejectChance)}</span>
-                    </strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Buyout</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.buyoutCost ?? null)}</strong>
-                  </article>
-                  <article className={`metric-card${fitSalaryDiscountActive ? " is-fit-discount" : ""}`}>
-                    <span>Fit</span>
-                    <strong>
-                      {buyPreview?.teamFit != null ? formatCompactNumber(buyPreview.teamFit, 1) : "—"}
-                      {fitSalaryDiscountActive ? <small>-10% Gehalt am Ende</small> : null}
-                    </strong>
-                  </article>
-                </div>
-                {buyPreview?.demandBreakdown?.length ? (
-                  <div className="transfer-demand-breakdown">
-                    <div className="transfer-callout-title">
-                      <strong>So entsteht die Forderung</strong>
-                      <span className="muted">
-                        {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)}
-                      </span>
-                    </div>
-                    <ul className="warning-list negotiation-factor-list">
-                      {buyPreview.demandBreakdown.map((entry) => (
-                        <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                          <strong>{formatDemandPercent(entry.percent)}</strong>
-                          <span>{entry.label}: {entry.reason}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-
-              {buyPreview ? (
-                <>
-                  <div className="transfer-modal-section transfer-callout is-info">
-                    <div className="transfer-callout-title">
-                      <strong>Jahresplan</strong>
-                      <span className="muted">
-                        {formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · {buyPreview.contractLength} Saison{buyPreview.contractLength === 1 ? "" : "en"}
-                      </span>
-                    </div>
-                    {buyPreview.yearlySalarySchedule?.length ? (
-                      <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
-                        <div className="contract-schedule-row is-head" role="row">
-                          <span>Jahr</span>
-                          <span>Season</span>
-                          <span>Gehalt</span>
-                        </div>
-                        {buyPreview.yearlySalarySchedule.map((entry) => (
-                          <div className="contract-schedule-row" role="row" key={`${entry.label}-${entry.yearIndex}`}>
-                            <span>Jahr {entry.yearIndex}</span>
-                            <span>{entry.label}</span>
-                            <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
-                          </div>
-                        ))}
-                        <div className="contract-schedule-row is-total" role="row">
-                          <span>Summe</span>
-                          <span>Buyout {formatTransfermarktCurrency(buyPreview.buyoutCost ?? null)}</span>
-                          <strong>{formatTransfermarktCurrency(buyPreview.totalSalary ?? null)}</strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="muted">Noch kein Jahresplan verfuegbar.</p>
-                    )}
-                    <p className="muted" style={{ marginTop: 8 }}>
-                      Forderungsweg: Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · aktuelle Forderung{" "}
-                      {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Gesamtverschiebung {formatTransfermarktCurrency(marketAndFitDelta)}
-                      {fitSalaryDiscountActive ? " · Fit-Bonus zuletzt aktiv" : ""}
-                    </p>
-                  </div>
-
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Team-Auswirkung</strong>
-                      <span className="muted">Sofort sichtbar, final erst beim Abschluss</span>
-                    </div>
-                    <div className="metric-grid compact">
-                      <article className="metric-card">
-                        <span>Kaufpreis / Abloese</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.purchasePrice)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Cash vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.cashBefore)} / {formatTransfermarktCurrency(buyPreview.cashAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Kader vorher / nachher</span>
-                        <strong>{buyPreview.rosterBefore ?? "—"} / {buyPreview.rosterAfter ?? "—"}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Gehalt vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.salaryBefore)} / {formatTransfermarktCurrency(buyPreview.salaryAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>MW vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.marketValueBefore)} / {formatTransfermarktCurrency(buyPreview.marketValueAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Rolle</span>
-                        <strong>{buyPreview.promisedRole ?? "offen"}</strong>
-                      </article>
-                    </div>
-                  </div>
-
-                  <div className="transfer-buy-meta-grid">
-                    <div className="transfer-callout is-blocked">
-                      <div className="transfer-callout-title">
-                        <strong>Blocker</strong>
-                        <span className="muted">{buyPreview.blockingReasons.length}</span>
-                      </div>
-                      {buyPreview.blockingReasons.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.blockingReasons.map((reason) => (
-                            <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Keine blockierenden Gruende.</p>
-                      )}
-                    </div>
-                    <div className="transfer-callout is-warning">
-                      <div className="transfer-callout-title">
-                        <strong>Hinweise</strong>
-                        <span className="muted">{buyPreview.warnings.length}</span>
-                      </div>
-                      {buyPreview.warnings.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.warnings.map((warning) => (
-                            <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Keine Warnungen.</p>
-                      )}
-                    </div>
-                    <div className="transfer-callout is-info">
-                      <div className="transfer-callout-title">
-                        <strong>Warum der Deal so ausfällt</strong>
-                        <span className="muted">{buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren</span>
-                      </div>
-                      {buyPreview.negotiationScoreBreakdown?.length ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.negotiationScoreBreakdown.map((entry) => (
-                            <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                              <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
-                              <span>{entry.label}: {entry.reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Noch keine Score-Faktoren verfuegbar.</p>
-                      )}
-                      {buyPreview.negotiationReasons?.length ? (
-                        <>
-                          <p className="muted" style={{ marginTop: 8 }}>Treiber</p>
-                          <ul className="warning-list negotiation-factor-list">
-                            {buyPreview.negotiationReasons.map((reason) => (
-                              <li className="negotiation-factor is-positive" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                      {buyPreview.negotiationWarnings?.length ? (
-                        <>
-                          <p className="muted" style={{ marginTop: 8 }}>Risiken</p>
-                          <ul className="warning-list negotiation-factor-list">
-                            {buyPreview.negotiationWarnings.map((warning) => (
-                              <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className="muted transfer-empty-hint">
-                  Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.
-                </p>
-              )}
-            </div>
-
-            <div className="foundation-modal-actions">
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Abbrechen
-              </button>
-              <button
-                className={buyNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
-                type="button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status === "rejected"}
-                onClick={() => void negotiateBuy()}
-                title={
-                  source !== "sqlite"
-                    ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
-                    : !buyPreview?.canBuy
-                      ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                      : buyNegotiationOutcome?.status === "rejected"
-                        ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
-                        : "Verhandlung starten und Reaktion der Gegenseite prüfen."
-                }
-              >
-                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Verhandeln"}
-              </button>
-              <button
-                className="primary-button"
-                type="button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status !== "accepted"}
-                onClick={() => void confirmBuy()}
-                title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}
-              >
-                {buyBusy ? "kauft..." : "Kauf final abschließen"}
-              </button>
-            </div>
-            {finalBuyDisabledReason ? <p className="foundation-screen-action-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
-          </div>
-        </div>
-      ) : null}
+      <FoundationShellRouterMarketBuy
+        active={buyModalOpen}
+        hostProps={{
+          buyModalRef,
+          buyModalBodyRef,
+          source,
+          selectedTeam,
+          selectedPlayer,
+          buyModalWishlistEntry,
+          selectedPortrait,
+          selectedTeamCanManage,
+          selectedTeamId,
+          buyPreview,
+          previewBusy,
+          previewError,
+          buyBusy,
+          buySuccess,
+          buyNegotiationOutcome,
+          contractLength,
+          contractShape,
+          offeredSalary,
+          salaryEditedManually,
+          derivationsInput: {
+            source,
+            selectedTeamCanManage,
+            selectedTeamReadOnlyReason,
+            selectedTeamId,
+            previewBusy,
+            buyBusy,
+          },
+          onContractLengthChange: setContractLength,
+          onContractShapeChange: setContractShape,
+          onOfferedSalaryChange: setOfferedSalary,
+          onSalaryEditedManuallyChange: setSalaryEditedManually,
+          onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
+          closeBuyModal,
+          negotiateBuy,
+          confirmBuy,
+          resetBuyDemandFrame,
+        }}
+      />
     </section>
   );
 }

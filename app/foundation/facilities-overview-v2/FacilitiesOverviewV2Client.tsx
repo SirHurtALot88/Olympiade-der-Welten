@@ -22,25 +22,16 @@ export default function FacilitiesOverviewV2Client({
   facilityBudget,
   facilities,
   boardMessage,
-  onOpenClassicTraining,
-  onOpenHomeV2,
 }: FacilitiesOverviewV2ClientProps) {
   return (
     <div className="facilities-overview-v2-shell" data-testid="foundation-facilities-overview-v2" id="foundation-facilities-overview-v2">
       <header className="facilities-overview-v2-header">
         <div>
-          <span className="eyebrow">Facilities Overview V2</span>
+          <span className="eyebrow">Gebäude</span>
           <h2>{teamName}</h2>
-          <p className="muted">{teamCode} · Infrastruktur auf einen Blick</p>
+          <p className="home-v2-hero-meta-line">{teamCode}</p>
         </div>
-        <div className="facilities-overview-v2-actions">
-          <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
-            Home V2
-          </button>
-          <button type="button" className="secondary-button" onClick={onOpenClassicTraining}>
-            Training Classic
-          </button>
-        </div>
+        <div className="facilities-overview-v2-actions" />
       </header>
 
       <div className="facilities-overview-v2-top">
@@ -64,6 +55,17 @@ export default function FacilitiesOverviewV2Client({
             </div>
             <p className="muted">{facility.description}</p>
             <p>{facility.effectDescription}</p>
+            <div className="facilities-overview-v2-maintenance-card">
+              <span>Wartung / Saison</span>
+              <strong>{formatMoney(facility.upkeep)}</strong>
+            </div>
+            {facility.level < facility.maxLevel ? (
+              <div className="facilities-overview-v2-upgrade-preview">
+                <span>Upgrade Vorschau</span>
+                <strong>L{facility.level} → L{facility.level + 1}</strong>
+                <small>Stärkere Facility-Wirkung</small>
+              </div>
+            ) : null}
             <small>Wartung {formatMoney(facility.upkeep)}</small>
           </article>
         ))}

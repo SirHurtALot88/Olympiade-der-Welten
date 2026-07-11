@@ -108,3 +108,10 @@ export function buildAllTimeTableFromSnapshots(
       return left.teamName.localeCompare(right.teamName, "de");
     });
 }
+
+export function resolveSeasonSnapshotTeamRecords(snapshot: SeasonSnapshotRecord): SeasonSnapshotTeamRecord[] {
+  if (snapshot.teamSnapshots != null && snapshot.teamSnapshots.length > 0) {
+    return snapshot.teamSnapshots;
+  }
+  return snapshot.finalStandings ?? [];
+}

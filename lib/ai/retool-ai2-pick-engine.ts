@@ -288,7 +288,7 @@ export function buildRetoolAi2BudgetPlan(input: {
     10,
   );
   const rosterSize = Math.max(0, Math.round(input.rosterSize));
-  const playerMin = clamp(Math.round(Number(input.playerMin ?? input.teamIdentity?.playerMin) || (finances >= 7 ? 10 : 9)), 7, 12);
+  const playerMin = clamp(Math.round(Number(input.playerMin ?? input.teamIdentity?.playerMin) || (finances >= 7 ? 10 : 9)), 8, 12);
   const optimum = clamp(Math.round(Number(input.optimum ?? input.teamIdentity?.playerOpt) || Math.max(playerMin, finances >= 6 ? 11 : 10)), playerMin, 12);
   const missingToMin = Math.max(0, playerMin - rosterSize);
   const missingToOptimum = Math.max(0, optimum - rosterSize);
@@ -351,13 +351,33 @@ export function buildRetoolAi2BudgetPlan(input: {
       0.14 * trendUp01 +
       0.1 * (missingToMin <= 0 ? 1 : 0) +
       0.26 * clamp(salaryBurdenRatio / 0.45, 0, 1) -
-      0.14 * cashRunway01,
+      0.14 * cashRunway01 +
+      (salaryFactorCurrent < 1 ? (1 - salaryFactorCurrent) * 0.5 : 0),
     0,
     1,
   );
   const spendPostureScore = clamp(aggression01 - caution01, -1, 1);
-  const reservePolicy = spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
-  const reserveTarget = reservePolicy === "aggressive" ? reserveTargetMin : reservePolicy === "conservative" ? reserveTargetMax : reserveTargetBase;
+  let reservePolicy: "aggressive" | "balanced" | "conservative" =
+    spendPostureScore >= 0.22 ? "aggressive" : spendPostureScore <= -0.18 ? "conservative" : "balanced";
+  let reserveTargetMinScaled = reserveTargetMin;
+  let reserveTargetBaseScaled = reserveTargetBase;
+  let reserveTargetMaxScaled = reserveTargetMax;
+  const softCashRatio = clamp(0.25 + (finances / 10) * 0.5, 0.25, 0.75);
+  const cashToKnownSalaryRatio = rosterSalaryKnown > 0 ? cash / rosterSalaryKnown : cashRunwayRatio;
+  if (cashToKnownSalaryRatio > softCashRatio + 0.05 && missingToOptimum > 0) {
+    const hoardExcess = clamp((cashToKnownSalaryRatio - softCashRatio) / Math.max(softCashRatio, 0.01), 0, 1.5);
+    const relief = clamp(0.4 + hoardExcess * 0.45, 0.4, 0.85);
+    reserveTargetMinScaled = clamp(reserveTargetMin * (1 - relief), 3, reserveTargetMin);
+    reserveTargetBaseScaled = clamp(reserveTargetBase * (1 - relief), 4, reserveTargetBase);
+    reserveTargetMaxScaled = clamp(reserveTargetMax * (1 - relief), 5, reserveTargetMax);
+    reservePolicy = "aggressive";
+  }
+  const reserveTarget =
+    reservePolicy === "aggressive"
+      ? reserveTargetMinScaled
+      : reservePolicy === "conservative"
+        ? reserveTargetMaxScaled
+        : reserveTargetBaseScaled;
   const rawBudgetMax = cash;
   const allowedBudgetForSearch = clamp(rawBudgetMax - reserveTarget, 0, cash);
   const spendWindowFloor = clamp(cash - reserveTargetMax, 0, cash);
@@ -742,12 +762,13 @@ export function scoreFormColorStackPenalty(input: { needState: TeamNeedState; ca
   const identityRelief = formAxis === input.needState.topAxis ? 0.78 : formAxis === input.needState.secondAxis ? 0.88 : 1;
   const realHoleRelief = clamp(Number(input.marginalGain?.bestDisciplineGain01 ?? 0) / 0.86, 0, 0.55);
   const diversityPressure = clamp(
-    input.needState.formColorDiversityNeed01 + missingTargetColors.length * 0.18 + Math.max(0, afterShare - 0.42) * 1.4,
+    input.needState.formColorDiversityNeed01 + missingTargetColors.length * 0.23 + Math.max(0, afterShare - 0.42) * 1.82,
     0,
     1,
   );
-  const penalty = (overTarget * 8.5 + afterShare * 24) * diversityPressure * identityRelief * (1 - realHoleRelief * 0.35);
-  return round(clamp(penalty, 0, 56), 4);
+  const overloadMultiplier = afterShare >= 0.65 ? 1.5 : 1.0;
+  const penalty = (overTarget * 8.5 + afterShare * 24) * diversityPressure * identityRelief * (1 - realHoleRelief * 0.35) * overloadMultiplier;
+  return round(clamp(penalty, 0, 72), 4);
 }
 
 export function scoreInAxisHoleCompletion(input: { needState: TeamNeedState; marginalGain: MarginalNeedGain }) {

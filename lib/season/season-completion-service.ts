@@ -1,9 +1,8 @@
 import type { CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service";
 import {
-  CASH_PRIZE_APPLY_CONFIRM_TOKEN,
-  executeCashPrizeApply,
   previewCashPrizeApply,
 } from "@/lib/season/cash-prize-apply-service";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { runWithSaveRecovery } from "@/lib/persistence/atomic-save-write";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -12,6 +11,7 @@ import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season
 import {
   applyTeamSeasonObjectiveRewards,
 } from "@/lib/board/team-season-objectives-service";
+import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -30,7 +30,7 @@ export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" | "blocked" | "skipped";
 
 export type SeasonCompletionStep = {
-  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "relationships" | "snapshot" | "transition" | "ai_audit";
+  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "sponsor_settlement" | "relationships" | "snapshot" | "transition" | "ai_audit";
   label: string;
   status: SeasonCompletionStepStatus;
   warnings: string[];
@@ -201,68 +201,98 @@ async function runLocalSeasonCompletionUnsafe(
 
   const existingCashLog =
     (initialSave.gameState.seasonState.cashPrizeApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
-  const cashApply =
-    !dryRun && blockingReasons.size === 0 && !existingCashLog
-      ? await executeCashPrizeApply(
-          {
-            saveId: initialSave.saveId,
-            seasonId,
-            matchdayId,
-            source,
-            phase: "season_end",
-            execute: true,
-            dryRun: false,
-            confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
-          },
-          persistence,
-        )
-      : await previewCashPrizeApply(
-          {
-            saveId: initialSave.saveId,
-            seasonId,
-            matchdayId,
-            source,
-            phase: "season_end",
-            dryRun: true,
-            execute: false,
-          },
-          persistence,
-        );
-  if (!existingCashLog && (!cashApply.ok || (!dryRun && !cashApply.applied))) {
-    cashApply.blockingReasons.forEach((reason) => blockingReasons.add(reason));
+  const cashApply = await previewCashPrizeApply(
+    {
+      saveId: initialSave.saveId,
+      seasonId,
+      matchdayId,
+      source,
+      phase: "season_end",
+      dryRun: true,
+      execute: false,
+    },
+    persistence,
+  );
+  if (existingCashLog) {
+    warnings.add("legacy_cash_prize_apply_log_present_benchmark_only_mode");
   }
   addStep(
     steps,
     {
       key: "cash_apply",
-      label: "Preisgeld",
-      status: existingCashLog ? "already_done" : cashApply.applied ? "applied" : cashApply.canApply ? "planned" : "blocked",
-      warnings: cashApply.warnings,
-      blockingReasons: existingCashLog ? [] : cashApply.blockingReasons,
-      auditId: existingCashLog?.id ?? cashApply.auditLogId,
+      label: "Preisgeld-Benchmark",
+      status: existingCashLog ? "already_done" : cashApply.canApply ? "planned" : "skipped",
+      warnings: [...cashApply.warnings, ...(existingCashLog ? ["legacy_cash_prize_apply_log_present"] : [])],
+      blockingReasons: [],
+      auditId: existingCashLog?.id ?? null,
     },
     warnings,
     blockingReasons,
   );
 
   const afterCashSave = resolveLocalSave(persistence, initialSave.saveId);
-  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
+  const sponsorSettlementPreview = previewSponsorSettlement(afterCashSave.gameState, "season_end");
+  const existingSponsorEndPayout =
+    (afterCashSave.gameState.seasonState.sponsorPayoutLogs ?? []).some(
+      (log) => log.seasonId === seasonId && log.phase === "season_end",
+    ) ?? false;
+  const shouldApplySponsorSettlement =
+    !dryRun && blockingReasons.size === 0 && !existingSponsorEndPayout;
+  const sponsorSettlementApply = shouldApplySponsorSettlement
+    ? applySponsorSettlement({
+        gameState: afterCashSave.gameState,
+        saveId: afterCashSave.saveId,
+        phase: "season_end",
+        execute: true,
+        deductSalary: true,
+      })
+    : { gameState: afterCashSave.gameState, preview: sponsorSettlementPreview, applied: false };
+  if (shouldApplySponsorSettlement && !sponsorSettlementApply.applied && sponsorSettlementPreview.canApply) {
+    sponsorSettlementPreview.blockingReasons.forEach((reason) => blockingReasons.add(`sponsor_settlement:${reason}`));
+  }
+  if (shouldApplySponsorSettlement && sponsorSettlementApply.applied) {
+    persistence.saveSingleplayerState(afterCashSave.saveId, sponsorSettlementApply.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "sponsor_settlement",
+      label: "Sponsor-Abrechnung",
+      status: existingSponsorEndPayout
+        ? "already_done"
+        : sponsorSettlementApply.applied
+          ? "applied"
+          : sponsorSettlementPreview.canApply
+            ? "planned"
+            : "skipped",
+      warnings: sponsorSettlementPreview.warnings,
+      blockingReasons: sponsorSettlementPreview.blockingReasons,
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterSponsorSave = sponsorSettlementApply.applied
+    ? resolveLocalSave(persistence, initialSave.saveId)
+    : afterCashSave;
+  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
     saveId: afterCashSave.saveId,
     seasonId,
     execute: false,
   });
   const existingObjectiveRewardLog =
-    (afterCashSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+    (afterSponsorSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
   const shouldApplyObjectiveRewards = !dryRun && blockingReasons.size === 0 && !existingObjectiveRewardLog;
   const objectiveRewardApply = shouldApplyObjectiveRewards
-    ? applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
-        saveId: afterCashSave.saveId,
+    ? applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
+        saveId: afterSponsorSave.saveId,
         seasonId,
         execute: true,
       })
     : objectiveRewardPreview;
   if (shouldApplyObjectiveRewards && objectiveRewardApply.applied) {
-    persistence.saveSingleplayerState(afterCashSave.saveId, objectiveRewardApply.gameState);
+    persistence.saveSingleplayerState(afterSponsorSave.saveId, objectiveRewardApply.gameState);
   }
   addStep(
     steps,
@@ -284,7 +314,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterCashSave;
+  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterSponsorSave;
   const relationshipApply = upsertTeamRelationshipEvents(afterObjectiveSave.gameState);
   const existingRelationshipEvents = afterCashSave.gameState.seasonState.teamRelationshipEvents ?? [];
   const existingRelationshipIds = new Set(existingRelationshipEvents.map((event) => event.eventId));
@@ -398,7 +428,7 @@ async function runLocalSeasonCompletionUnsafe(
   const applied = !dryRun && blockingList.length === 0;
   if (applied) {
     const latestSave = resolveLocalSave(persistence, initialSave.saveId);
-    persistence.saveSingleplayerState(latestSave.saveId, {
+    persistGameStateWithMaterializedDerivations(persistence, latestSave.saveId, {
       ...latestSave.gameState,
       seasonReviewState: buildSeasonConsequencesReviewState({
         previousState: latestSave.gameState.seasonReviewState,

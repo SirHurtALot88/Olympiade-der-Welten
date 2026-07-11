@@ -1,5 +1,6 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
-import { getAiManagerMarketSpendableCash } from "@/lib/ai/ai-manager-apply-service";
+import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
+import { getAiManagerMarketSpendableCash, resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { ContractShape, GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -14,6 +15,7 @@ import {
   createLocalTransfermarktRunContext,
   listLocalTransfermarktFreeAgents,
   previewLocalTransfermarktBuy,
+  type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { listTransfermarktFreeAgents } from "@/lib/market/transfermarkt-read-service";
 import {
@@ -23,11 +25,21 @@ import {
   normalizeTransfermarktToken,
 } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
+import {
+  annotateBuyRecommendations,
+  loadDoctrineContext,
+  resolveTeamReplacementSlots,
+} from "@/lib/ai/ai-transfer-plan-enrichment";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { recordBuyPreview } from "@/lib/ai/transfer-window-profiler";
 import {
   buildTeamThemeCompositionRuntimeContext,
   calculateThemeCompositionScore,
+  getHardFocusIdentityBlockReason,
   getTeamThemeCompositionTarget,
+  isFemaleGenderPlayer,
+  isHumanoidForGenderQuota,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 
@@ -44,9 +56,28 @@ export type AiTransferPreviewParams = {
   excludedPlayerIds?: string[] | null;
   limit?: number | null;
   fullScoringLimit?: number | null;
+  /** Picks/planner: budget-only stage-0 over full FA feed. Default strategic funnel for TM board. */
+  candidateScopeMode?: AiPreviewCandidateScopeMode | null;
   buyNeedOnly?: boolean | null;
   forceBuyScanTeamIds?: string[] | null;
+  /** Reuse in-memory save during batch runs (draft / transfer window) to skip disk reloads. */
+  localRunContext?: LocalTransfermarktRunContext | null;
 };
+
+export type AiPreviewCandidateScopeMode = "strategic" | "budget_wide";
+
+/** Full-score cap for budget_wide when caller does not pass fullScoringLimit. */
+export const AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING = 480;
+
+/**
+ * Corrected note (see resolveBudgetWideMwFloor below): an earlier version of this fix tried to
+ * bound the "budget_wide" base feed via a plain item-count `limit`. That was wrong —
+ * buildAiPreviewFreeAgentSlice/buildDiverseFreeAgentSlice always sort ascending by market value
+ * and fill bottom-up, so ANY item-count limit well short of the full pool systematically excludes
+ * Core/Star tiers (they sit in the top ~13-36% by MW). Raising the limit from 250/400 to
+ * 900-1400 out of ~2984 just produced a bigger pile of cheap players — it did not fix the
+ * original Core/Star representation bug. Replaced by an MW-band preset instead (below).
+ */
 
 export type AiTransferPreviewRecommendation = {
   playerId: string;
@@ -79,6 +110,14 @@ export type AiTransferPreviewRecommendation = {
   fitNotes: string[];
   riskNotes: string[];
   strategyNotes: string[];
+  buyIntentScore?: number | null;
+  passIntentScore?: number | null;
+  replacementFitScore?: number | null;
+  strategicBuyScore?: number | null;
+  buyDecisionLabel?: string | null;
+  replacementSlotId?: string | null;
+  reasonToBuy?: string[];
+  reasonToPass?: string[];
 };
 
 export type AiTransferPreviewSkippedTarget = {
@@ -161,13 +200,54 @@ type ResolvedPreviewContext = {
   saveId: string;
   seasonId: string;
   gameState: GameState;
-  localRunContext?: ReturnType<typeof createLocalTransfermarktRunContext> | null;
+  localRunContext?: LocalTransfermarktRunContext | null;
 };
 
 type RosterEntry = GameState["rosters"][number];
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Presets the MW band for a "budget_wide" planner scan from the team's own depth signal
+ * (rosterGap / budgetPressure from evaluateAiNeeds, plus current cash), instead of an item-count
+ * `limit`.
+ *
+ * Passing `minMarketValue`/`maxMarketValue` to listLocalTransfermarktFreeAgents takes a different
+ * code path than `limit`: it skips buildAiPreviewFreeAgentSlice entirely and returns EVERY item
+ * inside the band (see `useUnboundedFilteredPool` in transfermarkt-local-service.ts) — so, unlike
+ * an item-count limit, it never truncates Core/Star tiers out from the bottom up.
+ *
+ * - Team at/above Opt with cash to spare (low pressure): only doing opportunistic upgrades, has no
+ *   use for the ~60-70% of the pool sitting in reserve/backup/depth territory — floor moves up to
+ *   just below the "core" bracket; ceiling stays uncapped (a rich, healthy team legitimately might
+ *   go for Superstar tier).
+ * - Team below Opt or cash-constrained (high pressure): still needs the full low-end spread
+ *   (reserve/backup/depth/core), so floor stays at 0 — but it realistically can't afford Superstar
+ *   tier this window either, so the ceiling is capped to a generous multiple of current cash
+ *   (aspirational headroom for saving up), rather than loading the whole pool up to MW 110+.
+ */
+function resolveBudgetWideMwBand(input: {
+  needs: { rosterGap: number; budgetPressure: number } | null;
+  cash: number | null;
+}): { minMarketValue: number | null; maxMarketValue: number | null } {
+  if (!input.needs) return { minMarketValue: 0, maxMarketValue: null };
+  const pressure = clamp((input.needs.rosterGap + input.needs.budgetPressure) / 2, 0, 1);
+  const CASH_HEALTHY_UPGRADE_ONLY_THRESHOLD = 0.15;
+  const CASH_CONSTRAINED_ASPIRATIONAL_HEADROOM_MULTIPLIER = 2.5;
+  const CASH_CONSTRAINED_MAX_CEILING_MW = 90;
+
+  if (pressure <= CASH_HEALTHY_UPGRADE_ONLY_THRESHOLD) {
+    const coreFloorMw = MARKET_BRACKET_DEFINITIONS.find((entry) => entry.lane === "core")?.minMw ?? 30;
+    return { minMarketValue: Math.max(0, coreFloorMw - 2), maxMarketValue: null };
+  }
+
+  const cashCeiling =
+    input.cash != null && Number.isFinite(input.cash) && input.cash > 0
+      ? Math.min(CASH_CONSTRAINED_MAX_CEILING_MW, input.cash * CASH_CONSTRAINED_ASPIRATIONAL_HEADROOM_MULTIPLIER)
+      : null;
+  return { minMarketValue: 0, maxMarketValue: cashCeiling };
 }
 
 function roundValue(value: number, digits = 1) {
@@ -311,14 +391,57 @@ function normalizeGameState(gameState: GameState) {
   return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(gameState));
 }
 
-function getBudgetStatus(team: Team) {
-  if (!Number.isFinite(team.cash) || !Number.isFinite(team.budget) || team.budget <= 0) {
+export function resolveBudgetReference(input: {
+  team: Team;
+  salaryTotal?: number;
+  marketSpendableCash?: number | null;
+}) {
+  const cash = typeof input.team.cash === "number" && Number.isFinite(input.team.cash) ? input.team.cash : 0;
+  const salaryTotal = Math.max(0, input.salaryTotal ?? 0);
+  const salaryRunway = salaryTotal > 0 ? salaryTotal * 4 : 0;
+  const spendableAnchor =
+    typeof input.marketSpendableCash === "number" && Number.isFinite(input.marketSpendableCash)
+      ? Math.max(cash, input.marketSpendableCash)
+      : cash;
+  const rawReference = Math.max(salaryRunway, spendableAnchor, cash > 0 ? cash : 1);
+  const startBudget = typeof input.team.budget === "number" && Number.isFinite(input.team.budget) && input.team.budget > 0 ? input.team.budget : null;
+  if (startBudget == null) {
+    return Math.max(rawReference, 1);
+  }
+  if (cash >= startBudget * 0.45) {
+    return Math.max(rawReference, startBudget, 1);
+  }
+  return Math.max(rawReference, 1);
+}
+
+export function getBudgetStatus(
+  team: Team,
+  context?: {
+    salaryTotal?: number;
+    identityFinances?: number | null;
+    marketSpendableCash?: number | null;
+  },
+) {
+  const cash = team.cash;
+  if (!Number.isFinite(cash)) {
     return "unknown" as const;
   }
 
-  const ratio = team.cash / team.budget;
-  if (ratio <= 0.18) return "critical" as const;
-  if (ratio <= 0.4) return "tight" as const;
+  const referenceBudget = resolveBudgetReference({
+    team,
+    salaryTotal: context?.salaryTotal,
+    marketSpendableCash: context?.marketSpendableCash,
+  });
+  if (referenceBudget <= 0) {
+    return "unknown" as const;
+  }
+
+  const ratio = cash / referenceBudget;
+  const finances = context?.identityFinances ?? 5;
+  const criticalThreshold = finances >= 8 ? 0.2 : 0.18;
+  const tightThreshold = finances >= 8 ? 0.42 : 0.4;
+  if (ratio <= criticalThreshold) return "critical" as const;
+  if (ratio <= tightThreshold) return "tight" as const;
   return "healthy" as const;
 }
 
@@ -678,6 +801,16 @@ function isAiReserveCandidate(item: TransfermarktFreeAgentItem) {
   return getAiPreviewMarketValue(item) < AI_RESERVE_MARKET_VALUE_CAP;
 }
 
+// Teams mit weiblicher Pflicht-Identitaet brauchen einen breiten Pool weiblicher Humanoide,
+// damit die Frauen-Quote (z.B. D-P: >=65% Frauen unter Humanoiden) sauber erfuellt werden kann.
+const FEMALE_IDENTITY_TEAM_CODES = new Set(["D-P", "N-N", "V-D"]);
+
+function isFemaleIdentityTeam(teamId: string) {
+  return FEMALE_IDENTITY_TEAM_CODES.has(String(teamId ?? "").trim().toUpperCase());
+}
+
+const FEMALE_IDENTITY_COVERAGE_LIMIT = 60;
+
 function matchesStrategicStageZeroGate(input: {
   item: TransfermarktFreeAgentItem;
   weakestAxes: Array<"pow" | "spe" | "men" | "soc">;
@@ -840,6 +973,67 @@ function buildStrategicAiPreviewScope(input: {
   };
 }
 
+export function buildBudgetWideAffordableScope(input: {
+  baseFreeAgents: TransfermarktFreeAgentItem[];
+  marketValueSortedAsc?: boolean;
+  spendableCash: number;
+  globallyExcludedPlayerIds: Set<string>;
+  recentlySoldPlayerIds: Set<string>;
+  onScan?: (item: TransfermarktFreeAgentItem) => void;
+}) {
+  const candidates: TransfermarktFreeAgentItem[] = [];
+  const stage0SkippedTargets: AiTransferPreviewSkippedTarget[] = [];
+  const budget = Math.max(0, input.spendableCash);
+
+  for (const item of input.baseFreeAgents) {
+    if (input.globallyExcludedPlayerIds.has(item.playerId)) continue;
+    if (input.recentlySoldPlayerIds.has(item.playerId)) continue;
+    if (item.marketValue == null || item.salary == null) continue;
+    if (item.marketValue > budget) {
+      if (stage0SkippedTargets.length < 5) {
+        stage0SkippedTargets.push({
+          playerId: item.playerId,
+          name: item.name,
+          reason: "insufficient_cash",
+          blockingReasons: ["insufficient_cash"],
+        });
+      }
+      if (input.marketValueSortedAsc) {
+        break;
+      }
+      continue;
+    }
+    input.onScan?.(item);
+    candidates.push(item);
+  }
+
+  return {
+    candidates,
+    stage0SkippedTargets,
+    affordableCount: candidates.length,
+  };
+}
+
+function resolveRoughShortlistLimit(input: {
+  candidateScopeMode: AiPreviewCandidateScopeMode;
+  scopedCount: number;
+  limit: number;
+  fullScoringLimit: number | null;
+  rosterStatus: AiTransferPreviewTeamEntry["rosterStatus"];
+}) {
+  if (input.candidateScopeMode === "budget_wide") {
+    const cap = input.fullScoringLimit ?? AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING;
+    return Math.min(input.scopedCount, Math.max(120, cap));
+  }
+  if (input.fullScoringLimit != null) {
+    return Math.min(input.scopedCount, input.fullScoringLimit);
+  }
+  if (input.limit >= input.scopedCount) {
+    return Math.min(input.scopedCount, Math.max(72, Math.ceil(input.scopedCount * 0.12)));
+  }
+  return Math.max(16, Math.min(24, input.limit));
+}
+
 function enrichCandidateForTeam(input: {
   context: ResolvedPreviewContext;
   team: Team;
@@ -965,6 +1159,17 @@ async function resolvePreviewContext(params: AiTransferPreviewParams): Promise<R
     };
   }
 
+  const runContext = params.localRunContext ?? null;
+  if (runContext?.save) {
+    return {
+      source,
+      saveId: runContext.save.saveId,
+      seasonId: runContext.save.gameState.season.id,
+      gameState: normalizeGameState(ensureLeagueMarketValueSnapshot(runContext.save.gameState)),
+      localRunContext: runContext,
+    };
+  }
+
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
   const requestedSave = params.saveId ? persistence.getSaveById(params.saveId) : null;
@@ -984,7 +1189,7 @@ async function resolvePreviewContext(params: AiTransferPreviewParams): Promise<R
     source,
     saveId: save.saveId,
     seasonId: save.gameState.season.id,
-    gameState: normalizeGameState(save.gameState),
+    gameState: normalizeGameState(ensureLeagueMarketValueSnapshot(save.gameState)),
     localRunContext: createLocalTransfermarktRunContext({ persistence, save }),
   };
 }
@@ -1036,6 +1241,10 @@ function buildCandidatePreview(
     if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
     if (rosterBefore != null && rosterBefore >= team.rosterLimit) blockingReasons.push("roster_limit_reached");
     if (cashBefore != null && purchasePrice != null && cashBefore < purchasePrice) blockingReasons.push("insufficient_cash");
+    if (player) {
+      const identityHardBlock = getHardFocusIdentityBlockReason(team.shortCode || team.teamId, player);
+      if (identityHardBlock) blockingReasons.push(identityHardBlock);
+    }
 
     const canBuy = blockingReasons.length === 0;
     return {
@@ -1239,9 +1448,14 @@ function scoreCandidate(input: {
       })
     : null;
   const themeBoost = themeComposition ? clamp(themeComposition.themeCompositionScore / 100, -0.32, 0.42) : 0;
+  // Quoten-Identitaet (H-R Demon-Mindestquote, D-P/V-D Frauen-Mindestquote): dominanter, NICHT
+  // geclampter Floor-Delta, damit die Mindestquote nicht vom Quality/Need-Scoring ueberstimmt wird.
+  // Soft by design – ein Verletzer faellt nur ans Score-Ende, wird aber nie hart geblockt.
+  const identityFloorBoost = themeComposition?.identityFloorAdjustment ?? 0;
 
   const rawScore =
     0.18 +
+    identityFloorBoost +
     rosterNeedBonus * 0.18 +
     axisNeedScore * 0.18 +
     disciplineNeedScore * 0.1 +
@@ -1270,6 +1484,12 @@ function scoreCandidate(input: {
   const fitNotes: string[] = [];
   const riskNotes: string[] = [];
   const blockingReasons = [...preview.blockingReasons];
+  if (player) {
+    const identityHardBlock = getHardFocusIdentityBlockReason(input.team.shortCode || input.team.teamId, player);
+    if (identityHardBlock && !blockingReasons.includes(identityHardBlock)) {
+      blockingReasons.push(identityHardBlock);
+    }
+  }
 
   if (preferredRaceHits > 0) strategyNotes.push(`passt zur Wunsch-Rasse ${item.race}`);
   if (themeComposition && getTeamThemeCompositionTarget(input.team)) {
@@ -1446,6 +1666,8 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
   const contextResolvedAt = Date.now();
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const limit = typeof params.limit === "number" && Number.isFinite(params.limit) ? Math.max(10, Math.round(params.limit)) : 90;
+  const candidateScopeMode: AiPreviewCandidateScopeMode =
+    params.candidateScopeMode === "budget_wide" ? "budget_wide" : "strategic";
   const globallyExcludedPlayerIds = new Set((params.excludedPlayerIds ?? []).filter(Boolean));
   const currentMatchdayRosterRequirement = getCurrentMatchdayRosterRequirement(context.gameState);
 
@@ -1465,14 +1687,27 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     return control?.controlMode === "ai";
   });
 
+  const budgetWideMwBand =
+    candidateScopeMode === "budget_wide"
+      ? resolveBudgetWideMwBand({
+          needs: requestedTeam ? evaluateAiNeeds(context.gameState, requestedTeam.teamId) : null,
+          cash: requestedTeam?.cash ?? null,
+        })
+      : null;
   const baseFeedStartedAt = Date.now();
   const baseFreeAgentFeed =
     context.source === "sqlite"
       ? listLocalTransfermarktFreeAgents({
           saveId: context.saveId,
           seasonId: context.seasonId,
-          limit: Math.max(context.gameState.players.length, 5000),
           mode: "ai_preview",
+          fullPool: false,
+          // budget_wide: minMarketValue/maxMarketValue trigger the unbounded/unsliced pool path
+          // (no cheap-first bias) — exhaustive within the band, just narrower than the whole pool
+          // when the team demonstrably has no use for one end of it (see resolveBudgetWideMwBand).
+          minMarketValue: candidateScopeMode === "budget_wide" ? budgetWideMwBand?.minMarketValue ?? null : null,
+          maxMarketValue: candidateScopeMode === "budget_wide" ? budgetWideMwBand?.maxMarketValue ?? null : null,
+          limit: candidateScopeMode === "budget_wide" ? undefined : Math.max(120, params.limit ?? 250),
           localRunContext: context.localRunContext,
         })
       : null;
@@ -1539,9 +1774,6 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         playerMin: directPlayerMin > 0 ? directPlayerMin : null,
         playerOpt: directPlayerOpt > 0 ? directPlayerOpt : null,
       });
-      const effectiveMarketCash = getAiManagerMarketSpendableCash(context.gameState, team.teamId, team.cash);
-      const budgetTeam = { ...team, cash: effectiveMarketCash ?? team.cash };
-      const budgetStatus = getBudgetStatus(budgetTeam);
       const forceBuyScanTeamIds = new Set(params.forceBuyScanTeamIds ?? []);
       const shouldDeepScanBuyCandidates =
         requestedTeam != null ||
@@ -1574,6 +1806,20 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
         playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
       });
+      const effectiveMarketCash = resolveMarketSpendableCashForPlanner({
+        gameState: context.gameState,
+        teamId: team.teamId,
+        teamCash: team.cash,
+        rosterBelowMin: rosterStatus === "under_min" || directRosterStatus === "under_min",
+        forceRosterFill: forceBuyScanTeamIds.has(team.teamId),
+      });
+      const budgetTeam = { ...team, cash: effectiveMarketCash ?? team.cash };
+      const rosterSalaryTotal = teamRosterEntries.reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
+      const budgetStatus = getBudgetStatus(budgetTeam, {
+        salaryTotal: rosterSalaryTotal,
+        identityFinances: identity?.finances ?? null,
+        marketSpendableCash: effectiveMarketCash,
+      });
       const weakestAxes = needs.uncoveredNeedAxes.slice(0, 2);
       const warnings: string[] = [];
 
@@ -1600,6 +1846,22 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                 if (teamRosterEntries.length >= team.rosterLimit || spendableCash <= 0) {
                   return [];
                 }
+                const recentlySoldPlayerIds = recentlySoldByTeamPlayer.get(team.teamId) ?? new Set<string>();
+                const onScan = () => {
+                  debugPerformance.candidateScans += 1;
+                };
+                if (candidateScopeMode === "budget_wide") {
+                  const budgetScope = buildBudgetWideAffordableScope({
+                    baseFreeAgents,
+                    marketValueSortedAsc: true,
+                    spendableCash,
+                    globallyExcludedPlayerIds,
+                    recentlySoldPlayerIds,
+                    onScan,
+                  });
+                  stage0SkippedTargets.push(...budgetScope.stage0SkippedTargets);
+                  return budgetScope.candidates;
+                }
                 const strategicScope = buildStrategicAiPreviewScope({
                   baseFreeAgents,
                   marketValueSortedAsc: true,
@@ -1615,10 +1877,8 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                   objectiveBias,
                   rosterStatus,
                   globallyExcludedPlayerIds,
-                  recentlySoldPlayerIds: recentlySoldByTeamPlayer.get(team.teamId) ?? new Set<string>(),
-                  onScan: () => {
-                    debugPerformance.candidateScans += 1;
-                  },
+                  recentlySoldPlayerIds,
+                  onScan,
                 });
                 stage0SkippedTargets.push(...strategicScope.stage0SkippedTargets);
                 return strategicScope.candidates;
@@ -1637,12 +1897,13 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         warnings.push(`aktueller Spieltag braucht ${Math.min(currentMatchdayRosterRequirement, team.rosterLimit)} aktive Slots`);
       }
 
-      const roughShortlistLimit =
-        fullScoringLimit != null
-          ? Math.min(scopedFreeAgents.length, fullScoringLimit)
-          : limit >= scopedFreeAgents.length
-            ? Math.min(scopedFreeAgents.length, Math.max(72, Math.ceil(scopedFreeAgents.length * 0.12)))
-            : Math.max(16, Math.min(24, limit));
+      const roughShortlistLimit = resolveRoughShortlistLimit({
+        candidateScopeMode,
+        scopedCount: scopedFreeAgents.length,
+        limit,
+        fullScoringLimit,
+        rosterStatus,
+      });
       const roughShortlistStartedAt = Date.now();
       const roughShortlist =
         context.source === "sqlite"
@@ -1665,6 +1926,16 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                 selected.set(entry.item.playerId, entry.item);
               }
 
+              if (candidateScopeMode === "budget_wide") {
+                let cheapFillAdded = 0;
+                for (const item of scopedFreeAgents) {
+                  if (cheapFillAdded >= 240) break;
+                  if (!isAiCheapFillCandidate(item)) continue;
+                  selected.set(item.playerId, item);
+                  cheapFillAdded += 1;
+                }
+              }
+
               const addShortlistCoverage = (items: TransfermarktFreeAgentItem[], maxCount: number) => {
                 for (const item of items.slice(0, Math.max(0, maxCount))) {
                   selected.set(item.playerId, item);
@@ -1675,11 +1946,16 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
               // Coverage is drawn from price, ratio, need axes and discipline needs so every pick lane can still surface.
               const cheapCoverageLimit = Math.min(
                 scopedFreeAgents.length,
-                rosterStatus === "under_min"
-                  ? Math.max(32, Math.ceil(roughShortlistLimit * 1.25))
-                  : Math.max(24, Math.ceil(roughShortlistLimit * 1.1)),
+                candidateScopeMode === "budget_wide"
+                  ? Math.max(160, Math.ceil(roughShortlistLimit * 0.45))
+                  : rosterStatus === "under_min"
+                    ? Math.max(32, Math.ceil(roughShortlistLimit * 1.25))
+                    : Math.max(24, Math.ceil(roughShortlistLimit * 1.1)),
               );
-              const coverageChunk = Math.max(5, Math.ceil(cheapCoverageLimit / 4));
+              const coverageChunk =
+                candidateScopeMode === "budget_wide"
+                  ? Math.max(24, Math.ceil(cheapCoverageLimit / 6))
+                  : Math.max(5, Math.ceil(cheapCoverageLimit / 4));
               addShortlistCoverage(
                 [...scopedFreeAgents].sort((left, right) => {
                   const priceDelta =
@@ -1723,6 +1999,36 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                   }),
                 coverageChunk,
               );
+
+              // Frauen-Identitaets-Teams (z.B. D-P): zusaetzlich bezahlbare weibliche Humanoide
+              // aus dem GESAMTEN Free-Agent-Pool beimischen, damit die Frauen-Quote nicht an
+              // einem zu engen Kandidaten-Frame scheitert.
+              if (isFemaleIdentityTeam(team.teamId)) {
+                const affordableCap = budgetTeam.cash ?? Number.POSITIVE_INFINITY;
+                const recentlySoldForTeam = recentlySoldByTeamPlayer.get(team.teamId) ?? new Set<string>();
+                const femaleHumanoids = baseFreeAgents
+                  .filter(
+                    (item) =>
+                      !globallyExcludedPlayerIds.has(item.playerId) &&
+                      !recentlySoldForTeam.has(item.playerId) &&
+                      isFemaleGenderPlayer(item) &&
+                      isHumanoidForGenderQuota(item) &&
+                      (item.marketValue ?? Number.POSITIVE_INFINITY) <= affordableCap,
+                  )
+                  .sort((left, right) => {
+                    const ratioDelta = getValueRatio(right) - getValueRatio(left);
+                    if (Math.abs(ratioDelta) > 0.01) return ratioDelta;
+                    return (left.marketValue ?? Number.POSITIVE_INFINITY) - (right.marketValue ?? Number.POSITIVE_INFINITY);
+                  });
+                let femaleAdded = 0;
+                for (const item of femaleHumanoids) {
+                  if (femaleAdded >= FEMALE_IDENTITY_COVERAGE_LIMIT) break;
+                  if (!selected.has(item.playerId)) {
+                    selected.set(item.playerId, item);
+                    femaleAdded += 1;
+                  }
+                }
+              }
 
               return [...selected.values()].map((item) =>
                 enrichCandidateForTeam({
@@ -1796,7 +2102,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
           return (right.score ?? 0) - (left.score ?? 0);
         });
 
-      const recommendedBuys = rankedAffordableCandidates
+      const recommendedBuysRaw = rankedAffordableCandidates
         .slice(0, 3)
         .map<AiTransferPreviewRecommendation>((entry) =>
           toPreviewRecommendation({
@@ -1805,6 +2111,30 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
             strategyProfile,
           }),
         );
+      const doctrine = loadDoctrineContext(context.gameState, team.teamId);
+      const replacementSlots = resolveTeamReplacementSlots({
+        gameState: context.gameState,
+        saveId: context.saveId,
+        teamId: team.teamId,
+      });
+      const recommendedBuys = annotateBuyRecommendations({
+        gameState: context.gameState,
+        saveId: context.saveId,
+        teamId: team.teamId,
+        recommendations: recommendedBuysRaw,
+        doctrine,
+        replacementSlots,
+        rosterAfterSell: rosterEconomy.rosterCount,
+        playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
+        playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
+        teamCash: team.cash ?? null,
+        cashAfterSell: team.cash ?? null,
+        plannedSellCount: 0,
+        rosterPlayerIds: context.gameState.rosters
+          .filter((entry) => entry.teamId === team.teamId)
+          .map((entry) => entry.playerId),
+        coversNeedAxis: (candidate) => Boolean(candidate.needMatchLabel),
+      });
 
       const skippedTargets = [
         ...stage0SkippedTargets,
@@ -1887,6 +2217,14 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     return left.teamName.localeCompare(right.teamName, "de");
   });
 
+  const finalDebugPerformance = {
+    durationMs: Date.now() - startedAt,
+    contextMs: contextResolvedAt - startedAt,
+    baseFeedMs: baseFeedFinishedAt - baseFeedStartedAt,
+    teamCount: candidateTeams.length,
+    ...debugPerformance,
+  };
+  recordBuyPreview(finalDebugPerformance.durationMs, finalDebugPerformance);
   return {
     readOnly: true,
     source: context.source,
@@ -1918,12 +2256,6 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     warningTeams: sortedTeams.filter((team) => team.status === "warning").length,
     blockedTeams: sortedTeams.filter((team) => team.status === "blocked").length,
     teams: sortedTeams,
-    debugPerformance: {
-      durationMs: Date.now() - startedAt,
-      contextMs: contextResolvedAt - startedAt,
-      baseFeedMs: baseFeedFinishedAt - baseFeedStartedAt,
-      teamCount: candidateTeams.length,
-      ...debugPerformance,
-    },
+    debugPerformance: finalDebugPerformance,
   };
 }

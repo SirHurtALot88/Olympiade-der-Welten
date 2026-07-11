@@ -1,0 +1,18 @@
+fromTab,toTab,v7Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,391,0,0,,,ok
+Inbox,Einsatzliste,8912,0,0,,Tabwechsel >5s,slow
+Einsatzliste,Arena,8965,0,0,,Tabwechsel >5s,slow
+Arena,Saisonstand,20640,0,0,,Tabwechsel >5s,slow
+Saisonstand,Teams,8910,0,0,,Tabwechsel >5s,slow
+Teams,Spieler,11751,0,0,,Tabwechsel >5s,slow
+Spieler,Training,17496,0,0,,Tabwechsel >5s,slow
+Training,Gebäude,11859,0,0,,Tabwechsel >5s,slow
+Gebäude,Training (revisit),26888,9,9018,/api/season/warmup-derivations,Tabwechsel >5s,slow
+Gebäude,Transfermarkt,26094,9,6213,/api/season/standings-overview,Tabwechsel >5s,slow
+Transfermarkt,Scouting,27032,16,13618,/api/season/team-overview-slice,Tabwechsel >5s,slow
+Scouting,Historie,9584,5,6184,/api/season/ratings-slice,Tabwechsel >5s,slow
+Historie,Ranks,12613,2,5282,/api/season/warmup-derivations,Tabwechsel >5s,slow
+Ranks,Diszis,36255,14,9426,/api/season/ratings-slice,Tabwechsel >5s,slow
+Diszis,Sponsoren,48550,22,9985,/api/season/management-overview,Tabwechsel >5s,slow
+Sponsoren,Lexikon,13623,0,0,,Tabwechsel >5s,slow
+START,Home,1735,,,initial_load,,ok

@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 
 export const SEASON_TRANSITION_STEPS = [
@@ -225,12 +227,19 @@ export function startSeasonTransition(
     };
   }
   const transition = buildTransitionState(save, { status: "preview", currentStep: "season_review" });
+  // Apply season-end potential updates for all players (headroom-based, no age dependency)
+  const updatedPlayerPotential = applySeasonEndPotentialUpdates({
+    saveId: save.saveId,
+    seasonId: save.gameState.season.id,
+    gameState: save.gameState,
+  });
   const nextGameState: GameState = {
     ...save.gameState,
     gamePhase: "season_review",
     seasonTransition: transition,
+    playerPotential: updatedPlayerPotential,
   };
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
 
   return {
     ...buildSeasonTransitionPreview({ ...save, gameState: nextGameState }),

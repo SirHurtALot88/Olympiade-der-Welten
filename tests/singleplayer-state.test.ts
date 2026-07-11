@@ -90,7 +90,8 @@ describe("singleplayer game state", () => {
     const reloaded = persistence.getSaveById(first.save.saveId);
     const cashCreators = reloaded?.gameState.teams.find((team) => team.teamId === "C-C");
     expect(cashCreators?.rosterLimit).toBe(14);
-    expect(cashCreators?.rosterMinTarget).toBe(11);
+    // Kader-Minimum ist jetzt fix 8 für jedes Team (unabhängig vom Sheet-/Identity-playerMin).
+    expect(cashCreators?.rosterMinTarget).toBe(8);
     expect(cashCreators?.rosterOptTarget).toBe(13);
   }, 60000);
 
@@ -581,6 +582,43 @@ describe("singleplayer game state", () => {
     expect(new Set(Object.values(assignments).map((assignment) => assignment.gmId)).size).toBe(32);
   });
 
+  it("varies fit-near GM picks across different save seeds", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const identities = loadDefaultTeamIdentities();
+    const team = fresh.teams.find((entry) => entry.teamId === "Z-H");
+    expect(team).toBeTruthy();
+
+    const saveA = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-a");
+    const saveB = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-b");
+    const gmA = saveA["Z-H"]?.gmId;
+    const gmB = saveB["Z-H"]?.gmId;
+
+    expect(gmA).toBeTruthy();
+    expect(gmB).toBeTruthy();
+    expect(gmA).not.toBe(gmB);
+  });
+
+  it("caps repeated GM archetypes in the league pool", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const assignments = buildTeamGeneralManagerAssignments(
+      fresh.teams,
+      fresh.season.id,
+      null,
+      loadDefaultTeamIdentities(),
+      null,
+      null,
+      "diversity-audit-seed",
+    );
+    const archetypeCounts = new Map<string, number>();
+    for (const assignment of Object.values(assignments)) {
+      const profile = TEAM_GENERAL_MANAGER_PROFILES.find((entry) => entry.gmId === assignment.gmId);
+      if (!profile) continue;
+      archetypeCounts.set(profile.archetype, (archetypeCounts.get(profile.archetype) ?? 0) + 1);
+    }
+    const maxSameArchetype = Math.max(...archetypeCounts.values(), 0);
+    expect(maxSameArchetype).toBeLessThanOrEqual(6);
+  });
+
   it("keeps raw sheet identities available separately from GM-adjusted season identities", () => {
     const defaults = loadDefaultTeamIdentities();
 
@@ -989,7 +1027,8 @@ describe("singleplayer game state", () => {
       playerOpt: 12,
     });
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(9.3);
-    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(11);
+    // playerMin ist jetzt fix 8 (Sheet-/Override-playerMin wird für das Minimum ignoriert).
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(8);
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(13);
     expect(getTeamGeneralManager(reloaded!.gameState, "C-C")?.profile.title).toContain("Bargain Hunter");
     expect(createFreshSeasonOneGameState().teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(10);

@@ -1,4 +1,5 @@
 import type { GameState, LineupDraft, LineupDraftEntry } from "@/lib/data/olyDataTypes";
+import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 
 export type MatchdayLineupSideRequirements = {
   d1Required: number;
@@ -92,6 +93,70 @@ export function getTeamMatchdayLineupOpenSlots(
 
   const counts = getLineupDraftSideCounts(draft?.entries ?? []);
   return Math.max(d1Required - counts.d1, 0) + Math.max(d2Required - counts.d2, 0);
+}
+
+export function getTeamRosterPlayerIds(gameState: GameState, teamId: string) {
+  return gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
+}
+
+export function isTeamAllRosterPlayersDeployedInLineup(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+) {
+  const rosterPlayerIds = getTeamRosterPlayerIds(gameState, teamId);
+  if (rosterPlayerIds.length === 0 || !draft?.entries.length) {
+    return false;
+  }
+  const deployedPlayerIds = new Set(draft.entries.map((entry) => entry.playerId));
+  return rosterPlayerIds.every((playerId) => deployedPlayerIds.has(playerId));
+}
+
+/**
+ * Alle einsatzbereiten (nicht verletzten/gesperrten) Kaderspieler sind aufgestellt.
+ * Offene Slots sind erlaubt: ein Team mit zu dünnem Kader entscheidet sich dann,
+ * welche Disziplin es nicht (voll) besetzt — das ist kein Hard-Block.
+ */
+export function isTeamAllAvailablePlayersDeployedInLineup(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+) {
+  const rosterPlayerIds = getTeamRosterPlayerIds(gameState, teamId);
+  if (rosterPlayerIds.length === 0 || !draft?.entries.length) {
+    return false;
+  }
+  const matchdayId = draft.matchdayId ?? gameState.matchdayState.matchdayId;
+  const availablePlayerIds = rosterPlayerIds.filter(
+    (playerId) => !getPlayerAvailabilityView(gameState, playerId, teamId, matchdayId).isUnavailable,
+  );
+  if (availablePlayerIds.length === 0) {
+    return false;
+  }
+  const deployedPlayerIds = new Set(draft.entries.map((entry) => entry.playerId));
+  return availablePlayerIds.every((playerId) => deployedPlayerIds.has(playerId));
+}
+
+/**
+ * Spielbar, wenn entweder alle Slots voll sind, der gesamte Kader eingesetzt ist,
+ * oder alle einsatzbereiten (nicht verletzten) Spieler aufgestellt sind. Offene Slots
+ * durch zu dünnen/verletzten Kader sind dann kein Hard-Block mehr.
+ */
+export function isTeamMatchdayLineupOperationallyReady(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+): boolean {
+  if (!draft?.entries.length) {
+    return false;
+  }
+  if (isTeamMatchdayLineupComplete(gameState, teamId, draft)) {
+    return true;
+  }
+  if (isTeamAllRosterPlayersDeployedInLineup(gameState, teamId, draft)) {
+    return true;
+  }
+  return isTeamAllAvailablePlayersDeployedInLineup(gameState, teamId, draft);
 }
 
 export function isTeamMatchdayLineupSubmitted(draft: LineupDraft | null | undefined) {

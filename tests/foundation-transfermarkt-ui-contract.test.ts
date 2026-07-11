@@ -1,18 +1,31 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
-const transfermarktV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx";
-const lineupPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx";
-const teamDrawerPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/TeamDetailDrawer.tsx";
-const fitServicePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/market/transfermarkt-fit.ts";
-const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
+
+const root = process.cwd();
+const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const foundationShellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
+
+async function readFoundationSurfaceSourceLocal() {
+  return readFoundationSurfaceSource(root);
+}
+const foundationPageModuleHelpersPath = path.join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx");
+const foundationViewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
+const transfermarktV2Path = path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
+const marketBuyHostPath = path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx");
+const lineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
+const teamDrawerPath = path.join(root, "app/foundation/TeamDetailDrawer.tsx");
+const teamsRosterHookPath = path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts");
+const fitServicePath = path.join(root, "lib/market/transfermarkt-fit.ts");
+const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation transfermarkt ui contract", () => {
   it("keeps the global foundation context visible", async () => {
     const [fileText, cssText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationSurfaceSourceLocal(),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -24,33 +37,50 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("opens Transfermarkt V2 as the primary market flow", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const [fileText, routingText] = await Promise.all([
+      readFoundationOrchestratorSource(root),
+      fs.readFile(foundationViewRoutingPath, "utf8"),
+    ]);
 
-    expect(fileText).toContain('if (view === "market") return "marketV2";');
-    expect(fileText).toContain('if (view === "transfermarkt" || view === "market")');
-    expect(fileText).toContain("getDefaultFoundationViewTarget(view.id)");
+    expect(routingText).toContain('view === "transfermarkt-v2" || view === "transfermarkt" || view === "market"');
+    expect(routingText).toContain('return "marketV2"');
+    expect(fileText).toContain("normalizeFoundationViewParam");
+    const moduleHelpersText = await fs.readFile(foundationPageModuleHelpersPath, "utf8");
+    expect(moduleHelpersText).toContain("getDefaultFoundationViewTarget(view as FoundationViewId)");
     expect(fileText).toContain('setFoundationView("marketV2", setActiveView)');
   });
 
   it("keeps Transfermarkt V2 centered on scouting, deal preview and own roster context", async () => {
-    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+    const [fileText, buyHostText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
 
     expect(fileText).toContain("Markt-Pool");
     expect(fileText).toContain("Scouting-Profil");
     expect(fileText).toContain("Deal-Desk");
     expect(fileText).toContain("Deal-Vorschau");
     expect(fileText).toContain("Aktueller Kader");
-    expect(fileText).toContain("Wishlist & Bedarf");
+    expect(fileText).toContain("Wishlist & Scouting");
     expect(fileText).toContain("Deal prüfen");
     expect(fileText).toContain("Auf Wishlist");
+    expect(fileText).toContain("Beobachten");
+    expect(fileText).toContain("market-v2-star-row");
+    expect(fileText).toContain("axisStarsDisplay");
+    expect(fileText).toContain("onToggleScoutingWatch");
+    expect(fileText).toContain("market-v2-scout-certainty");
+    expect(cssText).toContain(".market-v2-scout-certainty-bar");
     expect(fileText).toContain("scoutingProfileTooltip");
     expect(fileText).toContain("title={scoutingProfileTooltip}");
     expect(fileText).toContain("Scouting L");
     expect(fileText).toContain("marketValueBrackets");
+    expect(fileText).toContain("market-v2-pool-bracket-panel");
+    expect(fileText).toContain("togglePoolBracketPanel");
     expect(fileText).toContain("Board-Fokus");
     expect(fileText).toContain("Kaufdialog");
-    expect(fileText).toContain("Kauf final abschließen");
-    expect(fileText).toContain("Warum der Deal so ausfällt");
+    expect(buyHostText).toContain("Kauf final abschließen");
+    expect(buyHostText).toContain("Warum der Deal so ausfällt");
     expect(fileText).toContain("getCandidateFrameStyle");
   });
 
@@ -88,14 +118,14 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".market-v2-filter-preset-chip");
   });
 
-  it("shows five colored discipline fit rows in Transfermarkt V2", async () => {
+  it("shows colored discipline fit rows in Transfermarkt V2", async () => {
     const [fileText, cssText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
     expect(fileText).toContain("getDisciplineCategoryClass");
-    expect(fileText).toContain("topDisciplineScores.slice(0, 5)");
+    expect(fileText).toContain("topDisciplineScores.slice(0, 3)");
     expect(cssText).toContain(".market-v2-diszi-row.is-power");
     expect(cssText).toContain(".market-v2-diszi-row.is-speed");
     expect(cssText).toContain(".market-v2-diszi-row.is-mental");
@@ -138,12 +168,17 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("lets local Chris/manual teams stay manageable in quick market views", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const fileText = await readFoundationOrchestratorSource(root);
+    const teamControlHookText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-team-control.ts"),
+      "utf8",
+    );
 
-    expect(fileText).toContain("localUserManualTeams");
+    expect(teamControlHookText).toContain("localUserManualTeams");
     expect(fileText).toContain("settings.ownerSlot === \"user\"");
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
-    expect(fileText).toContain("manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}");
+    expect(fileText).toContain("FoundationTransfermarktV2Panel");
+    expect(fileText).toContain("manageableTeamIds: foundationManageableTeamIds");
     expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
     expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
   });
@@ -166,34 +201,57 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("scorePresenceArray(traitKeys, tokenCounts.traits, -1)");
   });
 
+  it("uses compact full-art portrait cards in the candidate rail and table hover previews", async () => {
+    const [fileText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(fileText).toContain("FoundationPlayerPortraitCard");
+    expect(fileText).toContain("playerRatingsById");
+    expect(fileText).toContain("ovrRank={playerRating?.ovrRank ?? null}");
+    expect(fileText).toContain('context="market"');
+    expect(fileText).toContain('density="compact"');
+    expect(fileText).toContain('data-testid="transfer-candidate-card"');
+    expect(fileText).toContain("FoundationPlayerPortraitPreview");
+    expect(fileText).toContain("market-v2-wishlist-row");
+    expect(fileText).toContain("market-v2-roster-context-table");
+    expect(cssText).toContain(".foundation-player-portrait-preview-panel");
+  });
+
   it("keeps the team drawer relationship cards alive", async () => {
-    const [clientText, drawerText, cssText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+    const [clientText, teamsRosterHookText, drawerText, cssText] = await Promise.all([
+      readFoundationOrchestratorSource(root),
+      fs.readFile(teamsRosterHookPath, "utf8"),
       fs.readFile(teamDrawerPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(clientText).toContain("buildTeamRelationshipCards");
-    expect(clientText).toContain("relationships: drawerRelationships");
+    expect(clientText).toContain("buildTeamDetailDrawerData");
+    expect(teamsRosterHookText).toContain("buildTeamRelationshipCards");
+    expect(teamsRosterHookText).toContain("relationships: drawerRelationships");
     expect(drawerText).toContain("relationships:");
     expect(drawerText).toContain("formatRelationshipList");
     expect(cssText).toContain(".team-drawer-relationship-chip");
   });
 
   it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
-    const [fileText, foundationText] = await Promise.all([
+    const [fileText, buyHostText, foundationText, marketHostText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
-      fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
+      readFoundationOrchestratorSource(root),
+      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx"), "utf8"),
     ]);
 
     expect(fileText).toContain("Kaufdialog");
-    expect(fileText).toContain("Auto-Angebot");
     expect(fileText).toContain("resetBuyDemandFrame");
-    expect(fileText).toContain("Spieler ist noch angefressen");
-    expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
+    expect(buyHostText).toContain("Spieler ist noch angefressen");
+    expect(buyHostText).toContain('buyNegotiationOutcome?.status !== "accepted"');
     expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
-    expect(foundationText).toContain('marketNegotiationOutcome?.status !== "accepted"');
-    expect(foundationText).toContain("clearNegotiationOutcome: false");
+    expect(foundationText).toContain("toggleScoutingWatch");
+    expect(marketHostText).toContain("onToggleScoutingWatch");
+    expect(foundationText).toContain("openMarketOfferPanel");
+    expect(fileText).toContain("FoundationShellRouterMarketBuy");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {
@@ -213,5 +271,87 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".legacy-lineup-slot-conflict-chip");
     expect(cssText).toContain(".legacy-lineup-side-issue-chip");
     expect(cssText).toContain(".legacy-matchday-player-score-chip.is-quality-instant");
+  });
+
+  it("separates market loading from empty filter state", async () => {
+    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+
+    expect(fileText).toContain("bootstrapReady");
+    expect(fileText).toContain("marketBusy && visibleItems.length === 0");
+    expect(fileText).toContain("market-v2-candidate-skeleton");
+    expect(fileText).toContain("!marketBusy && visibleItems.length === 0");
+    expect(fileText).toContain('defaultSeasonId === "loading"');
+  });
+
+  it("blocks market buy for teams the active owner cannot manage", async () => {
+    const [foundationText, v2Text] = await Promise.all([
+      readFoundationOrchestratorSource(root),
+      fs.readFile(transfermarktV2Path, "utf8"),
+    ]);
+
+    expect(foundationText).toContain("openMarketBuyModal");
+    expect(foundationText).toContain("!canManageTeamId(effectiveTeamId)");
+    expect(v2Text).toContain("manageableTeamIdSet");
+    expect(v2Text).toContain("steuerbaren Teams");
+  });
+
+  it("shows negotiation abort feedback when closing buy offer pages", async () => {
+    const [v2Text, buyHostText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
+    ]);
+
+    expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
+    expect(v2Text).toContain("Verhandlung mit ${playerName} abgebrochen");
+    expect(buyHostText).toContain("data-testid=\"transfer-offer-page\"");
+    expect(v2Text).toContain("FoundationShellRouterMarketBuy");
+  });
+
+  it("loads buy preview skeleton and two-step confirm flow in Transfermarkt V2", async () => {
+    const [v2Text, buyHostText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(buyHostText).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
+    expect(buyHostText).toContain("data-testid=\"transfer-buy-confirm-button\"");
+    expect(buyHostText).toContain("Kauf final abschließen");
+    expect(buyHostText).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
+    expect(v2Text).toContain("negotiation_cancelled_after_contact");
+    expect(buyHostText).toContain("Spieler ist noch angefressen");
+    expect(v2Text).toContain("allSeasons: \"1\"");
+    expect(v2Text).toContain("Letzte Deals (alle Seasons)");
+    expect(cssText).toContain(".transfer-buy-preview-skeleton");
+  });
+
+  it("exposes sprint L mobile preview sheet, candidate chips, contract control, rejection meter, and Auto labels", async () => {
+    const [v2Text, sellHostText, drawerText, teamsPanelText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"), "utf8"),
+      fs.readFile(teamDrawerPath, "utf8"),
+      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(v2Text).toContain('data-testid="market-v2-mobile-preview-sheet"');
+    expect(v2Text).toContain("market-v2-candidate-decision-chips");
+    expect(v2Text).toContain("market-v2-candidate-chip is-value");
+    expect(v2Text).toContain('data-testid="market-v2-contract-segmented"');
+    expect(v2Text).toContain('data-testid="market-v2-rejection-meter"');
+    expect(v2Text).toContain("previewCashBefore");
+    expect(v2Text).toContain("previewCashAfter");
+    expect(sellHostText).toContain("Auto-Empfehlung");
+    expect(sellHostText).not.toContain("AI-Empfehlung");
+
+    expect(drawerText).toContain('data-testid="team-drawer-tabs"');
+    expect(drawerText).toContain('data-testid="team-drawer-transfer-tab"');
+    expect(drawerText).toContain('data-testid="team-drawer-duel-card"');
+    expect(teamsPanelText).toContain('data-testid="teams-v2-transfer-tab"');
+    expect(teamsPanelText).toContain("teams-v2-name-cell is-sticky-actions");
+    expect(teamsPanelText).toContain("table-icon-button");
+
+    expect(cssText).toContain(".market-v2-mobile-preview-sheet");
+    expect(cssText).toContain(".market-v2-rejection-meter");
   });
 });

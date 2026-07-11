@@ -6,17 +6,24 @@ import {
   getFacilityLevel,
   getScoutingConfidence,
 } from "@/lib/facilities/facility-effects";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import type { OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
 import type { PlayerProgressionForecast, PlayerProgressionRatingTier } from "@/lib/training/training-plan-types";
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightOrder,
-  officialDisciplineWeightTable,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
+import {
+  buildLeagueDisciplineRatingsForPlayers,
+  buildLeagueDisciplineRatingsWithAttributeOverrides,
+  calculateRawDisciplineScore,
+  mapRankToDisciplineStat,
+} from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndFacilityPreviewLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -81,6 +88,12 @@ export type SeasonEndProgressionPreviewRow = {
   teamId: string | null;
   teamCode: string | null;
   availableXP: number;
+  /** Legacy manual-upgrade pool from XP forecast — not organic setpoints. */
+  legacyAvailableXP: number;
+  organicNetSetpoints: number;
+  organicTrainingSetpoints: number;
+  organicPerformanceSetpoints: number;
+  organicMarketValuePressureTotal: number;
   trainingXP: number;
   performanceXP: number;
   traitModifierPct: number;
@@ -156,6 +169,21 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+/** Count of entries strictly greater than `value` in a descending-sorted array (binary search). */
+function countStrictlyGreater(sortedDescending: number[], value: number) {
+  let lo = 0;
+  let hi = sortedDescending.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedDescending[mid]! > value) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
 }
 
 function getAttributeValue(player: Player, attribute: PlayerGeneratorAttributeName) {
@@ -266,40 +294,35 @@ function toGeneratorAttributes(player: Player, override?: { attribute: PlayerGen
   return normalized;
 }
 
-function calculateDisciplineValueFromAttributes(attributes: PlayerGeneratorAttributes, disciplineId: OfficialDisciplineWeightId) {
-  const weighted = Object.entries(officialDisciplineWeightTable).reduce((sum, [attribute, weights]) => {
-    return sum + attributes[attribute as PlayerGeneratorAttributeName] * weights[disciplineId];
-  }, 0);
-  const weightSum = Object.values(officialDisciplineWeightTable).reduce((sum, weights) => sum + weights[disciplineId], 0);
-  return weightSum > 0 ? roundValue(clamp(weighted / weightSum, 1, 99), 2) : null;
-}
-
 export function buildPreviewDisciplineRatingsFromAttributes(input: {
   player: Player;
   attributesAfter: PlayerGeneratorAttributes | null;
+  leaguePlayers?: Player[];
 }) {
   if (!input.attributesAfter) {
     return input.player.disciplineRatings ?? {};
   }
 
-  const nextRatings = { ...(input.player.disciplineRatings ?? {}) };
-  for (const disciplineId of officialDisciplineWeightOrder) {
-    const next = calculateDisciplineValueFromAttributes(input.attributesAfter, disciplineId);
-    if (next != null && Object.prototype.hasOwnProperty.call(nextRatings, disciplineId)) {
-      nextRatings[disciplineId] = next;
-    }
-  }
-  return nextRatings;
+  const leaguePlayers = input.leaguePlayers ?? [input.player];
+  const ratingsByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(leaguePlayers, {
+    [input.player.id]: input.attributesAfter,
+  });
+  return ratingsByPlayerId.get(input.player.id) ?? input.player.disciplineRatings ?? {};
 }
 
 export function buildPreviewDisciplineRatings(input: {
   player: Player;
   attribute: PlayerGeneratorAttributeName;
   attributeAfter: number | null;
+  leaguePlayers?: Player[];
 }) {
   const attributesAfter =
     input.attributeAfter == null ? null : toGeneratorAttributes(input.player, { attribute: input.attribute, value: input.attributeAfter });
-  return buildPreviewDisciplineRatingsFromAttributes({ player: input.player, attributesAfter });
+  return buildPreviewDisciplineRatingsFromAttributes({
+    player: input.player,
+    attributesAfter,
+    leaguePlayers: input.leaguePlayers,
+  });
 }
 
 export function buildSeasonEndDisciplineDeltas(input: {
@@ -486,6 +509,7 @@ export function buildSeasonEndProgressionPreview(input: {
   gameState: GameState;
   teamId?: string | null;
   forecastsByPlayerId: Map<string, PlayerProgressionForecast>;
+  organicByPlayerId?: Map<string, OrganicSeasonProgressionResult>;
   upgradeRequests?: SeasonEndProgressionUpgradeRequest[];
   facilities?: SeasonEndFacilityPreviewInput;
 }) {
@@ -521,8 +545,75 @@ export function buildSeasonEndProgressionPreview(input: {
       Boolean(entry.player),
     );
   const requestByPlayerId = new Map((input.upgradeRequests ?? []).map((request) => [request.playerId, request] as const));
+
+  // Loop-invariant league-wide discipline ranking, hoisted out of the per-row map below.
+  // Discipline ratings are league-RELATIVE (each player's stat comes from its competition rank of
+  // a weighted attribute score across the whole league). Recomputing the full-league ranking twice
+  // per roster row was O(rosterSize x leagueSize). Instead we compute the no-override league baseline
+  // once, and precompute per-discipline sorted baseline scores so a single-player attribute override
+  // resolves that player's post-upgrade rank via a binary-search count (O(disciplines x log league)).
+  const leagueBaselineDisciplineRatings = buildLeagueDisciplineRatingsForPlayers(input.gameState.players);
+  const baselineDisciplineScoresByPlayerId = new Map<string, Partial<Record<OfficialDisciplineWeightId, number>>>();
+  const sortedBaselineScoresByDiscipline = new Map<OfficialDisciplineWeightId, number[]>();
+  for (const disciplineId of officialDisciplineWeightOrder) {
+    sortedBaselineScoresByDiscipline.set(disciplineId, []);
+  }
+  for (const leaguePlayer of input.gameState.players) {
+    const attributes = toGeneratorAttributes(leaguePlayer);
+    if (!attributes) continue;
+    const scores: Partial<Record<OfficialDisciplineWeightId, number>> = {};
+    for (const disciplineId of officialDisciplineWeightOrder) {
+      const score = calculateRawDisciplineScore(attributes, disciplineId);
+      if (score != null) {
+        scores[disciplineId] = score;
+        sortedBaselineScoresByDiscipline.get(disciplineId)!.push(score);
+      }
+    }
+    baselineDisciplineScoresByPlayerId.set(leaguePlayer.id, scores);
+  }
+  for (const scores of sortedBaselineScoresByDiscipline.values()) {
+    scores.sort((left, right) => right - left);
+  }
+
+  // Equivalent to buildPreviewDisciplineRatingsFromAttributes({ attributesAfter: baselineAttributes,
+  // leaguePlayers: input.gameState.players }): the self-override equals the player's own attributes,
+  // so the league ranking is identical to the no-override baseline.
+  const resolveBaselineDisciplineRatings = (player: Player, baselineAttributes: PlayerGeneratorAttributes | null) => {
+    if (!baselineAttributes) {
+      return player.disciplineRatings ?? {};
+    }
+    return leagueBaselineDisciplineRatings.get(player.id) ?? player.disciplineRatings ?? {};
+  };
+
+  // Equivalent to buildPreviewDisciplineRatingsFromAttributes({ attributesAfter, leaguePlayers: ... }):
+  // only the target player's attributes change, so the target's per-discipline competition rank is
+  // 1 + (league players whose baseline score is strictly greater than the target's post-upgrade score),
+  // excluding the target's own baseline score from that count.
+  const resolvePreviewDisciplineRatings = (player: Player, attributesAfter: PlayerGeneratorAttributes | null) => {
+    if (!attributesAfter) {
+      return player.disciplineRatings ?? {};
+    }
+    const baselineScores = baselineDisciplineScoresByPlayerId.get(player.id);
+    const ratings: Record<string, number> = {};
+    for (const disciplineId of officialDisciplineWeightOrder) {
+      const targetScore = calculateRawDisciplineScore(attributesAfter, disciplineId);
+      if (targetScore == null) continue;
+      const sortedScores = sortedBaselineScoresByDiscipline.get(disciplineId) ?? [];
+      let strictlyGreater = countStrictlyGreater(sortedScores, targetScore);
+      const targetBaselineScore = baselineScores?.[disciplineId];
+      if (targetBaselineScore != null && targetBaselineScore > targetScore) {
+        strictlyGreater -= 1;
+      }
+      const stat = mapRankToDisciplineStat(strictlyGreater + 1);
+      if (stat == null) continue;
+      ratings[disciplineId] = roundValue(stat, 2);
+    }
+    return Object.keys(ratings).length > 0 ? ratings : player.disciplineRatings ?? {};
+  };
+
   const rows: SeasonEndProgressionPreviewRow[] = rosterRows.map(({ player, team }) => {
     const forecast = input.forecastsByPlayerId.get(player.id);
+    const organic = input.organicByPlayerId?.get(player.id) ?? null;
     const request = requestByPlayerId.get(player.id);
     const selectedAttribute = request?.attribute ?? "power";
     const attributeBefore = getAttributeValue(player, selectedAttribute);
@@ -532,11 +623,14 @@ export function buildSeasonEndProgressionPreview(input: {
     const tierAfter = getProgressionRatingTier(attributeAfter);
     const baseTrainingXP = forecast?.baseTrainingXP ?? 0;
     const performanceXP = forecast?.performanceXP ?? 0;
-    const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities);
+    const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities, {
+      developmentTrainingBonusPct: team ? getTeamDevelopmentTrainingBonusPct(input.gameState, team.teamId) : 0,
+    });
     const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
     const spendableDevelopmentXP = Math.max(0, (forecast?.netDevelopmentXP ?? 0) + facilityTrainingDelta);
     const cost = getSeasonEndUpgradeCost({ tier: tierBefore, attribute: selectedAttribute, facilities });
-    const availableXP = spendableDevelopmentXP;
+    const legacyAvailableXP = spendableDevelopmentXP;
+    const availableXP = legacyAvailableXP;
     const blockReason =
       attributeBefore == null
         ? "attribute_source_missing"
@@ -549,11 +643,10 @@ export function buildSeasonEndProgressionPreview(input: {
               : null;
     const shouldBuildAfterPreview = blockReason == null;
     const baselineAttributes = toGeneratorAttributes(player);
-    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: baselineAttributes,
-    });
-    const previewDisciplineRatings = buildPreviewDisciplineRatings({ player, attribute: selectedAttribute, attributeAfter });
+    const attributesAfter =
+      attributeAfter == null ? null : toGeneratorAttributes(player, { attribute: selectedAttribute, value: attributeAfter });
+    const baselineDisciplineRatings = resolveBaselineDisciplineRatings(player, baselineAttributes);
+    const previewDisciplineRatings = resolvePreviewDisciplineRatings(player, attributesAfter);
     const disciplineDeltas = buildSeasonEndDisciplineDeltas({
       disciplines: input.gameState.disciplines,
       lastSeasonDisciplineValues: baselineDisciplineRatings,
@@ -589,6 +682,11 @@ export function buildSeasonEndProgressionPreview(input: {
       teamId: team?.teamId ?? null,
       teamCode: team?.shortCode ?? null,
       availableXP,
+      legacyAvailableXP,
+      organicNetSetpoints: organic?.netSetpoints ?? 0,
+      organicTrainingSetpoints: organic?.trainingSetpoints ?? 0,
+      organicPerformanceSetpoints: organic?.appliedPerformanceSetpoints ?? 0,
+      organicMarketValuePressureTotal: organic?.marketValuePressureTotal ?? 0,
       trainingXP: forecast?.baseTrainingXP ?? 0,
       performanceXP,
       traitModifierPct: forecast?.traitModifierPct ?? 0,

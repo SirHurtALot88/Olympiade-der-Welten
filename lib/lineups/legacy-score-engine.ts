@@ -41,8 +41,10 @@ type ScoreSideInput = {
   rosterPlayers?: LegacyRosterPlayerRef[];
   requiredPlayers?: number | null;
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
-  moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
+  injuryByPlayerId?: Record<string, { injuredThisMatchday: boolean; multiplier: number }> | null;
   fatigueSourceStatus?: "mapped" | "missing_source";
+  injurySourceStatus?: "mapped" | "not_applied";
+  moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
   intensity?: "conserve" | "normal" | "push" | null;
   slotRoleModifier?: number | null;
   formCardsAvailable?: number | null;
@@ -131,12 +133,20 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     const fatigueMultiplier = fatigueSourceStatus === "mapped" ? (fatigue?.multiplier ?? 1) : null;
     const fatigueAdjustedScore =
       baseScore == null || fatigueMultiplier == null ? baseScore : roundPreviewScore(baseScore * fatigueMultiplier);
+    const injurySourceStatus = input.injurySourceStatus ?? "not_applied";
+    const injury = input.injuryByPlayerId?.[entry.playerId] ?? null;
+    const injuryMultiplier =
+      injurySourceStatus === "mapped" ? (injury?.multiplier ?? 1) : injurySourceStatus === "not_applied" ? 1 : null;
+    const injuryAdjustedScore =
+      fatigueAdjustedScore == null || injuryMultiplier == null
+        ? fatigueAdjustedScore
+        : roundPreviewScore(fatigueAdjustedScore * injuryMultiplier);
     const morale = input.moraleByPlayerId?.[entry.playerId] ?? null;
     const moraleMultiplier = moraleStatus === "mapped" ? (morale?.multiplier ?? 1) : null;
     const moraleAdjustedScore =
-      fatigueAdjustedScore == null || moraleMultiplier == null
-        ? fatigueAdjustedScore
-        : roundPreviewScore(fatigueAdjustedScore * moraleMultiplier);
+      injuryAdjustedScore == null || moraleMultiplier == null
+        ? injuryAdjustedScore
+        : roundPreviewScore(injuryAdjustedScore * moraleMultiplier);
     const moraleModifier =
       fatigueAdjustedScore == null || moraleAdjustedScore == null
         ? null
@@ -162,6 +172,9 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       fatigueCount: fatigueSourceStatus === "mapped" ? (fatigue?.count ?? 0) : null,
       fatigueMultiplier,
       fatigueAdjustedScore,
+      injuryStatus: injurySourceStatus,
+      injuryMultiplier: injurySourceStatus === "mapped" ? injuryMultiplier : null,
+      injuryAdjustedScore,
       moraleStatus: moraleStatus === "mapped" && !morale ? "missing_source" : moraleStatus,
       morale: morale?.morale ?? null,
       moraleMultiplier,

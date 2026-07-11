@@ -133,3 +133,8 @@ export function buildTransfermarktPoolAudit(input: {
     cheapestCandidatePoolPlayer: getCheapest(input.candidatePool ?? []),
   } satisfies TransfermarktPoolAudit;
 }
+
+export function filterTransfermarktFreeAgentsByBracket(items: TransfermarktFreeAgentItem[], bracket: number) {
+  const normalizedBracket = Math.max(1, Math.min(9, Math.round(bracket)));
+  return items.filter((item) => getTransfermarktBracket(item.marketValue) === normalizedBracket);
+}

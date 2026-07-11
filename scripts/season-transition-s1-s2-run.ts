@@ -508,7 +508,6 @@ async function buildBudgetedAiMarketAudit(saveId: string, gameState: GameState):
       applySellSteps: true,
       applyBuySteps: true,
       maxBuysPerTeam: null,
-      maxSellsPerTeam: 4,
       stopOnTeamFailure: true,
     },
   });
@@ -682,7 +681,6 @@ async function main() {
           applySellSteps: true,
           applyBuySteps: true,
           maxBuysPerTeam: null,
-          maxSellsPerTeam: 4,
           previewBuyLimit: 120,
           previewSellLimit: 10,
           stopOnTeamFailure: true,

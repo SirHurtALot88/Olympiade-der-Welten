@@ -24,6 +24,12 @@ import { buildContractNegotiationPreview } from "@/lib/market/contract-negotiati
 import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { buildPlayerDrawerDataFromGameState } from "@/lib/foundation/player-detail-drawer";
+import {
+  buildGameStateContentSignature,
+  getSeasonDerivations,
+  getSeasonPointsLedger,
+} from "@/lib/foundation/get-season-derivations";
+import { invalidateSeasonDerivationsCache } from "@/lib/foundation/season-derivations-cache";
 import { buildSeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 
@@ -808,6 +814,78 @@ async function runReadOnlyAudit(records: PhaseRecord[]) {
     },
   });
 
+  const contentSignature =
+    createPersistenceService().getSaveVersionMetadata(saveId)?.contentSignature ??
+    buildGameStateContentSignature(activeSave.gameState);
+
+  await measurePhase(records, {
+    phaseName: "season derivations cold build",
+    saveId,
+    seasonId,
+    matchdayId,
+    source: "sqlite_active_readonly",
+    timeoutMs: 120_000,
+    run: () => {
+      invalidateSeasonDerivationsCache(saveId);
+      const derivations = getSeasonDerivations({
+        gameState: activeSave.gameState,
+        saveId,
+        seasonId,
+        contentSignature,
+      });
+      return {
+        itemCount: derivations.ratingsById.size,
+        warnings: derivations.ledger.warnings.slice(0, 10),
+      };
+    },
+  });
+
+  await measurePhase(records, {
+    phaseName: "season derivations cache hit",
+    saveId,
+    seasonId,
+    matchdayId,
+    source: "sqlite_active_readonly",
+    run: () => {
+      const derivations = getSeasonDerivations({
+        gameState: activeSave.gameState,
+        saveId,
+        seasonId,
+        contentSignature,
+      });
+      return {
+        itemCount: derivations.ratingsById.size,
+        warnings: derivations.ledger.warnings.length > 0 ? ["cache_hit_with_ledger_warnings"] : [],
+      };
+    },
+  });
+
+  await measurePhase(records, {
+    phaseName: "standings-overview build",
+    saveId,
+    seasonId,
+    matchdayId,
+    source: "sqlite_active_readonly",
+    run: () => {
+      const ledger = getSeasonPointsLedger({
+        gameState: activeSave.gameState,
+        saveId,
+        seasonId,
+        contentSignature,
+      });
+      const disciplineValuesByTeamId = new Map(
+        activeSave.gameState.teams.map((team) => {
+          const summary = ledger.teamSummariesByTeamId.get(team.teamId) ?? null;
+          return [team.teamId, summary?.totalPoints ?? 0] as const;
+        }),
+      );
+      return {
+        itemCount: disciplineValuesByTeamId.size,
+        warnings: ledger.warnings.slice(0, 5),
+      };
+    },
+  });
+
   if (player) {
     await measurePhase(records, {
       phaseName: "player drawer build",
@@ -821,6 +899,7 @@ async function runReadOnlyAudit(records: PhaseRecord[]) {
           playerId: player.id,
           activePlayerId: rosterEntry?.id ?? null,
           source: "sqlite",
+          saveId,
         });
         return { itemCount: data?.disciplineValues.length ?? 0 };
       },
@@ -1018,8 +1097,12 @@ async function runReadOnlyAudit(records: PhaseRecord[]) {
     source: "sqlite_active_readonly",
     timeoutMs: 15_000,
     run: () => {
+      const rosterPlayers = activeSave.gameState.rosters
+        .filter((entry) => entry.teamId === team.teamId)
+        .map((entry) => activeSave.gameState.players.find((playerEntry) => playerEntry.id === entry.playerId))
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
       const forecastsByPlayerId = new Map(
-        activeSave.gameState.players.map((player) => [
+        rosterPlayers.map((player) => [
           player.id,
           buildPlayerProgressionForecast({
             gameState: activeSave.gameState,

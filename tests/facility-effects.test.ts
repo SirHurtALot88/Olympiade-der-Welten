@@ -9,6 +9,7 @@ import {
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getAnalyticsForecastQuality,
+  getRecoveryTrainingFatigueReductionPct,
   getScoutingConfidence,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
@@ -93,25 +94,43 @@ describe("facility effects", () => {
     const base = applyTrainingXpFacilityModifiers(100, teamFacilities);
     const performanceXp = 50;
 
-    expect(base.modifierPct).toBe(10);
-    expect(base.after).toBe(110);
-    expect(base.after + performanceXp).toBe(160);
+    expect(base.modifierPct).toBe(9);
+    expect(base.after).toBe(109);
+    expect(base.after + performanceXp).toBe(159);
   });
 
   it("scales facility effects by condition below 70 percent and reaches zero when broken", () => {
     const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 35 } });
     const brokenFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 0 } });
 
-    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(5);
+    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(4.5);
     expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(105);
     expect(applyTrainingXpFacilityModifiers(100, brokenFacilities).after).toBe(100);
   });
 
-  it("recovery center increases recovery", () => {
-    const result = applyRecoveryFacilityModifiers(80, facilities({ recovery_center: { level: 3, enabled: true } }));
+  it("recovery center adds flat bonus on top of base recovery", () => {
+    const result = applyRecoveryFacilityModifiers(20, facilities({ recovery_center: { level: 3, enabled: true } }));
 
-    expect(result.modifierPct).toBe(15);
-    expect(result.after).toBe(92);
+    expect(result.flatBonus).toBe(7);
+    expect(result.after).toBe(27);
+  });
+
+  it("recovery center reduces training fatigue load proportional to flat bonus vs basis 20", () => {
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(65);
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 0, enabled: false } }))).toBe(0);
+  });
+
+  it("recovery center uses tiered flat bonus by level", () => {
+    const levels = [0, 1, 2, 3, 4, 5] as const;
+    const expectedTotals = [20, 23, 25, 27, 30, 33];
+
+    for (const level of levels) {
+      const result = applyRecoveryFacilityModifiers(
+        20,
+        facilities({ recovery_center: { level, enabled: level > 0 } }),
+      );
+      expect(result.after).toBe(expectedTotals[level]);
+    }
   });
 
   it("fan shop and arena upgrade generate season income", () => {
@@ -120,7 +139,7 @@ describe("facility effects", () => {
       arena_upgrade: { level: 1, enabled: true },
     });
 
-    expect(calculateFacilityIncome(teamFacilities)).toBe(8);
+    expect(calculateFacilityIncome(teamFacilities)).toBe(11);
   });
 
   it("sums upkeep correctly", () => {

@@ -302,8 +302,10 @@ export function buildLegacyMatchdayResolvePreview(
           context.disciplinePlayerCounts[meta.disciplineId] ??
           null,
             fatigueByPlayerId: context.fatigueByPlayerId ?? null,
+            injuryByPlayerId: context.injuryByPlayerId ?? null,
             moraleByPlayerId,
             fatigueSourceStatus: context.fatigueSourceStatus ?? "missing_source",
+            injurySourceStatus: context.injurySourceStatus ?? "not_applied",
             intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity,
             slotRoleModifier,
             ...(() => {

@@ -4,6 +4,25 @@ import { useMemo } from "react";
 
 import type { InboxV2ClientProps } from "@/app/foundation/inbox-v2/inbox-v2-types";
 
+const INBOX_DECISION_CATEGORY_FILTERS = [
+  { value: "ALL", label: "Alle" },
+  { value: "task", label: "Aufgaben" },
+  { value: "warning", label: "Warnungen" },
+  { value: "transfer", label: "Transfers" },
+  { value: "finance", label: "Finanzen" },
+  { value: "training", label: "Training" },
+  { value: "contract", label: "Vertraege" },
+  { value: "facility", label: "Facilities" },
+  { value: "sponsor", label: "Sponsoren" },
+] as const;
+
+const INBOX_CHRONICLE_CATEGORY_FILTERS = [
+  { value: "ALL", label: "Alle" },
+  { value: "news", label: "News" },
+  { value: "result", label: "Results" },
+  { value: "transfer", label: "Transfers" },
+] as const;
+
 export default function InboxV2Client({
   items,
   selectedItemId,
@@ -11,58 +30,56 @@ export default function InboxV2Client({
   teamLabel,
   openCount = 0,
   criticalCount = 0,
+  mode = "decisions",
   categoryFilter = "ALL",
   onCategoryFilterChange,
   includeDone = false,
   onIncludeDoneChange,
   includeDismissed = false,
   onIncludeDismissedChange,
-  onOpenHomeV2,
   onRunChoice,
   onMarkDone,
   onDismiss,
+  hideCategoryFilters = false,
 }: InboxV2ClientProps) {
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
     [items, selectedItemId],
   );
+  const categoryFilters = mode === "chronicle" ? INBOX_CHRONICLE_CATEGORY_FILTERS : INBOX_DECISION_CATEGORY_FILTERS;
+  const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
+  const emptyLabel =
+    mode === "chronicle" ? "Noch keine Chronik-Einträge." : "Keine offenen Aufgaben.";
 
   return (
-    <div className="inbox-v2-shell" data-testid="foundation-inbox-v2" id="foundation-inbox-v2">
+    <div className="inbox-v2-shell" data-testid="foundation-inbox-v2" id="foundation-inbox-v2" data-inbox-mode={mode}>
       <header className="inbox-v2-header">
         <div>
           <span className="eyebrow">Inbox</span>
-          <h2>Entscheidungen & Hinweise</h2>
-          {teamLabel ? <p className="muted">{teamLabel}</p> : null}
+          <h2 title={teamLabel ?? undefined}>{headerTitle}</h2>
+          {teamLabel ? <p className="home-v2-hero-meta-line">{teamLabel}</p> : null}
         </div>
         <div className="inbox-v2-actions">
           <span className="pill">{openCount} offen</span>
           {criticalCount > 0 ? <span className="pill is-warning">{criticalCount} kritisch</span> : null}
-          {onOpenHomeV2 ? (
-            <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
-              Home V2
-            </button>
-          ) : null}
         </div>
       </header>
 
-      {onCategoryFilterChange ? (
-        <div className="inbox-v2-filters foundation-filter-grid">
-          <label className="filter-field">
-            <span>Kategorie</span>
-            <select className="input" value={categoryFilter} onChange={(event) => onCategoryFilterChange(event.target.value)}>
-              <option value="ALL">Alle Kategorien</option>
-              <option value="task">Aufgaben</option>
-              <option value="warning">Warnungen</option>
-              <option value="news">News</option>
-              <option value="result">Results</option>
-              <option value="finance">Finanzen</option>
-              <option value="transfer">Transfers</option>
-              <option value="training">Training</option>
-              <option value="contract">Verträge</option>
-              <option value="facility">Facilities</option>
-            </select>
-          </label>
+      {onCategoryFilterChange && !hideCategoryFilters ? (
+        <div className="inbox-v2-filters">
+          <div className="velo-intensity-rail inbox-v2-category-rail" aria-label="Inbox Kategorien">
+            {categoryFilters.map((filter) => (
+              <button
+                key={filter.value}
+                className={`velo-intensity-segment inbox-v2-category-segment${categoryFilter === filter.value ? " is-active" : ""}`}
+                type="button"
+                onClick={() => onCategoryFilterChange(filter.value)}
+              >
+                <span className="velo-intensity-segment-label">{filter.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="inbox-v2-toggle-row foundation-filter-grid">
           {onIncludeDoneChange ? (
             <label className="filter-field checkbox-field">
               <input type="checkbox" checked={includeDone} onChange={(event) => onIncludeDoneChange(event.target.checked)} />
@@ -75,6 +92,7 @@ export default function InboxV2Client({
               <span>Ausgeblendete anzeigen</span>
             </label>
           ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -89,12 +107,12 @@ export default function InboxV2Client({
                 onClick={() => onSelectItem(item.id)}
               >
                 <span className="inbox-v2-category">{item.category}</span>
-                <strong>{item.title}</strong>
-                <small>{item.detail}</small>
+                <span className="inbox-v2-list-item-title">{item.title}</span>
+                <span className="inbox-v2-list-item-detail">{item.detail}</span>
               </button>
             ))
           ) : (
-            <p className="muted">Keine offenen Inbox-Einträge.</p>
+            <p className="muted">{emptyLabel}</p>
           )}
         </aside>
 
@@ -105,12 +123,13 @@ export default function InboxV2Client({
               <h3>{selectedItem.title}</h3>
               <p>{selectedItem.detail}</p>
               {selectedItem.choices && selectedItem.choices.length > 0 ? (
-                <div className="inbox-v2-choices">
+                <div className="inbox-v2-choices" data-testid="inbox-v2-quick-actions">
                   {selectedItem.choices.map((choice) => (
                     <button
                       key={choice.id}
                       type="button"
                       className="inbox-v2-choice-card"
+                      data-testid={`inbox-quick-action-${choice.id}`}
                       onClick={() => onRunChoice?.(selectedItem.id, choice.id)}
                     >
                       <strong>{choice.label}</strong>

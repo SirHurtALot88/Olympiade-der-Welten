@@ -85,6 +85,22 @@ const AUDIT_HINT_LABELS: Record<string, string> = {
     "Sell-Phase bleibt fuer Human-Teams manuell; AI-Teams laufen ueber ihre eigenen Auto-Entscheidungen.",
   buy_after_sell_only:
     "Buy-Phase startet bewusst nach Sell/Contract, damit Roster- und Budgetdruck nicht vermischt wird.",
+  board_objectives_failed:
+    "Mindestens ein Board-Ziel ist verfehlt; Hinweis im Team-Profil, kein technischer Season-Blocker.",
+  board_objectives_at_risk:
+    "Mindestens ein Board-Ziel steht unter Druck; Hinweis im Team-Profil, kein technischer Season-Blocker.",
+  high_board_pressure:
+    "Board-Druck ist hoch; Konsequenz-Hinweis, kein technischer Season-Blocker.",
+  prize_money_not_applied:
+    "Preisgeld wurde noch nicht gebucht; Pre-Season-Schritt im Cockpit offen.",
+  player_development_pending:
+    "Spielerentwicklung ist noch nicht abgeschlossen; Pre-Season-Schritt im Cockpit offen.",
+  formcards_assignment_optional:
+    "Formkarten-Pool ist bereit — Zuweisung ist optional und blockiert den Spieltag nicht.",
+  training_missing:
+    "Training fehlt fuer mindestens einen Kaderspieler; Flow-Schritt, kein Season-Gate-Blocker.",
+  transfer_window_closed:
+    "Transferfenster ist geschlossen; erwarteter Phasen-Hinweis, kein technischer Season-Blocker.",
 };
 
 function warningKey(warning: string) {

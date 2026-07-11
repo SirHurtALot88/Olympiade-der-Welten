@@ -56,6 +56,9 @@ export async function POST(request: Request) {
     }
 
     if (!runId) {
+      if (action === "status") {
+        return NextResponse.json({ ok: true, run: null });
+      }
       return NextResponse.json({ ok: false, run: null, error: "runId is required." }, { status: 400 });
     }
 

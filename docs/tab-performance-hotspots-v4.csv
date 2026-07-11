@@ -1,0 +1,20 @@
+fromTab,toTab,v4Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,12249,6,2959,/api/media/player-portrait/player-2070-vel-shara,Tabwechsel >5s,slow
+Inbox,Einsatzliste,9541,0,0,,Tabwechsel >5s,slow
+Einsatzliste,Arena,12676,2,3351,/api/lineups/legacy/ai-batch-apply,Tabwechsel >5s,slow
+Arena,Saisonstand,28093,3,6847,/api/singleplayer-state,Tabwechsel >5s,slow
+Saisonstand,Teams,25490,7,108,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Teams,Spieler,20755,63,4472,/api/media/player-portrait/player-1596-misty,Tabwechsel >5s,slow
+Spieler,Training,34595,12,7607,/api/singleplayer-state,Tabwechsel >5s,slow
+Training,Gebäude,52095,1,8678,/api/singleplayer-state,Tabwechsel >5s,slow
+Gebäude,Transfermarkt,10677,0,0,,Tabwechsel >5s,slow
+Transfermarkt,Scouting,8891,1,6,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Scouting,Historie,96877,0,0,,"locator.waitFor: Timeout 90000ms exceeded.
+Call log:
+  - waiting for locator('#transfer-history:not(.foundation-section-hidden)').first() to be visible
+",failed
+Historie,Ranks,10942,0,0,,Tabwechsel >5s,slow
+Ranks,Diszis,38685,1,10842,/api/season/standings-overview,Tabwechsel >5s,slow
+Diszis,Sponsoren,83961,10,17503,/api/media/team-logo/H-R,Tabwechsel >5s,slow
+Sponsoren,Lexikon,60345,1,6547,/api/singleplayer-state/version,Tabwechsel >5s,slow
+START,Home,25191,,,initial_load,,ok

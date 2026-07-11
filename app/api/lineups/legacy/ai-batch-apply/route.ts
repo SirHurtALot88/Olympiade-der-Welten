@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
@@ -43,6 +45,17 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    saveId,
+    action: "lineup_ai_batch_apply",
+    source: "sqlite",
+    dryRun,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
   try {

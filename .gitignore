@@ -12,6 +12,7 @@ coverage/
 
 # local runtime data and generated reports
 tmp/
+.cache/
 test-results/
 playwright-report/
 outputs/

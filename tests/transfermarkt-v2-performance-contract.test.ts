@@ -25,11 +25,10 @@ describe("transfermarkt v2 performance contract", () => {
     const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
 
     expect(source).not.toContain("VISIBLE_CANDIDATE_RENDER_LIMIT");
-    expect(source).not.toContain("renderedVisibleItems.map");
     expect(source).not.toContain("Mehr laden");
     expect(source).not.toContain("loadNextMarketPage");
-    expect(source).toContain("visibleItems.map");
-    expect(source).toContain("marketItems.length} geladen");
+    expect(source).toContain("renderedVisibleItems.map");
+    expect(source).toContain("visibleItems.length} sichtbar");
   });
 
   it("supports keyboard navigation through the visible candidate list", () => {
@@ -37,6 +36,7 @@ describe("transfermarkt v2 performance contract", () => {
 
     expect(source).toContain("candidateButtonRefs");
     expect(source).toContain("handleCandidateKeyDown");
+    expect(source).toContain("onGlobalCandidateKeyDown");
     expect(source).toContain("ArrowDown");
     expect(source).toContain("ArrowUp");
     expect(source).toContain("Home");
@@ -84,9 +84,10 @@ describe("transfermarkt v2 performance contract", () => {
     expect(source).toContain("Slots");
   });
 
-  it("opens the player drawer from a candidate card double click", () => {
+  it("opens the player profile from a candidate name click", () => {
     const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
 
-    expect(source).toContain("onDoubleClick={() => onOpenPlayerDetails?.({ playerId: item.playerId })}");
+    expect(source).toContain("table-link-button");
+    expect(source).toContain("onOpenPlayerDetails?.({ playerId: item.playerId })");
   });
 });

@@ -482,11 +482,14 @@ describe("ai transfermarkt sell preview", () => {
 
     const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "ai-core");
     expect(candidate?.boardTrustScore).toBeLessThan(40);
-    expect(candidate?.boardTrustPolicy).toBe("do_not_renew");
-    expect(candidate?.salaryCapMultiplier).toBe(0);
+    // do_not_renew wurde entfernt: sehr niedriges Vertrauen fällt nun in den weicheren
+    // (rein informativen) renewal_warning-Tier und erzwingt keinen Verkauf mehr.
+    expect(candidate?.boardTrustPolicy).toBe("renewal_warning");
+    expect(candidate?.salaryCapMultiplier).toBe(0.7);
     expect(candidate?.boardTrustReasons).toContain("low_board_confidence");
     expect(candidate?.boardTrustReasons).toContain("performance_below_board_expectation");
-    expect(candidate?.reasonsToSell).toContain("Vorstand will keine Verlaengerung");
+    expect(candidate?.reasonsToSell).not.toContain("Vorstand will keine Verlaengerung");
+    expect(candidate?.reasonsToSell).not.toContain("Vorstand warnt vor voller Verlaengerung");
   });
 
   it("includes manual and passive teams only as informative rows in all-scope mode", async () => {
@@ -540,5 +543,37 @@ describe("ai transfermarkt sell preview", () => {
     const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "ai-core");
     expect(candidate?.reasonsToSell).toContain("faellt in ein Team-Hard-No-Go");
     expect(candidate?.sellPriorityScore).toBeTypeOf("number");
+  });
+
+  it("keeps roster-min advisory warning in default UI preview", async () => {
+    const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
+    const result = await buildAiTransfermarktSellPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      source: "sqlite",
+      teamId: "A-I",
+    });
+
+    expect(result.teams[0]?.status).toBe("low_roster_depth");
+    const warned = result.teams[0]?.sellCandidates.some((candidate) =>
+      candidate.warnings.some((warning) => warning.includes("unter das Team-Minimum")),
+    );
+    expect(warned).toBe(true);
+  });
+
+  it("allows AI sell preview below roster min when explicitly enabled", async () => {
+    const { buildAiTransfermarktSellPreview } = await import("@/lib/ai/ai-transfermarkt-sell-preview-service");
+    const result = await buildAiTransfermarktSellPreview({
+      saveId: "save-local",
+      seasonId: "season-1",
+      source: "sqlite",
+      teamId: "A-I",
+      allowSellBelowRosterMin: true,
+    });
+
+    expect(result.teams[0]?.status).not.toBe("low_roster_depth");
+    const minWarnings = result.teams[0]?.sellCandidates.flatMap((candidate) => candidate.warnings) ?? [];
+    expect(minWarnings.some((warning) => warning.includes("unter das Team-Minimum"))).toBe(false);
+    expect((result.teams[0]?.sellCandidates.length ?? 0) > 0).toBe(true);
   });
 });

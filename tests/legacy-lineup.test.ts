@@ -569,3 +569,47 @@ describe("legacy lineup validator", () => {
     expect(result.errors).toContain("Discipline tdm on d2 expects 2 entries, but received 1.");
   });
 });
+
+describe("legacy lineup draft ui contract", () => {
+  it("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
+    const fs = await import("node:fs/promises");
+    const lineupPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx";
+    const cssPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+    const [lineupText, cssText] = await Promise.all([fs.readFile(lineupPath, "utf8"), fs.readFile(cssPath, "utf8")]);
+
+    expect(lineupText).toContain("SHOW_DRAFT_LINEUP_WORKSPACE = true");
+    expect(lineupText).toContain("{showExpertBackupPanels ? (");
+    expect(lineupText).toContain('className="legacy-lineup-main-flow"');
+    expect(lineupText).toContain("legacy-lineup-captain-strip");
+    expect(lineupText).toContain("Vorschlag bewusst setzen");
+    expect(lineupText).toContain("legacy-lineup-progress-track");
+    expect(lineupText).toContain("updateFormCardSelection");
+    expect(lineupText).toContain("renderInlineFormCardSelectors");
+    expect(lineupText).toContain("queueFormCardPlanSave");
+    expect(lineupText).toContain("LegacyLineupSlotMicroSteps");
+    expect(lineupText).toContain("legacy-lineup-quick-assign-row");
+    expect(lineupText).toContain("LegacyLineupCandidateReasonChips");
+    expect(lineupText).toContain("legacy-lineup-draft-flow-chip");
+    expect(lineupText).toContain("Spieltag wird geladen");
+    expect(lineupText).toContain('role="tablist"');
+    expect(lineupText).toContain("Formplan");
+    const formBoardText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/FormBoardPanel.tsx",
+      "utf8",
+    );
+    expect(formBoardText).toContain("legacy-lineup-form-deck");
+    expect(formBoardText).toContain("legacy-lineup-form-board-chip-picks");
+    expect(lineupText).not.toContain("Im Formplan bearbeiten");
+    expect(lineupText).not.toContain("legacy-lineup-draft-tactics-form-readonly");
+    expect(lineupText).toContain("legacy-lineup-draft-tactics-form");
+    expect(lineupText).toContain("legacy-lineup-team-tactics-form");
+    expect(lineupText).toContain("FormBoardPanel");
+    expect(lineupText).toContain("DraftWorkspace");
+    expect(lineupText).toContain("LineupExpertPanels");
+    expect(lineupText).not.toContain("legacy-lineup-team-tactics-form-readonly");
+    expect(lineupText).toContain("scheduleHoveredCandidate");
+    expect(formBoardText).toContain("legacy-lineup-form-board-cell-velo-strip");
+    expect(cssText).not.toContain(".legacy-lineup-draft-intensity-preview");
+    expect(cssText).toContain(".legacy-lineup-draft-flow-chip");
+  });
+});

@@ -7,6 +7,8 @@ import {
   buildSeasonSnapshot,
   buildSeasonSnapshotDryRun,
   createSeasonSnapshot,
+  patchCompletedSeasonSnapshotAfterPreseasonBuy,
+  resolveSeasonSnapshotTeamRecords,
   SEASON_SNAPSHOT_CONFIRM_TOKEN,
   upsertSeasonSnapshotRecord,
 } from "@/lib/season/season-snapshot-service";
@@ -352,7 +354,7 @@ describe("season snapshot service", () => {
     expect(snapshot.finalStandings[0]?.disciplinePointsByArea.spe).toBe(18.6);
     expect(snapshot.finalStandings[0]?.cashEnd).toBe(244.5);
     expect(snapshot.finalStandings[0]?.salaryTotalEnd).toBe(10);
-    expect(snapshot.finalStandings[0]?.marketValueTotalEnd).toBe(110);
+    expect(snapshot.finalStandings[0]?.marketValueTotalEnd).toBe(100);
     expect(snapshot.finalStandings[0]?.transferBuyCount).toBe(1);
     expect(snapshot.playerPerformances).toHaveLength(1);
     expect(snapshot.playerPerformances[0]?.playerId).toBe("p1");
@@ -525,5 +527,66 @@ describe("season snapshot service", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.archivedAt).toBe("2026-06-06T00:00:00.000Z");
+  });
+
+  it("falls back to finalStandings when teamSnapshots is empty", () => {
+    const snapshot = buildSeasonSnapshot(createGameState());
+    const withEmptyTeamSnapshots = {
+      ...snapshot,
+      teamSnapshots: [],
+    };
+
+    expect(resolveSeasonSnapshotTeamRecords(withEmptyTeamSnapshots)).toEqual(snapshot.finalStandings);
+  });
+
+  it("patches completed season snapshot roster after next preseason buys", () => {
+    const seasonOneSnapshot = buildSeasonSnapshot(createGameState());
+    const patchedTeams = seasonOneSnapshot.finalStandings.map((team) => ({
+      ...team,
+      rosterEndPostSell: 7,
+      rosterEnd: 7,
+      rosterCountEnd: 7,
+    }));
+    const gameState: GameState = {
+      ...createGameState(),
+      season: {
+        ...createGameState().season,
+        id: "season-2",
+        name: "Season 2",
+      },
+      seasonState: {
+        ...createGameState().seasonState,
+        seasonId: "season-2",
+        seasonSnapshots: [
+          {
+            ...seasonOneSnapshot,
+            finalStandings: patchedTeams,
+            teamSnapshots: patchedTeams,
+          },
+        ],
+      },
+      rosters: [
+        { teamId: "A-A", playerId: "p1", salary: 10, contractLength: 2 },
+        { teamId: "A-A", playerId: "p2", salary: 10, contractLength: 2 },
+        { teamId: "A-A", playerId: "p3", salary: 10, contractLength: 2 },
+        { teamId: "B-B", playerId: "p4", salary: 10, contractLength: 2 },
+      ],
+      players: [
+        { id: "p1", name: "P1", gender: "male", race: "human", rating: 50, potential: 60 },
+        { id: "p2", name: "P2", gender: "male", race: "human", rating: 50, potential: 60 },
+        { id: "p3", name: "P3", gender: "male", race: "human", rating: 50, potential: 60 },
+        { id: "p4", name: "P4", gender: "male", race: "human", rating: 50, potential: 60 },
+      ],
+    };
+
+    const result = patchCompletedSeasonSnapshotAfterPreseasonBuy(gameState, "season-2");
+    expect(result.patched).toBe(true);
+    const seasonOne = result.gameState.seasonState.seasonSnapshots?.find((entry) => entry.seasonId === "season-1");
+    const teamA = seasonOne?.finalStandings.find((team) => team.teamId === "A-A");
+    const teamB = seasonOne?.finalStandings.find((team) => team.teamId === "B-B");
+    expect(teamA?.rosterEndPostSell).toBe(7);
+    expect(teamA?.rosterEnd).toBe(3);
+    expect(teamB?.rosterEnd).toBe(1);
+    expect(seasonOne?.entryRosterPatchedFromSeasonId).toBe("season-2");
   });
 });

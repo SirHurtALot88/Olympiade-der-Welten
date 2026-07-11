@@ -1,0 +1,13 @@
+{
+  "name": "Cloud Strife",
+  "id": "player-0020-cloud-strife",
+  "className": "Berserker",
+  "race": "Human",
+  "alignment": "C-G",
+  "gender": "m",
+  "subclasses": ["Agent", "Augmented", "Swashbuckler"],
+  "traitsPositive": ["Motivated", "FanFavorite", "Ambitious"],
+  "traitsNegative": ["Egomaniac", "Diva"],
+  "flavorDe": "Neonkern riecht nach feuchtem Beton, kaltem Reaktorwind und Neon, das auf Pfützen liegt wie billiger Schmuck. Cloud Strife kam aus Bezirk Sieben — aus der Kristallgarde, jener Einheit, die in glänzenden Rüstungen durch Regen marschierte und vorgab, Helden zu sein, solange Kameras liefen. Sein Haar war schon damals zu hell für normale Leute. Sein Blick war es auch.\n\nBeim Schwellenbruch im Grauen Tal stand er Wache, während unten ein Dorf verschwand, das auf keiner Karte mehr stand. Er rannte nicht als Erster rein. Er kam als Letzter raus — mit der Erinnerung eines toten Freundes im Kopf und einem Schwert auf dem Rücken, das für jemand anderen gebaut worden war. Zu groß, zu schwer, zu ehrlich für die Lüge, die Neonkern danach verkaufte: dass ein einzelner Held gereicht hätte.\n\nDie Augenbinde ist kein Stil. Splitter aus Reaktor Sieben, als die zweite Druckwelle kam. Der rote Mantel ist kein Cape — er ist das Einzige, das noch nach jemand anderem riecht, den er zu lange gespielt hat. Heute zieht er durch fremde Welten, bezahlt in Münzen und Schweigen, und sagt nur selten den Satz, der alles erklärt: „Ich bin kein Held. Ich bin der Typ, der aufräumt, wenn die Helden schon wieder posieren.“",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Cloud Strife.jpg"
+}

@@ -19,6 +19,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
     const read = source === "sqlite" ? listLocalTransfermarktFreeAgents : listTransfermarktFreeAgents;
+    const scoutingLevel = parseOptionalNumber(searchParams.get("scoutingLevel"));
+    const compactList = searchParams.get("compact") !== "false";
     const result = await read({
       saveId: searchParams.get("saveId")?.trim() || null,
       seasonId: searchParams.get("seasonId")?.trim() || null,
@@ -30,7 +32,8 @@ export async function GET(request: Request) {
       maxMarketValue: parseOptionalNumber(searchParams.get("maxMarketValue")),
       minSalary: parseOptionalNumber(searchParams.get("minSalary")),
       maxSalary: parseOptionalNumber(searchParams.get("maxSalary")),
-      scoutingLevel: parseOptionalNumber(searchParams.get("scoutingLevel")),
+      scoutingLevel,
+      compactList,
     });
 
     return NextResponse.json(result);

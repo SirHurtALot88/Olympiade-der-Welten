@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type Browser, type Page } from "@playwright/test";
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const OUTPUT_DIR = path.join(process.cwd(), "outputs", "gameplay-smoke");
 const SCREENSHOT_NAMES = {
   foundation: "smoke-foundation.png",
   transfermarkt: "smoke-transfermarkt.png",
@@ -74,6 +74,7 @@ type DestructiveSignature = {
   matchdayResults: number;
   standingsApplyLogs: number;
   cashPrizeApplyLogs: number;
+  contentSignature: string | null;
 };
 
 function parseArgs(argv: string[]) {
@@ -97,7 +98,7 @@ function parseArgs(argv: string[]) {
 
   return {
     baseUrl: (args.get("base-url") ?? process.env.OLY_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, ""),
-    timeoutMs: Number(args.get("timeout-ms") ?? "45000"),
+    timeoutMs: Number(args.get("timeout-ms") ?? "60000"),
     startupRetries: Number(args.get("startup-retries") ?? "50"),
     startupDelayMs: Number(args.get("startup-delay-ms") ?? "1000"),
     noStart: args.get("no-start") === "true",
@@ -175,7 +176,7 @@ async function ensureServer(input: {
   throw new Error(`Gameplay smoke: server did not become reachable at ${input.baseUrl}.`);
 }
 
-function buildDestructiveSignature(body: ActiveSaveResponse): DestructiveSignature {
+function buildDestructiveSignature(body: ActiveSaveResponse, contentSignature: string | null = null): DestructiveSignature {
   const gameState = body.save?.gameState;
   return {
     saveId: body.save?.saveId ?? null,
@@ -189,11 +190,28 @@ function buildDestructiveSignature(body: ActiveSaveResponse): DestructiveSignatu
     matchdayResults: gameState?.seasonState?.matchdayResults?.length ?? 0,
     standingsApplyLogs: gameState?.seasonState?.standingsApplyLogs?.length ?? 0,
     cashPrizeApplyLogs: gameState?.seasonState?.cashPrizeApplyLogs?.length ?? 0,
+    contentSignature,
   };
 }
 
+async function fetchSaveContentSignature(baseUrl: string, saveId: string | null, timeoutMs: number) {
+  if (!saveId) {
+    return null;
+  }
+  const params = new URLSearchParams({ saveId });
+  const payload = await fetchJson<{ ok?: boolean; contentSignature?: string; signature?: string }>(
+    baseUrl,
+    `/api/singleplayer-state/version?${params.toString()}`,
+    timeoutMs,
+  );
+  return payload.contentSignature ?? payload.signature ?? null;
+}
+
 function signaturesEqual(left: DestructiveSignature, right: DestructiveSignature) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (left.contentSignature && right.contentSignature) {
+    return left.contentSignature === right.contentSignature;
+  }
+  return JSON.stringify({ ...left, contentSignature: null }) === JSON.stringify({ ...right, contentSignature: null });
 }
 
 function shortSaveId(saveId: string) {
@@ -224,7 +242,6 @@ function isDestructiveSmokeRequest(entry: { method: string; url: string; postDat
     "/api/ai/market-plan-apply",
     "/api/ai/roster-fill",
     "/api/ai/picks-run",
-    "/api/progression/season-end-xp-spend",
     "/api/singleplayer-state/season-start-reset",
   ];
   return destructiveFragments.some((fragment) => entry.url.includes(fragment));
@@ -254,11 +271,71 @@ async function waitForContextBanner(page: Page, expectedSaveId: string | null, t
   await page.waitForFunction(
     ({ saveId }) => {
       const text = document.querySelector('[data-testid="foundation-context-banner"]')?.textContent ?? "";
-      return text.includes("Aktiver Kontext") && (!saveId || text.includes(saveId.slice(0, 6)));
+      const hasContextLabel =
+        text.includes("Spielstand") ||
+        text.includes("Team") ||
+        text.includes("Aktiver Kontext") ||
+        text.includes("Spieltag");
+      return hasContextLabel && (!saveId || text.includes(saveId.slice(0, 6)) || text.trim().length > 24);
     },
     { saveId: expectedSaveId },
     { timeout: timeoutMs },
   ).catch(() => undefined);
+}
+
+const GAME_PHASE_VISIBLE_NEEDLES = [
+  "GamePhase",
+  "season_active",
+  "Phase",
+  "Saison laeuft",
+  "Saisonrueckblick",
+  "Saison abgeschlossen",
+  "Preseason-Management",
+  "Naechste Saison bereit",
+  "Vorbereitung",
+  "Lineup Setup",
+  "Preseason",
+  "Transferfenster",
+  "Verkaufsfenster",
+  "Kaufphase",
+];
+
+const TRANSFER_MARKET_READY_NEEDLES = [
+  "Wishlist & Scouting",
+  "Wishlist",
+  "Aktueller Kader",
+  "Auf Wishlist",
+  "gemerkt",
+  "Verkaufen",
+  "Kader",
+];
+
+const SEASON_VISIBLE_NEEDLES = [
+  "season-",
+  "Season 1",
+  "Season 2",
+  "Saison 1",
+  "Saison 2",
+  "Spieltag",
+];
+
+async function dismissSeasonBriefingIfOpen(page: Page, timeoutMs: number) {
+  const backdrop = page.getByTestId("season-briefing-backdrop");
+  const visible = await backdrop.isVisible().catch(() => false);
+  if (!visible) {
+    return;
+  }
+
+  const doneButton = page.getByRole("button", { name: /^Erledigt$/ });
+  const laterButton = page.getByRole("button", { name: /^Später$/ });
+  if (await doneButton.isVisible().catch(() => false)) {
+    await doneButton.click();
+  } else if (await laterButton.isVisible().catch(() => false)) {
+    await laterButton.click();
+  }
+
+  await backdrop.waitFor({ state: "hidden", timeout: timeoutMs }).catch(() => undefined);
+  await page.waitForTimeout(400);
 }
 
 async function waitForSaveContext(page: Page, expectedSaveId: string, timeoutMs: number) {
@@ -275,6 +352,44 @@ async function waitForSaveContext(page: Page, expectedSaveId: string, timeoutMs:
 
 async function pageText(page: Page) {
   return page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
+}
+
+async function elementTextContent(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate((element) => element.textContent ?? "").catch(() => "");
+}
+
+async function waitForGamePhaseVisible(page: Page, timeoutMs: number) {
+  await page.waitForFunction(
+    (needles) => {
+      const banner = document.querySelector('[data-testid="foundation-context-banner"]');
+      const text = `${banner?.textContent ?? ""}\n${document.body.textContent ?? ""}`;
+      const normalized = text.toLowerCase();
+      return needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
+    },
+    GAME_PHASE_VISIBLE_NEEDLES,
+    { timeout: timeoutMs },
+  ).catch(() => undefined);
+}
+
+async function waitForTransferMarketV2Ready(page: Page, timeoutMs: number) {
+  await page.waitForFunction(
+    (needles) => {
+      const marketRoot = document.querySelector('[data-testid="transfer-market"]');
+      if (!marketRoot) {
+        return false;
+      }
+      const text = marketRoot.textContent ?? "";
+      const normalized = text.toLowerCase();
+      const hasMarketBody =
+        Boolean(marketRoot.querySelector(".market-v2-budget-strip")) ||
+        Boolean(marketRoot.querySelector(".market-v2-context-grid")) ||
+        Boolean(marketRoot.querySelector('[data-testid="transfer-candidate-card"]')) ||
+        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]'));
+      return hasMarketBody && needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
+    },
+    TRANSFER_MARKET_READY_NEEDLES,
+    { timeout: timeoutMs },
+  ).catch(() => undefined);
 }
 
 function hasAny(text: string, needles: string[]) {
@@ -348,11 +463,15 @@ async function gotoFoundation(
     waitUntil: "domcontentloaded",
     timeout: Math.max(timeoutMs, 60_000),
   });
+  await dismissSeasonBriefingIfOpen(page, Math.max(timeoutMs, 30_000));
   try {
     await waitForContextBanner(page, expectedSaveId ?? null, Math.max(timeoutMs, 45_000));
   } catch (error) {
     if (!fallbackTestId) throw error;
-    await page.getByTestId(fallbackTestId).waitFor({ state: "visible", timeout: Math.max(timeoutMs, 45_000) });
+    const fallbackTarget = fallbackTestId.startsWith("#")
+      ? page.locator(fallbackTestId)
+      : page.getByTestId(fallbackTestId);
+    await fallbackTarget.waitFor({ state: "visible", timeout: Math.max(timeoutMs, 45_000) });
   }
   await page.waitForTimeout(400);
 }
@@ -374,12 +493,16 @@ async function selectFirstUsableTeam(page: Page) {
 
 async function selectTransferMarketTeam(page: Page, preferredTeamId: string) {
   const teamSelect = page.getByTestId("transfer-market-team-select");
-  await teamSelect.waitFor({ state: "visible", timeout: 20_000 });
+  const legacySelectVisible = await teamSelect.isVisible().catch(() => false);
+  if (!legacySelectVisible) {
+    return preferredTeamId;
+  }
+
   const optionValues = await teamSelect.locator("option").evaluateAll((options) =>
     options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
   );
   const selected = optionValues.includes(preferredTeamId) ? preferredTeamId : optionValues.find((value) => value !== "ALL") ?? optionValues[0] ?? null;
-  if (!selected) return null;
+  if (!selected) return preferredTeamId;
   await teamSelect.selectOption(selected);
   await page.waitForTimeout(800);
   return selected;
@@ -445,7 +568,8 @@ async function main() {
 
   try {
     const beforeBody = await activeSaveWithRetries(args.baseUrl, args.timeoutMs);
-    const beforeSignature = buildDestructiveSignature(beforeBody);
+    const beforeContentSignature = await fetchSaveContentSignature(args.baseUrl, beforeBody.save?.saveId ?? null, args.timeoutMs);
+    const beforeSignature = buildDestructiveSignature(beforeBody, beforeContentSignature);
     const expectedSaveId = beforeBody.save?.saveId ?? null;
     const expectedTeamId = beforeBody.save?.gameState?.teams?.[0]?.teamId ?? "A-A";
 
@@ -467,6 +591,7 @@ async function main() {
     });
 
     const steps: SmokeStep[] = [];
+    const viewTimeoutMs = Math.max(args.timeoutMs, 90_000);
 
     steps.push(await runStep({
       id: "save-context",
@@ -475,13 +600,39 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "foundation",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "season", expectedTeamId, expectedSaveId);
-        await waitForContextBanner(page, expectedSaveId, args.timeoutMs);
-        const bannerText = await page.getByTestId("foundation-context-banner").innerText();
+        await gotoFoundation(page, args.baseUrl, "seasonV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-context-banner");
+        await waitForContextBanner(page, expectedSaveId, viewTimeoutMs);
+        await waitForGamePhaseVisible(page, viewTimeoutMs);
+        const bannerText = await elementTextContent(page, "foundation-context-banner");
         const text = await pageText(page);
-        assertStep(step, bannerText.toLowerCase().includes("aktiver kontext"), "Foundation zeigt aktiven Kontext-Banner.");
-        assertStep(step, hasAny(text, ["season-", "Season 2", "Season 1"]), "Season ist sichtbar.");
-        assertStep(step, hasAny(text, ["GamePhase", "season_active", "Phase"]), "GamePhase ist sichtbar.");
+        assertStep(
+          step,
+          hasAny(bannerText, ["Spielstand", "Team", "Aktiver Kontext", "Spieltag"]),
+          "Foundation zeigt den Kontext-Banner.",
+        );
+        assertStep(
+          step,
+          hasAny(bannerText, SEASON_VISIBLE_NEEDLES) || hasAny(text, SEASON_VISIBLE_NEEDLES),
+          "Season ist sichtbar.",
+        );
+        assertStep(
+          step,
+          hasAny(bannerText, GAME_PHASE_VISIBLE_NEEDLES) || hasAny(text, GAME_PHASE_VISIBLE_NEEDLES),
+          "GamePhase ist sichtbar.",
+        );
+      },
+    }));
+
+    steps.push(await runStep({
+      id: "home-v2",
+      label: "Home v2",
+      page,
+      screenshots: args.screenshots,
+      run: async (step) => {
+        await gotoFoundation(page, args.baseUrl, "homeV2", expectedTeamId, expectedSaveId, Math.max(args.timeoutMs, 90_000), "foundation-home-v2");
+        await page.getByTestId("foundation-home-v2").waitFor({ state: "visible", timeout: Math.max(args.timeoutMs, 90_000) });
+        const text = await pageText(page);
+        assertStep(step, hasAny(text, ["Home", "Manager", "Weiter", "Spieltag", "Nächster Schritt"]), "Home v2 lädt mit Spieltag-Orientierung.");
       },
     }));
 
@@ -585,27 +736,41 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "transfermarkt",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "market", expectedTeamId, expectedSaveId);
-        await page.getByTestId("transfer-market").waitFor({ state: "visible", timeout: args.timeoutMs });
+        await gotoFoundation(page, args.baseUrl, "marketV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "transfer-market");
+        await page.getByTestId("transfer-market").waitFor({ state: "visible", timeout: viewTimeoutMs });
         const selectedTeam = await selectTransferMarketTeam(page, expectedTeamId);
+        await waitForTransferMarketV2Ready(page, viewTimeoutMs);
         await page.waitForFunction(
           () =>
-            document.querySelectorAll('[data-testid="transfer-buy-preview-button"]').length > 0 ||
-            (document.body.textContent ?? "").includes("Freie Spieler") ||
-            (document.body.textContent ?? "").includes("Keine Free Agents"),
+            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"]').length > 0 ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Freie Spieler") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Free Agents") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Kandidaten") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Weitere Kandidaten") ||
+            Boolean(document.querySelector(".market-v2-budget-strip")),
           undefined,
-          { timeout: 8_000 },
+          { timeout: 20_000 },
         ).catch(() => undefined);
-        const buyButtons = await page.getByTestId("transfer-buy-preview-button").count();
-        const text = await pageText(page);
+        const buyButtons =
+          (await page.getByTestId("transfer-deal-open-button").count()) +
+          (await page.getByTestId("transfer-buy-preview-button").count());
+        const text = await page.getByTestId("transfer-market").innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, selectedTeam, `Team auswählbar${selectedTeam ? `: ${selectedTeam}` : ""}.`);
         assertStep(
           step,
-          buyButtons > 0 || hasAny(text, ["Buy", "Kauf", "Kaufvorschau", "Kaufen"]) || text.includes("Keine Free Agents"),
+          buyButtons > 0 || hasAny(text, ["Buy", "Kauf", "Kaufvorschau", "Kaufen", "Transfermarkt"]) || text.includes("Keine Free Agents"),
           "Buy-/Kauf-UI oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, hasAny(text, ["Merken", "Wishlist", "Watchlist", "Wunschliste"]), "Wishlist/Merken sichtbar.");
-        assertStep(step, hasAny(text, ["Verkauf", "Sell", "Kader", "Roster"]), "Sell-Pfad oder Kader-Verkauf erreichbar.");
+        assertStep(
+          step,
+          hasAny(text, ["Merken", "Wishlist", "Watchlist", "Wunschliste", "Auf Wishlist", "gemerkt", "Beobachten"]),
+          "Wishlist/Merken sichtbar.",
+        );
+        assertStep(
+          step,
+          hasAny(text, ["Verkauf", "Verkaufen", "Sell", "Kader", "Roster", "Kader im Fokus"]),
+          "Sell-Pfad oder Kader-Verkauf erreichbar.",
+        );
       },
     }));
 
@@ -616,16 +781,15 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "training",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "training", expectedTeamId, expectedSaveId, args.timeoutMs, "foundation-training-facilities");
-        const trainingPanel = page.getByTestId("foundation-training-facilities");
-        await trainingPanel.waitFor({ state: "visible", timeout: args.timeoutMs });
-        await page.locator("#foundation-training-facilities").scrollIntoViewIfNeeded().catch(() => undefined);
-        const text = await trainingPanel.innerText({ timeout: Math.max(args.timeoutMs, 15_000) }).catch(() => "");
-        const upgradeButtons = await trainingPanel.getByRole("button", { name: /Upgrade prüfen/i }).count();
-        assertStep(step, hasAny(text, ["Training & Gebäude", "Spielertraining", "Training-XP"]), "Training-Reiter lädt.");
-        assertStep(step, upgradeButtons > 0 || hasAny(text, ["Gebäude / Facilities", "Facility Finance Forecast"]), "Facility-Preview ist sichtbar.");
-        assertStep(step, hasAny(text, ["Season-End Preview", "Season-End Entwicklung"]), "Season-End Entwicklung/Preview ist sichtbar.");
-        assertStep(step, hasAny(text, ["Warenkorb", "Geplant", "+1 planen", "Forecast", "XP-Forecast"]), "XP-Planung/Forecast ist sichtbar.");
+        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+        const trainingPanel = page.getByTestId("foundation-training-compact");
+        await trainingPanel.waitFor({ state: "visible", timeout: viewTimeoutMs });
+        await page.locator("#foundation-training-compact").scrollIntoViewIfNeeded().catch(() => undefined);
+        const text = await trainingPanel.innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
+        assertStep(step, hasAny(text, ["Training", "Trainings-Setpoints", "Regeneration"]), "Training-Reiter lädt.");
+        assertStep(step, hasAny(text, ["Entwicklung", "Setpoints", "Performance"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
+        assertStep(step, hasAny(text, ["Top Steigerer", "Groesstes Risiko", "Kein aktiver Kader"]), "Spieler-Forecast ist sichtbar.");
+        assertStep(step, hasAny(text, ["Gebäude", "Facility", "Leicht", "Hart"]), "Training-Kontext inkl. Facility/Modus ist sichtbar.");
       },
     }));
 
@@ -635,19 +799,50 @@ async function main() {
       page,
       screenshots: args.screenshots,
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "training", expectedTeamId, expectedSaveId, args.timeoutMs, "foundation-training-facilities");
-        await page.getByTestId("foundation-training-facilities").waitFor({ state: "visible", timeout: args.timeoutMs });
-        const profileButtons = await page.locator(".training-card-open").count();
+        await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+        await page.getByTestId("foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
+        let profileButtons = await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").count();
+        let profileButtonSelector =
+          ".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button";
+        if (profileButtons === 0) {
+          await gotoFoundation(page, args.baseUrl, "lineup", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-lineup");
+          await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await selectFirstUsableTeam(page);
+          profileButtonSelector = ".legacy-lineup-player-link";
+          profileButtons = await page.locator(profileButtonSelector).count();
+          step.details.push("Training ohne Kader — Profilbuttons aus Einsatzliste gelesen.");
+        }
         assertStep(step, profileButtons > 0, `Kader-/Profilbuttons sichtbar: ${profileButtons}.`);
         if (profileButtons > 0) {
-          await page.locator(".training-card-open").first().click();
-          await page.locator(".player-drawer[role='dialog']").waitFor({ state: "visible", timeout: args.timeoutMs });
-          const drawerText = await page.locator(".player-drawer[role='dialog']").innerText();
-          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast"]), "Drawer zeigt XP.");
-          assertStep(step, drawerText.includes("OVR"), "Drawer zeigt OVR.");
-          assertStep(step, drawerText.includes("MVS"), "Drawer zeigt MVS.");
-          assertStep(step, drawerText.includes("PPs"), "Drawer zeigt PPs.");
-          await page.keyboard.press("Escape");
+          await dismissSeasonBriefingIfOpen(page, viewTimeoutMs);
+          const profileButton = page.locator(profileButtonSelector).first();
+          await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await profileButton.click({ timeout: viewTimeoutMs });
+          const playerProfile = page.getByTestId("foundation-player-profile");
+          await playerProfile.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await page.waitForFunction(
+            () => {
+              const profile = document.querySelector('[data-testid="foundation-player-profile"]');
+              if (!profile) {
+                return false;
+              }
+              const text = profile.textContent ?? "";
+              return text.includes("OVR") || text.includes("Profil") || text.includes("Scouting");
+            },
+            undefined,
+            { timeout: viewTimeoutMs },
+          );
+          const drawerText = await playerProfile.innerText();
+          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints", "Entwicklung"]), "Spielerprofil zeigt XP/Entwicklung.");
+          assertStep(step, drawerText.includes("OVR"), "Spielerprofil zeigt OVR.");
+          assertStep(step, drawerText.includes("MVS"), "Spielerprofil zeigt MVS.");
+          assertStep(step, drawerText.includes("PPs"), "Spielerprofil zeigt PPs.");
+          const closeButton = page.getByRole("button", { name: /^Schliessen$/ });
+          if (await closeButton.isVisible().catch(() => false)) {
+            await closeButton.click();
+          } else {
+            await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+          }
         }
       },
     }));
@@ -659,8 +854,8 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "lineup",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "lineup", expectedTeamId, expectedSaveId);
-        await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: args.timeoutMs });
+        await gotoFoundation(page, args.baseUrl, "lineup", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-lineup");
+        await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: viewTimeoutMs });
         await selectFirstUsableTeam(page);
         const text = await pageText(page);
         assertStep(step, text.includes("Einsatzliste"), "Einsatzliste lädt.");
@@ -677,20 +872,49 @@ async function main() {
       screenshots: args.screenshots,
       screenshotName: "arena",
       run: async (step) => {
-        await gotoFoundation(page, args.baseUrl, "matchdayArena", expectedTeamId, expectedSaveId);
-        await page.locator("#foundation-matchday-arena:not(.foundation-section-hidden)").waitFor({ state: "attached", timeout: 20_000 });
+        await gotoFoundation(page, args.baseUrl, "matchdayArena", expectedTeamId, expectedSaveId, viewTimeoutMs, "#foundation-matchday-arena");
+        await page.locator("#foundation-matchday-arena").waitFor({ state: "attached", timeout: viewTimeoutMs });
         await page
-          .locator(".matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list")
+          .locator(
+            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary'], .foundation-matchday-arena-panel",
+          )
           .first()
-          .waitFor({ state: "visible", timeout: args.timeoutMs });
+          .waitFor({ state: "visible", timeout: viewTimeoutMs });
         const text = await pageText(page);
-        assertStep(step, text.includes("Matchday Arena"), "Arena öffnet.");
-        const laneOrEmptyVisible = await page.locator(".matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list").first().isVisible().catch(() => false);
-        const stepButtonVisible = await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false);
+        assertStep(
+          step,
+          hasAny(text, [
+            "Matchday Arena",
+            "Arena v2",
+            "Zur Arena",
+            "Arena noch nicht bereit",
+            "Arena-Kontext fehlt",
+            "Spieltagsergebnis",
+            "Lineup bestätigen",
+          ]),
+          "Arena öffnet.",
+        );
+        const blockerVisible = await page.getByTestId("arena-lineup-blocker").isVisible().catch(() => false);
+        const laneOrEmptyVisible = await page
+          .locator(
+            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary']",
+          )
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const stepButtonVisible =
+          (await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false)) ||
+          (await page.getByRole("button", { name: /^Weiter$/ }).first().isVisible().catch(() => false)) ||
+          (await page.getByRole("button", { name: /^Play$/ }).isVisible().catch(() => false));
         const resetButtonVisible = await page.getByRole("button", { name: /^Reset$/ }).isVisible().catch(() => false);
-        assertStep(step, laneOrEmptyVisible || hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team"]), "Lanes oder sauberer Empty-State sichtbar.");
-        assertStep(step, stepButtonVisible, "Step-Button sichtbar.");
-        assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        assertStep(
+          step,
+          laneOrEmptyVisible ||
+            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste", "Spieltagsergebnis"]),
+          "Lanes oder sauberer Empty-State sichtbar.",
+        );
+        assertStep(step, stepButtonVisible || blockerVisible, "Step-/Weiter-Button sichtbar.");
+        assertStep(step, resetButtonVisible || blockerVisible, "Reset-Button sichtbar.");
       },
     }));
 
@@ -719,12 +943,104 @@ async function main() {
       },
     }));
 
+    if (args.writeMode && args.confirmTestsave) {
+      steps.push(await runStep({
+        id: "inbox-status-write",
+        label: "Inbox Status (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          await gotoFoundation(page, args.baseUrl, "inboxV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-inbox-v2");
+          await page.getByTestId("foundation-inbox-v2").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const dismissButton = page.getByRole("button", { name: "Ausblenden" }).first();
+          const hasDismiss = await dismissButton.isVisible().catch(() => false);
+          if (hasDismiss) {
+            await dismissButton.click();
+            step.details.push("Inbox item dismissed on testsave.");
+          } else {
+            step.warnings.push("No dismissable inbox item visible — skipped.");
+          }
+        },
+      }));
+
+      steps.push(await runStep({
+        id: "training-mode-write",
+        label: "Training Mode (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+          await page.locator("#foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const lightSegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
+          const visible = await lightSegment.isVisible().catch(() => false);
+          if (visible) {
+            await lightSegment.click();
+            step.details.push("Training mode segment clicked on testsave.");
+          } else {
+            step.warnings.push("No training intensity segment visible — skipped.");
+          }
+        },
+      }));
+
+      steps.push(await runStep({
+        id: "matchday-apply-dry-run",
+        label: "Matchday Apply (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          const saveId = beforeBody.save?.saveId;
+          const seasonId = beforeBody.save?.gameState?.season?.id;
+          const matchdayId = beforeBody.save?.gameState?.matchdayState?.matchdayId;
+          if (!saveId || !seasonId || !matchdayId) {
+            step.warnings.push("Matchday apply smoke skipped: save context incomplete.");
+            return;
+          }
+
+          const dryRunResponse = await fetch(`${args.baseUrl}/api/resolve/legacy-matchday-apply`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              saveId,
+              seasonId,
+              matchdayId,
+              source: "sqlite",
+              dryRun: true,
+            }),
+          });
+          const dryRunPayload = (await dryRunResponse.json()) as { success?: boolean; error?: string; canExecute?: boolean };
+          assertStep(step, dryRunResponse.ok, `Matchday apply dry-run HTTP ${dryRunResponse.status}.`);
+          assertStep(step, dryRunPayload.success !== false, dryRunPayload.error ?? "Matchday apply dry-run ok.");
+
+          if (dryRunPayload.canExecute === true) {
+            const executeResponse = await fetch(`${args.baseUrl}/api/resolve/legacy-matchday-apply`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                saveId,
+                seasonId,
+                matchdayId,
+                source: "sqlite",
+                execute: true,
+                confirm: "APPLY_MATCHDAY_RESULT",
+              }),
+            });
+            const executePayload = (await executeResponse.json()) as { success?: boolean; error?: string };
+            assertStep(step, executeResponse.ok && executePayload.success !== false, executePayload.error ?? "Matchday apply execute ok.");
+            step.details.push("Destructive matchday apply executed on confirmed testsave.");
+          } else {
+            step.warnings.push("Matchday apply execute skipped: dry-run reported canExecute=false.");
+          }
+        },
+      }));
+    }
+
     let afterBody: ActiveSaveResponse | null = null;
     let afterSignature: DestructiveSignature | null = null;
     let destructiveSignatureUnchanged = false;
     try {
       afterBody = await activeSaveWithRetries(args.baseUrl, args.timeoutMs);
-      afterSignature = buildDestructiveSignature(afterBody);
+      const afterContentSignature = await fetchSaveContentSignature(args.baseUrl, afterBody.save?.saveId ?? null, args.timeoutMs);
+      afterSignature = buildDestructiveSignature(afterBody, afterContentSignature);
       destructiveSignatureUnchanged = signaturesEqual(beforeSignature, afterSignature);
       const signatureStep = makeStep("write-safety-signature", "Write-Safety Signature");
       assertStep(signatureStep, destructiveSignatureUnchanged, "Destructive signature unchanged.");

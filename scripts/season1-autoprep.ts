@@ -94,9 +94,9 @@ type FormCardAuditRow = {
   staleCards: number;
 };
 
+const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
-  process.env.OLY_AUTOPREP_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  process.env.OLY_AUTOPREP_OUTPUT_DIR ?? path.join(PROJECT_ROOT, "outputs");
 const WRITE_ENABLED = process.argv.includes("--write");
 const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
@@ -695,8 +695,24 @@ function main() {
     },
   };
 
-  const training = applyTrainingModes(gameState);
-  gameState = training.gameState;
+  let trainingRows: TrainingAuditRow[] = [];
+  if (process.env.OLY_AUTOPREP_SKIP_MANAGER_TRAINING === "1") {
+    const training = applyTrainingModes(gameState);
+    gameState = training.gameState;
+    trainingRows = training.rows;
+    console.error("[autoprep] legacy heuristic training applied (OLY_AUTOPREP_SKIP_MANAGER_TRAINING=1)");
+  } else {
+    const missingModes = gameState.players.filter(
+      (player) =>
+        gameState.rosters.some((entry) => entry.playerId === player.id) &&
+        !player.trainingMode,
+    ).length;
+    if (missingModes > 0) {
+      console.error(`[autoprep] skip heuristic training; ${missingModes} roster players without manager training mode`);
+    } else {
+      console.error("[autoprep] skip heuristic training (canonical manager path)");
+    }
+  }
   const lineupPrep = prepLineups(gameState, save.saveId);
   gameState = lineupPrep.gameState;
   console.error(`[autoprep] prep complete elapsed=${Date.now() - startedAt}ms`);
@@ -706,10 +722,10 @@ function main() {
   }
 
   const formRows = buildFormCardAudit(gameState);
-  const readiness = buildReadiness(gameState, preflight, training.rows, lineupPrep.rows, formRows);
+  const readiness = buildReadiness(gameState, preflight, trainingRows, lineupPrep.rows, formRows);
   const lineupCsv = writeCsv(exportName("lineup-readiness.csv"), lineupPrep.rows);
   const formCsv = writeCsv(exportName("formcards-audit.csv"), formRows);
-  const trainingCsv = writeCsv(exportName("training-audit.csv"), training.rows);
+  const trainingCsv = writeCsv(exportName("training-audit.csv"), trainingRows);
   const json = writeJson(exportName("autoprep-readiness.json"), readiness);
   const md = writeMarkdown(exportName("autoprep-readiness.md"), buildMarkdown(readiness, { json, lineupCsv, formCsv, trainingCsv }));
 

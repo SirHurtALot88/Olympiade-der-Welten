@@ -115,6 +115,18 @@ describe("player stats adapter", () => {
     expect(getImportedPlayerDisplaySalary(player)).toBe(16.54);
   });
 
+  it("materializes official rank-table economy for imported catalog players", () => {
+    const players = loadImportedPlayerStats();
+    const first = players[0];
+    const vipWal = players.find((player) => player.id === "player-2984-vip-wal");
+
+    expect(first?.marketValue).toBe(first?.displayMarketValue);
+    expect(first?.salaryDemand).toBe(first?.displaySalary);
+    expect(first?.marketValue).toBeLessThan(1000);
+    expect(vipWal?.marketValue).toBeGreaterThan(50);
+    expect(vipWal?.salaryDemand).toBeGreaterThan(5);
+  });
+
   it("normalizes imported player ratings to a visible 1-100 ovr scale", () => {
     const scale = getImportedPlayerOvrScale();
 

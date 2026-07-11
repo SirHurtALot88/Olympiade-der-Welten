@@ -1,9 +1,26 @@
 "use client";
 
-import ClassColorChip from "@/app/foundation/ClassColorChip";
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { useMemo, useState } from "react";
+
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { FoundationCard } from "@/components/foundation/FoundationCard";
+import { EmptyState } from "@/components/foundation/EmptyState";
+import { TooltipHeading } from "@/components/ui/TooltipHeading";
+import {
+  buildTrainingImpactItems,
+  buildTrainingModeSegments,
+  formatVeloNumber,
+  formatVeloSignedNumber,
+  VeloAttributeFocusTags,
+  VeloImpactStrip,
+  VeloIntensityRail,
+} from "@/components/foundation/velo-ui";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 
 import type {
   TrainingClassOption,
@@ -11,40 +28,182 @@ import type {
   TrainingModeOption,
   TrainingPlayerRowView,
 } from "@/app/foundation/training-facilities-v2/training-view-types";
-
-const AXIS_META = {
-  pow: { label: "POW", tone: "is-pow" },
-  spe: { label: "SPE", tone: "is-spe" },
-  men: { label: "MEN", tone: "is-men" },
-  soc: { label: "SOC", tone: "is-soc" },
-} as const;
+import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 
 export function formatLocaleNumber(value: number | null | undefined, digits = 0) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  }).format(value);
+  return formatVeloNumber(value, digits);
 }
 
 export function formatSignedPercent(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
+  if (value == null || !Number.isFinite(value)) return "—";
   const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatLocaleNumber(value, 0)}%`;
+  return `${prefix}${formatVeloNumber(value, 0)}%`;
 }
 
 export function getDevelopmentTone(row: TrainingPlayerRowView) {
-  if (row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high") {
+  if (row.organicForecast.netSetpoints < 0 || row.forecast.regressionRisk === "high") {
     return "regression";
   }
-  if (row.forecast.netDevelopmentXP >= 45) {
+  if (row.organicForecast.netSetpoints >= 2) {
     return "growth";
   }
   return "stable";
+}
+
+export type TrainingBudgetBreakdownStep = {
+  key: string;
+  operator: "base" | "add" | "subtract" | "result";
+  label: string;
+  value: string;
+  detail?: string;
+};
+
+/**
+ * Stepped Basis -> Modifikatoren -> Netto chain for the training/performance forecast.
+ * Pure presentation layer: reuses fields already computed by `buildOrganicSeasonProgression`
+ * (via `TrainingPlayerRowView`), no new balancing math. See docs/training-forecast-breakdown.md.
+ */
+export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): TrainingBudgetBreakdownStep[] {
+  const modePresentation = getTrainingModePresentation(row.mode);
+  const baseBudget = modePresentation.trainingSetpoints;
+  const appliedTraining = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
+  const appliedPerformance = row.attributeForecast.reduce((sum, entry) => sum + entry.performance, 0);
+  const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+
+  const knownMultiplier =
+    (1 + row.modifiers.traitModifierPct / 100) *
+    row.modifiers.potentialTrainingMultiplier *
+    (1 + row.modifiers.facilityModifierPct / 100);
+  const totalMultiplier = baseBudget > 0 ? row.organicForecast.trainingSetpoints / baseBudget : 1;
+  const otherBonusPct = knownMultiplier > 0 ? Math.round((totalMultiplier / knownMultiplier - 1) * 1000) / 10 : 0;
+
+  const steps: TrainingBudgetBreakdownStep[] = [
+    {
+      key: "base",
+      operator: "base",
+      label: `Basis-Training (${modePresentation.label})`,
+      value: `+${formatVeloNumber(baseBudget, 2)}`,
+      detail: "Fixer Startwert je Trainingsintensitaet, noch ohne Boni.",
+    },
+    {
+      key: "trait",
+      operator: "add",
+      label: "Trait-Bonus",
+      value: formatSignedPercent(row.modifiers.traitModifierPct),
+      detail: "Charaktereigenschaften wie Diligent (+) oder Lazy (-).",
+    },
+    {
+      key: "potential",
+      operator: "add",
+      label: "Potential-Multiplikator",
+      value: `x${formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}`,
+      detail: "Wie viel Luft zum gescouteten Potential noch nach oben offen ist.",
+    },
+    {
+      key: "facility",
+      operator: "add",
+      label: "Facility-Bonus",
+      value: formatSignedPercent(row.modifiers.facilityModifierPct),
+      detail: "Trainingscenter-Level, Zustand und Team-Entwicklungsfokus.",
+    },
+  ];
+
+  if (Math.abs(otherBonusPct) >= 0.5) {
+    steps.push({
+      key: "other",
+      operator: "add",
+      label: "Weitere Boni (Rolle/Fokus)",
+      value: formatSignedPercent(otherBonusPct),
+      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschluesselt.",
+    });
+  }
+
+  steps.push(
+    {
+      key: "budget",
+      operator: "result",
+      label: "= Trainingsbudget",
+      value: `+${formatVeloNumber(row.organicForecast.trainingSetpoints, 2)}`,
+      detail: "Gesamtbudget, das ueber alle 12 Attribute verteilt wird (Klassenprofil + Affinitaet).",
+    },
+    {
+      key: "applied-training",
+      operator: "add",
+      label: "Angewendet auf Stats",
+      value: `+${formatVeloNumber(appliedTraining, 2)}`,
+      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinitaet und Attribut-Decke.",
+    },
+    {
+      key: "performance",
+      operator: "add",
+      label: "+ Performance-Anteil",
+      value: `+${formatVeloNumber(appliedPerformance, 2)}`,
+      detail: `Aus echten Matchday-Ergebnissen (Score, Rang, Beitrag). Zum Vergleich: Saison-PPs ${
+        row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"
+      } · MVS ${row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}.`,
+    },
+    {
+      key: "regression",
+      operator: "subtract",
+      label: "− Regression",
+      value: formatVeloNumber(appliedRegression, 2),
+      detail: "Laufende Basis-Abnutzung plus zusaetzlicher Marktwert-Druck bei teuren Spielern.",
+    },
+    {
+      key: "net",
+      operator: "result",
+      label: "= Netto-Forecast",
+      value: formatVeloSignedNumber(row.organicForecast.netSetpoints, 2),
+      detail: "Summe aller 12 Attribut-Deltas: Training + Performance − Regression.",
+    },
+  );
+
+  return steps;
+}
+
+const BREAKDOWN_OPERATOR_SYMBOL: Record<TrainingBudgetBreakdownStep["operator"], string> = {
+  base: "Basis",
+  add: "+",
+  subtract: "−",
+  result: "=",
+};
+
+export function TrainingBudgetBreakdownDisclosure({ row }: { row: TrainingPlayerRowView }) {
+  const [expanded, setExpanded] = useState(false);
+  const steps = useMemo(() => buildTrainingBudgetBreakdown(row), [row]);
+
+  return (
+    <div className="training-budget-breakdown-disclosure">
+      <div className="training-budget-breakdown-head">
+        <button
+          className="secondary-button inline-button"
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Berechnung ausblenden" : "Wie kommt das zustande?"}
+        </button>
+        <small
+          className="training-budget-breakdown-forecast-hint"
+          title="Diese Werte sind eine laufende Prognose auf Basis des Saisonend-Batch-Modells. Sie werden nicht pro Spieltag verbucht, sondern erst als ein Schritt beim Saisonwechsel final auf den Spieler angewendet."
+        >
+          Forecast · wird erst am Saisonende final angewendet
+        </small>
+      </div>
+      {expanded ? (
+        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt fuer Schritt">
+          {steps.map((step) => (
+            <div className={`training-budget-breakdown-step is-${step.operator}`} key={step.key} title={step.detail}>
+              <span className="training-budget-breakdown-operator">{BREAKDOWN_OPERATOR_SYMBOL[step.operator]}</span>
+              <span className="training-budget-breakdown-label">{step.label}</span>
+              <strong className="training-budget-breakdown-value">{step.value}</strong>
+              {step.detail ? <small className="training-budget-breakdown-detail">{step.detail}</small> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function getPortraitModel(player: TrainingPlayerRowView["player"]) {
@@ -59,13 +218,398 @@ function getPortraitModel(player: TrainingPlayerRowView["player"]) {
   return { src, initials };
 }
 
-function TrainingAxisPill({ axis, value }: { axis: keyof typeof AXIS_META; value: number }) {
-  const meta = AXIS_META[axis];
+function getDevelopmentBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
+  if (tone === "growth") return "steigt";
+  if (tone === "regression") return "kann fallen";
+  return "stabil";
+}
+
+function getDemandStatusLabel(status: PlayerDemandStatus) {
+  switch (status) {
+    case "fulfilled":
+      return "erfuellt";
+    case "at_risk":
+      return "unter Druck";
+    case "failed":
+      return "ignoriert";
+    default:
+      return "offen";
+  }
+}
+
+function getTrainingStartStateLabel(row: TrainingPlayerRowView) {
+  if ((row.playerPps ?? 0) <= 0 && (row.playerMvs ?? 0) <= 0) {
+    return "Startzustand · erste Saisonwerte bauen sich noch auf";
+  }
+  return null;
+}
+
+function TrainingTraitBoostRow({ row }: { row: TrainingPlayerRowView }) {
+  if (row.traitBoosts.length === 0 && row.modifiers.traitModifierPct === 0) {
+    return null;
+  }
+
   return (
-    <span className={`training-v2-axis-pill ${meta.tone}`}>
-      <small>{meta.label}</small>
-      <strong>{formatLocaleNumber(value, 0)}</strong>
-    </span>
+    <div className="training-v2-trait-boost-row" aria-label="Trait Training Boosts">
+      <div className="training-v2-trait-boost-summary">
+        <span>Trait Boost</span>
+        <strong className={row.modifiers.traitModifierPct >= 0 ? "text-positive" : "text-negative"}>
+          {formatSignedPercent(row.modifiers.traitModifierPct)}
+        </strong>
+      </div>
+      <div className="training-v2-trait-boost-chips">
+        {row.traitBoosts.slice(0, 4).map((entry) => (
+          <span
+            key={`${row.player.id}-${entry.trait}`}
+            className={`training-v2-trait-chip is-${entry.tone}`}
+            title={`${entry.trait}: ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}% Legacy Training Signal`}
+          >
+            {entry.tone === "positive" ? "★" : entry.tone === "negative" ? "▼" : "•"} {entry.trait} {entry.pct >= 0 ? "+" : ""}
+            {formatVeloNumber(entry.pct, 1)}%
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
+  const demand = row.trainingDemand;
+  if (!demand || demand.status === "fulfilled") {
+    return null;
+  }
+
+  const preferred = getTrainingModePresentation(demand.preferredMode);
+  return (
+    <div className={`training-v2-mode-demand is-${demand.status}`} aria-label="Trainingswunsch">
+      <div className="training-v2-mode-demand-copy">
+        <strong>{demand.label}</strong>
+        <span>
+          {getDemandStatusLabel(demand.status)} · will {preferred.label} · Moral {demand.moraleReward >= 0 ? "+" : ""}
+          {demand.moraleReward}/{demand.moralePenalty}
+        </span>
+      </div>
+      <small>{demand.detail}</small>
+    </div>
+  );
+}
+
+/**
+ * Small always-visible pill row below the portrait card — KI-Empfehlung,
+ * Trait-Boost und Trainingswunsch als kompakte Chips mit Tooltip statt
+ * grosser Banner-Boxen. Voller Text bleibt in TrainingCardDetails/Drawer.
+ */
+function TrainingCardCompactBadges({ row }: { row: TrainingPlayerRowView }) {
+  const recommendedMode = row.recommendedTrainingMode ?? null;
+  const recommendedPresentation = recommendedMode ? getTrainingModePresentation(recommendedMode) : null;
+  const showRecommendation =
+    recommendedMode != null && recommendedMode !== row.mode && row.recommendedTrainingMatchesCurrent === false;
+  const demand = row.trainingDemand;
+  const hasDemand = demand != null && demand.status !== "fulfilled";
+  const hasTraitBoost = row.traitBoosts.length > 0 || row.modifiers.traitModifierPct !== 0;
+
+  if (!showRecommendation && !hasDemand && !hasTraitBoost) {
+    return null;
+  }
+
+  return (
+    <div className="training-v2-card-compact-badges" aria-label="Trainings-Hinweise">
+      {showRecommendation && recommendedPresentation ? (
+        <span
+          className="training-v2-card-badge is-recommendation"
+          data-testid="training-ai-recommendation"
+          title={`Empfohlen: ${recommendedPresentation.label}${row.recommendedTrainingDetail ? ` — ${row.recommendedTrainingDetail}` : ""}`}
+        >
+          💡 {recommendedPresentation.label}
+        </span>
+      ) : null}
+      {hasTraitBoost ? (
+        <span
+          className={`training-v2-card-badge is-trait${row.modifiers.traitModifierPct >= 0 ? " is-positive" : " is-negative"}`}
+          title={
+            row.traitBoosts
+              .map((entry) => `${entry.trait} ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}%`)
+              .join(" · ") || "Trait Training Boost"
+          }
+        >
+          ★ {formatSignedPercent(row.modifiers.traitModifierPct)}
+        </span>
+      ) : null}
+      {hasDemand && demand ? (
+        <span
+          className={`training-v2-card-badge is-demand is-${demand.status}`}
+          title={`${demand.label} · ${getDemandStatusLabel(demand.status)} · Moral ${demand.moraleReward >= 0 ? "+" : ""}${demand.moraleReward}/${demand.moralePenalty} — ${demand.detail}`}
+        >
+          ⚑ will {getTrainingModePresentation(demand.preferredMode).label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function TrainingAttributeUpgradeStrip({ row }: { row: TrainingPlayerRowView }) {
+  const upgrades = useMemo(
+    () =>
+      [...row.attributeForecast]
+        .filter((entry) => entry.delta > 0)
+        .sort((left, right) => right.delta - left.delta)
+        .slice(0, 4),
+    [row.attributeForecast],
+  );
+  if (upgrades.length === 0) {
+    return null;
+  }
+  return (
+    <div className="training-v2-upgrade-strip" data-testid="training-attribute-upgrade-strip" aria-label="Attribut-Upgrades">
+      {upgrades.map((entry) => (
+        <button key={`upgrade-${row.player.id}-${entry.attributeKey}`} type="button" className="training-v2-upgrade-tile" title={`${entry.attribute} +1 · ca. 40 SP`}>
+          <span>{entry.attribute}</span>
+          <strong>+1</strong>
+          <small>~40 SP</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TrainingWhyDisclosure({ row }: { row: TrainingPlayerRowView }) {
+  const reasons = [
+    row.organicForecast.netSetpoints >= 0 ? "Training/Performance überwiegen" : "Regression oder Fatigue drücken",
+    row.forecast.regressionRisk !== "low" ? `Rückschritt-Risiko: ${row.forecast.regressionRisk}` : "Regression aktuell ruhig",
+    row.modifiers.signatureAttributes.length > 0 ? `★ Signature: ${row.modifiers.signatureAttributes.join(", ")}` : null,
+  ].filter(Boolean);
+  return (
+    <details className="training-v2-why-disclosure">
+      <summary>Warum?</summary>
+      <ul>
+        {reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/**
+ * Full analysis for a single player card — same blocks as before the
+ * compaction (trait boosts, demand banner, forecast row, PPs/MVS, impact
+ * strip, budget breakdown, focus tags, attribute grid, modifier footer),
+ * just collapsed behind a toggle instead of always rendered. Identical
+ * content/order to `PlayerTrainingControls` in the player drawer.
+ */
+function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="training-v2-card-details-wrapper">
+      <button
+        type="button"
+        className="secondary-button inline-button training-v2-card-details-toggle"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+      >
+        {expanded ? "Analyse ausblenden" : "Analyse anzeigen"}
+      </button>
+      {expanded ? (
+        <div className="training-v2-card-details">
+          <TrainingTraitBoostRow row={row} />
+          <TrainingModeDemandBanner row={row} />
+
+          <div className="training-v2-rider-forecast-row">
+            <div>
+              <span>Stat Forecast</span>
+              <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
+                {row.organicForecast.netSetpoints > 0 ? "+" : ""}
+                {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
+              </strong>
+            </div>
+            <div>
+              <span>Training</span>
+              <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+            </div>
+            <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
+              <span>Performance</span>
+              <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
+            </div>
+            <div>
+              <span>Fatigue</span>
+              <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
+            </div>
+          </div>
+
+          <p
+            className="muted training-v2-reality-note"
+            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt."
+          >
+            Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
+            {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
+          </p>
+
+          <VeloImpactStrip
+            flashKey={row.mode}
+            items={buildTrainingImpactItems({
+              trainingSetpoints: row.organicForecast.trainingSetpoints,
+              performanceSetpoints: row.organicForecast.performanceSetpoints,
+              netSetpoints: row.organicForecast.netSetpoints,
+              recoveryBefore: row.recoveryForecast.before,
+              recoveryAfter: row.recoveryForecast.after,
+              recoveryDeltaPct: row.recoveryForecast.modifierPct,
+              regressionRisk: row.forecast.regressionRisk,
+            })}
+          />
+
+          <TrainingBudgetBreakdownDisclosure row={row} />
+          <TrainingWhyDisclosure row={row} />
+
+          <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
+
+          <TrainingAttributeForecastGrid row={row} />
+
+          <div className="training-v2-player-foot training-v2-modifier-row">
+            <small>
+              Traits {formatSignedPercent(row.modifiers.traitModifierPct)} · Facility{" "}
+              {formatSignedPercent(row.modifiers.facilityModifierPct)} · Potential x
+              {formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}
+            </small>
+            {row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? (
+              <small className={`training-v2-mode-demand-foot is-${row.trainingDemand.status}`}>
+                Wunsch {getTrainingModePresentation(row.trainingDemand.preferredMode).label} · aktuell{" "}
+                {getTrainingModePresentation(row.mode).label}
+              </small>
+            ) : null}
+            <small>
+              {row.modifiers.signatureAttributes.length > 0 ? `★ ${row.modifiers.signatureAttributes.join(" / ")}` : "★ —"}
+              {row.modifiers.weakAttribute ? ` · ◆ Weak ${row.modifiers.weakAttribute}` : ""}
+            </small>
+            <small>{row.modeConfig.note}</small>
+            <small>
+              Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
+            </small>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowView }) {
+  const [expanded, setExpanded] = useState(false);
+  const sorted = useMemo(
+    () =>
+      sortTrainingAttributeForecastByClassProfile(
+        row.attributeForecast,
+        row.trainingClass,
+        row.adminBalancingConfig,
+      ),
+    [row.adminBalancingConfig, row.attributeForecast, row.trainingClass],
+  );
+  const visible = expanded ? sorted : sorted.slice(0, 5);
+
+  if (visible.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="training-v2-attribute-forecast">
+      <div className="training-v2-attribute-forecast-head">
+        <TooltipHeading
+          as="strong"
+          tooltip="Trainingsplan zeigt die laufende Saison-Prognose aus Training, Performance und Regression. Das Entwicklungsziel darunter bleibt die Saisonende-Sicht auf Attribute und Klassen."
+        >
+          Trainingsplan (laufende Saison)
+        </TooltipHeading>
+        {sorted.length > 5 ? (
+          <button className="secondary-button inline-button" type="button" onClick={() => setExpanded((current) => !current)}>
+            {expanded ? "Weniger" : `Alle ${sorted.length} Stats`}
+          </button>
+        ) : null}
+      </div>
+      <div className="training-v2-attribute-forecast-grid">
+        {visible.map((entry) => (
+          <article
+            className={`training-v2-attribute-forecast-card${entry.delta < 0 ? " is-risk" : entry.delta > 0 ? " is-gain" : ""}${entry.affinity === "signature" ? " is-signature" : entry.affinity === "weak" ? " is-weak" : ""}${entry.ceilingState === "capped" ? " is-ceiling-capped" : entry.ceilingState === "closing" ? " is-ceiling-closing" : ""}`}
+            key={`${row.player.id}-${entry.attributeKey}`}
+          >
+            <div className="training-v2-attribute-forecast-title">
+              <small>{entry.attribute}</small>
+              {entry.affinity === "signature" ? <span className="training-v2-affinity-mark is-signature">★</span> : null}
+              {entry.affinity === "weak" ? <span className="training-v2-affinity-mark is-weak">◆</span> : null}
+              {entry.ceilingState === "capped" ? (
+                <span
+                  className="training-v2-ceiling-mark is-capped"
+                  title="Potential erreicht — kaum noch Trainingswachstum moeglich"
+                >
+                  Limit
+                </span>
+              ) : entry.ceilingState === "closing" ? (
+                <span
+                  className="training-v2-ceiling-mark is-closing"
+                  title={`Potential fast erreicht — ${entry.headroomLabel ?? "eng"}`}
+                >
+                  {entry.headroomLabel ?? "eng"}
+                </span>
+              ) : null}
+            </div>
+            <strong>
+              {formatVeloNumber(entry.before, 1)} → {formatVeloNumber(entry.after, 1)}
+            </strong>
+            <em>{formatVeloSignedNumber(entry.delta, 1)}</em>
+            <div className="training-v2-attribute-forecast-split">
+              <span>T {formatVeloSignedNumber(entry.training, 1)}</span>
+              <span>P {formatVeloSignedNumber(entry.performance, 1)}</span>
+              <span>R {formatVeloSignedNumber(entry.regression, 1)}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type TrainingModeGuideProps = {
+  trainingModeOptions: TrainingModeOption[];
+};
+
+export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProps) {
+  return (
+    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklaerung">
+      {trainingModeOptions.map((option) => (
+        <article
+          className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
+          key={`mode-guide-${option.value}`}
+          title={`Trainingsbudget vor Trait-, Potential- und Facility-Boni. Separat fliessen +${formatVeloNumber(option.baseXp, 0)} Entwicklungs-XP automatisch in Formkurve und Regressionsschutz ein — kein manuelles Ausgeben.`}
+        >
+          <span>{option.label}</span>
+          <strong>+{formatVeloNumber(option.trainingSetpoints, 1)} Trainingsbudget · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
+          <small>
+            {option.recoveryDeltaPct > 0 ? `+${option.recoveryDeltaPct}% Reg` : option.recoveryDeltaPct < 0 ? `${option.recoveryDeltaPct}% Reg` : "±0 Reg"} · {option.note}
+          </small>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Wraps `TrainingModeGuide` behind a collapsed-by-default toggle so the
+ * always-open Leicht/Mittel/Hart explainer cards don't push the roster
+ * below the fold. Same disclosure pattern as `TrainingBudgetBreakdownDisclosure`.
+ */
+export function TrainingModeGuideDisclosure({ trainingModeOptions }: TrainingModeGuideProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="training-v2-mode-guide-disclosure">
+      <button
+        type="button"
+        className="secondary-button inline-button"
+        onClick={() => setExpanded((current) => !current)}
+        aria-expanded={expanded}
+      >
+        {expanded ? "Trainings-Erklaerung ausblenden" : "Wie funktioniert Training?"}
+      </button>
+      {expanded ? <TrainingModeGuide trainingModeOptions={trainingModeOptions} /> : null}
+    </div>
   );
 }
 
@@ -81,6 +625,9 @@ type TrainingPlayerLaneProps = {
   onSetTrainingClass: (playerId: string, trainingClass: string) => void;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   trainingModeReadOnly?: boolean;
+  showIntensityRail?: boolean;
+  onActivePlayerChange?: (playerId: string) => void;
+  activeComparePlayerId?: string | null;
 };
 
 export function TrainingPlayerLane({
@@ -95,178 +642,188 @@ export function TrainingPlayerLane({
   onSetTrainingClass,
   onOpenPlayerDetails,
   trainingModeReadOnly = false,
+  showIntensityRail = true,
+  onActivePlayerChange,
+  activeComparePlayerId = null,
 }: TrainingPlayerLaneProps) {
+  const modeSegments = buildTrainingModeSegments(
+    trainingModeOptions.map((option) => ({
+      value: option.value,
+      label: option.label,
+      trainingSetpoints: option.trainingSetpoints,
+      baseXp: option.baseXp,
+      recoveryDeltaPct: option.recoveryDeltaPct,
+      fatigueLoad: option.fatigueLoad,
+      note: option.note,
+    })),
+  );
+
+  const teamModeCounts = useMemo(
+    () =>
+      playerRows.reduce(
+        (counts, row) => {
+          counts[row.mode] += 1;
+          return counts;
+        },
+        { leicht: 0, mittel: 0, hart: 0 },
+      ),
+    [playerRows],
+  );
+
   return (
     <>
       <div className="training-v2-section-head">
         <div>
-          <span className="training-v2-kicker">Spielertraining</span>
-          <strong>Wer steigt jetzt, wer kippt spaeter?</strong>
+          <TooltipHeading as="h3" tooltip="Modus und Klasse pro Spieler. Filter nach Entwicklung und Risiko.">
+            Kader
+          </TooltipHeading>
         </div>
         <span className="pill">
           {playerRows.length}/{allPlayerCount}
         </span>
       </div>
 
+      <div className="training-v2-team-mode-strip" aria-label="Team-Trainingsmodus">
+        <span>Team-Modus</span>
+        <strong>
+          Leicht {teamModeCounts.leicht} · Mittel {teamModeCounts.mittel} · Hart {teamModeCounts.hart}
+        </strong>
+      </div>
+
       <div className="training-v2-filter-row">
         {([
-          { id: "all" as const, label: "Alle", detail: "ganzer Kader" },
-          { id: "growth" as const, label: "Steigt", detail: "lohnt sich jetzt" },
-          { id: "stable" as const, label: "Stabil", detail: "Modus pruefen" },
-          { id: "regression" as const, label: "Risiko", detail: "zuerst sichern" },
+          { id: "growth" as const, label: "Upgrade bereit" },
+          { id: "regression" as const, label: "Risiko" },
+          { id: "stable" as const, label: "Stabil" },
+          { id: "all" as const, label: "Alle" },
         ]).map((filter) => (
-          <button
+          <FoundationCard
             key={filter.id}
+            as="div"
+            variant="metric"
             className={`training-v2-filter-card${developmentFilter === filter.id ? " is-active" : ""}`}
-            type="button"
-            onClick={() => onSetDevelopmentFilter(filter.id)}
           >
             <span>{filter.label}</span>
             <strong>{developmentSummary[filter.id]}</strong>
-            <small>{filter.detail}</small>
-          </button>
+            <FoundationButton variant="secondary" className="inline-button" onClick={() => onSetDevelopmentFilter(filter.id)}>
+              {developmentFilter === filter.id ? "Aktiv" : "Filtern"}
+            </FoundationButton>
+          </FoundationCard>
         ))}
       </div>
 
-      <div className="training-v2-player-list">
+      <div className="training-v2-player-list training-v2-rider-grid team-portraits-grid">
         {playerRows.map((row) => {
           const portrait = getPortraitModel(row.player);
           const tone = getDevelopmentTone(row);
+          const isHighRisk = row.forecast.regressionRisk === "high";
+          const modePresentation = getTrainingModePresentation(row.mode);
           return (
-            <article className={`training-v2-player-card is-${tone}`} id={`training-player-${row.player.id}`} key={row.entryId}>
-              <button
-                className="training-v2-player-head"
-                type="button"
-                onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
-              >
-                <div className="training-v2-player-media">
-                  {portrait.src ? (
-                    <OptimizedMediaImage
-                      src={portrait.src}
-                      alt={row.player.name}
-                      width={78}
-                      height={78}
-                      className="training-v2-player-image"
-                    />
-                  ) : (
-                    <div className="training-v2-player-image training-v2-player-image-fallback">{portrait.initials}</div>
-                  )}
-                </div>
-                <div className="training-v2-player-copy">
-                  <strong className="training-v2-clickable">{row.player.name}</strong>
-                  <p>
-                    <ClassColorChip className={row.player.className} /> · {row.roleTag ?? "ohne Rolle"}
-                  </p>
-                  <div className="training-v2-axis-row">
-                    <TrainingAxisPill axis="pow" value={row.player.coreStats.pow} />
-                    <TrainingAxisPill axis="spe" value={row.player.coreStats.spe} />
-                    <TrainingAxisPill axis="men" value={row.player.coreStats.men} />
-                    <TrainingAxisPill axis="soc" value={row.player.coreStats.soc} />
-                  </div>
-                </div>
-                <div className="training-v2-player-badge-row">
-                  <span className={`training-v2-badge is-${tone}`}>
-                    {tone === "growth" ? "steigt" : tone === "regression" ? "kann fallen" : "stabil"}
-                  </span>
-                </div>
-              </button>
+            <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}${activeComparePlayerId === row.player.id ? " is-compare-active" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
+              <FoundationPlayerPortraitCard
+                playerId={row.player.id}
+                name={row.player.name}
+                portraitUrl={portrait.src}
+                portraitInitials={portrait.initials}
+                playerOvr={row.developmentStars.currentAbilityRating}
+                playerMvs={row.playerMvs}
+                playerPps={row.playerPps}
+                pow={row.player.coreStats.pow}
+                spe={row.player.coreStats.spe}
+                men={row.player.coreStats.men}
+                soc={row.player.coreStats.soc}
+                leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                variant="team"
+                context="training"
+                density="full"
+                interactive={false}
+                highlight={getDevelopmentBadgeLabel(tone)}
+                subMeta={
+                  row.organicForecast.classBefore === row.organicForecast.classAfter
+                    ? row.player.className
+                    : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`
+                }
+                contextData={{
+                  training: {
+                    caRating: row.developmentStars.currentAbilityRating,
+                    poDisplay: row.developmentStars.potentialStars ?? formatVeloNumber(row.developmentStars.potentialRating, 0),
+                    netSetpoints: row.organicForecast.netSetpoints,
+                    regressionRisk: row.forecast.regressionRisk,
+                    trainingModeLabel: modePresentation.label,
+                    traitModifierPct: row.modifiers.traitModifierPct,
+                  },
+                }}
+                title={`${row.player.name} Profil öffnen`}
+                testId="training-player-portrait-card"
+                onOpen={() => onActivePlayerChange?.(row.player.id)}
+                footerSlot={
+                  <>
+                    {getTrainingStartStateLabel(row) ? (
+                      <small className="muted training-v2-start-state">{getTrainingStartStateLabel(row)}</small>
+                    ) : null}
+                    {onOpenPlayerDetails ? (
+                      <button
+                        type="button"
+                        className="table-link-button training-v2-open-profile training-v2-rider-portrait-button"
+                        onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
+                      >
+                        Profil öffnen
+                      </button>
+                    ) : null}
+                    {showIntensityRail ? (
+                      <VeloIntensityRail
+                        ariaLabel={`${row.player.name} Trainingsmodus`}
+                        segments={modeSegments}
+                        activeValue={row.mode}
+                        demandValue={
+                          row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? row.trainingDemand.preferredMode : null
+                        }
+                        disabled={trainingModeReadOnly}
+                        onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
+                      />
+                    ) : null}
+                    <div className="training-v2-plan-controls">
+                      <label className="filter-field training-v2-class-select">
+                        <span>Trainingsklasse</span>
+                        <select
+                          className="input"
+                          value={row.trainingClass}
+                          disabled={trainingModeReadOnly}
+                          onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
+                        >
+                          {trainingClassOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </>
+                }
+              />
 
-              <div className="training-v2-player-metrics">
-                <div>
-                  <span>Stat Forecast</span>
-                  <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
-                    {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-                    {formatLocaleNumber(row.organicForecast.netSetpoints, 1)}
-                  </strong>
-                </div>
-                <div>
-                  <span>Training</span>
-                  <strong>+{formatLocaleNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
-                </div>
-                <div>
-                  <span>Potential</span>
+              <TrainingCardCompactBadges row={row} />
+              {tone === "regression" ? (
+                <FoundationCard variant="decision" className="training-v2-regression-callout">
+                  <span className="eyebrow">Rueckschritt sichtbar</span>
                   <strong>
-                    {row.organicForecast.potentialRating ?? "—"} · x{formatLocaleNumber(row.organicForecast.potentialTrainingMultiplier, 2)}
+                    {row.organicForecast.netSetpoints < 0
+                      ? `Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)}`
+                      : `Risiko ${row.forecast.regressionRisk}`}
                   </strong>
-                </div>
-                <div>
-                  <span>Fatigue</span>
-                  <strong>+{formatLocaleNumber(row.organicForecast.fatigueLoad, 1)}</strong>
-                </div>
-              </div>
-
-              <div className="training-v2-plan-controls">
-                <div className="training-v2-mode-strip" aria-label={`${row.player.name} Trainingsmodus`}>
-                  {trainingModeOptions.map((option) => (
-                    <button
-                      key={`${row.player.id}-${option.value}`}
-                      className={`training-v2-mode-chip${row.mode === option.value ? " is-active" : ""}`}
-                      type="button"
-                      disabled={trainingModeReadOnly}
-                      onClick={() => onSetTrainingMode(row.player.id, option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <label className="filter-field training-v2-class-select">
-                  <span>Trainingsklasse</span>
-                  <select
-                    className="input"
-                    value={row.trainingClass}
-                    disabled={trainingModeReadOnly}
-                    onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
-                  >
-                    {trainingClassOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="training-v2-stat-forecast">
-                {row.organicForecast.topGains.map((entry) => (
-                  <span key={`${row.player.id}-gain-${entry.attribute}`}>
-                    <small>{entry.attribute}</small>
-                    <strong>
-                      {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-                    </strong>
-                    <em>+{formatLocaleNumber(entry.delta, 1)}</em>
-                  </span>
-                ))}
-                {row.organicForecast.topLosses.map((entry) => (
-                  <span className="is-risk" key={`${row.player.id}-loss-${entry.attribute}`}>
-                    <small>{entry.attribute}</small>
-                    <strong>
-                      {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-                    </strong>
-                    <em>{formatLocaleNumber(entry.delta, 1)}</em>
-                  </span>
-                ))}
-              </div>
-
-              <div className="training-v2-player-foot">
-                <small>{row.modeConfig.note}</small>
-                <small>
-                  Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter} · Training {row.trainingClass}
-                </small>
-                <small>
-                  Performance +{formatLocaleNumber(row.organicForecast.performanceSetpoints, 1)} · Steigerungsstufe {row.forecast.trainingFormTier}
-                </small>
-                <small>
-                  Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
-                </small>
-              </div>
+                  <p className="muted">
+                    {row.fatigueWarning} · Marktwert-Druck {formatVeloNumber(row.forecast.regressionPressure, 0)}
+                  </p>
+                </FoundationCard>
+              ) : null}
+              <TrainingAttributeUpgradeStrip row={row} />
+              <TrainingCardDetails row={row} />
             </article>
           );
         })}
         {playerRows.length === 0 ? (
-          <div className="training-v2-empty">
-            <strong>Keine Spieler im aktuellen Filter.</strong>
-            <p>Wechsle den Entwicklungsfokus oder waehle ein anderes Team.</p>
-          </div>
+          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder waehle ein anderes Team." />
         ) : null}
       </div>
     </>

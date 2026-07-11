@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
 import { db } from "@/src/server/db";
+import { resolveSeasonOneMarketBuyBlocker } from "@/lib/season/transfer-season-policy";
 import type { ContractShape, ContractYearSalary, RosterPromisedRole } from "@/lib/data/olyDataTypes";
 import type {
   NegotiationDemandBreakdownEntry,
@@ -28,6 +29,23 @@ export type TransfermarktBuyParams = {
   purchasePriceOverride?: number;
   purchasePriceOverrideReason?: string;
   allowRecentlySoldRebuyOverride?: boolean;
+  /**
+   * Root-cause fix (2026-07-04, W-W chronically stuck below hardMin — see
+   * outputs/real-engine-s1s5-final/progress-log.md): SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER (any team
+   * sold this player already this season) has no override anywhere, unlike the same-team-specific
+   * `allowRecentlySoldRebuyOverride`. That cooldown exists to stop healthy teams from speculative
+   * sell-then-immediately-rebuy churn — a reasonable rule for the normal buy/sell pipeline. But the
+   * emergency-roster-repair fallback (chunked-redraft-topup-service.ts, mode
+   * "preseason_roster_repair") is a last-resort mechanism that only ever runs for a team still below
+   * hardMin after every earlier tier (unified engine, regular repair) has failed. On a late-season
+   * save the free-agent pool's cheap tier can be thin enough that a below-hardMin team's entire
+   * legal candidate shortlist is a single player — and losing that one candidate to an unrelated
+   * team's independent sale in the same session permanently strands the repair with no fallback of
+   * its own, since retrying doesn't change the (correct, by design) cooldown. This flag lets a
+   * caller explicitly accept that trade-off for a specific, narrowly-scoped case (a team still below
+   * its absolute roster minimum), without weakening the cooldown for any regular buy.
+   */
+  bypassSoldThisSeasonCooldown?: boolean;
   fastLocalBatch?: boolean;
   localRunContext?: unknown;
   deferPersist?: boolean;
@@ -243,6 +261,10 @@ async function resolveBuyContext(
   }
   if (contractLength !== 1) {
     warnings.push("contract_length_override_in_effect");
+  }
+  const seasonOneMarketBlocker = resolveSeasonOneMarketBuyBlocker(params.seasonId, params.transferSource);
+  if (seasonOneMarketBlocker) {
+    blockingReasons.push(seasonOneMarketBlocker);
   }
 
   const canBuy = blockingReasons.length === 0;

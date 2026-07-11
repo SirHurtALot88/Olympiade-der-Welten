@@ -1,0 +1,20 @@
+{
+  "name": "Viper",
+  "id": "player-0347-viper",
+  "className": "Charger",
+  "race": "Human",
+  "alignment": "C-B",
+  "gender": "m",
+  "subclasses": ["Ninja", "Monk", "Lord"],
+  "traitsPositive": ["Eloquent", "FanFavorite", "Fearless"],
+  "traitsNegative": ["Egomaniac", "Scandalous", "Obsessive"],
+  "attributes": {
+    "power": 60, "health": 74, "stamina": 73, "intelligence": 42,
+    "awareness": 28, "determination": 66, "speed": 70, "dexterity": 86,
+    "charisma": 94, "will": 78, "spirit": 17, "torment": 76
+  },
+  "flavorDe": "Unter Gewitterhimmel und dem silbernen Licht eines vollen Monds erkennt man Viper an der dunklen Rüstung mit ihren filigranen Spitzen, dem roten Tuch und den Hörnern am Helm, die wie ein Warnsignal wirken. Er stammt aus den Grenzstädten, wo man Klinge und Schweigen gleich gut bezahlt — und wo Ruf wichtiger ist als Wahrheit. Einst war er nur ein schneller Krieger zwischen Verträgen und Verrat. Heute tritt er auf wie ein Lord, redet wie ein Diplomat und schlägt zu wie jemand, der weiß, dass Applaus auch Ablenkung sein kann. Das Publikum liebt ihn. Gegner nennen ihn laut. Viper lächelt selten unter dem Helm — aber wenn die Augen rot aufleuchten, ist die Pointe meist schon gesetzt.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Viper.jpg",
+  "cost": 80,
+  "upkeepBase": 9
+}

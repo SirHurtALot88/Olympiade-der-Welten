@@ -15,6 +15,8 @@ import {
   getFacilityLevel,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
+import { getDevelopmentWeightedFacilityUpgradeDiscount, getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -51,6 +53,14 @@ export type FacilityUpgradeApplyResult = Omit<FacilityUpgradePreview, "dryRun"> 
   dryRun: false;
   applied: boolean;
   facilityEventId: string | null;
+  // Populated with the freshly-persisted save whenever `applied` is true, so bulk callers (e.g.
+  // applyAiManagerPlan looping over many teams/actions) can chain straight into it instead of
+  // re-reading via persistence.getSaveById — each such read re-materializes the full GameState
+  // from SQL (cost scales with total players/history and was measured to reach 100+ms and rising
+  // per call on multi-season saves), which turns an O(actions) plan into an O(actions × state size)
+  // one. See outputs/real-engine-s1s5-final/progress-log.md (2026-07-04, applyCanonicalManagerPlan
+  // 141s/season-3 case study).
+  save?: PersistedSaveGame | null;
 };
 
 export type FacilityUpgradeAction = "upgrade" | "downgrade";
@@ -128,6 +138,7 @@ function buildWarnings(input: {
   currentIncome: number;
   newIncome: number;
   upgradeCost: number | null;
+  isIncomeFacility: boolean;
 }) {
   const warnings: string[] = [];
   if (input.cashBefore != null && input.upgradeCost != null && input.upgradeCost > input.cashBefore * 0.35) {
@@ -139,7 +150,7 @@ function buildWarnings(input: {
   if (input.cashAfter != null && input.cashAfter < 10) {
     warnings.push("cash_after_upgrade_low");
   }
-  if (input.newIncome <= input.currentIncome) {
+  if (input.isIncomeFacility && input.newIncome <= input.currentIncome) {
     warnings.push("income_source_missing");
   }
   if (input.newUpkeep > input.currentUpkeep) {
@@ -190,7 +201,19 @@ export function previewFacilityUpgrade(
   const newUpkeep = calculateFacilityUpkeep(nextTeamFacilities);
   const currentIncome = calculateFacilityIncome(teamFacilities);
   const newIncome = calculateFacilityIncome(nextTeamFacilities);
-  const upgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
+  const rawUpgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const profile = getTeamStrategyProfile(gameState, teamId);
+  const developmentTendency =
+    team != null ? getTeamDevelopmentTendency({ team, identity, profile }) : null;
+  const upgradeCost =
+    rawUpgradeCost != null && developmentTendency
+      ? getDevelopmentWeightedFacilityUpgradeDiscount({
+          baseUpgradeCost: rawUpgradeCost,
+          facilityId,
+          tendency: developmentTendency,
+        })
+      : rawUpgradeCost;
   const refundAmount =
     action === "downgrade" && downgradeRefundSourceDefinition
       ? roundValue(downgradeRefundSourceDefinition.upgradeCost * 0.25)
@@ -253,7 +276,16 @@ export function previewFacilityUpgrade(
     newIncome,
     cashBefore,
     cashAfter,
-    warnings: buildWarnings({ cashBefore, cashAfter, currentUpkeep, newUpkeep, currentIncome, newIncome, upgradeCost }),
+    warnings: buildWarnings({
+      cashBefore,
+      cashAfter,
+      currentUpkeep,
+      newUpkeep,
+      currentIncome,
+      newIncome,
+      upgradeCost,
+      isIncomeFacility: facility?.effectType === "season_income",
+    }),
     blockingReasons,
     saveContext: {
       saveId: save.saveId,
@@ -339,7 +371,7 @@ export function applyFacilityUpgrade(
     },
   };
 
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  const persistedSave = persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return {
     ...preview,
@@ -347,5 +379,6 @@ export function applyFacilityUpgrade(
     applied: true,
     facilityEventId: eventId,
     blockingReasons: [],
+    save: persistedSave,
   };
 }

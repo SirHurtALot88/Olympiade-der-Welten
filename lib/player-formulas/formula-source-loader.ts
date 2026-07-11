@@ -145,7 +145,29 @@ type LoadPlayerFormulaSourcesOptions = {
   classFactors?: unknown;
 };
 
+/**
+ * Cached result for the argument-less (default sources) call — this is the hot path, invoked
+ * once per player in `resolvePlayerEconomyContract` and friends. The underlying JSON imports are
+ * static per process, but this function used to re-validate/re-sort the ~3600-row rank table and
+ * re-derive every status field from scratch on *every single call*, which showed up as the single
+ * largest CPU cost in Foundation SSR profiling (~70% of ticks on the scouting/market/home routes).
+ */
+let cachedDefaultFormulaSources: PlayerFormulaSourceBundle | null = null;
+
 export function loadPlayerFormulaSources(options: LoadPlayerFormulaSourcesOptions = {}): PlayerFormulaSourceBundle {
+  const hasOverrides = Object.keys(options).length > 0;
+  if (!hasOverrides && cachedDefaultFormulaSources) {
+    return cachedDefaultFormulaSources;
+  }
+
+  const result = computePlayerFormulaSources(options);
+  if (!hasOverrides) {
+    cachedDefaultFormulaSources = result;
+  }
+  return result;
+}
+
+function computePlayerFormulaSources(options: LoadPlayerFormulaSourcesOptions): PlayerFormulaSourceBundle {
   const warnings: string[] = [];
   const attributeSalaryModifiers = validateAttributeSalaryModifiers(options.attributeSalaryModifiers ?? attributeSalaryModifiersJson);
   const traitSalaryFactors = validateTraitSalaryFactors(options.traitSalaryFactors ?? traitSalaryFactorsJson);

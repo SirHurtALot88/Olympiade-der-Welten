@@ -1,4 +1,5 @@
 import type {
+  AiLineupStrategy,
   DisciplineCategory,
   FormCardPlanRecord,
   FormCardColor,
@@ -112,6 +113,9 @@ export type LegacyLineupEntryScore = {
   fatigueCount?: number | null;
   fatigueMultiplier?: number | null;
   fatigueAdjustedScore?: number | null;
+  injuryStatus?: "mapped" | "not_applied";
+  injuryMultiplier?: number | null;
+  injuryAdjustedScore?: number | null;
   moraleStatus?: "mapped" | "missing_source" | "not_applied";
   morale?: number | null;
   moraleMultiplier?: number | null;
@@ -297,6 +301,7 @@ export type LegacyLineupContextMeta = LegacyLineupKeyParams & {
 
 export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   gameState?: GameState;
+  lineupStrategy?: AiLineupStrategy;
   save: {
     id: string;
     name: string;
@@ -426,6 +431,8 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
     displayLabel: string;
   };
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
+  injuryByPlayerId?: Record<string, { injuredThisMatchday: boolean; multiplier: number }> | null;
+  injurySourceStatus?: "mapped" | "not_applied";
   moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
   fatigueSourceStatus?: "mapped" | "missing_source";
   teamDisciplineRanks?: Record<string, { rank: number | null; score?: number | null; sourceStatus: string; rankSource?: string | null }>;

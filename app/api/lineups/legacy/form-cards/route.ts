@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 
 import { generateLocalLegacyFormCardsForSeason } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -38,6 +41,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequest(request),
+    saveId: params.saveId,
+    teamId: params.teamId,
+    action: "formcards_season_regenerate",
+    source: "sqlite",
+    dryRun: false,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
+  }
+
   const result = generateLocalLegacyFormCardsForSeason(params);
   if (!result.ok) {
     return NextResponse.json(
@@ -48,6 +63,16 @@ export async function POST(request: Request) {
       { status: 422 },
     );
   }
+
+  notifyRoomGameplayWrite(writeAuth, {
+    saveId: params.saveId,
+    teamId: params.teamId,
+    action: "formcards_season_regenerate",
+    eventType: "lineup_updated",
+    affectedViews: ["home", "lineup", "matchday", "arena"],
+    dryRun: false,
+    success: true,
+  });
 
   return NextResponse.json({
     summary: result,

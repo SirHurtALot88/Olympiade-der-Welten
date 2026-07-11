@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 
 function createContext(input: {
   teamId: string;
@@ -12,6 +13,8 @@ function createContext(input: {
   withLineup?: boolean;
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
   fatigueSourceStatus?: "mapped" | "missing_source";
+  injuryByPlayerId?: Record<string, { injuredThisMatchday: boolean; multiplier: number }> | null;
+  injurySourceStatus?: "mapped" | "not_applied";
 }): LegacyLineupLoadedContext {
   const withLineup = input.withLineup ?? true;
   const entries = withLineup
@@ -128,6 +131,8 @@ function createContext(input: {
     },
     fatigueByPlayerId: input.fatigueByPlayerId ?? null,
     fatigueSourceStatus: input.fatigueSourceStatus ?? "missing_source",
+    injuryByPlayerId: input.injuryByPlayerId ?? null,
+    injurySourceStatus: input.injurySourceStatus ?? "not_applied",
     contextLoadMode: "sqlite_local",
     formCardSource: {
       selectionStatus: "ready",
@@ -225,6 +230,42 @@ describe("legacy matchday resolve preview", () => {
     expect(d1Preview?.teamResults[0]?.finalPreviewScore).toBe(59.5);
     expect(d1Preview?.topPlayers[0]?.finalPlayerScore).toBe(40.5);
     expect(d1Preview?.topPlayers[0]?.captainBonus).toBe(13.5);
+  });
+
+  it("applies same-day injury malus on top of fatigue during resolve scoring", () => {
+    const baselineContext = createContext({
+      teamId: "A-A",
+      teamName: "Alpha",
+      d1Scores: [100],
+      d2Scores: [],
+      fatigueByPlayerId: {
+        "A-A-d1-0": { count: 80, multiplier: 0.75 },
+      },
+      fatigueSourceStatus: "mapped",
+      injurySourceStatus: "not_applied",
+    });
+    const injuredContext = createContext({
+      teamId: "A-A",
+      teamName: "Alpha",
+      d1Scores: [100],
+      d2Scores: [],
+      fatigueByPlayerId: {
+        "A-A-d1-0": { count: 80, multiplier: 0.75 },
+      },
+      fatigueSourceStatus: "mapped",
+      injuryByPlayerId: {
+        "A-A-d1-0": { injuredThisMatchday: true, multiplier: 0.75 },
+      },
+      injurySourceStatus: "mapped",
+    });
+
+    const baselinePreview = buildLegacyMatchdayResolvePreview([baselineContext]);
+    const injuredPreview = buildLegacyMatchdayResolvePreview([injuredContext]);
+    const baselineD1 = baselinePreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+    const injuredD1 = injuredPreview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm");
+
+    expect(baselineD1?.teamResults[0]?.finalPreviewScore).toBe(75);
+    expect(injuredD1?.teamResults[0]?.finalPreviewScore).toBe(56.3);
   });
 
   it("computes rankInTeam correctly", () => {
@@ -383,5 +424,29 @@ describe("legacy matchday resolve preview", () => {
     expect(preview.status).toBe("missing_scores");
     expect(preview.teamResults[0]?.d1Status).toBe("missing_scores");
     expect(preview.teamResults[0]?.missingScores.length).toBeGreaterThan(0);
+  });
+});
+
+describe("legacy matchday resolve preview payload", () => {
+  it("does not expose failed context load errors as user-facing warnings", () => {
+    const context = createContext({
+      teamId: "A-A",
+      teamName: "Alpha",
+      d1Scores: [10, 30],
+      d2Scores: [40],
+    });
+
+    const payload = buildLegacyMatchdayResolvePreviewPayload({
+      source: "sqlite",
+      params: { saveId: "save-1", seasonId: "season-1", matchdayId: "matchday-1" },
+      contextResults: [
+        { ok: true, context, warnings: ["context-warning"] },
+        { ok: false, errors: ["team-load-failed"], warnings: [] },
+      ],
+    });
+
+    expect(payload).not.toBeNull();
+    expect(payload?.warnings).toContain("context-warning");
+    expect(payload?.warnings).not.toContain("team-load-failed");
   });
 });

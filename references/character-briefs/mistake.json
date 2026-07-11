@@ -1,0 +1,20 @@
+{
+  "name": "Mistake",
+  "id": "player-0405-mistake",
+  "className": "Tank",
+  "race": "Demon",
+  "alignment": "C-B",
+  "gender": "m",
+  "subclasses": ["Warrior", "Isolated", "Destroyer"],
+  "traitsPositive": ["Motivated", "FiredUp", "Fearless"],
+  "traitsNegative": ["Feisty", "Cheater", "FaintHearted"],
+  "attributes": {
+    "power": 42, "health": 69, "stamina": 98, "intelligence": 1,
+    "awareness": 10, "determination": 72, "speed": 34, "dexterity": 32,
+    "charisma": 1, "will": 78, "spirit": 1, "torment": 96
+  },
+  "flavorDe": "Aus den Höllenschlünden kam Mistake — und schon der Name war die ehrlichste Sache an ihm. Ein hochgewachsener Dämon aus Knochen, Moos und einem glühenden Kohlenherz in der Brust, der aussieht, als habe jemand einen Fluch gesprochen und vergessen, ihn wieder zu beenden. Einst soll er ein fehlgeschlagener Pakt gewesen sein, zu viel Wut und zu wenig Verstand in einem Körper, der nicht wusste, wohin mit sich selbst. Heute ist er dennoch da: angespannt, unverwüstlich und berüchtigt dafür, genau dann zuzuschlagen, wenn man ihn für erledigt hält — oder selbst, wenn eigentlich niemand zugestimmt hat. Mistake ist kein großer Stratege. Aber gerade das macht ihn unberechenbar genug, um Angst zu verbreiten.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Mistake.jpg",
+  "cost": 35,
+  "upkeepBase": 4
+}

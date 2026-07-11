@@ -53,6 +53,22 @@ function normalizeSheetFactors(sheetFactors?: SheetFactorInput[]) {
   return values.length > 0 ? values : DEFAULT_SEASON_FACTOR_VALUES;
 }
 
+/**
+ * Reads OLY_LONG_RUN_SALARY_FACTOR_PATTERN, e.g. "1.18,1.15,0.85,0.85,0.88" for Season 1-5.
+ * Used only for the initial (Season 1, unseeded) window so balancing runs can deterministically
+ * script "N good seasons then M bad seasons" scenarios instead of relying on the randomized/default
+ * factor rolls. The window then shifts season-by-season via advanceSeasonEconomyFactorWindow as usual.
+ */
+export function parseSalaryFactorPatternEnv(): number[] | null {
+  const raw = process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN;
+  if (!raw || !raw.trim()) return null;
+  const values = raw
+    .split(",")
+    .map((entry) => Number(entry.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return values.length > 0 ? values.map(round2) : null;
+}
+
 function buildSeedWindow(input: {
   saveId: string;
   seasonId: string;
@@ -112,6 +128,14 @@ export function advanceSeasonEconomyFactorWindow(input: {
   fromSeasonId: string;
   toSeasonId: string;
   seasonState?: Pick<SeasonState, "seasonEconomyFactors">;
+  // 2026-07-04: lets a scripted multi-season pattern (see parseSalaryFactorPatternEnv) reach beyond
+  // the initial 5-value seed window. Without this, only the first SEASON_ECONOMY_FACTOR_WINDOW_SIZE
+  // (5) pattern values were ever consumed (buildSeedWindow only runs once, at season-1, and slices
+  // to a 5-length window) — any pattern entries beyond index 4 were silently dropped and every later
+  // season's factor fell back to a deterministic-but-uncontrolled random roll instead of the
+  // caller's intended value. Passing the same pattern array on every advance call lets a 10 (or
+  // longer) season pattern stay in full effect for the whole run.
+  patternFactors?: number[] | null;
 }) {
   const now = new Date().toISOString();
   const currentWindow = getSeasonEconomyFactorWindow({
@@ -120,6 +144,11 @@ export function advanceSeasonEconomyFactorWindow(input: {
     seasonState: input.seasonState,
   });
   const newRollSeed = `${input.saveId}:${input.toSeasonId}:season-economy-factor:new-s-plus-4`;
+  // The newly-revealed horizon+4 slot corresponds to absolute season number
+  // parseSeasonNumber(toSeasonId) + (WINDOW_SIZE - 1), i.e. 0-based index into patternFactors.
+  const newSlotAbsoluteIndex = parseSeasonNumber(input.toSeasonId) - 1 + (SEASON_ECONOMY_FACTOR_WINDOW_SIZE - 1);
+  const patternValueForNewSlot = input.patternFactors?.[newSlotAbsoluteIndex];
+  const hasPatternValue = typeof patternValueForNewSlot === "number" && Number.isFinite(patternValueForNewSlot);
   const nextWindow: SeasonEconomyFactorRecord[] = Array.from({ length: SEASON_ECONOMY_FACTOR_WINDOW_SIZE }, (_, horizonIndex) => {
     const carried = currentWindow[horizonIndex + 1] ?? null;
     if (carried) {
@@ -138,9 +167,9 @@ export function advanceSeasonEconomyFactorWindow(input: {
       seasonId: input.toSeasonId,
       seasonLabel: getHorizonLabel(horizonIndex),
       horizonIndex,
-      factor: rollFutureSeasonFactor(newRollSeed),
-      source: "rolled",
-      rollSeed: newRollSeed,
+      factor: hasPatternValue ? round2(patternValueForNewSlot) : rollFutureSeasonFactor(newRollSeed),
+      source: hasPatternValue ? "sheet_seed" : "rolled",
+      rollSeed: hasPatternValue ? null : newRollSeed,
       carriedFromSeasonId: input.fromSeasonId,
       generatedAt: now,
     };

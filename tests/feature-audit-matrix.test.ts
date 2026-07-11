@@ -44,12 +44,16 @@ describe("feature audit matrix", () => {
   it("marks missing tests and missing smoke coverage", () => {
     const matrix = buildFeatureAuditMatrix({ generatedAt: "2026-06-13T00:00:00.000Z" });
     const scouting = matrix.entries.find((entry) => entry.featureId === "scouting-potential");
+    const economyRecalcAfterXp = matrix.entries.find((entry) => entry.featureId === "economy-recalc-after-xp");
 
     expect(scouting).toBeTruthy();
     expect(getFeatureAuditFlags(scouting as FeatureAuditEntry)).toEqual(
-      expect.objectContaining({ missingTests: true, missingSmoke: true }),
+      expect.objectContaining({ missingTests: false, missingSmoke: false }),
     );
-    expect(matrix.summary.missingTests).toBeGreaterThanOrEqual(1);
+    expect(economyRecalcAfterXp).toBeTruthy();
+    expect(getFeatureAuditFlags(economyRecalcAfterXp as FeatureAuditEntry)).toEqual(
+      expect.objectContaining({ missingSmoke: true }),
+    );
     expect(matrix.summary.missingSmoke).toBeGreaterThanOrEqual(1);
   });
 

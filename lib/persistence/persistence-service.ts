@@ -1,7 +1,16 @@
+import type { GameState } from "@/lib/data/olyDataTypes";
 import { createSaveGameState, loadFreshSeasonOneSeedData, loadSeedData } from "@/lib/data/dataAdapter";
 import { createSaveRepository } from "@/lib/persistence/save-repository";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService } from "@/lib/persistence/types";
+
+/** Every persisted write bumps from the stored version so optimistic locking stays consistent. */
+export function withNextSaveVersion(gameState: GameState, storedSaveVersion: number | null | undefined): GameState {
+  return {
+    ...gameState,
+    saveVersion: (storedSaveVersion ?? 0) + 1,
+  };
+}
 
 const SINGLEPLAYER_SAVE_ID = "save-singleplayer-dev";
 const SINGLEPLAYER_SAVE_NAME = "Singleplayer Foundation";
@@ -50,11 +59,16 @@ export function createPersistenceService(): PersistenceService {
       }
       return saveRepository.getSaveById(saveId);
     },
+    getSaveVersionMetadata(saveId) {
+      return saveRepository.getSaveVersionMetadata(saveId);
+    },
     saveSingleplayerState(saveId, gameState, input) {
+      const existing = saveRepository.getSaveById(saveId);
+      const nextGameState = withNextSaveVersion(gameState, existing?.gameState.saveVersion);
       return saveRepository.saveGameState({
         saveId,
-        status: input?.status,
-        gameState,
+        status: input?.status ?? existing?.status,
+        gameState: nextGameState,
       });
     },
     createSave(name) {

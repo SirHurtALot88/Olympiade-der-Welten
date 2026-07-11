@@ -56,7 +56,7 @@ describe("matchday slot roles", () => {
         spirit: 39,
         torment: 47,
       },
-      currentFatigueCount: 1,
+      currentFatigueCount: 16,
       intensity: "normal",
       knownModifierBonus: 0,
       revealVariance: 2,
@@ -64,10 +64,10 @@ describe("matchday slot roles", () => {
 
     expect(projected.roleModifier).toBe(5.3);
     expect(projected.intensityModifier).toBe(0);
-    expect(projected.fatiguePenaltyPercent).toBe(0.5);
-    expect(projected.totalProjected).toBe(69.9);
-    expect(projected.rangeLow).toBe(65.4);
-    expect(projected.rangeHigh).toBe(74.4);
+    expect(projected.fatiguePenaltyPercent).toBe(5);
+    expect(projected.totalProjected).toBe(66.8);
+    expect(projected.rangeLow).toBe(62.5);
+    expect(projected.rangeHigh).toBe(71.1);
   });
 
   it("push raises score and fatigue while conserve lowers both", () => {
@@ -123,7 +123,7 @@ describe("matchday slot roles", () => {
         spirit: 30,
         torment: 74,
       },
-      currentFatigueCount: 3,
+      currentFatigueCount: 70,
       intensity: "push",
       knownModifierBonus: 0,
       revealVariance: 2,
@@ -133,7 +133,7 @@ describe("matchday slot roles", () => {
     expect(projected.warnings).toContain("Push bei stark belastetem Spieler");
   });
 
-  it("maps fatigue 10 to -5 percent performance", () => {
+  it("maps fatigue 16 to -5 percent performance", () => {
     const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
     const projected = calculateMatchdayProjectedPreview({
       baseScore: 80,
@@ -152,14 +152,14 @@ describe("matchday slot roles", () => {
         spirit: 32,
         torment: 50,
       },
-      currentFatigueCount: 10,
+      currentFatigueCount: 16,
       intensity: "normal",
     });
 
     expect(projected.fatiguePenaltyPercent).toBe(5);
   });
 
-  it("maps fatigue 20 to -10 percent performance", () => {
+  it("maps fatigue 32 to -10 percent performance", () => {
     const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
     const projected = calculateMatchdayProjectedPreview({
       baseScore: 80,
@@ -178,7 +178,7 @@ describe("matchday slot roles", () => {
         spirit: 32,
         torment: 50,
       },
-      currentFatigueCount: 20,
+      currentFatigueCount: 32,
       intensity: "normal",
     });
 
@@ -355,7 +355,7 @@ describe("matchday slot roles", () => {
         spirit: 39,
         torment: 66,
       },
-      currentFatigueCount: 30,
+      currentFatigueCount: 70,
       intensity: "push",
       requiredPlayers: 6,
       rivalryPressure: 2,

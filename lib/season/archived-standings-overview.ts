@@ -1,5 +1,10 @@
 import type { SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
-import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import {
+  buildTeamHistoryDisciplineValuesFromSnapshot,
+  SEASON_DISCIPLINE_AREA_GROUPS,
+  sumSeasonDisciplineAreaTotal,
+  type PlayerHistoryDisciplineValues,
+} from "@/lib/season/season-discipline-area-groups";
 import { SEASON_STANDINGS_DISCIPLINE_COLUMNS } from "@/lib/standings/season-standings-sheet";
 
 export type ArchivedSeasonStandingsOverviewItem = {
@@ -30,43 +35,48 @@ function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));
 }
 
-function buildDisciplinePointsByTeamId(snapshot: SeasonSnapshotRecord) {
-  const totalsByTeamId = new Map<string, Record<string, number | null>>();
+function emptyDisciplineValues() {
+  return Object.fromEntries(SEASON_STANDINGS_DISCIPLINE_COLUMNS.map((column) => [column.normalizedKey, null]));
+}
 
-  for (const player of snapshot.playerPerformances ?? []) {
-    if (!player.teamId) {
-      continue;
+function buildArchivedDisciplineValues(
+  snapshot: SeasonSnapshotRecord,
+  teamId: string,
+  areaPoints?: {
+    pow: number | null;
+    spe: number | null;
+    men: number | null;
+    soc: number | null;
+  },
+) {
+  const fromPerformances = buildTeamHistoryDisciplineValuesFromSnapshot(snapshot, teamId);
+  const merged = Object.fromEntries(
+    SEASON_STANDINGS_DISCIPLINE_COLUMNS.map((column) => [
+      column.normalizedKey,
+      fromPerformances[column.normalizedKey as keyof PlayerHistoryDisciplineValues] ?? null,
+    ]),
+  ) as Record<string, number | null>;
+
+  for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
+    const currentTotal = sumSeasonDisciplineAreaTotal(merged, group.id);
+    const fallback = areaPoints?.[group.id];
+    if (
+      currentTotal <= 0 &&
+      fallback != null &&
+      Number.isFinite(fallback) &&
+      fallback > 0 &&
+      group.keys.length > 0
+    ) {
+      merged[group.keys[0]] = roundValue(fallback, 1);
     }
-
-    const current =
-      totalsByTeamId.get(player.teamId) ??
-      Object.fromEntries(SEASON_STANDINGS_DISCIPLINE_COLUMNS.map((column) => [column.normalizedKey, null]));
-
-    for (const discipline of player.disciplineBreakdown ?? []) {
-      const disciplineKey = normalizeLineupDisciplineFieldName(discipline.disciplineId);
-      if (!disciplineKey || !(disciplineKey in current)) {
-        continue;
-      }
-
-      const value = discipline.totalContribution ?? 0;
-      if (!Number.isFinite(value)) {
-        continue;
-      }
-
-      current[disciplineKey] = roundValue((current[disciplineKey] ?? 0) + value, 1);
-    }
-
-    totalsByTeamId.set(player.teamId, current);
   }
 
-  return totalsByTeamId;
+  return merged;
 }
 
 export function buildArchivedSeasonStandingsOverviewItems(
   snapshot: SeasonSnapshotRecord,
 ): ArchivedSeasonStandingsOverviewItem[] {
-  const disciplinePointsByTeamId = buildDisciplinePointsByTeamId(snapshot);
-
   return [...snapshot.finalStandings]
     .sort((left, right) => {
       const leftRank = left.rank ?? Number.MAX_SAFE_INTEGER;
@@ -84,7 +94,7 @@ export function buildArchivedSeasonStandingsOverviewItems(
       teamName: row.teamName,
       teamCode: row.teamCode,
       rank: row.rank,
-      points: row.points ?? row.disciplinePoints,
+      points: row.points ?? row.disciplinePoints ?? null,
       cash: row.cashEnd,
       cashFc: row.cashFc ?? null,
       startplatz: row.startplatz ?? row.rank,
@@ -103,9 +113,7 @@ export function buildArchivedSeasonStandingsOverviewItems(
       rosterCount: row.rosterCountEnd ?? row.rosterEnd ?? null,
       salaryTotal: row.salaryTotalEnd ?? row.salaryEnd ?? null,
       marketValueTotal: row.marketValueTotalEnd ?? row.marketValueEnd ?? null,
-      disciplineValues:
-        disciplinePointsByTeamId.get(row.teamId) ??
-        Object.fromEntries(SEASON_STANDINGS_DISCIPLINE_COLUMNS.map((column) => [column.normalizedKey, null])),
+      disciplineValues: buildArchivedDisciplineValues(snapshot, row.teamId, row.disciplinePointsByArea) ?? emptyDisciplineValues(),
       warnings: [],
     }));
 }

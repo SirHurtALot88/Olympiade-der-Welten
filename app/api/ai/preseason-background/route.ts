@@ -9,14 +9,33 @@ import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
-  buildTeamControlSettingsMap,
-  DEFAULT_ACTIVE_OWNER_ID,
-} from "@/lib/foundation/team-control-settings";
+  allowsAiPreseasonManualTeamOverride,
+  getProtectedHumanTeamIds,
+  protectManualPlayerTeams,
+} from "@/lib/ai/ai-preseason-manual-team-guard";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import type { PersistenceService } from "@/lib/persistence/types";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+
+const inFlightRunKeys = new Set<string>();
+
+function claimPreseasonRunKey(runKey: string) {
+  if (inFlightRunKeys.has(runKey)) {
+    return false;
+  }
+  inFlightRunKeys.add(runKey);
+  return true;
+}
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function buildRunKey(saveId: string, seasonId: string) {
+  return `${saveId}:${seasonId}`;
 }
 
 function getAiTeamIds(gameState: GameState) {
@@ -25,67 +44,6 @@ function getAiTeamIds(gameState: GameState) {
   return gameState.teams
     .filter((team) => control[team.teamId]?.controlMode === "ai" && !protectedHumanTeamIds.has(team.teamId))
     .map((team) => team.teamId);
-}
-
-function getProtectedHumanTeamIds(gameState: GameState) {
-  return new Set(
-    [
-      gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
-      ...gameState.teams
-        .filter((team) => team.humanControlled !== false)
-        .map((team) => team.teamId),
-      ...Object.values(gameState.seasonState.teamControlSettings ?? {})
-        .filter((settings) => settings.controlMode === "manual")
-        .map((settings) => settings.teamId),
-    ].filter((teamId): teamId is string => Boolean(teamId)),
-  );
-}
-
-function protectSelectedHumanTeams(gameState: GameState): GameState {
-  const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
-  if (protectedHumanTeamIds.size === 0) return gameState;
-
-  const existingControl = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  return {
-    ...gameState,
-    teams: gameState.teams.map((team) =>
-      protectedHumanTeamIds.has(team.teamId)
-        ? { ...team, humanControlled: true }
-        : team,
-    ),
-    seasonState: {
-      ...gameState.seasonState,
-      teamControlSettings: {
-        ...existingControl,
-        ...Object.fromEntries(
-          [...protectedHumanTeamIds].map((teamId) => {
-            const team = gameState.teams.find((entry) => entry.teamId === teamId);
-            const current = existingControl[teamId];
-            return [
-              teamId,
-              {
-                ...current,
-                teamId,
-                controlMode: "manual" as const,
-                ownerId: current?.ownerId && current.ownerId !== "ai" ? current.ownerId : DEFAULT_ACTIVE_OWNER_ID,
-                ownerSlot: current?.ownerSlot && current.ownerSlot !== "ai" ? current.ownerSlot : "user",
-                displayLabel: current?.displayLabel ?? team?.shortCode ?? teamId,
-                aiLineupPreviewEnabled: false,
-                aiLineupApplyEnabled: false,
-                aiLineupAutoApplyEnabled: false,
-                aiTransferPreviewEnabled: false,
-                aiTransferAutoApplyEnabled: false,
-                aiSellPreviewEnabled: false,
-                aiSellAutoApplyEnabled: false,
-                notes: current?.notes ?? null,
-                strategyLock: current?.strategyLock ?? null,
-              },
-            ];
-          }),
-        ),
-      },
-    },
-  };
 }
 
 function isStaleRunningRun(run: AiPreseasonAutomationRunRecord | null) {
@@ -129,70 +87,16 @@ function writeRunRecord(saveId: string, record: AiPreseasonAutomationRunRecord) 
   return persistence.saveSingleplayerState(saveId, nextGameState, { status: latest.status });
 }
 
-export async function POST(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const saveId = searchParams.get("saveId")?.trim() ?? "";
-  const seasonId = searchParams.get("seasonId")?.trim() ?? "";
-  const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
-
-  if (!saveId || !seasonId) {
-    return NextResponse.json({ error: "saveId and seasonId are required." }, { status: 400 });
-  }
-
-  if (source === "prisma") {
-    return NextResponse.json({ error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
-  }
-
+async function executeAiPreseasonBackgroundWork(input: {
+  saveId: string;
+  seasonId: string;
+  baseRecord: AiPreseasonAutomationRunRecord;
+  aiTeamIds: string[];
+  setupDraftMode: boolean;
+  protectedSave: NonNullable<ReturnType<PersistenceService["getSaveById"]>>;
+}): Promise<AiPreseasonAutomationRunRecord> {
+  const { saveId, seasonId, baseRecord, aiTeamIds, setupDraftMode, protectedSave } = input;
   const persistence = createPersistenceService();
-  const save = persistence.getSaveById(saveId);
-  if (!save) {
-    return NextResponse.json({ error: `Save ${saveId} not found.` }, { status: 404 });
-  }
-  if (save.gameState.season.id !== seasonId) {
-    return NextResponse.json({ error: `Season ${seasonId} is not active in save ${saveId}.` }, { status: 409 });
-  }
-
-  const existingRun = save.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
-  if (existingRun?.status === "completed" || (existingRun?.status === "running" && !isStaleRunningRun(existingRun))) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: existingRun.status === "running" ? "ai_preseason_already_running" : "ai_preseason_already_completed",
-      run: existingRun,
-    });
-  }
-
-  const protectedGameState = protectSelectedHumanTeams(save.gameState);
-  const protectedSave =
-    protectedGameState === save.gameState
-      ? save
-      : persistence.saveSingleplayerState(save.saveId, protectedGameState, { status: save.status });
-  const aiTeamIds = getAiTeamIds(protectedSave.gameState);
-  const startedAt = nowIso();
-  const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
-  const baseRecord: AiPreseasonAutomationRunRecord = {
-    runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
-    seasonId,
-    status: aiTeamIds.length === 0 ? "skipped" : "running",
-    mode: aiTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
-    startedAt,
-    completedAt: null,
-    aiTeamsTotal: aiTeamIds.length,
-    aiTeamsCompleted: 0,
-    managerActionsApplied: 0,
-    transferBuysApplied: 0,
-    transferSellsApplied: 0,
-    warnings: [],
-    blockingReasons: [],
-  };
-
-  if (aiTeamIds.length === 0) {
-    const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
-    writeRunRecord(saveId, skippedRecord);
-    return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
-  }
-
-  writeRunRecord(saveId, baseRecord);
 
   try {
     const latestBeforeManager = persistence.getSaveById(saveId) ?? protectedSave;
@@ -209,6 +113,8 @@ export async function POST(request: Request) {
         "buy_building",
         "set_training_focus",
         "set_training_intensity",
+        "set_player_training_modes",
+        "set_player_training_classes",
         "mark_contract_strategy",
         "mark_sell_strategy",
       ],
@@ -220,27 +126,23 @@ export async function POST(request: Request) {
       let transferBuysApplied = 0;
       const warnings = [...managerResult.warnings];
       const blockingReasons = [...managerResult.blockers];
-      const teamRuns: Array<{
-        teamId: string;
-        status: string;
-        appliedPickCount: number;
-        durationMs: number;
-      }> = [];
 
       for (const teamId of aiTeamIds) {
-        const teamStartedAt = Date.now();
-        const picksRun = await runAiPicksExecutePreview({
-          source: "sqlite",
-          saveId,
-          seasonId,
-          dryRun: false,
-          confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-          teamScope: "ai",
-          teamIds: [teamId],
-          stepsPerTeam: 12,
-          runMode: "season1_optimum_execute",
-          draftSeed: `${saveId}:${seasonId}:preseason:${teamId}`,
-        }, persistence);
+        const picksRun = await runAiPicksExecutePreview(
+          {
+            source: "sqlite",
+            saveId,
+            seasonId,
+            dryRun: false,
+            confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+            teamScope: "ai",
+            teamIds: [teamId],
+            stepsPerTeam: 12,
+            runMode: "season1_optimum_execute",
+            draftSeed: `${saveId}:${seasonId}:preseason:${teamId}`,
+          },
+          persistence,
+        );
         const teamCompleted = picksRun.teams.some((team) => {
           if (team.teamId !== teamId || team.blockingReasons.length > 0) {
             return false;
@@ -253,12 +155,6 @@ export async function POST(request: Request) {
         transferBuysApplied += appliedPickCount;
         warnings.push(...picksRun.warnings);
         blockingReasons.push(...picksRun.blockingReasons);
-        teamRuns.push({
-          teamId,
-          status: picksRun.status,
-          appliedPickCount,
-          durationMs: Date.now() - teamStartedAt,
-        });
         writeRunRecord(saveId, {
           ...baseRecord,
           status: "running",
@@ -284,7 +180,7 @@ export async function POST(request: Request) {
         blockingReasons: Array.from(new Set(blockingReasons)),
       };
       writeRunRecord(saveId, finalRecord);
-      return NextResponse.json({ ok: finalRecord.status === "completed", skipped: false, run: finalRecord, manager: managerResult, teamRuns });
+      return finalRecord;
     }
 
     const market = await applyAiMarketPlanLocally({
@@ -316,7 +212,7 @@ export async function POST(request: Request) {
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
     };
     writeRunRecord(saveId, finalRecord);
-    return NextResponse.json({ ok: finalRecord.status === "completed", skipped: false, run: finalRecord, manager: managerResult, market });
+    return finalRecord;
   } catch (error) {
     const failedRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
@@ -326,14 +222,156 @@ export async function POST(request: Request) {
       blockingReasons: [error instanceof Error ? error.message : "ai_preseason_background_failed"],
     };
     writeRunRecord(saveId, failedRecord);
+    console.error("AI preseason background failed.", error);
+    return failedRecord;
+  } finally {
+    inFlightRunKeys.delete(buildRunKey(saveId, seasonId));
+  }
+}
+
+export async function POST(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const saveId = searchParams.get("saveId")?.trim() ?? "";
+  const seasonId = searchParams.get("seasonId")?.trim() ?? "";
+  const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+
+  if (!saveId || !seasonId) {
+    return NextResponse.json({ error: "saveId and seasonId are required." }, { status: 400 });
+  }
+
+  if (source === "prisma") {
+    return NextResponse.json({ error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
+  }
+
+  const persistence = createPersistenceService();
+  const save = persistence.getSaveById(saveId);
+  if (!save) {
+    return NextResponse.json({ error: `Save ${saveId} not found.` }, { status: 404 });
+  }
+  if (save.gameState.season.id !== seasonId) {
+    return NextResponse.json({ error: `Season ${seasonId} is not active in save ${saveId}.` }, { status: 409 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    saveId,
+    action: "ai_preseason_background",
+    source: "sqlite",
+    dryRun: false,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
+  }
+
+  const runKey = buildRunKey(saveId, seasonId);
+  if (!claimPreseasonRunKey(runKey)) {
+    const latestRun = persistence.getSaveById(saveId)?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "ai_preseason_already_running",
+      run: latestRun,
+    });
+  }
+
+  let handedToExecute = false;
+
+  try {
+    const freshSave = persistence.getSaveById(saveId);
+    if (!freshSave) {
+      return NextResponse.json({ error: `Save ${saveId} not found.` }, { status: 404 });
+    }
+
+    const existingRun = freshSave.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    if (
+      existingRun?.status === "completed" ||
+      (existingRun?.status === "running" && !isStaleRunningRun(existingRun))
+    ) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: existingRun?.status === "running" ? "ai_preseason_already_running" : "ai_preseason_already_completed",
+        run: existingRun,
+      });
+    }
+
+    const skipManualProtection = allowsAiPreseasonManualTeamOverride({
+      saveId,
+      gameState: freshSave.gameState,
+    });
+    const protectedGameState = skipManualProtection ? freshSave.gameState : protectManualPlayerTeams(freshSave.gameState);
+    const protectedSave =
+      protectedGameState === freshSave.gameState
+        ? freshSave
+        : persistence.saveSingleplayerState(freshSave.saveId, protectedGameState, { status: freshSave.status });
+    const aiTeamIds = getAiTeamIds(protectedSave.gameState);
+    const startedAt = nowIso();
+    const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
+    const baseRecord: AiPreseasonAutomationRunRecord = {
+      runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
+      seasonId,
+      status: aiTeamIds.length === 0 ? "skipped" : "running",
+      mode: aiTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
+      startedAt,
+      completedAt: null,
+      aiTeamsTotal: aiTeamIds.length,
+      aiTeamsCompleted: 0,
+      managerActionsApplied: 0,
+      transferBuysApplied: 0,
+      transferSellsApplied: 0,
+      warnings: [],
+      blockingReasons: [],
+    };
+
+    if (aiTeamIds.length === 0) {
+      const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
+      writeRunRecord(saveId, skippedRecord);
+      return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
+    }
+
+    const latestBeforeStart = persistence.getSaveById(saveId);
+    const runningRecord = latestBeforeStart?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    if (runningRecord?.status === "running" && !isStaleRunningRun(runningRecord)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "ai_preseason_already_running",
+        run: runningRecord,
+      });
+    }
+
+    writeRunRecord(saveId, baseRecord);
+    handedToExecute = true;
+    const finalRun = await executeAiPreseasonBackgroundWork({
+      saveId,
+      seasonId,
+      baseRecord,
+      aiTeamIds,
+      setupDraftMode,
+      protectedSave,
+    });
+
+    const succeeded = finalRun.status === "completed";
     return NextResponse.json(
       {
-        ok: false,
+        ok: succeeded,
         skipped: false,
-        run: failedRecord,
+        run: finalRun,
+      },
+      { status: succeeded ? 200 : 500 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
         error: error instanceof Error ? error.message : "AI preseason background failed.",
       },
       { status: 500 },
     );
+  } finally {
+    if (!handedToExecute) {
+      inFlightRunKeys.delete(runKey);
+    }
   }
 }

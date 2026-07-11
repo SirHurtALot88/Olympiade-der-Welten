@@ -5,7 +5,12 @@ import { buildLegacyMatchdayReadiness, type LegacyMatchdayReadinessStatus } from
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 import { db } from "@/src/server/db";
+
+function roundValue(value: number, digits = 2) {
+  return Number(value.toFixed(digits));
+}
 
 type PrismaLike = Pick<
   PrismaClient,
@@ -66,9 +71,13 @@ export type TransfermarktSellPreview = {
   marketValueReference: number | null;
   saleFactor: number | null;
   salePrice: number | null;
+  buyoutCost?: number | null;
+  netProceeds?: number | null;
   profit: number | null;
   salaryReduction: number | null;
   projectedReadinessAfterSell: LegacyMatchdayReadinessStatus | "unknown" | null;
+  coaching?: import("@/lib/market/transfermarkt-sell-coaching-service").TransfermarktSellCoachingView | null;
+  pricingPolicyMultiplier?: number | null;
 };
 
 export type TransfermarktSellExecuteResult = TransfermarktSellPreview & {
@@ -280,10 +289,24 @@ async function resolveSellContext(
     activePlayer?.purchasePrice,
     activePlayer?.player?.attributes?.displayMarketValue ?? activePlayer?.player?.attributes?.marketValue ?? null,
   );
-  const profit =
-    salePrice != null && normalizedPurchasePrice != null
-      ? Number((Math.abs(salePrice - normalizedPurchasePrice) < 0.005 ? 0 : salePrice - normalizedPurchasePrice).toFixed(2))
+  const sellProceeds =
+    activePlayer && salePrice != null
+      ? resolveTransfermarktSellProceeds({
+          rosterEntry: {
+            contractLength: activePlayer.contractLength,
+            salary: activePlayer.salary,
+            contractShape: "balanced",
+          },
+          grossSalePrice: salePrice,
+          purchasePrice: normalizedPurchasePrice,
+        })
       : null;
+  const buyoutCost = sellProceeds?.buyoutCost ?? null;
+  const netProceeds = sellProceeds?.netProceeds ?? salePrice;
+  const profit =
+    netProceeds != null && normalizedPurchasePrice != null
+      ? roundValue(Math.abs(netProceeds - normalizedPurchasePrice) < 0.005 ? 0 : netProceeds - normalizedPurchasePrice, 2)
+      : sellProceeds?.netProfitVsPurchase ?? null;
   const salaryReduction = activePlayer?.salary ?? null;
   const rosterBefore = currentRosterRows.length;
   const rosterAfter = activePlayer ? Math.max(0, rosterBefore - 1) : rosterBefore;
@@ -291,7 +314,7 @@ async function resolveSellContext(
   const teamSalaryAfter =
     activePlayer && salaryReduction != null ? Math.max(0, teamSalaryBefore - salaryReduction) : teamSalaryBefore;
   const cashBefore = teamSeasonState?.cash ?? null;
-  const cashAfter = cashBefore != null && salePrice != null ? cashBefore + salePrice : cashBefore;
+  const cashAfter = cashBefore != null && netProceeds != null ? cashBefore + netProceeds : cashBefore;
 
   if (salePrice == null || salePrice <= 0) {
     blockingReasons.push("sale_price_missing");
@@ -395,6 +418,8 @@ async function resolveSellContext(
       marketValueReference,
       saleFactor,
       salePrice,
+      buyoutCost,
+      netProceeds,
       profit,
       salaryReduction,
       projectedReadinessAfterSell: readinessPreview.projectedReadinessAfterSell,
@@ -427,6 +452,7 @@ export async function executeTransfermarktSell(
 
   const transferId = `transfer-sell:${randomUUID()}`;
   const salePrice = context.preview.salePrice ?? 0;
+  const netProceeds = context.preview.netProceeds ?? salePrice;
   const salary = context.activePlayer.salary;
   const marketValue = context.activePlayer.currentValue ?? context.activePlayer.purchasePrice ?? salePrice;
 
@@ -464,7 +490,7 @@ export async function executeTransfermarktSell(
       },
       data: {
         cash: {
-          increment: salePrice,
+          increment: netProceeds,
         },
       },
     });

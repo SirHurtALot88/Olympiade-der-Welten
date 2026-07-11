@@ -1,9 +1,11 @@
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { saisonstandDisciplineColumns } from "@/lib/foundation/saisonstand-column-contract";
+import { SEASON_DISCIPLINE_AREA_GROUPS } from "@/lib/season/season-discipline-area-groups";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
@@ -78,6 +80,7 @@ function buildTransferSummaryByTeamIdFromHistory(gameState: GameState) {
 
 type TeamManagementSnapshotInput = {
   gameState: GameState;
+  saveId?: string;
   seasonId?: string;
   preferStandingDisciplineValues?: boolean;
   standingsByTeamId?: Record<string, TeamManagementSnapshotStanding>;
@@ -237,7 +240,6 @@ function deriveVisibleSeasonPoints(
 
 function derivePpsByAreaFromDisciplineValues(
   disciplineValues: Record<string, number | null> | null | undefined,
-  gameState: GameState,
 ) {
   const totals = {
     total: 0,
@@ -251,34 +253,37 @@ function derivePpsByAreaFromDisciplineValues(
     return totals;
   }
 
-  const categoryByDisciplineKey = new Map(
-    gameState.disciplines.map((discipline) => [
-      normalizeLineupDisciplineFieldName(discipline.id),
-      discipline.category,
-    ] as const),
-  );
-
   for (const disciplineKey of visibleSeasonPointsDisciplineKeys) {
     const value = disciplineValues[disciplineKey];
     if (typeof value !== "number" || !Number.isFinite(value)) {
       continue;
     }
 
-    const category = categoryByDisciplineKey.get(disciplineKey);
     totals.total += value;
-    if (category === "power") totals.pow += value;
-    if (category === "speed") totals.spe += value;
-    if (category === "mental") totals.men += value;
-    if (category === "social") totals.soc += value;
+  }
+
+  for (const group of SEASON_DISCIPLINE_AREA_GROUPS) {
+    const areaTotal = group.keys.reduce((sum, key) => {
+      const value = disciplineValues[key];
+      return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+    }, 0);
+    totals[group.id] = roundValue(areaTotal, 1);
   }
 
   return {
     total: roundValue(totals.total, 1),
-    pow: roundValue(totals.pow, 1),
-    spe: roundValue(totals.spe, 1),
-    men: roundValue(totals.men, 1),
-    soc: roundValue(totals.soc, 1),
+    pow: totals.pow,
+    spe: totals.spe,
+    men: totals.men,
+    soc: totals.soc,
   };
+}
+
+function resolveDisplayAreaPoints(ledgerValue: number, disciplineFallback: number) {
+  if (ledgerValue > 0) {
+    return ledgerValue;
+  }
+  return disciplineFallback;
 }
 
 function mergeSeasonDisciplineValues(input: {
@@ -296,7 +301,7 @@ function mergeSeasonDisciplineValues(input: {
   }
 
   for (const [disciplineId, value] of Object.entries(input.ledgerValues ?? {})) {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
       continue;
     }
 
@@ -314,9 +319,10 @@ function mergeSeasonDisciplineValues(input: {
 export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput): TeamManagementSnapshotRow[] {
   const {
     gameState,
+    saveId,
     seasonId = gameState.season.id,
     preferStandingDisciplineValues = false,
-    standingsByTeamId = {},
+    standingsByTeamId = (gameState.seasonState.standings ?? {}) as Record<string, TeamManagementSnapshotStanding>,
     needScoreByTeamId = {},
     transferSummaryByTeamId = {},
   } = input;
@@ -353,8 +359,12 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
   const hasCashPrizeApply = (gameState.seasonState.cashPrizeApplyLogs ?? []).some(
     (entry) => entry.seasonId === seasonId,
   );
-  const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+  const seasonDerivations = saveId
+    ? getSeasonDerivations({ gameState, saveId, seasonId })
+    : null;
+  const seasonPointsLedger = seasonDerivations?.ledger ?? buildSeasonPointsLedger(gameState, seasonId);
+  const playerRatingsById =
+    seasonDerivations?.ratingsById ?? buildPlayerRatingContractMap(gameState, seasonPointsLedger);
   const allTimeTableByTeamId = new Map(
     buildAllTimeTableFromSnapshots(seasonSnapshots, gameState.teams).map((row) => [row.teamId, row] as const),
   );
@@ -386,7 +396,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
             rosterPlayers.reduce((sum, item) => sum + getRosterDisplaySalary(item.entry, item.player), 0),
             2,
           )
-        : roundValue(roster.reduce((sum, entry) => sum + entry.salary, 0), 2);
+        : roundValue(
+            roster.reduce((sum, entry) => sum + (normalizeEconomyMoney(entry.salary) ?? 0), 0),
+            2,
+          );
     const marketValueTotal =
       rosterPlayers.length > 0
         ? roundValue(
@@ -418,22 +431,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       ovrValues.length > 0
         ? roundValue(ovrValues.reduce((sum, value) => sum + value, 0) / ovrValues.length, 2)
         : null;
-    const ppsPow = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.power ?? 0 : 0,
-      1,
-    );
-    const ppsSpe = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.speed ?? 0 : 0,
-      1,
-    );
-    const ppsMen = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.mental ?? 0 : 0,
-      1,
-    );
-    const ppsSoc = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.social ?? 0 : 0,
-      1,
-    );
+    const ppsPow = roundValue(seasonPointsSummary?.pointsByArea.power ?? 0, 1);
+    const ppsSpe = roundValue(seasonPointsSummary?.pointsByArea.speed ?? 0, 1);
+    const ppsMen = roundValue(seasonPointsSummary?.pointsByArea.mental ?? 0, 1);
+    const ppsSoc = roundValue(seasonPointsSummary?.pointsByArea.social ?? 0, 1);
     const ppsTotal = hasCurrentPps ? currentPpsTotal : fallbackPpsTotal;
     const formAvg =
       rosterPlayers.length > 0
@@ -458,12 +459,12 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       standingValues: standing?.disciplineValues,
       ledgerValues: preferStandingDisciplineValues ? null : seasonPointsSummary?.pointsByDiscipline ?? null,
     });
-    const fallbackPpsByArea = derivePpsByAreaFromDisciplineValues(disciplineValues, gameState);
-    const displayPpsTotal = hasCurrentPps ? ppsTotal : fallbackPpsByArea.total;
-    const displayPpsPow = hasCurrentPps ? ppsPow : fallbackPpsByArea.pow;
-    const displayPpsSpe = hasCurrentPps ? ppsSpe : fallbackPpsByArea.spe;
-    const displayPpsMen = hasCurrentPps ? ppsMen : fallbackPpsByArea.men;
-    const displayPpsSoc = hasCurrentPps ? ppsSoc : fallbackPpsByArea.soc;
+    const fallbackPpsByArea = derivePpsByAreaFromDisciplineValues(disciplineValues);
+    const displayPpsPow = resolveDisplayAreaPoints(ppsPow, fallbackPpsByArea.pow);
+    const displayPpsSpe = resolveDisplayAreaPoints(ppsSpe, fallbackPpsByArea.spe);
+    const displayPpsMen = resolveDisplayAreaPoints(ppsMen, fallbackPpsByArea.men);
+    const displayPpsSoc = resolveDisplayAreaPoints(ppsSoc, fallbackPpsByArea.soc);
+    const displayPpsTotal = resolveDisplayAreaPoints(hasCurrentPps ? ppsTotal : 0, fallbackPpsByArea.total);
     disciplineValues.bonuspunkte =
       hasCurrentPps && seasonPointsSummary != null && seasonPointsSummary.mutatorPpsBonus > 0
         ? roundValue(seasonPointsSummary.mutatorPpsBonus, 1)
@@ -538,9 +539,9 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       rank: activeRank,
       points: currentVisiblePoints,
       rosterCount: roster.length > 0 ? roster.length : usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
-      salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
+      salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? normalizeEconomyMoney(standing?.salaryTotal) ?? salaryTotal : salaryTotal,
       avgContractLength,
-      marketValueTotal: roster.length > 0 ? marketValueTotal : usesArchivedSnapshotValues ? standing?.marketValueTotal ?? marketValueTotal : marketValueTotal,
+      marketValueTotal: roster.length > 0 ? marketValueTotal : usesArchivedSnapshotValues ? normalizeEconomyMoney(standing?.marketValueTotal) ?? marketValueTotal : marketValueTotal,
       cash,
       cashFc,
       budget,
@@ -664,8 +665,8 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         sponsorBasis: prizeSummary?.basis ?? row.sponsorBasis ?? null,
         sponsorRank: prizeSummary?.placementBonus ?? row.sponsorRank ?? null,
         sponsorSeason: prizeSummary?.sponsorSeason ?? row.sponsorSeason ?? null,
-        sponsorTotal: prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
-        guv: prizeSummary?.profitLoss ?? row.guv ?? null,
+        sponsorTotal: normalizeEconomyMoney(prizeSummary?.sponsorTotal ?? row.sponsorTotal) ?? prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
+        guv: normalizeEconomyMoney(prizeSummary?.profitLoss ?? row.guv) ?? prizeSummary?.profitLoss ?? row.guv ?? null,
         cashTotal: prizeSummary?.cashTotal ?? row.cashTotal ?? null,
       };
     })
@@ -676,5 +677,143 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         return leftRank - rightRank;
       }
       return (right.cash ?? Number.NEGATIVE_INFINITY) - (left.cash ?? Number.NEGATIVE_INFINITY);
+    });
+}
+
+function buildEmptyDisciplineValues(): Record<string, number | null> {
+  return Object.fromEntries(saisonstandDisciplineColumns.map((key) => [key, null]));
+}
+
+/** Fast standings rows for first paint while the team-overview slice loads. Skips season derivations. */
+export function buildLightweightTeamSeasonStandRows(input: {
+  gameState: GameState;
+  standingsByTeamId?: Record<string, TeamManagementSnapshotStanding>;
+  transferSummaryByTeamId?: Record<string, TeamManagementTransferSummary | undefined>;
+}): TeamManagementSnapshotRow[] {
+  const { gameState, standingsByTeamId = {}, transferSummaryByTeamId = {} } = input;
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const rostersByTeamId = new Map<string, RosterEntry[]>();
+  for (const rosterEntry of gameState.rosters) {
+    const existing = rostersByTeamId.get(rosterEntry.teamId);
+    if (existing) {
+      existing.push(rosterEntry);
+      continue;
+    }
+    rostersByTeamId.set(rosterEntry.teamId, [rosterEntry]);
+  }
+  const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState);
+
+  return gameState.teams
+    .map((team) => {
+      const generalManager = getTeamGeneralManager(gameState, team.teamId);
+      const roster = rostersByTeamId.get(team.teamId) ?? [];
+      const rosterPlayers = getRosterPlayers(playersById, roster);
+      const standing = standingsByTeamId[team.teamId] ?? null;
+      const transferSummary = transferSummaryByTeamId[team.teamId] ?? derivedTransferSummaryByTeamId[team.teamId] ?? null;
+      const avgContractLength =
+        roster.length > 0
+          ? roundValue(roster.reduce((sum, entry) => sum + entry.contractLength, 0) / roster.length, 1)
+          : null;
+      const salaryTotal =
+        rosterPlayers.length > 0
+          ? roundValue(
+              rosterPlayers.reduce((sum, item) => sum + getRosterDisplaySalary(item.entry, item.player), 0),
+              2,
+            )
+          : roundValue(
+              roster.reduce((sum, entry) => sum + (normalizeEconomyMoney(entry.salary) ?? 0), 0),
+              2,
+            );
+      const marketValueTotal =
+        rosterPlayers.length > 0
+          ? roundValue(
+              rosterPlayers.reduce(
+                (sum, item) =>
+                  sum + (resolvePlayerEconomyContract({ player: item.player, rosterEntry: item.entry }).marketValue ?? 0),
+                0,
+              ),
+              2,
+            )
+          : null;
+      const disciplineValues = {
+        ...buildEmptyDisciplineValues(),
+        ...(standing?.disciplineValues ?? {}),
+      };
+
+      return {
+        team,
+        teamId: team.teamId,
+        teamCode: team.shortCode,
+        teamName: team.name,
+        generalManagerName: generalManager?.profile.name ?? null,
+        generalManagerTitle: generalManager?.profile.title ?? null,
+        generalManagerInfluencePct: generalManager?.assignment.influencePct ?? null,
+        rank: standing?.rank ?? null,
+        points: standing?.points ?? null,
+        rosterCount: standing?.rosterCount ?? roster.length,
+        salaryTotal: standing?.salaryTotal ?? salaryTotal,
+        avgContractLength,
+        marketValueTotal: standing?.marketValueTotal ?? marketValueTotal,
+        cash: standing?.cash ?? team.cash ?? null,
+        cashFc: standing?.cashFc ?? null,
+        budget: standing?.budget ?? team.budget ?? null,
+        formAvg: null,
+        financeForm: standing?.form ?? null,
+        needScore: null,
+        avgMarketValue: null,
+        avgPps: null,
+        avgOvr: null,
+        ppsTotal: 0,
+        ppsPow: 0,
+        ppsSpe: 0,
+        ppsMen: 0,
+        ppsSoc: 0,
+        playerMin: standing?.playerMin ?? null,
+        playerOpt: standing?.playerOpt ?? null,
+        rosterTarget: null,
+        transferCount: transferSummary?.transferCount ?? 0,
+        transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
+        transferSellTotal: transferSummary?.transferSellTotal ?? 0,
+        transferNet: transferSummary?.transferNet ?? 0,
+        transfersSeasonValue: standing?.transfers ?? transferSummary?.transferNet ?? null,
+        cashDelta: null,
+        startplatz: standing?.startplatz ?? null,
+        rankDiff: standing?.rankDiff ?? null,
+        sponsorBasis: standing?.sponsorBasis ?? null,
+        sponsorRank: standing?.sponsorRank ?? null,
+        sponsorTotal: standing?.sponsorTotal ?? null,
+        sponsorSeason: standing?.sponsorSeason ?? null,
+        guv: standing?.guv ?? null,
+        cashTotal: standing?.cashTotal ?? null,
+        historicalPow: null,
+        historicalSpe: null,
+        historicalMen: null,
+        historicalSoc: null,
+        historicalGoldCount: 0,
+        historicalSilverCount: 0,
+        historicalBronzeCount: 0,
+        historicalTop5Count: 0,
+        historicalTop10Count: 0,
+        historicalAvgRank: null,
+        historicalAvgPoints: null,
+        historicalPointsTotal: null,
+        historicalPointsBySeason: [],
+        historicalSeasonsPlayed: 0,
+        historicalBestRank: null,
+        historicalLastSeasonRank: null,
+        historicalLastSeasonPoints: null,
+        historicalHasData: false,
+        disciplineValues,
+        roster,
+        rosterPlayers,
+      } satisfies TeamManagementSnapshotRow;
+    })
+    .sort((left, right) => {
+      const leftRank = left.rank ?? Number.POSITIVE_INFINITY;
+      const rightRank = right.rank ?? Number.POSITIVE_INFINITY;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+      return (right.points ?? Number.NEGATIVE_INFINITY) - (left.points ?? Number.NEGATIVE_INFINITY);
     });
 }

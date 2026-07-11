@@ -6,19 +6,23 @@ import type {
   SeasonSnapshotTeamRecord,
   SeasonSnapshotTransferRecord,
 } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { buildTeamDisciplineRankSnapshotRecords } from "@/lib/foundation/team-discipline-rank-engine";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
   buildAllTimeTableFromSnapshots,
+  resolveSeasonSnapshotTeamRecords,
   type SeasonSnapshotAllTimeRow,
 } from "@/lib/season/season-snapshot-helpers";
-export { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
+export { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 export const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
 
@@ -94,21 +98,13 @@ function resolveLocalSave(persistence: PersistenceService, saveId: string) {
 function getRosterMarketValue(
   gameState: GameState,
   playerId: string,
-  currentValue?: number | null,
-  purchasePrice?: number | null,
+  _currentValue?: number | null,
+  _purchasePrice?: number | null,
   playerById = new Map(gameState.players.map((entry) => [entry.id, entry] as const)),
+  rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId) ?? null,
 ) {
-  if (currentValue != null && Number.isFinite(currentValue)) {
-    return currentValue;
-  }
-  if (purchasePrice != null && Number.isFinite(purchasePrice)) {
-    return purchasePrice;
-  }
   const player = playerById.get(playerId) ?? null;
-  if (!player) {
-    return null;
-  }
-  return getImportedPlayerDisplayMarketValue(player);
+  return resolvePlayerEconomyContract({ player, rosterEntry }).marketValue;
 }
 
 function buildDisciplineCategoryMap(gameState: GameState) {
@@ -165,14 +161,21 @@ function buildSnapshotId(seasonId: string) {
   return `season-snapshot__${seasonId}`;
 }
 
-function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
+function buildSeasonSnapshotRecord(
+  gameState: GameState,
+  seasonId: string = gameState.season.id,
+  saveId?: string | null,
+): SeasonSnapshotRecord {
   const disciplineCategoryById = buildDisciplineCategoryMap(gameState);
   const disciplineById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
-  const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
+  const derivations = saveId
+    ? getSeasonDerivations({ gameState, saveId, seasonId })
+    : null;
+  const seasonPointsLedger = derivations?.ledger ?? buildSeasonPointsLedger(gameState, seasonId);
   const teamObjectiveOverview = buildTeamObjectiveOverview(gameState);
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+  const playerRatingsById = derivations?.ratingsById ?? buildPlayerRatingContractMap(gameState, seasonPointsLedger);
   const seasonResultIds = buildSeasonResultIdSet(gameState, seasonId);
   const coverage = buildSeasonCoverage(gameState, seasonId);
   const seasonMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
@@ -281,6 +284,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
           soc: teamResults.length > 0 ? roundValue(disciplinePointsByArea.soc, 1) : null,
         },
         cashEnd: team.cash ?? null,
+        rosterEndPostSell: roster.length,
         rosterEnd: roster.length,
         rosterCountEnd: roster.length,
         salaryEnd,
@@ -417,6 +421,10 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
       const economy = player
         ? resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry })
         : null;
+      const saleBreakdown =
+        player && rosterEntry
+          ? buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry, { saveId: saveId ?? null })
+          : null;
 
       return {
         playerId: entry.playerId,
@@ -441,6 +449,12 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         mvs: rating?.mvs ?? null,
         mvsRank: rating?.mvsRank ?? null,
         marketValue: economy?.marketValue ?? rosterEntry?.currentValue ?? rosterEntry?.purchasePrice ?? null,
+        purchasePrice: rosterEntry?.purchasePrice ?? null,
+        projectedSellValue: saleBreakdown?.salePrice ?? null,
+        projectedSellFactor: saleBreakdown?.saleFactor ?? null,
+        saleFactorBracket: saleBreakdown?.bracket ?? null,
+        saleFactorRankInBracket: saleBreakdown?.rankInBracket ?? null,
+        saleFactorBracketSize: saleBreakdown?.bracketGroupSize ?? null,
         salary: economy?.salary ?? rosterEntry?.salary ?? null,
         contractLength: economy?.contractLength ?? rosterEntry?.contractLength ?? null,
         promisedRole: rosterEntry?.promisedRole ?? null,
@@ -547,6 +561,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
       ? "partial"
       : "missing_source";
   const archivedAt = new Date().toISOString();
+  const teamDisciplineRankSnapshots = buildTeamDisciplineRankSnapshotRecords(gameState);
 
   return {
     snapshotId: buildSnapshotId(seasonId),
@@ -567,12 +582,17 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
     playerPerformanceSnapshots: playerPerformances,
     transferSnapshots,
     gmAssignments,
+    teamDisciplineRankSnapshots,
     warnings,
   };
 }
 
-export function buildSeasonSnapshot(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
-  return buildSeasonSnapshotRecord(gameState, seasonId);
+export function buildSeasonSnapshot(
+  gameState: GameState,
+  seasonId: string = gameState.season.id,
+  saveId?: string | null,
+): SeasonSnapshotRecord {
+  return buildSeasonSnapshotRecord(gameState, seasonId, saveId);
 }
 
 export function upsertSeasonSnapshotRecord(
@@ -595,6 +615,112 @@ export function getLatestSeasonSnapshot(gameState: GameState) {
   return getSeasonSnapshots(gameState)[0] ?? null;
 }
 
+function parseSeasonNumber(seasonId: string) {
+  return Number(seasonId.match(/(\d+)$/)?.[1] ?? 1);
+}
+
+function resolvePreviousSeasonId(seasonId: string) {
+  const seasonNumber = parseSeasonNumber(seasonId);
+  if (seasonNumber <= 1) return null;
+  return `season-${seasonNumber - 1}`;
+}
+
+function buildTeamEntryEconomyFromGameState(
+  gameState: GameState,
+  teamId: string,
+  playerById = new Map(gameState.players.map((player) => [player.id, player] as const)),
+) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  const roster = gameState.rosters.filter((entry) => entry.teamId === teamId);
+  const salaryEnd =
+    roster.length > 0 ? roundValue(roster.reduce((sum, entry) => sum + entry.salary, 0), 2) : 0;
+  const marketValueEnd =
+    roster.length > 0
+      ? roundValue(
+          roster.reduce(
+            (sum, entry) =>
+              sum + (getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice, playerById) ?? 0),
+            0,
+          ),
+          2,
+        )
+      : 0;
+  return {
+    cashEnd: team?.cash ?? null,
+    rosterEnd: roster.length,
+    rosterCountEnd: roster.length,
+    salaryEnd,
+    salaryTotalEnd: salaryEnd,
+    marketValueEnd,
+    marketValueTotalEnd: marketValueEnd,
+  };
+}
+
+/** Refresh the previous season snapshot's roster/cash/salary with post-preseason-buy entry state. */
+export function patchCompletedSeasonSnapshotAfterPreseasonBuy(
+  gameState: GameState,
+  currentSeasonId: string = gameState.season.id,
+): { gameState: GameState; patched: boolean; completedSeasonId: string | null; warnings: string[] } {
+  const completedSeasonId = resolvePreviousSeasonId(currentSeasonId);
+  if (!completedSeasonId) {
+    return { gameState, patched: false, completedSeasonId: null, warnings: [] };
+  }
+
+  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const snapshotIndex = snapshots.findIndex((entry) => entry.seasonId === completedSeasonId);
+  if (snapshotIndex < 0) {
+    return {
+      gameState,
+      patched: false,
+      completedSeasonId,
+      warnings: [`season_snapshot_missing_for_patch:${completedSeasonId}`],
+    };
+  }
+
+  const snapshot = snapshots[snapshotIndex]!;
+  const teamRecords = resolveSeasonSnapshotTeamRecords(snapshot);
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const patchedTeams = teamRecords.map((teamRecord) => {
+    const entry = buildTeamEntryEconomyFromGameState(gameState, teamRecord.teamId, playerById);
+    const rosterEndPostSell = teamRecord.rosterEndPostSell ?? teamRecord.rosterEnd ?? entry.rosterEnd;
+    return {
+      ...teamRecord,
+      rosterEndPostSell,
+      ...entry,
+    };
+  });
+
+  const patchedSnapshot: SeasonSnapshotRecord = {
+    ...snapshot,
+    finalStandings: patchedTeams,
+    teamSnapshots: patchedTeams,
+    entryRosterPatchedAt: new Date().toISOString(),
+    entryRosterPatchedFromSeasonId: currentSeasonId,
+    warnings: Array.from(
+      new Set([
+        ...(snapshot.warnings ?? []),
+        `entry_roster_patched_after_preseason:${currentSeasonId}`,
+      ]),
+    ),
+  };
+
+  const nextSnapshots = [...snapshots];
+  nextSnapshots[snapshotIndex] = patchedSnapshot;
+
+  return {
+    gameState: {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        seasonSnapshots: nextSnapshots,
+      },
+    },
+    patched: true,
+    completedSeasonId,
+    warnings: [],
+  };
+}
+
 export function buildSeasonSnapshotDryRun(
   gameState: GameState,
   input?: {
@@ -604,7 +730,7 @@ export function buildSeasonSnapshotDryRun(
 ): SeasonSnapshotBuildResult {
   const seasonId = input?.seasonId ?? gameState.season.id;
   const coverage = buildSeasonCoverage(gameState, seasonId);
-  const snapshot = buildSeasonSnapshotRecord(gameState, seasonId);
+  const snapshot = buildSeasonSnapshotRecord(gameState, seasonId, input?.saveId ?? null);
   const existingSnapshot =
     (gameState.seasonState.seasonSnapshots ?? []).find((entry) => entry.seasonId === seasonId) ?? null;
   const seasonCompleted =
@@ -764,7 +890,7 @@ export function createSeasonSnapshot(
     status: preview.seasonCompleted ? "completed" : "partial",
   });
 
-  persistence.saveSingleplayerState(save.saveId, {
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, {
     ...save.gameState,
     seasonState: {
       ...save.gameState.seasonState,

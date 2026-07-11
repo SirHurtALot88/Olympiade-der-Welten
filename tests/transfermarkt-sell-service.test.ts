@@ -41,7 +41,7 @@ function createDatabase(options?: {
           status: options?.activePlayerRow?.status ?? "active",
           roleTag: options?.activePlayerRow?.roleTag ?? "bench",
           contractLength: options?.activePlayerRow?.contractLength ?? 1,
-          salary: options?.activePlayerRow?.salary ?? 4000,
+          salary: options?.activePlayerRow?.salary ?? 52,
           purchasePrice:
             options?.activePlayerRow && "purchasePrice" in options.activePlayerRow
               ? options.activePlayerRow.purchasePrice ?? null
@@ -186,7 +186,20 @@ describe("transfermarkt sell service", () => {
   });
 
   it("writes sell transfer, removes active player and increases cash", async () => {
-    const database = createDatabase();
+    const database = createDatabase({
+      activePlayerRow: {
+        player: {
+          id: "player-1",
+          name: "Selene Dusk",
+          className: "Overseer",
+          race: "Human",
+          attributes: {
+            displayMarketValue: 520,
+            marketValue: 520,
+          },
+        },
+      },
+    });
 
     const result = await executeTransfermarktSell(
       { saveId: "save-initial", seasonId: "season-1", teamId: "A-A", activePlayerId: "active-1" },
@@ -194,6 +207,8 @@ describe("transfermarkt sell service", () => {
     );
 
     expect(result.canSell).toBe(true);
+    expect(result.netProceeds).toBeCloseTo(468, 0);
+    expect(result.buyoutCost).toBeCloseTo(52, 0);
     expect(result.transferCreated).toBe(true);
     expect(result.activePlayerRemoved).toBe(true);
     expect(result.teamSeasonStateUpdated).toBe(true);
@@ -203,7 +218,7 @@ describe("transfermarkt sell service", () => {
       expect.objectContaining({
         data: {
           cash: {
-            increment: 52000,
+            increment: 468,
           },
         },
       }),

@@ -189,7 +189,6 @@ describe("ai market plan apply api", () => {
             applySellSteps: true,
             applyBuySteps: false,
             maxBuysPerTeam: 0,
-            maxSellsPerTeam: 1,
             stopOnTeamFailure: true,
           },
         }),
@@ -212,7 +211,6 @@ describe("ai market plan apply api", () => {
         applySellSteps: true,
         applyBuySteps: false,
         maxBuysPerTeam: 0,
-        maxSellsPerTeam: 1,
         stopOnTeamFailure: true,
       },
     });

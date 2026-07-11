@@ -3,6 +3,7 @@ import type { FormCardColor, GameState, LineupDraftModifiers } from "@/lib/data/
 import type { AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import {
+  applyMutatorTraitsToLineupModifiers,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
@@ -412,10 +413,11 @@ function powerAllowedForSide(input: {
 
   const identitySlot = parseIdentityPowerSlotIndex(input.power.id);
   if (identitySlot == null) {
+    const categoryMatch = powerMatchesDisciplineCategory(input.power, input.disciplineCategory);
     if (input.power.source === "facility") {
       return (
         (input.competitiveness === "strong" || input.lateSeason) &&
-        powerMatchesDisciplineCategory(input.power, input.disciplineCategory)
+        categoryMatch
       );
     }
     return (
@@ -973,8 +975,13 @@ export function buildAiLegacyLineupModifiers(
 
   applyAiTeamPowers(context, modifiers, plannedEntries);
   applyAiIntensity(context, modifiers, plannedEntries);
+  const modifiersWithTraits = applyMutatorTraitsToLineupModifiers({
+    modifiers,
+    entries: plannedEntries,
+    rosterPlayers: context.rosterPlayers ?? [],
+  });
 
-  return modifiers;
+  return modifiersWithTraits;
 }
 
 export function applyAiLegacyLineupBatchLocally(
@@ -1082,7 +1089,7 @@ export function applyAiLegacyLineupBatchLocally(
         result: "skipped_manual",
         overwriteExisting: false,
         warnings: [],
-        blockingReasons: ["team_control_mode_manual"],
+        blockingReasons: [],
         saved: false,
       });
       continue;
@@ -1103,7 +1110,7 @@ export function applyAiLegacyLineupBatchLocally(
         result: "skipped_passive",
         overwriteExisting: false,
         warnings: [],
-        blockingReasons: ["team_control_mode_passive"],
+        blockingReasons: [],
         saved: false,
       });
       continue;

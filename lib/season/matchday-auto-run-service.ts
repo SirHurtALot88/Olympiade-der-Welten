@@ -7,6 +7,7 @@ import { createLineupDraftId } from "@/lib/lineups/lineup-discipline-contract";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
+import { prepareGameStateForMatchdayResolve } from "@/lib/lineups/matchday-lineup-auto-prep";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -403,9 +404,14 @@ function addStep(result: MatchdayAutoRunResult, step: MatchdayAutoRunStep) {
     result.warnings.push(...step.warnings);
   }
   if (step.blockingReasons.length > 0) {
-    result.blockingReasons.push(...step.blockingReasons);
-    result.ok = false;
-    result.status = "blocked";
+    if (!step.canContinue) {
+      result.blockingReasons.push(...step.blockingReasons);
+      result.ok = false;
+      result.status = "blocked";
+    } else {
+      // canContinue=true with blocking reasons means non-fatal issues (e.g. skipped_disabled teams)
+      result.warnings.push(...step.blockingReasons);
+    }
   }
   if (step.plannedWrites > 0) {
     result.plannedWrites.push({
@@ -454,8 +460,16 @@ export async function runLocalMatchdayAutoRun(
     seasonId: params.seasonId,
     matchdayId: params.matchdayId,
   };
+  const prepared = prepareGameStateForMatchdayResolve(save.gameState, scope);
+  if (prepared.warnings.length > 0 && !dryRun) {
+    persistence.saveSingleplayerState(scope.saveId, prepared.gameState);
+  }
+  const workingSave = {
+    ...save,
+    gameState: prepared.gameState,
+  };
   const existingMatchdayResult =
-    (save.gameState.seasonState.matchdayResults ?? []).find(
+    (workingSave.gameState.seasonState.matchdayResults ?? []).find(
       (entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId,
     ) ?? null;
 

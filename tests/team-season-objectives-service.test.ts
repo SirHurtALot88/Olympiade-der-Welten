@@ -1,9 +1,12 @@
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
 import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
+  getRosterObjectiveStatus,
   getTeamObjectiveAiBias,
   refreshTeamObjectiveState,
 } from "@/lib/board/team-season-objectives-service";
@@ -235,13 +238,14 @@ describe("team season objectives service", () => {
   it("generates a compact four-objective board slate per team", () => {
     const overview = buildTeamObjectiveOverview(createGameState());
     const teamObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M");
-    const categories = new Set(teamObjectives.map((objective) => objective.category));
+    const coreObjectives = teamObjectives.filter((objective) => objective.category !== "sponsor");
+    const categories = new Set(coreObjectives.map((objective) => objective.category));
 
-    expect(teamObjectives).toHaveLength(4);
+    expect(coreObjectives).toHaveLength(4);
     expect(categories.has("sport")).toBe(true);
     expect(categories.has("finance")).toBe(true);
     expect(categories.has("roster")).toBe(true);
-    expect(overview.warnings).toContain("sponsor_objective_source_missing");
+    expect(overview.warnings).not.toContain("sponsor_objective_source_missing");
   });
 
   it("does not assign transfer-balance objectives during the Season 1 setup churn", () => {
@@ -256,7 +260,27 @@ describe("team season objectives service", () => {
     const overview = buildTeamObjectiveOverview(gameState);
 
     expect(overview.objectives.some((objective) => objective.objectiveId === "transfer-profit")).toBe(false);
-    expect(overview.objectives).toHaveLength(4);
+    expect(overview.objectives.filter((objective) => objective.category !== "sponsor")).toHaveLength(4);
+  });
+
+  it("treats roster optimum +/- 1 as completed, not at risk", () => {
+    for (const rosterCount of [9, 10, 11]) {
+      expect(getRosterObjectiveStatus({ current: rosterCount, playerMin: 7, playerOpt: 10 })).toBe("completed");
+    }
+
+    expect(getRosterObjectiveStatus({ current: 8, playerMin: 7, playerOpt: 10 })).toBe("open");
+    expect(getRosterObjectiveStatus({ current: 12, playerMin: 7, playerOpt: 10 })).toBe("at_risk");
+
+    const twelvePlayers = Array.from({ length: 12 }, (_, index) => createPlayer(`p${index + 1}`));
+    const overTargetState = createGameState({
+      identities: [createIdentity("M-M", { playerMin: 7, playerOpt: 10 })],
+      players: twelvePlayers,
+      rosters: twelvePlayers.map((player) => createRoster(player.id)),
+    });
+    const overTargetObjective = buildTeamObjectiveOverview(overTargetState).objectives.find(
+      (objective) => objective.teamId === "M-M" && objective.objectiveId === "roster-optimum",
+    );
+    expect(overTargetObjective?.status).toBe("at_risk");
   });
 
   it("uses team identity for profile-like goals such as M-M top target and C-C value transfer target", () => {
@@ -274,16 +298,17 @@ describe("team season objectives service", () => {
         {
           id: "sell-c1",
           playerId: "x",
-          seasonId: "season-3",
-          seasonLabel: "Season 3",
+          seasonId: "season-2",
+          seasonLabel: "Season 2",
           transferType: "sell",
           fromTeamId: "C-C",
           toTeamId: null,
-          fee: 14,
+          fee: 16,
           salary: 0,
           marketValue: 10,
           remainingContractLength: 1,
           happenedAt: "2026-06-12T00:00:00.000Z",
+          source: "ai_preseason_market_sell",
         },
       ],
     });
@@ -294,7 +319,8 @@ describe("team season objectives service", () => {
 
     expect(mmSport?.label).toContain("Top 3");
     expect(mmSport?.status).toBe("completed");
-    expect(ccTransfer?.targetValue).toBe(10);
+    // Season 3 → C-C transfer target is 15 (seasonal scaling)
+    expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
   });
 
@@ -454,6 +480,41 @@ describe("team season objectives service", () => {
     expect(zeroRating?.pressure).toBe(neutralRating?.pressure);
   });
 
+  it("keeps season 1 preseason board neutral regardless of identity and failed objectives", () => {
+    const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -8 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity(team.teamId, { boardConfidence: 1 })],
+    });
+    gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
+    gameState.seasonState.seasonId = "season-1";
+    gameState.gamePhase = "preseason_management";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const board = overview.boardConfidence[team.teamId];
+
+    expect(board?.value).toBe(5);
+    expect(board?.pressure).toBe(5);
+    expect(board?.warnings).toEqual([]);
+  });
+
+  it("applies board objective pressure after season 1 leaves preseason", () => {
+    const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -8 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity(team.teamId, { boardConfidence: 1 })],
+    });
+    gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
+    gameState.seasonState.seasonId = "season-1";
+    gameState.gamePhase = "season_active";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const board = overview.boardConfidence[team.teamId];
+
+    expect(board?.value).toBeLessThan(5);
+    expect(board?.pressure).toBeGreaterThan(5);
+  });
+
   it("exposes AI objective bias for market decisions", () => {
     const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -4 });
     const gameState = createGameState({
@@ -565,7 +626,7 @@ describe("team season objectives service", () => {
   });
 
   it("keeps playable mini objectives as candidates without expanding the compact board", () => {
-    const players = Array.from({ length: 7 }, (_, index) => createPlayer(`p${index + 1}`));
+    const players = Array.from({ length: 9 }, (_, index) => createPlayer(`p${index + 1}`));
     const gameState = createGameState({
       players,
       rosters: players.map((player) => createRoster(player.id)),
@@ -626,7 +687,7 @@ describe("team season objectives service", () => {
     const formColor = overview.objectives.find((objective) => objective.objectiveId === "roster-form-color-cover");
     const matchdayTop10 = overview.objectives.find((objective) => objective.objectiveId === "sport-next-matchday-top10");
 
-    expect(overview.objectives.filter((objective) => objective.teamId === "M-M")).toHaveLength(4);
+    expect(overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor")).toHaveLength(4);
     expect(formColor?.status).toBe("completed");
     if (matchdayTop10) {
       expect(matchdayTop10.label).toContain("Climbing/Football");
@@ -688,7 +749,8 @@ describe("team season objectives service", () => {
 
     expect(categories.has("player")).toBe(true);
     expect(topPlayer?.status).toBe("completed");
-    expect(transferGoal?.targetValue).toBe(10);
+    // Season 3 → C-C transfer target is 15 (seasonal scaling)
+    expect(transferGoal?.targetValue).toBe(15);
   });
 
   it("counts matchday medals from summed team scores across discipline results", () => {
@@ -770,6 +832,16 @@ describe("team season objectives service", () => {
     expect(bias?.warnings).toContain("objective_bias_player_peak_needed");
   });
 
+  it("keeps sponsor offer hydration out of client-safe objective refresh", () => {
+    const gameState = createGameState();
+    expect(gameState.seasonState.sponsorOffersByTeamId).toBeUndefined();
+
+    const refreshed = refreshTeamObjectiveState(gameState);
+
+    expect(refreshed.seasonState.sponsorOffersByTeamId).toBeUndefined();
+    expect(refreshed.seasonState.teamSeasonObjectives?.length ?? 0).toBeGreaterThan(0);
+  });
+
   it("refreshes board confidence into season state without compounding saved confidence", () => {
     const gameState = createGameState({
       teams: [createTeam({ cash: -8 })],
@@ -814,5 +886,163 @@ describe("team season objectives service", () => {
     expect(Math.abs((minusRow?.cashDelta ?? 0) + (minusRow?.boardConfidenceDelta ?? 0))).toBeGreaterThan(0);
     expect(settlement.byTeamId["M-M"]?.completed).toBeGreaterThan(0);
     expect(settlement.byTeamId["A-A"]?.failed).toBeGreaterThan(0);
+  });
+});
+
+describe("team season objectives build stability", () => {
+  it("uses resolveSeasonNumberFromState without duplicate getSeasonNumber exports", async () => {
+    const fs = await import("node:fs/promises");
+    const servicePath = path.join(process.cwd(), "lib/board/team-season-objectives-service.ts");
+    const serviceText = await fs.readFile(servicePath, "utf8");
+
+    expect(serviceText).toContain("function resolveSeasonNumberFromState(gameState: GameState)");
+    expect(serviceText).toContain("resolveSeasonNumberFromState(gameState)");
+    expect(serviceText.match(/function getSeasonNumber\(/g)?.length ?? 0).toBe(1);
+  });
+});
+
+describe("human board pressure + C-C eco rules", () => {
+  it("uses a softer S1 salary-ratio target so early roster building stays playable", async () => {
+    const fs = await import("node:fs/promises");
+    const servicePath = path.join(process.cwd(), "lib/board/team-season-objectives-service.ts");
+    const serviceText = await fs.readFile(servicePath, "utf8");
+
+    expect(serviceText).toContain("seasonNumber <= 1 ? 0.93");
+    expect(serviceText).toContain("seasonNumber <= 1 ? 0.98");
+    expect(serviceText).toContain("seasonNumber <= 1 ? -0.05");
+
+    const team = createTeam({ teamId: "S-1", shortCode: "S-1", cash: 10, humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("S-1")],
+      players: [createPlayer("s1")],
+      rosters: [createRoster("s1", { teamId: "S-1", salary: 190 })],
+    });
+    gameState.season = {
+      id: "season-1",
+      name: "Season 1",
+      year: 2026,
+      currentMatchday: 1,
+      matchdayIds: ["md-1"],
+    };
+    gameState.seasonState.seasonId = "season-1";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const salaryObjective = overview.objectives.find((entry) => entry.teamId === "S-1" && entry.objectiveId === "finance-salary-ratio");
+
+    expect(salaryObjective?.targetValue).toBe("<= 93%");
+    expect(salaryObjective?.status).toBe("at_risk");
+  });
+
+  it("adds board-confidence-budget-cut objective for human team with low confidence", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 5 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 3.5, pressure: 7.5, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeDefined();
+    expect(penalty?.status).toBe("failed");
+    // confidence=3.5 → (5.0 - 3.5) * 3.3 = 4.95 → rounds to 5
+    expect(penalty?.penaltyCash).toBe(5);
+    expect(penalty?.category).toBe("finance");
+  });
+
+  it("does NOT add board-confidence-budget-cut for non-human team", () => {
+    const team = createTeam({ teamId: "A-I", shortCode: "A-I", humanControlled: false });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("A-I", { boardConfidence: 5 })],
+      players: [createPlayer("a1")],
+      rosters: [createRoster("a1", { teamId: "A-I" })],
+      boardConfidence: {
+        "A-I": { teamId: "A-I", value: 2.5, pressure: 9.0, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "A-I" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeUndefined();
+  });
+
+  it("does NOT add board-confidence-budget-cut when confidence is >= 5.0", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 7 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 5.5, pressure: 4.5, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeUndefined();
+  });
+
+  it("caps board-confidence-budget-cut penaltyCash at 10 (confidence=2.0)", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 5 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 2.0, pressure: 9.0, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty?.penaltyCash).toBe(10);
+  });
+
+  it("C-C gets transfer target 15 in season 3", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { finances: 10, ambition: 2 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+    });
+    // default gameState uses season-3
+    const objective = buildTeamObjectiveOverview(gameState).objectives.find(
+      (o) => o.teamId === "C-C" && o.objectiveId === "transfer-profit",
+    );
+
+    expect(objective?.targetValue).toBe(15);
+    expect(objective?.penaltyCash).toBe(3);
+  });
+
+  it("C-C gets transfer target 20 in season 4+", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { finances: 10, ambition: 2 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+    });
+    gameState.season = { ...gameState.season, id: "season-5", name: "Season 5" };
+    gameState.seasonState = { ...gameState.seasonState, seasonId: "season-5" };
+
+    const objective = buildTeamObjectiveOverview(gameState).objectives.find(
+      (o) => o.teamId === "C-C" && o.objectiveId === "transfer-profit",
+    );
+
+    expect(objective?.targetValue).toBe(20);
+    expect(objective?.penaltyCash).toBe(3);
   });
 });

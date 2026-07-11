@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import ArenaRevealPlaybackPanel from "@/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel";
 import MatchdayArenaPlayerCard from "@/components/matchday-arena/MatchdayArenaPlayerCard";
-import MatchdayArenaTimeline from "@/components/matchday-arena/MatchdayArenaTimeline";
+import { VeloImpactStrip, VeloStatOrbitRow, type VeloAxisKey } from "@/components/foundation/velo-ui";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Player, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
@@ -37,6 +38,8 @@ import {
   getMatchdayArenaPhaseScore,
   ARENA_SCORE_TRACK_SEGMENT_LABELS,
   type MatchdayArenaScoreboardRowView,
+  type MatchdayArenaPhaseBreakdownItem,
+  type ArenaScoreTrackSegment,
 } from "@/lib/season/matchday-arena-presenter";
 import type {
   MatchdayMvpScoringResult,
@@ -48,6 +51,14 @@ import { normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
 import type { CoachRole, OlyRoomState, RoomArenaState } from "@/types/game";
+import {
+  buildMatchdayArenaBaseSessionKey,
+  buildMatchdayArenaResolveSessionKey,
+  getMatchdayArenaBaseBundle,
+  getMatchdayArenaResolvePreview,
+  setMatchdayArenaBaseBundle,
+  setMatchdayArenaResolvePreview,
+} from "@/lib/foundation/matchday-arena-session-cache";
 
 type MatchdayArenaV2ClientProps = {
   initialSource?: "sqlite" | "prisma";
@@ -64,6 +75,7 @@ type MatchdayArenaV2ClientProps = {
   onBackToLineup?: (() => void) | null;
   onOpenMatchdayResult?: (() => void) | null;
   onOpenSeason?: (() => void) | null;
+  onOpenTraining?: (() => void) | null;
 };
 
 type ArenaLabOptions = {
@@ -88,6 +100,15 @@ type ArenaContextResponse = {
   contextErrors: string[];
   options: ArenaLabOptions;
   error?: string;
+};
+
+type ArenaBaseResponse = ArenaContextResponse & {
+  ok?: boolean;
+  scoreSummary?: MatchdayMvpScoringResult | null;
+  scoreWarnings?: string[];
+  scoreBlockingReasons?: string[];
+  resolvePreview?: ArenaResolveResponse | null;
+  standingsPreview?: ArenaStandingsPreviewResponse | null;
 };
 
 type ArenaResolveResponse = {
@@ -229,6 +250,17 @@ type ArenaPlayerAxisStat = {
   value: number | null;
 };
 
+function axisStatsToOrbitStats(axisStats: ArenaPlayerAxisStat[]) {
+  const stats = { pow: 0, spe: 0, men: 0, soc: 0 };
+  for (const stat of axisStats) {
+    const key = stat.axis.toLowerCase() as VeloAxisKey;
+    if (key in stats && stat.value != null && Number.isFinite(stat.value)) {
+      stats[key] = stat.value;
+    }
+  }
+  return stats;
+}
+
 type ArenaFocusTeamEntryCard = {
   disciplineSide: "d1" | "d2";
   playerId: string;
@@ -243,6 +275,7 @@ type ArenaFocusTeamEntryCard = {
   roleHint: string;
   baseScore: number | null;
   fatigueAdjustedScore: number | null;
+  mutatorBonus: number | null;
   finalPlayerScore: number | null;
   pointsAwarded: number | null;
   mutatorPpsBonus?: number | null;
@@ -280,6 +313,38 @@ type ArenaMatchdayWinnerRow = {
   d1Mutators: string[];
   d2Mutators: string[];
 };
+
+// Shared shape for a rendered scoreboard row, produced either from the discipline-level
+// scoreboard views (d1/d2 board modes) or from the aggregated matchday winner rows (total
+// board mode). Declaring this explicitly (instead of letting it be inferred separately per
+// branch) keeps both branches structurally identical so consumers like
+// `buildFocusedArenaBoardRows` receive a single, consistent element type.
+type ArenaBoardRow = {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  rank: number;
+  stepRankDelta: number | null;
+  score: number;
+  points: number | null;
+  baseRank: number;
+  rankDelta: number;
+  projectedRank: number | null;
+  tone: ReturnType<typeof getToneForTeam>;
+  detailChips: string[];
+  breakdown: MatchdayArenaPhaseBreakdownItem[];
+  trackSegments: ArenaScoreTrackSegment[];
+  sideKey?: "d1" | "d2";
+};
+
+// Narrows the "why is this team leading" source row (used only when the board is showing the
+// total/aggregated matchday view) down to the discipline-level scoreboard shape, which is the
+// only one of the two candidate types that carries push/form/mutator/fatigue detail fields.
+function isMatchdayArenaScoreboardRowView(
+  value: MatchdayArenaScoreboardRowView | ArenaMatchdayWinnerRow | undefined,
+): value is MatchdayArenaScoreboardRowView {
+  return value != null && "intensity" in value;
+}
 
 function formatDecimalScore(value: number | null | undefined, fractionDigits = 1) {
   if (value == null || !Number.isFinite(value)) {
@@ -552,6 +617,218 @@ function clampPct(value: number) {
   return Math.max(6, Math.min(100, value));
 }
 
+function ArenaAnimatedScore({ value, fractionDigits = 1 }: { value: number; fractionDigits?: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const previousValueRef = useRef(value);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = previousValueRef.current;
+    const to = value;
+    if (Math.abs(from - to) < 0.01) {
+      setDisplayValue(to);
+      previousValueRef.current = to;
+      return;
+    }
+    previousValueRef.current = to;
+    const start = performance.now();
+    const duration = 420;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(from + (to - from) * eased);
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick);
+      } else {
+        setDisplayValue(to);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current != null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, [value]);
+
+  return (
+    <strong className="arena-v2-board-score is-counting">
+      {formatDecimalScore(displayValue, fractionDigits)}
+    </strong>
+  );
+}
+
+const ARENA_BOARD_ROW_STRIDE = 66;
+const ARENA_BOARD_VIRTUAL_OVERSCAN = 4;
+
+function buildFocusedArenaBoardRows<T extends { teamId: string }>(rows: T[], userTeamId: string | null | undefined): T[] {
+  if (!userTeamId || rows.length <= 10) {
+    return rows;
+  }
+  const userIndex = rows.findIndex((row) => row.teamId === userTeamId);
+  if (userIndex < 0) {
+    return rows.slice(0, 10);
+  }
+  const indices = new Set<number>();
+  for (let index = 0; index < Math.min(3, rows.length); index += 1) {
+    indices.add(index);
+  }
+  for (let index = Math.max(0, userIndex - 3); index <= Math.min(rows.length - 1, userIndex + 3); index += 1) {
+    indices.add(index);
+  }
+  return [...indices].sort((left, right) => left - right).map((index) => rows[index]!);
+}
+
+type ArenaAct = "prep" | "reveal" | "result";
+type ArenaGuidedState = "loading" | "prep" | "ready" | "reveal" | "result";
+
+type ArenaBoardRowModel = {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  rank: number;
+  stepRankDelta: number | null;
+  score: number;
+  points: number | null;
+  baseRank?: number;
+  rankDelta?: number;
+  projectedRank?: number | null;
+  tone: string;
+  detailChips: string[];
+  trackSegments?: Array<{ id: string; value: number; tone: string; label: string }>;
+  breakdown?: MatchdayArenaPhaseBreakdownItem[];
+};
+
+type ArenaBoardRowProps = {
+  row: ArenaBoardRowModel;
+  maxBoardScore: number;
+  widthPct: number;
+  isSelected: boolean;
+  isActiveTeam: boolean;
+  effectiveBoardMode: string;
+  isSlotsPhase: boolean;
+  slotDelta: number | null;
+  stepRankDeltaLabel: string | null;
+  statSecondaryLabel: string | null;
+  teamResult: { seasonRank?: number | null; seasonRankDelta?: number | null } | null;
+  paramsTeamId: string;
+  onTeamRowClick: (teamId: string) => void;
+  onOpenTeam?: (teamId: string) => void;
+  registerRowRef: (teamId: string, node: HTMLElement | null) => void;
+};
+
+const ArenaBoardRow = memo(function ArenaBoardRow({
+  row,
+  maxBoardScore,
+  widthPct,
+  isSelected,
+  isActiveTeam,
+  effectiveBoardMode,
+  isSlotsPhase,
+  slotDelta,
+  stepRankDeltaLabel,
+  statSecondaryLabel,
+  teamResult,
+  paramsTeamId,
+  onTeamRowClick,
+  onOpenTeam,
+  registerRowRef,
+}: ArenaBoardRowProps) {
+  return (
+    <article
+      ref={(node) => registerRowRef(row.teamId, node)}
+      className={`arena-v2-board-row is-${row.tone}${isSelected ? " is-selected" : ""}${isActiveTeam ? " is-active-team" : ""}`}
+      role="listitem"
+      tabIndex={0}
+      aria-current={isSelected ? "true" : undefined}
+      title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren`}
+      onClick={() => onTeamRowClick(row.teamId)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onTeamRowClick(row.teamId);
+        }
+      }}
+    >
+      <div className="arena-v2-board-row-main">
+        <span className="arena-v2-board-rank">
+          #{row.rank}
+          {stepRankDeltaLabel ? (
+            <span
+              className={`arena-v2-board-rank-delta${(row.stepRankDelta ?? 0) > 0 ? " is-up" : " is-down"}`}
+              title="Rangänderung seit dem letzten Reveal-Schritt"
+            >
+              {stepRankDeltaLabel}
+            </span>
+          ) : null}
+        </span>
+        {row.teamLogoUrl ? (
+          <OptimizedMediaImage className="arena-v2-board-logo" src={row.teamLogoUrl} alt={`${row.teamName} Logo`} width={32} height={32} />
+        ) : (
+          <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
+        )}
+        <div className="arena-v2-board-copy">
+          <button
+            type="button"
+            className="table-link-button arena-v2-board-team-link"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenTeam?.(row.teamId);
+            }}
+          >
+            {row.teamName}
+          </button>
+          {row.detailChips.length > 0 ? (
+            <div className="arena-v2-board-chips">
+              {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
+                <span key={`${row.teamId}-${chip}`} className="pill arena-v2-board-chip">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="arena-v2-board-track-wrap">
+        <div className="arena-v2-board-track">
+          {(row.trackSegments?.length ?? 0) > 0 ? (
+            <div className="arena-v2-board-track-stack" style={{ width: `${widthPct}%` }}>
+              {row.trackSegments!.map((segment) => (
+                <span
+                  key={`${row.teamId}-${segment.id}`}
+                  className={`arena-v2-board-track-segment is-${segment.id} is-${segment.tone}`}
+                  style={{ flexGrow: Math.max(Math.abs(segment.value), 0.01) }}
+                  title={`${segment.label}: ${formatSignedDelta(segment.value)}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="arena-v2-board-track-fill" style={{ width: `${widthPct}%` }} />
+          )}
+        </div>
+        <span className="arena-v2-board-track-rank">Rang {row.rank}</span>
+      </div>
+      <div className="arena-v2-board-stats">
+        <ArenaAnimatedScore value={row.score} />
+        {statSecondaryLabel ? <span>{statSecondaryLabel}</span> : null}
+      </div>
+      {isSelected && (row.breakdown?.length ?? 0) > 0 ? (
+        <VeloImpactStrip
+          className="arena-v2-board-row-velo-strip"
+          items={row.breakdown!.slice(0, 5).map((entry) => ({
+            key: entry.id,
+            label: entry.label,
+            value: entry.valueLabel || "—",
+            tone: entry.tone === "negative" ? "negative" : entry.tone === "positive" ? "positive" : "neutral",
+          }))}
+        />
+      ) : null}
+    </article>
+  );
+});
+
 export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps) {
   const [params, setParams] = useState(() => defaultArenaParams(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
@@ -576,6 +853,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   });
   const [restoredRevealSessionLabel, setRestoredRevealSessionLabel] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [revealEventActive, setRevealEventActive] = useState(false);
+  const [mvpSpotlightActive, setMvpSpotlightActive] = useState(false);
   const [speed, setSpeed] = useState<ArenaPhaseControlSpeed>(1);
   const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
   const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
@@ -586,6 +865,48 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const detailRequestAbortRef = useRef<AbortController | null>(null);
   const boardListRef = useRef<HTMLDivElement | null>(null);
   const boardRowRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const scoreFeedCacheRef = useRef<Map<string, MatchdayMvpScoringResult>>(new Map());
+  const revealPulseTimerRef = useRef<number | null>(null);
+  const revealSignatureRef = useRef<string | null>(null);
+  const [boardScrollTop, setBoardScrollTop] = useState(0);
+  const [boardViewportHeight, setBoardViewportHeight] = useState(560);
+  const [showArenaHandoffBanner, setShowArenaHandoffBanner] = useState(false);
+  const [arenaShowAllTeams, setArenaShowAllTeams] = useState(false);
+  const [broadcastFocusMode, setBroadcastFocusMode] = useState(false);
+
+  const handleBackToLineup = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const openSlots = Math.max(0, (context?.matchdayContract?.discipline1?.requiredPlayers ?? 0) + (context?.matchdayContract?.discipline2?.requiredPlayers ?? 0));
+      window.sessionStorage.setItem(
+        "lineup-v2-return-focus",
+        JSON.stringify({ matchdayId: params.matchdayId, teamId: params.teamId, openSlotsHint: openSlots }),
+      );
+    }
+    props.onBackToLineup?.();
+  }, [context?.matchdayContract?.discipline1?.requiredPlayers, context?.matchdayContract?.discipline2?.requiredPlayers, params.matchdayId, params.teamId, props.onBackToLineup]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (window.sessionStorage.getItem("lineup-v2-arena-handoff") === "1") {
+      setShowArenaHandoffBanner(true);
+      window.sessionStorage.removeItem("lineup-v2-arena-handoff");
+      const timer = window.setTimeout(() => setShowArenaHandoffBanner(false), 6500);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
+  const boardScrollRafRef = useRef<number | null>(null);
+  const handleBoardScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    if (boardScrollRafRef.current != null) {
+      return;
+    }
+    boardScrollRafRef.current = window.requestAnimationFrame(() => {
+      setBoardScrollTop(scrollTop);
+      boardScrollRafRef.current = null;
+    });
+  }, []);
   const teamRowClickTimerRef = useRef<number | null>(null);
   const hasAutoScrolledToFocusRef = useRef(false);
   const shouldScrollToActiveTeamAfterStepRef = useRef(false);
@@ -612,6 +933,19 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     requestId: number,
     signal: AbortSignal,
   ) {
+    const resolveCacheKey = buildMatchdayArenaResolveSessionKey({
+      saveId: canonicalParams.saveId,
+      seasonId: canonicalParams.seasonId,
+      matchdayId: canonicalParams.matchdayId,
+      source: nextSource,
+    });
+    const cachedResolve = getMatchdayArenaResolvePreview<ArenaResolveResponse>(resolveCacheKey);
+    if (cachedResolve && requestSequenceRef.current === requestId && !signal.aborted) {
+      setResolveFeed(cachedResolve);
+      setLoadStage("ready");
+      return;
+    }
+
     const canonicalContextQuery = new URLSearchParams({
       saveId: canonicalParams.saveId,
       seasonId: canonicalParams.seasonId,
@@ -636,6 +970,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
       if (response.ok && !payload.error) {
         setResolveFeed(payload);
+        setMatchdayArenaResolvePreview(resolveCacheKey, payload);
         setWarnings((current) => Array.from(new Set([...current, ...payload.warnings])));
       } else {
         const detail = payload.error ?? "Resolve-Vorschau konnte nicht geladen werden.";
@@ -702,7 +1037,169 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         matchdayId: resolvedParams.matchdayId,
         teamId: resolvedParams.teamId,
         source: nextSource,
+        includeDetails: "0",
       });
+      const scoreCacheKey = `${resolvedParams.saveId}:${resolvedParams.seasonId}:${resolvedParams.matchdayId}:${nextSource}`;
+      const cachedScoreFeed = scoreFeedCacheRef.current.get(scoreCacheKey) ?? null;
+      const arenaBaseSessionKey = buildMatchdayArenaBaseSessionKey({
+        saveId: resolvedParams.saveId,
+        seasonId: resolvedParams.seasonId,
+        matchdayId: resolvedParams.matchdayId,
+        teamId: resolvedParams.teamId,
+        source: nextSource,
+      });
+
+      if (nextSource === "sqlite") {
+        const cachedBundlePayload = getMatchdayArenaBaseBundle<ArenaBaseResponse>(arenaBaseSessionKey);
+        if (cachedBundlePayload?.context) {
+          const scoreSummary = cachedScoreFeed ?? cachedBundlePayload.scoreSummary ?? null;
+          if (scoreSummary) {
+            const storedRevealSession = props.roomContext
+              ? null
+              : readStoredMatchdayArenaRevealSession(cachedBundlePayload.params);
+            setSource(cachedBundlePayload.source);
+            setParams(cachedBundlePayload.params);
+            setContext(cachedBundlePayload.context);
+            setTeamOptions(cachedBundlePayload.options.teams);
+            setScoreFeed(scoreSummary);
+            scoreFeedCacheRef.current.set(scoreCacheKey, scoreSummary);
+            setStandingsPreviewFeed(cachedBundlePayload.standingsPreview ?? null);
+            setFocusTeamId(cachedBundlePayload.params.teamId);
+            setWarnings(
+              Array.from(
+                new Set([
+                  ...cachedBundlePayload.contextWarnings,
+                  ...cachedBundlePayload.contextErrors,
+                  ...(cachedBundlePayload.scoreWarnings ?? []),
+                  ...(cachedBundlePayload.scoreBlockingReasons ?? []),
+                  ...scoreSummary.warnings,
+                  ...scoreSummary.blockingReasons,
+                  ...(cachedBundlePayload.resolvePreview?.warnings ?? []),
+                ]),
+              ),
+            );
+            if (storedRevealSession) {
+              setActiveDisciplinePhase(storedRevealSession.activeDisciplinePhase);
+              setPhaseIndex(
+                Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === storedRevealSession.phaseId)),
+              );
+              setRevealedSlotCountByDiscipline(storedRevealSession.revealedSlotCountByDiscipline);
+              setCompletedDisciplinePhases(storedRevealSession.completedDisciplinePhases);
+              setRestoredRevealSessionLabel(
+                `Fortgesetzt bei ${storedRevealSession.activeDisciplinePhase.toUpperCase()} · ${
+                  MATCHDAY_ARENA_PHASES.find((phase) => phase.id === storedRevealSession.phaseId)?.label ?? "Slots"
+                }`,
+              );
+            } else {
+              setActiveDisciplinePhase("d1");
+              setPhaseIndex(0);
+              setRevealedSlotCountByDiscipline({ d1: 0, d2: 0 });
+              setCompletedDisciplinePhases({ d1: false, d2: false });
+              setRestoredRevealSessionLabel(null);
+            }
+            setIsPlaying(false);
+            if (cachedBundlePayload.resolvePreview) {
+              setResolveFeed(cachedBundlePayload.resolvePreview);
+              setLoadStage("ready");
+              return;
+            }
+
+            setLoadStage("players");
+            const resolveController = new AbortController();
+            resolveRequestAbortRef.current = resolveController;
+            void loadResolvePreview(cachedBundlePayload.params, cachedBundlePayload.source, requestId, resolveController.signal);
+            return;
+          }
+        }
+
+        const bundleResponse = await fetch(`/api/matchday/arena-base?${contextQuery.toString()}`, {
+          cache: "no-store",
+          signal: baseController.signal,
+        });
+        const bundlePayload = await readArenaJsonPayload<ArenaBaseResponse>(
+          bundleResponse,
+          "Der Arena-v2-Basisblock hat keine lesbare Antwort geliefert.",
+        );
+
+        if (requestSequenceRef.current !== requestId || baseController.signal.aborted) {
+          return;
+        }
+
+        if (!bundleResponse.ok || bundlePayload.error || !bundlePayload.context) {
+          setErrors([bundlePayload.error ?? bundlePayload.contextErrors?.[0] ?? "Arena v2 konnte den Basisblock nicht laden."]);
+          setContext(null);
+          setScoreFeed(null);
+          setLoadStage("idle");
+          return;
+        }
+
+        const scoreSummary = cachedScoreFeed ?? bundlePayload.scoreSummary ?? null;
+        if (!scoreSummary) {
+          setErrors(["Arena v2 konnte die Spieltagswertung nicht laden."]);
+          setParams(bundlePayload.params);
+          setSource(bundlePayload.source);
+          setContext(bundlePayload.context);
+          setTeamOptions(bundlePayload.options.teams);
+          setScoreFeed(null);
+          setLoadStage("idle");
+          return;
+        }
+
+        setMatchdayArenaBaseBundle(arenaBaseSessionKey, bundlePayload);
+
+        const storedRevealSession = props.roomContext ? null : readStoredMatchdayArenaRevealSession(bundlePayload.params);
+        setSource(bundlePayload.source);
+        setParams(bundlePayload.params);
+        setContext(bundlePayload.context);
+        setTeamOptions(bundlePayload.options.teams);
+        setScoreFeed(scoreSummary);
+        scoreFeedCacheRef.current.set(scoreCacheKey, scoreSummary);
+        setStandingsPreviewFeed(bundlePayload.standingsPreview ?? null);
+        setFocusTeamId(bundlePayload.params.teamId);
+        setWarnings(
+          Array.from(
+            new Set([
+              ...bundlePayload.contextWarnings,
+              ...bundlePayload.contextErrors,
+              ...(bundlePayload.scoreWarnings ?? []),
+              ...(bundlePayload.scoreBlockingReasons ?? []),
+              ...scoreSummary.warnings,
+              ...scoreSummary.blockingReasons,
+              ...(bundlePayload.resolvePreview?.warnings ?? []),
+            ]),
+          ),
+        );
+        if (storedRevealSession) {
+          setActiveDisciplinePhase(storedRevealSession.activeDisciplinePhase);
+          setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === storedRevealSession.phaseId)));
+          setRevealedSlotCountByDiscipline(storedRevealSession.revealedSlotCountByDiscipline);
+          setCompletedDisciplinePhases(storedRevealSession.completedDisciplinePhases);
+          setRestoredRevealSessionLabel(
+            `Fortgesetzt bei ${storedRevealSession.activeDisciplinePhase.toUpperCase()} · ${
+              MATCHDAY_ARENA_PHASES.find((phase) => phase.id === storedRevealSession.phaseId)?.label ?? "Slots"
+            }`,
+          );
+        } else {
+          setActiveDisciplinePhase("d1");
+          setPhaseIndex(0);
+          setRevealedSlotCountByDiscipline({ d1: 0, d2: 0 });
+          setCompletedDisciplinePhases({ d1: false, d2: false });
+          setRestoredRevealSessionLabel(null);
+        }
+        setIsPlaying(false);
+        if (bundlePayload.resolvePreview) {
+          setResolveFeed(bundlePayload.resolvePreview);
+          setLoadStage("ready");
+          return;
+        }
+
+        setLoadStage("players");
+
+        const resolveController = new AbortController();
+        resolveRequestAbortRef.current = resolveController;
+        void loadResolvePreview(bundlePayload.params, bundlePayload.source, requestId, resolveController.signal);
+        return;
+      }
 
       const [contextResult, scoreResult] = await Promise.allSettled([
         fetch(`/api/lineups/legacy/lab-context?${contextQuery.toString()}`, {
@@ -715,7 +1212,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             "Der Arena-v2-Kontext hat keine lesbare Antwort geliefert.",
           ),
         })),
-        fetch("/api/season/matchday-mvp-score", {
+        cachedScoreFeed
+          ? Promise.resolve({
+              ok: true,
+              payload: { summary: cachedScoreFeed },
+            })
+          : fetch("/api/season/matchday-mvp-score", {
           method: "POST",
           signal: baseController.signal,
           headers: {
@@ -790,7 +1292,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       }
 
       if (scoreResult.status === "fulfilled" && (!scoreResult.value.ok || !scoreResult.value.payload.summary)) {
-        setErrors([scoreResult.value.payload.error ?? "Arena v2 konnte die Spieltagswertung nicht laden."]);
+        const errorPayload = scoreResult.value.payload;
+        setErrors([
+          "error" in errorPayload && errorPayload.error
+            ? errorPayload.error
+            : "Arena v2 konnte die Spieltagswertung nicht laden.",
+        ]);
         setParams(canonicalParams);
         setSource(contextPayload.source);
         setContext(contextPayload.context);
@@ -816,6 +1323,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       setContext(contextPayload.context);
       setTeamOptions(contextPayload.options.teams);
       setScoreFeed(scorePayload.summary);
+      scoreFeedCacheRef.current.set(scoreCacheKey, scorePayload.summary);
       setStandingsPreviewFeed(null);
       setFocusTeamId(canonicalParams.teamId);
       setWarnings(
@@ -1050,7 +1558,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       return {
         teamId,
         teamName: d1?.teamName ?? d2?.teamName ?? team?.name ?? teamId,
-        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null) : null,
+        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null, { variant: "thumb" }) : null,
         rank: 0,
         medal: null,
         d1Points,
@@ -1089,6 +1597,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       }));
   }, [props.teams, scoreboardByTeamId, standingsRankChangeByTeamId]);
 
+  const matchdayWinnerByTeamId = useMemo(
+    () => new Map(matchdayWinnerRows.map((row) => [row.teamId, row] as const)),
+    [matchdayWinnerRows],
+  );
+
   const resolvePlayerCatalogById = useMemo(
     () => new Map((resolveFeed?.playerCatalog ?? []).map((player) => [player.playerId, player] as const)),
     [resolveFeed?.playerCatalog],
@@ -1100,13 +1613,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
   function resolveArenaPortrait(playerId: string, fallbackPortraitUrl?: string | null) {
     const foundationPlayer = foundationPlayerById.get(playerId) ?? null;
-    return (
-      fallbackPortraitUrl ??
-      getPlayerPortraitBrowserUrl(
-        playerId,
-        foundationPlayer?.portraitUrl ?? null,
-        foundationPlayer?.portraitPath ?? null,
-      )
+    return getPlayerPortraitBrowserUrl(
+      playerId,
+      fallbackPortraitUrl ?? foundationPlayer?.portraitUrl ?? null,
+      foundationPlayer?.portraitPath ?? null,
+      { variant: "thumb" },
     );
   }
 
@@ -1139,8 +1650,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     if (!focusTeamId) {
       return null;
     }
-    return matchdayWinnerRows.find((entry) => entry.teamId === focusTeamId) ?? null;
-  }, [focusTeamId, matchdayWinnerRows]);
+    return matchdayWinnerByTeamId.get(focusTeamId) ?? null;
+  }, [focusTeamId, matchdayWinnerByTeamId]);
 
   const focusTeam = useMemo(
     () => (focusTeamId ? props.teams.find((team) => team.teamId === focusTeamId) ?? null : null),
@@ -1149,7 +1660,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const focusTeamName = focusWinnerRow?.teamName ?? focusTeamDetail?.teamName ?? focusTeam?.name ?? "Top Player";
   const focusTeamLogoUrl =
     focusWinnerRow?.teamLogoUrl ??
-    (focusTeam ? getTeamLogoBrowserUrl(focusTeam.teamId, focusTeam.logoPath ?? null) : null);
+    (focusTeam ? getTeamLogoBrowserUrl(focusTeam.teamId, focusTeam.logoPath ?? null, { variant: "thumb" }) : null);
 
   const topPlayersBySide = useMemo(() => {
     const buildTopPlayers = (topPlayers: MatchdayMvpTopPlayerRow[], scoreboard: MatchdayArenaScoreboardRowView[]) =>
@@ -1255,12 +1766,24 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   }, [matchdayMutatorTraitsBySide]);
   const canShowResultLayer =
     isResultPhase && activeDisciplinePhase === "total" && completedDisciplinePhases.d1 && completedDisciplinePhases.d2;
+  const mvpSpotlightPlayer = ppWinnerCards[0] ?? null;
+  const isArenaEventMode = isPlaying || revealEventActive;
   const canShowFinalLayer = effectiveBoardMode !== "total" && (displayPhase === "final" || canShowResultLayer);
   const revealedPhaseIndex = Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === displayPhase));
   const isPhaseRevealed = (phaseId: (typeof MATCHDAY_ARENA_PHASES)[number]["id"]) => {
     const targetIndex = MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === phaseId);
     return targetIndex >= 0 && targetIndex <= revealedPhaseIndex;
   };
+
+  useEffect(() => {
+    if (!canShowResultLayer || displayPhase !== "result" || !mvpSpotlightPlayer) {
+      setMvpSpotlightActive(false);
+      return;
+    }
+    setMvpSpotlightActive(true);
+    const timer = window.setTimeout(() => setMvpSpotlightActive(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [canShowResultLayer, displayPhase, mvpSpotlightPlayer?.playerId]);
 
   const d1SlotRoles = useMemo(
     () => resolveSlotRolesForDiscipline(d1Id, d1Label, d1Required),
@@ -1346,6 +1869,23 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         revealedSlotCountByDiscipline.d2 >= maxD2SlotRevealCount &&
         phaseIndex >= finalPhaseIndex));
   const isSlotsPhase = displayPhase === "slots";
+
+  useEffect(() => {
+    const signature = `${activeDisciplinePhase}:${displayPhase}:${revealedSlotCount}:${phaseIndex}`;
+    if (revealSignatureRef.current && revealSignatureRef.current !== signature) {
+      setRevealEventActive(true);
+      if (revealPulseTimerRef.current) {
+        window.clearTimeout(revealPulseTimerRef.current);
+      }
+      revealPulseTimerRef.current = window.setTimeout(() => setRevealEventActive(false), 720);
+    }
+    revealSignatureRef.current = signature;
+    return () => {
+      if (revealPulseTimerRef.current) {
+        window.clearTimeout(revealPulseTimerRef.current);
+      }
+    };
+  }, [activeDisciplinePhase, displayPhase, phaseIndex, revealedSlotCount]);
 
   const slotScoresAtCount = useMemo(() => {
     const teamDetails = resolveFeed?.teamDetails ?? [];
@@ -1527,6 +2067,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           roleHint: role?.description ?? "Spielerbeitrag in dieser Rolle.",
           baseScore: entry.baseScore,
           fatigueAdjustedScore: entry.fatigueAdjustedScore,
+          mutatorBonus: entry.mutatorBonus,
           finalPlayerScore: entry.finalPlayerScore,
           pointsAwarded: entry.pointsAwarded,
           mutatorPpsBonus: entry.mutatorPpsBonus,
@@ -1549,7 +2090,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     [focusTeamDetail, d1Id, d1Label, d1Required, d2Id, d2Label, d2Required, resolvePlayerCatalogById, foundationPlayerById, arenaRankContextBySide],
   );
 
-  const boardRows = useMemo(() => {
+  const boardRows = useMemo<ArenaBoardRow[]>(() => {
     if (effectiveBoardMode === "total") {
       return matchdayWinnerRows.map((row) => ({
         teamId: row.teamId,
@@ -1598,7 +2139,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         return {
           teamId: row.teamId,
           teamName: row.teamName,
-          teamLogoUrl: getTeamLogoBrowserUrl(row.teamId, props.teams.find((team) => team.teamId === row.teamId)?.logoPath ?? null),
+          teamLogoUrl: getTeamLogoBrowserUrl(row.teamId, props.teams.find((team) => team.teamId === row.teamId)?.logoPath ?? null, { variant: "thumb" }),
           rank: arenaTeamRankMaps.currentRankByTeamId.get(row.teamId) ?? index + 1,
           stepRankDelta: arenaTeamRankMaps.stepRankDeltaByTeamId.get(row.teamId) ?? null,
           score:
@@ -1684,8 +2225,62 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     [boardRows],
   );
 
+  const isFocusedBoardMode = loadStage === "ready" && effectiveBoardMode !== "total";
+  const isArenaFocusedTenTeamView = isFocusedBoardMode && !arenaShowAllTeams;
+  const visibleBoardRows = useMemo(
+    () => (isArenaFocusedTenTeamView ? buildFocusedArenaBoardRows(boardRows, params.teamId) : boardRows),
+    [boardRows, isArenaFocusedTenTeamView, params.teamId],
+  );
+
+  const arenaAct: ArenaAct =
+    loadStage !== "ready" ? "prep" : canShowResultLayer ? "result" : "reveal";
+  const arenaGuidedState: ArenaGuidedState =
+    loadStage === "idle" || loadStage === "scoreboard"
+      ? "loading"
+      : loadStage === "players"
+        ? "prep"
+        : canShowResultLayer
+          ? "result"
+          : isPlaying || revealEventActive || phaseIndex > 0
+            ? "reveal"
+            : "ready";
+
   const leaderRow = boardRows[0] ?? null;
   const boardLeaderLabel = leaderRow?.teamName ?? "—";
+  const topDuelBroadcast = useMemo(() => {
+    if (loadStage !== "ready" || boardRows.length < 2) {
+      return null;
+    }
+    const leader = boardRows[0];
+    const challenger = boardRows[1];
+    if (!leader || !challenger || (leader.score ?? 0) <= 0) {
+      return null;
+    }
+    return {
+      leader,
+      challenger,
+      gap: Math.max(0, (leader.score ?? 0) - (challenger.score ?? 0)),
+    };
+  }, [boardRows, loadStage]);
+  const boardVirtualWindow = useMemo(() => {
+    const start = Math.max(0, Math.floor(boardScrollTop / ARENA_BOARD_ROW_STRIDE) - ARENA_BOARD_VIRTUAL_OVERSCAN);
+    const end = Math.min(
+      boardRows.length,
+      Math.ceil((boardScrollTop + boardViewportHeight) / ARENA_BOARD_ROW_STRIDE) + ARENA_BOARD_VIRTUAL_OVERSCAN,
+    );
+    return { start, end, offsetY: start * ARENA_BOARD_ROW_STRIDE };
+  }, [boardRows.length, boardScrollTop, boardViewportHeight]);
+  useEffect(() => {
+    const node = boardListRef.current;
+    if (!node) {
+      return;
+    }
+    const syncViewport = () => setBoardViewportHeight(node.clientHeight || 560);
+    syncViewport();
+    const observer = new ResizeObserver(syncViewport);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadStage, boardRows.length]);
   const boardLabel =
     effectiveBoardMode === "total" ? "Gesamtwertung" : effectiveBoardMode === "d1" ? `${d1Label} Reveal` : `${d2Label} Reveal`;
   const canGoBackArenaStep =
@@ -1759,11 +2354,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     }, 220);
   }
 
-  function handleTeamRowDoubleClick(teamId: string) {
-    if (teamRowClickTimerRef.current) {
-      window.clearTimeout(teamRowClickTimerRef.current);
-      teamRowClickTimerRef.current = null;
-    }
+  function handleTeamProfileOpen(teamId: string) {
     props.onOpenTeam?.(teamId);
   }
 
@@ -1937,7 +2528,13 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   }
 
   useEffect(() => {
-    if (!canShowTotalResults || standingsPreviewFeed || !params.saveId || !params.seasonId || !params.matchdayId) {
+    if (
+      !canShowTotalResults ||
+      standingsPreviewFeed ||
+      !params.saveId ||
+      !params.seasonId ||
+      !params.matchdayId
+    ) {
       return undefined;
     }
 
@@ -2075,6 +2672,29 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         setIsPlaying(false);
         rewindArenaStep();
       }
+
+      if (event.code === "ArrowDown" || event.code === "ArrowUp") {
+        if (!boardRows.length) {
+          return;
+        }
+        event.preventDefault();
+        setIsPlaying(false);
+        const currentIndex = focusTeamId ? boardRows.findIndex((row) => row.teamId === focusTeamId) : -1;
+        const startIndex = currentIndex >= 0 ? currentIndex : event.code === "ArrowDown" ? -1 : boardRows.length;
+        const nextIndex = Math.min(
+          Math.max(startIndex + (event.code === "ArrowDown" ? 1 : -1), 0),
+          boardRows.length - 1,
+        );
+        const nextTeamId = boardRows[nextIndex]?.teamId;
+        if (!nextTeamId) {
+          return;
+        }
+        setFocusTeamId(nextTeamId);
+        scrollArenaTeamIntoView(nextTeamId, "auto");
+        window.requestAnimationFrame(() => {
+          boardRowRefs.current.get(nextTeamId)?.focus({ preventScroll: true });
+        });
+      }
     };
 
     window.addEventListener("keydown", onKeyDown, { capture: true });
@@ -2189,7 +2809,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           return (
           <article
             key={`${disciplineLabel}-${entry.playerId}-${entry.slotIndex}`}
-            className={`arena-v2-slot-card is-compact is-tier-${getArenaFocusEntryCardTier(entry, entryRankPools)}${entry.isCaptain ? " is-captain" : ""}`}
+            className={`arena-v2-slot-card is-compact is-tier-${getArenaFocusEntryCardTier(entry, entryRankPools)}${entry.isCaptain ? " is-captain" : ""}${revealEventActive ? " is-arena-slot-pulse" : ""}${entry.rankInSlotBase === 1 ? " is-slot-winner" : ""}`}
             role={entry.activePlayerId ? "button" : undefined}
             tabIndex={entry.activePlayerId ? 0 : undefined}
             onClick={() => entry.activePlayerId && props.onOpenPlayerDetails?.({ playerId: entry.playerId, activePlayerId: entry.activePlayerId })}
@@ -2225,18 +2845,36 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 </div>
                 <div className="arena-v2-slot-meta-row">
                   <span>{entry.className ?? "—"}</span>
-                  <span className={`arena-v2-slot-score-pill is-tier-${getArenaAxisValueTier(entry.baseScore)}`}>
-                    Base {formatDecimalScore(entry.baseScore, 1)}
-                  </span>
-                  {canShowFinalLayer ? (
-                    <span className={`arena-v2-slot-score-pill is-tier-${getArenaAxisValueTier(entry.finalPlayerScore)}`}>
-                      Final {formatDecimalScore(entry.finalPlayerScore, 1)}
-                    </span>
-                  ) : null}
                   {canShowResultLayer ? <span>PPs {formatDecimalScore(entry.pointsAwarded, 1)}</span> : null}
                 </div>
               </div>
             </div>
+            <VeloImpactStrip
+              className="arena-v2-slot-impact-strip"
+              items={[
+                {
+                  key: "base",
+                  label: "Base",
+                  value: formatDecimalScore(entry.baseScore, 1),
+                  tone: "neutral",
+                },
+                {
+                  key: "mutator",
+                  label: "Mutator",
+                  value:
+                    entry.mutatorBonus != null
+                      ? `${entry.mutatorBonus >= 0 ? "+" : ""}${formatDecimalScore(entry.mutatorBonus, 1)}`
+                      : "—",
+                  tone: (entry.mutatorBonus ?? 0) >= 0 ? "positive" : "negative",
+                },
+                {
+                  key: "final",
+                  label: "Final",
+                  value: canShowFinalLayer ? formatDecimalScore(entry.finalPlayerScore, 1) : "—",
+                  tone: "positive",
+                },
+              ]}
+            />
             <div className="arena-v2-rank-tag-row">
               {renderArenaRankTag("S#", entry.rankInSlotBase, "base", ARENA_PLAYER_RANK_TOOLTIPS.slotBase, entryRankPools.slotPoolSize)}
               {renderArenaRankTag("G#", entry.rankTotalBase, "base", ARENA_PLAYER_RANK_TOOLTIPS.totalBase, entryRankPools.totalPoolSize)}
@@ -2244,17 +2882,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               {renderArenaRankTag("G+#", entry.rankTotalBoosted, "boosted", ARENA_PLAYER_RANK_TOOLTIPS.totalBoosted, entryRankPools.totalPoolSize)}
             </div>
             {entry.axisStats.length ? (
-              <div className="arena-v2-axis-strip">
-                {entry.axisStats.map((stat) => (
-                  <span
-                    key={`${entry.playerId}-${stat.axis}`}
-                    className={`arena-v2-axis-chip is-${stat.axis.toLowerCase()} is-tier-${getArenaAxisValueTier(stat.value)}`}
-                  >
-                    <small>{stat.axis}</small>
-                    <strong>{stat.value == null || !Number.isFinite(stat.value) ? "—" : Math.round(stat.value)}</strong>
-                  </span>
-                ))}
-              </div>
+              <VeloStatOrbitRow
+                className="arena-v2-slot-orbit-row"
+                ariaLabel={`${entry.playerName} Attribute`}
+                stats={axisStatsToOrbitStats(entry.axisStats)}
+              />
             ) : null}
             {entry.warnings.length ? <p className="arena-v2-slot-warning">{entry.warnings[0]}</p> : null}
           </article>
@@ -2298,7 +2930,33 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   };
 
   return (
-    <div className="arena-v2-shell">
+    <div className={`arena-v2-shell is-act-${arenaAct}${isArenaEventMode ? " is-event-mode" : ""}${isFocusedBoardMode ? " is-focused-board" : ""}${broadcastFocusMode ? " is-broadcast-mode" : ""}`}>
+      {showArenaHandoffBanner ? (
+        <div className="arena-v2-handoff-banner" role="status" data-testid="arena-lineup-handoff-banner">
+          <strong>Einsatzliste gespeichert</strong>
+          <span>Reveal startet hier — Play oder Leertaste für den nächsten Schritt.</span>
+        </div>
+      ) : null}
+      {arenaGuidedState === "loading" || arenaGuidedState === "prep" || arenaGuidedState === "ready" ? (
+        <div className={`arena-v2-guided-state is-${arenaGuidedState}`} data-testid="arena-guided-empty-state" aria-live="polite">
+          {arenaGuidedState === "loading" ? (
+            <>
+              <strong>Wertung wird vorbereitet</strong>
+              <span>32 Teams, Auto-Lineups und Resolve laufen — gleich geht&apos;s los.</span>
+            </>
+          ) : arenaGuidedState === "prep" ? (
+            <>
+              <strong>Spieler-Details laden</strong>
+              <span>Portraits und Slot-Scores kommen gleich — Board folgt im nächsten Schritt.</span>
+            </>
+          ) : (
+            <>
+              <strong>Bereit für den Reveal</strong>
+              <span>Play startet die Show · Leertaste = Schritt · Fokus-Board zeigt Top 3 + dein Team ±3.</span>
+            </>
+          )}
+        </div>
+      ) : null}
       <section className="panel arena-v2-hero">
         <div className="arena-v2-hero-main">
           <div className="arena-v2-kicker-row">
@@ -2318,13 +2976,23 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 {d1Label} / {d2Label}
               </TooltipHeading>
               <p className="arena-v2-subline">
-                {focusModeLabel} · {boardLabel} · Phase {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
+                {focusModeLabel} · {boardLabel} · {arenaAct === "prep" ? "Vorbereitung" : arenaAct === "result" ? "Ergebnis" : "Reveal"} ·{" "}
+                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
               </p>
               {loadStageHint ? <p className="arena-v2-load-hint">{loadStageHint}</p> : null}
             </div>
             <div className="arena-v2-hero-actions">
+              <button
+                className={`secondary-button inline-button${broadcastFocusMode ? " is-selected" : ""}`}
+                type="button"
+                data-testid="arena-v2-broadcast-toggle"
+                onClick={() => setBroadcastFocusMode((current) => !current)}
+                title={broadcastFocusMode ? "Broadcast-Modus aus — Seitenpanels wieder an" : "Broadcast-Modus — Board vergrößern, Nebenpanels ausblenden"}
+              >
+                {broadcastFocusMode ? "Fokus aus" : "Broadcast"}
+              </button>
               {props.onBackToLineup ? (
-                <button className="secondary-button inline-button" type="button" onClick={props.onBackToLineup}>
+                <button className="secondary-button inline-button" type="button" onClick={handleBackToLineup}>
                   Einsatzliste
                 </button>
               ) : null}
@@ -2395,97 +3063,137 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         </section>
       )}
 
-      <section className="panel arena-v2-timeline-panel">
+      <section className={`panel arena-v2-timeline-panel arena-v2-act-reveal${revealEventActive ? " is-reveal-event" : ""}`} data-testid="arena-reveal-timeline">
         <div className="arena-v2-timeline-head">
           <div>
             <strong>Reveal-Fortschritt</strong>
-            <small>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"} · {boardLabel}</small>
           </div>
           <div className="arena-v2-phase-pills">
             <span className="pill">Aktiv: {activeDisciplineLabel}</span>
             <span className="pill">Slots {revealedSlotCount}/{maxSlotRevealCount}</span>
             <span className="pill">{canShowResultLayer ? `PPs ${scoreFeed?.ppWinners.length ?? 0} sichtbar` : "PPs im Result"}</span>
           </div>
-          <div className="arena-v2-control-row arena-v2-timeline-controls">
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "total" ? " is-selected" : ""}`}
-              type="button"
-              disabled={!canShowTotalResults || isRoomRevealSyncActive}
-              onClick={showTotalResults}
-              title={canShowTotalResults ? "Gesamtwertung anzeigen" : "Gesamtwertung wird erst nach D1 und D2 freigeschaltet"}
-            >
-              Gesamt
-            </button>
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "d1" ? " is-selected" : ""}`}
-              type="button"
-              disabled={isRoomRevealSyncActive}
-              onClick={() => switchToDiscipline("d1")}
-            >
-              {d1Label}
-            </button>
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "d2" ? " is-selected" : ""}`}
-              type="button"
-              disabled={!canSwitchToD2 || isRoomRevealSyncActive}
-              onClick={() => switchToDiscipline("d2")}
-              title={canSwitchToD2 ? `${d2Label} Reveal anzeigen` : `${d2Label} wird nach Abschluss von ${d1Label} freigeschaltet`}
-            >
-              {d2Label}
-            </button>
-            <button className="primary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={() => (isPlaying ? setIsPlaying(false) : startRevealPlayback())}>
-              {isPlaying ? "Pause" : "Play"}
-            </button>
-            <button className="secondary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={resetArenaReveal}>
-              Reset
-            </button>
-            {[1, 2, 4].map((entry) => (
-              <button
-                key={`speed-${entry}`}
-                className={`secondary-button inline-button${speed === entry ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => setSpeed(entry as ArenaPhaseControlSpeed)}
-              >
-                x{entry}
-              </button>
-            ))}
-          </div>
-          {effectiveBoardMode !== "total" ? (
-            <div className="arena-v2-score-legend" aria-label="Score-Balken Legende">
-              {(["slots", "push", "form", "mutator", "captain", "power"] as const).map((segmentId) => (
-                <span key={segmentId} className={`arena-v2-score-legend-item is-${segmentId}`}>
-                  {ARENA_SCORE_TRACK_SEGMENT_LABELS[segmentId]}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {restoredRevealSessionLabel ? (
-            <p className="arena-v2-control-hint">
-              {restoredRevealSessionLabel}. Leertaste = nächster Schritt, Pfeiltasten ebenfalls.
-              {isRoomRevealSyncActive ? (isRoomHost ? " Du steuerst den Reveal für alle." : " Der Host steuert den Reveal.") : ""}
-            </p>
-          ) : (
-            <p className="arena-v2-control-hint">
-              Leertaste = nächster Reveal-Schritt. Play startet Auto-Reveal.
-              {roomRevealWaitingForHost ? " Warte auf Host-Start." : ""}
-              {isRoomRevealSyncActive && !isRoomHost ? " Der Host steuert den gemeinsamen Reveal." : ""}
-              {isRoomRevealSyncActive && isRoomHost ? " Dein Schritt gilt für alle Spieler." : ""}
-            </p>
-          )}
         </div>
-        <MatchdayArenaTimeline activePhase={displayPhase} onSelectPhase={canControlArenaReveal ? jumpToArenaPhase : undefined} />
+        <ArenaRevealPlaybackPanel
+          activePhase={displayPhase}
+          onSelectPhase={canControlArenaReveal ? jumpToArenaPhase : undefined}
+          controls={
+            <>
+              <div className="arena-v2-control-row arena-v2-timeline-controls">
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "total" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={!canShowTotalResults || isRoomRevealSyncActive}
+                  onClick={showTotalResults}
+                  title={canShowTotalResults ? "Gesamtwertung anzeigen" : "Gesamtwertung wird erst nach D1 und D2 freigeschaltet"}
+                >
+                  Gesamt
+                </button>
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "d1" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={isRoomRevealSyncActive}
+                  onClick={() => switchToDiscipline("d1")}
+                >
+                  {d1Label}
+                </button>
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "d2" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={!canSwitchToD2 || isRoomRevealSyncActive}
+                  onClick={() => switchToDiscipline("d2")}
+                  title={canSwitchToD2 ? `${d2Label} Reveal anzeigen` : `${d2Label} wird nach Abschluss von ${d1Label} freigeschaltet`}
+                >
+                  {d2Label}
+                </button>
+                <button className="primary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={() => (isPlaying ? setIsPlaying(false) : startRevealPlayback())}>
+                  {isPlaying ? "Pause" : "Play"}
+                </button>
+                <button className="secondary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={resetArenaReveal}>
+                  Zurücksetzen
+                </button>
+                {[1, 2, 4].map((entry) => (
+                  <button
+                    key={`speed-${entry}`}
+                    className={`secondary-button inline-button${speed === entry ? " is-selected" : ""}`}
+                    type="button"
+                    title={entry === 1 ? "Normaltempo" : entry === 2 ? "Schnell" : "Turbo-Reveal"}
+                    onClick={() => setSpeed(entry as ArenaPhaseControlSpeed)}
+                  >
+                    {entry === 1 ? "Normal" : entry === 2 ? "Schnell" : "Turbo"}
+                  </button>
+                ))}
+              </div>
+              {effectiveBoardMode !== "total" ? (
+                <div className="arena-v2-score-legend" aria-label="Score-Balken Legende">
+                  {(["slots", "push", "form", "mutator", "captain", "power"] as const).map((segmentId) => (
+                    <span key={segmentId} className={`arena-v2-score-legend-item is-${segmentId}`}>
+                      {ARENA_SCORE_TRACK_SEGMENT_LABELS[segmentId]}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          }
+          hint={
+            restoredRevealSessionLabel ? (
+              <p className="arena-v2-control-hint">
+                {restoredRevealSessionLabel}. Leertaste = nächster Schritt, Pfeiltasten ebenfalls.
+                {isRoomRevealSyncActive ? (isRoomHost ? " Du steuerst den Reveal für alle." : " Der Host steuert den Reveal.") : ""}
+              </p>
+            ) : (
+              <p className="arena-v2-control-hint">
+                Leertaste = nächster Reveal-Schritt. Play startet Auto-Reveal.
+                {roomRevealWaitingForHost ? " Warte auf Host-Start." : ""}
+                {isRoomRevealSyncActive && !isRoomHost ? " Der Host steuert den gemeinsamen Reveal." : ""}
+                {isRoomRevealSyncActive && isRoomHost ? " Dein Schritt gilt für alle Spieler." : ""}
+              </p>
+            )
+          }
+        />
       </section>
 
-      <section className={`arena-v2-main-grid is-full-stage${canShowResultLayer ? "" : " is-single-discipline"}`}>
+      {topDuelBroadcast && isSlotsPhase ? (
+        <section className="arena-v2-broadcast-panel" aria-label="Top-Duell Broadcast">
+          <div className="arena-v2-broadcast-stage">
+            <article className="arena-v2-broadcast-team is-leader">
+              <span className="arena-v2-broadcast-rank">#1</span>
+              <strong>{topDuelBroadcast.leader.teamName}</strong>
+              <small>{formatDecimalScore(topDuelBroadcast.leader.score, 1)} Score</small>
+            </article>
+            <div className="arena-v2-broadcast-vs" aria-hidden="true">
+              <span>Top-Duell</span>
+              <strong>+{formatDecimalScore(topDuelBroadcast.gap, 1)}</strong>
+            </div>
+            <article className="arena-v2-broadcast-team">
+              <span className="arena-v2-broadcast-rank">#2</span>
+              <strong>{topDuelBroadcast.challenger.teamName}</strong>
+              <small>{formatDecimalScore(topDuelBroadcast.challenger.score, 1)} Score</small>
+            </article>
+          </div>
+        </section>
+      ) : null}
+
+      <section className={`arena-v2-main-grid is-full-stage arena-v2-act-board${canShowResultLayer ? "" : " is-single-discipline"}${broadcastFocusMode ? " is-broadcast-mode" : ""}`}>
         <section className="panel arena-v2-board-panel">
           <div className="arena-v2-board-sticky-stack">
             <div className="arena-v2-board-head">
               <div className="arena-v2-board-head-main">
                 <TooltipHeading
                   as="h3"
-                  tooltip="Links bleibt das Hauptboard: alle 32 Teams, direkt klickbar. Rechts sitzen die Fokus-Spieler. Vor dem Result zeigt die Arena nur die aktive Disziplin; Gesamtwertung, PPs und Top Player werden erst danach sichtbar."
+                  tooltip={
+                    isFocusedBoardMode
+                      ? arenaShowAllTeams
+                        ? "Fokus-Board mit allen 32 Teams — dein Team bleibt hervorgehoben."
+                        : "Fokus-Board: Top 3 fix, dein Team hervorgehoben, je 3 Ränge darüber/darunter — 10 Teams statt 32."
+                      : "Links bleibt das Hauptboard: alle 32 Teams, direkt klickbar. Rechts sitzen die Fokus-Spieler. Vor dem Result zeigt die Arena nur die aktive Disziplin; Gesamtwertung, PPs und Top Player werden erst danach sichtbar."
+                  }
                 >
-                  32 Teams · {boardLabel}
+                  {isFocusedBoardMode
+                    ? arenaShowAllTeams
+                      ? "Fokus · Alle Teams"
+                      : "Fokus · 10 Teams"
+                    : `32 Teams · ${boardLabel}`}
                 </TooltipHeading>
                 {matchdayMutatorTraitsBySide ? (
                   <div className="arena-v2-board-mutators" aria-label="Spieltag-Mutatoren">
@@ -2499,9 +3207,28 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 ) : null}
               </div>
               <div className="arena-v2-board-head-actions">
-                <span className="pill">{boardRows.length} Teams</span>
+                {isFocusedBoardMode ? (
+                  <button
+                    type="button"
+                    className="secondary-button inline-button"
+                    data-testid="arena-v2-show-all-teams-toggle"
+                    title={arenaShowAllTeams ? "Auf 10 relevante Teams einschränken" : "Alle 32 Teams im Fokus-Board anzeigen"}
+                    onClick={() => setArenaShowAllTeams((current) => !current)}
+                  >
+                    {arenaShowAllTeams ? "10 Teams" : "Alle Teams"}
+                  </button>
+                ) : null}
+                <span className="pill">{isFocusedBoardMode ? `${visibleBoardRows.length} / ${boardRows.length}` : `${boardRows.length} Teams`}</span>
               </div>
             </div>
+            {isArenaEventMode && leaderRow ? (
+              <div className="arena-v2-score-ticker" aria-live="polite" data-testid="arena-v2-score-ticker">
+                <span className="arena-v2-score-ticker-kicker">Live</span>
+                <ArenaAnimatedScore value={leaderRow.score} />
+                <strong>{boardLeaderLabel}</strong>
+                <small>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Slots"}</small>
+              </div>
+            ) : null}
             <div className="arena-v2-board-step-nav" aria-label="Reveal Schritt-Navigation">
               <button
                 className="secondary-button inline-button"
@@ -2515,129 +3242,172 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 Zurück
               </button>
               <span>
-                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"} · {boardLabel}
+                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
               </span>
-              <button
-                className="primary-button inline-button"
-                type="button"
-                disabled={!canGoForwardArenaStep || !canControlArenaReveal}
-                onClick={() => {
-                  setIsPlaying(false);
-                  handleAdvanceArenaStep();
-                }}
-              >
-                Weiter
-              </button>
+              {canShowResultLayer && props.onOpenMatchdayResult ? (
+                <button
+                  className="primary-button inline-button"
+                  type="button"
+                  onClick={() => {
+                    setIsPlaying(false);
+                    props.onOpenMatchdayResult?.();
+                  }}
+                >
+                  Zu den Ergebnissen →
+                </button>
+              ) : (
+                <button
+                  className="primary-button inline-button"
+                  type="button"
+                  disabled={!canGoForwardArenaStep || !canControlArenaReveal}
+                  onClick={() => {
+                    setIsPlaying(false);
+                    handleAdvanceArenaStep();
+                  }}
+                >
+                  {phaseIndex === slotsPhaseIndex && revealedSlotCount < maxSlotRevealCount
+                    ? "Naechster Reveal"
+                    : !canShowResultLayer && activeDisciplinePhase === "d1" && activeDisciplineRevealComplete
+                      ? `${d2Label} freischalten`
+                      : !canShowResultLayer && activeDisciplinePhase === "d2" && activeDisciplineRevealComplete
+                        ? "Result freischalten"
+                        : "Naechster Reveal"}
+                </button>
+              )}
             </div>
           </div>
           {loadStage === "scoreboard" ? (
             <div className="arena-v2-panel-loading arena-v2-board-loading" role="status" aria-live="polite">
               <strong>Wertung für 32 Teams wird berechnet</strong>
               <span>Auto-Lineups, Formkarten und Resolve laufen serverseitig. Das dauert meist ein paar Sekunden.</span>
+              <div className="arena-v2-board-skeleton-rows" aria-hidden="true">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div
+                    key={`arena-board-skeleton-${index}`}
+                    className="arena-v2-board-skeleton-row"
+                    style={{ width: `${Math.max(58, 96 - index * 4)}%` }}
+                  />
+                ))}
+              </div>
             </div>
-          ) : (
-          <div className="arena-v2-board-list" ref={boardListRef} role="list" aria-label="Arena v2 Teamboard">
-            {boardRows.map((row) => {
+          ) : isFocusedBoardMode ? (
+          <div
+            className="arena-v2-board-list is-focused-board"
+            ref={boardListRef}
+            role="list"
+            aria-label="Arena v2 Fokusboard"
+            data-testid="arena-v2-focused-board"
+          >
+            {visibleBoardRows.map((row) => {
               const widthPct = maxBoardScore > 0 && row.score > 0 ? clampPct((row.score / maxBoardScore) * 100) : 0;
               const isSelected = focusTeamId === row.teamId;
               const isActiveTeam = params.teamId === row.teamId;
-              const teamResult = matchdayWinnerRows.find((entry) => entry.teamId === row.teamId) ?? null;
+              const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
               const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
               const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+              // Note: `effectiveBoardMode` can never be "total" in this branch — the focused
+              // board list is only rendered when `isFocusedBoardMode` is true, which itself
+              // requires `effectiveBoardMode !== "total"` (see `isFocusedBoardMode` above; the
+              // total-mode board always renders via the virtualized list further below, where
+              // the equivalent "Saison ..." label is shown).
               const statSecondaryLabel =
                 row.points != null
                   ? `${formatDecimalScore(row.points, 1)} PPs`
-                  : effectiveBoardMode === "total"
-                    ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
-                    : slotDelta != null
-                      ? `+${formatDecimalScore(slotDelta, 1)}`
-                      : null;
+                  : slotDelta != null
+                    ? `+${formatDecimalScore(slotDelta, 1)}`
+                    : null;
               return (
-                <article
-                  key={`arena-v2-row-${row.teamId}`}
-                  ref={(node) => {
+                <ArenaBoardRow
+                  key={`arena-v2-focused-row-${row.teamId}`}
+                  row={row}
+                  maxBoardScore={maxBoardScore}
+                  widthPct={widthPct}
+                  isSelected={isSelected}
+                  isActiveTeam={isActiveTeam}
+                  effectiveBoardMode={effectiveBoardMode}
+                  isSlotsPhase={isSlotsPhase}
+                  slotDelta={slotDelta}
+                  stepRankDeltaLabel={stepRankDeltaLabel}
+                  statSecondaryLabel={statSecondaryLabel}
+                  teamResult={teamResult}
+                  paramsTeamId={params.teamId}
+                  onTeamRowClick={handleTeamRowClick}
+                  onOpenTeam={handleTeamProfileOpen}
+                  registerRowRef={(teamId, node) => {
                     if (node) {
-                      boardRowRefs.current.set(row.teamId, node);
+                      boardRowRefs.current.set(teamId, node);
                     } else {
-                      boardRowRefs.current.delete(row.teamId);
+                      boardRowRefs.current.delete(teamId);
                     }
                   }}
-                  className={`arena-v2-board-row is-${row.tone}${isSelected ? " is-selected" : ""}${isActiveTeam ? " is-active-team" : ""}`}
-                  role="listitem"
-                  tabIndex={0}
-                  aria-current={isSelected ? "true" : undefined}
-                  title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren · Doppelklick für Team-Drawer`}
-                  onClick={() => handleTeamRowClick(row.teamId)}
-                  onDoubleClick={() => handleTeamRowDoubleClick(row.teamId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleTeamRowClick(row.teamId);
-                    }
-                  }}
-                >
-                  <div className="arena-v2-board-row-main">
-                    <span className="arena-v2-board-rank">
-                      #{row.rank}
-                      {stepRankDeltaLabel ? (
-                        <span
-                          className={`arena-v2-board-rank-delta${(row.stepRankDelta ?? 0) > 0 ? " is-up" : " is-down"}`}
-                          title="Rangänderung seit dem letzten Reveal-Schritt"
-                        >
-                          {stepRankDeltaLabel}
-                        </span>
-                      ) : null}
-                    </span>
-                    {row.teamLogoUrl ? (
-                      <OptimizedMediaImage
-                        className="arena-v2-board-logo"
-                        src={row.teamLogoUrl}
-                        alt={`${row.teamName} Logo`}
-                        width={32}
-                        height={32}
-                      />
-                    ) : (
-                      <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
-                    )}
-                    <div className="arena-v2-board-copy">
-                      <strong>{row.teamName}</strong>
-                      {row.detailChips.length > 0 ? (
-                        <div className="arena-v2-board-chips">
-                          {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
-                            <span key={`${row.teamId}-${chip}`} className="pill arena-v2-board-chip">
-                              {chip}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="arena-v2-board-track-wrap">
-                    <div className="arena-v2-board-track">
-                      {(row.trackSegments?.length ?? 0) > 0 ? (
-                        <div className="arena-v2-board-track-stack" style={{ width: `${widthPct}%` }}>
-                          {row.trackSegments!.map((segment) => (
-                            <span
-                              key={`${row.teamId}-${segment.id}`}
-                              className={`arena-v2-board-track-segment is-${segment.id} is-${segment.tone}`}
-                              style={{ flexGrow: Math.max(Math.abs(segment.value), 0.01) }}
-                              title={`${segment.label}: ${formatSignedDelta(segment.value)}`}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="arena-v2-board-track-fill" style={{ width: `${widthPct}%` }} />
-                      )}
-                    </div>
-                    <span className="arena-v2-board-track-rank">Rang {row.rank}</span>
-                  </div>
-                  <div className="arena-v2-board-stats">
-                    <strong>{formatDecimalScore(row.score, 1)}</strong>
-                    {statSecondaryLabel ? <span>{statSecondaryLabel}</span> : null}
-                  </div>
-                </article>
+                />
               );
             })}
+          </div>
+          ) : (
+          <div
+            className="arena-v2-board-list is-virtualized"
+            data-virtualized="true"
+            ref={boardListRef}
+            role="list"
+            aria-label="Arena v2 Teamboard"
+            onScroll={handleBoardScroll}
+          >
+            <div style={{ height: boardRows.length * ARENA_BOARD_ROW_STRIDE, position: "relative" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  top: boardVirtualWindow.offsetY,
+                  left: 0,
+                  right: 0,
+                  display: "grid",
+                  gap: "var(--arena-v2-board-list-gap, 8px)",
+                }}
+              >
+                {boardRows.slice(boardVirtualWindow.start, boardVirtualWindow.end).map((row) => {
+                  const widthPct = maxBoardScore > 0 && row.score > 0 ? clampPct((row.score / maxBoardScore) * 100) : 0;
+                  const isSelected = focusTeamId === row.teamId;
+                  const isActiveTeam = params.teamId === row.teamId;
+                  const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
+                  const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
+                  const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+                  const statSecondaryLabel =
+                    row.points != null
+                      ? `${formatDecimalScore(row.points, 1)} PPs`
+                      : effectiveBoardMode === "total"
+                        ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
+                        : slotDelta != null
+                          ? `+${formatDecimalScore(slotDelta, 1)}`
+                          : null;
+                  return (
+                    <ArenaBoardRow
+                      key={`arena-v2-row-${row.teamId}`}
+                      row={row}
+                      maxBoardScore={maxBoardScore}
+                      widthPct={widthPct}
+                      isSelected={isSelected}
+                      isActiveTeam={isActiveTeam}
+                      effectiveBoardMode={effectiveBoardMode}
+                      isSlotsPhase={isSlotsPhase}
+                      slotDelta={slotDelta}
+                      stepRankDeltaLabel={stepRankDeltaLabel}
+                      statSecondaryLabel={statSecondaryLabel}
+                      teamResult={teamResult}
+                      paramsTeamId={params.teamId}
+                      onTeamRowClick={handleTeamRowClick}
+                      onOpenTeam={handleTeamProfileOpen}
+                      registerRowRef={(teamId, node) => {
+                        if (node) {
+                          boardRowRefs.current.set(teamId, node);
+                        } else {
+                          boardRowRefs.current.delete(teamId);
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
           )}
         </section>
@@ -2773,7 +3543,58 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               )}
             </div>
           ) : (
-            <div className="arena-v2-player-stack arena-v2-winner-stack">
+            <>
+              {canShowResultLayer ? (
+                <div className="arena-v2-podium-grid" data-testid="arena-v2-top-player-podium" aria-label="Topspieler Podium">
+                  {ppWinnerCards.slice(0, 3).map((player, index) => (
+                    <article key={`arena-v2-podium-${player.playerId}`} className={`arena-v2-podium-card is-rank-${index + 1}`}>
+                      <span className="arena-v2-podium-kicker">#{index + 1} Top Player</span>
+                      <strong>{player.playerName}</strong>
+                      <small>{player.teamName} · {player.disciplineName}</small>
+                      <div className="arena-v2-podium-stats">
+                        <span>{formatDecimalScore(player.finalPlayerScore, 1)} Score</span>
+                        <span>{player.pointsAwarded != null ? `${formatDecimalScore(player.pointsAwarded, 1)} PPs` : "PPs —"}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+              {mvpSpotlightActive && mvpSpotlightPlayer ? (
+                <article
+                  className="arena-v2-mvp-spotlight"
+                  data-testid="arena-v2-mvp-spotlight"
+                  aria-live="polite"
+                >
+                  <span className="arena-v2-mvp-spotlight-kicker">MVP Spotlight</span>
+                  <MatchdayArenaPlayerCard
+                    rank={mvpSpotlightPlayer.rankInDiscipline}
+                    portraitUrl={mvpSpotlightPlayer.portraitUrl}
+                    playerName={mvpSpotlightPlayer.playerName}
+                    teamName={mvpSpotlightPlayer.teamName}
+                    className={mvpSpotlightPlayer.className}
+                    scoreLabel={`${formatDecimalScore(mvpSpotlightPlayer.finalPlayerScore, 1)} Score`}
+                    pointsLabel={
+                      mvpSpotlightPlayer.pointsAwarded != null
+                        ? `${formatDecimalScore(mvpSpotlightPlayer.pointsAwarded, 1)} PPs`
+                        : "—"
+                    }
+                    contributionLabel={mvpSpotlightPlayer.disciplineName}
+                    axisStats={mvpSpotlightPlayer.axisStats}
+                    badges={mvpSpotlightPlayer.badges}
+                    variant="default"
+                    onOpen={
+                      mvpSpotlightPlayer.activePlayerId
+                        ? () =>
+                            props.onOpenPlayerDetails?.({
+                              playerId: mvpSpotlightPlayer.playerId,
+                              activePlayerId: mvpSpotlightPlayer.activePlayerId,
+                            })
+                        : undefined
+                    }
+                  />
+                </article>
+              ) : null}
+              <div className="arena-v2-player-stack arena-v2-winner-stack">
               {canShowResultLayer ? (
                 ppWinnerCards.map((player) => (
                   <MatchdayArenaPlayerCard
@@ -2801,11 +3622,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   </div>
                 </article>
               )}
-            </div>
+              </div>
+            </>
           )}
         </section>
 
-        <section className="arena-v2-lower-section arena-v2-insight-panel">
+        <section className="arena-v2-lower-section arena-v2-insight-panel arena-v2-act-result">
           <div className="arena-v2-panel-title">
             <strong>Was Arena v2 gerade zeigt</strong>
             <small>Mehr Kontext, weniger Tabellenblindflug.</small>
@@ -2843,16 +3665,142 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               {boardRows.slice(0, 3).map((row) => (
                 <article key={`arena-v2-breakdown-${row.teamId}`} className="arena-v2-breakdown-card">
                   <strong>{row.teamName}</strong>
-                  <div className="arena-v2-breakdown-list">
-                    {(row.breakdown ?? []).map((item) => (
-                      <span key={`${row.teamId}-${item.id}`} className={`arena-v2-breakdown-item is-${item.tone}`}>
-                        <small>{item.label}</small>
-                        <strong>{item.valueLabel}</strong>
-                      </span>
-                    ))}
-                  </div>
+                  <VeloImpactStrip
+                    className="arena-v2-breakdown-velo-strip"
+                    items={(row.breakdown ?? []).map((item) => ({
+                      key: item.id,
+                      label: item.label,
+                      value: item.valueLabel,
+                      tone: item.tone === "negative" ? "negative" : item.tone === "positive" ? "positive" : "neutral",
+                    }))}
+                  />
                 </article>
               ))}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer ? (
+            <div className="arena-v2-result-reason-grid" data-testid="arena-v2-result-reasons" aria-label="Ergebnisgründe Top-Teams">
+              {boardRows.slice(0, 3).map((row) => {
+                const sourceRow =
+                  effectiveBoardMode === "d2"
+                    ? d2ScoreboardView.find((entry) => entry.teamId === row.teamId)
+                    : effectiveBoardMode === "d1"
+                      ? d1ScoreboardView.find((entry) => entry.teamId === row.teamId)
+                      : matchdayWinnerRows.find((entry) => entry.teamId === row.teamId) ?? d1ScoreboardView.find((entry) => entry.teamId === row.teamId);
+                // In "total" board mode `sourceRow` can resolve to an `ArenaMatchdayWinnerRow`,
+                // which only carries aggregated d1/d2/total scores — none of the per-discipline
+                // push/form/mutator/fatigue breakdown fields below. Narrow to the discipline
+                // scoreboard shape and fall back to "—" placeholders otherwise.
+                const disciplineSourceRow = isMatchdayArenaScoreboardRowView(sourceRow) ? sourceRow : null;
+                const taktikLabel =
+                  disciplineSourceRow?.intensity === "push"
+                    ? "Push"
+                    : disciplineSourceRow?.intensity === "conserve"
+                      ? "Schonen"
+                      : disciplineSourceRow?.intensity
+                        ? "Normal"
+                        : "—";
+                const formLabel =
+                  disciplineSourceRow?.formCardStatus === "ready" && disciplineSourceRow.formCardModifier != null
+                    ? formatSignedDelta(disciplineSourceRow.formCardModifier)
+                    : "—";
+                const fatigueLabel =
+                  disciplineSourceRow?.fatigueStatus === "mapped"
+                    ? formatSignedDelta(disciplineSourceRow.fatigueModifier)
+                    : "—";
+                const mutatorLabel =
+                  disciplineSourceRow?.totalMutatorScore != null
+                    ? formatSignedDelta(disciplineSourceRow.totalMutatorScore)
+                    : "—";
+                const leadFactor = [
+                  {
+                    label: "Taktik",
+                    value:
+                      disciplineSourceRow?.pushScore != null
+                        ? formatSignedDelta(disciplineSourceRow.pushScore)
+                        : taktikLabel,
+                    weight: Math.abs(disciplineSourceRow?.pushScore ?? 0),
+                  },
+                  {
+                    label: "Form",
+                    value: formLabel,
+                    weight: Math.abs(disciplineSourceRow?.formCardModifier ?? 0),
+                  },
+                  {
+                    label: "Mutator",
+                    value: mutatorLabel,
+                    weight: Math.abs(disciplineSourceRow?.totalMutatorScore ?? 0),
+                  },
+                ].sort((left, right) => right.weight - left.weight)[0];
+                return (
+                  <article key={`arena-result-reason-${row.teamId}`} className="arena-v2-result-reason-card">
+                    <strong>{row.teamName}</strong>
+                    <span className="arena-v2-result-reason-headline">
+                      Warum vorn? {leadFactor?.label ?? "Gesamtpaket"} {leadFactor?.value ?? "—"}
+                    </span>
+                    <div className="arena-v2-result-reason-chips">
+                      <span className="arena-v2-result-reason-chip is-taktik">Taktik {taktikLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-form">Form {formLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-mutator">Mutator {mutatorLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-fatigue">Erschöpfung {fatigueLabel}</span>
+                    </div>
+                    <small>
+                      Score {formatDecimalScore(row.score, 1)} · PPs {formatDecimalScore(row.points, 1)}
+                    </small>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer && activeFocusEntries.length > 0 ? (
+            <div className="arena-v2-training-hint" data-testid="arena-v2-training-hint">
+              <strong>Training-Hinweis</strong>
+              <span>
+                {[
+                  ...activeFocusEntries
+                    .filter((entry) => entry.warnings.some((warning) => /fatigue|ermüd|push|belast/i.test(warning)))
+                    .slice(0, 1)
+                    .map((entry) => `${entry.playerName} erschöpft`),
+                  ...[...activeFocusEntries]
+                    .sort((left, right) => (right.finalPlayerScore ?? 0) - (left.finalPlayerScore ?? 0))
+                    .slice(0, 1)
+                    .map((entry) => `${entry.playerName} Top-Performer`),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Regeneration im Training prüfen"}
+              </span>
+              {props.onOpenTraining ? (
+                <button type="button" className="secondary-button inline-button" onClick={props.onOpenTraining}>
+                  Zum Training
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer ? (
+            <div className="arena-v2-next-step-links" data-testid="arena-v2-next-steps">
+              <strong>Naechster sinnvoller Schritt</strong>
+              <div className="arena-v2-next-step-actions">
+                {props.onOpenMatchdayResult ? (
+                  <button type="button" className="secondary-button inline-button" onClick={props.onOpenMatchdayResult}>
+                    Zur Tabelle des Spieltags
+                  </button>
+                ) : null}
+                {props.onOpenTraining ? (
+                  <button type="button" className="secondary-button inline-button" onClick={props.onOpenTraining}>
+                    Zum Training
+                  </button>
+                ) : null}
+                {props.onOpenSeason ? (
+                  <button type="button" className="primary-button inline-button" onClick={props.onOpenSeason}>
+                    Zum Saisonstand
+                  </button>
+                ) : null}
+                {props.onBackToLineup ? (
+                  <button type="button" className="ghost-button inline-button" onClick={handleBackToLineup}>
+                    Zur Einsatzliste
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </section>

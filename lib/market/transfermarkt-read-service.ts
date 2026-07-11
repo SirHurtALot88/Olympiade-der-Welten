@@ -48,6 +48,7 @@ export type TransfermarktDisciplineScore = {
   disciplineId: string;
   disciplineName: string;
   scoreTier: TransfermarktRatingTier | null;
+  displayedScore?: number | null;
   ppsLastSeason: number | null;
   playerCount?: number | null;
   teamRank?: number | null;
@@ -115,6 +116,16 @@ export type TransfermarktFreeAgentItem = {
   potentialTier: PlayerProgressionRatingTier | null;
   potentialBand: PlayerPotentialBand;
   potentialRange: { min: number; max: number } | null;
+  axisStarsDisplay: string | null;
+  axisStarsOverall: number | null;
+  axisStarsPow: number | null;
+  axisStarsSpe: number | null;
+  axisStarsMen: number | null;
+  axisStarsSoc: number | null;
+  potentialStarsDisplay: string | null;
+  potentialStarsMin: number | null;
+  potentialStarsMax: number | null;
+  potentialGapStars: number | null;
   scoutingConfidence: number | null;
   scoutingSource: PlayerPotentialSource;
   scoutingWarnings: string[];
@@ -175,6 +186,9 @@ export type TransfermarktReadParams = {
   minSalary?: number | null;
   maxSalary?: number | null;
   mode?: "full" | "ai_preview" | null;
+  /** When true (ai_preview), return every filtered free agent — no slice/limit cap. */
+  fullPool?: boolean | null;
+  compactList?: boolean | null;
   scoutingLevel?: number | null;
   localRunContext?: unknown;
 };
@@ -823,6 +837,7 @@ export async function listTransfermarktFreeAgents(
         disciplineId: entry.disciplineId,
         disciplineName: entry.disciplineName,
         scoreTier: entry.scoreTier,
+        displayedScore: entry.displayedScore,
         ppsLastSeason: null,
         playerCount: disciplinePlayerCountById.get(entry.disciplineId) ?? null,
         teamRank: teamDisciplineRankById.get(entry.disciplineId) ?? null,
@@ -834,6 +849,16 @@ export async function listTransfermarktFreeAgents(
       scoutingConfidence: scoutPotential.confidence,
       scoutingSource: scoutPotential.source,
       scoutingWarnings: scoutPotential.warnings,
+      axisStarsDisplay: null,
+      axisStarsOverall: null,
+      axisStarsPow: null,
+      axisStarsSpe: null,
+      axisStarsMen: null,
+      axisStarsSoc: null,
+      potentialStarsDisplay: null,
+      potentialStarsMin: null,
+      potentialStarsMax: null,
+      potentialGapStars: null,
       marketValuePotentialPremiumPct: scoutPotential.marketValuePotentialPremiumPct,
       trainingFormTier: null,
       developmentTrend: null,

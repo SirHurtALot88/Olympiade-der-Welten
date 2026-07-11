@@ -2,13 +2,13 @@ import type { MatchdayMvpScoreboardRow } from "@/lib/season/matchday-mvp-scoring
 
 export const MATCHDAY_ARENA_PHASES = [
   { id: "slots", label: "Slots" },
-  { id: "push", label: "Push" },
+  { id: "push", label: "Intensität" },
   { id: "form", label: "Form" },
   { id: "mutator", label: "Mutator" },
-  { id: "captain", label: "Captain" },
-  { id: "power", label: "Power" },
-  { id: "final", label: "Final" },
-  { id: "result", label: "Result" },
+  { id: "captain", label: "Kapitän" },
+  { id: "power", label: "Team-Power" },
+  { id: "final", label: "Finale" },
+  { id: "result", label: "Ergebnis" },
 ] as const;
 
 export type MatchdayArenaPhaseId = (typeof MATCHDAY_ARENA_PHASES)[number]["id"];

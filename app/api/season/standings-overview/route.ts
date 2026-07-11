@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
@@ -17,6 +18,7 @@ import {
   SEASON_STANDINGS_DISCIPLINE_COLUMNS,
   type SeasonStandingsSheetRow,
 } from "@/lib/standings/season-standings-sheet";
+import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { db } from "@/src/server/db";
 
 function roundValue(value: number, digits = 1) {
@@ -26,8 +28,15 @@ function roundValue(value: number, digits = 1) {
 function buildLocalSeasonDisciplineValues(input: {
   gameState: GameState;
   seasonId: string;
+  saveId: string;
+  contentSignature?: string | null;
 }) {
-  const ledger = buildSeasonPointsLedger(input.gameState, input.seasonId);
+  const ledger = getSeasonPointsLedger({
+    gameState: input.gameState,
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    contentSignature: input.contentSignature ?? null,
+  });
 
   return new Map(
     input.gameState.teams.map((team) => {
@@ -59,11 +68,35 @@ function buildLocalSeasonDisciplineValues(input: {
   );
 }
 
+function buildStandingsOverviewCacheSignature(input: {
+  localSave: NonNullable<ReturnType<ReturnType<typeof createPersistenceService>["getSaveById"]>>;
+  seasonId: string;
+  sourceKind: "live" | "season_snapshot" | "season_snapshot_missing";
+  contentSignature?: string | null;
+}) {
+  const versionMeta = createPersistenceService().getSaveVersionMetadata(input.localSave.saveId);
+  const base = versionMeta
+    ? [
+        versionMeta.seasonId,
+        versionMeta.matchdayId,
+        String(versionMeta.saveVersion),
+        String(versionMeta.lineupDraftCount),
+        String(versionMeta.transferHistoryCount),
+        versionMeta.updatedAt,
+        input.seasonId,
+        input.sourceKind,
+        input.contentSignature ?? versionMeta.contentSignature ?? "",
+      ].join("|")
+    : `${input.localSave.updatedAt}|${input.seasonId}|${input.sourceKind}|${input.contentSignature ?? ""}`;
+  return base;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const saveId = searchParams.get("saveId")?.trim() || undefined;
     const requestedSeasonId = searchParams.get("seasonId")?.trim() || undefined;
+    const requestedContentSignature = searchParams.get("contentSignature")?.trim() || undefined;
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
 
     const localSave =
@@ -78,28 +111,84 @@ export async function GET(request: Request) {
           })()
         : null;
     const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
+    const contentSignature =
+      requestedContentSignature ??
+      (localSave ? createPersistenceService().getSaveVersionMetadata(localSave.saveId)?.contentSignature ?? null : null);
 
-    const archivedSnapshot =
-      source === "sqlite" && seasonId !== localSave!.gameState.season.id
-        ? (localSave!.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null
+    if (source === "sqlite" && localSave) {
+      const activeSeasonId = localSave.gameState.season.id;
+      const isCurrentSeason = seasonId === activeSeasonId;
+      const archivedSnapshot = !isCurrentSeason
+        ? (localSave.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null
         : null;
 
-    if (archivedSnapshot) {
-      return NextResponse.json({
-        items: buildArchivedSeasonStandingsOverviewItems(archivedSnapshot),
-        missingMappings: [],
-        mappingWarnings: archivedSnapshot.warnings ?? [],
-        source: {
-          kind: "season_snapshot",
-          access: "local_save",
-          detectedColumns: [],
-          disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
-        },
-        scope: {
-          saveId: localSave!.saveId,
-          seasonId,
-        },
+      if (!isCurrentSeason && !archivedSnapshot) {
+        return NextResponse.json({
+          items: [],
+          missingMappings: [],
+          mappingWarnings: [`season_snapshot_missing:${seasonId}`],
+          source: {
+            kind: "season_snapshot_missing",
+            access: "local_save",
+            detectedColumns: [],
+            disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
+          },
+          scope: {
+            saveId: localSave.saveId,
+            seasonId,
+          },
+        });
+      }
+
+      const cacheKey = `${localSave.saveId}:${seasonId}`;
+      const cacheSignature = buildStandingsOverviewCacheSignature({
+        localSave,
+        seasonId,
+        sourceKind: archivedSnapshot ? "season_snapshot" : "live",
+        contentSignature,
       });
+      const cached = readStandingsOverviewCache(cacheKey, cacheSignature);
+      if (cached) {
+        if (contentSignature) {
+          return respondWithSliceEtag(request, {
+            slice: "standings-overview",
+            saveId: localSave.saveId,
+            seasonId,
+            contentSignature,
+            payload: cached as Record<string, unknown>,
+          });
+        }
+        return NextResponse.json(cached);
+      }
+
+      if (archivedSnapshot) {
+        const archivedPayload = {
+          items: buildArchivedSeasonStandingsOverviewItems(archivedSnapshot),
+          missingMappings: [],
+          mappingWarnings: archivedSnapshot.warnings ?? [],
+          source: {
+            kind: "season_snapshot",
+            access: "local_save",
+            detectedColumns: [],
+            disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
+          },
+          scope: {
+            saveId: localSave.saveId,
+            seasonId,
+          },
+        };
+        writeStandingsOverviewCache(cacheKey, cacheSignature, archivedPayload);
+        if (contentSignature) {
+          return respondWithSliceEtag(request, {
+            slice: "standings-overview",
+            saveId: localSave.saveId,
+            seasonId,
+            contentSignature,
+            payload: archivedPayload,
+          });
+        }
+        return NextResponse.json(archivedPayload);
+      }
     }
 
     const teamStates =
@@ -129,19 +218,29 @@ export async function GET(request: Request) {
             },
           });
 
-    const sheet = await inspectSeasonStandingsSheet();
+    const sheet =
+      source === "sqlite"
+        ? null
+        : await inspectSeasonStandingsSheet();
     const sheetRows =
-      sheet.sourceKind === "season_standings"
+      sheet?.sourceKind === "season_standings"
         ? (sheet.mappedRows as SeasonStandingsSheetRow[])
         : [];
-    const mapping = mapSeasonStandingsRowsToTeams(
-      sheetRows,
-      teamStates.map((state) => ({
-        teamId: state.teamId,
-        shortCode: state.team.shortCode,
-        teamName: state.team.name,
-      })),
-    );
+    const mapping =
+      source === "sqlite"
+        ? {
+            rows: [],
+            missingInDb: [],
+            mappingWarnings: [],
+          }
+        : mapSeasonStandingsRowsToTeams(
+            sheetRows,
+            teamStates.map((state) => ({
+              teamId: state.teamId,
+              shortCode: state.team.shortCode,
+              teamName: state.team.name,
+            })),
+          );
     const teamStateById = new Map(teamStates.map((state) => [state.teamId, state] as const));
     const localSheetRowByTeamId =
       source === "sqlite"
@@ -156,6 +255,8 @@ export async function GET(request: Request) {
         ? buildLocalSeasonDisciplineValues({
             gameState: localSave!.gameState,
             seasonId,
+            saveId: localSave!.saveId,
+            contentSignature: contentSignature ?? null,
           })
         : null;
 
@@ -248,7 +349,7 @@ export async function GET(request: Request) {
           })()
         : null;
 
-    return NextResponse.json({
+    const responsePayload = {
       items:
         source === "sqlite"
           ? localSave!.gameState.teams.map((team) => {
@@ -312,16 +413,39 @@ export async function GET(request: Request) {
       missingMappings: mapping.missingInDb,
       mappingWarnings: mapping.mappingWarnings,
       source: {
-        kind: "season_standings_sheet",
-        access: sheet.access,
-        detectedColumns: sheet.detectedColumns,
+        kind: source === "sqlite" ? "local_save" : "season_standings_sheet",
+        access: sheet?.access ?? "local_save",
+        detectedColumns: sheet?.detectedColumns ?? [],
         disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
       },
       scope: {
         saveId,
         seasonId,
       },
-    });
+    };
+
+    if (source === "sqlite" && localSave) {
+      const cacheKey = `${localSave.saveId}:${seasonId}`;
+      const cacheSignature = buildStandingsOverviewCacheSignature({
+        localSave,
+        seasonId,
+        sourceKind: "live",
+        contentSignature,
+      });
+      writeStandingsOverviewCache(cacheKey, cacheSignature, responsePayload);
+    }
+
+    if (source === "sqlite" && localSave && contentSignature) {
+      return respondWithSliceEtag(request, {
+        slice: "standings-overview",
+        saveId: localSave.saveId,
+        seasonId,
+        contentSignature,
+        payload: responsePayload,
+      });
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Season standings overview could not be loaded.";
     return NextResponse.json(

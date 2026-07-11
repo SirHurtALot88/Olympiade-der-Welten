@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   applyAiManagerPlan,
+  applyTransferBudgetSpend,
   buildAiManagerApplyPreview,
   getAiManagerMarketSpendableCash,
+  resolveMarketSpendableCashForPlanner,
 } from "@/lib/ai/ai-manager-apply-service";
+import { buildAiLeagueManagementPreview } from "@/lib/ai/ai-team-management-preview-service";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
@@ -230,7 +233,7 @@ describe("ai manager apply service", () => {
     expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(18);
   });
 
-  it("subtracts building budget before exposing AI market spendable cash", () => {
+  it("does not phantom-deduct unspent building budget from AI market spendable cash", () => {
     const state = gameState({
       cash: 100,
       budgetReservations: {
@@ -249,7 +252,302 @@ describe("ai manager apply service", () => {
       },
     });
 
-    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(25);
+    // Only salary/maintenance/emergency are protected buffers; unspent buildingBudget/cashReserve
+    // still physically sit in team.cash and must not be double-subtracted from the transfer pool.
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(70);
+  });
+
+  it("only opens drawable budget pools when includeFallbackPools (rebuild mode) is set", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 5,
+          buildingBudget: 12,
+          maintenanceBudget: 15,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(5);
+    // Rebuild: transfer + building + combined liquidity reserve; emergency + maintenance stay protected.
+    expect(
+      getAiManagerMarketSpendableCash(state, "T-1", 100, { includeFallbackPools: true }),
+    ).toBe(37);
+  });
+
+  it("decrements transferBudget when a market buy executes", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 40,
+          buildingBudget: 20,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const next = applyTransferBudgetSpend(state, "T-1", 12);
+    expect(next.seasonState.aiManagerBudgetReservations?.["T-1"]?.transferBudget).toBe(28);
+  });
+
+  it("cascades spend through buildingBudget, cashReserve, salaryReserve, maintenanceBudget once transferBudget is exhausted", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 15,
+          buildingBudget: 8,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const next = applyTransferBudgetSpend(state, "T-1", 20);
+    const reservation = next.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation?.transferBudget).toBe(0);
+    expect(reservation?.buildingBudget).toBe(3);
+    expect(reservation?.cashReserve).toBe(10);
+
+    const beyondBuildingAndCashReserve = applyTransferBudgetSpend(state, "T-1", 30);
+    const reservation2 = beyondBuildingAndCashReserve.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation2?.transferBudget).toBe(0);
+    expect(reservation2?.buildingBudget).toBe(0);
+    expect(reservation2?.cashReserve).toBe(3);
+    expect(reservation2?.salaryReserve).toBe(10);
+    expect(reservation2?.emergencyBudget).toBe(5);
+
+    const beyondAllPools = applyTransferBudgetSpend(state, "T-1", 53);
+    const reservation3 = beyondAllPools.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation3?.transferBudget).toBe(0);
+    expect(reservation3?.buildingBudget).toBe(0);
+    expect(reservation3?.cashReserve).toBe(0);
+    expect(reservation3?.salaryReserve).toBe(0);
+    expect(reservation3?.maintenanceBudget).toBe(0);
+    expect(reservation3?.emergencyBudget).toBe(5);
+  });
+
+  it("caps planner market spend at transfer bucket when reservations exist and roster is at Opt", () => {
+    const playersAtOpt = Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`));
+    const state = gameState({
+      cash: 100,
+      playerFatigue: playersAtOpt.map(() => 20),
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 18,
+          buildingBudget: 25,
+          maintenanceBudget: 20,
+          emergencyBudget: 8,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      contractLength: 2,
+      salary: 5,
+      upkeep: 5,
+      roleTag: "starter",
+      joinedSeasonId: "season-1",
+    }));
+
+    expect(
+      resolveMarketSpendableCashForPlanner({
+        gameState: state,
+        teamId: "T-1",
+        teamCash: 100,
+        rosterBelowMin: false,
+      }),
+    ).toBe(18);
+  });
+
+  it("S2+ at Opt ignores stale budget buckets and uses liquidity buffer", () => {
+    const playersAtOpt = [
+      player("p1", { marketValue: 200, displayMarketValue: 200 }),
+      ...Array.from({ length: 5 }, (_, index) => player(`p-${index + 2}`, { marketValue: 1, displayMarketValue: 1 })),
+    ];
+    const state = gameState({
+      cash: 154,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-2",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 0,
+          buildingBudget: 0,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+    state.season = { ...state.season, id: "season-2", name: "Season 2" };
+    state.seasonState.seasonId = "season-2";
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      slot: index,
+      salary: 2,
+      contractLength: 2,
+      upkeep: 2,
+      roleTag: "starter",
+      joinedSeasonId: "season-2",
+    }));
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 154,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(120);
+    expect(spendable).toBeLessThan(154);
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 154)).toBe(0);
+  });
+
+  it("unlocks current cash for hard-min fill even when stale budget reservations exist", () => {
+    const state = gameState({
+      cash: 154,
+      rosters: [{ id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 2 }],
+      players: [player("p1")],
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-2",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 8,
+          buildingBudget: 5,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 154,
+      rosterBelowMin: true,
+    });
+
+    expect(spendable).toBeGreaterThan(140);
+    expect(spendable).toBeLessThan(154);
+  });
+
+  it("falls back to salary runway reserve when no budget reservations exist and roster is at Opt", () => {
+    const playersAtOpt = Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`));
+    const state = gameState({ cash: 100, playerFatigue: playersAtOpt.map(() => 20) });
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      contractLength: 2,
+      salary: 5,
+      upkeep: 5,
+      roleTag: "starter",
+      joinedSeasonId: "season-1",
+    }));
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 100,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(0);
+    expect(spendable).toBeLessThan(100);
+  });
+
+  it("unlocks most cash for draft when roster is below Opt", () => {
+    const state = gameState({
+      cash: 50,
+      rosters: [
+        { id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 5 },
+        { id: "r2", teamId: "T-1", playerId: "p2", slot: 1, salary: 5 },
+      ],
+      players: [player("p1"), player("p2")],
+    });
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 50,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(35);
+    expect(spendable).toBeLessThan(50);
+  });
+
+  it("S2+ below Opt uses only a tiny liquidity pad so preseason plans can execute", () => {
+    const state = gameState({
+      cash: 116,
+      rosters: Array.from({ length: 8 }, (_, index) => ({
+        id: `r-${index + 1}`,
+        teamId: "T-1",
+        playerId: `p-${index + 1}`,
+        slot: index,
+        salary: 5,
+        contractLength: 2,
+        upkeep: 5,
+        roleTag: "starter",
+        joinedSeasonId: "season-2",
+      })),
+      players: Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`)),
+    });
+    state.season = { ...state.season, id: "season-2", name: "Season 2" };
+    state.seasonState.seasonId = "season-2";
+    state.teamIdentities = [identity({ playerOpt: 13, playerMin: 8 })];
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 116,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(108);
+    expect(spendable).toBeLessThan(116);
   });
 
   it("applies maintenance through the facility service and restores condition", () => {
@@ -326,13 +624,16 @@ describe("ai manager apply service", () => {
     expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_downgrade");
   });
 
-  it("stores team training settings and player training modes through the training service", () => {
+  it("stores team training settings and per-player training modes through the training service", () => {
     const source = save();
     const mock = persistenceMock(source);
+    const leaguePreview = buildAiLeagueManagementPreview(source.gameState);
+    const teamPreview = leaguePreview.teams.find((team) => team.teamId === "T-1");
+    expect(teamPreview?.trainingPlan.playerTrainingPlans.length).toBeGreaterThan(0);
     const result = applyAiManagerPlan({
       save: source,
       dryRun: false,
-      actionTypes: ["set_training_focus", "set_training_intensity"],
+      actionTypes: ["set_training_focus", "set_training_intensity", "set_player_training_modes"],
       persistence: mock.persistence,
     });
 
@@ -342,7 +643,8 @@ describe("ai manager apply service", () => {
       trainingIntensity: "hard",
       playerTrainingMode: "hart",
     });
-    expect(mock.current.gameState.players.every((entry) => entry.trainingMode === "hart")).toBe(true);
+    expect(mock.current.gameState.players.every((entry) => entry.trainingMode != null)).toBe(true);
+    expect(result.actions.some((action) => action.actionType === "set_player_training_modes" && action.applied)).toBe(true);
   });
 
   it("hard training lowers recovery forecast while light training improves it", () => {

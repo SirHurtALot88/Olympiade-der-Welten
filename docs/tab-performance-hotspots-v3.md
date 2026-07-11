@@ -47,9 +47,13 @@ CSV: `docs/tab-performance-hotspots-v3.csv`
   - Markt-Recap ist einklappbar und nur bei Bedarf aktiv
   - Historie feuert keine Recap-API mehr im Hintergrund
 
-## Request-Audit
+## Dev-Hygiene (2026-06-26)
 
-Frischer Home-Start:
+- Niemals `season:smoke-block-*` parallel zum lokalen Dev-Server auf derselben SQLite-Datei starten.
+- Version-Poll laeuft jetzt alle **45s** ueber leichtes Metadata (`getSaveVersionMetadata`, Budget <50ms).
+- Transferhistorie laedt wieder **100** Eintraege initial plus „Mehr laden“.
+- CI nutzt isolierte DB unter `$RUNNER_TEMP/ci-oly.sqlite`; volle Block-1→3-Kette nur noch im Nightly-Workflow.
+
 
 - `GET /foundation`
 - `GET /api/singleplayer-state?compact=foundation-initial`

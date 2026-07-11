@@ -59,9 +59,9 @@ describe("team-theme-composition-service", () => {
       player({
         id: "p1",
         name: "Sir Skullwake",
-        race: "Undead",
+        race: "Human",
         className: "Necromancer",
-        subclasses: ["Lich", "Grave Reaper"],
+        subclasses: ["Undead", "Lich", "Grave Reaper"],
         traitsPositive: ["Mercenary"],
         alignment: "Lawful Evil",
       }),
@@ -72,10 +72,10 @@ describe("team-theme-composition-service", () => {
 
   it("rewards hard-theme candidates and penalizes avoid-tag outsiders", () => {
     const players = [
-      player({ id: "lich", name: "Lich", race: "Undead", subclasses: ["Lich"], rating: 60 }),
-      player({ id: "ghost", name: "Ghost", race: "Undead", subclasses: ["Ghost"], rating: 55 }),
+      player({ id: "lich", name: "Lich", race: "Human", subclasses: ["Undead", "Lich"], rating: 60 }),
+      player({ id: "ghost", name: "Ghost", race: "Spirit", subclasses: ["Ghost"], rating: 55 }),
       player({ id: "angel", name: "Angel", race: "Divine", subclasses: ["Angel"], rating: 90 }),
-      player({ id: "candidate-undead", name: "New Reaper", race: "Undead", subclasses: ["Reaper"], rating: 65 }),
+      player({ id: "candidate-undead", name: "New Reaper", race: "Human", subclasses: ["Undead", "Reaper"], rating: 65 }),
       player({ id: "candidate-holy", name: "Holy Outsider", race: "Divine", subclasses: ["Angel", "Holy"], rating: 65 }),
     ];
     const state = gameState(players);
@@ -102,8 +102,8 @@ describe("team-theme-composition-service", () => {
 
   it("audits team theme share and marks teams below hard minimum red", () => {
     const players = [
-      player({ id: "lich", name: "Lich", race: "Undead", subclasses: ["Lich"], rating: 60 }),
-      player({ id: "ghost", name: "Ghost", race: "Undead", subclasses: ["Ghost"], rating: 55 }),
+      player({ id: "lich", name: "Lich", race: "Human", subclasses: ["Undead", "Lich"], rating: 60 }),
+      player({ id: "ghost", name: "Ghost", race: "Spirit", subclasses: ["Ghost"], rating: 55 }),
       player({ id: "angel", name: "Angel", race: "Divine", subclasses: ["Angel"], rating: 90 }),
     ];
     const state = gameState(players);

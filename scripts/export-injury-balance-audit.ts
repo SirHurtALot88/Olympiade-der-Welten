@@ -7,6 +7,7 @@ import {
   MATCHDAY_FATIGUE_LOAD,
   calculateTeamRecovery,
   getInjuryRiskBand,
+  getInjuryRiskPercent,
   getPlayerAvailabilityView,
   injuryRiskBands,
   rollInjuryRisk,
@@ -557,7 +558,10 @@ function main() {
     saveName: save.name,
     seasonId: gameState.season.id,
     matchdayCount: schedule.length,
-    riskCurve: injuryRiskBands,
+    riskCurve: injuryRiskBands.map((band) => ({
+      ...band,
+      riskPercent: getInjuryRiskPercent(band.max),
+    })),
     assumptions: [
       "read_only_no_save_write",
       "max_14_15_use_virtual_rotation_slots_not_real_players",
@@ -591,7 +595,9 @@ function main() {
     "",
     "| Fatigue | Label | Risiko |",
     "| --- | --- | ---: |",
-    ...injuryRiskBands.map((band) => `| ${band.min}-${band.max} | ${band.uiLabel} | ${band.riskPercent}% |`),
+    ...injuryRiskBands.map(
+      (band) => `| ${band.min}-${band.max} | ${band.uiLabel} | ${getInjuryRiskPercent(band.max)}% |`,
+    ),
     "",
     "## Szenariovergleich",
     "",

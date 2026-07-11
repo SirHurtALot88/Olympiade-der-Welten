@@ -39,6 +39,9 @@ export type FacilityMaintenanceApplyResult = Omit<FacilityMaintenancePreview, "d
   dryRun: false;
   applied: boolean;
   facilityEventId: string | null;
+  // See FacilityUpgradeApplyResult.save in facility-upgrade-service.ts for why this is here:
+  // avoids a redundant full-state persistence.getSaveById() re-read in bulk callers.
+  save?: PersistedSaveGame | null;
 };
 
 function roundValue(value: number, digits = 2) {
@@ -185,7 +188,7 @@ export function applyFacilityMaintenance(
     },
   };
 
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  const persistedSave = persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return {
     ...preview,
@@ -195,5 +198,6 @@ export function applyFacilityMaintenance(
     nextConditionPct: FACILITY_CONDITION_FULL,
     nextEfficiencyPct: FACILITY_CONDITION_FULL,
     cashAfter: roundValue((preview.cashBefore ?? 0) - preview.maintenanceCost),
+    save: persistedSave,
   };
 }

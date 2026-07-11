@@ -320,7 +320,7 @@ describe("ai transfermarkt preview service", () => {
     expect(cashCreators?.recommendedBuys[0]?.name).toBe("Value Hunter");
     expect(cashCreators?.explanation).toContain("Top-Pick: Value Hunter");
     expect(cashCreators?.recommendedBuys[0]?.overallRecommendationScore).toBeGreaterThan(0);
-    expect(cashCreators?.recommendedBuys[0]?.fitSummary).toContain("Need");
+    expect(cashCreators?.recommendedBuys[0]?.strategicBuyScore).toBeTypeOf("number");
     expect(cashCreators?.recommendedBuys[0]?.sportsSummary).toContain("POW");
     expect(cashCreators?.recommendedBuys[0]?.budgetReason.join(" ")).toContain("Cash");
     expect(wickedWizards?.recommendedBuys[0]?.className).toBe("Mage");

@@ -1,4 +1,5 @@
 import type { PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
+import { getFatiguePerformancePenaltyPercent, getFatigueRiskLevel } from "@/lib/fatigue/fatigue-calibration";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightMatrix,
@@ -64,7 +65,6 @@ export type MatchdayProjectedPreview = {
   warnings: string[];
 };
 
-const FATIGUE_PENALTY_CAP_PERCENT = 35;
 const SLOT_PROFILE_MODIFIER_SCALE = 2.2;
 
 const INTENSITY_CONFIG: Record<
@@ -611,10 +611,10 @@ function resolvePlayerStrainResistance(strainValue: number | null | undefined) {
 }
 
 function resolveCurrentFatigueFactor(currentFatigueCount: number) {
-  if (currentFatigueCount >= 30) return 4;
-  if (currentFatigueCount >= 20) return 3;
-  if (currentFatigueCount >= 10) return 2;
-  if (currentFatigueCount >= 5) return 1;
+  if (currentFatigueCount >= 80) return 4;
+  if (currentFatigueCount >= 65) return 3;
+  if (currentFatigueCount >= 40) return 2;
+  if (currentFatigueCount >= 20) return 1;
   return 0;
 }
 
@@ -746,7 +746,7 @@ export function calculateMatchdayProjectedPreview(input: {
   const roleModifier = profileRoleModifier ?? fallbackRoleModifier;
 
   const intensityConfig = INTENSITY_CONFIG[input.intensity];
-  const fatiguePenaltyPercent = Math.min(Math.max(currentFatigueCount, 0) * 0.5, FATIGUE_PENALTY_CAP_PERCENT);
+  const fatiguePenaltyPercent = getFatiguePerformancePenaltyPercent(currentFatigueCount);
   const preFatigueScore = baseScore + roleModifier;
   const fatigueModifier = Number(((preFatigueScore * fatiguePenaltyPercent) / 100).toFixed(1));
   const fatigueAdjustedScore = preFatigueScore - fatigueModifier;
@@ -761,15 +761,10 @@ export function calculateMatchdayProjectedPreview(input: {
   );
   const rivalryPressureModifier = input.intensity === "push" ? rivalryPressure : 0;
   const totalProjected = Number((fatigueAdjustedScore + intensityConfig.scoreModifier + knownModifierBonus).toFixed(1));
-  const fatigueRisk =
-    strainRiskScore >= 4 || additionalFatigue >= 12 || currentFatigueCount >= 20
-      ? "hoch"
-      : strainRiskScore >= 2 || additionalFatigue >= 8 || currentFatigueCount >= 10
-        ? "mittel"
-        : "niedrig";
+  const fatigueRisk = getFatigueRiskLevel(currentFatigueCount);
   const warnings: string[] = [];
 
-  if (input.intensity === "push" && (currentFatigueCount >= 20 || strainRiskScore >= 4)) {
+  if (input.intensity === "push" && (currentFatigueCount >= 65 || strainRiskScore >= 4)) {
     warnings.push("Push bei stark belastetem Spieler");
   }
   if (rivalryPressureModifier > 0) {

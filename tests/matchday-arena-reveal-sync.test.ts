@@ -29,7 +29,7 @@ describe("matchday arena reveal sync", () => {
   it("switches from d1 result into d2 slots", () => {
     let state = {
       activeDisciplinePhase: "d1" as const,
-      phaseIndex: 5,
+      phaseIndex: 6,
       revealedSlotCountByDiscipline: { d1: 3, d2: 0 },
       completedDisciplinePhases: { d1: false, d2: false },
     };

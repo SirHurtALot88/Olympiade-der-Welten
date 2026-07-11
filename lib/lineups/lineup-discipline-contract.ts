@@ -126,15 +126,16 @@ export function buildMatchdayLineupContract(input: {
   const toSlot = (
     discipline: LineupDisciplineContractEntry | null,
     disciplineSide: LineupDisciplineSide,
+    scheduleSlot: SeasonDisciplineScheduleEntry["discipline1"],
   ): MatchdayDisciplineSlotContract | null =>
     discipline
       ? {
           disciplineId: discipline.disciplineId,
-          displayName: discipline.displayName,
-          order: discipline.order,
-          requiredPlayers: discipline.requiredPlayers,
+          displayName: scheduleSlot?.displayName ?? discipline.displayName,
+          order: scheduleSlot?.order ?? discipline.order,
+          requiredPlayers: scheduleSlot?.playerCount ?? discipline.requiredPlayers,
           requiredCaptains: discipline.requiredCaptains,
-          category: discipline.category,
+          category: scheduleSlot?.category ?? discipline.category,
           scoringField: discipline.scoringField,
           rankSource: discipline.rankSource ?? normalizeDisciplineRankField(discipline.disciplineId),
           rankSourceStatus: discipline.rankSourceStatus,
@@ -149,8 +150,8 @@ export function buildMatchdayLineupContract(input: {
     matchdayIndex: input.matchday.index,
     sourceStatus,
     sourceNote,
-    discipline1: toSlot(resolvedDiscipline1, "d1"),
-    discipline2: toSlot(resolvedDiscipline2, "d2"),
+    discipline1: toSlot(resolvedDiscipline1, "d1", scheduledEntry?.discipline1 ?? null),
+    discipline2: toSlot(resolvedDiscipline2, "d2", scheduledEntry?.discipline2 ?? null),
     seasonCaptainSlots: SEASON_CAPTAIN_SLOTS,
     totalDisciplineSidesInSeason:
       input.disciplineSchedule?.length != null && input.disciplineSchedule.length > 0

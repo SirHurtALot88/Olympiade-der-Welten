@@ -62,6 +62,8 @@ EXISTING_PID="$(find_port_pid || true)"
 if [[ -n "$EXISTING_PID" ]]; then
   echo "Port ${PORT} ist noch belegt (PID ${EXISTING_PID}), aber die Seite antwortet nicht."
   echo "Alte Oly-Prozesse werden beendet und neu gestartet ..."
+  kill "$EXISTING_PID" >/dev/null 2>&1 || true
+  sleep 1
   cleanup_stale_project_processes
 fi
 

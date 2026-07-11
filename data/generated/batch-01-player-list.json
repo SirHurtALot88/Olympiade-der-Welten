@@ -1,0 +1,2309 @@
+[
+  {
+    "id": "player-0001-umbros",
+    "name": "Umbros",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "m",
+    "subclasses": [
+      "Fallen Angel",
+      "Destroyer",
+      "Undead"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "ColdBlooded",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Umbros.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0002-kargath",
+    "name": "Kargath",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Pet Master",
+      "Beast"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "Lazy"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kargath.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0003-zed",
+    "name": "Zed",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "C-N",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Ninja",
+      "Assassin"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "Altruistic"
+    ],
+    "traitsNegative": [
+      "Manipulative",
+      "Egomaniac"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Zed.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0004-wartusk",
+    "name": "Wartusk",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-B",
+    "gender": "m",
+    "subclasses": [
+      "Beast",
+      "Royalty",
+      "Destroyer"
+    ],
+    "traitsPositive": [
+      "Flexible"
+    ],
+    "traitsNegative": [
+      "ColdBlooded",
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Wartusk.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0005-badmona",
+    "name": "Badmona",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "f",
+    "subclasses": [
+      "Assassin",
+      "Warrior",
+      "Augmented"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "She does not enjoy being underestimated; she enjoys correcting it slowly. The last smile usually belongs to her.",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Badmona.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0006-pooka",
+    "name": "Pooka",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "R-N",
+    "gender": "f",
+    "subclasses": [
+      "Beast"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Motivated",
+      "FiredUp"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Pooka.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0007-umbrafond",
+    "name": "Umbrafond",
+    "className": "Berserker",
+    "race": "Plant",
+    "alignment": "N-G",
+    "gender": "f",
+    "subclasses": [
+      "Guardian",
+      "Druid",
+      "Jungle"
+    ],
+    "traitsPositive": [
+      "Healthy",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Timid",
+      "Lazy"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Umbrafond.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0008-pandora",
+    "name": "Pandora",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "f",
+    "subclasses": [
+      "Vigilante",
+      "Assassin",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "Relaxed"
+    ],
+    "traitsNegative": [
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Pandora.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0009-valira",
+    "name": "Valira",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Hunter",
+      "Pet Master"
+    ],
+    "traitsPositive": [
+      "FanFavorite",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Valira.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0010-monk-hans",
+    "name": "Monk Hans",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Monk"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "Altruistic",
+      "Relaxed"
+    ],
+    "traitsNegative": [
+      "Timid"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Monk Hans.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0011-rifle-bot-z",
+    "name": "Rifle Bot-Z",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Wayfarer",
+      "Bot",
+      "Spec Ops"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Mercenary",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Rifle Bot-Z.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0012-ragnarok",
+    "name": "Ragnarok",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-B",
+    "gender": "m",
+    "subclasses": [
+      "Beast",
+      "Destroyer",
+      "Behemoth"
+    ],
+    "traitsPositive": [
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "ColdBlooded",
+      "Renegade",
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Ragnarok.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0013-flora",
+    "name": "Flora",
+    "className": "Berserker",
+    "race": "Plant",
+    "alignment": "C-G",
+    "gender": "f",
+    "subclasses": [
+      "Jungle",
+      "Amazoness",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Timid"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Flora.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0014-celina",
+    "name": "Celina",
+    "className": "Charger",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Rebel",
+      "Amazoness",
+      "Pet Master"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Celina.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0015-bloodmoon",
+    "name": "Bloodmoon",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "f",
+    "subclasses": [
+      "Maniac",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Eloquent",
+      "Ambitious",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bloodmoon.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0016-broodmother",
+    "name": "Broodmother",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "R-B",
+    "gender": "f",
+    "subclasses": [
+      "Beast",
+      "Jungle",
+      "Pet Master"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Broodmother.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0017-keira",
+    "name": "Keira",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Swashbuckler",
+      "Jungle"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Flexible",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Devious",
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Keira.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0018-cave-stalker",
+    "name": "Cave Stalker",
+    "className": "Berserker",
+    "race": "Dwarf",
+    "alignment": "N",
+    "gender": "m",
+    "subclasses": [
+      "Wayfarer",
+      "Trickster",
+      "Hunter"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Cave Stalker.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0019-fleshkeeper",
+    "name": "Fleshkeeper",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "f",
+    "subclasses": [
+      "Undead",
+      "Pet Master",
+      "Beast"
+    ],
+    "traitsPositive": [
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Mercenary",
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Fleshkeeper.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0020-cloud-strife",
+    "name": "Cloud Strife",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "m",
+    "subclasses": [
+      "Agent",
+      "Augmented",
+      "Swashbuckler"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "FanFavorite",
+      "Ambitious"
+    ],
+    "traitsNegative": [
+      "Egomaniac",
+      "Diva"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Cloud Strife.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0021-wildheart",
+    "name": "Wildheart",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N",
+    "gender": "m",
+    "subclasses": [
+      "Hunter",
+      "Pet Master"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Healthy",
+      "FanFavorite"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "Lazy"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Wildheart.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0022-buckbeak",
+    "name": "Buckbeak",
+    "className": "Berserker",
+    "race": "Divine",
+    "alignment": "R-G",
+    "gender": "m",
+    "subclasses": [
+      "Beast",
+      "Angel",
+      "Ambassador"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Altruistic",
+      "Resourceful"
+    ],
+    "traitsNegative": [
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Buckbeak.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0023-floralis",
+    "name": "Floralis",
+    "className": "Berserker",
+    "race": "Plant",
+    "alignment": "N-B",
+    "gender": "f",
+    "subclasses": [
+      "Jungle",
+      "Amazoness"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Feisty",
+      "Mercenary",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Floralis.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0024-scale",
+    "name": "Scale",
+    "className": "Berserker",
+    "race": "Alien",
+    "alignment": "N-G",
+    "gender": "m",
+    "subclasses": [
+      "Hunter",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Diligent",
+      "Altruistic"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Scale.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0025-kindness",
+    "name": "Kindness",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "R-G",
+    "gender": "n",
+    "subclasses": [
+      "Beast",
+      "Guardian",
+      "Apparition"
+    ],
+    "traitsPositive": [
+      "Caring",
+      "Altruistic",
+      "Loyal"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kindness.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0026-xal-thrix",
+    "name": "Xal'thrix",
+    "className": "Berserker",
+    "race": "Alien",
+    "alignment": "C-B",
+    "gender": "f",
+    "subclasses": [
+      "Hunter",
+      "Destroyer",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Cool",
+      "FanFavorite"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "ColdBlooded",
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Xal'thrix.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0027-gunther",
+    "name": "Gunther",
+    "className": "Berserker",
+    "race": "Dwarf",
+    "alignment": "C-G",
+    "gender": "m",
+    "subclasses": [
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Motivated"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Gunther.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0028-anub-ra",
+    "name": "Anub'Ra",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "Neutral",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Lord"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Egomaniac",
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "He weighs souls with one hand and paperwork with the other. Nobody knows which disappoints him more.",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Anub'Ra.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0029-granzor",
+    "name": "Granzor",
+    "className": "Berserker",
+    "race": "Dragon",
+    "alignment": "Neutral",
+    "gender": "n",
+    "subclasses": [
+      "Beast",
+      "Jungle"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Cruel",
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Granzor.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0030-samurai-shogun",
+    "name": "Samurai Shogun",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Cool",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Timid",
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Samurai Shogun.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0031-silverfang",
+    "name": "Silverfang",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Hunter",
+      "Jungle"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Silverfang.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0032-firedunk",
+    "name": "Firedunk",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "m",
+    "subclasses": [
+      "Trickster",
+      "Swashbuckler",
+      "Vigilante"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Firedunk.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0033-tank",
+    "name": "Tank",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "N",
+    "gender": "n",
+    "subclasses": [
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Healthy"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tank.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0034-lasse",
+    "name": "Lasse",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Fearless"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "Feisty",
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lasse.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0035-thraxis",
+    "name": "Thraxis",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "Neutral",
+    "gender": "m",
+    "subclasses": [
+      "Destroyer",
+      "Isolated"
+    ],
+    "traitsPositive": [
+      "Healthy"
+    ],
+    "traitsNegative": [
+      "Egomaniac",
+      "Scandalous",
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Thraxis.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0036-sturla",
+    "name": "Sturla",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Knight",
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Sturla.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0037-deathknight-monk",
+    "name": "Deathknight Monk",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Monk"
+    ],
+    "traitsPositive": [
+      "Fair",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Timid"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Deathknight Monk.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0038-jasmine-jackal",
+    "name": "Jasmine Jackal",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Eloquent",
+      "Diligent"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Jasmine Jackal.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0039-raisin",
+    "name": "Raisin",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Jungle"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "FiredUp",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Devious"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Raisin.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0040-meira",
+    "name": "Meira",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-G",
+    "gender": "f",
+    "subclasses": [
+      "Warrior",
+      "Jungle",
+      "Trickster"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "Flexible"
+    ],
+    "traitsNegative": [
+      "Egomaniac",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Meira.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0041-drazara",
+    "name": "Drazara",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "N-B",
+    "gender": "f",
+    "subclasses": [
+      "Succubus",
+      "Warrior",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Drazara.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0042-warrior",
+    "name": "Warrior",
+    "className": "Berserker",
+    "race": "Lizard",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Fair",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Warrior.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0043-leif-eriksson",
+    "name": "Leif Eriksson",
+    "className": "Berserker",
+    "race": "Dwarf",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Healthy",
+      "Relaxed"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Leif Eriksson.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0044-bloodwraith",
+    "name": "Bloodwraith",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "m",
+    "subclasses": [
+      "Wraith",
+      "Destroyer"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Vindictive",
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bloodwraith.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0045-rugana",
+    "name": "Rugana",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N",
+    "gender": "f",
+    "subclasses": [
+      "Jungle",
+      "Amazoness",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Rugana.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0046-skybreaker",
+    "name": "Skybreaker",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "R-N",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Rebel",
+      "Spec Ops"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "Healthy"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Skybreaker.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0047-tavascron",
+    "name": "Tavascron",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "R-N",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Warrior",
+      "Behemoth"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tavascron.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0048-sir-varrus",
+    "name": "Sir Varrus",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N-B",
+    "gender": "m",
+    "subclasses": [
+      "Knight",
+      "Destroyer"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Egomaniac"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Sir Varrus.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0049-skysplitter-strider",
+    "name": "Skysplitter Strider",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-B",
+    "gender": "n",
+    "subclasses": [
+      "Assassin",
+      "Jungle"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "FanFavorite"
+    ],
+    "traitsNegative": [
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Skysplitter Strider.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0050-bryndra",
+    "name": "Bryndra",
+    "className": "Berserker",
+    "race": "Dwarf",
+    "alignment": "N-G",
+    "gender": "f",
+    "subclasses": [
+      "Cleric",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bryndra.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0051-hexiron",
+    "name": "Hexiron",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "R-N",
+    "gender": "n",
+    "subclasses": [
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Hexiron.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0052-dire-wulf",
+    "name": "Dire Wulf",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Beast"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Loyal",
+      "FanFavorite"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Dire Wulf.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0053-wolfdancer",
+    "name": "Wolfdancer",
+    "className": "Berserker",
+    "race": "Elf",
+    "alignment": "N",
+    "gender": "m",
+    "subclasses": [
+      "Pet Master",
+      "Jungle",
+      "Whore"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Sexy"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Wolfdancer.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0054-ketilsson",
+    "name": "Ketilsson",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Ketilsson.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0055-neos",
+    "name": "Neos",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "N",
+    "gender": "n",
+    "subclasses": [
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Ambitious",
+      "Healthy"
+    ],
+    "traitsNegative": [
+      "Renegade",
+      "Egomaniac"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Neos.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0056-faxtar",
+    "name": "Faxtar",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "N-B",
+    "gender": "m",
+    "subclasses": [
+      "Beast",
+      "Ninja"
+    ],
+    "traitsPositive": [
+      "Eloquent",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Faxtar.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0057-gluttony",
+    "name": "Gluttony",
+    "className": "Berserker",
+    "race": "Alien",
+    "alignment": "N-B",
+    "gender": "f",
+    "subclasses": [
+      "Prime Evil"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Scandalous",
+      "Manipulative"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Gluttony.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0058-zelkor",
+    "name": "Zelkor",
+    "className": "Berserker",
+    "race": "Lizard",
+    "alignment": "N-G",
+    "gender": "m",
+    "subclasses": [
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Zelkor.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0059-forar",
+    "name": "Forar",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N",
+    "gender": "f",
+    "subclasses": [
+      "Monk"
+    ],
+    "traitsPositive": [
+      "Flexible"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Forar.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0060-emberlash",
+    "name": "Emberlash",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Pirate",
+      "Maniac",
+      "Destroyer"
+    ],
+    "traitsPositive": [
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Mercenary",
+      "Scandalous",
+      "Obsessive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Emberlash.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0061-astaroth",
+    "name": "Astaroth",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Servant",
+      "Wraith",
+      "Undead"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "The grave gave him back with orders still warm in his skull. Since then, every arena bell sounds like someone digging too close.",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Astaroth.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0062-kebet",
+    "name": "Kebet",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "N-G",
+    "gender": "m",
+    "subclasses": [
+      "Trickster",
+      "Undead"
+    ],
+    "traitsPositive": [
+      "Relaxed",
+      "Altruistic"
+    ],
+    "traitsNegative": [
+      "Timid",
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kebet.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0063-kragar",
+    "name": "Kragar",
+    "className": "Berserker",
+    "race": "Tauren",
+    "alignment": "N-B",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Vindictive"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kragar.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0064-bumblecrank",
+    "name": "Bumblecrank",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Motivated"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bumblecrank.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0065-zeronis-prime",
+    "name": "Zeronis Prime",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "R-B",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Spec Ops",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "Flexible",
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Timid",
+      "Lazy"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Zeronis Prime.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0066-zen",
+    "name": "Zen",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "m",
+    "subclasses": [
+      "Vigilante",
+      "Swashbuckler",
+      "Monk"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "Loyal",
+      "Cool"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Zen.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0067-greyhus",
+    "name": "Greyhus",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Flexible"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Greyhus.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0068-arlong",
+    "name": "Arlong",
+    "className": "Berserker",
+    "race": "Lizard",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Swashbuckler"
+    ],
+    "traitsPositive": [
+      "FanFavorite",
+      "Flexible",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Renegade",
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "He has never understood why enemies scream before impact. To him, that is simply the part where the world becomes honest.",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Arlong.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0069-leviathan",
+    "name": "Leviathan",
+    "className": "Berserker",
+    "race": "Dragon",
+    "alignment": "Neutral",
+    "gender": "m",
+    "subclasses": [],
+    "traitsPositive": [
+      "Relaxed"
+    ],
+    "traitsNegative": [
+      "Timid"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Leviathan.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0070-mechatron",
+    "name": "Mechatron",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Wayfarer",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Flexible"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Mechatron.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0071-tempest",
+    "name": "Tempest",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "C-N",
+    "gender": "n",
+    "subclasses": [
+      "Behemoth"
+    ],
+    "traitsPositive": [
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "Renegade",
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tempest.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0072-swiftstrike",
+    "name": "Swiftstrike",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Rebel"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "Ambitious"
+    ],
+    "traitsNegative": [
+      "Timid"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Swiftstrike.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0073-valeria-bloodfang",
+    "name": "Valeria Bloodfang",
+    "className": "Berserker",
+    "race": "Orc",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Hunter"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Ambitious"
+    ],
+    "traitsNegative": [
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Valeria Bloodfang.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0074-raphael",
+    "name": "Raphael",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Ninja",
+      "Augmented"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "Feisty",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Raphael.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0075-naotsugu",
+    "name": "Naotsugu",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-G",
+    "gender": "m",
+    "subclasses": [
+      "Knight"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Naotsugu.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0076-boulderclash",
+    "name": "Boulderclash",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "Healthy"
+    ],
+    "traitsNegative": [
+      "FaintHearted",
+      "Lazy"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Boulderclash.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0077-buttercup",
+    "name": "Buttercup",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "R-N",
+    "gender": "m",
+    "subclasses": [
+      "Guardian",
+      "Beast"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Relaxed"
+    ],
+    "traitsNegative": [
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Buttercup.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0078-baz",
+    "name": "Baz",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Trickster",
+      "Assassin"
+    ],
+    "traitsPositive": [
+      "FanFavorite"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "ColdBlooded",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Baz.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0079-tomahawk",
+    "name": "Tomahawk",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "N",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Guardian"
+    ],
+    "traitsPositive": [
+      "Altruistic",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tomahawk.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0080-gaius",
+    "name": "Gaius",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N-B",
+    "gender": "m",
+    "subclasses": [
+      "Knight"
+    ],
+    "traitsPositive": [
+      "Ambitious"
+    ],
+    "traitsNegative": [
+      "Mercenary",
+      "FaintHearted",
+      "Diva"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Gaius.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0081-skryx",
+    "name": "Skryx",
+    "className": "Berserker",
+    "race": "Animal",
+    "alignment": "C-B",
+    "gender": "m",
+    "subclasses": [
+      "Beast",
+      "Hunter",
+      "Wraith"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Skryx.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0082-goro",
+    "name": "Goro",
+    "className": "Berserker",
+    "race": "Lizard",
+    "alignment": "C-N",
+    "gender": "n",
+    "subclasses": [
+      "Warrior",
+      "Creature"
+    ],
+    "traitsPositive": [
+      "Flexible"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Goro.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0083-scruffy",
+    "name": "Scruffy",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "f",
+    "subclasses": [
+      "Servant",
+      "Beast"
+    ],
+    "traitsPositive": [
+      "FiredUp",
+      "Diligent"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "ColdBlooded",
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Scruffy.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0084-xix",
+    "name": "Xix",
+    "className": "Berserker",
+    "race": "Aqua",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Beast"
+    ],
+    "traitsPositive": [],
+    "traitsNegative": [
+      "Feisty",
+      "Renegade",
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Xix.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0085-summer",
+    "name": "Summer",
+    "className": "Berserker",
+    "race": "Elf",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness"
+    ],
+    "traitsPositive": [
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "FaintHearted",
+      "Diva"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Summer.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0086-olaf",
+    "name": "Olaf",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Altruistic"
+    ],
+    "traitsNegative": [
+      "Cheater"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Olaf.JPG",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0087-mary-slayblade",
+    "name": "Mary Slayblade",
+    "className": "Berserker",
+    "race": "Elf",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Warrior",
+      "Destroyer",
+      "Scout"
+    ],
+    "traitsPositive": [
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "Devious",
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Mary Slayblade.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0088-yasuo-windthrift",
+    "name": "Yasuo Windthrift",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Warrior",
+      "Wayfarer"
+    ],
+    "traitsPositive": [
+      "Loyal",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "Feisty",
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Yasuo Windthrift.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0089-yuuri-shadowhand",
+    "name": "Yuuri Shadowhand",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Pirate",
+      "Swashbuckler"
+    ],
+    "traitsPositive": [
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Mercenary",
+      "Diva"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Yuuri Shadowhand.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0090-grasshopper-m-vi",
+    "name": "Grasshopper M-VI",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "C-N",
+    "gender": "n",
+    "subclasses": [
+      "Bot"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Grasshopper M-VI.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0091-moknar",
+    "name": "Moknar",
+    "className": "Berserker",
+    "race": "Orc",
+    "alignment": "N-B",
+    "gender": "m",
+    "subclasses": [
+      "Swashbuckler",
+      "Destroyer"
+    ],
+    "traitsPositive": [
+      "Motivated",
+      "Flexible"
+    ],
+    "traitsNegative": [
+      "Egomaniac",
+      "Vindictive",
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Moknar.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0092-micro",
+    "name": "Micro",
+    "className": "Berserker",
+    "race": "Construct",
+    "alignment": "N",
+    "gender": "n",
+    "subclasses": [
+      "Bot",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Micro.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0093-draven",
+    "name": "Draven",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Maniac"
+    ],
+    "traitsPositive": [
+      "Cool",
+      "Motivated",
+      "Ambitious"
+    ],
+    "traitsNegative": [
+      "Vindictive",
+      "Renegade",
+      "Scandalous"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Draven.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0094-dualflame",
+    "name": "Dualflame",
+    "className": "Berserker",
+    "race": "Dragon",
+    "alignment": "Neutral",
+    "gender": "f",
+    "subclasses": [],
+    "traitsPositive": [
+      "Cool",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Dualflame.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0095-lumen",
+    "name": "Lumen",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "C-N",
+    "gender": "f",
+    "subclasses": [
+      "Wayfarer",
+      "Rebel"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "Motivated"
+    ],
+    "traitsNegative": [
+      "Gambler",
+      "Mercenary"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lumen.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0096-faceless-void",
+    "name": "Faceless Void",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Wayfarer",
+      "Destroyer"
+    ],
+    "traitsPositive": [
+      "Cool",
+      "Flexible",
+      "Fearless"
+    ],
+    "traitsNegative": [
+      "Vindictive",
+      "Renegade",
+      "Feisty"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Faceless Void.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0097-tremble",
+    "name": "Tremble",
+    "className": "Berserker",
+    "race": "Demon",
+    "alignment": "C-B",
+    "gender": "n",
+    "subclasses": [
+      "Maniac",
+      "Undead",
+      "Servant"
+    ],
+    "traitsPositive": [
+      "Healthy",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "Scandalous",
+      "ColdBlooded"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tremble.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0098-vasdrotdir-undemshield",
+    "name": "Vasdrotdir Undemshield",
+    "className": "Berserker",
+    "race": "Dwarf",
+    "alignment": "N",
+    "gender": "m",
+    "subclasses": [
+      "Behemoth",
+      "Viking"
+    ],
+    "traitsPositive": [
+      "Diligent",
+      "Healthy"
+    ],
+    "traitsNegative": [],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Vasdrotdir Undemshield.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0099-drake",
+    "name": "Drake",
+    "className": "Berserker",
+    "race": "Lizard",
+    "alignment": "C-N",
+    "gender": "m",
+    "subclasses": [
+      "Guardian",
+      "Warrior"
+    ],
+    "traitsPositive": [
+      "Loyal"
+    ],
+    "traitsNegative": [
+      "Feisty",
+      "Renegade"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Drake.jpg",
+    "hasPortrait": true
+  },
+  {
+    "id": "player-0100-red-riding-hood",
+    "name": "Red Riding Hood",
+    "className": "Berserker",
+    "race": "Human",
+    "alignment": "N-G",
+    "gender": "f",
+    "subclasses": [
+      "Amazoness",
+      "Pirate"
+    ],
+    "traitsPositive": [
+      "FanFavorite",
+      "Loyal",
+      "FiredUp"
+    ],
+    "traitsNegative": [
+      "FaintHearted"
+    ],
+    "flavorDe": "",
+    "flavorEn": "",
+    "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Red Riding Hood.jpg",
+    "hasPortrait": true
+  }
+]

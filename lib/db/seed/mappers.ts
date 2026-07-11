@@ -1,4 +1,5 @@
 import type { Discipline, Player, RosterEntry, Team, TeamIdentity } from "../../data/olyDataTypes";
+import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "../../data/player-economy-display";
 
 import type { DisciplineWeightSeedRow, SeasonDisciplineConfigSeedRow } from "./seedSources";
 
@@ -106,16 +107,19 @@ export function mapPlayerRecord(player: Player) {
 }
 
 export function mapPlayerAttributeRecord(player: Player) {
+  const marketValue = getImportedPlayerDisplayMarketValue(player);
+  const salaryDemand = getImportedPlayerDisplaySalary(player);
+
   return {
     id: buildPlayerAttributeId(player.id),
     playerId: player.id,
     rating: toFloat(player.rating),
-    marketValue: toInt(player.marketValue),
-    salaryDemand: toInt(player.salaryDemand),
-    displayMarketValue: toFloat(player.displayMarketValue ?? player.marketValue),
-    displaySalary: toFloat(player.displaySalary ?? player.salaryDemand),
-    cost: toInt(player.cost ?? player.marketValue),
-    upkeepBase: toInt(player.upkeepBase ?? player.salaryDemand),
+    marketValue: marketValue != null ? toInt(marketValue) : toInt(player.marketValue),
+    salaryDemand: salaryDemand != null ? toInt(salaryDemand) : toInt(player.salaryDemand),
+    displayMarketValue: marketValue != null ? toFloat(marketValue) : toFloat(player.displayMarketValue ?? player.marketValue),
+    displaySalary: salaryDemand != null ? toFloat(salaryDemand) : toFloat(player.displaySalary ?? player.salaryDemand),
+    cost: toInt(player.cost ?? marketValue ?? player.marketValue),
+    upkeepBase: toInt(player.upkeepBase ?? salaryDemand ?? player.salaryDemand),
     pow: toFloat(player.coreStats.pow),
     spe: toFloat(player.coreStats.spe),
     men: toFloat(player.coreStats.men),

@@ -1,0 +1,20 @@
+{
+  "name": "Red Reaper",
+  "id": "player-0160-red-reaper",
+  "className": "Warlord",
+  "race": "Demon",
+  "alignment": "C-B",
+  "gender": "m",
+  "subclasses": ["Fallen Angel", "Warrior", "Lord"],
+  "traitsPositive": ["Ambitious", "FiredUp", "Fearless"],
+  "traitsNegative": ["ColdBlooded", "Cheater", "Obsessive"],
+  "attributes": {
+    "power": 85, "health": 96, "stamina": 73, "intelligence": 41,
+    "awareness": 12, "determination": 74, "speed": 20, "dexterity": 30,
+    "charisma": 94, "will": 78, "spirit": 48, "torment": 89
+  },
+  "flavorDe": "Zwischen Ashkara und dem Schwefelreich, wo der Himmel oft nach Metall und altem Blut riecht, fiel Red Reaper längst aus jeder Hierarchie heraus, die noch Worte wie „Gnade“ kannte. Einst war er kein Poet des Untergangs, sondern ein Krieger, der Siege nicht feierte — er zählte sie nur und ging weiter, ehe die Asche kalt wurde. Heute erkennt man ihn an den zerrissenen roten Flügeln, der hornigen Rüstung und dem großen Schwert, das er trägt, als wäre der nächste Blitz nur eine Einladung. Wer ihn im Feld sieht, merkt schnell: Hier wird nicht diskutiert — hier wird durchgeritten, oft über Regeln hinweg, und meistens zu spät für Widerspruch.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Red Reaper.jpg",
+  "cost": 85,
+  "upkeepBase": 9
+}

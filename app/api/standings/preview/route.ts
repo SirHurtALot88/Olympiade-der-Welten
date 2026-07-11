@@ -2,7 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
+import { readStandingsPreviewCache, writeStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
 
 export async function GET(request: Request) {
   try {
@@ -11,6 +13,30 @@ export async function GET(request: Request) {
     const seasonId = searchParams.get("seasonId")?.trim() || "season-1";
     const matchdayId = searchParams.get("matchdayId")?.trim() || "matchday-1";
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+
+    if (source === "sqlite") {
+      const persistence = createPersistenceService();
+      const versionMeta = persistence.getSaveVersionMetadata(saveId);
+      const cacheKey = `${saveId}:${seasonId}:${matchdayId}`;
+      const cacheSignature = versionMeta?.contentSignature ?? versionMeta?.updatedAt ?? "0";
+      const cached = readStandingsPreviewCache(cacheKey, cacheSignature);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+
+      const result = await buildStandingsPreview(
+        {
+          saveId,
+          seasonId,
+          matchdayId,
+          source,
+        },
+        undefined,
+        persistence,
+      );
+      writeStandingsPreviewCache(cacheKey, cacheSignature, result);
+      return NextResponse.json(result);
+    }
 
     const result = await buildStandingsPreview({
       saveId,

@@ -15,6 +15,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildTrainingModeDemandRecord, evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {
   smiley: string;
@@ -347,6 +348,31 @@ function evaluateDemandDelta(input: {
   if (demand.type === "facility") {
     if (demand.status === "fulfilled") return { delta: reward, outcome: "fulfilled" as const };
     if (input.currentSeasonHasResults) return { delta: penalty * 0.35, outcome: "pressure" as const };
+  }
+
+  if (demand.type === "training_mode") {
+    const player = input.gameState.players.find((entry) => entry.id === playerId) ?? null;
+    const activeMode = player?.trainingMode ?? "mittel";
+    const preferredMode =
+      demand.targetValue === "leicht" || demand.targetValue === "mittel" || demand.targetValue === "hart"
+        ? demand.targetValue
+        : "mittel";
+    return evaluateTrainingModeDemandDelta({
+      demand: {
+        preferredMode,
+        currentMode: activeMode,
+        status: demand.status,
+        moraleReward: demand.moraleReward,
+        moralePenalty: demand.moralePenalty,
+        mismatchSeverity:
+          activeMode === preferredMode
+            ? 0
+            : (activeMode === "leicht" && preferredMode === "hart") || (activeMode === "hart" && preferredMode === "leicht")
+              ? 2
+              : 1,
+      },
+      activeMode,
+    });
   }
 
   if (demand.status === "failed") return { delta: penalty, outcome: "failed" as const };
@@ -813,6 +839,77 @@ function computePlayerMorale(input: {
     warnings,
     source: "computed_preview",
   };
+}
+
+export const MORALE_REFUSES_FORMER_TEAM = "morale_refuses_former_team";
+export const MORALE_FORMER_TEAM_HOSTILE = "morale_former_team_hostile";
+export const MORALE_FORMER_TEAM_LOYAL_RETURN = "morale_former_team_loyal_return";
+
+export type FreeAgentTeamDisposition = {
+  applies: boolean;
+  storedTeamId: string | null;
+  morale: number | null;
+  salaryMultiplier: number;
+  blockingReason: string | null;
+  warnings: string[];
+};
+
+export function assessFreeAgentDispositionTowardTeam(input: {
+  gameState: GameState;
+  playerId: string;
+  teamId: string;
+}) {
+  const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
+  if (!player) {
+    return {
+      applies: false,
+      storedTeamId: null,
+      morale: null,
+      salaryMultiplier: 1,
+      blockingReason: null,
+      warnings: [],
+    } satisfies FreeAgentTeamDisposition;
+  }
+
+  const stored = getStoredMorale(input.gameState, input.playerId, input.teamId);
+  if (!stored || stored.teamId !== input.teamId) {
+    return {
+      applies: false,
+      storedTeamId: stored?.teamId ?? null,
+      morale: null,
+      salaryMultiplier: 1,
+      blockingReason: null,
+      warnings: [],
+    } satisfies FreeAgentTeamDisposition;
+  }
+
+  // Free agents keep stronger memory toward their last team than the roster carry blend uses elsewhere.
+  const morale =
+    (stored.inactiveSeasons ?? 0) > 0
+      ? roundValue(clamp(stored.morale, 0, 100))
+      : normalizeCarryOverMorale(stored, input.gameState.season.id, input.teamId).morale;
+  const warnings: string[] = [];
+  let salaryMultiplier = 1;
+  let blockingReason: string | null = null;
+
+  if (morale < 22 && !hasTrait(player, "loyal")) {
+    blockingReason = MORALE_REFUSES_FORMER_TEAM;
+  } else if (morale < 34) {
+    salaryMultiplier = 1.18;
+    warnings.push(MORALE_FORMER_TEAM_HOSTILE);
+  } else if (morale >= 75) {
+    salaryMultiplier = 0.94;
+    warnings.push(MORALE_FORMER_TEAM_LOYAL_RETURN);
+  }
+
+  return {
+    applies: true,
+    storedTeamId: stored.teamId,
+    morale,
+    salaryMultiplier,
+    blockingReason,
+    warnings,
+  } satisfies FreeAgentTeamDisposition;
 }
 
 export function applyMoraleToSalary(baseSalary: number | null | undefined, morale: PlayerMoraleAssessment | null | undefined) {

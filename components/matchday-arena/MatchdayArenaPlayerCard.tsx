@@ -2,12 +2,14 @@
 
 import type { KeyboardEvent } from "react";
 
-import { getArenaAxisValueTier } from "@/lib/matchday-arena/arena-stat-visuals";
-import { getGameTermTooltip } from "@/components/ui/GameTerm";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 
 type MatchdayArenaPlayerCardProps = {
   rank?: number | null;
   portraitUrl?: string | null;
+  portraitInitials?: string;
+  playerId?: string;
   playerName: string;
   teamName: string;
   className?: string | null;
@@ -26,6 +28,8 @@ type MatchdayArenaPlayerCardProps = {
 export default function MatchdayArenaPlayerCard({
   rank,
   portraitUrl,
+  portraitInitials = "—",
+  playerId = "arena-player",
   playerName,
   teamName,
   className,
@@ -37,6 +41,11 @@ export default function MatchdayArenaPlayerCard({
   variant = "default",
   onOpen,
 }: MatchdayArenaPlayerCardProps) {
+  const pow = axisStats.find((entry) => entry.axis === "POW")?.value ?? null;
+  const spe = axisStats.find((entry) => entry.axis === "SPE")?.value ?? null;
+  const men = axisStats.find((entry) => entry.axis === "MEN")?.value ?? null;
+  const soc = axisStats.find((entry) => entry.axis === "SOC")?.value ?? null;
+
   const clickableProps =
     onOpen != null
       ? {
@@ -54,54 +63,46 @@ export default function MatchdayArenaPlayerCard({
       : {};
 
   return (
-    <article className={`matchday-arena-player-card is-${variant}`.trim()} {...clickableProps}>
-      <div className="matchday-arena-player-card-head">
-        {rank != null ? <span className="matchday-arena-player-rank">#{rank}</span> : null}
-        {portraitUrl ? (
-          <OptimizedMediaImage
-            className="matchday-arena-player-portrait"
-            src={portraitUrl}
-            alt={playerName}
-            width={52}
-            height={52}
-          />
-        ) : (
-          <span className="matchday-arena-player-portrait matchday-arena-player-portrait-fallback">—</span>
-        )}
-        <div className="matchday-arena-player-title">
-          <strong>{playerName}</strong>
-          <span>{teamName}</span>
-          {className ? <span>{className}</span> : null}
-        </div>
-      </div>
-      <div className="matchday-arena-player-card-metrics">
-        <span className="matchday-arena-player-card-score">{scoreLabel}</span>
-        {pointsLabel ? <span className="matchday-arena-player-card-points" title={getGameTermTooltip("PPs") ?? undefined}>{pointsLabel}</span> : null}
-        {contributionLabel ? <span className="matchday-arena-player-card-contribution">{contributionLabel}</span> : null}
-      </div>
-      {axisStats.length ? (
-        <div className="matchday-arena-player-axis-strip" aria-label="Player Achsenwerte">
-          {axisStats.map((stat) => (
-            <span
-              key={`${playerName}-${stat.axis}`}
-              className={`matchday-arena-player-axis is-${stat.axis.toLowerCase()} is-tier-${getArenaAxisValueTier(stat.value)}`}
-              title={getGameTermTooltip(stat.axis) ?? undefined}
-            >
-              <small>{stat.axis}</small>
-              <strong>{stat.value == null || !Number.isFinite(stat.value) ? "—" : Math.round(stat.value)}</strong>
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {badges.length ? (
-        <div className="matchday-arena-player-card-badges">
-          {badges.map((badge) => (
-            <span key={`${playerName}-${badge}`} className="pill">
-              {badge}
-            </span>
-          ))}
-        </div>
-      ) : null}
+    <article className={`matchday-arena-player-card is-portrait-card is-${variant}`.trim()} {...clickableProps}>
+      <FoundationPlayerPortraitCard
+        playerId={playerId}
+        name={playerName}
+        portraitUrl={portraitUrl ?? null}
+        portraitInitials={portraitInitials}
+        playerOvr={null}
+        playerMvs={null}
+        pow={pow}
+        spe={spe}
+        men={men}
+        soc={soc}
+        leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+        variant="team"
+        context="arenaReveal"
+        density={variant === "compact" ? "compact" : "full"}
+        subMeta={[teamName, className].filter(Boolean).join(" · ")}
+        highlight={badges[0] ?? null}
+        contextData={{
+          arena: {
+            rank: rank ?? null,
+            scoreLabel,
+            pointsLabel: pointsLabel ?? null,
+            contributionLabel: contributionLabel ?? null,
+          },
+        }}
+        interactive={false}
+        onOpen={onOpen ?? undefined}
+        footerSlot={
+          badges.length > 1 ? (
+            <div className="matchday-arena-player-card-badges">
+              {badges.slice(1).map((badge) => (
+                <span key={`${playerName}-${badge}`} className="pill">
+                  {badge}
+                </span>
+              ))}
+            </div>
+          ) : null
+        }
+      />
     </article>
   );
 }

@@ -11,10 +11,23 @@ vi.mock("@/lib/ai/ai-transfermarkt-sell-preview-service", () => ({
   buildAiTransfermarktSellPreview,
 }));
 
+vi.mock("@/lib/persistence/persistence-service", () => ({
+  createPersistenceService: () => ({
+    bootstrapSingleplayerSave: () => ({ save: null }),
+    getSaveById: () => null,
+    getActiveSave: () => null,
+  }),
+}));
+
+vi.mock("@/lib/db/read/foundation-read-repository", () => ({
+  loadFoundationSnapshotFromPrisma: async () => null,
+}));
+
 describe("ai market plan preview service", () => {
   beforeEach(() => {
     buildAiTransfermarktPreview.mockReset();
     buildAiTransfermarktSellPreview.mockReset();
+    process.env.OLY_UNIFIED_PICK = "0";
   });
 
   it("stays read-only and combines buy and sell previews for ai teams", async () => {
@@ -218,6 +231,9 @@ describe("ai market plan preview service", () => {
       seasonId: "season-1",
     });
 
+    expect(buildAiTransfermarktPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ candidateScopeMode: "budget_wide" }),
+    );
     expect(result.readOnly).toBe(true);
     expect(result.totalTeams).toBe(2);
     expect(result.aiTeams).toBe(2);
@@ -704,15 +720,15 @@ describe("ai market plan preview service", () => {
     expect(result.sellThenBuyTeams).toBe(1);
     expect(result.teams[0].status).toBe("sell_then_buy");
     expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual([
-      "Peak Value",
       "Flat Season",
+      "Peak Value",
     ]);
     expect(result.teams[0].buyPlan.candidates.map((candidate) => candidate.playerName)).toContain("Top Ten Push");
     expect(result.teams[0].planSteps.filter((step) => step.stepType === "sell")).toHaveLength(2);
     expect(result.teams[0].planSteps.some((step) => step.reason.includes("realisierbarer Gewinn"))).toBe(true);
   });
 
-  it("sells enough safe players to clear negative team cash without dropping below the player minimum", async () => {
+  it("sells enough players to clear negative team cash even at player minimum", async () => {
     buildAiTransfermarktPreview.mockResolvedValue({
       readOnly: true,
       source: "sqlite",
@@ -830,14 +846,134 @@ describe("ai market plan preview service", () => {
 
     expect(result.teams[0].status).toBe("sell_only");
     expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual([
-      "Debt Relief 1",
-      "Debt Relief 2",
-      "Debt Relief 3",
       "Debt Relief 4",
+      "Debt Relief 3",
+      "Debt Relief 2",
+      "Debt Relief 1",
     ]);
     expect(result.teams[0].projectedState.cashAfterPlan).toBe(9);
     expect(result.teams[0].projectedState.rosterAfterPlan).toBe(4);
     expect(result.teams[0].blockingReasons).not.toContain("cash_after_market_plan_not_positive");
+  });
+
+  it("includes sell candidates when roster is exactly at playerMin", async () => {
+    buildAiTransfermarktPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "M-N",
+          teamCode: "M-N",
+          teamName: "Min Roster",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          status: "ready",
+          cash: 40,
+          salary: 20,
+          salaryTotal: 20,
+          rosterSize: 8,
+          rosterCount: 8,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          marketValueTotal: 120,
+          needSummary: "Trim for cash.",
+          budgetStatus: "healthy",
+          rosterStatus: "at_min",
+          topTargets: [],
+          recommendedBuys: [],
+          skippedTargets: [],
+          warnings: [],
+          explanation: "Profit trim.",
+        },
+      ],
+    });
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "M-N",
+          teamCode: "M-N",
+          teamName: "Min Roster",
+          controlMode: "ai",
+          aiSellPreviewEnabled: true,
+          status: "ready",
+          strategySummary: "Profit trim.",
+          cash: 40,
+          rosterCount: 8,
+          salaryTotal: 20,
+          marketValueTotal: 120,
+          rosterSize: 8,
+          playerMin: 8,
+          playerOpt: 10,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          budgetPressure: "healthy",
+          sellCandidates: [
+            {
+              activePlayerId: "ap-min-1",
+              playerId: "p-min-1",
+              playerName: "Min Trim",
+              className: "Runner",
+              race: "Human",
+              raceName: "Human",
+              ovr: 50,
+              mvs: 10,
+              salary: 3,
+              marketValue: 12,
+              expectedSellValue: 14,
+              contractLength: 1,
+              rosterAfter: 7,
+              salaryAfter: 17,
+              cashAfter: 54,
+              sportValueSummary: "Trim",
+              performanceSummary: "Trim",
+              strategyFitSummary: "Trim.",
+              reasonToSell: ["realisierbarer Gewinn von 2"],
+              reasonToKeep: [],
+              reasonsToSell: ["realisierbarer Gewinn von 2"],
+              reasonsToKeep: [],
+              warnings: [],
+              sellPriority: 72,
+              sellPriorityScore: 72,
+            },
+          ],
+          keepCore: [],
+          warnings: [],
+          blockingReasons: [],
+          explanation: "Profit trim.",
+        },
+      ],
+    });
+
+    const { buildAiMarketPlanPreview } = await import("@/lib/ai/ai-market-plan-preview-service");
+    const result = await buildAiMarketPlanPreview({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-2",
+    });
+
+    expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual(["Min Trim"]);
+    expect(result.teams[0].projectedState.rosterAfterPlan).toBe(7);
   });
 
   it("blocks a market plan when safe sells cannot clear negative team cash", async () => {
@@ -960,5 +1096,272 @@ describe("ai market plan preview service", () => {
     expect(result.teams[0].blockingReasons).toContain("negative_cash_unresolved_after_safe_sells");
     expect(result.teams[0].blockingReasons).toContain("cash_after_market_plan_not_positive");
     expect(result.summary.blocked).toBe(1);
+  });
+
+  it("allows profit rotation sell at exact playerOpt with moderate priority", async () => {
+    const profitSell = {
+      activePlayerId: "ap-opt-1",
+      playerId: "p-opt-1",
+      playerName: "Opt Trim",
+      className: "Runner",
+      race: "Human",
+      raceName: "Human",
+      ovr: 52,
+      mvs: 11,
+      salary: 3,
+      marketValue: 20,
+      expectedSellValue: 24,
+      contractLength: 1,
+      rosterAfter: 9,
+      salaryAfter: 17,
+      cashAfter: 64,
+      sportValueSummary: "Trim",
+      performanceSummary: "Trim",
+      strategyFitSummary: "Trim.",
+      reasonToSell: ["realisierbarer Gewinn von 4"],
+      reasonToKeep: [],
+      reasonsToSell: ["realisierbarer Gewinn von 4"],
+      reasonsToKeep: [],
+      warnings: [],
+      sellPriority: 54,
+      sellPriorityScore: 54,
+    };
+
+    buildAiTransfermarktPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "O-P",
+          teamCode: "O-P",
+          teamName: "Opt Roster",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          status: "ready",
+          cash: 40,
+          salary: 20,
+          salaryTotal: 20,
+          rosterSize: 10,
+          rosterCount: 10,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          marketValueTotal: 160,
+          needSummary: "Rotation.",
+          budgetStatus: "healthy",
+          rosterStatus: "at_opt",
+          topTargets: [],
+          recommendedBuys: [],
+          skippedTargets: [],
+          warnings: [],
+          explanation: "Profit rotation.",
+        },
+      ],
+    });
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "O-P",
+          teamCode: "O-P",
+          teamName: "Opt Roster",
+          controlMode: "ai",
+          aiSellPreviewEnabled: true,
+          status: "ready",
+          strategySummary: "Profit rotation.",
+          cash: 40,
+          rosterCount: 10,
+          salaryTotal: 20,
+          marketValueTotal: 160,
+          rosterSize: 10,
+          playerMin: 8,
+          playerOpt: 10,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          budgetPressure: "healthy",
+          sellCandidates: [profitSell],
+          keepCore: [],
+          warnings: [],
+          blockingReasons: [],
+          explanation: "Profit rotation.",
+        },
+      ],
+    });
+
+    const { buildAiMarketPlanPreview } = await import("@/lib/ai/ai-market-plan-preview-service");
+    const result = await buildAiMarketPlanPreview({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-2",
+    });
+
+    expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual(["Opt Trim"]);
+    expect(result.teams[0].status).toBe("sell_only");
+  });
+
+  it("allows sell-then-buy rotation when buy score is strong at playerOpt", async () => {
+    const profitSell = {
+      activePlayerId: "ap-swap-1",
+      playerId: "p-swap-1",
+      playerName: "Swap Out",
+      className: "Runner",
+      race: "Human",
+      raceName: "Human",
+      ovr: 50,
+      mvs: 10,
+      salary: 3,
+      marketValue: 18,
+      expectedSellValue: 22,
+      contractLength: 1,
+      rosterAfter: 9,
+      salaryAfter: 17,
+      cashAfter: 62,
+      sportValueSummary: "Swap",
+      performanceSummary: "Swap",
+      strategyFitSummary: "Swap.",
+      reasonToSell: ["realisierbarer Gewinn von 4"],
+      reasonToKeep: [],
+      reasonsToSell: ["realisierbarer Gewinn von 4"],
+      reasonsToKeep: [],
+      warnings: [],
+      sellPriority: 48,
+      sellPriorityScore: 48,
+    };
+
+    buildAiTransfermarktPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "S-W",
+          teamCode: "S-W",
+          teamName: "Swap Team",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          status: "ready",
+          cash: 35,
+          salary: 20,
+          salaryTotal: 20,
+          rosterSize: 10,
+          rosterCount: 10,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          marketValueTotal: 150,
+          needSummary: "Upgrade swap.",
+          budgetStatus: "healthy",
+          rosterStatus: "at_opt",
+          topTargets: [],
+          recommendedBuys: [
+            {
+              playerId: "fa-swap-1",
+              playerName: "Swap In",
+              name: "Swap In",
+              className: "Trader",
+              race: "Human",
+              ovr: 58,
+              mvs: 16,
+              price: 18,
+              marketValue: 18,
+              salary: 3,
+              contractLength: 1,
+              cashAfter: 39,
+              rosterAfter: 10,
+              salaryAfter: 20,
+              fitSummary: "Upgrade",
+              sportsSummary: "POW 40",
+              budgetReason: ["Cash bleibt gesund"],
+              warnings: [],
+              overallRecommendationScore: 60,
+              score: 60,
+              reason: "Upgrade fit",
+              fitNotes: [],
+              riskNotes: [],
+              strategyNotes: [],
+            },
+          ],
+          skippedTargets: [],
+          warnings: [],
+          explanation: "Upgrade swap.",
+        },
+      ],
+    });
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "S-W",
+          teamCode: "S-W",
+          teamName: "Swap Team",
+          controlMode: "ai",
+          aiSellPreviewEnabled: true,
+          status: "ready",
+          strategySummary: "Upgrade swap.",
+          cash: 35,
+          rosterCount: 10,
+          salaryTotal: 20,
+          marketValueTotal: 150,
+          rosterSize: 10,
+          playerMin: 8,
+          playerOpt: 10,
+          targetRosterMin: 8,
+          targetRosterOpt: 10,
+          budgetPressure: "healthy",
+          sellCandidates: [profitSell],
+          keepCore: [],
+          warnings: [],
+          blockingReasons: [],
+          explanation: "Upgrade swap.",
+        },
+      ],
+    });
+
+    const { buildAiMarketPlanPreview } = await import("@/lib/ai/ai-market-plan-preview-service");
+    const result = await buildAiMarketPlanPreview({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-2",
+    });
+
+    expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual(["Swap Out"]);
+    expect(result.teams[0].status).toBe("sell_then_buy");
   });
 });

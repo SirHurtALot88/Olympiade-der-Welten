@@ -1,12 +1,32 @@
-import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { AdminBalancingConfigInput, PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { AttributeHeadroomState } from "@/lib/scouting/player-attribute-ceiling-service";
 import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
 
 export type TrainingModeOption = {
   value: PlayerTrainingMode;
   label: string;
   note: string;
   fatigueRisk: "niedrig" | "mittel" | "hoch";
+  baseXp: number;
+  recoveryDeltaPct: number;
+  trainingSetpoints: number;
+  fatigueLoad: number;
+};
+
+export type TrainingAttributeForecastEntry = {
+  attributeKey: PlayerGeneratorAttributeName;
+  attribute: string;
+  before: number;
+  after: number;
+  delta: number;
+  training: number;
+  performance: number;
+  regression: number;
+  affinity: "signature" | "weak" | "neutral";
+  ceilingState?: AttributeHeadroomState;
+  headroomLabel?: string | null;
 };
 
 export type TrainingPlayerRowView = {
@@ -38,13 +58,36 @@ export type TrainingPlayerRowView = {
   trainingXp: number;
   performanceXp: number;
   totalXp: number;
-  upgradeEstimate: string;
   fatigueWarning: string;
   recoveryForecast: {
     before: number;
     after: number;
     modifierPct: number;
   };
+  classTrainingFocus: {
+    primary: Array<{ attribute: string; weight: number }>;
+    risks: Array<{ attribute: string; weight: number }>;
+  };
+  attributeForecast: TrainingAttributeForecastEntry[];
+  modifiers: {
+    traitModifierPct: number;
+    facilityModifierPct: number;
+    potentialTrainingMultiplier: number;
+    signatureAttributes: string[];
+    weakAttribute: string | null;
+  };
+  developmentStars: {
+    currentAbilityStars: string | null;
+    potentialStars: string | null;
+    currentAbilityRating: number | null;
+    potentialRating: number | null;
+  };
+  traitBoosts: Array<{
+    trait: string;
+    pct: number;
+    tone: "positive" | "negative" | "neutral";
+  }>;
+  trainingDemand: TrainingModeDemandView | null;
   organicForecast: {
     classBefore: string;
     classAfter: string;
@@ -72,6 +115,23 @@ export type TrainingPlayerRowView = {
       label: "niedrig" | "mittel" | "hoch";
     };
   };
+  recommendedTrainingMode?: PlayerTrainingMode | null;
+  recommendedTrainingDetail?: string | null;
+  recommendedTrainingMatchesCurrent?: boolean;
+  adminBalancingConfig?: AdminBalancingConfigInput | null;
+  /**
+   * True once the team's training intensity is sealed for the current season
+   * (preseason setup window closed / first matchday result recorded). See
+   * `evaluateGamePhaseAction(gameState, "set_training")` and
+   * docs/training-intensity-season-lock.md.
+   */
+  trainingIntensityLocked?: boolean;
+  /**
+   * True during the short early-season grace window before the first result is
+   * recorded. Training mode can still be changed now, but the lock will snap
+   * shut as soon as the first matchday result exists.
+   */
+  trainingIntensityLockWarning?: boolean;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

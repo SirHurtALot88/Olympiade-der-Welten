@@ -163,3 +163,37 @@ it("does not treat stale previous-season discipline schedules as active", () => 
   expect(active.every((entry) => entry.seasonId === "season-3")).toBe(true);
   expect(active.some((entry) => entry.seasonId === "season-2")).toBe(false);
 });
+
+it("rebuilds stored schedules that are complete but missing discipline slots", () => {
+  const gameState = {
+    season: {
+      id: "season-1",
+      name: "Season 1",
+      year: 1,
+      currentMatchday: 1,
+      matchdayIds: ["season-1-matchday-1", "season-1-matchday-2", "season-1-matchday-3", "season-1-matchday-4"],
+    },
+    seasonState: {
+      seasonId: "season-1",
+      schedule: [],
+      disciplineSchedule: Array.from({ length: 4 }, (_, index) => ({
+        seasonId: "season-1",
+        matchdayId: `season-1-matchday-${index + 1}`,
+        matchdayIndex: index + 1,
+        matchdayLabel: `Spieltag ${index + 1}`,
+        discipline1: null,
+        discipline2: null,
+        sourceStatus: "season_seed",
+      })),
+      standings: {},
+    },
+    matchdayState: { matchdayId: "season-1-matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+    disciplines,
+    teams: [],
+  } as unknown as GameState;
+
+  const resolved = getSeasonDisciplineSchedule(gameState, { saveId: "save-a" });
+
+  expect(resolved).toHaveLength(4);
+  expect(resolved.every((entry) => entry.discipline1?.disciplineId && entry.discipline2?.disciplineId)).toBe(true);
+});

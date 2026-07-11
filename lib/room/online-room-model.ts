@@ -122,11 +122,19 @@ export type TeamWriteAction =
   | "contract_renewal"
   | "training_update"
   | "formcards"
+  | "formcards_season_regenerate"
+  | "lineup_ai_batch_apply"
+  | "ai_preseason_background"
+  | "ai_picks_run_execute"
+  | "ai_market_plan_apply"
+  | "ai_roster_fill_execute"
+  | "ai_xp_spend_apply"
   | "matchday_resolve"
   | "season_transition"
   | "season_completion"
   | "cash_prize_apply"
-  | "standings_apply";
+  | "standings_apply"
+  | "sponsor_choice";
 
 export type TeamWriteAuthorizationReason =
   | "ok"

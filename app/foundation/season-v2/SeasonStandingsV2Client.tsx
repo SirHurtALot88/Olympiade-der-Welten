@@ -2,6 +2,7 @@
 
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -11,7 +12,9 @@ import {
   type ReactNode,
 } from "react";
 
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { FoundationButton } from "@/components/foundation/FoundationButton";
+import { EmptyState } from "@/components/foundation/EmptyState";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   formatGmDismissalReason,
@@ -20,68 +23,26 @@ import {
   getGmStoryTone,
 } from "@/lib/foundation/gm-story";
 import { clampTableColumnWidth } from "@/lib/ui/global-table-layout";
+import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
+import {
+  resolveSeasonDisciplineAreaTotal,
+  SEASON_DISCIPLINE_AREA_GROUPS,
+  SEASON_DISCIPLINE_LABELS,
+  type SeasonDisciplineKey,
+} from "@/lib/season/season-discipline-area-groups";
 
 type SeasonV2AreaId = "pow" | "spe" | "men" | "soc";
 
 type SeasonV2ExpandableColumnId = "points" | SeasonV2AreaId;
 
-type SeasonV2DisciplineKey =
-  | "bonuspunkte"
-  | "tdm"
-  | "mini_dm"
-  | "gewichtheben"
-  | "hockey"
-  | "breaking"
-  | "staffel"
-  | "time_trial"
-  | "spurt"
-  | "climbing"
-  | "fechten"
-  | "schach"
-  | "takeshi"
-  | "tennis"
-  | "i_spy"
-  | "wettessen"
-  | "basketball"
-  | "football"
-  | "battlefield"
-  | "eiskunst"
-  | "showcase";
+type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
 
 const seasonV2DisciplineLabels: Record<SeasonV2DisciplineKey, string> = {
   bonuspunkte: "Bonus",
-  tdm: "TDM",
-  mini_dm: "MIN",
-  gewichtheben: "GEW",
-  hockey: "HOC",
-  breaking: "BRE",
-  staffel: "STA",
-  time_trial: "TIT",
-  spurt: "SPU",
-  climbing: "CLI",
-  fechten: "FEC",
-  schach: "SCH",
-  takeshi: "TAK",
-  tennis: "TEN",
-  i_spy: "ISP",
-  wettessen: "WET",
-  basketball: "BAS",
-  football: "FOO",
-  battlefield: "BAT",
-  eiskunst: "EIS",
-  showcase: "SHO",
+  ...SEASON_DISCIPLINE_LABELS,
 };
 
-const seasonV2AreaGroups: Array<{
-  id: SeasonV2AreaId;
-  label: string;
-  keys: SeasonV2DisciplineKey[];
-}> = [
-  { id: "pow", label: "POW", keys: ["tdm", "mini_dm", "gewichtheben", "hockey", "breaking"] },
-  { id: "spe", label: "SPE", keys: ["staffel", "time_trial", "spurt", "climbing", "fechten"] },
-  { id: "men", label: "MEN", keys: ["schach", "takeshi", "tennis", "i_spy", "wettessen"] },
-  { id: "soc", label: "SOC", keys: ["basketball", "football", "battlefield", "eiskunst", "showcase"] },
-];
+const seasonV2AreaGroups = SEASON_DISCIPLINE_AREA_GROUPS;
 
 type SeasonV2Option = {
   seasonId: string;
@@ -294,7 +255,7 @@ type SeasonV2GmRow = {
   history: SeasonV2GmHistoryRow[];
 };
 
-type SeasonStandingsV2ClientProps = {
+export type SeasonStandingsV2ClientProps = {
   selectedSeasonId: string;
   selectedSeasonLabel: string;
   sourceLabel: string;
@@ -307,7 +268,6 @@ type SeasonStandingsV2ClientProps = {
   pressureTeam: SeasonV2StandingsRow | null;
   topPlayer: SeasonV2TopPlayerRow | null;
   standingsRows: SeasonV2StandingsRow[];
-  ppRows: SeasonV2PpRow[];
   topPlayers: SeasonV2TopPlayerRow[];
   playerRows: SeasonV2TopPlayerRow[];
   gmRows: SeasonV2GmRow[];
@@ -316,9 +276,11 @@ type SeasonStandingsV2ClientProps = {
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
-  onOpenClassic?: (() => void) | null;
+  viewMode?: SeasonV2ViewMode;
+  onViewModeChange?: (mode: SeasonV2ViewMode) => void;
   onOpenRanks?: (() => void) | null;
   onOpenPrize?: (() => void) | null;
+  isLoading?: boolean;
 };
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -331,7 +293,14 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 
 function formatMoney(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
-  return formatNumber(value, digits);
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+function formatCash(value: number | null | undefined, digits = 1) {
+  return formatMoney(value, digits);
 }
 
 function formatGmTitle(title: string | null | undefined, archetype?: string | null) {
@@ -347,10 +316,6 @@ function formatGmTitle(title: string | null | undefined, archetype?: string | nu
 
 function formatGmLabel(row: SeasonV2StandingsRow) {
   return `${formatGmTitle(row.gmTitle, row.gmArchetype)} · ${row.rosterCount} Spieler`;
-}
-
-function formatCash(value: number | null | undefined, digits = 1) {
-  return formatNumber(value, digits);
 }
 
 function formatSigned(value: number | null | undefined, digits = 1) {
@@ -433,12 +398,26 @@ function renderSummaryCard(
   value: string,
   detail: string,
   tone: "leader" | "selected" | "momentum" | "player",
+  trend: number | null = null,
+  formCurve: number[] | null = null,
 ) {
   return (
     <article className={`season-v2-story-card is-${tone}`}>
       <span>{title}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+      {trend != null && trend !== 0 ? (
+        <span className={`season-v2-trend-arrow ${trend > 0 ? "is-up" : "is-down"}`} aria-label="Trend">
+          {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}
+        </span>
+      ) : null}
+      {formCurve && formCurve.length > 0 ? (
+        <div className="season-v2-form-curve" aria-hidden="true">
+          {formCurve.map((point, index) => (
+            <span key={`form-curve-${index}`} style={{ height: `${Math.max(12, Math.min(100, point))}%` }} />
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -546,6 +525,10 @@ function saveSeasonV2TableWidths(storageKey: string, widths: Record<string, numb
   }
 }
 
+type SeasonV2ViewMode = "table" | "gms";
+
+const SEASON_V2_DEFAULT_MODE: SeasonV2ViewMode = "table";
+
 export default function SeasonStandingsV2Client({
   selectedSeasonId,
   selectedSeasonLabel,
@@ -567,21 +550,34 @@ export default function SeasonStandingsV2Client({
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
-  onOpenClassic,
+  viewMode,
+  onViewModeChange,
   onOpenRanks,
   onOpenPrize,
+  isLoading = false,
 }: SeasonStandingsV2ClientProps) {
-  const standingsPowPool = standingsRows.map((row) => row.pow);
-  const standingsSpePool = standingsRows.map((row) => row.spe);
-  const standingsMenPool = standingsRows.map((row) => row.men);
-  const standingsSocPool = standingsRows.map((row) => row.soc);
-  const topPlayerPpsPool = topPlayers.map((row) => row.pps);
-  const topPlayerPowPool = topPlayers.map((row) => row.ppPow);
-  const topPlayerSpePool = topPlayers.map((row) => row.ppSpe);
-  const topPlayerMenPool = topPlayers.map((row) => row.ppMen);
-  const topPlayerSocPool = topPlayers.map((row) => row.ppSoc);
-  const topPlayerOvrPool = topPlayers.map((row) => row.ovr);
-  const topPlayerMvsPool = topPlayers.map((row) => row.mvs);
+  const resolvedStandingsRows = useMemo(
+    () =>
+      standingsRows.map((row) => ({
+        ...row,
+        pow: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "pow", row.pow),
+        spe: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "spe", row.spe),
+        men: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "men", row.men),
+        soc: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "soc", row.soc),
+      })),
+    [standingsRows],
+  );
+  const standingsPowPool = useMemo(() => resolvedStandingsRows.map((row) => row.pow), [resolvedStandingsRows]);
+  const standingsSpePool = useMemo(() => resolvedStandingsRows.map((row) => row.spe), [resolvedStandingsRows]);
+  const standingsMenPool = useMemo(() => resolvedStandingsRows.map((row) => row.men), [resolvedStandingsRows]);
+  const standingsSocPool = useMemo(() => resolvedStandingsRows.map((row) => row.soc), [resolvedStandingsRows]);
+  const topPlayerPpsPool = useMemo(() => topPlayers.map((row) => row.pps), [topPlayers]);
+  const topPlayerPowPool = useMemo(() => topPlayers.map((row) => row.ppPow), [topPlayers]);
+  const topPlayerSpePool = useMemo(() => topPlayers.map((row) => row.ppSpe), [topPlayers]);
+  const topPlayerMenPool = useMemo(() => topPlayers.map((row) => row.ppMen), [topPlayers]);
+  const topPlayerSocPool = useMemo(() => topPlayers.map((row) => row.ppSoc), [topPlayers]);
+  const topPlayerOvrPool = useMemo(() => topPlayers.map((row) => row.ovr), [topPlayers]);
+  const topPlayerMvsPool = useMemo(() => topPlayers.map((row) => row.mvs), [topPlayers]);
   const [expandedColumns, setExpandedColumns] = useState<Record<SeasonV2ExpandableColumnId, boolean>>({
     points: false,
     pow: false,
@@ -589,6 +585,7 @@ export default function SeasonStandingsV2Client({
     men: false,
     soc: false,
   });
+  const [showFullStandingsTable, setShowFullStandingsTable] = useState(true);
   const [standingsSort, setStandingsSort] = useState<{ key: SeasonV2StandingsSortKey; direction: SortDirection }>({
     key: "rank",
     direction: "asc",
@@ -598,9 +595,26 @@ export default function SeasonStandingsV2Client({
     direction: "asc",
   });
   const [showTopPlayerAxes, setShowTopPlayerAxes] = useState(true);
-  const [showFinanceColumns, setShowFinanceColumns] = useState(true);
-  const [seasonV2Mode, setSeasonV2Mode] = useState<"table" | "gms">("table");
+  const [showFinanceColumns, setShowFinanceColumns] = useState(false);
+  const [mobileCardsView, setMobileCardsView] = useState(false);
+  const [internalSeasonV2Mode, setInternalSeasonV2Mode] = useState<SeasonV2ViewMode>(SEASON_V2_DEFAULT_MODE);
+  const seasonV2Mode = viewMode ?? internalSeasonV2Mode;
+  const setSeasonV2Mode = (mode: SeasonV2ViewMode) => {
+    if (onViewModeChange) {
+      onViewModeChange(mode);
+      return;
+    }
+    setInternalSeasonV2Mode(mode);
+  };
+  const [standingsTableScrollTop, setStandingsTableScrollTop] = useState(0);
+  const [standingsTableViewportHeight, setStandingsTableViewportHeight] = useState(560);
+  const standingsTableShellRef = useRef<HTMLDivElement | null>(null);
   const [focusedTeamId, setFocusedTeamId] = useState<string | null>(selectedTeamSummary?.teamId ?? null);
+  useEffect(() => {
+    if (selectedTeamSummary?.teamId) {
+      setFocusedTeamId(selectedTeamSummary.teamId);
+    }
+  }, [selectedTeamSummary?.teamId]);
   const seasonV2ResizeState = useRef<{
     tableId: SeasonV2TableStorageId;
     columnId: string;
@@ -609,6 +623,7 @@ export default function SeasonStandingsV2Client({
     minWidth: number;
     maxWidth?: number;
   } | null>(null);
+  const seasonV2TableWidthsSaveTimerRef = useRef<number | null>(null);
   const [seasonV2TableWidthsLoaded, setSeasonV2TableWidthsLoaded] = useState(false);
   const [seasonV2TableWidths, setSeasonV2TableWidths] = useState<Record<SeasonV2TableStorageId, Record<string, number>>>({
     seasonStandingsV2Table: {},
@@ -625,38 +640,49 @@ export default function SeasonStandingsV2Client({
     if (!seasonV2TableWidthsLoaded) {
       return;
     }
-    saveSeasonV2TableWidths(seasonV2TableWidthStorageKeys.seasonStandingsV2Table, seasonV2TableWidths.seasonStandingsV2Table);
-    saveSeasonV2TableWidths(
-      seasonV2TableWidthStorageKeys.seasonStandingsV2TopPlayersTable,
-      seasonV2TableWidths.seasonStandingsV2TopPlayersTable,
-    );
+    if (seasonV2TableWidthsSaveTimerRef.current) {
+      window.clearTimeout(seasonV2TableWidthsSaveTimerRef.current);
+    }
+    seasonV2TableWidthsSaveTimerRef.current = window.setTimeout(() => {
+      saveSeasonV2TableWidths(seasonV2TableWidthStorageKeys.seasonStandingsV2Table, seasonV2TableWidths.seasonStandingsV2Table);
+      saveSeasonV2TableWidths(
+        seasonV2TableWidthStorageKeys.seasonStandingsV2TopPlayersTable,
+        seasonV2TableWidths.seasonStandingsV2TopPlayersTable,
+      );
+    }, 300);
+    return () => {
+      if (seasonV2TableWidthsSaveTimerRef.current) {
+        window.clearTimeout(seasonV2TableWidthsSaveTimerRef.current);
+      }
+    };
   }, [seasonV2TableWidths, seasonV2TableWidthsLoaded]);
-  const pointsRankClassByTeamId = useMemo(
-    () => buildValueRankClassMap(standingsRows, (row) => row.points),
-    [standingsRows],
-  );
-  const areaRankClassByTeamId = useMemo(
-    () => ({
-      pow: buildValueRankClassMap(standingsRows, (row) => row.pow),
-      spe: buildValueRankClassMap(standingsRows, (row) => row.spe),
-      men: buildValueRankClassMap(standingsRows, (row) => row.men),
-      soc: buildValueRankClassMap(standingsRows, (row) => row.soc),
-    }),
-    [standingsRows],
-  );
-  const disciplineRankClassByKey = useMemo(
-    () =>
-      Object.fromEntries(
-        (Object.keys(seasonV2DisciplineLabels) as SeasonV2DisciplineKey[]).map((key) => [
-          key,
-          buildValueRankClassMap(standingsRows, (row) => row.disciplineValues[key]),
-        ]),
-      ) as Record<SeasonV2DisciplineKey, Map<string, string>>,
-    [standingsRows],
-  );
+  const seasonV2RankClassMaps = useMemo(() => {
+    const disciplineMaps = Object.fromEntries(
+      (Object.keys(seasonV2DisciplineLabels) as SeasonV2DisciplineKey[]).map((key) => [
+        key,
+        buildValueRankClassMap(standingsRows, (row) => row.disciplineValues[key]),
+      ]),
+    ) as Record<SeasonV2DisciplineKey, Map<string, string>>;
+    return {
+      points: buildValueRankClassMap(standingsRows, (row) => row.points),
+      pow: buildValueRankClassMap(resolvedStandingsRows, (row) => row.pow),
+      spe: buildValueRankClassMap(resolvedStandingsRows, (row) => row.spe),
+      men: buildValueRankClassMap(resolvedStandingsRows, (row) => row.men),
+      soc: buildValueRankClassMap(resolvedStandingsRows, (row) => row.soc),
+      disciplines: disciplineMaps,
+    };
+  }, [resolvedStandingsRows, standingsRows]);
+  const pointsRankClassByTeamId = seasonV2RankClassMaps.points;
+  const areaRankClassByTeamId = {
+    pow: seasonV2RankClassMaps.pow,
+    spe: seasonV2RankClassMaps.spe,
+    men: seasonV2RankClassMaps.men,
+    soc: seasonV2RankClassMaps.soc,
+  };
+  const disciplineRankClassByKey = seasonV2RankClassMaps.disciplines;
   const sortedStandingsRows = useMemo(() => {
     const direction = standingsSort.direction === "asc" ? 1 : -1;
-    return [...standingsRows].sort((left, right) => {
+    return [...resolvedStandingsRows].sort((left, right) => {
       let result = 0;
       switch (standingsSort.key) {
         case "rank":
@@ -704,14 +730,65 @@ export default function SeasonStandingsV2Client({
       }
       return result * direction;
     });
-  }, [standingsRows, standingsSort]);
+  }, [resolvedStandingsRows, standingsSort]);
+
+  const displayStandingsRows = useMemo(() => {
+    if (showFullStandingsTable || sortedStandingsRows.length <= 6) {
+      return sortedStandingsRows;
+    }
+    const topRows = sortedStandingsRows.slice(0, 5);
+    const focusTeamId = focusedTeamId ?? selectedTeamSummary?.teamId ?? null;
+    if (!focusTeamId || topRows.some((row) => row.teamId === focusTeamId)) {
+      return topRows;
+    }
+    const ownRow = sortedStandingsRows.find((row) => row.teamId === focusTeamId);
+    return ownRow ? [...topRows, ownRow] : topRows;
+  }, [focusedTeamId, selectedTeamSummary?.teamId, showFullStandingsTable, sortedStandingsRows]);
+
+  const standingsTableVirtualWindow = useRowVirtualWindow({
+    count: displayStandingsRows.length,
+    scrollTop: standingsTableScrollTop,
+    viewportHeight: standingsTableViewportHeight,
+    rowHeight: 44,
+    virtualizeThreshold: 48,
+  });
+  const visibleStandingsTableRows = useMemo(
+    () => displayStandingsRows.slice(standingsTableVirtualWindow.start, standingsTableVirtualWindow.end),
+    [displayStandingsRows, standingsTableVirtualWindow.end, standingsTableVirtualWindow.start],
+  );
+
+  useEffect(() => {
+    const node = standingsTableShellRef.current;
+    if (!node || seasonV2Mode !== "table") {
+      return;
+    }
+    const syncHeight = () => setStandingsTableViewportHeight(node.clientHeight || 560);
+    syncHeight();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(syncHeight) : null;
+    observer?.observe(node);
+    return () => observer?.disconnect();
+  }, [seasonV2Mode, sortedStandingsRows.length]);
+
   const focusedTeam = useMemo(
-    () => standingsRows.find((row) => row.teamId === focusedTeamId) ?? null,
-    [focusedTeamId, standingsRows],
+    () => resolvedStandingsRows.find((row) => row.teamId === focusedTeamId) ?? null,
+    [focusedTeamId, resolvedStandingsRows],
   );
   const rightPanelPlayers = useMemo(() => {
     const sourceRows = focusedTeamId ? playerRows.filter((player) => player.teamId === focusedTeamId) : topPlayers;
-    return sourceRows.map((player, index) => ({ ...player, rank: focusedTeamId ? index + 1 : player.rank }));
+    const sortedRows = focusedTeamId
+      ? [...sourceRows].sort((left, right) => {
+          const ppsDelta = (right.pps ?? Number.NEGATIVE_INFINITY) - (left.pps ?? Number.NEGATIVE_INFINITY);
+          if (ppsDelta !== 0) {
+            return ppsDelta;
+          }
+          const ovrDelta = (right.ovr ?? Number.NEGATIVE_INFINITY) - (left.ovr ?? Number.NEGATIVE_INFINITY);
+          if (ovrDelta !== 0) {
+            return ovrDelta;
+          }
+          return left.name.localeCompare(right.name, "de");
+        })
+      : sourceRows;
+    return sortedRows.map((player, index) => ({ ...player, rank: index + 1 }));
   }, [focusedTeamId, playerRows, topPlayers]);
   const sortedTopPlayers = useMemo(() => {
     const direction = topPlayerSort.direction === "asc" ? 1 : -1;
@@ -759,6 +836,7 @@ export default function SeasonStandingsV2Client({
   function selectTeam(teamId: string) {
     setFocusedTeamId((current) => (current === teamId ? null : teamId));
   }
+
   const visibleStandingsColumnIds = useMemo(() => {
     const columnIds = ["rank", "team", "points"];
     if (expandedColumns.points) {
@@ -943,20 +1021,26 @@ export default function SeasonStandingsV2Client({
     );
   }
 
+  const pastSeasonOptions = useMemo(
+    () => seasonOptions.filter((option) => option.status !== "active"),
+    [seasonOptions],
+  );
+
   return (
     <div className="season-v2-shell">
-      <section className="season-v2-hero">
-        <div className="season-v2-hero-copy">
-          <span className="season-v2-kicker">Saisonstand v2</span>
-          <h2>{selectedSeasonLabel}</h2>
-          <p>{sourceLabel}</p>
-          <div className="season-v2-pill-row">
+      <section className="season-v2-compact-toolbar" aria-label="Saisonstand Steuerung">
+        <div className="season-v2-compact-toolbar-main">
+          <div className="season-v2-compact-title">
+            <h2>{selectedSeasonLabel}</h2>
+            <span className="muted">{sourceLabel}</span>
+          </div>
+          <div className="season-v2-pill-row season-v2-compact-pills">
             <span className="pill">{sourceBadgeLabel}</span>
             <span className={`pill ${isArchived ? "is-warning" : "is-ready"}`}>{isArchived ? "Archiv" : "Live"}</span>
             {selectedTeamSummary?.rank != null ? <span className="pill">Dein Rang #{selectedTeamSummary.rank}</span> : null}
           </div>
         </div>
-        <div className="season-v2-hero-actions">
+        <div className="season-v2-compact-toolbar-actions">
           <label className="filter-field season-v2-season-select">
             <span>Saison</span>
             <select className="input" value={selectedSeasonId} onChange={(event) => onChangeSeason(event.target.value)}>
@@ -967,106 +1051,57 @@ export default function SeasonStandingsV2Client({
               ))}
             </select>
           </label>
-          <div className="season-v2-action-row season-v2-view-switch" role="tablist" aria-label="Saisonstand Ansicht">
-            {onOpenClassic ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenClassic} aria-pressed="false">
-                Classic
+          {!onViewModeChange ? (
+            <div className="season-v2-action-row season-v2-mode-switch" role="tablist" aria-label="Saisonstand Modus">
+              <button
+                className={`secondary-button inline-button${seasonV2Mode === "table" ? " is-active" : ""}`}
+                type="button"
+                onClick={() => setSeasonV2Mode("table")}
+                aria-pressed={seasonV2Mode === "table"}
+              >
+                Datenansicht
               </button>
-            ) : null}
-            <button className="secondary-button inline-button is-active" type="button" aria-pressed="true">
-              V2
-            </button>
-            {onOpenRanks ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenRanks}>
-                Ranks
+              <button
+                className={`secondary-button inline-button${seasonV2Mode === "gms" ? " is-active" : ""}`}
+                type="button"
+                onClick={() => setSeasonV2Mode("gms")}
+                aria-pressed={seasonV2Mode === "gms"}
+              >
+                GM Board
               </button>
-            ) : null}
-            {onOpenPrize ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenPrize}>
-                Preisgeld
-              </button>
-            ) : null}
-          </div>
-          <div className="season-v2-action-row season-v2-mode-switch" role="tablist" aria-label="Saisonstand Modus">
-            <button
-              className={`secondary-button inline-button${seasonV2Mode === "table" ? " is-active" : ""}`}
-              type="button"
-              onClick={() => setSeasonV2Mode("table")}
-              aria-pressed={seasonV2Mode === "table"}
-            >
-              Tabelle
-            </button>
-            <button
-              className={`secondary-button inline-button${seasonV2Mode === "gms" ? " is-active" : ""}`}
-              type="button"
-              onClick={() => setSeasonV2Mode("gms")}
-              aria-pressed={seasonV2Mode === "gms"}
-            >
-              GM Board
-            </button>
-          </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section className="season-v2-story-grid" aria-label="Saison-Fokus">
-        {renderSummaryCard(
-          "Titelkurs",
-          leaderTeam ? leaderTeam.teamName : "—",
-          leaderTeam ? `#${leaderTeam.rank ?? "—"} · ${formatNumber(leaderTeam.points, 1)} Punkte` : "kein Leader",
-          "leader",
-        )}
-        {renderSummaryCard(
-          "Dein Team",
-          selectedTeamSummary ? selectedTeamSummary.teamName : "—",
-          selectedTeamSummary
-            ? `#${selectedTeamSummary.rank ?? "—"} · ${formatNumber(selectedTeamSummary.points, 1)} Punkte · Cash ${formatCash(selectedTeamSummary.cash)}`
-            : "kein Team gewählt",
-          "selected",
-        )}
-        {renderSummaryCard(
-          "Momentum",
-          momentumTeam ? momentumTeam.teamName : "—",
-          momentumTeam ? `${formatSigned(momentumTeam.rankDiff, 0)} Plätze · ${formatNumber(momentumTeam.points, 1)} Punkte` : "kein Aufsteiger",
-          "momentum",
-        )}
-        {renderSummaryCard(
-          "Top Player",
-          topPlayer ? topPlayer.name : "—",
-          topPlayer
-            ? `${topPlayer.teamCode ?? topPlayer.teamName ?? "—"} · ${formatNumber(topPlayer.pps, 1)} PPs · OVR ${formatNumber(topPlayer.ovr, 0)}`
-            : "kein Spieler",
-          "player",
-        )}
-      </section>
-
-      {selectedTeamSummary && showFinanceColumns ? (
-        <section className="season-v2-team-strip">
-          <article>
-            <span>Cash</span>
-            <strong>{formatCash(selectedTeamSummary.cash)}</strong>
-          </article>
-          <article>
-            <span>Gehalt</span>
-            <strong>{formatCash(selectedTeamSummary.salaryTotal, 2)}</strong>
-          </article>
-          <article>
-            <span>Ø LZ</span>
-            <strong>{formatNumber(standingsRows.find((row) => row.teamId === selectedTeamSummary.teamId)?.avgContractLength, 1)}</strong>
-          </article>
-          <article>
-            <span>GuV</span>
-            <strong className={selectedTeamSummary.guv != null && selectedTeamSummary.guv < 0 ? "text-negative" : "text-positive"}>
-              {formatMoney(selectedTeamSummary.guv)}
-            </strong>
-          </article>
-          <article>
-            <span>Sponsor</span>
-            <strong>{formatMoney(selectedTeamSummary.sponsorTotal)}</strong>
-          </article>
-          <article>
-            <span>MW</span>
-            <strong>{formatMoney(selectedTeamSummary.marketValueTotal)}</strong>
-          </article>
+      {pastSeasonOptions.length > 0 ? (
+        <section className="season-v2-history-strip" aria-label="Vergangene Saisons">
+          <div className="season-v2-history-chips">
+            {pastSeasonOptions.map((option) => (
+              <button
+                key={option.seasonId}
+                type="button"
+                className={`secondary-button inline-button season-v2-history-chip${option.seasonId === selectedSeasonId ? " is-active" : ""}`}
+                aria-pressed={option.seasonId === selectedSeasonId}
+                onClick={() => onChangeSeason(option.seasonId)}
+              >
+                {option.seasonName}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`secondary-button inline-button season-v2-history-chip season-v2-history-chip-live${selectedSeasonId === seasonOptions.find((option) => option.status === "active")?.seasonId ? " is-active" : ""}`}
+              aria-pressed={!isArchived}
+              onClick={() => {
+                const activeSeason = seasonOptions.find((option) => option.status === "active");
+                if (activeSeason) {
+                  onChangeSeason(activeSeason.seasonId);
+                }
+              }}
+            >
+              Aktuelle Saison
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -1099,7 +1134,7 @@ export default function SeasonStandingsV2Client({
               return (
                 <article key={row.teamId} className={`season-v2-gm-card${isHotSeat ? " is-hot" : ""}${row.source === "board_replacement" ? " is-new" : ""}`}>
                   <button className="season-v2-gm-team" type="button" onClick={() => onOpenTeam(row.teamId)}>
-                    <OptimizedMediaImage
+                    <BudgetedMediaImage
                       src={row.logoUrl}
                       alt={`${row.teamName} Logo`}
                       className="season-v2-team-logo"
@@ -1171,6 +1206,21 @@ export default function SeasonStandingsV2Client({
         </section>
       ) : null}
 
+      {seasonV2Mode === "table" && selectedTeamSummary ? (
+        <section className="season-v2-pinned-team modern-game-pinned-row" aria-label="Dein Team" data-testid="season-v2-pinned-team">
+          <span className="season-v2-pinned-label">Dein Team</span>
+          <strong>{selectedTeamSummary.teamName}</strong>
+          <span>#{selectedTeamSummary.rank ?? "—"}</span>
+          <span>{formatNumber(selectedTeamSummary.points, 1)} Pkt</span>
+          <span className="season-v2-prize-preview" title="Geschätztes Preisgeld bei diesem Rang">
+            Preis ~{formatCash(Math.max(0, (33 - (selectedTeamSummary.rank ?? 33)) * 2.5))}
+          </span>
+          <button type="button" className="secondary-button inline-button" onClick={() => onOpenTeam(selectedTeamSummary.teamId)}>
+            Team öffnen
+          </button>
+        </section>
+      ) : null}
+
       {seasonV2Mode === "table" ? (
       <section className="season-v2-main-grid">
         <div className="season-v2-table-panel">
@@ -1180,31 +1230,70 @@ export default function SeasonStandingsV2Client({
                 Tabelle
               </TooltipHeading>
               <div className="season-v2-inline-sort-row" aria-label="Schnellsortierung Saisonstand">
-                <button
-                  className={`secondary-button inline-button${showFinanceColumns ? "" : " is-active"}`}
-                  type="button"
-                  onClick={() => setShowFinanceColumns(false)}
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${mobileCardsView ? " is-active" : ""}`}
+                  data-testid="season-v2-mobile-cards-toggle"
+                  onClick={() => setMobileCardsView((current) => !current)}
+                  title="Wechselt zwischen Tabellen- und Kartenansicht auf kleineren Screens."
                 >
-                  Kern
-                </button>
-                <button
-                  className={`secondary-button inline-button${showFinanceColumns ? " is-active" : ""}`}
-                  type="button"
+                  {mobileCardsView ? "Tabelle" : "Karten"}
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${showFinanceColumns ? "" : " is-active"}`}
+                  onClick={() => setShowFinanceColumns(false)}
+                  title="Kernwerte mit Punkten und Bereichs-PPs."
+                >
+                  Kernwerte
+                </FoundationButton>
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${showFinanceColumns ? " is-active" : ""}`}
                   onClick={() => setShowFinanceColumns(true)}
+                  title="Cash, Gehalt, GuV, Sponsor und Marktwert."
                 >
                   Finanzen
-                </button>
-                <button
-                  className={`secondary-button inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
-                  type="button"
+                </FoundationButton>
+                {!showFullStandingsTable && sortedStandingsRows.length > 6 ? (
+                  <FoundationButton variant="secondary" className="inline-button" onClick={() => setShowFullStandingsTable(true)} title="Zeigt die komplette Tabelle statt Top 5 plus Fokus-Team.">
+                    Alle {sortedStandingsRows.length} Teams
+                  </FoundationButton>
+                ) : showFullStandingsTable && sortedStandingsRows.length > 6 ? (
+                  <FoundationButton variant="secondary" className="inline-button" onClick={() => setShowFullStandingsTable(false)} title="Reduziert die Ansicht auf Top 5 plus dein Team.">
+                    Top 5
+                  </FoundationButton>
+                ) : null}
+                <FoundationButton
+                  variant="secondary"
+                  className={`inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
                   onClick={() => toggleStandingsSort("points")}
+                  title="Sortiert die Tabelle direkt nach Punkten."
                 >
                   Punkte
-                </button>
+                </FoundationButton>
               </div>
             </div>
           </div>
-          <div className="table-shell season-v2-table-shell">
+          <div
+            className={`table-shell season-v2-table-shell season-v2-table-shell-full${mobileCardsView ? " is-mobile-cards" : ""}`}
+            ref={standingsTableShellRef}
+            data-virtualized={standingsTableVirtualWindow.enabled ? "true" : undefined}
+            onScroll={(event) => setStandingsTableScrollTop(event.currentTarget.scrollTop)}
+          >
+            {mobileCardsView ? (
+              <div className="season-v2-mobile-card-grid" data-testid="season-v2-mobile-cards">
+                {sortedStandingsRows.map((row) => (
+                  <article key={`mobile-card-${row.teamId}`} className={`season-v2-mobile-card${row.isSelected ? " is-selected" : ""}`}>
+                    <strong>#{row.rank ?? "—"} {row.teamName}</strong>
+                    <span>{formatNumber(row.points, 1)} Pkt</span>
+                    {row.rankDiff != null && row.rankDiff !== 0 ? (
+                      <span className={`season-v2-trend-arrow ${row.rankDiff > 0 ? "is-up" : "is-down"}`}>{row.rankDiff > 0 ? "↑" : "↓"} {Math.abs(row.rankDiff)}</span>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
             <table className="team-table season-v2-table season-v2-standings-table">
               <colgroup>
                 {visibleStandingsColumnIds.map((columnId) => (
@@ -1276,12 +1365,26 @@ export default function SeasonStandingsV2Client({
                 </tr>
               </thead>
               <tbody>
-                {sortedStandingsRows.map((row) => (
+                {isLoading && standingsRows.length === 0 ? (
+                  Array.from({ length: 6 }, (_, index) => (
+                    <tr key={`season-v2-skeleton-${index}`} className="season-v2-table-row is-skeleton" aria-hidden="true">
+                      <td colSpan={visibleStandingsColumnIds.length}>
+                        <div className="season-v2-table-skeleton-row" style={{ width: `${Math.max(52, 96 - index * 6)}%` }} />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <>
+                {standingsTableVirtualWindow.enabled ? (
+                  <tr aria-hidden="true">
+                    <td colSpan={visibleStandingsColumnIds.length} style={{ height: standingsTableVirtualWindow.offsetY, padding: 0, border: 0 }} />
+                  </tr>
+                ) : null}
+                {visibleStandingsTableRows.map((row) => (
                   <tr
                     key={row.teamId}
                     className={`season-v2-table-row${row.isSelected ? " is-selected" : ""}${focusedTeamId === row.teamId ? " is-focused" : ""}`}
                     onClick={() => selectTeam(row.teamId)}
-                    onDoubleClick={() => onOpenTeam(row.teamId)}
                   >
                     <td className="season-v2-rank-cell">
                       <span>{row.rank ?? "—"}</span>
@@ -1290,9 +1393,9 @@ export default function SeasonStandingsV2Client({
                       ) : null}
                     </td>
                     <td className="season-v2-team-cell">
-                      <button className="table-link-button season-v2-team-link" type="button" onClick={() => selectTeam(row.teamId)}>
+                      <button className="table-link-button season-v2-team-link" type="button" onClick={() => onOpenTeam(row.teamId)}>
                         <span className="season-v2-team-ident">
-                          <OptimizedMediaImage
+                          <BudgetedMediaImage
                             src={row.logoUrl}
                             alt={`${row.teamName} Logo`}
                             className="season-v2-team-logo"
@@ -1349,15 +1452,33 @@ export default function SeasonStandingsV2Client({
                     ) : null}
                   </tr>
                 ))}
+                {standingsTableVirtualWindow.enabled ? (
+                  <tr aria-hidden="true">
+                    <td
+                      colSpan={visibleStandingsColumnIds.length}
+                      style={{
+                        height:
+                          standingsTableVirtualWindow.totalHeight -
+                          standingsTableVirtualWindow.offsetY -
+                          visibleStandingsTableRows.length * 44,
+                        padding: 0,
+                        border: 0,
+                      }}
+                    />
+                  </tr>
+                ) : null}
+                  </>
+                )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
 
         <section className="season-v2-table-panel">
           <div className="panel-header season-v2-panel-header">
             <div className="stack">
-              <TooltipHeading as="h3" tooltip="Ein Klick auf ein Team zeigt hier den Kader. Doppelklick auf Spieler öffnet den Drawer.">
+              <TooltipHeading as="h3" tooltip="Ein Klick auf ein Team zeigt hier den Kader. Klick auf Spielername öffnet das Profil.">
                 {focusedTeam ? focusedTeam.teamName : "Top Player"}
               </TooltipHeading>
               <small className="muted">{focusedTeam ? `${rightPanelPlayers.length} Spieler im Kader` : "Globale Bestenliste"}</small>
@@ -1446,12 +1567,16 @@ export default function SeasonStandingsV2Client({
               </thead>
               <tbody>
                 {sortedTopPlayers.map((player) => (
-                  <tr key={player.playerId} className="season-v2-player-table-row" onDoubleClick={() => onOpenPlayer(player.playerId)}>
+                  <tr key={player.playerId} className="season-v2-player-table-row">
                     <td className="season-v2-rank-cell">
                       <span>{player.rank}</span>
                     </td>
                     <td className="season-v2-player-name-cell">
-                      <button className="table-link-button season-v2-player-link" type="button">
+                      <button
+                        className="table-link-button season-v2-player-link"
+                        type="button"
+                        onClick={() => onOpenPlayer(player.playerId)}
+                      >
                         <span className="season-v2-player-name">{player.name}</span>
                         <small>{player.className ?? "Klasse offen"}</small>
                       </button>
@@ -1486,6 +1611,48 @@ export default function SeasonStandingsV2Client({
       ) : null}
 
       {seasonV2Mode === "table" ? (
+      <section className="season-v2-story-grid season-v2-story-grid-compact" aria-label="Saison-Fokus">
+        {renderSummaryCard(
+          "Titelkurs",
+          leaderTeam ? leaderTeam.teamName : "—",
+          leaderTeam ? `#${leaderTeam.rank ?? "—"} · ${formatNumber(leaderTeam.points, 1)} Punkte` : "kein Leader",
+          "leader",
+          leaderTeam?.rankDiff ?? null,
+          leaderTeam ? [leaderTeam.pow ?? 0, leaderTeam.spe ?? 0, leaderTeam.men ?? 0, leaderTeam.soc ?? 0] : null,
+        )}
+        {renderSummaryCard(
+          "Dein Team",
+          selectedTeamSummary ? selectedTeamSummary.teamName : "—",
+          selectedTeamSummary
+            ? `#${selectedTeamSummary.rank ?? "—"} · ${formatNumber(selectedTeamSummary.points, 1)} Punkte · Cash ${formatCash(selectedTeamSummary.cash)}`
+            : "kein Team gewählt",
+          "selected",
+          sortedStandingsRows.find((row) => row.teamId === selectedTeamSummary?.teamId)?.rankDiff ?? null,
+          (() => {
+            const row = sortedStandingsRows.find((entry) => entry.teamId === selectedTeamSummary?.teamId);
+            return row ? [row.pow ?? 0, row.spe ?? 0, row.men ?? 0, row.soc ?? 0] : null;
+          })(),
+        )}
+        {renderSummaryCard(
+          "Momentum",
+          momentumTeam ? momentumTeam.teamName : "—",
+          momentumTeam ? `${formatSigned(momentumTeam.rankDiff, 0)} Plätze · ${formatNumber(momentumTeam.points, 1)} Punkte` : "kein Aufsteiger",
+          "momentum",
+          momentumTeam?.rankDiff ?? null,
+          momentumTeam ? [momentumTeam.pow ?? 0, momentumTeam.spe ?? 0, momentumTeam.men ?? 0, momentumTeam.soc ?? 0] : null,
+        )}
+        {renderSummaryCard(
+          "Top Player",
+          topPlayer ? topPlayer.name : "—",
+          topPlayer
+            ? `${topPlayer.teamCode ?? topPlayer.teamName ?? "—"} · ${formatNumber(topPlayer.pps, 1)} PPs · OVR ${formatNumber(topPlayer.ovr, 0)}`
+            : "kein Spieler",
+          "player",
+        )}
+      </section>
+      ) : null}
+
+      {seasonV2Mode === "table" ? (
       <section className="season-v2-bottom-grid">
         <section className="season-v2-bottom-panel">
           <div className="panel-header season-v2-panel-header">
@@ -1498,7 +1665,19 @@ export default function SeasonStandingsV2Client({
           <div className="season-v2-archive-list">
             {archiveRows.length > 0 ? (
               archiveRows.map((entry) => (
-                <article key={entry.seasonId} className={`season-v2-archive-card${entry.seasonId === selectedSeasonId ? " is-active" : ""}`}>
+                <article
+                  key={entry.seasonId}
+                  className={`season-v2-archive-card${entry.seasonId === selectedSeasonId ? " is-active" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onChangeSeason(entry.seasonId)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onChangeSeason(entry.seasonId);
+                    }
+                  }}
+                >
                   <div>
                     <strong>{entry.seasonName}</strong>
                     <small>{entry.archivedAt ? new Date(entry.archivedAt).toLocaleString("de-DE") : "aktiv"}</small>
@@ -1510,7 +1689,7 @@ export default function SeasonStandingsV2Client({
                 </article>
               ))
             ) : (
-              <p className="muted">Noch kein Archiv gespeichert.</p>
+              <EmptyState title="Noch kein Archiv gespeichert" text="Sobald die erste Saison abgeschlossen ist, erscheinen hier die Snapshots." />
             )}
           </div>
         </section>
@@ -1535,7 +1714,7 @@ export default function SeasonStandingsV2Client({
                 </button>
               ))
             ) : (
-              <p className="muted">Kein extra Archiv-Diszi-Board für diese Auswahl vorhanden.</p>
+              <EmptyState title="Keine Diszi-Leader" text="Für diese Auswahl ist noch kein Archiv-Diszi-Board vorhanden." />
             )}
           </div>
         </section>

@@ -218,6 +218,32 @@ describe("legacy ai lineup suggestion", () => {
     expect(modifiers.d1.mutatorTrait2).toBeNull();
   });
 
+  it("prefers fresher players when fatigue and injury risk are elevated", () => {
+    const context = createContext();
+    context.disciplineScores = context.disciplineScores.map((score) => {
+      if (score.disciplineId !== "tdm") return score;
+      if (score.playerId === "p1") return { ...score, score: 91 };
+      if (score.playerId === "p2") return { ...score, score: 90 };
+      if (score.playerId === "p3") return { ...score, score: 55 };
+      if (score.playerId === "p4") return { ...score, score: 52 };
+      return score;
+    });
+    context.rosterPlayers = context.rosterPlayers.map((player) => ({
+      ...player,
+      fatigue: player.id === "p1" ? 92 : player.id === "p2" ? 88 : player.id === "p3" ? 18 : 15,
+      injuryRiskPercent: player.id === "p1" ? 28 : player.id === "p2" ? 25 : 5,
+    }));
+    context.lineupStrategy = "rotate_depth";
+
+    const suggestion = buildAiLegacyLineupSuggestion(context);
+    const d1Players = suggestion.entries.filter((entry) => entry.disciplineSide === "d1").map((entry) => entry.playerId);
+
+    expect(d1Players).toContain("p3");
+    expect(d1Players).toContain("p4");
+    expect(d1Players).not.toContain("p1");
+    expect(d1Players).not.toContain("p2");
+  });
+
   it("avoids injured roster players because they are not selectable active players", () => {
     const context = createContext();
     context.activePlayers = context.activePlayers.filter((player) => player.playerId !== "p1");

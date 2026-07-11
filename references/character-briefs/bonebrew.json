@@ -1,0 +1,20 @@
+{
+  "name": "Bonebrew",
+  "id": "player-1078-bonebrew",
+  "className": "Bard",
+  "race": "Human",
+  "alignment": "N-B",
+  "gender": "f",
+  "subclasses": ["Controller", "Mage", "Undead"],
+  "traitsPositive": ["Diligent", "Ambitious", "Flexible"],
+  "traitsNegative": ["Egomaniac", "Manipulative", "Obsessive"],
+  "attributes": {
+    "power": 17, "health": 19, "stamina": 29, "intelligence": 61,
+    "awareness": 72, "determination": 85, "speed": 22, "dexterity": 78,
+    "charisma": 8, "will": 56, "spirit": 61, "torment": 66
+  },
+  "flavorDe": "In Mortis Hall betreibt Bonebrew eine Taverne, die eigentlich zu klein ist für das, was in ihren Köcheln brodelt. Zwischen Kerzenlicht, Knochengerüst und alten Rezepten mischt sie Getränke, die mehr nach Urteil als nach Genuss schmecken — und genau deshalb kommen die Falschen selten zweimal. Einst war sie nur eine Gelehrte der Totenmark, zu fleißig für Ruhm und zu ehrgeizig für Ruhe. Heute serviert sie Geschichten in Flaschenform: manche betörend, manche bitter, alle definitiv nicht harmlos.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bonebrew.jpg",
+  "cost": 35,
+  "upkeepBase": 3
+}

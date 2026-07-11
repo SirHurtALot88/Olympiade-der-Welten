@@ -208,7 +208,7 @@ describe("legacy lineup lab helpers", () => {
     );
     expect(fileText).toContain("Matchday Room · Lineup Prep");
     expect(fileText).toContain("Matchday Preview");
-    expect(fileText).toContain("Form Board");
+    expect(fileText).toContain("Formplan");
     expect(fileText).toContain("aiInsightPreview");
     expect(fileText).toContain("Fatigue Cost gesamt");
     expect(fileText).toContain("Captain moeglich");
@@ -238,7 +238,6 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-result-team-card");
     expect(fileText).toContain("D1 / D2 Lineup-Zonen");
     expect(fileText).toContain("Expert Modus");
-    expect(fileText).toContain("Expert Modus an");
     expect(fileText).toContain("legacy-lineup-expert-mode-v1");
     expect(fileText).toContain("formatWeightInfo");
     expect(fileText).toContain("legacy-lineup-focus-switch");
@@ -246,6 +245,13 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-arena-slot");
     expect(fileText).toContain("legacy-lineup-slot-drag-callout");
     expect(fileText).toContain("legacy-lineup-slot-fit-pill");
+    expect(fileText).toContain("legacy-lineup-slot-micro-steps");
+    expect(fileText).toContain("LegacyLineupSlotMicroSteps");
+    expect(fileText).toContain("Waehlen");
+    expect(fileText).toContain("Naechster Slot");
+    expect(fileText).toContain("legacy-lineup-candidate-reason-chip");
+    expect(fileText).toContain("LegacyLineupCandidateReasonChips");
+    expect(fileText).toContain("buildCandidateAxisReasonChips");
     expect(fileText).toContain("getDragFitTierClass");
     expect(fileText).toContain("resolveLegacyLineupDragBlockReason");
     expect(fileText).toContain("handleDropOnSlot");

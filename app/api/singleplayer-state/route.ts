@@ -20,6 +20,12 @@ import {
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import {
+  compactFoundationInitialGameState,
+  rehydrateGameStateAfterCompactPut,
+} from "@/lib/persistence/foundation-initial-compact-state";
+import { prepareGameStateForPersistence } from "@/lib/foundation/materialize-on-save";
+import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
+import {
   matchesFoundationSaveMode,
   normalizeFoundationSaveMode,
   resolveFoundationSaveMode,
@@ -27,6 +33,8 @@ import {
 } from "@/lib/persistence/foundation-save-mode";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { setTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
@@ -38,16 +46,17 @@ type SaveActionBody =
   | { action: "activate"; saveId: string }
   | { action: "fresh-season-1"; name?: string }
   | {
+      action: "assign-team-captain";
+      saveId: string;
+      teamId: string;
+      playerId: string;
+    }
+  | {
       action: "new-game-flow-step";
       saveId: string;
       stepId: NewGameFlowStepId;
       status: NewGameFlowStepStatus;
       selectedTeamId?: string | null;
-    }
-  | {
-      action: "select-manager-team";
-      saveId: string;
-      selectedTeamId: string;
     }
   | {
       action: "contract-negotiation-outcome";
@@ -61,6 +70,7 @@ const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
   "team_confirm",
   "roster_review",
+  "appoint_captain",
   "first_transfers",
   "fill_roster",
   "training_facilities",
@@ -117,29 +127,6 @@ function enrichSaveSummary(save: SaveSummary): SaveSummary {
 function listSavesForMode(persistence: PersistenceService, saveMode: FoundationSaveMode) {
   const summaries = persistence.listSaves().map(enrichSaveSummary);
   return saveMode === "all" ? summaries : summaries.filter((save) => matchesFoundationSaveMode(saveMode, save));
-}
-
-function compactFoundationInitialGameState(gameState: GameState): GameState {
-  return {
-    ...gameState,
-    playerBaselines: undefined,
-    baselineWriteGuardEvents: undefined,
-    players: gameState.players.map((player) => ({
-      ...player,
-      attributeSheetStats: undefined,
-      attributeSheetRatings: undefined,
-      flavorEn: "",
-      flavorDe: "",
-      previousDisciplineRatings: undefined,
-      lastSeasonDisciplineValues: undefined,
-      currentDisciplineValues: undefined,
-      disciplineDelta: undefined,
-    })),
-    seasonState: {
-      ...gameState.seasonState,
-      seasonSnapshots: undefined,
-    },
-  };
 }
 
 async function loadPrismaResponse(saveId?: string) {
@@ -222,7 +209,8 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     );
   }
 
-  const gameState = withNormalizedLocalTeamSettings(save.gameState);
+  const normalizedGameState = withNormalizedLocalTeamSettings(save.gameState);
+  const gameState = compactInitial ? normalizedGameState : refreshTeamObjectiveState(normalizedGameState);
 
   return NextResponse.json({
     save: serializeSave({
@@ -266,9 +254,45 @@ export async function PUT(request: Request) {
     );
   }
 
-  const body = (await request.json()) as { saveId?: string; gameState?: GameState };
+  const body = (await request.json()) as {
+    saveId?: string;
+    gameState?: GameState;
+    expectedSaveVersion?: number;
+    expectedUpdatedAt?: string;
+    materializeSeasonDerivations?: boolean;
+    compactPut?: boolean;
+    skipMaterializeIfUnchanged?: boolean;
+  };
   if (!body.saveId || !body.gameState) {
     return NextResponse.json({ error: "saveId and gameState are required." }, { status: 400 });
+  }
+
+  const persistence = createPersistenceService();
+  const existing = persistence.getSaveById(body.saveId);
+  if (!existing) {
+    return NextResponse.json({ error: `Save ${body.saveId} not found.` }, { status: 404 });
+  }
+
+  const currentSaveVersion = existing.gameState.saveVersion ?? 0;
+  if (body.expectedSaveVersion !== undefined && body.expectedSaveVersion !== currentSaveVersion) {
+    return NextResponse.json(
+      {
+        error: "save_version_conflict",
+        currentSaveVersion,
+        message: `Expected saveVersion ${body.expectedSaveVersion}, current is ${currentSaveVersion}.`,
+      },
+      { status: 409 },
+    );
+  }
+  if (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== existing.updatedAt) {
+    return NextResponse.json(
+      {
+        error: "save_version_conflict",
+        currentUpdatedAt: existing.updatedAt,
+        message: "Save was updated elsewhere before this write could be applied.",
+      },
+      { status: 409 },
+    );
   }
 
   const activeRoom = getActiveRoomBySaveId(body.saveId);
@@ -283,13 +307,20 @@ export async function PUT(request: Request) {
     );
   }
 
-  const persistence = createPersistenceService();
-  const save = persistence.saveSingleplayerState(body.saveId, withNormalizedLocalTeamSettings(body.gameState));
+  const rehydratedGameState = rehydrateGameStateAfterCompactPut(existing.gameState, body.gameState);
+  const nextGameState = withNormalizedLocalTeamSettings(rehydratedGameState);
+  const preparedGameState = body.materializeSeasonDerivations
+    ? withPersistedSeasonDerivations(nextGameState)
+    : body.skipMaterializeIfUnchanged === false
+      ? withPersistedSeasonDerivations(nextGameState)
+      : prepareGameStateForPersistence(existing.gameState, nextGameState);
+  const save = persistence.saveSingleplayerState(body.saveId, preparedGameState);
 
   return NextResponse.json({
     save: {
       saveId: save.saveId,
       name: save.name,
+      saveVersion: save.gameState.saveVersion,
     },
     saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });
@@ -343,6 +374,32 @@ export async function POST(request: Request) {
     save = persistence.createFreshSeasonOneSave({
       name: body.name,
     });
+  } else if (body.action === "assign-team-captain") {
+    if (!body.saveId || !body.teamId || !body.playerId) {
+      return NextResponse.json({ error: "saveId, teamId and playerId are required." }, { status: 400 });
+    }
+
+    const sourceSave = persistence.getSaveById(body.saveId);
+    if (!sourceSave) {
+      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
+    }
+
+    const team = sourceSave.gameState.teams.find((entry) => entry.teamId === body.teamId);
+    if (!team?.humanControlled) {
+      return NextResponse.json({ error: "Kapitän kann nur für manuell geführte Teams gesetzt werden." }, { status: 403 });
+    }
+
+    let nextGameState: GameState;
+    try {
+      nextGameState = setTeamCaptain(sourceSave.gameState, body.teamId, body.playerId);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Kapitän konnte nicht gesetzt werden." },
+        { status: 400 },
+      );
+    }
+
+    save = persistence.saveSingleplayerState(body.saveId, withNormalizedLocalTeamSettings(nextGameState));
   } else if (body.action === "new-game-flow-step") {
     if (!body.saveId || !NEW_GAME_FLOW_STEP_IDS.includes(body.stepId) || !NEW_GAME_FLOW_STEP_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "saveId, stepId and status are required." }, { status: 400 });
@@ -386,69 +443,6 @@ export async function POST(request: Request) {
           updatedAt: now,
           completedAt: isHandled ? previousFlow.completedAt ?? now : previousFlow.completedAt ?? null,
         },
-      },
-    });
-
-    save = persistence.saveSingleplayerState(body.saveId, nextGameState);
-  } else if (body.action === "select-manager-team") {
-    if (!body.saveId || !body.selectedTeamId) {
-      return NextResponse.json({ error: "saveId and selectedTeamId are required." }, { status: 400 });
-    }
-
-    const sourceSave = persistence.getSaveById(body.saveId);
-    if (!sourceSave) {
-      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
-    }
-    if (!sourceSave.gameState.teams.some((team) => team.teamId === body.selectedTeamId)) {
-      return NextResponse.json({ error: "selectedTeamId could not be resolved." }, { status: 404 });
-    }
-
-    const now = new Date().toISOString();
-    const previousFlow = sourceSave.gameState.seasonState.newGameFlow ?? {
-      active: true,
-      selectedTeamId: body.selectedTeamId,
-      steps: [],
-    };
-    const baseSettings = buildTeamControlSettingsMap(
-      sourceSave.gameState.teams,
-      sourceSave.gameState.seasonState.teamControlSettings,
-    );
-    const selectedTeam = sourceSave.gameState.teams.find((team) => team.teamId === body.selectedTeamId);
-    const selectedSettings = baseSettings[body.selectedTeamId];
-    const nextTeamControlSettings = {
-      ...baseSettings,
-      [body.selectedTeamId]: {
-        ...selectedSettings,
-        teamId: body.selectedTeamId,
-        controlMode: "manual" as const,
-        ownerId: DEFAULT_ACTIVE_OWNER_ID,
-        ownerSlot: "user",
-        displayLabel: selectedSettings?.displayLabel ?? selectedTeam?.shortCode ?? body.selectedTeamId,
-        aiLineupPreviewEnabled: false,
-        aiLineupApplyEnabled: false,
-        aiLineupAutoApplyEnabled: false,
-        aiTransferPreviewEnabled: false,
-        aiTransferAutoApplyEnabled: false,
-        aiSellPreviewEnabled: false,
-        aiSellAutoApplyEnabled: false,
-      },
-    };
-    const nextGameState = withNormalizedLocalTeamSettings({
-      ...sourceSave.gameState,
-      teams: sourceSave.gameState.teams.map((team) =>
-        team.teamId === body.selectedTeamId ? { ...team, humanControlled: true } : team,
-      ),
-      seasonState: {
-        ...sourceSave.gameState.seasonState,
-        newGameFlow: {
-          ...previousFlow,
-          active: previousFlow.active ?? true,
-          dismissed: previousFlow.dismissed ?? false,
-          selectedTeamId: body.selectedTeamId,
-          steps: previousFlow.steps ?? [],
-          updatedAt: now,
-        },
-        teamControlSettings: nextTeamControlSettings,
       },
     });
 
@@ -519,7 +513,13 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    save: save ? { saveId: save.saveId } : null,
+    save: save
+      ? {
+          saveId: save.saveId,
+          name: save.name,
+          saveVersion: save.gameState.saveVersion,
+        }
+      : null,
     saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });
 }

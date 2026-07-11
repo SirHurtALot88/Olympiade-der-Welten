@@ -1,0 +1,45 @@
+---
+description: Balancing-Prinzip — kein Sell-Floor, aber volle Rebuild-Pflicht der Buy-Seite
+globs: lib/market/**,lib/ai/ai-market-plan-convergence-service.ts,lib/ai/ai-transfer-window-session-service.ts,lib/ai/ai-transfermarkt-sell-preview-service.ts,lib/ai/preseason-cash-recovery-service.ts,lib/ai/chunked-redraft-topup-service.ts,scripts/long-run-sandbox-s1-s6.ts
+alwaysApply: false
+---
+
+# Balancing: kein Sell-Floor, volle Rebuild-Pflicht
+
+## Design-Prinzip (User-Entscheidung, verbindlich)
+
+- Ein Team **darf zu 100% leer verkauft werden**. Es gibt **keinen** Sell-Floor
+  bzw. keine Sell-Bremse im Markt-Code (kein `ABSOLUTE_MIN_ROSTER_FLOOR`,
+  kein `roster_floor_reached`-Blocker o.ä.). Baue so etwas nicht wieder ein.
+- Im Gegenzug **MUSS** die Buy-Seite/Convergence-Engine garantieren, dass ein
+  Team, das auf 0 (oder sehr wenig) Kader gefallen ist, im selben Preseason-Pass
+  wieder auf **mindestens hardMin, bevorzugt Opt** aufgebaut wird — über die
+  echte Unified-Pick-Engine (Planner-Convergence-Runden), nicht nur mit einem
+  Minimal-Repair-Filler, der bei hardMin aufhört.
+- Wenn du an Sell-Pfaden arbeitest und der Impuls aufkommt, „einen Floor
+  einzubauen, damit der Kader nie ganz leer wird" — tu das nicht. Das
+  widerspricht diesem Prinzip. Löse Leerkader-Probleme stattdessen auf der
+  Buy-/Repair-Seite (mehr Planner-Runden, Repair-Loop bis Opt statt nur
+  hardMin, keine Hard-Blocker für nachgelagerte Preseason-Schritte bei
+  `team_roster_empty`).
+
+## Beobachteter Vorfall (Referenz)
+
+Balancing-Run `fresh-season-1-1782969582524`, Team A-A in Season 4: 7 Spieler
+weg (3 Contract-Expiries + 4 Market-Sells), 0 Buys → Kader = 0 → nachgelagerte
+Preseason-Manager-Aktionen (`set_training_focus` etc.) liefen gegen den leeren
+Kader und lösten `team_roster_empty` als Hard-Blocker aus → `RUN-PAUSED`.
+
+## Bereits umgesetzte Absicherungen
+
+- `team_roster_empty` ist in `lib/season/long-run-canonical.ts`
+  (`splitLongRunManagerBlockers`) ein **Soft-Blocker**, kein Hard-Stop mehr.
+- `DEFAULT_PLANNER_LEAGUE_ROUNDS` (`lib/season/long-run-profile.ts`) ist von 3
+  auf 5 erhöht, damit die echte Convergence-Engine mehr Chancen hat, Teams
+  organisch auf hardMin/Opt zu bringen, bevor der Emergency-Repair-Fallback
+  greift.
+- `emergencyRepairRosterMinimumBeforeSeasonStart` in
+  `scripts/long-run-sandbox-s1-s6.ts` erkennt Teams, die mit Kader = 0 in die
+  Reparatur gehen ("Full-Rebuild-Teams"), und retry't für diese gezielt bis
+  `getTeamOptTarget(...)` erreicht ist — nicht nur bis hardMin wie bei
+  gewöhnlichen Coverage-Risk-Teams.

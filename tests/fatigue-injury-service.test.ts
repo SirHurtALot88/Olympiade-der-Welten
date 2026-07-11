@@ -4,6 +4,7 @@ import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import {
   applyFatigueAndInjuryAfterMatchday,
   BASE_MATCHDAY_RECOVERY,
+  buildMatchdayInjuryRollMap,
   calculatePlayerRecovery,
   calculateTeamRecovery,
   getInjuryRiskBand,
@@ -142,24 +143,24 @@ function createGameState(playerId = "player-1", fatigue = 83): GameState {
 
 describe("fatigue injury service", () => {
   it("uses the requested fatigue risk curve", () => {
-    expect(injuryRiskBands).toEqual([
-      { min: 0, max: 29, label: "none", riskPercent: 0, uiLabel: "kein Risiko" },
-      { min: 30, max: 49, label: "minimal", riskPercent: 2, uiLabel: "minimales Verletzungsrisiko" },
-      { min: 50, max: 69, label: "mittel", riskPercent: 6, uiLabel: "mittleres Verletzungsrisiko" },
-      { min: 70, max: 84, label: "stark", riskPercent: 12, uiLabel: "starkes Verletzungsrisiko" },
-      { min: 85, max: 100, label: "sehr_stark", riskPercent: 22, uiLabel: "sehr starkes Verletzungsrisiko" },
+    expect(injuryRiskBands.map((band) => band.label)).toEqual([
+      "none",
+      "minimal",
+      "mittel",
+      "stark",
+      "sehr_stark",
     ]);
-    expect(getInjuryRiskPercent(29)).toBe(0);
+    expect(getInjuryRiskPercent(29)).toBe(4.83);
     expect(getInjuryRiskBand(29).label).toBe("none");
-    expect(getInjuryRiskPercent(30)).toBe(2);
+    expect(getInjuryRiskPercent(30)).toBe(5);
     expect(getInjuryRiskBand(30).label).toBe("minimal");
-    expect(getInjuryRiskPercent(50)).toBe(6);
+    expect(getInjuryRiskPercent(50)).toBe(10);
     expect(getInjuryRiskBand(50).label).toBe("mittel");
-    expect(getInjuryRiskPercent(70)).toBe(12);
+    expect(getInjuryRiskPercent(70)).toBe(20);
     expect(getInjuryRiskBand(70).label).toBe("stark");
-    expect(getInjuryRiskPercent(85)).toBe(22);
+    expect(getInjuryRiskPercent(85)).toBe(28.75);
     expect(getInjuryRiskBand(85).label).toBe("sehr_stark");
-    expect(getInjuryRiskPercent(100)).toBe(22);
+    expect(getInjuryRiskPercent(100)).toBe(40);
   });
 
   it("rolls injury risk deterministically from save, season, matchday and player", () => {
@@ -199,6 +200,47 @@ describe("fatigue injury service", () => {
     const laterAvailability = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-3");
     expect(laterAvailability.isUnavailable).toBe(false);
     expect(laterAvailability.injuryStatus).toBe("recovering");
+  });
+
+  it("keeps injured players available on the injury matchday but blocks the next matchday", () => {
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const injuryDayAvailability = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-1");
+    expect(injuryDayAvailability.isUnavailable).toBe(false);
+    expect(injuryDayAvailability.injuryStatus).toBe("injured");
+  });
+
+  it("uses the same deterministic injury rolls for pre-match scoring and post-match state", () => {
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const rollMap = buildMatchdayInjuryRollMap({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+    });
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+      precomputedInjuryRolls: rollMap,
+    });
+
+    expect(rollMap.get("A-A::" + playerId)?.result).toBe("injured");
+    expect(result.injuryEvents[0]?.result).toBe("injured");
+    expect(result.injuryEvents[0]?.roll).toBe(rollMap.get("A-A::" + playerId)?.roll);
   });
 
   it("supports an explicitly marked deterministic injury rehearsal mode without changing normal rates", () => {
@@ -383,7 +425,7 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(32);
+    expect(usedPlayer?.fatigue).toBe(31);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();

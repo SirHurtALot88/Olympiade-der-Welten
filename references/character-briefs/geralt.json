@@ -1,0 +1,20 @@
+{
+  "name": "Geralt",
+  "id": "player-1133-geralt",
+  "className": "Templar",
+  "race": "Human",
+  "alignment": "C-G",
+  "gender": "m",
+  "subclasses": ["Hunter", "Warlock", "Warrior"],
+  "traitsPositive": ["Cool", "FanFavorite", "Sexy"],
+  "traitsNegative": ["Renegade", "Egomaniac", "Mercenary"],
+  "attributes": {
+    "power": 71, "health": 54, "stamina": 67, "intelligence": 59,
+    "awareness": 79, "determination": 74, "speed": 44, "dexterity": 65,
+    "charisma": 80, "will": 81, "spirit": 14, "torment": 52
+  },
+  "flavorDe": "In den Nebelwäldern der Grünen Ringe erkennt man Geralt an den gelben Augen, der Narbe und dem Wolfsmedaillon, das im Dunkeln manchmal mitrot leuchtet, als hätte es selbst eine Meinung. Sein weißes Haar, die abgetragene Rüstung und die Klinge in den Händen gehören zu einem Leben aus Verträgen, Monstern und schlechtem Wetter — ein Leben, das er nie schönredet. Einst war er nur ein Söldner mit zu gutem Blick für das, was andere nicht sehen wollen. Heute ist er Legende ohne Thron: kühl im Ton, selten bescheiden, verdammt teuer, wenn man ihn braucht. Wer ihn anheuert, kriegt keine Moralpredigt. Meistens nur die richtige Klinge — zur richtigen Zeit.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Geralt.jpg",
+  "cost": 70,
+  "upkeepBase": 8
+}

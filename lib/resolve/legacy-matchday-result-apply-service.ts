@@ -22,8 +22,9 @@ import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-ty
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
-import { applyFatigueAndInjuryAfterMatchday } from "@/lib/fatigue/fatigue-injury-service";
+import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 
 type DbClient = typeof db;
 
@@ -140,7 +141,6 @@ type ContextLoaderLike = Pick<LegacyLineupContextLoader, "loadLegacyLineupContex
 type LocalContextLoaderLike = (params: LegacyMatchdayScopeParams & { teamId: string }) => LegacyLineupContextLoadResult;
 
 const APPLY_CONFIRM_TOKEN = "APPLY_MATCHDAY_RESULT";
-const FATIGUE_INJURY_ENABLED = process.env.OLY_ENABLE_INJURIES === "1";
 
 function elapsedSince(startedAt: number) {
   return Math.max(0, Math.round(performance.now() - startedAt));
@@ -379,6 +379,16 @@ export async function prepareLegacyMatchdayResultApply(
       ? await loadAllContextsForPrisma(client, params, loader)
       : loadAllContextsForSqlite(params, persistence, localLoader));
   const contextLoadMs = elapsedSince(contextStartedAt);
+  if (source === "sqlite") {
+    const save = resolveLocalSave(persistence, params.saveId);
+    const injuryRollMap = buildMatchdayInjuryRollMap({
+      gameState: save.gameState,
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+    });
+    attachMatchdayInjuryPerformanceToContexts(contexts, injuryRollMap);
+  }
   const resolveStartedAt = performance.now();
   const preview = options?.preloadedPreview ?? buildLegacyMatchdayResolvePreview(contexts, options?.resolveOptions);
   const resolvePreviewMs = elapsedSince(resolveStartedAt);
@@ -680,22 +690,27 @@ export class LegacyMatchdayResultApplyService {
     };
     const recordMapMs = elapsedSince(recordMapStartedAt);
 
-    const injuryResult = FATIGUE_INJURY_ENABLED
-      ? applyFatigueAndInjuryAfterMatchday({
+    const injuryRollMap = buildMatchdayInjuryRollMap({
+      gameState: nextGameState,
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+    });
+    const injuryResult = applyFatigueAndInjuryAfterMatchday({
           gameState: nextGameState,
           saveId: params.saveId,
           seasonId: params.seasonId,
           matchdayId: params.matchdayId,
           matchdayResultId,
           timestamp: now,
-        })
-      : { gameState: nextGameState, injuryEvents: [] };
+          precomputedInjuryRolls: injuryRollMap,
+        });
 
     const objectiveStartedAt = performance.now();
     const refreshedGameState = refreshTeamObjectiveState(injuryResult.gameState);
     const standingsObjectiveRefreshMs = elapsedSince(objectiveStartedAt);
     const saveStartedAt = performance.now();
-    this.persistence.saveSingleplayerState(save.saveId, refreshedGameState);
+    persistGameStateWithMaterializedDerivations(this.persistence, save.saveId, refreshedGameState);
     const saveWriteMs = elapsedSince(saveStartedAt);
 
     return {

@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { loadEnvConfig } from "@next/env";
+
 import {
   calculateTeamRecovery,
   getInjuryRiskBand,
@@ -12,9 +14,13 @@ import {
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assertOlyProjectRoot } from "@/lib/persistence/project-root-guard";
 
-const OUTPUT_DIR =
-  process.env.OLY_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+
+function argValue(flag: string) {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return null;
+  return process.argv[index + 1] ?? null;
+}
 
 function escapeCsv(value: string | number | boolean | null | undefined) {
   const text = value == null ? "—" : String(value);
@@ -26,16 +32,47 @@ function writeCsv(filePath: string, header: string[], rows: Array<Array<string |
   fs.writeFileSync(filePath, [header, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n") + "\n");
 }
 
+function round(value: number, digits = 1) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 function main() {
   assertOlyProjectRoot();
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  loadEnvConfig(PROJECT_ROOT);
+
+  const saveIdArg = argValue("--save-id");
+  const outputDirArg = argValue("--output-dir");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const outputDir =
+    outputDirArg != null
+      ? path.isAbsolute(outputDirArg)
+        ? outputDirArg
+        : path.join(PROJECT_ROOT, outputDirArg)
+      : path.join(PROJECT_ROOT, "outputs", `fatigue-injury-audit-${timestamp}`);
+
+  fs.mkdirSync(outputDir, { recursive: true });
 
   const persistence = createPersistenceService();
-  const save = persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
+  const save = saveIdArg
+    ? persistence.getSaveById(saveIdArg)
+    : persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
+  if (!save) {
+    throw new Error(saveIdArg ? `Save not found: ${saveIdArg}` : "No active save available");
+  }
+
   const gameState = save.gameState;
   const currentMatchdayId = gameState.matchdayState?.matchdayId ?? gameState.season.matchdayIds?.[0] ?? "unknown";
   const teamNameById = new Map(gameState.teams.map((team) => [team.teamId, team.name] as const));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
+  const rosteredPlayers = gameState.players.filter((player) => rosterPlayerIds.has(player.id));
+  const avgFatigue =
+    rosteredPlayers.length > 0
+      ? round(rosteredPlayers.reduce((sum, player) => sum + (player.fatigue ?? 0), 0) / rosteredPlayers.length)
+      : 0;
+  const trainingModeNoneCount = rosteredPlayers.filter((player) => !player.trainingMode).length;
+
   const activeRosterRows = gameState.rosters
     .map((roster) => ({
       roster,
@@ -78,6 +115,8 @@ function main() {
     "## Summary",
     "",
     `- Active roster players tracked: ${availabilityRows.length}`,
+    `- Rostered avg fatigue: ${avgFatigue}`,
+    `- Training mode none: ${trainingModeNoneCount}`,
     `- Injury events stored: ${injuryEvents.length}`,
     `- Currently injured/unavailable: ${availabilityRows.filter((row) => row.availability.isUnavailable).length}`,
     `- Players above fatigue risk threshold: ${availabilityRows.filter((row) => row.riskPercent > 0).length}`,
@@ -107,17 +146,43 @@ function main() {
     "",
   ];
 
-  const mdPath = path.join(OUTPUT_DIR, "fatigue-injury-audit.md");
-  const eventCsvPath = path.join(OUTPUT_DIR, "fatigue-injury-events.csv");
-  const riskBandsCsvPath = path.join(OUTPUT_DIR, "fatigue-injury-risk-bands.csv");
-  const recoveryCsvPath = path.join(OUTPUT_DIR, "injury-recovery-audit.csv");
-  const blockerCsvPath = path.join(OUTPUT_DIR, "injury-lineup-blockers.csv");
+  const mdPath = path.join(outputDir, "fatigue-injury-audit.md");
+  const eventCsvPath = path.join(outputDir, "fatigue-injury-events.csv");
+  const riskBandsCsvPath = path.join(outputDir, "fatigue-injury-risk-bands.csv");
+  const recoveryCsvPath = path.join(outputDir, "injury-recovery-audit.csv");
+  const blockerCsvPath = path.join(outputDir, "injury-lineup-blockers.csv");
+  const summaryJsonPath = path.join(outputDir, "fatigue-injury-summary.json");
 
   fs.writeFileSync(mdPath, markdownLines.join("\n"));
+  fs.writeFileSync(
+    summaryJsonPath,
+    JSON.stringify(
+      {
+        saveId: save.saveId,
+        seasonId: gameState.season.id,
+        gamePhase: gameState.gamePhase,
+        rosteredPlayers: rosteredPlayers.length,
+        avgFatigueRostered: avgFatigue,
+        trainingModeNoneCount,
+        injuryEventsTotal: injuryEvents.length,
+        unavailableCount: availabilityRows.filter((row) => row.availability.isUnavailable).length,
+        lineupBlockers: blockers.length,
+      },
+      null,
+      2,
+    ),
+  );
   writeCsv(
     riskBandsCsvPath,
     ["min", "max", "riskBand", "riskPercent", "uiLabel", "source"],
-    injuryRiskBands.map((band) => [band.min, band.max, band.label, band.riskPercent, band.uiLabel, "injuryRiskBands"]),
+    injuryRiskBands.map((band) => [
+      band.min,
+      band.max,
+      band.label,
+      getInjuryRiskPercent(band.max),
+      band.uiLabel,
+      "injuryRiskBands",
+    ]),
   );
   writeCsv(
     eventCsvPath,
@@ -239,6 +304,7 @@ function main() {
   );
 
   console.log(`Wrote ${mdPath}`);
+  console.log(`Wrote ${summaryJsonPath}`);
   console.log(`Wrote ${riskBandsCsvPath}`);
   console.log(`Wrote ${eventCsvPath}`);
   console.log(`Wrote ${recoveryCsvPath}`);

@@ -1,16 +1,30 @@
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
+import { buildTeamPlayerTrainingLoadPlans, type AiTeamTrainingIntensity } from "@/lib/ai/ai-player-training-load-service";
 import type {
   GameInboxItem,
   GameInboxSeverity,
   GameInboxStatus,
   GameState,
+  Player,
+  RosterEntry,
+  Team,
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
+import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
+import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
+import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
+import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
+import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
+import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
+import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 
 export type GameInboxTargetView =
   | "home"
@@ -60,6 +74,113 @@ function severityRank(severity: GameInboxSeverity) {
   return 2;
 }
 
+function formatInboxDetail(value: string | null | undefined) {
+  if (!value) {
+    return "—";
+  }
+  return formatCockpitReason(value);
+}
+
+function parseProgressionInboxDescription(description: string) {
+  const upgradesMatch = description.match(/(\d+) Upgrade\(s\)/);
+  const xpMatch = description.match(/(\d+) XP ausgegeben/);
+  return {
+    upgrades: upgradesMatch ? Number(upgradesMatch[1]) : 0,
+    xpSpent: xpMatch ? Number(xpMatch[1]) : 0,
+  };
+}
+
+const INBOX_CHRONICLE_ONLY_SOURCES = new Set([
+  "player_progression_events",
+  "facility_events",
+  "cash_prize_apply_logs",
+  "matchday_results",
+  "season_snapshots",
+  "transfer_history",
+]);
+
+export function isGameInboxChronicleOnlySource(source: string) {
+  return INBOX_CHRONICLE_ONLY_SOURCES.has(source) || source.startsWith("story:");
+}
+
+export function groupInboxItemsForDisplay(items: GameInboxItem[]) {
+  const groupedProgression = new Map<string, GameInboxItem[]>();
+  const groupedFacilities = new Map<string, GameInboxItem[]>();
+  const passthrough: GameInboxItem[] = [];
+
+  for (const item of items) {
+    if (item.source === "player_progression_events") {
+      const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
+      const bucket = groupedProgression.get(key) ?? [];
+      bucket.push(item);
+      groupedProgression.set(key, bucket);
+      continue;
+    }
+    if (item.source === "facility_events") {
+      const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
+      const bucket = groupedFacilities.get(key) ?? [];
+      bucket.push(item);
+      groupedFacilities.set(key, bucket);
+      continue;
+    }
+    passthrough.push(item);
+  }
+
+  const result = [...passthrough];
+
+  for (const [key, group] of groupedProgression) {
+    if (group.length === 1) {
+      result.push(group[0]!);
+      continue;
+    }
+    const totals = group.reduce(
+      (summary, item) => {
+        const parsed = parseProgressionInboxDescription(item.description);
+        return {
+          upgrades: summary.upgrades + parsed.upgrades,
+          xpSpent: summary.xpSpent + parsed.xpSpent,
+        };
+      },
+      { upgrades: 0, xpSpent: 0 },
+    );
+    const template = [...group].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]!;
+    result.push({
+      ...template,
+      itemId: `grouped:player_progression_events:${key}`,
+      title: `${group.length} XP-Upgrades durchgeführt`,
+      description: `${group.length} Spieler · ${totals.upgrades} Upgrade(s) · ${totals.xpSpent} XP ausgegeben.`,
+      createdAt: template.createdAt,
+    });
+  }
+
+  for (const [key, group] of groupedFacilities) {
+    if (group.length === 1) {
+      result.push(group[0]!);
+      continue;
+    }
+    const template = [...group].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]!;
+    const facilityLabels = group
+      .map((item) => item.description.replace(/: Level .+$/, ""))
+      .slice(0, 3)
+      .join(" · ");
+    result.push({
+      ...template,
+      itemId: `grouped:facility_events:${key}`,
+      title: `${group.length} Facility-Events`,
+      description: `${group.length} Upgrades: ${facilityLabels}${group.length > 3 ? " · …" : ""}.`,
+      createdAt: template.createdAt,
+    });
+  }
+
+  return result.sort((left, right) => {
+    const statusDelta = (left.status === "open" ? 0 : 1) - (right.status === "open" ? 0 : 1);
+    if (statusDelta !== 0) return statusDelta;
+    const severityDelta = severityRank(left.severity) - severityRank(right.severity);
+    if (severityDelta !== 0) return severityDelta;
+    return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  });
+}
+
 function getStoredStatusMap(gameState: GameState) {
   return new Map((gameState.gameInboxItems ?? []).map((item) => [item.itemId, normalizeStatus(item.status)] as const));
 }
@@ -69,6 +190,10 @@ function withStoredStatus(item: GameInboxItem, storedStatusById: Map<string, Gam
     ...item,
     status: storedStatusById.get(item.itemId) ?? item.status,
   };
+}
+
+function resolvePlayerDisplayName(gameState: GameState, playerId: string) {
+  return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
 
 function createItem(
@@ -119,15 +244,6 @@ function getVisibleTeamIds(input: BuildGameInboxInput, settingsMap: Record<strin
   );
 }
 
-import {
-  isTeamMatchdayLineupComplete,
-  isTeamMatchdayLineupSubmitted,
-} from "@/lib/foundation/matchday-lineup-readiness";
-
-function hasTeamFormCards(gameState: GameState, teamId: string) {
-  return (gameState.seasonState.formCards ?? []).some((card) => card.seasonId === gameState.season.id && card.teamId === teamId);
-}
-
 function getTeamRosterPlayerIds(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
 }
@@ -147,6 +263,149 @@ function teamTrainingMissingCount(gameState: GameState, teamId: string) {
   return getTeamRosterPlayerIds(gameState, teamId).filter((playerId) => playersById.get(playerId)?.trainingMode == null).length;
 }
 
+function resolveTeamTrainingBaselineIntensity(gameState: GameState, teamId: string): AiTeamTrainingIntensity {
+  const settings = gameState.seasonState.aiManagerTrainingSettings?.[teamId];
+  if (settings?.trainingIntensity === "light") return "light";
+  if (settings?.trainingIntensity === "hard") return "hard";
+  return "normal";
+}
+
+function buildPlayerHealthInboxTasks(input: {
+  saveId: string;
+  gameState: GameState;
+  team: Team;
+  roster: RosterEntry[];
+  playerById: Map<string, Player>;
+  controlMode: string;
+  createdAt: string;
+}) {
+  if (input.controlMode !== "manual") {
+    return [] as GameInboxItem[];
+  }
+
+  const items: GameInboxItem[] = [];
+  const matchdayId = input.gameState.matchdayState.matchdayId;
+  const seasonId = input.gameState.season.id;
+  const teamBaselineIntensity = resolveTeamTrainingBaselineIntensity(input.gameState, input.team.teamId);
+  const trainingPlans = buildTeamPlayerTrainingLoadPlans({
+    gameState: input.gameState,
+    teamId: input.team.teamId,
+    teamBaselineIntensity,
+  });
+  const lineupRestPlayerIds = new Set<string>();
+
+  for (const entry of input.roster) {
+    const player = input.playerById.get(entry.playerId);
+    if (!player) continue;
+
+    const availability = getPlayerAvailabilityView(
+      input.gameState,
+      entry.playerId,
+      input.team.teamId,
+      matchdayId,
+    );
+
+    if (availability.isUnavailable && availability.injuryStatus === "injured") {
+      items.push(
+        createItem({
+          itemId: `player_injured:${input.saveId}:${seasonId}:${matchdayId}:${input.team.teamId}:${entry.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: entry.playerId,
+          category: "warning",
+          severity: "critical",
+          title: "Verletzter Spieler",
+          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${availability.injuryUntilMatchday ? ` bis ${availability.injuryUntilMatchday}` : ""}.`,
+          targetView: "lineup",
+          targetParams: { team: input.team.teamId, player: entry.playerId },
+          ctaLabel: "Lineup prüfen",
+          source: "player_health_injury",
+          createdAt: input.createdAt,
+        }),
+      );
+      continue;
+    }
+
+    const fatigue = player.fatigue ?? availability.fatigue ?? 0;
+    const riskPercent = getInjuryRiskPercent(fatigue);
+    if (fatigue >= 70 || riskPercent >= 15) {
+      items.push(
+        createItem({
+          itemId: `player_fatigue_risk:${input.saveId}:${seasonId}:${input.team.teamId}:${entry.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: entry.playerId,
+          category: "training",
+          severity: fatigue >= 80 || riskPercent >= 25 ? "critical" : "warning",
+          title: fatigue >= 80 || riskPercent >= 25 ? "Hohes Verletzungsrisiko" : "Ermüdung beobachten",
+          description: `${getPlayerName(input.gameState, entry.playerId)}: Fatigue ${Math.round(fatigue)}, Verletzungsrisiko ${riskPercent}%.`,
+          targetView: "training",
+          targetParams: { team: input.team.teamId, player: entry.playerId },
+          ctaLabel: "Training prüfen",
+          source: "player_health_fatigue_risk",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+  }
+
+  for (const plan of trainingPlans) {
+    if (plan.needsLineupRest && !lineupRestPlayerIds.has(plan.playerId)) {
+      lineupRestPlayerIds.add(plan.playerId);
+      items.push(
+        createItem({
+          itemId: `player_lineup_rest:${input.saveId}:${seasonId}:${matchdayId}:${input.team.teamId}:${plan.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: plan.playerId,
+          category: "warning",
+          severity: "warning",
+          title: "Spielpause empfohlen",
+          description: `${plan.playerName}: hohe Belastung — für den nächsten Spieltag pausieren.`,
+          targetView: "lineup",
+          targetParams: { team: input.team.teamId, player: plan.playerId },
+          ctaLabel: "Lineup prüfen",
+          source: "player_health_lineup_rest",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+
+    if (
+      plan.trainingDemandPreferred === "hart" &&
+      (plan.currentFatigue >= 55 || plan.currentInjuryRiskPercent >= 10)
+    ) {
+      items.push(
+        createItem({
+          itemId: `player_training_load:${input.saveId}:${seasonId}:${input.team.teamId}:${plan.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: plan.playerId,
+          category: "training",
+          severity: plan.projectedInjuryRiskPercent >= 20 ? "warning" : "info",
+          title: "Hard-Training vs. Erholung",
+          description: `${plan.playerName}: Hard-Demand unter Belastung (Fatigue ${Math.round(plan.currentFatigue)}, Modus ${plan.selectedMode}).`,
+          targetView: "training",
+          targetParams: { team: input.team.teamId, player: plan.playerId },
+          ctaLabel: "Training steuern",
+          source: "player_health_training_load",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+  }
+
+  return items;
+}
+
 function buildFlowItem(input: BuildGameInboxInput, createdAt: string): GameInboxItem | null {
   const step = input.gameFlowState?.currentStep;
   if (!step) return null;
@@ -159,7 +418,7 @@ function buildFlowItem(input: BuildGameInboxInput, createdAt: string): GameInbox
     category: step.status === "blocked" ? "warning" : "task",
     severity: step.status === "blocked" ? "critical" : step.status === "warning" ? "warning" : "info",
     title: step.label,
-    description: step.blockers[0] ?? step.warnings[0] ?? step.cta,
+    description: formatInboxDetail(step.blockers[0] ?? step.warnings[0] ?? step.cta),
     targetView: step.targetView,
     targetParams: {
       team: step.teamId ?? input.activeTeamId ?? null,
@@ -181,16 +440,18 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     const controlMode = settingsMap[team.teamId]?.controlMode ?? (team.humanControlled ? "manual" : "ai");
     const roster = input.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
     const rosterCount = roster.length;
+    const rosterOptTarget = team.rosterOptTarget ?? team.rosterLimit ?? 12;
+    const rosterMinTarget = team.rosterMinTarget ?? Math.max(10, rosterOptTarget - 2);
+    const lineupDraft =
+      (input.gameState.seasonState.lineupDrafts ?? []).find(
+        (draft) =>
+          draft.seasonId === input.gameState.season.id &&
+          draft.matchdayId === input.gameState.matchdayState.matchdayId &&
+          draft.teamId === team.teamId,
+      ) ?? null;
     const lineupStatus = {
-      hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId),
-      isSubmitted: isTeamMatchdayLineupSubmitted(
-        (input.gameState.seasonState.lineupDrafts ?? []).find(
-          (draft) =>
-            draft.seasonId === input.gameState.season.id &&
-            draft.matchdayId === input.gameState.matchdayState.matchdayId &&
-            draft.teamId === team.teamId,
-        ) ?? null,
-      ),
+      hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft),
+      isSubmitted: isTeamMatchdayLineupSubmitted(lineupDraft),
     };
     if (rosterCount > 0 && !lineupStatus.hasLineup && controlMode === "manual") {
       items.push(
@@ -206,13 +467,36 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
+          ctaLabel: "Lineup öffnen",
           source: "lineup_drafts",
           createdAt,
         }),
       );
     }
 
-    if (rosterCount > 0 && !hasTeamFormCards(input.gameState, team.teamId) && controlMode === "manual") {
+    const lineupComplete = lineupStatus.hasLineup;
+    if (rosterCount > 0 && lineupComplete && !lineupStatus.isSubmitted && controlMode === "manual") {
+      items.push(
+        createItem({
+          itemId: `lineup_not_submitted:${input.saveId}:${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          matchday: input.gameState.matchdayState.matchdayId,
+          teamId: team.teamId,
+          category: "task",
+          severity: team.teamId === input.activeTeamId ? "critical" : "warning",
+          title: "Lineup bestätigen",
+          description: `${team.shortCode}: Einsatzliste ist voll, aber noch nicht bestätigt.`,
+          targetView: "lineup",
+          targetParams: { team: team.teamId },
+          ctaLabel: "Lineup bestätigen",
+          source: "lineup_drafts",
+          createdAt,
+        }),
+      );
+    }
+    const formCardFlow = getFormCardFlowStatus(input.gameState, team.teamId);
+    if (rosterCount > 0 && lineupComplete && !formCardFlow.hasPool && controlMode === "manual") {
       items.push(
         createItem({
           itemId: `formcards_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -222,12 +506,105 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           teamId: team.teamId,
           category: "task",
           severity: "warning",
-          title: "Formkarten offen",
-          description: `${team.shortCode}: Für die aktive Season sind noch keine Formkarten sichtbar.`,
+          title: "Formkarten-Pool fehlt",
+          description: `${team.shortCode}: Formkarten fuer diese Saison muessen noch in der Einsatzliste erzeugt werden.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
+          ctaLabel: "Formkarten erzeugen",
           source: "season_formcards",
           createdAt,
+        }),
+      );
+    }
+
+    if (
+      controlMode === "manual" &&
+      rosterCount >= rosterMinTarget &&
+      lineupComplete &&
+      !hasPersistedTeamCaptain(input.gameState, team.teamId)
+    ) {
+      items.push(
+        createItem({
+          itemId: `captain_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "task",
+          severity: team.teamId === input.activeTeamId ? "warning" : "info",
+          title: "Kapitän ernennen",
+          description: `${team.shortCode}: Kader ist vollständig — wähle einen Saison-Kapitän für Moral-Bonus.`,
+          targetView: "home",
+          targetParams: { team: team.teamId, panel: "captain-picker" },
+          ctaLabel: "Kapitän wählen",
+          source: "team_captain_missing",
+          createdAt,
+        }),
+      );
+    }
+
+    const formCardUsageAudit = buildFormCardSeasonUsageAudit(input.gameState, input.gameState.season.id).rows.find(
+      (row) => row.teamId === team.teamId,
+    );
+    if (controlMode === "manual" && (formCardUsageAudit?.unusedNegativeCards ?? 0) > 0) {
+      items.push(
+        createItem({
+          itemId: `formcards_negative_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          matchday: input.gameState.matchdayState.matchdayId,
+          teamId: team.teamId,
+          category: "task",
+          severity: "warning",
+          title: "Negative Formkarten offen",
+          description: `${team.shortCode}: ${formCardUsageAudit!.unusedNegativeCards} negative Karte(n) ungenutzt — am Saisonende drohen ${formCardUsageAudit!.negativePenaltyPoints} Strafpunkte.`,
+          targetView: "lineup",
+          targetParams: { team: team.teamId, panel: "formcards" },
+          ctaLabel: "Formkarten pruefen",
+          source: "season_formcards",
+          createdAt,
+        }),
+      );
+    }
+
+    if (controlMode === "manual" && !getTeamSponsorContract(input.gameState, team.teamId)) {
+      items.push(
+        createItem({
+          itemId: `sponsor_choice_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "sponsor",
+          severity: "warning",
+          title: "Sponsor wählen",
+          description: `${team.shortCode}: Wähle einen von drei Sponsor-Verträgen für die Saison.`,
+          targetView: "teams",
+          targetParams: { team: team.teamId, panel: "sponsor-choice" },
+          ctaLabel: "Sponsor wählen",
+          source: "sponsor_v2_choice_pending",
+          createdAt,
+        }),
+      );
+    }
+
+    for (const event of listOpenSponsorEvents(input.gameState, team.teamId)) {
+      if (controlMode !== "manual") {
+        continue;
+      }
+      items.push(
+        createItem({
+          itemId: event.eventId,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "sponsor",
+          severity: event.cashDelta >= 0 ? "info" : "warning",
+          title: event.eventType === "activation_bonus" ? "Sponsor-Aktion" : "Sponsor-Ereignis",
+          description: event.message,
+          targetView: "teams",
+          targetParams: { team: team.teamId, panel: "sponsor-choice", sponsorEventId: event.eventId },
+          ctaLabel: event.cashDelta >= 0 ? "Bonus annehmen" : "Ereignis prüfen",
+          source: `sponsor_event:${event.eventType}`,
+          createdAt: event.createdAt,
         }),
       );
     }
@@ -246,6 +623,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${missingTraining} Spieler ohne Trainingsmodus.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "training-plan" },
+          ctaLabel: "Training öffnen",
           source: "player_training_mode",
           createdAt,
         }),
@@ -268,6 +646,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${xpPlayers.length} Spieler können entwickelt werden.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "season-end-development" },
+          ctaLabel: "XP ausgeben",
           source: "player_current_xp",
           createdAt,
         }),
@@ -290,12 +669,14 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${expiring.length} Vertrag(e) brauchen Entscheidung.`,
           targetView: "teams",
           targetParams: { team: team.teamId, panel: "contracts" },
+          ctaLabel: "Kader verwalten",
           source: "roster_contracts",
           createdAt,
         }),
       );
     }
 
+    const transferWindowOpen = getTransferWindowStatus(input.gameState).open;
     const sellCandidates: Array<{ entry: typeof roster[number]; player: NonNullable<ReturnType<typeof playerById.get>>; profit: number; isExpiring: boolean }> = [];
     for (const entry of roster) {
         const player = playerById.get(entry.playerId);
@@ -310,7 +691,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         }
     }
     const sellCandidate = sellCandidates.sort((left, right) => right.profit - left.profit)[0];
-    if (sellCandidate) {
+    if (transferWindowOpen && sellCandidate) {
       items.push(
         createItem({
           itemId: `transfer_candidate:${input.saveId}:${input.gameState.season.id}:${team.teamId}:${sellCandidate.entry.playerId}`,
@@ -324,7 +705,28 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${sellCandidate.player.name}: ${sellCandidate.profit >= 0 ? "+" : ""}${sellCandidate.profit.toFixed(1)} MW-Puffer${sellCandidate.isExpiring ? ", Vertrag läuft aus" : ""}.`,
           targetView: "teams",
           targetParams: { team: team.teamId, player: sellCandidate.entry.playerId, panel: "roster" },
+          ctaLabel: "Spieler prüfen",
           source: "roster_value_contract_cash",
+          createdAt,
+        }),
+      );
+    }
+
+    if (transferWindowOpen && rosterCount > 0 && rosterCount < rosterOptTarget && team.cash >= 8) {
+      items.push(
+        createItem({
+          itemId: `transfer_buy_candidate:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "transfer",
+          severity: rosterCount < rosterMinTarget ? "warning" : "info",
+          title: "Spieler kaufen",
+          description: `${team.shortCode}: Kader ${rosterCount}/${rosterOptTarget}, Cash ${team.cash.toFixed(1)} — Transfermarkt prüfen.`,
+          targetView: "market",
+          targetParams: { team: team.teamId },
+          ctaLabel: "Transfermarkt öffnen",
+          source: "roster_cash_transfer_window",
           createdAt,
         }),
       );
@@ -353,6 +755,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${wornFacility.facility.label} ist bei ${wornFacility.conditionPct}% und verliert Leistung.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude prüfen",
           source: "facility_condition_forecast",
           createdAt,
         }),
@@ -373,6 +776,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Cash reicht nach Facility-Netto voraussichtlich nicht.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude prüfen",
           source: "facility_finance_forecast",
           createdAt,
         }),
@@ -397,7 +801,69 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Mindestens ein Gebäude kann geprüft werden.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude upgraden",
           source: "facility_catalog_cash_check",
+          createdAt,
+        }),
+      );
+    }
+
+    items.push(
+      ...buildPlayerHealthInboxTasks({
+        saveId: input.saveId,
+        gameState: input.gameState,
+        team,
+        roster,
+        playerById,
+        controlMode,
+        createdAt,
+      }),
+    );
+  }
+
+  const objectiveOverview = buildTeamObjectiveOverview(input.gameState);
+  for (const objective of objectiveOverview.objectives) {
+    if (!visibleTeamIds.has(objective.teamId)) continue;
+    if (objective.status !== "at_risk" && objective.status !== "failed") continue;
+    items.push(
+      createItem({
+        itemId: `board_objective_${objective.status}:${input.saveId}:${objective.seasonId}:${objective.teamId}:${objective.objectiveId}`,
+        saveId: input.saveId,
+        seasonId: objective.seasonId,
+        teamId: objective.teamId,
+        category: "task",
+        severity: objective.status === "failed" ? "critical" : "warning",
+        title: objective.status === "failed" ? "Board-Ziel verfehlt" : "Board-Ziel gefährdet",
+        description: `${objective.label}: ${objective.currentValue ?? "—"} / Ziel ${objective.targetValue ?? "—"}`,
+        targetView: "teams",
+        targetParams: { team: objective.teamId, panel: "board-objectives" },
+        source: "team_season_objectives",
+        createdAt,
+      }),
+    );
+  }
+
+  for (const teamId of visibleTeamIds) {
+    const intelEntries = (input.gameState.seasonState.scoutIntelByTeamId?.[teamId] ?? []).filter(
+      (entry) => entry.seasonId === input.gameState.season.id,
+    );
+    for (const entry of intelEntries) {
+      const milestone = entry.certainty >= 75 ? 75 : entry.certainty >= 50 ? 50 : entry.certainty >= 25 ? 25 : null;
+      if (milestone == null) continue;
+      items.push(
+        createItem({
+          itemId: `scout_milestone:${input.saveId}:${input.gameState.season.id}:${teamId}:${entry.playerId}:${milestone}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId,
+          playerId: entry.playerId,
+          category: "transfer",
+          severity: "info",
+          title: "Scouting-Fortschritt",
+          description: `${resolvePlayerDisplayName(input.gameState, entry.playerId)}: Certainty ${entry.certainty}% — Intel wird schärfer.`,
+          targetView: "market",
+          targetParams: { team: teamId, player: entry.playerId },
+          source: "scout_intel_pipeline",
           createdAt,
         }),
       );
@@ -633,6 +1099,42 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     .find((result) => result.status === "preview_applied" && result.seasonId === seasonId);
   if (latestResult) {
     const summary = buildMatchdaySummary(input.gameState, { seasonId, matchdayId: latestResult.matchdayId });
+    const injuryEvents = (input.gameState.seasonState.injuryEvents ?? []).filter(
+      (event) => event.seasonId === seasonId && event.matchdayId === latestResult.matchdayId && event.result === "injured",
+    );
+
+    for (const teamRow of summary.teamRows.filter((row) => teamVisible(row.teamId))) {
+      const topPlayer = summary.topPlayers.find((player) => player.teamId === teamRow.teamId && player.rankInDiscipline === 1);
+      const teamInjuries = injuryEvents.filter((event) => event.teamId === teamRow.teamId);
+      const rankDetail =
+        teamRow.rankDelta != null && teamRow.rankDelta !== 0
+          ? `${teamRow.rankDelta > 0 ? "+" : ""}${teamRow.rankDelta} Platz${Math.abs(teamRow.rankDelta) === 1 ? "" : "e"}`
+          : "Rang unverändert";
+      const mvpDetail = topPlayer ? `MVP: ${topPlayer.playerName} (${topPlayer.disciplineName})` : "Kein MVP-Signal";
+      const injuryDetail =
+        teamInjuries.length > 0
+          ? `${teamInjuries.length} Verletzung(en) nach Belastung`
+          : "Keine neuen Verletzungen";
+
+      items.push(
+        createItem({
+          itemId: `matchday_recap:${input.saveId}:${latestResult.id}:${teamRow.teamId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: latestResult.matchdayId,
+          teamId: teamRow.teamId,
+          category: "result",
+          severity: teamInjuries.length > 0 ? "warning" : "info",
+          title: `Spieltag-Recap: ${teamRow.teamShortCode}`,
+          description: `${latestResult.matchdayId}: ${rankDetail} · ${mvpDetail} · ${injuryDetail}.`,
+          targetView: "matchdayArena",
+          targetParams: { team: teamRow.teamId, matchday: latestResult.matchdayId, panel: "arena-result-summary" },
+          source: "story:matchday_recap",
+          createdAt: latestResult.updatedAt ?? createdAt,
+        }),
+      );
+    }
+
     const mutatorBonusByTeam = new Map<string, number>();
     for (const perf of input.gameState.seasonState.playerDisciplinePerformances ?? []) {
       if (perf.matchdayResultId !== latestResult.id) continue;
@@ -793,8 +1295,54 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
   });
 }
 
-export function getPrimaryInboxTask(items: GameInboxItem[]) {
-  return items.find((item) => item.status === "open" && (item.category === "task" || item.category === "warning" || item.severity === "critical")) ?? null;
+export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMatchdayLoop?: boolean }) {
+  const severityRank: Record<GameInboxItem["severity"], number> = {
+    critical: 0,
+    warning: 1,
+    info: 2,
+  };
+  const sourcePriority: Record<string, number> = {
+    player_health_injury: 0,
+    player_health_fatigue_risk: 1,
+    player_health_lineup_rest: 2,
+    player_health_training_load: 3,
+    lineup_drafts: 4,
+    game_flow_controller: 5,
+    team_season_objectives: 6,
+    roster_value_contract_cash: 7,
+    roster_cash_transfer_window: 8,
+    facility_condition_forecast: 9,
+    facility_finance_forecast: 10,
+  };
+
+  const candidates = items.filter(
+    (item) =>
+      item.status === "open" &&
+      (item.category === "task" ||
+        item.category === "warning" ||
+        item.category === "sponsor" ||
+        item.category === "training" ||
+        (item.category === "transfer" && (item.severity === "warning" || item.severity === "critical")) ||
+        (item.category === "facility" && (item.severity === "warning" || item.severity === "critical")) ||
+        (!options?.focusMatchdayLoop && item.category === "contract") ||
+        item.severity === "critical"),
+  );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return [...candidates].sort((left, right) => {
+    const severityDiff = severityRank[left.severity] - severityRank[right.severity];
+    if (severityDiff !== 0) {
+      return severityDiff;
+    }
+    const sourceDiff = (sourcePriority[left.source] ?? 50) - (sourcePriority[right.source] ?? 50);
+    if (sourceDiff !== 0) {
+      return sourceDiff;
+    }
+    return left.title.localeCompare(right.title, "de");
+  })[0];
 }
 
 export function mapInboxItemToFlowStep(item: GameInboxItem): Pick<GameFlowStep, "label" | "cta" | "status" | "targetView" | "targetPanel" | "teamId" | "blockers" | "warnings"> {
@@ -809,4 +1357,71 @@ export function mapInboxItemToFlowStep(item: GameInboxItem): Pick<GameFlowStep, 
     blockers: isCritical ? [item.description] : [],
     warnings: isCritical ? [] : [item.description],
   };
+}
+
+export const INBOX_DECISION_CATEGORIES = [
+  "task",
+  "warning",
+  "transfer",
+  "finance",
+  "contract",
+  "training",
+  "facility",
+  "sponsor",
+] as const;
+
+export const INBOX_CHRONICLE_CATEGORIES = ["news", "result"] as const;
+
+export function isGameInboxDecisionItem(item: GameInboxItem) {
+  if (isGameInboxChronicleOnlySource(item.source)) {
+    return false;
+  }
+  if (item.source.startsWith("player_health_")) {
+    return true;
+  }
+  if ((INBOX_DECISION_CATEGORIES as readonly string[]).includes(item.category)) {
+    if (item.category === "transfer" && item.source === "transfer_history") {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+export function isGameInboxChronicleItem(item: GameInboxItem) {
+  if ((INBOX_CHRONICLE_CATEGORIES as readonly string[]).includes(item.category)) {
+    return true;
+  }
+  if (item.source.startsWith("story:")) {
+    return true;
+  }
+  if (item.source === "story:matchday_recap") {
+    return true;
+  }
+  if (item.source === "season_snapshots" || item.source === "transfer_history") {
+    return true;
+  }
+  if (item.source === "facility_events" || item.source === "player_progression_events") {
+    return true;
+  }
+  if (item.source === "cash_prize_apply_logs" || item.source === "matchday_results") {
+    return true;
+  }
+  if (item.category === "finance" && item.source === "cash_prize_apply_logs") {
+    return true;
+  }
+  if (item.category === "transfer" && item.source === "transfer_history") {
+    return true;
+  }
+  if (item.category === "facility" && item.source === "facility_events") {
+    return true;
+  }
+  if (item.category === "training" && item.source === "player_progression_events") {
+    return true;
+  }
+  return false;
+}
+
+export function filterInboxItemsByMode(items: GameInboxItem[], mode: "decisions" | "chronicle") {
+  return items.filter((item) => (mode === "decisions" ? isGameInboxDecisionItem(item) : isGameInboxChronicleItem(item)));
 }

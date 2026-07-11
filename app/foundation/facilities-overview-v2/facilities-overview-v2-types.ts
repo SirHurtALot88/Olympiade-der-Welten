@@ -15,6 +15,4 @@ export type FacilitiesOverviewV2ClientProps = {
   facilityBudget: number | null;
   facilities: FacilitiesOverviewV2Snapshot[];
   boardMessage: string;
-  onOpenClassicTraining: () => void;
-  onOpenHomeV2: () => void;
 };

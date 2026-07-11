@@ -68,19 +68,19 @@ describe("data adapter", () => {
     const teams = loadSourceTeams();
 
     expect(teams).toHaveLength(32);
-    expect(teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
-    expect(teams.find((team) => team.teamId === "B-P")?.budget).toBe(275);
-    expect(teams.find((team) => team.teamId === "C-C")?.budget).toBe(215);
-    expect(teams.find((team) => team.teamId === "C-S")?.budget).toBe(315);
+    expect(teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
+    expect(teams.find((team) => team.teamId === "B-P")?.budget).toBe(325);
+    expect(teams.find((team) => team.teamId === "C-C")?.budget).toBe(265);
+    expect(teams.find((team) => team.teamId === "C-S")?.budget).toBe(365);
   });
 
   it("carries startbudget values into the seeded game state", () => {
     const seed = loadSeedData();
     const gameState = createGameStateFromSeed(seed);
 
-    expect(seed.teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
-    expect(gameState.teams.find((team) => team.teamId === "A-A")?.budget).toBe(175);
-    expect(gameState.teams.find((team) => team.teamId === "B-P")?.budget).toBe(275);
+    expect(seed.teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
+    expect(gameState.teams.find((team) => team.teamId === "A-A")?.budget).toBe(225);
+    expect(gameState.teams.find((team) => team.teamId === "B-P")?.budget).toBe(325);
   });
 
   it("builds a fresh season one seed without inherited transfer history", () => {

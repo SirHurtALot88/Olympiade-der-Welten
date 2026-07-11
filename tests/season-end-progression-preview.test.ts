@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
+import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
 import {
   buildCoreStatsFromDisciplineRatings,
   buildSeasonEndProgressionPreview,
@@ -152,18 +153,6 @@ function createForecast(partial: Partial<PlayerProgressionForecast> = {}): Playe
     xpBeforeTraits: partial.xpBeforeTraits ?? 100,
     xpAfterTraits: partial.xpAfterTraits ?? 100,
     xpEvents: partial.xpEvents ?? [],
-    possibleUpgradeSummary: partial.possibleUpgradeSummary ?? "preview",
-    ratingTierCosts: partial.ratingTierCosts ?? {
-      F: 45,
-      E: 55,
-      D: 70,
-      C: 95,
-      B: 130,
-      A: 180,
-      S: 250,
-      "S+": 360,
-      "99": null,
-    },
     fatigueStrain: partial.fatigueStrain ?? { label: "mittel", score: 30, warning: "ok" },
     sourceStatus: partial.sourceStatus ?? { appearances: "ready", mvs: "ready", pps: "ready", highlights: "ready", facilities: "future_source", writes: "preview_only" },
     audit: partial.audit ?? { mvsPpsCoupling: "test", seasonEndOnly: true, productiveWrites: false, warnings: [] },
@@ -230,8 +219,27 @@ describe("season-end progression preview", () => {
     const row = previewFor(createPlayer(), createForecast({ baseTrainingXP: 100, performanceXP: 50, seasonProjectedXP: 150 }), "power", { trainingCenterLevel: 2 });
 
     expect(row.facilityEffects.xpBeforeFacility).toBe(100);
-    expect(row.facilityEffects.xpAfterFacility).toBe(110);
-    expect(row.availableXP).toBe(160);
+    expect(row.facilityEffects.xpAfterFacility).toBe(106);
+    expect(row.availableXP).toBe(156);
+    expect(row.legacyAvailableXP).toBe(156);
+  });
+
+  it("includes organic setpoint fields alongside legacy XP preview", () => {
+    const player = createPlayer({ trainingMode: "normal" });
+    const gameState = createGameState(player);
+    const organic = buildOrganicSeasonProgression({ gameState, player });
+    const preview = buildSeasonEndProgressionPreview({
+      gameState,
+      teamId: "team-1",
+      forecastsByPlayerId: new Map([["player-1", createForecast({ seasonProjectedXP: 100 })]]),
+      organicByPlayerId: new Map([["player-1", organic]]),
+      upgradeRequests: [{ playerId: "player-1", attribute: "power" }],
+    });
+
+    expect(preview.rows[0]?.organicNetSetpoints).toBe(organic.netSetpoints);
+    expect(preview.rows[0]?.organicTrainingSetpoints).toBe(organic.trainingSetpoints);
+    expect(preview.rows[0]?.organicPerformanceSetpoints).toBe(organic.appliedPerformanceSetpoints);
+    expect(preview.rows[0]?.legacyAvailableXP).toBe(preview.rows[0]?.availableXP);
   });
 
   it("shows scouting and analytics quality without faking missing potential values", () => {

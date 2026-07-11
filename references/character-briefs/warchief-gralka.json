@@ -1,0 +1,20 @@
+{
+  "name": "Warchief Gralka",
+  "id": "player-1365-warchief-gralka",
+  "className": "Warlord",
+  "race": "Orc",
+  "alignment": "R-B",
+  "gender": "f",
+  "subclasses": ["Warrior", "Destroyer", "Lord"],
+  "traitsPositive": ["Ambitious", "FiredUp", "Motivated"],
+  "traitsNegative": ["Feisty", "Cruel", "Obsessive"],
+  "attributes": {
+    "power": 89, "health": 80, "stamina": 80, "intelligence": 54,
+    "awareness": 26, "determination": 85, "speed": 45, "dexterity": 46,
+    "charisma": 71, "will": 75, "spirit": 23, "torment": 79
+  },
+  "flavorDe": "Auf den Feldern vor den Eisernen Hallen führt Warchief Gralka keine feinen Reden — sie führt Blut, Schädelketten und eine Axt, die aussieht, als habe sie noch nie Pause gemacht. Die roten Kriegsstreifen im Gesicht, die Zöpfe und die Haltung einer Orc, die lieber vorne steht als irgendwo erinnert zu werden, machen sie zur Warchief, bevor man den Titel ausgesprochen hat. Einst war sie nur ein Klan-Mädchen, das zu laut lachte und zu früh zuschlug. Heute sammelt sie Schädel wie andere Trophäen und nennt es Führung. Wer sie unterschätzt, liegt meist schneller, als seine Knochen protestieren können.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Warchief Gralka.jpg",
+  "cost": 90,
+  "upkeepBase": 10
+}

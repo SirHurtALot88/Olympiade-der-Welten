@@ -1,20 +1,31 @@
+import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+
 export type HomeV2TopPlayerCard = {
   playerId: string;
   name: string;
-  roleTag: string | null;
   portraitUrl: string | null;
+  portraitPlaceholderUrl?: string | null;
   portraitInitials: string;
+  rosterRank: number;
   playerOvr: number | null;
   playerPps: number | null;
   playerMvs: number | null;
-  ppPow: number | null;
-  ppSpe: number | null;
-  ppMen: number | null;
-  ppSoc: number | null;
+  pow: number | null;
+  spe: number | null;
+  men: number | null;
+  soc: number | null;
   contractLength: number | null;
   marketValue: number | null;
   highlight?: "top" | "prospect" | null;
+  ovrRank?: number | null;
+  mvsRank?: number | null;
+  ppsRank?: number | null;
+  caRating: number | null;
+  poRangeMin: number | null;
+  poRangeMax: number | null;
 };
+
+export const HOME_V2_TOP_PLAYER_COUNT = 6;
 
 export type HomeV2FacilitySnapshot = {
   facilityId: string;
@@ -45,6 +56,14 @@ export type HomeV2TodayCard = {
   tone: "ready" | "warning" | "info";
 };
 
+export type HomeV2BoardObjective = {
+  objectiveId: string;
+  label: string;
+  status: string;
+  currentValue: string | number | boolean | null;
+  targetValue: string | number | boolean | null;
+};
+
 export type HomeV2ClientProps = {
   teamName: string;
   teamCode: string;
@@ -70,18 +89,22 @@ export type HomeV2ClientProps = {
   nextStepDetail: string;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
+  leagueHeatPools: LeaguePlayerHeatPools;
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
   inboxItems: HomeV2InboxItem[];
+  inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
+  boardObjectives: HomeV2BoardObjective[];
   onContinue: () => void;
-  onOpenClassicHome: () => void;
   onOpenTeams: () => void;
   onOpenLineup: () => void;
   onOpenMarket: () => void;
   onOpenTraining: () => void;
-  onOpenHq: () => void;
+  onOpenOffice: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
+  onCompleteInboxItem?: (itemId: string) => void;
+  onOpenBoardObjectives?: () => void;
   onOpenPlayer: (playerId: string) => void;
 };

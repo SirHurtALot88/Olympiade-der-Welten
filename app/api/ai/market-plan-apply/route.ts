@@ -7,6 +7,8 @@ import {
   applyAiMarketPlanLocally,
 } from "@/lib/ai/ai-market-plan-apply-service";
 import { isExplicitLocalTransferWindowPhase, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
@@ -42,7 +44,6 @@ export async function POST(request: Request) {
       applySellSteps?: boolean;
       applyBuySteps?: boolean;
       maxBuysPerTeam?: number | null;
-      maxSellsPerTeam?: number | null;
       previewBuyLimit?: number | null;
       previewSellLimit?: number | null;
       performanceBudgetMs?: number | null;
@@ -68,6 +69,19 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
+    saveId,
+    teamId,
+    action: "ai_market_plan_apply",
+    source: "sqlite",
+    dryRun,
+    confirmToken: body.confirmToken ?? null,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
   try {
