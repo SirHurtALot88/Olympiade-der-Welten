@@ -15,6 +15,9 @@
  * - NlGauge: kleines Bogen-Gauge (CA→PO, Kommerz-Rating, …)
  * - NlSparkline / NlBarChart / NlRadar: handgerollte SVG-Chart-Primitives
  * - NlMedalBadge: Gold/Silber/Bronze-Abzeichen
+ * - useCountUp / NlCountUpValue: Zähler-Animation für Hero-/KPI-Zahlen
+ *   (respektiert prefers-reduced-motion); dazu die CSS-only Reveal-Klasse
+ *   `.nl-reveal` (+ `--nl-reveal-i` Stagger-Index) für gestaffelten Karten-Einstieg.
  */
 export { StatChip, StatChipRow, type StatChipProps, type StatChipRowProps } from "@/components/foundation/new-look/StatChip";
 export { NlCard, type NlCardProps } from "@/components/foundation/new-look/NlCard";
@@ -26,6 +29,12 @@ export { NlSparkline, type NlSparklineProps } from "@/components/foundation/new-
 export { NlBarChart, type NlBarChartProps, type NlBarChartBar } from "@/components/foundation/new-look/NlBarChart";
 export { NlRadar, type NlRadarProps, type NlRadarAxis } from "@/components/foundation/new-look/NlRadar";
 export { NlMedalBadge, type NlMedalBadgeProps, type NlMedalKind } from "@/components/foundation/new-look/NlMedalBadge";
+export {
+  useCountUp,
+  NlCountUpValue,
+  type UseCountUpOptions,
+  type NlCountUpValueProps,
+} from "@/components/foundation/new-look/useCountUp";
 export {
   formatNlNumber,
   NL_AXIS_LABELS,

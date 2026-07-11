@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
@@ -294,6 +294,135 @@ export default function InboxV2NewLook({
     action();
   };
 
+  // Chronik-"Magazin" (#Wave2): Lead-Story-Karte + Support-Karten-Grid statt
+  // der generischen Liste. Nur für Chronik-Items (news/result/transfer aus
+  // der Chronik-Quelle) — der Entscheidungen-Modus rendert unverändert die
+  // bestehende Listenansicht, funktionale Items bleiben also unangetastet.
+  const renderChronicleCardActions = (item: InboxV2Item) => (
+    <>
+      {item.choices && item.choices.length > 0 ? (
+        <div className="nl-inbox-card-choices" data-testid="inbox-v2-quick-actions">
+          {item.choices.map((choice, choiceIndex) => (
+            <button
+              key={choice.id}
+              type="button"
+              className={`nl-inbox-choice${choiceIndex === 0 ? " is-recommended" : ""}`}
+              data-testid={`inbox-quick-action-${choice.id}`}
+              onClick={(event) => runInnerAction(event, () => onRunChoice?.(item.id, choice.id))}
+            >
+              <span className="nl-inbox-choice-label">
+                {choice.label}
+                {choiceIndex === 0 && item.choices && item.choices.length > 1 ? (
+                  <span className="nl-inbox-choice-tag">Empfohlen</span>
+                ) : null}
+              </span>
+              {choice.detail ? <small className="nl-inbox-choice-hint">{choice.detail}</small> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {item.status === "open" && (onMarkDone || onDismiss) ? (
+        <div className="nl-inbox-card-actions">
+          {onMarkDone ? (
+            <button
+              type="button"
+              className="nl-inbox-card-action"
+              onClick={(event) => runInnerAction(event, () => onMarkDone(item.id))}
+            >
+              Erledigt
+            </button>
+          ) : null}
+          {onDismiss ? (
+            <button
+              type="button"
+              className="nl-inbox-card-action"
+              onClick={(event) => runInnerAction(event, () => onDismiss(item.id))}
+            >
+              Ausblenden
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+
+  const renderChronicleEyebrow = (meta: ReturnType<typeof getCategoryMeta>, statusLabel: string | null) => {
+    const CategoryIcon = meta.icon;
+    return (
+      <span className="nl-inbox-card-meta">
+        <CategoryIcon />
+        <span className="nl-inbox-card-category">{meta.label}</span>
+        {statusLabel ? <span className="nl-inbox-card-status">{statusLabel}</span> : null}
+      </span>
+    );
+  };
+
+  const renderChronicleLeadCard = (item: InboxV2Item) => {
+    const meta = getCategoryMeta(item.category);
+    const severityTone = getSeverityTone(item.severity);
+    const statusLabel = getStatusLabel(item.status);
+    const isSelected = selectedItemId === item.id;
+    return (
+      <div key={item.id} id={getInboxItemDomId(item.id)}>
+        <NlCard
+          interactive
+          onClick={() => onSelectItem(item.id)}
+          className={`nl-chronicle-lead ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          eyebrow={renderChronicleEyebrow(meta, statusLabel)}
+          title={item.title}
+          data-testid={`nl-chronicle-lead-${item.id}`}
+        >
+          <p className="nl-chronicle-lead-body">{item.detail}</p>
+          {renderChronicleCardActions(item)}
+        </NlCard>
+      </div>
+    );
+  };
+
+  const renderChronicleStoryCard = (item: InboxV2Item, revealIndex: number) => {
+    const meta = getCategoryMeta(item.category);
+    const severityTone = getSeverityTone(item.severity);
+    const statusLabel = getStatusLabel(item.status);
+    const isSelected = selectedItemId === item.id;
+    return (
+      <div
+        key={item.id}
+        id={getInboxItemDomId(item.id)}
+        className="nl-reveal"
+        style={{ "--nl-reveal-i": revealIndex } as CSSProperties}
+      >
+        <NlCard
+          interactive
+          onClick={() => onSelectItem(item.id)}
+          className={`nl-chronicle-story ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          eyebrow={renderChronicleEyebrow(meta, statusLabel)}
+          title={item.title}
+          data-testid={`nl-chronicle-story-${item.id}`}
+        >
+          <p className="nl-chronicle-story-body">{item.detail}</p>
+          {renderChronicleCardActions(item)}
+        </NlCard>
+      </div>
+    );
+  };
+
+  const renderChronicleMagazine = () => {
+    const [leadItem, ...restItems] = displayedItems;
+    if (!leadItem) {
+      return null;
+    }
+    return (
+      <div className="nl-chronicle-magazine" aria-label="Chronik-Magazin">
+        {renderChronicleLeadCard(leadItem)}
+        {restItems.length > 0 ? (
+          <div className="nl-chronicle-grid" aria-label="Weitere Chronik-Einträge">
+            {restItems.map((item, index) => renderChronicleStoryCard(item, index))}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   const emptyTitle = mode === "chronicle" ? "Noch keine Chronik-Einträge" : "Alles erledigt";
   const emptyText =
     mode === "chronicle"
@@ -374,7 +503,13 @@ export default function InboxV2NewLook({
         </div>
       ) : null}
 
-      {displayedItems.length > 0 ? (
+      {displayedItems.length === 0 ? (
+        <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
+          <p className="nl-inbox-empty-text">{emptyText}</p>
+        </NlCard>
+      ) : mode === "chronicle" ? (
+        renderChronicleMagazine()
+      ) : (
         <ul className="nl-inbox-list" aria-label="Inbox Einträge">
           {displayedItems.map((item) => {
             const meta = getCategoryMeta(item.category);
@@ -453,10 +588,6 @@ export default function InboxV2NewLook({
             );
           })}
         </ul>
-      ) : (
-        <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
-          <p className="nl-inbox-empty-text">{emptyText}</p>
-        </NlCard>
       )}
     </div>
   );

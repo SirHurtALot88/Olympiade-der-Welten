@@ -1265,6 +1265,137 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     }
   }
 
+  // --- Story Card: enges Rennen in der Live-Tabelle -----------------
+  // Zwei benachbarte Ränge mit knappem Punktabstand — reale Standings-Daten
+  // (`seasonState.standings`), kein erfundener Zustand. Nur der engste Fall
+  // liga-weit wird als Karte erzeugt, damit nicht jeder Spieltag mehrere
+  // Rivalitäts-Karten gleichzeitig zeigt.
+  const standings = input.gameState.seasonState.standings ?? {};
+  const rankedStandings = input.gameState.teams
+    .map((team) => {
+      const record = standings[team.teamId];
+      if (!record || record.rank == null || !Number.isFinite(record.rank)) return null;
+      return { team, rank: record.rank, points: record.points ?? 0 };
+    })
+    .filter((entry): entry is { team: Team; rank: number; points: number } => entry != null)
+    .sort((left, right) => left.rank - right.rank);
+
+  let closestRivalry: { left: (typeof rankedStandings)[number]; right: (typeof rankedStandings)[number]; gap: number } | null = null;
+  for (let i = 0; i < rankedStandings.length - 1; i += 1) {
+    const left = rankedStandings[i]!;
+    const right = rankedStandings[i + 1]!;
+    if (!teamVisible(left.team.teamId) && !teamVisible(right.team.teamId)) continue;
+    const gap = Math.abs(left.points - right.points);
+    if (gap > 3) continue;
+    if (!closestRivalry || gap < closestRivalry.gap) {
+      closestRivalry = { left, right, gap };
+    }
+  }
+  if (closestRivalry) {
+    const { left, right, gap } = closestRivalry;
+    const [teamA, teamB] = [left.team.teamId, right.team.teamId].sort();
+    items.push(
+      createItem({
+        itemId: `story_rivalry_close_standings:${input.saveId}:${seasonId}:${teamA}:${teamB}`,
+        saveId: input.saveId,
+        seasonId,
+        teamId: left.team.teamId,
+        category: "news",
+        severity: "info",
+        title: "Story Card: Enges Rennen",
+        description: `${left.team.shortCode} (Rang ${left.rank}, ${left.points} Pkt.) vs. ${right.team.shortCode} (Rang ${right.rank}, ${right.points} Pkt.) — nur ${gap} Punkt(e) trennen die Teams.`,
+        targetView: "season",
+        targetParams: { team: left.team.teamId },
+        source: "story:standings_rivalry_gap",
+        createdAt,
+      }),
+    );
+  }
+
+  // --- Story Card: Board unter Hochspannung --------------------------
+  // Nutzt dieselbe `buildTeamObjectiveOverview`-Ableitung wie die
+  // Board-Ziel-Tasks oben (gecached pro gameState-Objekt) statt eigene
+  // Board-Logik zu duplizieren. Schwelle (`high_board_pressure`) ist die
+  // bestehende Warnung aus dem Board-Confidence-Modell.
+  const boardOverview = buildTeamObjectiveOverview(input.gameState);
+  for (const teamId of visibleTeamIds) {
+    const board = boardOverview.boardConfidence[teamId];
+    if (!board || !board.warnings.includes("high_board_pressure")) continue;
+    const team = input.gameState.teams.find((entry) => entry.teamId === teamId);
+    if (!team) continue;
+    items.push(
+      createItem({
+        itemId: `story_board_pressure_high:${input.saveId}:${seasonId}:${teamId}`,
+        saveId: input.saveId,
+        seasonId,
+        teamId,
+        category: "news",
+        severity: "warning",
+        title: "Story Card: Board unter Hochspannung",
+        description: `${team.shortCode}: Board-Druck bei ${board.pressure}/10 — Vertrauen nur ${board.value}/10.`,
+        targetView: "teams",
+        targetParams: { team: teamId, panel: "board-objectives" },
+        source: "story:board_confidence_high_pressure",
+        createdAt,
+      }),
+    );
+  }
+
+  // --- Story Card: Sponsor-Meilenstein -------------------------------
+  // Reale Auszahlungs-Logs (`sponsorPayoutLogs`), bislang von keiner
+  // anderen Inbox-Quelle konsumiert.
+  for (const log of (input.gameState.seasonState.sponsorPayoutLogs ?? []).slice(-12)) {
+    if (!teamVisible(log.teamId)) continue;
+    const team = input.gameState.teams.find((entry) => entry.teamId === log.teamId);
+    items.push(
+      createItem({
+        itemId: `story_sponsor_milestone:${input.saveId}:${log.id}`,
+        saveId: input.saveId,
+        seasonId: log.seasonId ?? seasonId,
+        teamId: log.teamId,
+        category: "news",
+        severity: "info",
+        title: "Story Card: Sponsor-Meilenstein",
+        description: `${team?.shortCode ?? log.teamId}: Sponsor-Auszahlung ${log.cashDelta >= 0 ? "+" : ""}${log.cashDelta} (${log.phase}).`,
+        targetView: "teams",
+        targetParams: { team: log.teamId, panel: "sponsor-choice" },
+        source: "story:sponsor_payout_log",
+        createdAt: log.createdAt ?? createdAt,
+      }),
+    );
+  }
+
+  // --- Story Card: Durchbruch-Spieler --------------------------------
+  // Andere Kennzahl als die bestehende "XP zeigt Wirkung"-Karte oben
+  // (OVR-Sprung statt Anzahl verbesserter Diszis) und ein eigener
+  // `story:`-Source, damit `groupInboxItemsForDisplay` (das ausschließlich
+  // nach `source === "player_progression_events"` gruppiert) unberührt bleibt.
+  for (const event of (input.gameState.playerProgressionEvents ?? []).slice(-12)) {
+    if (!teamVisible(event.teamId)) continue;
+    const beforeOvr = event.progressionSnapshotBefore?.ovr;
+    const afterOvr = event.progressionSnapshotAfter?.ovr;
+    if (typeof beforeOvr !== "number" || typeof afterOvr !== "number") continue;
+    const delta = afterOvr - beforeOvr;
+    if (delta < 5) continue;
+    items.push(
+      createItem({
+        itemId: `story_breakout_player_ovr:${input.saveId}:${event.eventId}`,
+        saveId: input.saveId,
+        seasonId: event.seasonId ?? seasonId,
+        teamId: event.teamId,
+        playerId: event.playerId,
+        category: "news",
+        severity: "info",
+        title: "Story Card: Durchbruch-Spieler",
+        description: `${getPlayerName(input.gameState, event.playerId)} steigt im OVR um +${delta.toFixed(0)} auf ${afterOvr}.`,
+        targetView: "trainingV2",
+        targetParams: { team: event.teamId, player: event.playerId, panel: "season-end-development" },
+        source: "story:player_breakout_ovr_delta",
+        createdAt: event.timestamp ?? createdAt,
+      }),
+    );
+  }
+
   return items;
 }
 

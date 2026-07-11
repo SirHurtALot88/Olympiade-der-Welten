@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { HomeV2ClientProps, HomeV2TodayCard, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
@@ -13,6 +15,7 @@ import {
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
   type NlAxisKey,
   type NlRadarAxis,
   type NlTone,
@@ -232,6 +235,16 @@ export default function HomeV2NewLook({
   const visibleTodayCards = todayCards.slice(0, 3);
   const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
 
+  // Hero-/KPI-Zähler (#Wave2): nur die Headline-Zahlen zählen hoch — Tabellen
+  // und Listen bleiben unverändert. Fixe Anzahl Top-Level-Hooks (kein Loop),
+  // respektiert prefers-reduced-motion via `useCountUp`.
+  const animatedRank = useCountUp(rank);
+  const animatedCash = useCountUp(cash);
+  const animatedGuv = useCountUp(guv);
+  const animatedPoints = useCountUp(points);
+  const animatedRosterCount = useCountUp(rosterCount, { durationMs: 700 });
+  const animatedSalaryTotal = useCountUp(salaryTotal);
+
   // Team-Achsenprofil (#50): Durchschnitt der vier Spiel-Achsen über die
   // Top-Kader-Spieler — nur reale, endliche Werte, fehlende Achsen fallen
   // raus. Radar wird nur gerendert, wenn mindestens eine Achse ableitbar ist.
@@ -306,24 +319,24 @@ export default function HomeV2NewLook({
           <StatChipRow className="nl-home-hero-kpis" aria-label="Team KPIs">
             <StatChip
               label="Rang"
-              value={rank != null ? `#${rank}` : "—"}
+              value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
               tone="accent"
               onClick={onOpenSeason}
               title="Zum Saisonstand"
             />
             <StatChip
               label="Cash"
-              value={formatNlMoney(cash)}
+              value={formatNlMoney(animatedCash ?? cash)}
               onClick={onOpenOffice}
               title="Zum Front Office"
             />
           </StatChipRow>
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-            <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
-            <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
-            <StatChip label="Kader" value={formatNlNumber(rosterCount, 0)} />
-            <StatChip label="Gehalt" value={formatNlMoney(salaryTotal)} />
+            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
+            <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
+            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} />
+            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} />
           </StatChipRow>
         </div>
       </NlCard>
@@ -366,22 +379,23 @@ export default function HomeV2NewLook({
         </div>
         <div className="nl-home-today-grid">
           {visibleTodayCards.map((card, index) => (
-            <NlCard
-              key={card.key}
-              interactive
-              onClick={() => handleTodayCardClick(card.key)}
-              className={`nl-home-today-card ${nlToneClass(getTodayCardTone(card.tone))}${index === 0 ? " is-primary" : ""}`}
-              eyebrow={
-                <span className="nl-home-today-kicker">
-                  {getTodayCardIcon(card.key)}
-                  {index + 1}. {card.kicker}
-                </span>
-              }
-              title={card.title}
-              data-testid={`nl-home-today-card-${card.key}`}
-            >
-              <p className="nl-home-today-detail">{card.detail}</p>
-            </NlCard>
+            <div key={card.key} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+              <NlCard
+                interactive
+                onClick={() => handleTodayCardClick(card.key)}
+                className={`nl-home-today-card ${nlToneClass(getTodayCardTone(card.tone))}${index === 0 ? " is-primary" : ""}`}
+                eyebrow={
+                  <span className="nl-home-today-kicker">
+                    {getTodayCardIcon(card.key)}
+                    {index + 1}. {card.kicker}
+                  </span>
+                }
+                title={card.title}
+                data-testid={`nl-home-today-card-${card.key}`}
+              >
+                <p className="nl-home-today-detail">{card.detail}</p>
+              </NlCard>
+            </div>
           ))}
         </div>
       </section>
@@ -589,9 +603,9 @@ export default function HomeV2NewLook({
         >
           <div className="nl-home-league-body">
             <StatChipRow aria-label="Liga-Kennzahlen">
-              <StatChip label="Rang" value={rank != null ? `#${rank}` : "—"} tone="accent" />
-              <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" />
-              <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} />
+              <StatChip label="Rang" value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"} tone="accent" />
+              <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" />
+              <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} />
             </StatChipRow>
           </div>
         </NlCard>

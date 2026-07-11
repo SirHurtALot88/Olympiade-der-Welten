@@ -12,6 +12,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  useCountUp,
   type NlBarChartBar,
 } from "@/components/foundation/new-look";
 import type { FoundationPrizeV2PanelProps } from "@/app/foundation/prize-v2/FoundationPrizeV2Panel";
@@ -137,6 +138,14 @@ export default function FoundationPrizeV2NewLook({
   // Simulation folgen. "Cash vorher" bleibt der reale Startwert.
   const firstForecastRow = prizeForecastRows[0] ?? null;
 
+  // Headline-Geldbeträge zählen hoch (#Wave2) — die Haupttabelle und die
+  // Verteilungsbalken bleiben unverändert (sortierbar/groß, kein Zähler).
+  const animatedSummaryBonusMalus = useCountUp(prizePreviewFeed?.summary.totalRankChangePrize ?? null);
+  const animatedForecastCashBefore = useCountUp(prizeV2SelectedTeamSummary?.currentCash ?? null);
+  const animatedForecastPrizeMoney = useCountUp(prizeForecastRankRow?.prizeMoney ?? null);
+  const animatedForecastBonusMalus = useCountUp(firstForecastRow?.guv ?? null);
+  const animatedForecastCashAfter = useCountUp(firstForecastRow?.cashAfter ?? null);
+
   const sortedTableRows = useMemo(() => [...displayPrizePreviewRows].sort(compareByRank), [displayPrizePreviewRows]);
 
   const maxPrizeMoney = useMemo(
@@ -200,7 +209,7 @@ export default function FoundationPrizeV2NewLook({
             label="Bonus/Malus"
             value={
               prizePreviewFeed?.summary.totalRankChangePrize != null
-                ? formatSignedDisplayMoney(prizePreviewFeed.summary.totalRankChangePrize)
+                ? formatSignedDisplayMoney(animatedSummaryBonusMalus ?? prizePreviewFeed.summary.totalRankChangePrize)
                 : "—"
             }
             sub="Liga gesamt"
@@ -405,25 +414,31 @@ export default function FoundationPrizeV2NewLook({
               label="Cash vorher"
               value={
                 prizeV2SelectedTeamSummary?.currentCash != null
-                  ? formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)
+                  ? formatLocalePoints(animatedForecastCashBefore ?? prizeV2SelectedTeamSummary.currentCash, 1)
                   : "—"
               }
             />
             <StatChip
               label="Preisgeld"
-              value={prizeForecastRankRow?.prizeMoney != null ? formatLocalePoints(prizeForecastRankRow.prizeMoney, 1) : "—"}
+              value={
+                prizeForecastRankRow?.prizeMoney != null
+                  ? formatLocalePoints(animatedForecastPrizeMoney ?? prizeForecastRankRow.prizeMoney, 1)
+                  : "—"
+              }
               sub={prizeForecastRankRow ? `bei Platz ${prizeForecastRank}` : "kein Rang-Datum"}
               tone="accent"
             />
             <StatChip
               label="Bonus/Malus"
-              value={firstForecastRow?.guv != null ? formatSignedDisplayMoney(firstForecastRow.guv) : "—"}
+              value={firstForecastRow?.guv != null ? formatSignedDisplayMoney(animatedForecastBonusMalus ?? firstForecastRow.guv) : "—"}
               tone={firstForecastRow?.guv != null && firstForecastRow.guv < 0 ? "risk" : "good"}
             />
             <StatChip
               label="Cash nachher"
               value={
-                firstForecastRow?.cashAfter != null ? formatLocalePoints(firstForecastRow.cashAfter, 1) : "—"
+                firstForecastRow?.cashAfter != null
+                  ? formatLocalePoints(animatedForecastCashAfter ?? firstForecastRow.cashAfter, 1)
+                  : "—"
               }
             />
           </StatChipRow>
