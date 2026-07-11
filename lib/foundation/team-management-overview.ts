@@ -151,6 +151,14 @@ export type TeamManagementSnapshotRow = {
     points: number | null;
     rank: number | null;
   }>;
+  // Optional gehalten, damit bestehende Test-Fixtures/Fremd-Konstruktoren gültig
+  // bleiben; die produktiven Builder setzen es immer, Konsumenten nutzen `?? []`.
+  historicalEconomyBySeason?: Array<{
+    seasonId: string;
+    seasonName: string;
+    marketValueTotal: number | null;
+    cash: number | null;
+  }>;
   historicalSeasonsPlayed: number;
   historicalBestRank: number | null;
   historicalLastSeasonRank: number | null;
@@ -505,6 +513,28 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
               : null,
         rank: entry.standing.rank ?? null,
       }));
+    // Ökonomie je abgeschlossener Saison (echte Snapshot-Endwerte, chronologisch).
+    // Gleiche Feld-Präzedenz wie die Team-Detail-Historie (…TotalEnd → …End),
+    // damit MW/Cash-Verläufe konsistent sind. Fehlt ein Feld im Snapshot, bleibt
+    // der Punkt null und wird beim Zeichnen übersprungen (kein Fake).
+    const historicalEconomyBySeason = [...teamHistoricalSnapshots]
+      .sort((left, right) => left.snapshot.seasonId.localeCompare(right.snapshot.seasonId, "de", { numeric: true }))
+      .map((entry) => ({
+        seasonId: entry.snapshot.seasonId,
+        seasonName: entry.snapshot.seasonName,
+        marketValueTotal:
+          entry.standing.marketValueTotalEnd != null && Number.isFinite(entry.standing.marketValueTotalEnd)
+            ? roundValue(entry.standing.marketValueTotalEnd, 2)
+            : entry.standing.marketValueEnd != null && Number.isFinite(entry.standing.marketValueEnd)
+              ? roundValue(entry.standing.marketValueEnd, 2)
+              : null,
+        cash:
+          entry.standing.cashTotal != null && Number.isFinite(entry.standing.cashTotal)
+            ? roundValue(entry.standing.cashTotal, 2)
+            : entry.standing.cashEnd != null && Number.isFinite(entry.standing.cashEnd)
+              ? roundValue(entry.standing.cashEnd, 2)
+              : null,
+      }));
     const historicalAvgPoints =
       historicalPointsBySeason.length > 0
         ? roundValue(
@@ -589,6 +619,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       historicalAvgPoints,
       historicalPointsTotal,
       historicalPointsBySeason,
+      historicalEconomyBySeason,
       historicalSeasonsPlayed: allTimeRow?.seasonsPlayed ?? teamHistoricalSnapshots.length,
       historicalBestRank: allTimeRow?.bestRank ?? null,
       historicalLastSeasonRank: latestHistoricalEntry?.standing.rank ?? allTimeRow?.lastSeasonRank ?? null,
@@ -798,6 +829,7 @@ export function buildLightweightTeamSeasonStandRows(input: {
         historicalAvgPoints: null,
         historicalPointsTotal: null,
         historicalPointsBySeason: [],
+        historicalEconomyBySeason: [],
         historicalSeasonsPlayed: 0,
         historicalBestRank: null,
         historicalLastSeasonRank: null,

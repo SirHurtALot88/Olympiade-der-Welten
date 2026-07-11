@@ -79,12 +79,33 @@ export function calculateFacilityUpkeep(teamFacilities: TeamFacilityCollection |
   );
 }
 
-export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection | null | undefined) {
+/**
+ * Summiert die effektiven Saison-Einnahmen aller Gebäude (effizienzgewichtet).
+ *
+ * `arenaPopularityFactor` (Beliebtheit, Default 1.0 = Liga-Durchschnitt) skaliert
+ * NUR die Arena (`arena_upgrade`) — der Fan-Shop bleibt bewusst flach. Der Default
+ * 1.0 hält Aufrufer ohne Liga-Kontext (und Alt-Tests) auf der reinen Basis.
+ * Reales Cash wird an der echten Season-End-Resolution (facility-season-end-service)
+ * mit dem team-spezifischen Faktor gutgeschrieben.
+ */
+export function calculateFacilityIncome(
+  teamFacilities: TeamFacilityCollection | null | undefined,
+  options?: { arenaPopularityFactor?: number },
+) {
+  const arenaPopularityFactor =
+    typeof options?.arenaPopularityFactor === "number" && Number.isFinite(options.arenaPopularityFactor)
+      ? options.arenaPopularityFactor
+      : 1;
   return roundValue(
     FACILITY_CATALOG.reduce((sum, facility) => {
       const level = getFacilityLevel(teamFacilities, facility.facilityId);
       const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
-      return sum + ((getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0) * efficiencyPct) / 100;
+      const popularityFactor = facility.facilityId === "arena_upgrade" ? arenaPopularityFactor : 1;
+      return (
+        sum +
+        ((getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) /
+          100
+      );
     }, 0),
   );
 }

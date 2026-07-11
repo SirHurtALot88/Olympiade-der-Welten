@@ -17,6 +17,8 @@ import type {
 } from "@/app/foundation/training-facilities-v2/training-view-types";
 import {
   TrainingBudgetBreakdownDisclosure,
+  buildTrainingClassSuggestion,
+  buildTrainingIntensityProjection,
   formatSignedPercent,
   getDevelopmentTone,
 } from "@/app/foundation/training-facilities-v2/training-view-shared";
@@ -259,10 +261,86 @@ function NlTrainingForecastBar({
   );
 }
 
+/** Potential-Trainingsspeed als Tonstufe — macht hohes Potential auf einen Blick sichtbar. */
+function getPotentialTone(multiplier: number): "high" | "good" | "neutral" | "low" {
+  if (multiplier >= 1.12) return "high";
+  if (multiplier >= 1.03) return "good";
+  if (multiplier >= 0.98) return "neutral";
+  return "low";
+}
+
+/**
+ * D1/D2 — Pro-Spieler, pro-Intensität Trainings-Prognose. Zeigt für Leicht/Mittel/Hart
+ * den erwarteten Zuwachs "durch Training" (potentialgetrieben, daher pro Spieler
+ * unterschiedlich) plus die konstante Regression und den projizierten Netto-Wert.
+ */
+function NlTrainingIntensityProjection({
+  row,
+  trainingModeOptions,
+}: {
+  row: TrainingPlayerRowView;
+  trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
+}) {
+  const projection = useMemo(
+    () => buildTrainingIntensityProjection(row, trainingModeOptions),
+    [row, trainingModeOptions],
+  );
+  const potentialMultiplier = row.modifiers.potentialTrainingMultiplier;
+  const potentialTone = getPotentialTone(potentialMultiplier);
+  const best = projection.reduce((max, entry) => Math.max(max, entry.trainingGain), 0.01);
+
+  return (
+    <div className="nl-training-intensity" data-testid="nl-training-intensity" aria-label="Trainingsbudget je Intensität">
+      <div className="nl-training-intensity-head">
+        <span className="nl-training-intensity-title">Entwicklung je Intensität</span>
+        <span
+          className={`nl-training-potential is-${potentialTone}`}
+          title="Potential-Trainingsspeed: höheres Potential ⇒ mehr Zuwachs pro Intensität. Dieser Faktor steckt in jeder Prognose unten."
+        >
+          <NlTrainingGlyph kind="signature" /> Potential ×{formatVeloNumber(potentialMultiplier, 2)}
+        </span>
+      </div>
+      <div className="nl-training-intensity-rows">
+        {projection.map((entry) => (
+          <div
+            key={`intensity-${row.player.id}-${entry.mode}`}
+            className={`nl-training-intensity-row${entry.isCurrent ? " is-current" : ""}`}
+            title={`${entry.label}: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)}`}
+          >
+            <span className="nl-training-intensity-label">
+              {entry.label}
+              {entry.isCurrent ? <span className="nl-training-intensity-current">aktiv</span> : null}
+            </span>
+            <span className="nl-training-intensity-bar" aria-hidden="true">
+              <span
+                className="nl-training-intensity-fill"
+                style={{ width: `${Math.min(100, (entry.trainingGain / best) * 100)}%` }}
+              />
+            </span>
+            <span className="nl-training-intensity-gain nl-tnum" title="Erwarteter Zuwachs durch Training bei dieser Intensität">
+              +{formatVeloNumber(entry.trainingGain, 1)} <small>Training</small>
+            </span>
+            <NlDeltaChip
+              value={entry.net}
+              format={(n) => `${formatVeloSignedNumber(n, 1)} SP`}
+              className="nl-training-intensity-net"
+            />
+          </div>
+        ))}
+      </div>
+      <small className="nl-training-intensity-foot nl-tnum">
+        Regression konstant {formatVeloSignedNumber(projection[0]?.regression ?? 0, 1)} · höheres Potential ⇒ größerer
+        Trainings-Zuwachs
+      </small>
+    </div>
+  );
+}
+
 function NlTrainingPlayerCard({
   row,
   trainingModeReadOnly,
   modeSegments,
+  trainingModeOptions,
   trainingClassOptions,
   onSetTrainingMode,
   onSetTrainingClass,
@@ -271,6 +349,7 @@ function NlTrainingPlayerCard({
   row: TrainingPlayerRowView;
   trainingModeReadOnly: boolean;
   modeSegments: ReturnType<typeof buildTrainingModeSegments>;
+  trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
   trainingClassOptions: TrainingCompactClientProps["trainingClassOptions"];
   onSetTrainingMode: TrainingCompactClientProps["onSetTrainingMode"];
   onSetTrainingClass: TrainingCompactClientProps["onSetTrainingClass"];
@@ -278,6 +357,18 @@ function NlTrainingPlayerCard({
 }) {
   const [showAllAttributes, setShowAllAttributes] = useState(false);
   const tone = getDevelopmentTone(row);
+  const classSuggestion = useMemo(
+    () => buildTrainingClassSuggestion(row, trainingClassOptions),
+    [row, trainingClassOptions],
+  );
+  // Label der Klasse, die aktuell tatsächlich trainiert wird (row.trainingClass — kann von
+  // row.player.className abweichen, siehe "Trainingsklasse"-Select unten). Wird explizit als
+  // "Trainiert:"-Seite im Vorschlags-Chip gezeigt, damit die Klasse nicht mit der oben gezeigten
+  // Statprofil-Entwicklung (classBefore/classAfter) verwechselt werden kann.
+  const currentTrainingClassLabel = useMemo(
+    () => trainingClassOptions.find((option) => option.value === row.trainingClass)?.label ?? row.trainingClass,
+    [row.trainingClass, trainingClassOptions],
+  );
   const sortedForecast = useMemo(
     () => sortTrainingAttributeForecastByClassProfile(row.attributeForecast, row.trainingClass, row.adminBalancingConfig),
     [row.adminBalancingConfig, row.attributeForecast, row.trainingClass],
@@ -309,7 +400,14 @@ function NlTrainingPlayerCard({
         </span>
         <div className="nl-training-player-copy">
           <strong className="nl-training-player-name">{row.player.name}</strong>
-          <small className="nl-training-player-class">
+          <small
+            className="nl-training-player-class"
+            title={
+              row.organicForecast.classBefore === row.organicForecast.classAfter
+                ? undefined
+                : `Statprofil-Entwicklung über die Saison (nicht die Trainingsklasse): ${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`
+            }
+          >
             {row.organicForecast.classBefore === row.organicForecast.classAfter
               ? row.player.className
               : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
@@ -341,8 +439,19 @@ function NlTrainingPlayerCard({
         {formatVeloNumber(row.organicForecast.fatigueLoad, 1)} · Risiko {row.forecast.fatigueStrain.label}
       </small>
 
-      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk ? (
+      <NlTrainingIntensityProjection row={row} trainingModeOptions={trainingModeOptions} />
+
+      {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || classSuggestion ? (
         <div className="nl-training-chip-row" aria-label="Trainings-Hinweise">
+          {classSuggestion ? (
+            <span
+              className="nl-training-chip is-class-suggest"
+              data-testid="training-class-suggestion"
+              title={`Klassen-Vorschlag: ${classSuggestion.label} passt am besten zu den Signature-Attributen ${classSuggestion.attributes.join(" + ")}. Trainiert wird aktuell als ${currentTrainingClassLabel}.`}
+            >
+              <NlTrainingGlyph kind="signature" /> Trainiert: {currentTrainingClassLabel} → Vorschlag: {classSuggestion.label}
+            </span>
+          ) : null}
           {showRecommendation && recommendedPresentation ? (
             <span
               className="nl-training-chip is-recommend"
@@ -495,6 +604,25 @@ export default function TrainingCompactNewLook({
   const uniformTeamMode =
     playerRows.length > 0 && playerRows.every((row) => row.mode === playerRows[0].mode) ? playerRows[0].mode : null;
 
+  // Team-Vorschau je Intensität: echte, potentialgewichtete Summe der pro-Spieler-Prognose
+  // (nicht der flache Konstant-Wert) — so unterscheidet sich das Team-Budget zwischen Kadern.
+  const teamProjectionByMode = useMemo(() => {
+    const totals = new Map<PlayerTrainingMode, { trainingGain: number; net: number }>();
+    for (const option of trainingModeOptions) {
+      totals.set(option.value, { trainingGain: 0, net: 0 });
+    }
+    for (const row of playerRows) {
+      for (const entry of buildTrainingIntensityProjection(row, trainingModeOptions)) {
+        const bucket = totals.get(entry.mode);
+        if (bucket) {
+          bucket.trainingGain += entry.trainingGain;
+          bucket.net += entry.net;
+        }
+      }
+    }
+    return totals;
+  }, [playerRows, trainingModeOptions]);
+
   const topGrowth =
     [...playerRows].sort((left, right) => right.organicForecast.netSetpoints - left.organicForecast.netSetpoints)[0] ?? null;
   const topRisk =
@@ -594,12 +722,16 @@ export default function TrainingCompactNewLook({
           <small>
             Aktuell: Leicht {teamModeCounts.leicht} · Mittel {teamModeCounts.mittel} · Hart {teamModeCounts.hart}
           </small>
-          {trainingModeOptions.map((option) => (
-            <small key={`team-preview-${option.value}`} className="nl-tnum">
-              Alle {option.label}: +{formatVeloNumber(option.trainingSetpoints * playerRows.length, 1)} Budget · Fatigue{" "}
-              {formatVeloNumber(option.fatigueLoad * playerRows.length, 0)}
-            </small>
-          ))}
+          {trainingModeOptions.map((option) => {
+            const team = teamProjectionByMode.get(option.value);
+            return (
+              <small key={`team-preview-${option.value}`} className="nl-tnum">
+                Alle {option.label}: +{formatVeloNumber(team?.trainingGain ?? option.trainingSetpoints * playerRows.length, 1)}{" "}
+                durch Training · Netto {formatVeloSignedNumber(team?.net ?? 0, 1)} SP · Fatigue{" "}
+                {formatVeloNumber(option.fatigueLoad * playerRows.length, 0)}
+              </small>
+            );
+          })}
         </div>
       </NlCard>
 
@@ -652,6 +784,7 @@ export default function TrainingCompactNewLook({
               row={row}
               trainingModeReadOnly={trainingModeReadOnly}
               modeSegments={modeSegments}
+              trainingModeOptions={trainingModeOptions}
               trainingClassOptions={trainingClassOptions}
               onSetTrainingMode={onSetTrainingMode}
               onSetTrainingClass={onSetTrainingClass}

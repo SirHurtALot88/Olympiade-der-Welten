@@ -9,6 +9,7 @@ import {
   NlProgressBar,
   NlRadar,
   StatChip,
+  StatChipRow,
   formatNlNumber,
   nlToneClass,
   NL_AXIS_LABELS,
@@ -24,6 +25,11 @@ import { getTeamLogoModel } from "@/lib/data/mediaAssets";
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
  * `FoundationRanksPanel` fällt ohne Flag unverändert auf die bestehende
  * Tabelle zurück. Konsumiert exakt dieselben Props/Daten wie die alte Tabelle.
+ *
+ * Liga-Überblick im Kopf (Ø/Spannweite/eigenes Team/Abstand zu #1) ist rein
+ * aus den vorhandenen `sortedPpAreaRows` berechnet; "eigenes Team" nutzt den
+ * `team.humanControlled`-Marker, der auch im Foundation-Shell die
+ * Team-Auflösung als Fallback bestimmt.
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten in den Props gibt:
  * - keine Rang-Bewegung (die `sortedPpAreaRows` tragen keinen Vor-Rang /
@@ -94,6 +100,28 @@ export default function FoundationRanksNewLook({
     [metric, rankedRows],
   );
 
+  // Liga-Ø und Spannweite für die aktive Metrik — direkt aus denselben Zeilen.
+  const metricStats = useMemo(() => {
+    const values = sortedPpAreaRows
+      .map((row) => getMetricValue(row, metric))
+      .filter((value) => Number.isFinite(value));
+    if (values.length === 0) {
+      return null;
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return { mean, min, max, count: values.length };
+  }, [metric, sortedPpAreaRows]);
+
+  // Eigenes Team: bester (rang-höchster) Eintrag mit `humanControlled`-Marker.
+  const ownEntry = useMemo(
+    () => rankedRows.find((entry) => entry.row.team.humanControlled) ?? null,
+    [rankedRows],
+  );
+  const ownValue = ownEntry ? getMetricValue(ownEntry.row, metric) : null;
+  const gapToTop = ownValue != null ? topValue - ownValue : null;
+
   return (
     <section className="nl-ranks" data-testid="foundation-ranks" id="foundation-ranks" data-new-look="true">
       <NlCard
@@ -116,6 +144,51 @@ export default function FoundationRanksNewLook({
           </div>
         }
       >
+        {metricStats ? (
+          <StatChipRow className="nl-ranks-statrow" aria-label={`Liga-Überblick ${activeMetric.label}`}>
+            <StatChip
+              label={`Liga Ø · ${activeMetric.label}`}
+              value={formatNlNumber(metricStats.mean, 1)}
+              tone={activeMetric.tone}
+              title={`Durchschnitt über ${formatNlNumber(metricStats.count, 0)} Teams`}
+            />
+            <StatChip
+              label="Spannweite"
+              value={formatNlNumber(metricStats.max - metricStats.min, 1)}
+              sub={`${formatNlNumber(metricStats.min, 1)} – ${formatNlNumber(metricStats.max, 1)}`}
+              title={`Abstand zwischen stärkstem und schwächstem Team (${activeMetric.label})`}
+            />
+            {ownEntry && ownValue != null ? (
+              <StatChip
+                label={`Dein Team · ${ownEntry.row.team.shortCode}`}
+                value={formatNlNumber(ownValue, 1)}
+                sub={`Rang ${formatNlNumber(ownEntry.displayRank, 0)} von ${formatNlNumber(rankedRows.length, 0)}`}
+                tone="accent"
+                onClick={() => openTeamProfileById(ownEntry.row.team.teamId)}
+                title={`${ownEntry.row.team.name} · Teamprofil öffnen`}
+              />
+            ) : null}
+            {ownEntry && gapToTop != null ? (
+              ownEntry.displayRank === 1 ? (
+                <StatChip
+                  label="Abstand zu #1"
+                  value="Spitze"
+                  sub="Dein Team führt"
+                  tone="good"
+                  title={`Dein Team ist Rang 1 in ${activeMetric.label}`}
+                />
+              ) : (
+                <StatChip
+                  label="Abstand zu #1"
+                  value={gapToTop === 0 ? "gleichauf" : `−${formatNlNumber(gapToTop, 1)}`}
+                  sub={`auf ${rankedRows[0]?.row.team.shortCode ?? "#1"}`}
+                  tone="warn"
+                  title={`Rückstand deines Teams auf Rang 1 (${activeMetric.label})`}
+                />
+              )
+            ) : null}
+          </StatChipRow>
+        ) : null}
         <p className="nl-ranks-hint">
           Summe aus POW, SPE, MEN und SOC je Team. Formkartenbonus (z.&nbsp;B. +8) ist bereits in den Punkten enthalten.
           Klick auf ein Team öffnet das Teamprofil.
@@ -129,6 +202,7 @@ export default function FoundationRanksNewLook({
               displayRank === 1 ? "gold" : displayRank === 2 ? "silver" : displayRank === 3 ? "bronze" : null;
 
             const isExpanded = expandedTeamId === row.team.teamId;
+            const isOwnTeam = row.team.humanControlled;
             const radarAxes = (["pow", "spe", "men", "soc"] as const).map((areaId) => ({
               key: areaId,
               value: row.pps[areaId],
@@ -137,7 +211,7 @@ export default function FoundationRanksNewLook({
             return (
               <li key={row.team.teamId}>
                 <div
-                  className={`nl-ranks-row${medalKind ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
+                  className={`nl-ranks-row${medalKind ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}${isOwnTeam ? " is-own-team" : ""}`}
                   style={getSeasonV2TeamTagStyle(row.team.shortCode)}
                 >
                   <span className="nl-ranks-rank">
@@ -164,7 +238,10 @@ export default function FoundationRanksNewLook({
                     />
                     <span className="nl-ranks-team-copy">
                       <span className="nl-ranks-teamname">{row.team.name}</span>
-                      <span className="nl-ranks-teamcode">{row.team.shortCode}</span>
+                      <span className="nl-ranks-teamcode">
+                        {row.team.shortCode}
+                        {isOwnTeam ? <span className="nl-ranks-own-tag">Dein Team</span> : null}
+                      </span>
                     </span>
                   </button>
                   <span className="nl-ranks-value">

@@ -2537,7 +2537,10 @@ export function useFoundationShellRouterBodyScope({
     returnContext?: { playerId: string; playerName: string },
   ) {
     setLeagueLeadersReturnContext(returnContext ?? null);
-    setFoundationView("ranks", setActiveView);
+    // Rangliste wird i. d. R. aus einem Spieler-Profil heraus geöffnet (returnContext
+    // gesetzt) — ein History-Eintrag wird gepusht, damit Zurück (Browser-Back oder der
+    // "Zurück zu {Spieler}"-Link) verlässlich zum Herkunfts-Profil zurückführt.
+    setFoundationView("ranks", setActiveView, { push: true });
     scrollToFoundationTarget(`league-leaders-${categoryId}`);
   }
 
@@ -2567,6 +2570,15 @@ export function useFoundationShellRouterBodyScope({
 
   function closeTeamProfile() {
     setTeamProfileTeamId(null);
+    // Zurück soll auf den Herkunfts-Tab führen (z. B. Saisonstand), von dem das
+    // Team-Profil geöffnet wurde — nicht pauschal auf „Teams". Das Öffnen pusht
+    // einen History-Eintrag (openTeamProfileById, mode: "push"), also bringt uns
+    // der Browser-Back verlässlich dorthin zurück. Nur ohne History fällt es auf
+    // die Teams-Übersicht zurück.
+    if (canFoundationNavigateBack()) {
+      foundationNavigateBack();
+      return;
+    }
     setFoundationView("teams", setActiveView);
     syncFoundationViewInUrl("teams");
   }
@@ -6874,6 +6886,7 @@ export function useFoundationShellRouterBodyScope({
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
+    teamBeliebtheit,
     trainingV2ModeOptions,
   } = useFoundationCrossTabTraining({
     // Compact-tab derivations now live in `FoundationTrainingCompactShellHost`
@@ -9183,6 +9196,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     scheduleActiveManagerTeam,
     openTeamProfileById,
+    onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
     formatLocalePoints,
     getSeasonCashHeatClass,
     formatWholeNumber,
@@ -9509,8 +9523,17 @@ export function useFoundationShellRouterBodyScope({
     returnContext: leagueLeadersReturnContext,
     onReturnToPlayer: leagueLeadersReturnContext
       ? () => {
-          openPlayerProfileById(leagueLeadersReturnContext.playerId);
+          const returnPlayerId = leagueLeadersReturnContext.playerId;
           setLeagueLeadersReturnContext(null);
+          // "Zurück zu {Spieler}" soll zum Herkunfts-Profil zurückführen. Da das Öffnen
+          // der Rangliste (onOpenLeagueLeaders) einen History-Eintrag pusht, bringt uns
+          // der Browser-Back verlässlich dorthin zurück. Nur ohne History (z. B. direkter
+          // Deep-Link) fällt es auf ein erneutes Öffnen des Profils zurück.
+          if (canFoundationNavigateBack()) {
+            foundationNavigateBack();
+            return;
+          }
+          openPlayerProfileById(returnPlayerId);
         }
       : undefined,
     onOpenPlayer: openPlayerProfileById,
@@ -10107,6 +10130,7 @@ export function useFoundationShellRouterBodyScope({
     toggleTransferWishlist,
     trainingDevelopmentFilter,
     trainingDevelopmentSummary,
+    teamBeliebtheit,
     trainingFacilityEffectPreview,
     trainingFacilityRows,
     trainingFacilitySeasonEndFinance,

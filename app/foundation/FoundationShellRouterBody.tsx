@@ -14,6 +14,7 @@ import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import type { RoomParticipant } from "@/types/game";
+import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
 import {
   BudgetedMediaImage,
   ClassColorChip,
@@ -142,6 +143,7 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
+import FoundationPlayersTableNewLook from "@/app/foundation/players-table/FoundationPlayersTableNewLook";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
@@ -658,6 +660,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   toggleGameModeOwnershipTeam,
   toggleNewGameTeam,
   toggleScoutingWatch,
+  teamBeliebtheit,
   toggleTableSort,
   toggleTransferSellMarker,
   toggleTransferWishlist,
@@ -1740,13 +1743,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               inboxItems: homeV2InboxItems,
               todayCards: homeTodayCards,
               onContinue: triggerGlobalNext,
-              onOpenTeams: () => setFoundationView("teams", setActiveView),
-              onOpenLineup: () => setFoundationView("lineup", setActiveView),
-              onOpenMarket: () => setFoundationView("marketV2", setActiveView),
-              onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
+              // Alle Home-Schnellsprünge pushen einen History-Eintrag (wie die
+              // Sidebar), damit „Zurück" von der Zielseite verlässlich wieder auf
+              // Home führt statt auf den zuvor aktiven Tab.
+              onOpenTeams: () => setFoundationView("teams", setActiveView, { push: true }),
+              onOpenLineup: () => setFoundationView("lineup", setActiveView, { push: true }),
+              onOpenMarket: () => setFoundationView("marketV2", setActiveView, { push: true }),
+              onOpenTraining: () => setFoundationView("trainingCompact", setActiveView, { push: true }),
               onOpenOffice: () => navigateHomeTab("office"),
-              onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
-              onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
+              onOpenSeason: () => setFoundationView("seasonV2", setActiveView, { push: true }),
+              // Aufgaben (Inbox) wird von Home aus geöffnet — History-Push, damit
+              // Zurück verlässlich auf Home zurückführt statt auf den zuvor
+              // aktiven Tab (z. B. Teams) zu springen.
+              onOpenInbox: () => setFoundationView("inboxV2", setActiveView, { push: true }),
               onCompleteInboxItem: (itemId) => {
                 const sourceItem = visibleInboxItems.find((item: GameInboxItem) => item.itemId === itemId);
                 if (sourceItem) {
@@ -1825,6 +1834,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onClose={() => {
                   playerProfileHydrationSequenceRef.current += 1;
                   setPlayerProfileData(null);
+                  // Zurück soll auf den Herkunfts-Tab führen (z. B. Teams, Marktplatz,
+                  // Rangliste), von dem das Spieler-Profil geöffnet wurde — nicht
+                  // pauschal auf Home. Das Öffnen pusht einen History-Eintrag
+                  // (openPlayerDrawerById / openPlayerProfileById mit push: true), also
+                  // bringt uns der Browser-Back verlässlich dorthin zurück. Nur ohne
+                  // History fällt es auf Home zurück.
+                  if (canFoundationNavigateBack()) {
+                    foundationNavigateBack();
+                    return;
+                  }
                   setFoundationView("homeV2", setActiveView);
                   syncFoundationViewInUrl("homeV2");
                 }}
@@ -1867,7 +1886,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               <TeamProfileClient
                 data={teamProfileData}
                 onClose={closeTeamProfile}
-                onOpenPlayer={(playerId, activePlayerId) => void openPlayerProfileById(playerId, activePlayerId)}
+                onOpenPlayer={(playerId, activePlayerId) => void openPlayerDrawerById(playerId, activePlayerId)}
                 leagueHeatPools={leaguePlayerHeatPools}
               />
             ) : null}
@@ -1903,6 +1922,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
                   recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
                 }}
+                beliebtheit={teamBeliebtheit}
                 trainingFacilityEffectPreview={trainingFacilityEffectPreview}
                 facilityRows={trainingFacilityRows}
                 specialistWingVariant={specialistWingVariantDraft}
@@ -1985,7 +2005,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 }
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
                 onOpenFacilities={() => setFoundationView("facilitiesOverviewV2", setActiveView)}
-                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+                onOpenPlayer={(playerId) => void openPlayerDrawerById(playerId)}
                 queueEntries={scoutingQueueEntries}
                 focusEtaLabel={
                   scoutingFocusSummary && Number.isFinite(scoutingFocusSummary.etaMatchdays)
@@ -2482,7 +2502,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 void reloadSeasonStandingsOverview(seasonId);
               }}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
-              onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+              onOpenPlayer={(playerId) => void openPlayerDrawerById(playerId)}
               viewMode={seasonStandingsMode}
               onViewModeChange={setSeasonStandingsMode}
               onOpenRanks={() => setFoundationView("ranks", setActiveView)}
@@ -2496,6 +2516,29 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
 
           {activeView === "players" ? (
+          // "Neuer Look" Flag-Gate (additiv): Flag an => komplett neu gebaute
+          // Spieler-Ansicht mit denselben Daten/Filtern/Sortierungen; Flag
+          // aus => bestehende Tabelle unverändert.
+          newLookEnabled ? (
+            <FoundationPlayersTableNewLook
+              rows={sortedPlayersTableRows}
+              gameState={gameState}
+              leaguePlayerHeatPools={leaguePlayerHeatPools}
+              sortState={tableSorts.playersTable}
+              onToggleSort={(columnKey: string) => toggleTableSort("playersTable", columnKey)}
+              playerScope={playerScope}
+              onChangeScope={setPlayerScope}
+              teams={gameState.teams}
+              playerTeamFilter={playerTeamFilter}
+              onChangeTeamFilter={setPlayerTeamFilter}
+              playerClassFilter={playerClassFilter}
+              playerClassOptions={playerClassOptions}
+              onChangeClassFilter={setPlayerClassFilter}
+              playerBracketCounts={playerBracketCounts}
+              openPlayerDrawerById={openPlayerDrawerById}
+              openTeamProfileById={openTeamProfileById}
+            />
+          ) : (
           <section className={`panel${getViewClass("players")}`} id="players-table">
             <div className="panel-header">
               <h2>Players</h2>
@@ -2803,6 +2846,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               Farben sind liga-relativ: jede Stufe steht fuer ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
             </p>
           </section>
+          )
           ) : null}
 
           {activeView === "ranks" ? (

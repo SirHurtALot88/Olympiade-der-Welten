@@ -16,6 +16,7 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import {
   evaluateGamePhaseAction,
   isTrainingIntensityLockedForSeason,
@@ -509,6 +510,19 @@ export function useFoundationCrossTabTraining(input: {
     trainingForecastSummary.trainingXp,
   ]);
 
+  /**
+   * Beliebtheitsfaktor des ausgewählten Teams (real, echte Liga-Werte). Treibt
+   * die Arena-Einnahme (Basis × Beliebtheit). Wird an den Gebäude-„Neuer Look"
+   * als KPI-Chip durchgereicht. Nur berechnet, wenn die Facilities-Ansicht
+   * gebaut wird — sonst null (Chip wird versteckt statt gefälscht).
+   */
+  const teamBeliebtheit = useMemo(() => {
+    if (!shouldBuildTrainingFacilitiesDerivations) {
+      return null;
+    }
+    return computeTeamBeliebtheitFromGameState(input.gameState, input.selectedTeam.teamId);
+  }, [shouldBuildTrainingFacilitiesDerivations, input.gameState, input.selectedTeam.teamId]);
+
   const trainingV2ModeOptions = useMemo(
     () =>
       getAllTrainingModePresentations().map((presentation) => ({
@@ -537,6 +551,7 @@ export function useFoundationCrossTabTraining(input: {
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
+    teamBeliebtheit,
     trainingV2ModeOptions,
   };
 }

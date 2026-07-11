@@ -6,6 +6,7 @@ import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlCard,
   NlDeltaChip,
+  NlProgressBar,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -236,12 +237,22 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
             {row.matchdayRank != null ? `Tag #${row.matchdayRank}` : "Tag —"}
           </span>
           <span className="nl-spreview-scorebars" aria-hidden="true">
-            <span className={`nl-spreview-scorebar ${nlToneClass("pow")}`} title={`D1: ${formatNlNumber(row.d1Score, 1)}`}>
-              <span className="nl-spreview-scorebar-fill" style={{ width: `${getBarPercent(row.d1Score, maxD1)}%` }} />
-            </span>
-            <span className={`nl-spreview-scorebar ${nlToneClass("men")}`} title={`D2: ${formatNlNumber(row.d2Score, 1)}`}>
-              <span className="nl-spreview-scorebar-fill" style={{ width: `${getBarPercent(row.d2Score, maxD2)}%` }} />
-            </span>
+            <NlProgressBar
+              className="nl-spreview-scorebar"
+              value={getBarPercent(row.d1Score, maxD1)}
+              max={100}
+              tone="pow"
+              showValue={false}
+              title={`D1: ${formatNlNumber(row.d1Score, 1)}`}
+            />
+            <NlProgressBar
+              className="nl-spreview-scorebar"
+              value={getBarPercent(row.d2Score, maxD2)}
+              max={100}
+              tone="men"
+              showValue={false}
+              title={`D2: ${formatNlNumber(row.d2Score, 1)}`}
+            />
           </span>
           <span className="nl-spreview-matchday-score nl-tnum">
             {row.matchdayScore != null ? formatNlNumber(row.matchdayScore, 1) : "—"}

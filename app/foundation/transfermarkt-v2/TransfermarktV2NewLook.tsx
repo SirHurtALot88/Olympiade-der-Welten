@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { TransfermarktV2RosterRow } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
@@ -19,7 +19,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import type { Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import {
   formatTransfermarktCurrency,
@@ -29,6 +29,7 @@ import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import {
+  computeTopSixAxisAverage,
   formatTeamRankEstimateLabel,
   type TransfermarktAxisTeamRankEstimate,
   type TransfermarktDisciplineTopSixImpactRow,
@@ -51,6 +52,11 @@ import { formatScoutedImpactDelta, isScoutedImpactExact } from "@/lib/market/tra
  *   solange `isScoutedImpactExact` nicht erfüllt ist,
  * - Wishlist-Panel (echte `wishlistEntries` + Fokus/Deal/Entfernen-Handler)
  *   und eigener Kader ("was ich habe / noch brauche") aus `rosterRows`,
+ * - Team-Stärke-Block über der Kaderliste: Ø POW/SPE/MEN/SOC über den ganzen
+ *   Kader UND über die besten Top-{topSixCount} je Achse (gleiche Semantik wie
+ *   `computeTopSixAxisAverage` im Team-Impact), je Achse aufklappbar zu den
+ *   echten Sub-Disziplinen aus `rosterRows[].disciplineRatings` (Muster wie
+ *   das Saisonstand-Board) — Disziplinen ohne Kader-Werte werden nicht gezeigt,
  * - "VERPFLICHTET"-Moment auf Basis des bestehenden `buySuccess`-Signals,
  * - Sortierung/Filter als Pill-Toggles mit den echten Sort-Keys.
  *
@@ -87,6 +93,43 @@ const NL_PREV_SEASON_AXIS_KEYS: Record<
   soc: { points: "ppSoc", rank: "ppSocRank" },
 };
 
+/** Achse → Disziplin-Kategorie (für die aufklappbaren Sub-Disziplinen im Kader-Block). */
+const NL_AXIS_DISCIPLINE_CATEGORY: Record<NlAxisKey, DisciplineCategory> = {
+  pow: "power",
+  spe: "speed",
+  men: "mental",
+  soc: "social",
+};
+
+/** Ø über echte Werte — null statt erfundener 0, wenn nichts vorliegt. */
+function nlAverage(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+type NlSquadDisciplineSummary = {
+  disciplineId: string;
+  disciplineName: string;
+  topAvg: number | null;
+  squadAvg: number | null;
+  ratedCount: number;
+};
+
+type NlSquadAxisSummary = {
+  axis: NlAxisKey;
+  /** Ø über die besten `topSixCount` Achswerte (Aufstellung = 6). */
+  topAvg: number | null;
+  /** Ø über den ganzen Kader. */
+  squadAvg: number | null;
+  playerCount: number;
+  min: number | null;
+  max: number | null;
+  bestName: string | null;
+  disciplines: NlSquadDisciplineSummary[];
+};
+
 export type TransfermarktV2NewLookProps = {
   // Kopf & Status
   teamName: string | null;
@@ -94,6 +137,7 @@ export type TransfermarktV2NewLookProps = {
   availabilityLabel: string;
   marketBusy: boolean;
   marketError: string | null;
+  onRetryMarket?: () => void;
   buySuccess: string | null;
   onDismissBuySuccess: () => void;
   // Budget-Board
@@ -167,8 +211,12 @@ export type TransfermarktV2NewLookProps = {
   marketItemsById: Map<string, TransfermarktFreeAgentItem>;
   // Eigener Kader
   rosterRows: TransfermarktV2RosterRow[];
-  budgetStatusLabel: string;
-  readinessStatusLabel: string;
+  /** Sortierte Disziplin-Liste (POW→SOC) für die Sub-Diszi-Aufschlüsselung des Kaders. */
+  disciplines: Discipline[];
+  /** null = unbekannt → Chip wird ausgeblendet statt "Budget —" zu zeigen. */
+  budgetStatusLabel: string | null;
+  /** null = unbekannt → Chip wird ausgeblendet statt "Status unbekannt" zu zeigen. */
+  readinessStatusLabel: string | null;
   onSellRow: ((row: TransfermarktV2RosterRow) => void) | null;
   // Letzte Deals
   historyItems: TransferHistoryItem[];
@@ -286,6 +334,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     availabilityLabel,
     marketBusy,
     marketError,
+    onRetryMarket,
     buySuccess,
     onDismissBuySuccess,
     teamCash,
@@ -351,6 +400,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onRemoveWishlist,
     marketItemsById,
     rosterRows,
+    disciplines,
     budgetStatusLabel,
     readinessStatusLabel,
     onSellRow,
@@ -364,6 +414,68 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     ? "Geschätzt — Schätzwerte auf Basis des Scouting-Standes, genaue Teamwirkung erst nach mehr Intel."
     : undefined;
   const scoutingActiveSet = new Set(scoutingActiveWishlistPlayerIds);
+
+  // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
+  const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
+
+  // F4 — Team-Stärke: Ø POW/SPE/MEN/SOC über den ganzen Kader UND über die
+  // besten `topSixCount` Werte je Achse (gleiche Top-6-Semantik wie der
+  // Team-Impact via computeTopSixAxisAverage — keine erfundenen Werte).
+  const squadAxisSummaries = useMemo<NlSquadAxisSummary[]>(() => {
+    return NL_MARKET_AXES.map((axis) => {
+      const rated = rosterRows
+        .map((row) => ({ name: row.name, value: row[axis] }))
+        .filter((entry): entry is { name: string; value: number } =>
+          typeof entry.value === "number" && Number.isFinite(entry.value),
+        );
+      const values = rated.map((entry) => entry.value);
+      const best = rated.reduce<{ name: string; value: number } | null>(
+        (currentBest, entry) => (currentBest == null || entry.value > currentBest.value ? entry : currentBest),
+        null,
+      );
+      const category = NL_AXIS_DISCIPLINE_CATEGORY[axis];
+      const axisDisciplines = disciplines
+        .filter((discipline) => discipline.category === category)
+        .map((discipline) => {
+          const scores = rosterRows
+            .map((row) => row.disciplineRatings?.[discipline.id])
+            .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+          return {
+            disciplineId: discipline.id,
+            disciplineName: discipline.name,
+            topAvg: computeTopSixAxisAverage(scores, topSixCount),
+            squadAvg: nlAverage(scores),
+            ratedCount: scores.length,
+          };
+        })
+        // Nur Disziplinen mit echten Kader-Werten zeigen — nichts erfinden.
+        .filter((entry) => entry.ratedCount > 0);
+      return {
+        axis,
+        topAvg: computeTopSixAxisAverage(values, topSixCount),
+        squadAvg: nlAverage(values),
+        playerCount: rated.length,
+        min: values.length > 0 ? Math.min(...values) : null,
+        max: values.length > 0 ? Math.max(...values) : null,
+        bestName: best?.name ?? null,
+        disciplines: axisDisciplines,
+      };
+    });
+  }, [disciplines, rosterRows, topSixCount]);
+
+  const squadTopComposite = useMemo(
+    () => nlAverage(squadAxisSummaries.map((entry) => entry.topAvg).filter((value): value is number => value != null)),
+    [squadAxisSummaries],
+  );
+  const squadFullComposite = useMemo(
+    () => nlAverage(squadAxisSummaries.map((entry) => entry.squadAvg).filter((value): value is number => value != null)),
+    [squadAxisSummaries],
+  );
+  const hasSquadSummary = rosterRows.length > 0 && squadAxisSummaries.some((entry) => entry.squadAvg != null);
+
+  // F2/F3 — Kader-Zähler im Kopf kohärent zur sichtbaren Liste: wenn ein
+  // Kader gelistet ist, zählt genau diese Liste; sonst der Server-Wert.
+  const effectiveRosterCount = rosterRows.length > 0 ? rosterRows.length : rosterCount;
 
   return (
     <section className={`nl-market${buyModalOpen ? " is-offer-mode" : ""}`} data-new-look="true">
@@ -399,7 +511,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatNlNumber(teamSalaryTotal, 1) : "—"} tone="accent" />
           <StatChip
             label="Kader"
-            value={`${rosterCount ?? "—"} / ${rosterLimit ?? "—"}`}
+            value={`${effectiveRosterCount ?? "—"} / ${rosterLimit ?? "—"}`}
             tone={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? "warn" : "neutral"}
             sub={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? `${rosterGapOpenCount} Plätze offen` : undefined}
             onClick={() => scrollToNlMarketSection(".nl-market-roster-card")}
@@ -462,7 +574,19 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             </button>
           </div>
         </div>
-        {marketError ? <p className="nl-market-error">{marketError}</p> : null}
+        {marketError ? (
+          <div className="nl-market-error" role="alert">
+            <div className="nl-market-error-copy">
+              <strong>Transfermarkt konnte nicht geladen werden.</strong>
+              <small>{marketError}</small>
+            </div>
+            {onRetryMarket ? (
+              <button type="button" className="nl-market-pill is-reset" onClick={onRetryMarket}>
+                Erneut laden
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </NlCard>
 
       <div className="nl-market-main-grid">
@@ -536,8 +660,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 Kandidaten laden…
               </p>
             ) : null}
-            {!marketBusy && candidates.length === 0 ? (
+            {!marketBusy && !marketError && candidates.length === 0 ? (
               <p className="nl-market-muted">Keine Kandidaten im aktuellen Filter — Suche oder Limits weiter stellen.</p>
+            ) : null}
+            {!marketBusy && marketError && candidates.length === 0 ? (
+              <p className="nl-market-muted">Feed nicht geladen — oben „Erneut laden“ nutzen.</p>
             ) : null}
           </div>
         </NlCard>
@@ -1011,20 +1138,180 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           title={`Was ich habe — ${rosterRows.length} Spieler`}
           actions={teamShortCode ? <small className="nl-market-rail-meta">{teamShortCode}</small> : null}
         >
+          {/* F4/F5 — Team-Stärke: Ø der vier Achsen (Top-6 vs. ganzer Kader),
+              je Achse aufklappbar zu den Sub-Disziplinen (Muster wie
+              SeasonStandingsNewLook "Disziplinen nach Bereich"). */}
+          {hasSquadSummary ? (
+            <div className="nl-market-squad-summary" aria-label="Team-Stärke nach Achsen">
+              <div className="nl-market-squad-head">
+                <span className="nl-market-eyebrow">Team-Stärke — Ø je Achse</span>
+                <span className="nl-market-squad-legend" aria-hidden="true">
+                  <span className="nl-market-squad-legend-item is-top">Top-{topSixCount} (Aufstellung)</span>
+                  <span className="nl-market-squad-legend-item is-squad">Kader ({rosterRows.length})</span>
+                </span>
+              </div>
+              <StatChipRow className="nl-market-squad-composite" aria-label="Team-Stärke gesamt">
+                <StatChip
+                  label={`Top-${topSixCount} Ø`}
+                  value={formatNlNumber(squadTopComposite, 1)}
+                  tone="accent"
+                  sub={`beste ${topSixCount} je Achse`}
+                  title={`Ø der vier Achsen-Schnitte über die jeweils besten ${topSixCount} Spieler`}
+                />
+                <StatChip
+                  label="Kader Ø"
+                  value={formatNlNumber(squadFullComposite, 1)}
+                  tone="neutral"
+                  sub={`alle ${rosterRows.length} Spieler`}
+                  title="Ø der vier Achsen-Schnitte über den ganzen Kader"
+                />
+              </StatChipRow>
+              <div className="nl-market-squad-axes">
+                {squadAxisSummaries.map((summary) => {
+                  const isExpanded = expandedSquadAxis === summary.axis;
+                  const detailId = `nl-market-squad-detail-${summary.axis}`;
+                  const depthGap =
+                    summary.topAvg != null && summary.squadAvg != null ? summary.topAvg - summary.squadAvg : null;
+                  return (
+                    <div
+                      key={`nl-squad-axis-${summary.axis}`}
+                      className={`nl-market-squad-axis ${nlToneClass(summary.axis)}${isExpanded ? " is-expanded" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        className="nl-market-squad-axis-toggle"
+                        aria-expanded={isExpanded}
+                        aria-controls={detailId}
+                        aria-label={`${NL_AXIS_LABELS[summary.axis]} Details ${isExpanded ? "einklappen" : "ausklappen"}`}
+                        onClick={() =>
+                          setExpandedSquadAxis((current) => (current === summary.axis ? null : summary.axis))
+                        }
+                      >
+                        <span className="nl-market-squad-axis-label">
+                          {NL_AXIS_LABELS[summary.axis]}
+                          {wishlistAxes.includes(summary.axis) ? (
+                            <span className="nl-market-need-tag">Bedarf</span>
+                          ) : null}
+                        </span>
+                        <span className="nl-market-squad-axis-bars">
+                          <NlProgressBar
+                            value={summary.topAvg ?? 0}
+                            max={100}
+                            label={`Top-${topSixCount}`}
+                            tone={summary.axis}
+                            format={() => formatNlNumber(summary.topAvg, 1)}
+                            className="nl-market-squad-bar is-top"
+                          />
+                          <NlProgressBar
+                            value={summary.squadAvg ?? 0}
+                            max={100}
+                            label="Kader"
+                            tone={summary.axis}
+                            format={() => formatNlNumber(summary.squadAvg, 1)}
+                            className="nl-market-squad-bar is-squad"
+                          />
+                        </span>
+                        <span
+                          className="nl-market-squad-axis-gap nl-tnum"
+                          title={`Abstand Top-${topSixCount} zu Kader-Ø — großer Abstand heißt wenig Tiefe hinter der Aufstellung.`}
+                        >
+                          {depthGap != null ? `Δ ${formatNlNumber(depthGap, 1)}` : "—"}
+                        </span>
+                        <span className="nl-market-squad-caret" aria-hidden="true">
+                          {isExpanded ? "▾" : "▸"}
+                        </span>
+                      </button>
+                      {isExpanded ? (
+                        <div className="nl-market-squad-expand" id={detailId}>
+                          <div className="nl-market-squad-range">
+                            {summary.bestName ? (
+                              <span>
+                                Stärkster <strong>{summary.bestName}</strong>{" "}
+                                <span className="nl-tnum">({formatNlNumber(summary.max, 0)})</span>
+                              </span>
+                            ) : null}
+                            {summary.min != null && summary.max != null ? (
+                              <span className="nl-tnum">
+                                Spanne {formatNlNumber(summary.min, 0)}–{formatNlNumber(summary.max, 0)}
+                              </span>
+                            ) : null}
+                            <span>
+                              {summary.playerCount}/{rosterRows.length} Spieler mit Wert
+                            </span>
+                          </div>
+                          {summary.disciplines.length > 0 ? (
+                            <ul
+                              className="nl-market-squad-disc-list"
+                              aria-label={`${NL_AXIS_LABELS[summary.axis]} Sub-Disziplinen`}
+                            >
+                              <li className="nl-market-squad-disc is-head" aria-hidden="true">
+                                <span className="nl-market-squad-disc-label">Disziplin</span>
+                                <span className="nl-market-squad-disc-track-spacer" />
+                                <span className="nl-market-squad-disc-value">Top-{topSixCount} Ø</span>
+                                <span className="nl-market-squad-disc-value is-squad">Kader Ø</span>
+                              </li>
+                              {summary.disciplines.map((discipline) => (
+                                <li
+                                  key={`nl-squad-disc-${discipline.disciplineId}`}
+                                  className="nl-market-squad-disc"
+                                  title={`${discipline.disciplineName}: Top-${topSixCount} Ø ${formatNlNumber(
+                                    discipline.topAvg,
+                                    1,
+                                  )} · Kader Ø ${formatNlNumber(discipline.squadAvg, 1)} (${discipline.ratedCount} Spieler)`}
+                                >
+                                  <span className="nl-market-squad-disc-label">{discipline.disciplineName}</span>
+                                  <span className="nl-market-squad-disc-track" aria-hidden="true">
+                                    <span
+                                      className="nl-market-squad-disc-fill"
+                                      style={{ width: `${Math.max(3, Math.min(100, discipline.topAvg ?? 0))}%` }}
+                                    />
+                                    <span
+                                      className="nl-market-squad-disc-fill is-squad"
+                                      style={{ width: `${Math.max(3, Math.min(100, discipline.squadAvg ?? 0))}%` }}
+                                    />
+                                  </span>
+                                  <span className="nl-market-squad-disc-value nl-tnum">
+                                    {formatNlNumber(discipline.topAvg, 1)}
+                                  </span>
+                                  <span className="nl-market-squad-disc-value is-squad nl-tnum">
+                                    {formatNlNumber(discipline.squadAvg, 1)}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="nl-market-muted">
+                              Für diesen Kader liegen keine Disziplin-Werte vor — das Achsen-Detail zeigt Spanne und
+                              stärksten Spieler.
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <div className="nl-market-need-summary" aria-label="Transferbedarf">
             <span className="nl-market-eyebrow">Was ich noch brauche</span>
             <div className="nl-market-need-chips">
-              <span
-                className={`nl-market-signal-chip ${
-                  rosterGapOpenCount != null && rosterGapOpenCount > 0 ? nlToneClass("warn") : nlToneClass("good")
-                }`}
-              >
-                {rosterGapOpenCount != null && rosterGapOpenCount > 0
-                  ? `${rosterGapOpenCount} Kaderplatz${rosterGapOpenCount === 1 ? "" : "e"} offen`
-                  : "Kadergröße okay"}
-              </span>
-              <span className={`nl-market-signal-chip ${nlToneClass("neutral")}`}>Budget {budgetStatusLabel}</span>
-              <span className={`nl-market-signal-chip ${nlToneClass("neutral")}`}>Status {readinessStatusLabel}</span>
+              {/* F2/F3 — nur echte Aussagen: unbekannte Werte (null) blenden den Chip aus. */}
+              {rosterGapOpenCount != null ? (
+                <span
+                  className={`nl-market-signal-chip ${rosterGapOpenCount > 0 ? nlToneClass("warn") : nlToneClass("good")}`}
+                >
+                  {rosterGapOpenCount > 0
+                    ? `${rosterGapOpenCount} Kaderplatz${rosterGapOpenCount === 1 ? "" : "e"} offen`
+                    : "Kadergröße okay"}
+                </span>
+              ) : null}
+              {budgetStatusLabel ? (
+                <span className={`nl-market-signal-chip ${nlToneClass("neutral")}`}>Budget {budgetStatusLabel}</span>
+              ) : null}
+              {readinessStatusLabel ? (
+                <span className={`nl-market-signal-chip ${nlToneClass("neutral")}`}>Status {readinessStatusLabel}</span>
+              ) : null}
               {wishlistAxes.length > 0 ? (
                 wishlistAxes.map((axis) => (
                   <span key={`nl-need-axis-${axis}`} className={`nl-market-signal-chip ${nlToneClass(axis)}`}>

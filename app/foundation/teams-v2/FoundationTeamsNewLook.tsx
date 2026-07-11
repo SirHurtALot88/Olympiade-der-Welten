@@ -57,7 +57,7 @@ import type {
  * Bereichs-Ränge die Hover-Karte (Mini-Radar + Saison-Sparkline).
  */
 
-type NlTeamsRosterMode = "kader" | "tabelle";
+type NlTeamsRosterMode = "portraits" | "tabelle";
 
 export type NlTeamsRosterRow = {
   entry: {
@@ -99,6 +99,12 @@ type NlTeamsPortraitModel = {
 export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
+  /**
+   * Aktiver Team-Unterreiter aus dem Host: "portraits" öffnet standardmäßig
+   * das Portrait-Grid, "roster" (Kader) die Datentabelle. Steuert nur die
+   * Standard-Ansicht — der In-Card-Umschalter bleibt nutzbar.
+   */
+  selectedTeamDetailTab: "roster" | "portraits";
   sortedTeamsViewRows: TeamsViewRow[];
   /**
    * Vom Host bereits berechnete Team-Historie (Live-Saison + echte
@@ -163,12 +169,26 @@ export type FoundationTeamsNewLookProps = {
     playerName: string;
     contractLength: number;
   }) => void | Promise<unknown>;
+  /**
+   * Öffnet die Saisonstand-Seite (seasonV2). Portal-Ziel der Rang-Kachel.
+   * Optional: fehlt der Handler, bleibt die Rang-Kachel beim Team-Profil.
+   */
+  onOpenSeason?: () => void;
 };
 
 const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }> = [
-  { id: "kader", label: "Kader" },
+  { id: "portraits", label: "Portraits" },
   { id: "tabelle", label: "Tabelle" },
 ];
+
+/**
+ * Standard-Ansicht je Unterreiter: der "Portraits"-Reiter startet im
+ * bild-fokussierten Portrait-Grid, der "Kader"-Reiter (roster) in der
+ * datenkompetenten Tabelle. So sind die beiden Reiter klar unterscheidbar.
+ */
+function defaultRosterModeForTab(tab: "roster" | "portraits"): NlTeamsRosterMode {
+  return tab === "portraits" ? "portraits" : "tabelle";
+}
 
 const NL_TEAMS_AXES: Array<{ key: NlAxisKey; label: "POW" | "SPE" | "MEN" | "SOC" }> = [
   { key: "pow", label: "POW" },
@@ -289,6 +309,7 @@ function compareBoardRows(left: TeamsViewRow, right: TeamsViewRow): number {
 export default function FoundationTeamsNewLook({
   selectedTeam,
   gameState,
+  selectedTeamDetailTab,
   sortedTeamsViewRows,
   selectedTeamsHistoryData,
   filteredSelectedRosterTableRows,
@@ -316,11 +337,23 @@ export default function FoundationTeamsNewLook({
   contractRenewalBusy,
   openMarketSellModal,
   openContractRenewalNegotiation,
+  onOpenSeason,
 }: FoundationTeamsNewLookProps) {
-  const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>("kader");
+  const [rosterMode, setRosterMode] = useState<NlTeamsRosterMode>(() =>
+    defaultRosterModeForTab(selectedTeamDetailTab),
+  );
+  // Wechselt der Host-Unterreiter (Kader ↔ Portraits), ohne dass die
+  // Komponente neu mountet, die Standard-Ansicht angleichen — React-Muster
+  // „State beim Prop-Wechsel während des Renderns anpassen" (kein Effekt).
+  const [syncedRosterTab, setSyncedRosterTab] = useState<"roster" | "portraits">(selectedTeamDetailTab);
+  if (syncedRosterTab !== selectedTeamDetailTab) {
+    setSyncedRosterTab(selectedTeamDetailTab);
+    setRosterMode(defaultRosterModeForTab(selectedTeamDetailTab));
+  }
   const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
 
+  const heroCardRef = useRef<HTMLDivElement | null>(null);
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
   const leagueCardRef = useRef<HTMLDivElement | null>(null);
@@ -356,6 +389,23 @@ export default function FoundationTeamsNewLook({
     });
   }, [boardSort, sortedTeamsViewRows]);
 
+  // Mini-Tabellen-Vorschau der Rang-Kachel: echte Nachbar-Zeilen um das
+  // eigene Team herum (Rang · Team · Punkte), immer nach Gesamtrang geordnet
+  // — unabhängig von der aktuellen Board-Sortierung.
+  const rankPreviewRows = useMemo(() => {
+    const ordered = [...sortedTeamsViewRows].sort(compareBoardRows);
+    if (ordered.length === 0) {
+      return [];
+    }
+    const selfIndex = ordered.findIndex((row) => row.team.teamId === selectedTeam.teamId);
+    if (selfIndex < 0) {
+      return [];
+    }
+    const windowSize = Math.min(5, ordered.length);
+    const start = Math.max(0, Math.min(selfIndex - 2, ordered.length - windowSize));
+    return ordered.slice(start, start + windowSize);
+  }, [selectedTeam.teamId, sortedTeamsViewRows]);
+
   // Team-Entwicklung: Host liefert [Live, jüngste Saison, …] — für die
   // Verlaufs-Charts chronologisch drehen (älteste zuerst, Live zuletzt).
   const developmentRows = useMemo(
@@ -390,10 +440,14 @@ export default function FoundationTeamsNewLook({
       isFiniteNumber(liveHistoryRow.marketValue) && isFiniteNumber(previousSeasonRow.marketValue)
         ? liveHistoryRow.marketValue - previousSeasonRow.marketValue
         : null;
-    if (rankDelta == null && pointsDelta == null && marketValueDelta == null) {
+    const cashDelta =
+      isFiniteNumber(liveHistoryRow.cash) && isFiniteNumber(previousSeasonRow.cash)
+        ? liveHistoryRow.cash - previousSeasonRow.cash
+        : null;
+    if (rankDelta == null && pointsDelta == null && marketValueDelta == null && cashDelta == null) {
       return null;
     }
-    return { rankDelta, pointsDelta, marketValueDelta };
+    return { rankDelta, pointsDelta, marketValueDelta, cashDelta };
   }, [liveHistoryRow, previousSeasonRow]);
 
   const developmentSeries = useMemo(() => {
@@ -414,6 +468,7 @@ export default function FoundationTeamsNewLook({
         tone: row.isLive ? ("accent" as const) : ("neutral" as const),
       }));
     const marketValueSpark = developmentRows.filter((row) => isFiniteNumber(row.marketValue)).map((row) => row.marketValue as number);
+    const cashSpark = developmentRows.filter((row) => isFiniteNumber(row.cash)).map((row) => row.cash as number);
     return {
       rankSpark,
       bestRank: rankValues.length > 0 ? Math.min(...rankValues) : null,
@@ -424,6 +479,9 @@ export default function FoundationTeamsNewLook({
       marketValueSpark,
       marketValueFirst: marketValueSpark.length > 0 ? marketValueSpark[0] : null,
       marketValueLast: marketValueSpark.length > 0 ? marketValueSpark[marketValueSpark.length - 1] : null,
+      cashSpark,
+      cashFirst: cashSpark.length > 0 ? cashSpark[0] : null,
+      cashLast: cashSpark.length > 0 ? cashSpark[cashSpark.length - 1] : null,
     };
   }, [developmentRows, teamCount]);
 
@@ -445,6 +503,13 @@ export default function FoundationTeamsNewLook({
 
   function handleHeroAxisSortSelect(key: NlAxisKey) {
     setBoardSort({ key, dir: "asc" });
+    scrollToSection(leagueCardRef);
+  }
+
+  // Portal: eine Hero-Kachel (MW/Cash) klicken → Teamtabelle danach sortieren
+  // und dorthin scrollen. „Klick MW → alle Teams nach Marktwert sortiert."
+  function handleHeroBoardSortSelect(key: NlTeamsBoardSortKey, dir: NlTeamsBoardSortDir) {
+    setBoardSort({ key, dir });
     scrollToSection(leagueCardRef);
   }
 
@@ -497,10 +562,28 @@ export default function FoundationTeamsNewLook({
           const body = (
             <>
               <span className="nl-teams-axis-label">{label}</span>
-              <span className="nl-teams-axis-rank nl-tnum">{rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}</span>
-              {!compact && points != null ? (
-                <span className="nl-teams-axis-points nl-tnum">{formatNlNumber(points, 1)} PP</span>
-              ) : null}
+              {compact ? (
+                <span className="nl-teams-axis-rank nl-tnum">
+                  {rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}
+                </span>
+              ) : (
+                // Wert (Bereichspunkte) UND Liga-Rang klar nebeneinander: "58 · #14".
+                // Fehlt ein echter Rang, bleibt nur der Wert stehen — kein Fake.
+                <span className="nl-teams-axis-figures nl-tnum">
+                  {points != null ? (
+                    <span className="nl-teams-axis-value">{formatNlNumber(points, 1)}</span>
+                  ) : null}
+                  {points != null && rank != null ? (
+                    <span className="nl-teams-axis-sep" aria-hidden="true">
+                      ·
+                    </span>
+                  ) : null}
+                  {rank != null ? (
+                    <span className="nl-teams-axis-rank">#{formatNlNumber(rank, 0)}</span>
+                  ) : null}
+                  {points == null && rank == null ? <span className="nl-teams-axis-rank">—</span> : null}
+                </span>
+              )}
             </>
           );
           if (onSelectAxis) {
@@ -523,39 +606,6 @@ export default function FoundationTeamsNewLook({
             </span>
           );
         })}
-      </div>
-    );
-  }
-
-  function renderRosterFilterBar() {
-    return (
-      <div className="nl-teams-filters">
-        <div className="nl-teams-filterbar" role="group" aria-label="Kaderrollen filtern">
-          {teamRosterRoleFilterOptions.map((option) => (
-            <button
-              key={`nl-teams-role-${option.id}`}
-              type="button"
-              className={`nl-teams-filter${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
-              onClick={() => setTeamRosterRoleFilter(option.id)}
-            >
-              {option.label}
-              <span className="nl-teams-filter-count nl-tnum">{option.count}</span>
-            </button>
-          ))}
-        </div>
-        <div className="nl-teams-filterbar" role="group" aria-label="Kaderfokus wählen">
-          {teamRosterFocusOptions.map((option) => (
-            <button
-              key={`nl-teams-focus-${option.id}`}
-              type="button"
-              className={`nl-teams-filter${teamRosterFocusMode === option.id ? " is-active" : ""}`}
-              onClick={() => setTeamRosterFocusMode(option.id)}
-            >
-              {option.label}
-              <span className="nl-teams-filter-count nl-tnum">{option.count}</span>
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -801,7 +851,16 @@ export default function FoundationTeamsNewLook({
             .filter(isFiniteNumber)
             .map((rank) => teamCount - rank + 1)
         : [];
-    const hasTrend = seasonPointsSpark.length >= 2;
+    // Ökonomie-Trajektorie je Team: echte Snapshot-Endwerte + Live-Wert.
+    // Fehlende Felder werden herausgefiltert (kein Fake).
+    const economySeasons = row.historicalEconomyBySeason ?? [];
+    const marketValueSpark = [...economySeasons.map((entry) => entry.marketValueTotal), row.marketValueTotal].filter(
+      isFiniteNumber,
+    );
+    const cashSpark = [...economySeasons.map((entry) => entry.cash), row.cash].filter(isFiniteNumber);
+    const hasPointsTrend = seasonPointsSpark.length >= 2;
+    const hasEconomyTrend = marketValueSpark.length >= 2 || cashSpark.length >= 2;
+    const hasTrend = hasPointsTrend || hasEconomyTrend;
     if (radarAxes.length === 0 && !hasTrend) {
       return null;
     }
@@ -818,14 +877,28 @@ export default function FoundationTeamsNewLook({
                 {historicalSeasons.length + 1} Saisons
                 {isFiniteNumber(row.historicalBestRank) ? ` · Best #${formatNlNumber(row.historicalBestRank, 0)}` : ""}
               </span>
-              <span className="nl-teams-board-hover-trend">
-                <small>Punkte</small>
-                <NlSparkline points={seasonPointsSpark} tone="accent" />
-              </span>
+              {hasPointsTrend ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Punkte</small>
+                  <NlSparkline points={seasonPointsSpark} tone="accent" />
+                </span>
+              ) : null}
               {seasonRankSpark.length >= 2 ? (
                 <span className="nl-teams-board-hover-trend">
                   <small>Rang (oben = besser)</small>
                   <NlSparkline points={seasonRankSpark} tone="good" />
+                </span>
+              ) : null}
+              {marketValueSpark.length >= 2 ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Marktwert</small>
+                  <NlSparkline points={marketValueSpark} tone="warn" />
+                </span>
+              ) : null}
+              {cashSpark.length >= 2 ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Cash</small>
+                  <NlSparkline points={cashSpark} tone="good" />
                 </span>
               ) : null}
             </div>
@@ -833,6 +906,39 @@ export default function FoundationTeamsNewLook({
         </div>
       </div>
     );
+  }
+
+  // Aktive Sortierung als Zeilenwert: zeigt in jeder Zeile genau den Wert, nach
+  // dem gerade sortiert wird, wenn er nicht ohnehin schon in der Zeile steht
+  // (Rang/Punkte/Cash/Medaillen/Achsen sind bereits sichtbar). So sieht man
+  // beim Sortieren nach MW/Gehalt/Kader auch die zugehörige Zahl.
+  function renderBoardSortValue(row: TeamsViewRow) {
+    const key = boardSort.key;
+    if (key === "mw") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Team-Marktwert">
+          <small>MW</small>
+          {formatNlNumber(row.marketValueTotal, 2)}
+        </span>
+      );
+    }
+    if (key === "salary") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Gehaltsblock">
+          <small>Gehalt</small>
+          {formatNlNumber(row.salaryTotal, 2)}
+        </span>
+      );
+    }
+    if (key === "roster") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Kadergröße">
+          <small>Kader</small>
+          {formatNlNumber(row.rosterCount, 0)}
+        </span>
+      );
+    }
+    return null;
   }
 
   function renderBoardRow(row: TeamsViewRow) {
@@ -854,8 +960,14 @@ export default function FoundationTeamsNewLook({
         <button
           type="button"
           className="nl-teams-boardrow-main"
-          onClick={() => scheduleActiveManagerTeam(row.team.teamId, "manual_select")}
-          title={`${row.teamName} auswählen`}
+          onClick={() => {
+            // Zeile anklicken = dieses Team in den Fokus holen (Hero oben wird
+            // sein Profil) und nach oben scrollen. Ein separater „Profil"-Knopf
+            // ist damit überflüssig.
+            scheduleActiveManagerTeam(row.team.teamId, "manual_select");
+            scrollToSection(heroCardRef);
+          }}
+          title={`${row.teamName} in den Fokus holen`}
         >
           <span className="nl-teams-board-rank">
             {medalKind ? (
@@ -892,6 +1004,7 @@ export default function FoundationTeamsNewLook({
           </span>
           {renderAxisRankBadges(row, row.teamName, true)}
           <span className="nl-teams-board-meta">
+            {renderBoardSortValue(row)}
             {row.goldCount > 0 ? <NlMedalBadge kind="gold" count={row.goldCount} /> : null}
             {row.silverCount > 0 ? <NlMedalBadge kind="silver" count={row.silverCount} /> : null}
             {row.bronzeCount > 0 ? <NlMedalBadge kind="bronze" count={row.bronzeCount} /> : null}
@@ -900,20 +1013,13 @@ export default function FoundationTeamsNewLook({
             </span>
           </span>
         </button>
-        <button
-          type="button"
-          className="nl-teams-board-profile"
-          onClick={() => openTeamProfileById(row.team.teamId)}
-          title={`${row.teamName} Profil öffnen`}
-        >
-          Profil
-        </button>
       </li>
     );
   }
 
   return (
     <div className="nl-teams foundation-teams-view-panel" data-testid="nl-teams-view" data-new-look="true">
+      <div ref={heroCardRef} className="nl-teams-anchor">
       <NlCard className="nl-teams-hero-card" data-testid="nl-teams-hero">
         <div className="nl-teams-hero" style={getSeasonV2TeamTagStyle(heroRow?.teamCode ?? null)}>
           <div className="nl-teams-hero-identity">
@@ -931,13 +1037,38 @@ export default function FoundationTeamsNewLook({
               <span className="nl-teams-hero-eyebrow">Team Fokus</span>
               <h2 className="nl-teams-hero-name">{selectedTeam.name}</h2>
               <StatChipRow className="nl-teams-hero-chips" aria-label={`Kennzahlen ${selectedTeam.name}`}>
-                <StatChip
-                  label="Rang"
-                  value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
-                  tone="accent"
-                  onClick={() => openTeamProfileById(selectedTeam.teamId)}
-                  title={`${selectedTeam.name} Profil öffnen`}
-                />
+                <span className="nl-teams-rank-portal">
+                  <StatChip
+                    label="Rang"
+                    value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
+                    tone="accent"
+                    onClick={onOpenSeason ?? (() => openTeamProfileById(selectedTeam.teamId))}
+                    title={onOpenSeason ? "Zum Saisonstand springen" : `${selectedTeam.name} Profil öffnen`}
+                  />
+                  {rankPreviewRows.length > 0 ? (
+                    <div className="nl-teams-rank-preview" aria-hidden="true">
+                      <span className="nl-teams-rank-preview-title">Saisonstand</span>
+                      <ol className="nl-teams-rank-preview-list nl-tnum">
+                        {rankPreviewRows.map((row) => {
+                          const isSelf = row.team.teamId === selectedTeam.teamId;
+                          const previewRank = getBoardRank(row);
+                          return (
+                            <li
+                              key={row.team.teamId}
+                              className={`nl-teams-rank-preview-row${isSelf ? " is-self" : ""}`}
+                            >
+                              <span className="nl-teams-rank-preview-rank">
+                                {previewRank != null ? `#${formatNlNumber(previewRank, 0)}` : "—"}
+                              </span>
+                              <span className="nl-teams-rank-preview-team">{row.teamName}</span>
+                              <span className="nl-teams-rank-preview-points">{formatNlNumber(row.points, 1)}</span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ) : null}
+                </span>
                 <StatChip
                   label="Punkte"
                   value={formatNlNumber(heroRow?.points, 1)}
@@ -948,24 +1079,23 @@ export default function FoundationTeamsNewLook({
                   label="Kader"
                   value={heroRow != null ? formatNlNumber(heroRow.rosterCount, 0) : "—"}
                   onClick={() => {
-                    setRosterMode("kader");
+                    setRosterMode("tabelle");
                     scrollToSection(rosterCardRef);
                   }}
-                  title="Zum Kader springen"
+                  title="Zur Kadertabelle springen"
                 />
                 <StatChip
                   label="Cash"
                   value={heroRow?.cash != null ? formatMoney(heroRow.cash) : "—"}
                   tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
+                  title="Cash — sortiert die Teamtabelle nach Cash"
+                  onClick={() => handleHeroBoardSortSelect("cash", "desc")}
                 />
                 <StatChip
                   label="MW"
                   value={formatNlNumber(heroRow?.marketValueTotal, 2)}
-                  title="Marktwert gesamt — öffnet die Kadertabelle"
-                  onClick={() => {
-                    setRosterMode("tabelle");
-                    scrollToSection(rosterCardRef);
-                  }}
+                  title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
+                  onClick={() => handleHeroBoardSortSelect("mw", "desc")}
                 />
                 <StatChip
                   label="Gehalt"
@@ -1029,16 +1159,21 @@ export default function FoundationTeamsNewLook({
           <div className="nl-teams-hero-axes">
             {renderAxisRankBadges(heroRow, selectedTeam.name, false, handleHeroAxisSortSelect)}
             {heroRadarAxes.length > 0 ? (
-              <NlRadar
-                axes={heroRadarAxes}
-                max={teamCount}
-                className="nl-teams-hero-radar"
-                aria-label={`Bereichs-Ränge von ${selectedTeam.name} (außen = besser)`}
-              />
+              <figure className="nl-teams-hero-radar-figure">
+                <NlRadar
+                  axes={heroRadarAxes}
+                  max={teamCount}
+                  className="nl-teams-hero-radar"
+                  onAxisClick={handleHeroAxisSortSelect}
+                  aria-label={`Stärkenprofil von ${selectedTeam.name}: Bereichs-Ränge im Liga-Vergleich, außen = stärker`}
+                />
+                <figcaption className="nl-teams-hero-radar-caption">Stärkenprofil · außen = liga-stark</figcaption>
+              </figure>
             ) : null}
           </div>
         </div>
       </NlCard>
+      </div>
 
       {selectedTeamsHistoryData != null ? (
         <div ref={developmentCardRef} className="nl-teams-anchor">
@@ -1140,6 +1275,36 @@ export default function FoundationTeamsNewLook({
                         : "—"}
                     </p>
                   </article>
+                  <article className="nl-teams-development-metric">
+                    <header className="nl-teams-development-head">
+                      <span className="nl-teams-development-label">Cash</span>
+                      <span className="nl-teams-development-value nl-tnum">
+                        {liveHistoryRow?.cash != null ? formatMoney(liveHistoryRow.cash) : "—"}
+                      </span>
+                      {seasonDeltas?.cashDelta != null ? (
+                        <NlDeltaChip
+                          value={seasonDeltas.cashDelta}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatMoney(n)}`}
+                          title={`Cash ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
+                        />
+                      ) : null}
+                    </header>
+                    {developmentSeries.cashSpark.length >= 2 ? (
+                      <NlSparkline
+                        points={developmentSeries.cashSpark}
+                        tone="good"
+                        className="nl-teams-development-spark"
+                        aria-label={`Cash-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons`}
+                      />
+                    ) : (
+                      <p className="nl-teams-empty">Kein Cash-Verlauf vorhanden.</p>
+                    )}
+                    <p className="nl-teams-development-meta">
+                      {developmentSeries.cashFirst != null && developmentSeries.cashLast != null
+                        ? `von ${formatMoney(developmentSeries.cashFirst)} auf ${formatMoney(developmentSeries.cashLast)}`
+                        : "—"}
+                    </p>
+                  </article>
                 </div>
                 <ol className="nl-teams-development-seasons" aria-label="Saisons im Verlauf">
                   {developmentRows.map((row) => (
@@ -1180,7 +1345,7 @@ export default function FoundationTeamsNewLook({
           <NlSubTabs
             items={NL_TEAMS_ROSTER_MODE_ITEMS.map((item) => ({
               ...item,
-              count: item.id === "kader" ? filteredSelectedRosterTableRows.length : undefined,
+              count: filteredSelectedRosterTableRows.length,
             }))}
             activeId={rosterMode}
             onSelect={(id) => setRosterMode(id as NlTeamsRosterMode)}
@@ -1189,14 +1354,13 @@ export default function FoundationTeamsNewLook({
           />
         }
       >
-        {renderRosterFilterBar()}
         {selectedTeamRosterActionHint ? (
           <p className={`nl-teams-action-hint${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
             <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
             <span>{selectedTeamRosterActionHint}</span>
           </p>
         ) : null}
-        {rosterMode === "kader" ? renderRosterGrid() : renderRosterTable()}
+        {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
       </NlCard>
       </div>
 

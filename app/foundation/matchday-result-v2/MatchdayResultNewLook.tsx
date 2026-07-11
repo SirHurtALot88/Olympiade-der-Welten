@@ -7,6 +7,7 @@ import {
   NlCard,
   NlDeltaChip,
   NlMedalBadge,
+  NlProgressBar,
   NlSubTabs,
   StatChip,
   StatChipRow,
@@ -368,12 +369,24 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           {row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}
         </span>
         <span className="nl-result-scores" aria-hidden="true">
-          <span className={`nl-result-scorebar ${nlToneClass("pow")}`} title={`${matchdaySummary.d1.disciplineName ?? "D1"}: ${formatNlNumber(row.d1Score, 1)}`}>
-            <span className="nl-result-scorebar-fill" style={{ width: `${getBarPercent(row.d1Score, maxD1)}%` }} />
+          <span className="nl-result-scorebar" title={`${matchdaySummary.d1.disciplineName ?? "D1"}: ${formatNlNumber(row.d1Score, 1)}`}>
+            <NlProgressBar
+              className="nl-result-scorebar-progress"
+              value={getBarPercent(row.d1Score, maxD1)}
+              max={100}
+              tone="pow"
+              showValue={false}
+            />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d1Score, 1)}</span>
           </span>
-          <span className={`nl-result-scorebar ${nlToneClass("men")}`} title={`${matchdaySummary.d2.disciplineName ?? "D2"}: ${formatNlNumber(row.d2Score, 1)}`}>
-            <span className="nl-result-scorebar-fill" style={{ width: `${getBarPercent(row.d2Score, maxD2)}%` }} />
+          <span className="nl-result-scorebar" title={`${matchdaySummary.d2.disciplineName ?? "D2"}: ${formatNlNumber(row.d2Score, 1)}`}>
+            <NlProgressBar
+              className="nl-result-scorebar-progress"
+              value={getBarPercent(row.d2Score, maxD2)}
+              max={100}
+              tone="men"
+              showValue={false}
+            />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d2Score, 1)}</span>
           </span>
         </span>

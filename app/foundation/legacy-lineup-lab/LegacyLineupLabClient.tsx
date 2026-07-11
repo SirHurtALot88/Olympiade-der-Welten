@@ -7001,6 +7001,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onUndo={restoreLineupUndo}
         statusMessage={message}
         errors={errors}
+        resolvePreview={preview}
         controlsSlot={
           <>
             <label>

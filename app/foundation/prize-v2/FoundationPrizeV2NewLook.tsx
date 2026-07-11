@@ -150,6 +150,14 @@ export default function FoundationPrizeV2NewLook({
 
   const championLogo = seasonEndChampionRow ? getTeamLogoModel(seasonEndChampionRow.team) : null;
 
+  // Story-/Champion-Karten sind Portale: nur wenn die Zeile ein Team mit
+  // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
+  const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
+  const outlookTeamId = (prizeV2SelectedTeamSummary?.teamId as string | null | undefined) ?? null;
+  const swingTeamId = prizeV2SwingRow?.teamId ?? null;
+  const riskTeamId = prizeV2RiskRow?.teamId ?? null;
+  const championTeamId = seasonEndChampionRow?.teamId ?? null;
+
   return (
     <div className="nl-prize" data-testid="foundation-prize-v2" data-new-look="true">
       <NlCard
@@ -224,28 +232,48 @@ export default function FoundationPrizeV2NewLook({
       </NlCard>
 
       <div className="nl-prize-story-grid" aria-label="Preisgeld-Fokus">
-        <NlCard className="nl-prize-story-card" eyebrow="Top Auszahlung" title={prizeV2LeaderRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Top Auszahlung"
+          title={prizeV2LeaderRow?.teamName ?? "—"}
+          onClick={leaderTeamId ? () => openTeamProfileById(leaderTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2LeaderRow
               ? `#${prizeV2LeaderRow.rank ?? "—"} · ${formatNullableMoney(prizeV2LeaderRow.prizeMoney)}`
               : "kein Leader"}
           </p>
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Dein Outlook" title={prizeV2SelectedTeamSummary?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Dein Outlook"
+          title={prizeV2SelectedTeamSummary?.teamName ?? "—"}
+          onClick={outlookTeamId ? () => openTeamProfileById(outlookTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2SelectedTeamSummary
               ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)} → ${formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)}`
               : "kein Team aktiv"}
           </p>
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Größter Swing" title={prizeV2SwingRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Größter Swing"
+          title={prizeV2SwingRow?.teamName ?? "—"}
+          onClick={swingTeamId ? () => openTeamProfileById(swingTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2SwingRow
               ? `${formatSignedDisplayMoney(prizeV2SwingRow.rankDelta)} Plätze · ${formatSignedDisplayMoney(prizeV2SwingRow.bonusMalus)}`
               : "kein Ausschlag"}
           </p>
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Finanzrisiko" title={prizeV2RiskRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Finanzrisiko"
+          title={prizeV2RiskRow?.teamName ?? "—"}
+          onClick={riskTeamId ? () => openTeamProfileById(riskTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2RiskRow
               ? `Cash danach ${formatLocalePoints(prizeV2RiskRow.projectedCash, 1)} · ${prizeV2RiskRow.warnings.length} Hinweise`
@@ -255,6 +283,7 @@ export default function FoundationPrizeV2NewLook({
         {seasonEndChampionRow ? (
           <NlCard
             className="nl-prize-story-card nl-prize-champion-card"
+            onClick={championTeamId ? () => openTeamProfileById(championTeamId) : undefined}
             eyebrow="Champion · Saisonende"
             title={
               <span className="nl-prize-champion-title">

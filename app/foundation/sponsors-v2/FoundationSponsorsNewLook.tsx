@@ -412,7 +412,11 @@ export default function FoundationSponsorsNewLook({
           ) : null}
         </NlCard>
 
-        {sponsorChoiceMessage ? <div className="status-banner is-success">{sponsorChoiceMessage}</div> : null}
+        {sponsorChoiceMessage ? (
+          <div className="nl-sponsor-banner" role="status">
+            {sponsorChoiceMessage}
+          </div>
+        ) : null}
 
         {selectedTeamSponsorContract ? (
           <>
