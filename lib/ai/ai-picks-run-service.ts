@@ -3547,7 +3547,22 @@ export async function runAiPicksExecutePreview(
         (player) => player.marketValue ?? player.displayMarketValue ?? null,
       ),
     );
-    const executePoolCache = new Map<string, TransfermarktFreeAgentItem[]>();
+    // Build the team's league free-agent feed once for this execute loop instead of re-deriving it
+    // per pick. `listExecuteFreeAgentsForSlot` otherwise re-enters `listLocalTransfermarktFreeAgents`
+    // on every pick, and because the market-context cache key includes rosters/transferHistory counts
+    // (which grow with each applied pick), that call rebuilds the whole ~league-wide base feed every
+    // time. The pick-selection fields (marketValue/mvs/ovr/salary/core stats/preferredDisciplineIds)
+    // are roster-invariant during the draft, so the loop-start feed is reused with an availability
+    // filter (`unavailablePlayerIds`) applied per pick — behaviour-preserving, ~O(teams) rebuilds
+    // instead of O(picks).
+    const executeBaseFreeAgents = listLocalTransfermarktFreeAgents({
+      saveId: save.saveId,
+      seasonId,
+      teamId: latestTeam.teamId,
+      mode: "ai_preview",
+      localRunContext: teamRunContext,
+      fullPool: true,
+    }).items;
     for (const frozenPick of frozenTrace) {
       const currentTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
       const loopSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam);
@@ -3582,6 +3597,9 @@ export async function runAiPicksExecutePreview(
       });
       const underMinExecute = previewTeam.targetRosterMin != null && loopSnapshot.rosterCount < previewTeam.targetRosterMin;
       const effectiveSlotLane = underMinExecute ? "cheap_fill" : slotLane;
+      const availableBaseFreeAgents = executeBaseFreeAgents.filter(
+        (item) => !unavailablePlayerIds.has(item.playerId),
+      );
       const executeFreeAgents = listExecuteFreeAgentsForSlot({
         saveId: save.saveId,
         seasonId,
@@ -3592,7 +3610,10 @@ export async function runAiPicksExecutePreview(
         slotPriceCeiling,
         affordabilityCash,
         includeCheapFillFallback: !underMinExecute,
-        poolCache: executePoolCache,
+        // Availability-filtered loop-start feed → in-memory MW-band filtering (no per-pick league
+        // rebuild). The pool already excludes taken players, so no bounds-keyed pool cache is used
+        // (it would not reflect availability and could serve a stale pool).
+        precomputedFreeAgents: availableBaseFreeAgents,
       });
       const livePick = resolveExecuteLivePickForSlot({
         saveId: save.saveId,

@@ -164,7 +164,22 @@ function listExecuteFreeAgentsInBounds(input: {
   teamRunContext: LocalTransfermarktRunContext;
   minMarketValue: number;
   maxMarketValue: number;
+  /**
+   * Pre-built, availability-filtered free-agent feed for this team. When provided, the MW-band
+   * pool is derived by an in-memory filter instead of re-entering the local market service — this
+   * avoids rebuilding the whole league free-agent base feed on every draft-execute pick. The bounds
+   * filter mirrors `matchesFreeAgentFilters` (min/max MW) exactly, so the returned set is identical
+   * to a fresh `listLocalTransfermarktFreeAgents` call over the same available players.
+   */
+  precomputedFreeAgents?: TransfermarktFreeAgentItem[];
 }): TransfermarktFreeAgentItem[] {
+  if (input.precomputedFreeAgents) {
+    return input.precomputedFreeAgents.filter(
+      (item) =>
+        (item.marketValue ?? Number.NEGATIVE_INFINITY) >= input.minMarketValue &&
+        (item.marketValue ?? Number.POSITIVE_INFINITY) <= input.maxMarketValue,
+    );
+  }
   return listLocalTransfermarktFreeAgents({
     saveId: input.saveId,
     seasonId: input.seasonId,
@@ -188,6 +203,13 @@ export function listExecuteFreeAgentsForSlot(input: {
   affordabilityCash: number;
   includeCheapFillFallback?: boolean;
   poolCache?: Map<string, TransfermarktFreeAgentItem[]>;
+  /**
+   * Availability-filtered league free-agent feed for this team, built once per draft-execute team
+   * loop. Threaded to `listExecuteFreeAgentsInBounds` so per-pick pool loads are an in-memory MW
+   * filter rather than a full league feed rebuild. Behaviour-preserving: the caller filters taken
+   * players out of this feed before each pick, so bounded pools match a fresh service call.
+   */
+  precomputedFreeAgents?: TransfermarktFreeAgentItem[];
 }): TransfermarktFreeAgentItem[] {
   const cacheKey = (bounds: ExecutePoolMwBounds) =>
     `${input.teamId}:${input.slotLane}:${bounds.minMarketValue}:${bounds.maxMarketValue}:${input.slotPriceCeiling ?? "na"}`;
@@ -205,6 +227,7 @@ export function listExecuteFreeAgentsForSlot(input: {
       teamRunContext: input.teamRunContext,
       minMarketValue: bounds.minMarketValue,
       maxMarketValue: bounds.maxMarketValue,
+      precomputedFreeAgents: input.precomputedFreeAgents,
     });
     input.poolCache?.set(key, items);
     return items;
