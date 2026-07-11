@@ -2641,7 +2641,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                   src={teamLogo.src}
                                   alt={`${row.team?.name ?? "Team"} Logo`}
                                   loading="lazy"
-                                  decoding="async"
                                   fetchPriority="low"
                                 />
                               ) : (
