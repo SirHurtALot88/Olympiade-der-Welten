@@ -32531,6 +32531,19 @@ button.market-v2-bucket-card.is-selected {
   }
 }
 
+/* Portrait-Karten-Slot für NlAbilityStars (Tier-3 Rosterkarten: Home Top-Kader, Teams-Kader,
+   Team-Profil). Additiv und nur unterhalb von `.is-new-look` gerendert — siehe
+   `FoundationPlayerPortraitCard`'s `newLook`/`showAbilityStars`. */
+.is-new-look .nl-portrait-ability-stars {
+  display: flex;
+  margin-top: 2px;
+}
+
+.is-new-look .nl-portrait-ability-stars .nl-ability-stars {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
 .velo-star-stack,
 .training-v2-rider-star-stack {
   display: grid;

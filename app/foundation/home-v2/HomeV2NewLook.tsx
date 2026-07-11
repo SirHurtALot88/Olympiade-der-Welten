@@ -421,6 +421,10 @@ export default function HomeV2NewLook({
                 poRangeMax={player.poRangeMax}
                 variant="home"
                 context="teamGrid"
+                newLook
+                known
+                caStars={player.caStars}
+                poStars={player.poStars}
                 portraitLoading={index < 2 ? "eager" : "lazy"}
                 portraitFetchPriority={index < 2 ? "high" : "auto"}
                 onOpen={() => onOpenPlayer(player.playerId)}

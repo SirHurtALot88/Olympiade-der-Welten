@@ -30,8 +30,10 @@ import {
   countTeamSeasonInjuries,
 } from "@/lib/foundation/team-history-health-metrics";
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { getPotentialBand } from "@/lib/progression/player-potential-service";
+import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
+import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
 import {
   buildTeamProfileSessionKey,
   getCachedTeamProfileData,
@@ -58,7 +60,52 @@ export type FoundationRosterTableRow = {
   ppMen: number | null;
   ppSoc: number | null;
   saleBreakdown: ReturnType<typeof buildTransfermarktSaleFactorBreakdown>;
+  /** "Neuer Look" CA/PO-Sterne (Tier-3 Rosterkarten) — fog-korrekt über den Scouting-Bridge-Snapshot. */
+  known: boolean;
+  caStars: number | null;
+  poStarRange: { min: number; max: number } | null;
+  caScore: number | null;
+  poScoreRange: { min: number; max: number } | null;
 };
+
+/**
+ * CA/PO-Sterne + exakte Zahlen für eine Rosterkarte ("Neuer Look") — fog-korrekt:
+ * bekannte (eigene) Teams bekommen vollen Scouting-Level, unbekannte (nicht
+ * steuerbare) Teams bleiben auf Scouting-Level 0 (ungescoutet). Nutzt denselben
+ * Sterne-Bridge-Snapshot wie die Scouting-Watchlist (`buildPlayerStarScoutingSnapshot`)
+ * statt eine eigene Fog-Logik zu erfinden.
+ */
+function buildRosterCaPoStarFields(input: {
+  gameState: GameState;
+  player: Player;
+  saveId: string;
+  known: boolean;
+  currentRating: number | null;
+}): Pick<FoundationRosterTableRow, "known" | "caStars" | "poStarRange" | "caScore" | "poScoreRange"> {
+  const scoutingLevel = input.known ? 5 : 0;
+  const snapshot = buildPlayerStarScoutingSnapshot({
+    gameState: input.gameState,
+    player: input.player,
+    saveId: input.saveId,
+    scoutingLevel,
+  });
+  const insight = buildPlayerDevelopmentInsight({
+    gameState: input.gameState,
+    player: input.player,
+    currentRating: input.currentRating,
+    scoutingLevel,
+  });
+  return {
+    known: input.known,
+    caStars: snapshot.revealedCurrentStars.overall,
+    poStarRange:
+      snapshot.revealedPotentialStars.overallMin != null && snapshot.revealedPotentialStars.overallMax != null
+        ? { min: snapshot.revealedPotentialStars.overallMin, max: snapshot.revealedPotentialStars.overallMax }
+        : null,
+    caScore: insight.currentRating ?? null,
+    poScoreRange: insight.potentialRangeDisplay ?? null,
+  };
+}
 
 type FoundationPlayerRatingSnapshot = {
   ovrNormalized?: number | null;
@@ -146,6 +193,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
   seasonPointsLedger: SeasonPointsLedger;
   teamObjectiveOverview: TeamObjectiveOverview;
   currentMatchdayDisciplineSchedule: CurrentMatchdayDisciplineSchedule;
+  /** Steuerbare Teams des aktiven Owners — bestimmt `known` für CA/PO-Sterne (Tier-3 Rosterkarten). */
+  manageableTeamIds?: string[] | null;
 }) {
   const shouldBuildSelectedRosterTableRows = shouldBuildFoundationSelectedRosterTableRows({
     shouldBuildTeamsView: input.shouldBuildTeamsView,
@@ -174,9 +223,18 @@ export function useFoundationCrossTabTeamsRoster(input: {
       return EMPTY_SELECTED_ROSTER_TABLE_ROWS;
     }
 
+    const saveId = input.activeSaveId ?? "default";
     return [...input.rosterPlayers]
       .map(({ entry, player }) => {
         const playerRating = input.playerRatingsById.get(player.id) ?? null;
+        const known = !isFoundationTeamManagementLocked(entry.teamId, input.manageableTeamIds);
+        const caPoStarFields = buildRosterCaPoStarFields({
+          gameState: input.gameState,
+          player,
+          saveId,
+          known,
+          currentRating: playerRating?.ppsSeason ?? null,
+        });
         return {
           entry,
           player,
@@ -191,6 +249,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
           ppMen: playerRating?.ppMen ?? null,
           ppSoc: playerRating?.ppSoc ?? null,
           saleBreakdown: buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry),
+          ...caPoStarFields,
         };
       })
       .sort((left, right) =>
@@ -210,7 +269,9 @@ export function useFoundationCrossTabTeamsRoster(input: {
         }),
       );
   }, [
+    input.activeSaveId,
     input.gameState,
+    input.manageableTeamIds,
     input.playerRatingsById,
     input.rosterPlayers,
     shouldBuildSelectedRosterTableRows,
@@ -450,6 +511,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
           activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.soc ?? 0 })),
         ),
       };
+      const rosterCardsKnown = !isFoundationTeamManagementLocked(team.teamId, input.manageableTeamIds);
       const rosterCards = rosterEntries
         .map((entry) => {
           const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
@@ -458,6 +520,13 @@ export function useFoundationCrossTabTeamsRoster(input: {
           }
           const portrait = getPlayerPortraitModel(player);
           const rating = input.playerRatingsById.get(player.id) ?? null;
+          const caPoStarFields = buildRosterCaPoStarFields({
+            gameState: input.gameState,
+            player,
+            saveId,
+            known: rosterCardsKnown,
+            currentRating: rating?.ppsSeason ?? null,
+          });
           const topDisciplines = Object.entries(player.disciplineRatings)
             .sort((left, right) => right[1] - left[1])
             .slice(0, 2)
@@ -536,6 +605,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
             topDisciplines,
             potential: player.potential ?? null,
             potentialBand: player.potential != null ? getPotentialBand(player.potential) : null,
+            ...caPoStarFields,
           };
         })
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
@@ -627,6 +697,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
       input.currentAreaRanksByTeamId,
       input.currentMatchdayDisciplineSchedule,
       input.gameState,
+      input.manageableTeamIds,
       input.playerRatingsById,
       input.seasonPointsLedger,
       liveSeasonStandRows,

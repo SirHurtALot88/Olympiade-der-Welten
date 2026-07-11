@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { NlAbilityStars, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import {
   buildContextOverlayStats,
   shouldShowPortraitOrbit,
@@ -45,6 +45,19 @@ export type FoundationPlayerPortraitCardProps = {
   caRating?: number | null;
   poRangeMin?: number | null;
   poRangeMax?: number | null;
+  /**
+   * "Neuer Look" CA/PO-Sterne-Slot (Tier-3 Rosterkarten): additiv, rendert `NlAbilityStars`
+   * außerhalb des String-basierten `PortraitOverlayStat`-Systems. Nur aktiv, wenn `newLook`
+   * true ist — die Karte bleibt für Flag-aus-Aufrufer byte-identisch (Default `false`).
+   */
+  newLook?: boolean;
+  /** Fog-of-war: `true` = eigenes/steuerbares Team (exakte Zahl gezeigt), `false` = gescoutet (nur Sterne/Range). */
+  known?: boolean;
+  caStars?: number | string | null;
+  poStars?: number | string | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
   className?: string;
   variant?: "home" | "team";
   roleTag?: string | null;
@@ -102,6 +115,13 @@ export default function FoundationPlayerPortraitCard({
   caRating,
   poRangeMin,
   poRangeMax,
+  newLook = false,
+  known = true,
+  caStars = null,
+  poStars = null,
+  poStarRange = null,
+  caScore = null,
+  poScoreRange = null,
   className = "",
   variant = "home",
   roleTag,
@@ -125,7 +145,23 @@ export default function FoundationPlayerPortraitCard({
   portraitFetchPriority = "auto",
 }: FoundationPlayerPortraitCardProps) {
   const resolvedHeatPools = leagueHeatPools ?? createEmptyLeaguePlayerHeatPools();
-  const showCaPo = variant === "home" && context === "roster" && (caRating != null || poRangeMin != null || poRangeMax != null);
+  // Team-Varianten dürfen die alte String-CA/PO-Zeile nur im "Neuen Look" zeigen (Tier-3
+  // Rosterkarten) — Flag-aus bleibt unverändert, weil `newLook` dort nie gesetzt wird.
+  const showCaPo =
+    (variant === "home" || newLook) &&
+    context === "roster" &&
+    (caRating != null || poRangeMin != null || poRangeMax != null);
+  // Neuer, eigenständiger Sterne-Slot (außerhalb des String-Preset-Systems): rendert
+  // `NlAbilityStars`, sobald der Aufrufer `newLook` setzt und echte CA/PO-Daten mitgibt —
+  // unabhängig vom `context` (Home nutzt "teamGrid", Teams/Team-Profil "roster").
+  const showAbilityStars =
+    newLook &&
+    (caStars != null ||
+      poStars != null ||
+      poStarRange != null ||
+      caRating != null ||
+      poRangeMin != null ||
+      poRangeMax != null);
   const resolvedSubMeta =
     subMeta ??
     (variant === "team" && context === "roster" ? [roleTag, playerClassName].filter(Boolean).join(" · ") || null : null);
@@ -148,6 +184,22 @@ export default function FoundationPlayerPortraitCard({
     leagueHeatPools: resolvedHeatPools,
     rankStyle: ovrRank != null || ppsRank != null || mvsRank != null || variant === "team" ? "inline" : "label",
   });
+
+  const abilityStarsRow =
+    showAbilityStars && density !== "mini" && portraitLayout !== "rail" ? (
+      <div className="nl-portrait-ability-stars" data-testid="foundation-player-portrait-ability-stars">
+        <NlAbilityStars
+          caStars={caStars}
+          caScore={caScore ?? caRating ?? null}
+          poStars={poStars}
+          poStarRange={poStarRange}
+          poScoreRange={poScoreRange ?? (poRangeMin != null && poRangeMax != null ? { min: poRangeMin, max: poRangeMax } : null)}
+          known={known}
+          compact
+          label={`${name} Fähigkeiten`}
+        />
+      </div>
+    ) : null;
 
   const economyRow =
     economyStats && economyStats.length > 0 && density !== "mini" && portraitLayout !== "rail" ? (
@@ -245,6 +297,7 @@ export default function FoundationPlayerPortraitCard({
           ) : null}
           <strong className="home-v2-player-name">{name}</strong>
           {overlayStatsRow}
+          {abilityStarsRow}
           {economyRow}
           {orbitRow}
           {footerSlot && density !== "mini" ? (

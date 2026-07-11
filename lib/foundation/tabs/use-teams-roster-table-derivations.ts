@@ -32,6 +32,12 @@ export type SelectedRosterTableRow = {
     salePrice?: number | null;
     saleFactor?: number | null;
   };
+  /** "Neuer Look" CA/PO-Sterne (Tier-3 Rosterkarten) — optional, nur von `NlTeamsRosterRow`-Konsumenten genutzt. */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
 
 function getTeamRosterRoleBucket(roleTag: string | null | undefined): Exclude<TeamRosterRoleFilter, "all"> {

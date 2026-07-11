@@ -81,6 +81,12 @@ export type NlTeamsRosterRow = {
   ovrRank?: number | null;
   mvsRank?: number | null;
   ppsRank?: number | null;
+  /** CA/PO-Sterne (Tier-3 Rosterkarten) — fog-korrekt über `buildRosterCaPoStarFields`. */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
 
 export type NlTeamsFilterOption<TId extends string> = {
@@ -649,6 +655,12 @@ export default function FoundationTeamsNewLook({
               playerClassName={player.className}
               className={getClassColorClassName(player.className, "player-card-class-frame")}
               subMeta={subMeta || null}
+              newLook
+              known={row.known}
+              caStars={row.caStars}
+              poStarRange={row.poStarRange}
+              caScore={row.caScore}
+              poScoreRange={row.poScoreRange}
               onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
               title={`${player.name} öffnen`}
               economyStats={[

@@ -23,6 +23,9 @@ export type HomeV2TopPlayerCard = {
   caRating: number | null;
   poRangeMin: number | null;
   poRangeMax: number | null;
+  /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
+  caStars?: number | string | null;
+  poStars?: number | string | null;
 };
 
 export const HOME_V2_TOP_PLAYER_COUNT = 6;

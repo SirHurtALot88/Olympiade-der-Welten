@@ -366,6 +366,12 @@ export default function TeamProfileNewLook({
             playerClassName={player.className ?? undefined}
             className={getClassColorClassName(player.className, "player-card-class-frame")}
             subMeta={`${getRoleLabel(player.roleTag)}${player.promisedRole ? ` · versprochen ${getRoleLabel(player.promisedRole)}` : ""} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+            newLook
+            known={player.known}
+            caStars={player.caStars}
+            poStarRange={player.poStarRange}
+            caScore={player.caScore}
+            poScoreRange={player.poScoreRange}
             onOpen={() => onOpenPlayer(player.playerId, player.activePlayerId)}
             title={`${player.name} öffnen`}
             economyStats={[
