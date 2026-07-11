@@ -30,6 +30,15 @@ function setPlayerTrainingMode(gameState: GameState, playerId: string, mode: Pla
 }
 
 export function getInboxQuickActions(item: GameInboxItem): InboxQuickAction[] {
+  // #43: ein bereits erledigtes Item (egal ob manuell oder — bei
+  // Bedingungs-Items — automatisch aus dem Spielstand abgeleitet, siehe
+  // `isAutoResolvingInboxItemId` in game-inbox-service.ts) braucht keine
+  // weiteren Quick-Actions mehr; die CTA war "geh das beheben" und das ist
+  // bereits geschehen.
+  if (item.status === "done") {
+    return [];
+  }
+
   const actions: InboxQuickAction[] = [];
 
   if (item.source.startsWith("player_health_")) {

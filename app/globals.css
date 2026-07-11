@@ -58317,3 +58317,144 @@ button.is-new-look .nl-thist-season-pill,
   font-size: 10.5px;
   letter-spacing: 0.05em;
 }
+
+/* Wave 5 — Home-Politur (#40): Radar-Prominenz + reichhaltigere
+   Aufsteiger/Risiken-Zeilen. Nur NEUE `.nl-home-*` Klassen; alle
+   Selektoren sind bewusst spezifischer als die bestehenden Regeln in
+   globals.css, damit sie unabhängig von der Merge-Reihenfolge greifen.
+   Datei betrifft ausschließlich HomeV2NewLook.tsx. */
+
+/* --- Team-Profil-Radar: größer + mehr Spaltenbreite im Profil-Grid --- */
+.is-new-look .nl-home-profile-grid.nl-home-profile-grid-hero {
+  grid-template-columns: minmax(320px, 1.35fr) minmax(280px, 1fr);
+  align-items: stretch;
+}
+@media (max-width: 860px) {
+  .is-new-look .nl-home-profile-grid.nl-home-profile-grid-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-home-radar-card.nl-home-radar-card-hero {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero {
+  padding: var(--nl-s3) 0 var(--nl-s2);
+}
+.is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero .nl-radar {
+  width: 100%;
+  max-width: 340px;
+}
+@media (max-width: 480px) {
+  .is-new-look .nl-home-radar-wrap.nl-home-radar-wrap-hero .nl-radar {
+    max-width: 280px;
+  }
+}
+
+/* --- Aufsteiger/Risiken: reichhaltigere, mehrzeilige Zeilen ---------- */
+.is-new-look .nl-home-development-row.nl-home-development-row-rich {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.is-new-look .nl-home-development-row.nl-home-development-row-rich:hover,
+.is-new-look .nl-home-development-row.nl-home-development-row-rich:focus-visible {
+  transform: none;
+}
+
+.is-new-look .nl-home-development-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-home-development-rank {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-home-development-row-rich .nl-home-development-figures {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.is-new-look .nl-home-development-bar.nl-progress {
+  width: 100%;
+  gap: 0;
+}
+.is-new-look .nl-home-development-bar .nl-progress-track {
+  height: 4px;
+}
+
+.is-new-look .nl-home-development-range {
+  font-size: 10.5px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Wave 5 — Inbox rework (#43 auto-resolve, #44 categorization)
+   Namespace: .is-new-look .nl-inbox-* (matches existing inbox-v2
+   "Neuer Look" block in app/globals.css — merge alongside it).
+   ============================================================ */
+
+/* #44 — "Wiederkehrend" / "Einmalig" cadence tag next to the
+   category label in the Aktionen list. Recurring reminders get a
+   faint accent tint so they read as "keeps coming back"; one-time
+   setup tasks stay neutral. */
+.is-new-look .nl-inbox-cadence-tag {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-recurring {
+  border-color: color-mix(in srgb, var(--nl-accent) 40%, transparent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-inbox-cadence-tag.nl-inbox-cadence-once {
+  border-color: var(--nl-line-2);
+  color: var(--nl-mut);
+}
+
+/* #43 — "Automatisch" tag shown on still-open condition items to
+   explain why there is no manual "Erledigt" button: the game will
+   resolve it once the underlying condition is met. Dashed border
+   distinguishes it from the solid cadence tag. */
+.is-new-look .nl-inbox-auto-tag {
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px dashed var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+/* #43 — small check glyph inside the existing .nl-inbox-card-status
+   pill, only for auto-resolved ("Automatisch erledigt") items. */
+.is-new-look .nl-inbox-card-status-icon {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 3px;
+  vertical-align: -1px;
+  color: var(--nl-good, #4cc56b);
+}

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import InboxV2NewLook from "@/app/foundation/inbox-v2/InboxV2NewLook";
 import type { InboxV2ClientProps } from "@/app/foundation/inbox-v2/inbox-v2-types";
+import { isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 
 const INBOX_DECISION_CATEGORY_FILTERS = [
@@ -146,7 +147,7 @@ export default function InboxV2Client(props: InboxV2ClientProps) {
                   ))}
                 </div>
               ) : null}
-              {selectedItem.status === "open" && (onMarkDone || onDismiss) ? (
+              {selectedItem.status === "open" && !isAutoResolvingInboxItemId(selectedItem.id) && (onMarkDone || onDismiss) ? (
                 <div className="inbox-v2-detail-actions">
                   {onMarkDone ? (
                     <button type="button" className="secondary-button inline-button" onClick={() => onMarkDone(selectedItem.id)}>
@@ -159,6 +160,12 @@ export default function InboxV2Client(props: InboxV2ClientProps) {
                     </button>
                   ) : null}
                 </div>
+              ) : null}
+              {selectedItem.status === "open" && isAutoResolvingInboxItemId(selectedItem.id) ? (
+                <p className="muted">Löst sich automatisch, sobald die Bedingung erfüllt ist.</p>
+              ) : null}
+              {selectedItem.status === "done" && isAutoResolvingInboxItemId(selectedItem.id) ? (
+                <p className="muted">Automatisch erledigt.</p>
               ) : null}
             </>
           ) : (

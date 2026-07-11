@@ -186,7 +186,93 @@ function getStoredStatusMap(gameState: GameState) {
   return new Map((gameState.gameInboxItems ?? []).map((item) => [item.itemId, normalizeStatus(item.status)] as const));
 }
 
+// --- #43 Auto-Resolve: Bedingungs-Items ------------------------------
+// Ein Teil der Inbox-"Aufgaben" ist in Wahrheit eine reine Bedingung, die
+// der Spielstand selbst beantworten kann ("ist ein Lineup gesetzt?", "hat
+// das Team einen Kapitaen?", ...). Fuer diese Items wird `status`
+// AUSSCHLIESSLICH live aus dem Spielstand abgeleitet (siehe die jeweiligen
+// `createItem(...)`-Aufrufe unten, die `status: bedingungErfuellt ? "done"
+// : "open"` setzen) — persistierter Status aus `gameState.gameInboxItems`
+// wird fuer diese Item-Praefixe bewusst ignoriert. Ohne diese Sperre koennte
+// ein alter "done"/"dismissed"-Eintrag (z.B. durch einen frueheren Klick auf
+// "Erledigt", der die Bedingung NICHT tatsaechlich erfuellt) einen weiterhin
+// unerfuellten Zustand verstecken — genau der Bug, den #43 behebt. Die Liste
+// ist bewusst auf Items beschraenkt, deren Erfuellung 1:1 aus vorhandenen
+// Spielstand-Feldern lesbar ist; Items, die eine echte Nutzer-ENTSCHEIDUNG
+// brauchen (z.B. welchen Spieler man verkauft, ob man jetzt Facility X
+// upgradet), bleiben aussen vor und behalten den bisherigen Mechanismus.
+const AUTO_RESOLVING_INBOX_ITEM_PREFIXES = new Set<string>([
+  "lineup_missing",
+  "lineup_not_submitted",
+  "formcards_open",
+  "formcards_negative_open",
+  "captain_missing",
+  "sponsor_choice_missing",
+  "training_missing",
+  "preseason_step_open",
+  "room_waiting",
+  "flow",
+  "board_objective_at_risk",
+  "board_objective_failed",
+]);
+
+function getInboxItemIdPrefix(itemId: string): string {
+  const separatorIndex = itemId.indexOf(":");
+  return separatorIndex === -1 ? itemId : itemId.slice(0, separatorIndex);
+}
+
+/** True fuer Items, deren `status` live aus dem Spielstand abgeleitet wird (siehe oben). */
+export function isAutoResolvingInboxItemId(itemId: string): boolean {
+  return AUTO_RESOLVING_INBOX_ITEM_PREFIXES.has(getInboxItemIdPrefix(itemId));
+}
+
+// --- #44 Wiederkehrend vs. einmalig -----------------------------------
+// Rein informatives Tagging fuer die UI (kein Save-Feld, nur aus dem
+// itemId-Praefix abgeleitet): wiederkehrende Reminder (tauchen jeden
+// Spieltag/immer wieder auf) vs. einmalige Setup-Aufgaben pro Saison.
+const RECURRING_INBOX_ITEM_PREFIXES = new Set<string>([
+  "lineup_missing",
+  "lineup_not_submitted",
+  "training_missing",
+  "xp_available",
+  "contracts_expiring",
+  "transfer_candidate",
+  "transfer_buy_candidate",
+  "facility_condition_low",
+  "facility_upkeep_risk",
+  "facility_upgrade_possible",
+  "player_injured",
+  "player_fatigue_risk",
+  "player_lineup_rest",
+  "player_training_load",
+  "board_objective_at_risk",
+  "board_objective_failed",
+  "scout_milestone",
+  "room_waiting",
+  "formcards_negative_open",
+]);
+
+const ONE_TIME_INBOX_ITEM_PREFIXES = new Set<string>([
+  "captain_missing",
+  "sponsor_choice_missing",
+  "formcards_open",
+  "preseason_step_open",
+]);
+
+export type InboxItemCadence = "recurring" | "once" | null;
+
+/** "recurring" (taucht regelmaessig wieder auf), "once" (Setup-Aufgabe pro Saison) oder null (kein Tag). */
+export function getInboxItemCadence(itemId: string): InboxItemCadence {
+  const prefix = getInboxItemIdPrefix(itemId);
+  if (RECURRING_INBOX_ITEM_PREFIXES.has(prefix)) return "recurring";
+  if (ONE_TIME_INBOX_ITEM_PREFIXES.has(prefix)) return "once";
+  return null;
+}
+
 function withStoredStatus(item: GameInboxItem, storedStatusById: Map<string, GameInboxStatus>): GameInboxItem {
+  if (isAutoResolvingInboxItemId(item.itemId)) {
+    return item;
+  }
   return {
     ...item,
     status: storedStatusById.get(item.itemId) ?? item.status,
@@ -457,7 +543,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft),
       isSubmitted: isTeamMatchdayLineupSubmitted(lineupDraft),
     };
-    if (rosterCount > 0 && !lineupStatus.hasLineup && controlMode === "manual") {
+    if (rosterCount > 0 && controlMode === "manual") {
+      const lineupSet = lineupStatus.hasLineup;
       items.push(
         createItem({
           itemId: `lineup_missing:${input.saveId}:${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${team.teamId}`,
@@ -466,9 +553,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           matchday: input.gameState.matchdayState.matchdayId,
           teamId: team.teamId,
           category: "task",
-          severity: team.teamId === input.activeTeamId ? "critical" : "warning",
-          title: "Lineup fehlt",
-          description: `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
+          severity: lineupSet ? "info" : team.teamId === input.activeTeamId ? "critical" : "warning",
+          status: lineupSet ? "done" : "open",
+          title: lineupSet ? "Lineup gesetzt" : "Lineup fehlt",
+          description: lineupSet
+            ? `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist gesetzt.`
+            : `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup öffnen",
@@ -479,7 +569,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     }
 
     const lineupComplete = lineupStatus.hasLineup;
-    if (rosterCount > 0 && lineupComplete && !lineupStatus.isSubmitted && controlMode === "manual") {
+    if (rosterCount > 0 && lineupComplete && controlMode === "manual") {
+      const lineupSubmitted = lineupStatus.isSubmitted;
       items.push(
         createItem({
           itemId: `lineup_not_submitted:${input.saveId}:${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${team.teamId}`,
@@ -488,9 +579,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           matchday: input.gameState.matchdayState.matchdayId,
           teamId: team.teamId,
           category: "task",
-          severity: team.teamId === input.activeTeamId ? "critical" : "warning",
-          title: "Lineup bestätigen",
-          description: `${team.shortCode}: Einsatzliste ist voll, aber noch nicht bestätigt.`,
+          severity: lineupSubmitted ? "info" : team.teamId === input.activeTeamId ? "critical" : "warning",
+          status: lineupSubmitted ? "done" : "open",
+          title: lineupSubmitted ? "Lineup bestätigt" : "Lineup bestätigen",
+          description: lineupSubmitted
+            ? `${team.shortCode}: Einsatzliste ist bestätigt.`
+            : `${team.shortCode}: Einsatzliste ist voll, aber noch nicht bestätigt.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup bestätigen",
@@ -500,7 +594,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
     const formCardFlow = getFormCardFlowStatus(input.gameState, team.teamId);
-    if (rosterCount > 0 && lineupComplete && !formCardFlow.hasPool && controlMode === "manual") {
+    if (rosterCount > 0 && lineupComplete && controlMode === "manual") {
+      const formCardsReady = formCardFlow.hasPool;
       items.push(
         createItem({
           itemId: `formcards_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -509,9 +604,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           matchday: input.gameState.matchdayState.matchdayId,
           teamId: team.teamId,
           category: "task",
-          severity: "warning",
-          title: "Formkarten-Pool fehlt",
-          description: `${team.shortCode}: Formkarten fuer diese Saison muessen noch in der Einsatzliste erzeugt werden.`,
+          severity: formCardsReady ? "info" : "warning",
+          status: formCardsReady ? "done" : "open",
+          title: formCardsReady ? "Formkarten-Pool erstellt" : "Formkarten-Pool fehlt",
+          description: formCardsReady
+            ? `${team.shortCode}: Formkarten fuer diese Saison sind erzeugt.`
+            : `${team.shortCode}: Formkarten fuer diese Saison muessen noch in der Einsatzliste erzeugt werden.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
           ctaLabel: "Formkarten erzeugen",
@@ -521,12 +619,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    if (
-      controlMode === "manual" &&
-      rosterCount >= rosterMinTarget &&
-      lineupComplete &&
-      !hasPersistedTeamCaptain(input.gameState, team.teamId)
-    ) {
+    if (controlMode === "manual" && rosterCount >= rosterMinTarget && lineupComplete) {
+      const captainSet = hasPersistedTeamCaptain(input.gameState, team.teamId);
       items.push(
         createItem({
           itemId: `captain_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -534,9 +628,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           seasonId: input.gameState.season.id,
           teamId: team.teamId,
           category: "task",
-          severity: team.teamId === input.activeTeamId ? "warning" : "info",
-          title: "Kapitän ernennen",
-          description: `${team.shortCode}: Kader ist vollständig — wähle einen Saison-Kapitän für Moral-Bonus.`,
+          severity: captainSet ? "info" : team.teamId === input.activeTeamId ? "warning" : "info",
+          status: captainSet ? "done" : "open",
+          title: captainSet ? "Kapitän ernannt" : "Kapitän ernennen",
+          description: captainSet
+            ? `${team.shortCode}: Saison-Kapitän ist gewählt.`
+            : `${team.shortCode}: Kader ist vollständig — wähle einen Saison-Kapitän für Moral-Bonus.`,
           targetView: "home",
           targetParams: { team: team.teamId, panel: "captain-picker" },
           ctaLabel: "Kapitän wählen",
@@ -570,7 +667,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    if (controlMode === "manual" && !getTeamSponsorContract(input.gameState, team.teamId)) {
+    if (controlMode === "manual") {
+      const sponsorChosen = Boolean(getTeamSponsorContract(input.gameState, team.teamId));
       items.push(
         createItem({
           itemId: `sponsor_choice_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -578,9 +676,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           seasonId: input.gameState.season.id,
           teamId: team.teamId,
           category: "sponsor",
-          severity: "warning",
-          title: "Sponsor wählen",
-          description: `${team.shortCode}: Wähle einen von drei Sponsor-Verträgen für die Saison.`,
+          severity: sponsorChosen ? "info" : "warning",
+          status: sponsorChosen ? "done" : "open",
+          title: sponsorChosen ? "Sponsor gewählt" : "Sponsor wählen",
+          description: sponsorChosen
+            ? `${team.shortCode}: Sponsor-Vertrag für die Saison ist gewählt.`
+            : `${team.shortCode}: Wähle einen von drei Sponsor-Verträgen für die Saison.`,
           targetView: "teams",
           targetParams: { team: team.teamId, panel: "sponsor-choice" },
           ctaLabel: "Sponsor wählen",
@@ -614,7 +715,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     }
 
     const missingTraining = teamTrainingMissingCount(input.gameState, team.teamId);
-    if (missingTraining > 0 && controlMode === "manual") {
+    if (rosterCount > 0 && controlMode === "manual") {
+      const trainingSet = missingTraining === 0;
       items.push(
         createItem({
           itemId: `training_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -622,9 +724,12 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           seasonId: input.gameState.season.id,
           teamId: team.teamId,
           category: "training",
-          severity: "warning",
-          title: "Training nicht gesetzt",
-          description: `${team.shortCode}: ${missingTraining} Spieler ohne Trainingsmodus.`,
+          severity: trainingSet ? "info" : "warning",
+          status: trainingSet ? "done" : "open",
+          title: trainingSet ? "Training gesetzt" : "Training nicht gesetzt",
+          description: trainingSet
+            ? `${team.shortCode}: Alle Spieler haben einen Trainingsmodus.`
+            : `${team.shortCode}: ${missingTraining} Spieler ohne Trainingsmodus.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "training-plan" },
           ctaLabel: "Training öffnen",
@@ -1520,6 +1625,12 @@ export function isGameInboxDecisionItem(item: GameInboxItem) {
     if (item.category === "transfer" && item.source === "transfer_history") {
       return false;
     }
+    // #44: Scouting-Fortschritt ("Certainty 50% — Intel wird schärfer") ist
+    // eine reine Beobachtung ohne Entscheidung/Handlung — gehört ins
+    // Chronik/News-Bild, nicht in den Aktionen-Aktionsraum.
+    if (item.category === "transfer" && item.source === "scout_intel_pipeline") {
+      return false;
+    }
     return true;
   }
   return false;
@@ -1548,6 +1659,9 @@ export function isGameInboxChronicleItem(item: GameInboxItem) {
     return true;
   }
   if (item.category === "transfer" && item.source === "transfer_history") {
+    return true;
+  }
+  if (item.category === "transfer" && item.source === "scout_intel_pipeline") {
     return true;
   }
   if (item.category === "facility" && item.source === "facility_events") {

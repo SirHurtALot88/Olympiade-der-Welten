@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } fro
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
+import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
 
 /**
  * "Neuer Look" Entscheidungs-Triage fuer Inbox V2 (flag-gated, additive).
@@ -159,6 +160,14 @@ function IconDot({ className }: NlIconProps) {
   );
 }
 
+function IconCheck({ className }: NlIconProps) {
+  return (
+    <svg {...NL_ICON_SVG_PROPS} className={className}>
+      <path d="M5 12.5 9.5 17 19 6.5" />
+    </svg>
+  );
+}
+
 /** Reale Inbox-Kategorien (Enum) → deutsches Label + Icon. */
 const NL_INBOX_CATEGORY_META: Record<string, { label: string; icon: (props: NlIconProps) => ReturnType<typeof IconDot> }> = {
   task: { label: "Aufgabe", icon: IconClipboard },
@@ -188,10 +197,22 @@ function getSeverityTone(severity: InboxV2Item["severity"]): NlTone {
   return "accent";
 }
 
-function getStatusLabel(status: InboxV2Item["status"]): string | null {
-  if (status === "done") return "Erledigt";
-  if (status === "dismissed") return "Ausgeblendet";
+function getStatusLabel(item: InboxV2Item): string | null {
+  // #43: automatisch (aus dem Spielstand) erledigte Bedingungs-Items tragen
+  // ein eigenes Label statt "Erledigt" — das macht sichtbar, dass hier
+  // niemand geklickt hat, sondern die Bedingung schlicht erfüllt ist.
+  if (item.status === "done") {
+    return isAutoResolvingInboxItemId(item.id) ? "Automatisch erledigt" : "Erledigt";
+  }
+  if (item.status === "dismissed") return "Ausgeblendet";
   return null;
+}
+
+/** #44: kleines Cadence-Tag ("Wiederkehrend" / "Einmalig") für die Aktionen-Liste. */
+function getCadenceLabel(item: InboxV2Item): { text: string; cadence: "recurring" | "once" } | null {
+  const cadence = getInboxItemCadence(item.id);
+  if (!cadence) return null;
+  return { text: cadence === "recurring" ? "Wiederkehrend" : "Einmalig", cadence };
 }
 
 function getInboxItemDomId(itemId: string) {
@@ -360,7 +381,7 @@ export default function InboxV2NewLook({
   const renderChronicleLeadCard = (item: InboxV2Item) => {
     const meta = getCategoryMeta(item.category);
     const severityTone = getSeverityTone(item.severity);
-    const statusLabel = getStatusLabel(item.status);
+    const statusLabel = getStatusLabel(item);
     const isSelected = selectedItemId === item.id;
     return (
       <div key={item.id} id={getInboxItemDomId(item.id)}>
@@ -382,7 +403,7 @@ export default function InboxV2NewLook({
   const renderChronicleStoryCard = (item: InboxV2Item, revealIndex: number) => {
     const meta = getCategoryMeta(item.category);
     const severityTone = getSeverityTone(item.severity);
-    const statusLabel = getStatusLabel(item.status);
+    const statusLabel = getStatusLabel(item);
     const isSelected = selectedItemId === item.id;
     return (
       <div
@@ -515,8 +536,15 @@ export default function InboxV2NewLook({
             const meta = getCategoryMeta(item.category);
             const CategoryIcon = meta.icon;
             const severityTone = getSeverityTone(item.severity);
-            const statusLabel = getStatusLabel(item.status);
+            const statusLabel = getStatusLabel(item);
             const isSelected = selectedItemId === item.id;
+            // #43: Bedingungs-Items lösen sich selbst auf — keine manuelle
+            // "Erledigt/Ausblenden"-Aktion, die einen unerfüllten Zustand
+            // vortäuschen könnte. Solange die Bedingung offen ist, zeigt ein
+            // kleines "Automatisch"-Tag, warum hier kein Button steht.
+            const isAutoResolving = isAutoResolvingInboxItemId(item.id);
+            const cadenceLabel = getCadenceLabel(item);
+            const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
             return (
               <li key={item.id} id={getInboxItemDomId(item.id)} className="nl-inbox-list-row">
                 <NlCard
@@ -532,7 +560,22 @@ export default function InboxV2NewLook({
                     <div className="nl-inbox-card-copy">
                       <span className="nl-inbox-card-meta">
                         <span className="nl-inbox-card-category">{meta.label}</span>
-                        {statusLabel ? <span className="nl-inbox-card-status">{statusLabel}</span> : null}
+                        {cadenceLabel ? (
+                          <span className={`nl-inbox-cadence-tag nl-inbox-cadence-${cadenceLabel.cadence}`}>
+                            {cadenceLabel.text}
+                          </span>
+                        ) : null}
+                        {item.status === "open" && isAutoResolving ? (
+                          <span className="nl-inbox-auto-tag" title="Löst sich automatisch, sobald die Bedingung erfüllt ist.">
+                            Automatisch
+                          </span>
+                        ) : null}
+                        {statusLabel ? (
+                          <span className="nl-inbox-card-status">
+                            {item.status === "done" && isAutoResolving ? <IconCheck className="nl-inbox-card-status-icon" /> : null}
+                            {statusLabel}
+                          </span>
+                        ) : null}
                       </span>
                       <strong className="nl-inbox-card-title">{item.title}</strong>
                       {item.detail ? <p className="nl-inbox-card-detail">{item.detail}</p> : null}
@@ -559,7 +602,7 @@ export default function InboxV2NewLook({
                         </div>
                       ) : null}
 
-                      {item.status === "open" && (onMarkDone || onDismiss) ? (
+                      {showManualActions ? (
                         <div className="nl-inbox-card-actions">
                           {onMarkDone ? (
                             <button
