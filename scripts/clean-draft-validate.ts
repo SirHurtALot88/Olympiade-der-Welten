@@ -1,8 +1,8 @@
 /**
  * Validation harness for the clean S1 draft engine (OLY_CLEAN_DRAFT).
  *
- * Bootstraps ONE fresh Season-1 save, runs the canonical S1 draft phase (which branches to the clean
- * engine when OLY_CLEAN_DRAFT=1), then classifies every roster by market value and checks R-R's races.
+ * Bootstraps ONE fresh Season-1 save, runs the canonical S1 draft phase (which uses the clean engine
+ * by default; OLY_CLEAN_DRAFT=0 opts out), then classifies every roster by market value and checks R-R's races.
  * Uses an isolated scratch SQLite DB — never touches the shared/live save.
  */
 import path from "node:path";

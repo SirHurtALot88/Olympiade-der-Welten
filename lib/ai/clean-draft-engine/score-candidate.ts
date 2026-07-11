@@ -3,6 +3,7 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 // Class stacking reuses the existing mechanism (first 3 same class free, then -4 per extra).
 import { computeClassspamPenalty } from "@/lib/ai/ai-needs-picks-compare-service";
+import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 
 // Form-color anti-monoculture (clean engine, tuned stronger than the legacy -4/step): first 5 of a
 // form-color are free, then a STEEP quadratic ramp so no team realistically exceeds ~7 of one color
@@ -55,14 +56,16 @@ function candidateOverall(candidate: TransfermarktFreeAgentItem): number {
   return clamp(avg, 0, 1);
 }
 
-/** Identity axis weights (0..1 each), from the team's pow/spe/men/soc identity. */
+/**
+ * Identity axis weights (0..1 each) from the team's pow/spe/men/soc identity SHARES. The runtime
+ * axes are a ~20-point distribution across the four axes (see data/source/team-identities.json —
+ * they sum to 20, they are NOT a 0-100 rating), so weight by each axis's share of the total via the
+ * shared derivation rather than dividing raw counts by a fixed scale (which collapsed every real
+ * team's weights to ~0 and made need/identity-fit inert). A null / zero-sum identity yields all-0
+ * weights (need falls back to raw axis strength, identity-fit to 0).
+ */
 function identityWeights(identity: ScoreCandidateInput["identity"]) {
-  return {
-    pow: clamp((identity?.pow ?? 50) / 100, 0, 1),
-    spe: clamp((identity?.spe ?? 50) / 100, 0, 1),
-    men: clamp((identity?.men ?? 50) / 100, 0, 1),
-    soc: clamp((identity?.soc ?? 50) / 100, 0, 1),
-  };
+  return deriveTeamIdentityAxisWeightMap(identity);
 }
 
 /** Team's current per-axis coverage from the roster-so-far (0 if empty). */
@@ -176,8 +179,24 @@ function themeBonus(input: ScoreCandidateInput, onTheme: boolean): number {
   return THEME_BASE + deficit * THEME_URGENCY;
 }
 
+// scoreCandidate runs once per (candidate × slot); traits depend only on the team's identity/strategy,
+// which are stable references across a single team's draft. Memoize on those references so we don't
+// recompute CleanTeamTraits for every candidate (behavior-identical, avoids the per-candidate rebuild).
+let cachedTraitsIdentity: ScoreCandidateInput["identity"] | undefined;
+let cachedTraitsStrategy: ScoreCandidateInput["strategy"] | undefined;
+let cachedTraits: CleanTeamTraits | null = null;
+function traitsFor(input: ScoreCandidateInput): CleanTeamTraits {
+  if (cachedTraits && cachedTraitsIdentity === input.identity && cachedTraitsStrategy === input.strategy) {
+    return cachedTraits;
+  }
+  cachedTraits = resolveCleanTeamTraits(input);
+  cachedTraitsIdentity = input.identity;
+  cachedTraitsStrategy = input.strategy;
+  return cachedTraits;
+}
+
 export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult {
-  const traits: CleanTeamTraits = resolveCleanTeamTraits(input);
+  const traits: CleanTeamTraits = traitsFor(input);
   const isPremiumSlot = input.slot.lane === "superstar" || input.slot.lane === "star";
   const isLowerSlot = input.slot.lane === "backup" || input.slot.lane === "reserve" || input.slot.lane === "depth";
 

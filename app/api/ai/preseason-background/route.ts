@@ -7,6 +7,7 @@ import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service"
 import { applyAiManagerPlan } from "@/lib/ai/ai-manager-apply-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { isCleanDraftEnabled, runCleanSeasonOneDraft } from "@/lib/ai/clean-draft-engine/run-clean-draft";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   allowsAiPreseasonManualTeamOverride,
@@ -127,34 +128,20 @@ async function executeAiPreseasonBackgroundWork(input: {
       const warnings = [...managerResult.warnings];
       const blockingReasons = [...managerResult.blockers];
 
-      for (const teamId of aiTeamIds) {
-        const picksRun = await runAiPicksExecutePreview(
-          {
-            source: "sqlite",
-            saveId,
-            seasonId,
-            dryRun: false,
-            confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
-            teamScope: "ai",
-            teamIds: [teamId],
-            stepsPerTeam: 12,
-            runMode: "season1_optimum_execute",
-            draftSeed: `${saveId}:${seasonId}:preseason:${teamId}`,
-          },
-          persistence,
-        );
-        const teamCompleted = picksRun.teams.some((team) => {
-          if (team.teamId !== teamId || team.blockingReasons.length > 0) {
-            return false;
-          }
-          const rosterAfter = team.rosterAfter ?? team.previewSummary.plannedRosterCount ?? 0;
-          return team.targetRosterMin == null || rosterAfter >= team.targetRosterMin;
-        });
-        const appliedPickCount = picksRun.globalExecution.appliedPickCount;
-        if (teamCompleted) completedTeams += 1;
-        transferBuysApplied += appliedPickCount;
-        warnings.push(...picksRun.warnings);
-        blockingReasons.push(...picksRun.blockingReasons);
+      // Clean draft engine is the DEFAULT S1 setup draft (mirrors long-run-canonical); OLY_CLEAN_DRAFT=0
+      // falls back to the legacy per-team picks-run. Only the AI-controlled teams are drafted so the
+      // protected/human team is left untouched.
+      if (isCleanDraftEnabled()) {
+        const clean = await runCleanSeasonOneDraft(saveId, persistence, { teamIds: aiTeamIds });
+        transferBuysApplied = clean.result.globalExecution.appliedPickCount;
+        warnings.push(...clean.result.qualityGate.warnings);
+        blockingReasons.push(...clean.blockers);
+        const latestAfterDraft = persistence.getSaveById(saveId);
+        const draftedGameState = latestAfterDraft?.gameState ?? protectedSave.gameState;
+        completedTeams = aiTeamIds.filter((teamId) => {
+          const rosterAfter = draftedGameState.rosters.filter((entry) => entry.teamId === teamId).length;
+          return rosterAfter >= getSetupRosterTarget(draftedGameState, teamId);
+        }).length;
         writeRunRecord(saveId, {
           ...baseRecord,
           status: "running",
@@ -166,6 +153,47 @@ async function executeAiPreseasonBackgroundWork(input: {
           warnings: Array.from(new Set(warnings)),
           blockingReasons: Array.from(new Set(blockingReasons)),
         });
+      } else {
+        for (const teamId of aiTeamIds) {
+          const picksRun = await runAiPicksExecutePreview(
+            {
+              source: "sqlite",
+              saveId,
+              seasonId,
+              dryRun: false,
+              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+              teamScope: "ai",
+              teamIds: [teamId],
+              stepsPerTeam: 12,
+              runMode: "season1_optimum_execute",
+              draftSeed: `${saveId}:${seasonId}:preseason:${teamId}`,
+            },
+            persistence,
+          );
+          const teamCompleted = picksRun.teams.some((team) => {
+            if (team.teamId !== teamId || team.blockingReasons.length > 0) {
+              return false;
+            }
+            const rosterAfter = team.rosterAfter ?? team.previewSummary.plannedRosterCount ?? 0;
+            return team.targetRosterMin == null || rosterAfter >= team.targetRosterMin;
+          });
+          const appliedPickCount = picksRun.globalExecution.appliedPickCount;
+          if (teamCompleted) completedTeams += 1;
+          transferBuysApplied += appliedPickCount;
+          warnings.push(...picksRun.warnings);
+          blockingReasons.push(...picksRun.blockingReasons);
+          writeRunRecord(saveId, {
+            ...baseRecord,
+            status: "running",
+            completedAt: null,
+            aiTeamsCompleted: completedTeams,
+            managerActionsApplied: managerResult.actions.filter((action) => action.applied).length,
+            transferBuysApplied,
+            transferSellsApplied: 0,
+            warnings: Array.from(new Set(warnings)),
+            blockingReasons: Array.from(new Set(blockingReasons)),
+          });
+        }
       }
 
       const finalRecord: AiPreseasonAutomationRunRecord = {

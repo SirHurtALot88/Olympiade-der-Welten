@@ -1504,7 +1504,10 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         subclasses: player.subclasses,
         traitsPositive: baseTraitView.visiblePositiveTraits,
         traitsNegative: baseTraitView.visibleNegativeTraits,
-        preferredDisciplineIds: [],
+        // AI preview is an internal omniscient scorer (drives the clean draft's discipline-coverage
+        // term), not the human market view — expose the real preferred disciplines instead of the
+        // disclosure-gated []. The human path applies its own disclosure gate in applyTeamOverlay.
+        preferredDisciplineIds: aiPreviewMode ? player.preferredDisciplineIds : [],
         scoutingLevel: 0,
         scoutingDisclosure: baseTraitView.disclosure,
         hiddenPositiveTraitCount: baseTraitView.hiddenPositiveTraitCount,
@@ -1753,8 +1756,10 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
           traitsNegative: baseItem.traitsNegative,
           scoutingLevel: playerScoutingLevel,
         });
+    // AI preview bypasses human scouting disclosure (internal omniscient scorer); the human market
+    // view stays gated by preferredDisciplinesVisible.
     const visiblePreferredDisciplineIds =
-      player && traitView.disclosure.preferredDisciplinesVisible ? player.preferredDisciplineIds : [];
+      player && (aiPreviewMode || traitView.disclosure.preferredDisciplinesVisible) ? player.preferredDisciplineIds : [];
     const scoutedFitPlayer = player
       ? {
           race: player.race,

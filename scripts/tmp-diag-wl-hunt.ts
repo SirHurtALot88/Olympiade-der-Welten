@@ -81,17 +81,19 @@ async function runOnce(runIndex: number) {
   const wlIdentity = gameState.teamIdentities.find((entry) => entry.teamId === wlTeam.teamId);
   const wlRoster = gameState.rosters.filter((entry) => entry.teamId === wlTeam.teamId).length;
   const { playerMin } = deriveRosterTargets(wlTeam, wlIdentity);
-  const wlPreview = draft.picksRun.teams.find((team) => team.teamCode === "W-L")!;
+  // The clean engine (default) reports via purchases/teamOutcomes and leaves picksRun.teams empty, so
+  // this legacy per-team preview may be absent — guard it instead of asserting non-null.
+  const wlPreview = draft.picksRun.teams.find((team) => team.teamCode === "W-L") ?? null;
   const result = {
     runIndex,
     wlRoster,
     playerMin,
     wlCash: wlTeam.cash,
     failed: wlRoster < playerMin,
-    wlPreviewPlanned: wlPreview.plannedPicks.filter((pick) => pick.status !== "blocked").length,
-    wlPreviewApplied: wlPreview.plannedPicks.filter((pick) => pick.status === "applied").length,
-    wlTeamBlocking: wlPreview.blockingReasons,
-    wlWarnings: wlPreview.warnings.filter(
+    wlPreviewPlanned: wlPreview?.plannedPicks.filter((pick) => pick.status !== "blocked").length ?? 0,
+    wlPreviewApplied: wlPreview?.plannedPicks.filter((pick) => pick.status === "applied").length ?? 0,
+    wlTeamBlocking: wlPreview?.blockingReasons ?? [],
+    wlWarnings: (wlPreview?.warnings ?? []).filter(
       (warning) =>
         warning.includes("partial") ||
         warning.includes("fallback") ||
@@ -100,7 +102,7 @@ async function runOnce(runIndex: number) {
     ),
     globalWlBlockers: draft.picksRun.blockingReasons.filter((reason) => reason.includes("W-L")),
     blockers: draft.blockers.filter((entry) => entry.includes("W-L")),
-    picks: wlPreview.plannedPicks.map((pick) => ({
+    picks: (wlPreview?.plannedPicks ?? []).map((pick) => ({
       status: pick.status,
       mv: pick.marketValue,
       minReach: pick.minimumReachableAfterPick,

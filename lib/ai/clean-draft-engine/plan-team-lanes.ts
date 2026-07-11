@@ -9,10 +9,15 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-/** identity axes are 0-100. */
-function normalizeIdentityAxis(value: number | null | undefined, fallback: number) {
+/**
+ * Management identity axes (ambition, finances, ...) are 0-10 in the runtime data
+ * (data/source/team-identities.json; the repo convention — see normalizeManagementValue,
+ * ai-transfer-doctrine-layer.ts:84). Map to 0..1 by dividing by 10; a missing axis takes the
+ * neutral midpoint (5 -> 0.5).
+ */
+export function normalizeIdentityAxis(value: number | null | undefined, fallback = 5) {
   const raw = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  return clamp(raw / 100, 0, 1);
+  return clamp(raw / 10, 0, 1);
 }
 
 /** strategy bias axes are 1-10 (see clampBias in team-strategy-profiles). */
@@ -33,13 +38,13 @@ export type CleanTeamTraits = {
 };
 
 export function resolveCleanTeamTraits(input: Pick<PlanTeamLanesInput, "identity" | "strategy">): CleanTeamTraits {
-  const ambition = normalizeIdentityAxis(input.identity?.ambition, 50);
+  const ambition = normalizeIdentityAxis(input.identity?.ambition, 5);
   const valuePriority = normalizeBias(input.strategy?.bias?.valuePriority, 5);
   const rosterDepthPreference = normalizeBias(input.strategy?.bias?.rosterDepthPreference, 5);
   const developmentBias = clamp(0.5 * valuePriority + 0.3 * rosterDepthPreference - 0.3 * ambition + 0.15, 0, 1);
   return {
     ambition,
-    finances: normalizeIdentityAxis(input.identity?.finances, 55),
+    finances: normalizeIdentityAxis(input.identity?.finances, 5),
     starPriority: normalizeBias(input.strategy?.bias?.starPriority, 5),
     valuePriority,
     rosterDepthPreference,

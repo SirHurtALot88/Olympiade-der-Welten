@@ -67,7 +67,7 @@ export type CleanDraftRunResult = {
 };
 
 /**
- * League entry point for the clean S1 draft. Only invoked when OLY_CLEAN_DRAFT=1. Drafts each team's
+ * League entry point for the clean S1 draft (the DEFAULT engine; OLY_CLEAN_DRAFT=0 opts out). Drafts each team's
  * full roster via the clean planner/scorer/executor, then applies every pick through the intact
  * local-transfermarkt buy path (cash deduction, roster + transfer-history write, salary/contract) so
  * the persisted save matches exactly what the rest of the sim expects from `ai_roster_fill` buys.
@@ -75,11 +75,16 @@ export type CleanDraftRunResult = {
 export async function runCleanSeasonOneDraft(
   saveId: string,
   persistence: PersistenceService,
+  options?: { teamIds?: string[] },
 ): Promise<CleanDraftRunResult> {
   const startedAt = Date.now();
   const baseSave = persistence.getSaveById(saveId);
   if (!baseSave) throw new Error("Clean draft: save missing.");
   const seasonId = baseSave.gameState.season.id;
+  // Optional team restriction: the long-run sim drafts every team (all AI), but the in-app preseason
+  // path must draft ONLY the AI-controlled teams and leave protected/human teams untouched.
+  const teamFilter =
+    options?.teamIds && options.teamIds.length > 0 ? new Set(options.teamIds) : null;
 
   const runContext = createLocalTransfermarktRunContext({ save: baseSave, persistence });
 
@@ -87,16 +92,22 @@ export async function runCleanSeasonOneDraft(
   const brackets = buildLeagueMarketBrackets(baseSave.gameState.players.map((player) => player.marketValue));
 
   // Draft order: richer / more ambitious teams pick first so they can genuinely land premium
-  // players from the shared pool (trait-driven, no team-code gate).
-  const teamsOrdered = [...baseSave.gameState.teams].sort((left, right) => {
-    const identityById = new Map(runContext.save.gameState.teamIdentities.map((entry) => [entry.teamId, entry]));
-    const leftId = identityById.get(left.teamId);
-    const rightId = identityById.get(right.teamId);
-    const leftScore = (leftId?.ambition ?? 50) + (leftId?.finances ?? 55);
-    const rightScore = (rightId?.ambition ?? 50) + (rightId?.finances ?? 55);
-    if (rightScore !== leftScore) return rightScore - leftScore;
-    return left.teamId.localeCompare(right.teamId);
-  });
+  // players from the shared pool (trait-driven, no team-code gate). ambition + finances are 0-10
+  // management axes; a missing identity takes the neutral midpoint (5+5) so it no longer sorts ahead
+  // of every real team (the old 50/55 fallbacks were on the wrong scale). Map hoisted out of the
+  // comparator to keep the sort O(n log n).
+  const identityById = new Map(runContext.save.gameState.teamIdentities.map((entry) => [entry.teamId, entry] as const));
+  const draftOrderScore = (teamId: string) => {
+    const identity = identityById.get(teamId);
+    return (identity?.ambition ?? 5) + (identity?.finances ?? 5);
+  };
+  const teamsOrdered = [...baseSave.gameState.teams]
+    .filter((team) => !teamFilter || teamFilter.has(team.teamId))
+    .sort((left, right) => {
+      const diff = draftOrderScore(right.teamId) - draftOrderScore(left.teamId);
+      if (diff !== 0) return diff;
+      return left.teamId.localeCompare(right.teamId);
+    });
 
   const blockers: string[] = [];
   const purchases: Array<Record<string, unknown>> = [];
@@ -113,44 +124,7 @@ export async function runCleanSeasonOneDraft(
     const strategy = getTeamStrategyProfile(gameState, teamId);
     const { playerMin } = deriveRosterTargets(team, identity ?? undefined);
 
-    const currentRosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
-    const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-    const currentRoster = currentRosterEntries
-      .map((entry) => playersById.get(entry.playerId))
-      .filter((player): player is Player => Boolean(player));
-
-    const spendableCash = resolveTransferBuyAffordabilityCash({
-      gameState,
-      teamId,
-      teamCash: team.cash,
-      rosterBefore: currentRosterEntries.length,
-      playerMin,
-      seasonId,
-      transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
-    });
-
     const themeTarget = buildCleanThemeTarget(getTeamThemeCompositionTarget(teamId));
-
-    const freeAgents: TransfermarktFreeAgentItem[] = listLocalTransfermarktFreeAgents({
-      saveId,
-      seasonId,
-      teamId,
-      mode: "ai_preview",
-      fullPool: true,
-      localRunContext: runContext,
-    }).items;
-
-    const plannedPicks = draftTeamRoster({
-      teamId,
-      identity,
-      strategy,
-      spendableCash,
-      currentRoster,
-      freeAgents,
-      brackets,
-      themeTarget,
-      playerMin,
-    });
 
     let applied = 0;
     let onThemeApplied = 0;
@@ -158,52 +132,117 @@ export async function runCleanSeasonOneDraft(
     let spend = 0;
     const teamBlockers: string[] = [];
 
-    for (const pick of plannedPicks) {
-      const preview = previewLocalTransfermarktBuy({
-        saveId,
-        seasonId,
-        teamId,
-        playerId: pick.playerId,
-        transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
-        localRunContext: runContext,
-      });
-      if (!preview.canBuy) {
-        skipped += 1;
-        continue;
+    // Apply a planned batch through the intact buy path; returns how many actually landed so a repair
+    // pass can tell whether it made progress.
+    const applyPicks = (plannedPicks: CleanDraftPick[]): number => {
+      let batchApplied = 0;
+      for (const pick of plannedPicks) {
+        const preview = previewLocalTransfermarktBuy({
+          saveId,
+          seasonId,
+          teamId,
+          playerId: pick.playerId,
+          transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
+          localRunContext: runContext,
+        });
+        if (!preview.canBuy) {
+          skipped += 1;
+          continue;
+        }
+        const execResult = executeLocalTransfermarktBuy({
+          saveId,
+          seasonId,
+          teamId,
+          playerId: pick.playerId,
+          transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
+          localRunContext: runContext,
+          fastLocalBatch: true,
+          deferPersist: true,
+        });
+        if (!execResult.transferCreated) {
+          skipped += 1;
+          continue;
+        }
+        applied += 1;
+        batchApplied += 1;
+        if (pick.onTheme) onThemeApplied += 1;
+        const fee = execResult.purchasePrice ?? pick.fee;
+        spend += fee;
+        purchases.push({
+          seasonId,
+          teamId,
+          playerId: pick.playerId,
+          fee,
+          lane: pick.lane,
+          onTheme: pick.onTheme,
+          source: CLEAN_DRAFT_TRANSFER_SOURCE,
+        });
       }
-      const execResult = executeLocalTransfermarktBuy({
-        saveId,
-        seasonId,
-        teamId,
-        playerId: pick.playerId,
-        transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
-        localRunContext: runContext,
-        fastLocalBatch: true,
-        deferPersist: true,
-      });
-      if (!execResult.transferCreated) {
-        skipped += 1;
-        continue;
-      }
-      applied += 1;
-      if (pick.onTheme) onThemeApplied += 1;
-      const fee = execResult.purchasePrice ?? pick.fee;
-      spend += fee;
-      purchases.push({
-        seasonId,
-        teamId,
-        playerId: pick.playerId,
-        fee,
-        lane: pick.lane,
-        onTheme: pick.onTheme,
-        source: CLEAN_DRAFT_TRANSFER_SOURCE,
-      });
-    }
+      return batchApplied;
+    };
 
-    // Persist this team's buys before the next team reads the pool (keeps caches + rosters honest).
+    // Plan + draft a full roster from the team's LIVE run-context state (current roster, remaining
+    // cash, residual free-agent pool). At loop start this is the pre-team state; after a flush it is
+    // the post-buy state, so the same routine both drafts and repairs.
+    const draftFromLiveState = (): CleanDraftPick[] => {
+      const gs = runContext.save.gameState;
+      const liveTeam = gs.teams.find((entry) => entry.teamId === teamId);
+      if (!liveTeam) return [];
+      const liveRosterEntries = gs.rosters.filter((entry) => entry.teamId === teamId);
+      const livePlayersById = new Map(gs.players.map((player) => [player.id, player] as const));
+      const liveRoster = liveRosterEntries
+        .map((entry) => livePlayersById.get(entry.playerId))
+        .filter((player): player is Player => Boolean(player));
+      const liveSpendable = resolveTransferBuyAffordabilityCash({
+        gameState: gs,
+        teamId,
+        teamCash: liveTeam.cash,
+        rosterBefore: liveRosterEntries.length,
+        playerMin,
+        seasonId,
+        transferSource: CLEAN_DRAFT_TRANSFER_SOURCE,
+      });
+      const livePool: TransfermarktFreeAgentItem[] = listLocalTransfermarktFreeAgents({
+        saveId,
+        seasonId,
+        teamId,
+        mode: "ai_preview",
+        fullPool: true,
+        localRunContext: runContext,
+      }).items;
+      return draftTeamRoster({
+        teamId,
+        identity,
+        strategy,
+        spendableCash: liveSpendable,
+        currentRoster: liveRoster,
+        freeAgents: livePool,
+        brackets,
+        themeTarget,
+        playerMin,
+      });
+    };
+
+    // 1) Initial full-roster draft, then persist so caches + rosters stay honest.
+    applyPicks(draftFromLiveState());
     flushLocalTransfermarktRunContext(runContext);
 
-    const rosterAfter = runContext.save.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+    // 2) Below-min repair: a skipped pick (missing salary/market value, disposition blocker) strands
+    //    its freed cash and can leave a team short of its hard minimum. Re-draft the residual gap from
+    //    the players STILL in the pool with the cash that remains and re-apply — bounded, until the
+    //    team reaches its minimum or a pass makes no progress. Cash-guarded by the executor, so this
+    //    never overspends. (Any team still short after this falls through to the long-run topup pass.)
+    let rosterAfter = runContext.save.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+    const maxRepairPasses = 3;
+    for (let pass = 0; pass < maxRepairPasses && rosterAfter < playerMin; pass += 1) {
+      const landed = applyPicks(draftFromLiveState());
+      flushLocalTransfermarktRunContext(runContext);
+      const nextRosterAfter = runContext.save.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+      const progressed = landed > 0 && nextRosterAfter > rosterAfter;
+      rosterAfter = nextRosterAfter;
+      if (!progressed) break;
+    }
+
     if (rosterAfter < playerMin) {
       teamBlockers.push(`clean_draft_below_min:${team.shortCode}:${rosterAfter}/${playerMin}`);
     }

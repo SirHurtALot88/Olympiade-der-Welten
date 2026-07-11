@@ -5,7 +5,7 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 /**
  * Clean S1 draft pick engine — shared types (see SPEC-clean-draft-engine.md).
  *
- * Isolated, flag-gated path. NONE of this runs unless OLY_CLEAN_DRAFT=1 (see run-clean-draft.ts).
+ * Default S1 draft path. Set OLY_CLEAN_DRAFT=0 to fall back to the legacy engine (see run-clean-draft.ts).
  * The lane vocabulary mirrors the intact market-brackets primitive so the two agree on tiers.
  */
 export type CleanLane = "superstar" | "star" | "core" | "depth" | "backup" | "reserve";
@@ -33,7 +33,7 @@ export type CleanLanePlan = {
   spendable: number;
   /** spendable / openSlots at plan time. */
   perSlotBudget: number;
-  /** Roster size the draft aims for (playerOpt + S1 fatigue buffer, capped at max). */
+  /** Roster size the draft aims for: OPT as a soft target, budget-flexed within the roster min/max. */
   targetRosterSize: number;
   /** Exactly (targetRosterSize - currentRosterCount) entries, premium-first order. */
   slots: CleanLanePlanSlot[];

@@ -222,6 +222,69 @@ function collectDraftTargetBlockers(save: PersistedSaveGame, prefix: string, mod
   return blockers;
 }
 
+/**
+ * Shared below-min emergency top-up: after ANY S1 draft engine (clean or legacy) has run, repeatedly
+ * top up teams still short of their hard roster minimum via the chunked redraft, appending blockers
+ * for anything still short. Behaviour-identical to the legacy inline pass; used by both engines so a
+ * below-min team can never slip through just because the clean engine ran.
+ */
+function applyBelowMinTopup(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  seasonId: string;
+  initialSave: PersistedSaveGame;
+  blockers: string[];
+  logPrefix: string;
+}): PersistedSaveGame {
+  const { persistence, saveId, seasonId, blockers, logPrefix } = input;
+  let latest = input.initialSave;
+  if (isEmergencyRosterRepairEnabled()) {
+    const maxTopupPasses = 3;
+    for (let topupPass = 0; topupPass < maxTopupPasses; topupPass += 1) {
+      const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
+      if (belowMinAfterDraft.length === 0) {
+        break;
+      }
+      console.error(`[${logPrefix}] S1 post-draft min topup pass ${topupPass + 1}: ${belowMinAfterDraft.length} teams`);
+      const topupResult = runChunkedRedraftTopup({
+        persistence,
+        saveId,
+        seasonId,
+        dryRun: false,
+        confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+        mode: "season1_initial_topup",
+        target: "playerMin",
+        targetTeamIds: belowMinAfterDraft,
+        roundLimit: 8,
+        teamTimeLimitMs: 30_000,
+        watchdogMs: 60_000,
+      });
+      latest = persistence.getSaveById(saveId) ?? latest;
+      const stillBelowMin = getAllTeamsBelowMinIds(latest.gameState);
+      for (const teamId of stillBelowMin) {
+        const team = latest.gameState.teams.find((entry) => entry.teamId === teamId);
+        const rosterCount = latest.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+        const hardMin = getTeamHardMinRequired(latest.gameState, teamId);
+        blockers.push(`season1_topup_no_candidate:${team?.shortCode ?? teamId}:${rosterCount}/${hardMin}`);
+      }
+      if (topupResult.warnings.length > 0) {
+        blockers.push(...topupResult.warnings.slice(0, 8).map((warning) => `season1_topup_warning:${warning}`));
+      }
+      if (stillBelowMin.length === 0) {
+        break;
+      }
+    }
+  } else {
+    const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
+    if (belowMinAfterDraft.length > 0) {
+      console.error(
+        `[${logPrefix}] S1 post-draft min topup skipped (OLY_ENABLE_EMERGENCY_REPAIR!=1): ${belowMinAfterDraft.length} teams below min`,
+      );
+    }
+  }
+  return latest;
+}
+
 export async function runSeasonOnePicksDraft(
   saveId: string,
   persistence: PersistenceService,
@@ -247,8 +310,19 @@ export async function runSeasonOnePicksDraft(
     console.error(`[long-run] S1 draft via CLEAN engine (default; OLY_CLEAN_DRAFT=0 to opt out) (${saveId})`);
     const cleanStartedAt = Date.now();
     const clean = await runCleanSeasonOneDraft(saveId, persistence);
-    const latestClean = persistence.getSaveById(saveId) ?? save;
-    const cleanBlockers = [...clean.blockers, ...collectDraftTargetBlockers(latestClean, "season1_topup", "min")];
+    // Fall through to the SAME emergency below-min top-up the legacy path uses: the clean engine's own
+    // repair should already reach min, but any team still short (no affordable candidate in its own
+    // pass) is topped up here instead of merely returning a `clean_draft_below_min` string.
+    const cleanBlockers = [...clean.blockers];
+    const latestClean = applyBelowMinTopup({
+      persistence,
+      saveId,
+      seasonId,
+      initialSave: persistence.getSaveById(saveId) ?? save,
+      blockers: cleanBlockers,
+      logPrefix: "long-run",
+    });
+    cleanBlockers.push(...collectDraftTargetBlockers(latestClean, "season1_topup", "min"));
     console.error(
       `[long-run] S1 CLEAN draft done: applied=${clean.result.globalExecution.appliedPickCount} ms=${Date.now() - cleanStartedAt} blockers=${cleanBlockers.length}`,
     );
@@ -284,53 +358,8 @@ export async function runSeasonOnePicksDraft(
   }
 
   let latest = persistence.getSaveById(saveId) ?? save;
-  if (result.executed && isEmergencyRosterRepairEnabled()) {
-    const maxTopupPasses = 3;
-    for (let topupPass = 0; topupPass < maxTopupPasses; topupPass += 1) {
-      const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
-      if (belowMinAfterDraft.length === 0) {
-        break;
-      }
-      console.error(
-        `[long-run] S1 post-draft min topup pass ${topupPass + 1}: ${belowMinAfterDraft.length} teams`,
-      );
-      const topupResult = runChunkedRedraftTopup({
-        persistence,
-        saveId,
-        seasonId,
-        dryRun: false,
-        confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
-        mode: "season1_initial_topup",
-        target: "playerMin",
-        targetTeamIds: belowMinAfterDraft,
-        roundLimit: 8,
-        teamTimeLimitMs: 30_000,
-        watchdogMs: 60_000,
-      });
-      latest = persistence.getSaveById(saveId) ?? latest;
-      const stillBelowMin = getAllTeamsBelowMinIds(latest.gameState);
-      for (const teamId of stillBelowMin) {
-        const team = latest.gameState.teams.find((entry) => entry.teamId === teamId);
-        const rosterCount = latest.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
-        const hardMin = getTeamHardMinRequired(latest.gameState, teamId);
-        blockers.push(
-          `season1_topup_no_candidate:${team?.shortCode ?? teamId}:${rosterCount}/${hardMin}`,
-        );
-      }
-      if (topupResult.warnings.length > 0) {
-        blockers.push(...topupResult.warnings.slice(0, 8).map((warning) => `season1_topup_warning:${warning}`));
-      }
-      if (stillBelowMin.length === 0) {
-        break;
-      }
-    }
-  } else if (result.executed) {
-    const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
-    if (belowMinAfterDraft.length > 0) {
-      console.error(
-        `[long-run] S1 post-draft min topup skipped (OLY_ENABLE_EMERGENCY_REPAIR!=1): ${belowMinAfterDraft.length} teams below min`,
-      );
-    }
+  if (result.executed) {
+    latest = applyBelowMinTopup({ persistence, saveId, seasonId, initialSave: latest, blockers, logPrefix: "long-run" });
   }
 
   blockers.push(...collectDraftTargetBlockers(latest, "season1_topup", "min"));
