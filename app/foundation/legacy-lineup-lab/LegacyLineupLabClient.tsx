@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
-import LegacyLineupFocusV2Board from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
-import LineupNewLook from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
-import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { LegacyLineupVirtualCardGrid } from "@/app/foundation/legacy-lineup-lab/LegacyLineupVirtualTableBody";
 import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
@@ -71,6 +70,30 @@ import type {
 } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
+
+// Perf/DX (#57): these three sub-views are each only rendered behind a single
+// runtime condition (newLook flag, formBoard tab, focusV2 variant) — never all
+// at once. Lazy-loading them keeps LegacyLineupLabClient's own dev compile
+// graph from dragging in ~3.7k lines of sibling UI that a given session may
+// never touch. ssr:false is safe: none of the three read window/document at
+// module scope (only inside effects/handlers), and each is reached solely via
+// client-side state after this component has already mounted, so there is no
+// SSR/hydration path to preserve.
+const LegacyLineupFocusV2Board = dynamic(
+  () => import("@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton variant="lineup" label="Focus-Board wird geladen…" />,
+  },
+);
+const LineupNewLook = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LineupNewLook"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Neuer Look wird geladen…" />,
+});
+const FormBoardPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FormBoardPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Formplan wird geladen…" />,
+});
 
 type LabOptions = {
   saves: Array<{ id: string; name: string; status: string }>;

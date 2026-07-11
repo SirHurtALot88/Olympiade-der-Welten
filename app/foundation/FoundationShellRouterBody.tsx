@@ -2,16 +2,15 @@
 /* eslint-disable */
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
+import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
-import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
-import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
-import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import type { RoomParticipant } from "@/types/game";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
@@ -25,35 +24,23 @@ import {
   FACILITY_CATALOG,
   FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
   FOUNDATION_SAVE_MODE_OPTIONS,
-  FacilitiesV2Client,
-  FoundationHomeV2Panel,
-  FoundationLineupPanel,
-  FoundationMatchdayArenaPanel,
   FoundationPlayerPortraitPreview,
-  FoundationSeasonV2Panel,
   FoundationShell,
   FoundationSubNav,
-  FoundationTeamsDetailPanel,
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
   HISTORY_ALL_SEASONS_FILTER,
-  InboxV2Client,
   MappingHighlight,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
   PLAYER_PROFILE_TABS,
   PROGRESSION_CLASS_ORDER,
-  PlayerGeneratorPanel,
   PlayerPortrait,
-  PlayerProfileClient,
   RaceIcon,
   SEASON_TRANSITION_STATIC_STEPS,
   SPECIALIST_WING_VARIANTS,
-  ScoutingCenterV2Client,
   SortableHeader,
-  TeamProfileClient,
   TooltipHeading,
-  TransferHistoryV2Client,
   WarningList,
   buildResolvedTeamIdentities,
   buildScenarioWarning,
@@ -143,8 +130,6 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
-import FoundationPlayersTableNewLook from "@/app/foundation/players-table/FoundationPlayersTableNewLook";
-import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
   DisciplineCategoryFilter,
@@ -179,6 +164,89 @@ import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+
+// Perf/DX (#57): these view panels used to come in eagerly through the
+// `foundation-page-client-exports` barrel (or, for the last five, a direct
+// top-level import), which forced Next/webpack to compile every large view's
+// full dependency graph just to render the /foundation shell once — this is
+// the main cause of the ~15s+ cold compile. Every one of these components is
+// only ever mounted behind a single `activeView === "…"` (or equivalent)
+// gate below, so lazy-loading them via next/dynamic lets each view's chunk
+// compile on demand instead of all up front. ssr:false is used throughout:
+// this shell only ever renders client-side (see FoundationSharedProvider /
+// the "use client" pragma above and the `gameState.season.id === "loading"`
+// bootstrap gate), so there is no server-rendered markup for these panels to
+// match — ssr:false simply skips a wasted server render of code that would
+// never produce visible output pre-hydration anyway. `prefetchFoundationPanel`
+// (lib/foundation/foundation-panel-prefetch.ts) already calls `import(...)`
+// against these same real module paths ahead of navigation, independent of
+// this wrapping, so hover/focus prefetch keeps warming these exact chunks.
+const FoundationHomeV2Panel = dynamic(() => import("@/app/foundation/home-v2/FoundationHomeV2Panel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
+});
+const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Spielerprofil wird geladen…" />,
+});
+const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Teamprofil wird geladen…" />,
+});
+const FacilitiesV2Client = dynamic(() => import("@/app/foundation/facilities-v2/FacilitiesV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Gebäude werden geladen…" />,
+});
+const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-center-v2/ScoutingCenterV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Scouting wird geladen…" />,
+});
+const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Inbox wird geladen…" />,
+});
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Player Generator wird geladen…" />,
+});
+const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+});
+const FoundationMatchdayArenaPanel = dynamic(
+  () => import("@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton label="Matchday Arena wird geladen…" />,
+  },
+);
+const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
+});
+const FoundationPlayersTableNewLook = dynamic(
+  () => import("@/app/foundation/players-table/FoundationPlayersTableNewLook"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton label="Spielerliste wird geladen…" />,
+  },
+);
+const FoundationTeamSettingsHost = dynamic(() => import("@/app/foundation/team-settings/FoundationTeamSettingsHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Team-Einstellungen werden geladen…" />,
+});
+const FoundationRanksHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationRanksHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Rangliste wird geladen…" />,
+});
+const FoundationLeagueLeadersHost = dynamic(() => import("@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Liga-Leader werden geladen…" />,
+});
+const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationDiszisHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
