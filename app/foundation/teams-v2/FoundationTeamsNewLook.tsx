@@ -106,9 +106,11 @@ export type FoundationTeamsNewLookProps = {
   selectedTeam: Team;
   gameState: GameState;
   /**
-   * Aktiver Team-Unterreiter aus dem Host: "portraits" öffnet standardmäßig
-   * das Portrait-Grid, "roster" (Kader) die Datentabelle. Steuert nur die
-   * Standard-Ansicht — der In-Card-Umschalter bleibt nutzbar.
+   * Aktiver Team-Unterreiter aus dem Host. Steuert historisch die
+   * Standard-Ansicht der Kaderprofil-Karte — die startet jedoch bewusst
+   * immer auf "Portraits" (siehe `defaultRosterModeForTab`), unabhängig
+   * vom Host-Unterreiter. Der In-Card-Umschalter (Portraits/Tabelle)
+   * bleibt in jedem Fall nutzbar.
    */
   selectedTeamDetailTab: "roster" | "portraits";
   sortedTeamsViewRows: TeamsViewRow[];
@@ -188,12 +190,16 @@ const NL_TEAMS_ROSTER_MODE_ITEMS: Array<{ id: NlTeamsRosterMode; label: string }
 ];
 
 /**
- * Standard-Ansicht je Unterreiter: der "Portraits"-Reiter startet im
- * bild-fokussierten Portrait-Grid, der "Kader"-Reiter (roster) in der
- * datenkompetenten Tabelle. So sind die beiden Reiter klar unterscheidbar.
+ * Standard-Ansicht der Kaderprofil-Karte: startet immer im
+ * bild-fokussierten Portrait-Grid ("Portraits" ist der erste Unterreiter
+ * in `NL_TEAMS_ROSTER_MODE_ITEMS` und soll auch die Startansicht sein),
+ * unabhängig davon, über welchen Host-Unterreiter (Kader/Portraits) die
+ * Ansicht geöffnet wurde. Der In-Card-Umschalter (Portraits/Tabelle)
+ * bleibt unverändert nutzbar — Nutzer:innen können jederzeit zur
+ * Tabelle wechseln, es wird nur der Startzustand vereinheitlicht.
  */
-function defaultRosterModeForTab(tab: "roster" | "portraits"): NlTeamsRosterMode {
-  return tab === "portraits" ? "portraits" : "tabelle";
+function defaultRosterModeForTab(_tab: "roster" | "portraits"): NlTeamsRosterMode {
+  return "portraits";
 }
 
 const NL_TEAMS_AXES: Array<{ key: NlAxisKey; label: "POW" | "SPE" | "MEN" | "SOC" }> = [

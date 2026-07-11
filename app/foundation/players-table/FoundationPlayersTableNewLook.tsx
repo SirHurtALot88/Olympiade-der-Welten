@@ -128,6 +128,12 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   sortKey?: string;
   align?: "left" | "right" | "center";
   tooltip?: string;
+  /**
+   * Primäre/sekundäre Spalten-Betonung (Akzent-Rahmen auf Kopf + Zellen).
+   * PPs ist laut Produkt die wichtigste Kennzahl (wichtiger als OVR/MVS)
+   * und bekommt die stärkste Betonung; OVR bleibt sekundär hervorgehoben.
+   */
+  highlight?: "primary" | "secondary";
 }> = [
   { id: "image", label: "Bild", align: "left" },
   { id: "name", label: "Name", sortKey: "name", align: "left" },
@@ -135,8 +141,15 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   { id: "class", label: "Klasse", sortKey: "class", align: "center" },
   { id: "race", label: "Rasse", sortKey: "race", align: "center" },
   { id: "axes", label: "Achsen", align: "left", tooltip: "POW / SPE / MEN / SOC Kernwerte (0–100)" },
-  { id: "pps", label: "PPs", sortKey: "pps", align: "right" },
-  { id: "ovr", label: "OVR", sortKey: "ovr", align: "right" },
+  {
+    id: "pps",
+    label: "PPs",
+    sortKey: "pps",
+    align: "right",
+    tooltip: "Performance-Punkte der Saison — wichtigste Leistungskennzahl. Zeile aufklappbar für die Aufschlüsselung.",
+    highlight: "primary",
+  },
+  { id: "ovr", label: "OVR", sortKey: "ovr", align: "right", highlight: "secondary" },
   { id: "mvs", label: "MVS", sortKey: "mvs", align: "right" },
   { id: "mw", label: "MW", sortKey: "mw", align: "right" },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
@@ -192,10 +205,13 @@ export default function FoundationPlayersTableNewLook({
   openTeamProfileById,
 }: FoundationPlayersTableNewLookProps) {
   const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_PAGE_SIZE);
+  /** Welche Zeile ist gerade per PPs-Klick aufgeklappt (max. eine gleichzeitig). */
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
     setVisibleCount(NL_PLAYERS_PAGE_SIZE);
+    setExpandedPlayerId(null);
   }, [playerScope, playerTeamFilter, playerClassFilter]);
 
   /**
@@ -316,6 +332,12 @@ export default function FoundationPlayersTableNewLook({
     );
   }
 
+  /**
+   * Achsen-Zellinhalt: eine Zeile je Achse (POW/SPE/MEN/SOC) statt eines
+   * engen 2×2-Clusters — Label, Balken und Wert stehen so nie horizontal
+   * nebeneinander benachbarter Achsen und laufen nicht zusammen
+   * ("91SPE" statt "91 · SPE"). Jede Achse ist einzeln lesbar.
+   */
   function renderAxisBars(row: FoundationPlayerScopeRow) {
     return (
       <div className="nl-players-axes" role="group" aria-label={`Achsenwerte ${row.player.name}`}>
@@ -341,6 +363,51 @@ export default function FoundationPlayersTableNewLook({
     );
   }
 
+  /**
+   * Aufgeklappte PPs-Detailzeile. Echte Pro-Areal-PPs-Punkte (wie viele
+   * Performance-Punkte je Bereich POW/SPE/MEN/SOC erzielt wurden) liegen in
+   * `FoundationPlayerScopeRow` nicht vor — nur der Gesamtwert `playerPps`.
+   * Sie existieren an anderer Stelle im Code (z. B. `ppPow`/`ppSpe`/`ppMen`/
+   * `ppSoc` in `lib/foundation/player-rating-contract.ts`), aber nur als
+   * Ergebnis einer ligaweiten Neuberechnung, die hier nicht verfügbar ist.
+   * Statt das zu erfinden, zeigen wir ehrlich die vorhandenen Kernwerte
+   * (POW/SPE/MEN/SOC, 0–100) als Aufschlüsselungs-Näherung mit klarer
+   * Kennzeichnung, dass es keine echten Areal-PPs-Punkte sind.
+   */
+  function renderPpsDetail(row: FoundationPlayerScopeRow) {
+    return (
+      <div className="nl-players-pps-detail" role="group" aria-label={`PPs-Aufschlüsselung ${row.player.name}`}>
+        <div className="nl-players-pps-detail-head">
+          <strong className="nl-players-pps-detail-name">{row.player.name}</strong>
+          <span className="nl-players-pps-detail-total">
+            Gesamt-PPs (Saison):{" "}
+            <span className="nl-tnum">{row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</span>
+          </span>
+        </div>
+        <div className="nl-players-pps-detail-grid">
+          {NL_PLAYERS_AXES.map(({ key, label }) => {
+            const value = row.player.coreStats[key] ?? null;
+            const percent =
+              value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
+            return (
+              <div key={key} className={`nl-players-pps-detail-axis ${nlToneClass(key)}`}>
+                <span className="nl-players-pps-detail-axis-label">{label}</span>
+                <span className="nl-players-pps-detail-axis-track" aria-hidden="true">
+                  <span className="nl-players-pps-detail-axis-fill" style={{ width: `${percent}%` }} />
+                </span>
+                <span className="nl-players-pps-detail-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="nl-players-pps-detail-note">
+          Zeigt die Kernwerte POW/SPE/MEN/SOC (0–100) als Näherung. Echte Pro-Areal-PPs-Punkte (Performance-Punkte je
+          Bereich) sind für Spieler in dieser Ansicht nicht gespeichert — nur der Gesamtwert oben.
+        </p>
+      </div>
+    );
+  }
+
   function renderRow(row: FoundationPlayerScopeRow) {
     const portrait = getPlayerPortraitModel(row.player);
     const teamLogo = row.team ? getTeamLogoModel(row.team, { variant: "thumb" }) : null;
@@ -358,8 +425,10 @@ export default function FoundationPlayersTableNewLook({
     const careerStats = row.careerLeagueStats;
     const traits = [...row.player.traitsPositive, ...row.player.traitsNegative.map((trait) => `-${trait}`)];
     const traitsText = traits.length > 0 ? traits.join(", ") : "—";
+    const isPpsExpanded = expandedPlayerId === row.player.id;
+    const ppsDetailId = `nl-players-pps-detail-${row.player.id}`;
 
-    return (
+    const rowElement = (
       <tr
         key={row.player.id}
         className="nl-players-row"
@@ -473,14 +542,31 @@ export default function FoundationPlayersTableNewLook({
         </td>
         <td className="nl-players-td-axes">{renderAxisBars(row)}</td>
         <td
-          className={`nl-players-td-metric ${
+          className={`nl-players-td-metric nl-players-td-pps is-highlight-primary ${
             row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
           }`}
         >
-          {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}
+          <button
+            type="button"
+            className={`nl-players-pps-toggle${isPpsExpanded ? " is-expanded" : ""}`}
+            aria-expanded={isPpsExpanded}
+            aria-controls={ppsDetailId}
+            title={`PPs-Aufschlüsselung für ${row.player.name} ${isPpsExpanded ? "schließen" : "öffnen"}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpandedPlayerId((current) => (current === row.player.id ? null : row.player.id));
+            }}
+          >
+            <span className="nl-players-pps-toggle-value nl-tnum">
+              {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}
+            </span>
+            <b className="nl-players-pps-toggle-caret" aria-hidden="true">
+              {isPpsExpanded ? "▾" : "▸"}
+            </b>
+          </button>
         </td>
         <td
-          className={`nl-players-td-metric ${
+          className={`nl-players-td-metric is-highlight-secondary ${
             row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""
           }`}
         >
@@ -567,6 +653,19 @@ export default function FoundationPlayersTableNewLook({
         </td>
       </tr>
     );
+
+    if (!isPpsExpanded) {
+      return [rowElement];
+    }
+
+    return [
+      rowElement,
+      <tr key={`${row.player.id}-pps-detail`} id={ppsDetailId} className="nl-players-detail-row">
+        <td className="nl-players-detail-cell" colSpan={NL_PLAYERS_COLUMNS.length}>
+          {renderPpsDetail(row)}
+        </td>
+      </tr>,
+    ];
   }
 
   return (
@@ -724,7 +823,9 @@ export default function FoundationPlayersTableNewLook({
                     <th
                       key={column.id}
                       scope="col"
-                      className={`nl-players-th is-${column.align ?? "left"}`}
+                      className={`nl-players-th is-${column.align ?? "left"}${
+                        column.highlight ? ` is-highlight-${column.highlight}` : ""
+                      }`}
                       aria-sort={ariaSortFor(column.sortKey)}
                     >
                       {column.sortKey ? (
@@ -736,7 +837,7 @@ export default function FoundationPlayersTableNewLook({
                   ))}
                 </tr>
               </thead>
-              <tbody>{visibleRows.map((row) => renderRow(row))}</tbody>
+              <tbody>{visibleRows.flatMap((row) => renderRow(row))}</tbody>
             </table>
           </div>
           {hasMoreRows ? (

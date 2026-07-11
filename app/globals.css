@@ -53801,6 +53801,150 @@ button.is-new-look .nl-thist-season-pill,
   text-align: center;
 }
 
+/* --- Primäre/sekundäre Spalten-Betonung (PPs > OVR) ------------------
+   PPs ist die wichtigste Kennzahl (wichtiger als OVR/MVS) und bekommt die
+   stärkste Betonung; OVR bleibt sekundär hervorgehoben, aber schwächer.
+   Nutzt Ränder statt Hintergrund, damit die liga-relative Heat-Färbung
+   (getPoolHeatClass) je Zelle weiterhin sichtbar bleibt. ---------------- */
+.is-new-look .nl-players-th.is-highlight-primary {
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  box-shadow: inset 0 -2px 0 var(--nl-accent);
+}
+
+.is-new-look .nl-players-th.is-highlight-secondary {
+  box-shadow: inset 0 -2px 0 var(--nl-line-2);
+}
+
+.is-new-look .nl-players-td-metric.is-highlight-primary {
+  box-shadow:
+    inset 2px 0 0 var(--nl-accent),
+    inset -2px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-players-td-metric.is-highlight-secondary {
+  box-shadow:
+    inset 1px 0 0 var(--nl-line-2),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+/* --- PPs: aufklappbarer Zellen-Button + Detailzeile ------------------- */
+.is-new-look .nl-players-pps-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-players-pps-toggle:hover,
+.is-new-look .nl-players-pps-toggle.is-expanded {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-players-pps-toggle:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-players-pps-toggle-caret {
+  font-size: 9px;
+  opacity: 0.75;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-players-detail-row > .nl-players-detail-cell {
+  padding: 0;
+  background: var(--nl-panel-2);
+  cursor: default;
+}
+
+.is-new-look .nl-players-pps-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+  white-space: normal;
+  border-left: 2px solid var(--nl-accent);
+}
+
+.is-new-look .nl-players-pps-detail-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-players-pps-detail-name {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-players-pps-detail-total {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-players-pps-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+  max-width: 720px;
+}
+
+.is-new-look .nl-players-pps-detail-axis {
+  display: grid;
+  grid-template-columns: 34px minmax(60px, 1fr) 30px;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-players-pps-detail-axis-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-players-pps-detail-axis-track {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-players-pps-detail-axis-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-players-pps-detail-axis-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .nl-players-pps-detail-note {
+  margin: 0;
+  max-width: 720px;
+  font-size: 11px;
+  color: var(--nl-mut-2);
+  white-space: normal;
+}
+
 /* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
 .is-new-look .nl-players-sort-th {
   display: inline-flex;
@@ -53951,34 +54095,39 @@ button.is-new-look .nl-thist-season-pill,
   white-space: nowrap;
 }
 
-/* --- Achsen-Mini-Bars (POW/SPE/MEN/SOC, 0-100) ---------------------- */
+/* --- Achsen-Mini-Bars (POW/SPE/MEN/SOC, 0-100) ---------------------------
+   Eine Zeile je Achse (1×4) statt eines engen 2×2-Clusters: Label, Balken
+   und Wert stehen so nie horizontal neben der nächsten Achse und laufen
+   nicht zusammen (z. B. "91SPE"). Jede Achse bekommt eigenen Raum. --------- */
 .is-new-look .nl-players-td-axes {
-  min-width: 190px;
+  min-width: 172px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .is-new-look .nl-players-axes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px var(--nl-s3);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
   min-width: 0;
 }
 
 .is-new-look .nl-players-axis {
   display: grid;
-  grid-template-columns: 28px minmax(36px, 1fr) 22px;
+  grid-template-columns: 30px minmax(48px, 1fr) 28px;
   align-items: center;
-  gap: 4px;
+  gap: var(--nl-s2);
 }
 
 .is-new-look .nl-players-axis-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--nl-tone, var(--nl-mut));
 }
 
 .is-new-look .nl-players-axis-track {
-  height: 5px;
+  height: 6px;
   border-radius: var(--nl-r-pill);
   background: var(--nl-panel-2);
   overflow: hidden;
@@ -53992,8 +54141,9 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look .nl-players-axis-value {
-  font-size: 10px;
-  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-ink);
   text-align: right;
 }
 
