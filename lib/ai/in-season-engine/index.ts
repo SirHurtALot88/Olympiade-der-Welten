@@ -62,3 +62,11 @@ export {
   markReplacementSlotFulfilled,
   type ReplacementSlot,
 } from "@/lib/ai/in-season-engine/replacement-linkage";
+
+export {
+  planTransferWindowForTeam,
+  isInSeasonEngineV2Enabled,
+  type PlanTransferWindowForTeamInput,
+  type PlanTransferWindowForTeamResult,
+  type TransferWindowTeamNeeds,
+} from "@/lib/ai/in-season-engine/plan-transfer-window-for-team";
