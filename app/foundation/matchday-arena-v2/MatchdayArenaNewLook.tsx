@@ -292,6 +292,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const previousPhase: MatchdayArenaPhaseId | null =
     phaseIndex > 0 ? (MATCHDAY_ARENA_PHASES[phaseIndex - 1]?.id ?? null) : null;
   const isResultPhase = activePhase === "result";
+  // Auf dem "Gesamt"-Board sind die Endwerte immer sichtbar (keine Reveal-Phasen),
+  // daher dort die Ausgangs-Buttons (Ergebnis/Saisonstand) ebenfalls freischalten.
+  const resultsUnlocked = isResultPhase || boardSide === "total";
   const finalPhaseIndex = MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === "final");
   const mvpsRevealed = phaseIndex >= finalPhaseIndex || boardSide === "total";
 
@@ -768,8 +771,8 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               <button
                 className="nl-arena-button"
                 type="button"
-                disabled={!isResultPhase}
-                title={isResultPhase ? "Spieltagsergebnis öffnen" : "Wird nach der Ergebnis-Phase freigeschaltet"}
+                disabled={!resultsUnlocked}
+                title={resultsUnlocked ? "Spieltagsergebnis öffnen" : "Wird nach der Ergebnis-Phase freigeschaltet"}
                 onClick={props.onOpenMatchdayResult}
               >
                 Ergebnis
@@ -779,8 +782,8 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               <button
                 className="nl-arena-button is-primary"
                 type="button"
-                disabled={!isResultPhase}
-                title={isResultPhase ? "Saisonstand öffnen" : "Wird nach der Ergebnis-Phase freigeschaltet"}
+                disabled={!resultsUnlocked}
+                title={resultsUnlocked ? "Saisonstand öffnen" : "Wird nach der Ergebnis-Phase freigeschaltet"}
                 onClick={props.onOpenSeason}
               >
                 Saisonstand

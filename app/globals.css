@@ -40642,10 +40642,10 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 .werdegang-season-stat.is-area small { color: var(--wg-muted); }
-.werdegang-season-stat.is-pow strong { color: #e08a80; }
-.werdegang-season-stat.is-spe strong { color: #7db4e8; }
-.werdegang-season-stat.is-men strong { color: #d9bc6a; }
-.werdegang-season-stat.is-soc strong { color: #94c58c; }
+.werdegang-season-stat.is-pow strong { color: var(--nl-pow); }
+.werdegang-season-stat.is-spe strong { color: var(--nl-spe); }
+.werdegang-season-stat.is-men strong { color: var(--nl-men); }
+.werdegang-season-stat.is-soc strong { color: var(--nl-soc); }
 .werdegang-season-foot {
   margin: 0;
   font-size: 11.5px;
@@ -40718,6 +40718,8 @@ button.foundation-team-portrait-card {
   /* Accent */
   --nl-accent: #5b9bff;
   --nl-accent-soft: #15294b;
+  /* Gemeinsamer Fokus-Ring (zusammen mit outline-offset: 2px angewandt) */
+  --nl-focus-ring: 2px solid var(--nl-accent);
   /* Achsen (Spiel-Identität) */
   --nl-pow: #ff6b6b;
   --nl-spe: #57d08a;
@@ -40866,7 +40868,7 @@ button.foundation-team-portrait-card {
   color: var(--nl-tone, var(--nl-accent));
 }
 .is-new-look .nl-stat-chip.is-interactive:focus-visible {
-  outline: 2px solid var(--nl-accent);
+  outline: var(--nl-focus-ring);
   outline-offset: 2px;
 }
 .is-new-look .nl-stat-chip-row {
@@ -40907,6 +40909,10 @@ button.foundation-team-portrait-card {
   transform: translateY(-2px);
   border-color: var(--nl-line-2);
   box-shadow: var(--nl-e3);
+}
+.is-new-look .nl-card.is-interactive:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
 }
 .is-new-look .nl-card-head {
   display: flex;
@@ -40983,7 +40989,7 @@ button.foundation-team-portrait-card {
   background: color-mix(in srgb, var(--nl-panel) 70%, transparent);
 }
 .is-new-look .nl-subtab:focus-visible {
-  outline: 2px solid var(--nl-accent);
+  outline: var(--nl-focus-ring);
   outline-offset: 1px;
 }
 .is-new-look .nl-subtab.is-active {
@@ -51013,10 +51019,16 @@ button.foundation-team-portrait-card {
   transition: opacity 140ms ease;
 }
 
-.is-new-look .nl-radar-label.is-clickable:hover,
-.is-new-look .nl-radar-label.is-clickable:focus-visible {
+.is-new-look .nl-radar-label.is-clickable:hover {
   opacity: 0.75;
-  outline: none;
+}
+/* Sichtbarer Fokus statt outline:none — Achsen-Label ist ein echtes Portal.
+   Outline (wo SVG-<text> es unterstützt) plus Glow für breite Browser-Deckung. */
+.is-new-look .nl-radar-label.is-clickable:focus-visible {
+  opacity: 1;
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--nl-accent) 70%, transparent));
 }
 
 .is-new-look .nl-player-hero-radar-legend {

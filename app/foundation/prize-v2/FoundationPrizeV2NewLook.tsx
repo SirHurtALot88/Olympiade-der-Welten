@@ -131,6 +131,12 @@ export default function FoundationPrizeV2NewLook({
     [prizeForecastRows],
   );
 
+  // Erste (simulierte) Forecast-Zeile: dieselbe Quelle wie Chart + Tabelle, die
+  // auf "Platz simulieren" reagieren. Speist Bonus/Malus (GuV) und "Cash nachher"
+  // (cashAfter), damit die Eckwert-Chips nicht dem realen Rang, sondern der
+  // Simulation folgen. "Cash vorher" bleibt der reale Startwert.
+  const firstForecastRow = prizeForecastRows[0] ?? null;
+
   const sortedTableRows = useMemo(() => [...displayPrizePreviewRows].sort(compareByRank), [displayPrizePreviewRows]);
 
   const maxPrizeMoney = useMemo(
@@ -382,17 +388,13 @@ export default function FoundationPrizeV2NewLook({
             />
             <StatChip
               label="Bonus/Malus"
-              value={formatSignedDisplayMoney(prizeV2SelectedTeamSummary?.bonusMalus)}
-              tone={
-                prizeV2SelectedTeamSummary?.bonusMalus != null && prizeV2SelectedTeamSummary.bonusMalus < 0 ? "risk" : "good"
-              }
+              value={firstForecastRow?.guv != null ? formatSignedDisplayMoney(firstForecastRow.guv) : "—"}
+              tone={firstForecastRow?.guv != null && firstForecastRow.guv < 0 ? "risk" : "good"}
             />
             <StatChip
               label="Cash nachher"
               value={
-                prizeV2SelectedTeamSummary?.projectedCash != null
-                  ? formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)
-                  : "—"
+                firstForecastRow?.cashAfter != null ? formatLocalePoints(firstForecastRow.cashAfter, 1) : "—"
               }
             />
           </StatChipRow>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
@@ -235,6 +235,18 @@ export default function InboxV2NewLook({
       setLocalCategoryFilter(value);
     }
   };
+
+  // Modus-Wechsel (Entscheidungen ↔ Chronik) setzt den lokalen Kategorie-Filter
+  // auf "ALL" zurück: die Kategorie-Vokabulare der beiden Modi überschneiden
+  // sich nur teilweise, ein überlebender Filter würde die Chronik sonst auf eine
+  // dort nicht existierende Kategorie einschränken (leere Liste + irreführende
+  // "alles erledigt"-Karte). Nur im lokal gefilterten Pfad — vorfiltert der Host
+  // extern, gehört das Filter-State ihm.
+  useEffect(() => {
+    if (!isExternallyFiltered) {
+      setLocalCategoryFilter("ALL");
+    }
+  }, [mode, isExternallyFiltered]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();

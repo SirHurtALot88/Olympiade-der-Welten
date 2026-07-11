@@ -124,13 +124,14 @@ export default function PlayerHeroNewLook({
   // Portal-Navigation: identisch zu den bestehenden KPI-Hero-Karten des
   // Drawers führen OVR/PPs/MVS über `onOpenLeagueLeaders` in die
   // Liga-Leaders-Spielerliste (nach der jeweiligen Kennzahl sortiert).
-  // Ohne erreichbaren Handler (oder für MW, wofür es keinen gibt) bleibt der
-  // Chip als Portal-Affordance klickbar, navigiert aber bewusst nirgendwohin.
+  // Ohne erreichbaren Handler (oder für MW, wofür es keinen gibt) gibt es kein
+  // Portal-Ziel — dann `undefined` zurückgeben, damit der StatChip statisch
+  // (kein Cursor/Hover-Lift/Pfeil/Fokus) rendert statt ein Portal ins Leere.
   const buildLeadersClick = (categoryId: LeagueLeaderCategoryId, rank: number | null) => {
     if (onOpenLeagueLeaders != null && !isFreeAgent && rank != null) {
       return () => onOpenLeagueLeaders(categoryId, { playerId: data.playerId, playerName: data.name });
     }
-    return () => {};
+    return undefined;
   };
 
   // Radar-Achsen als Portale (#60): POW/SPE/MEN/SOC sind reale
@@ -214,7 +215,6 @@ export default function PlayerHeroNewLook({
               tone="neutral"
               sub="Marktwert"
               title="Marktwert"
-              onClick={() => {}}
             />
           </StatChipRow>
         </div>

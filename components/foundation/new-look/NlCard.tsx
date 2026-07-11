@@ -37,8 +37,37 @@ export function NlCard({
     .filter(Boolean)
     .join(" ");
 
+  // Nur eine Karte mit echtem `onClick` ist tastatur-aktivierbar: role=button +
+  // tabIndex + Enter/Space. Der Guard (target === currentTarget) verhindert, dass
+  // Enter/Space auf verschachtelten Buttons zusätzlich die Karte auslöst.
+  const isActionable = onClick != null;
+  const isSelected =
+    typeof className === "string" && className.split(/\s+/).includes("is-selected");
+
   return (
-    <section className={classes} onClick={onClick} data-testid={dataTestId}>
+    <section
+      className={classes}
+      onClick={onClick}
+      data-testid={dataTestId}
+      role={isActionable ? "button" : undefined}
+      tabIndex={isActionable ? 0 : undefined}
+      aria-pressed={isActionable ? isSelected : undefined}
+      onKeyDown={
+        isActionable
+          ? (event) => {
+              if (event.target !== event.currentTarget) {
+                return;
+              }
+              if (event.key === "Enter" || event.key === " ") {
+                if (event.key === " ") {
+                  event.preventDefault();
+                }
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+    >
       {hasHeader ? (
         <header className="nl-card-head">
           <div className="nl-card-head-copy">
