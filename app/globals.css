@@ -51654,6 +51654,159 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
+/* ============================================================
+   Gebäude — Feedback E1/E4/E5/E6: Kosten-Übersicht im Header,
+   Unterhalts-Kurve neben der Ausbau-Kurve, Info-Tooltips,
+   Zustands-Schwellen-Marke auf der Wear-Bar.
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+
+/* --- Gebäude: Kosten-Kurven-Duo (Ausbau einmalig + Unterhalt/Saison) --- */
+
+.is-new-look .nl-facility-curve-duo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4) var(--nl-s5);
+}
+
+.is-new-look .nl-facility-curve-col {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  flex: 1 1 260px;
+  min-width: 240px;
+  max-width: 360px;
+}
+
+.is-new-look .nl-facility-curve-col .nl-barchart {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+}
+
+.is-new-look .nl-facility-curve-col-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-curve-note {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Gebäude: Info-Tooltip (echter Button, Bubble via data-tip) --- */
+
+.is-new-look .nl-facility-infotip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--nl-sans);
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-facility-infotip:hover,
+.is-new-look .nl-facility-infotip:focus-visible {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-facility-infotip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: max-content;
+  max-width: 260px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  box-shadow: var(--nl-e2);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--nl-t-fast) var(--nl-ease), visibility var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-facility-infotip:hover::after,
+.is-new-look .nl-facility-infotip:focus::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* In der sticky Aktionsleiste öffnet die Bubble nach oben. */
+.is-new-look .nl-facility-infotip.is-up::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-facility-infotip,
+  .is-new-look .nl-facility-infotip::after {
+    transition: none;
+  }
+}
+
+/* --- Gebäude: Toolbar-Label mit Tooltip-Platz --- */
+
+.is-new-look .nl-facility-ampel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- Gebäude: Zustands-Schwellen-Marke (E6) auf der Wear-Bar --- */
+
+.is-new-look .nl-facility-wear-wrap {
+  position: relative;
+  margin-top: 2px;
+}
+
+.is-new-look .nl-facility-wear-wrap .nl-facility-wear {
+  margin-top: 0;
+}
+
+.is-new-look .nl-facility-wear-threshold {
+  position: absolute;
+  bottom: -2px;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--nl-warn);
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0.9;
+}
+
 /* =======================================================================
    Batch b8 — Transfermarkt & Scouting NewLook (flag-gated, additiv)
    ======================================================================= */
