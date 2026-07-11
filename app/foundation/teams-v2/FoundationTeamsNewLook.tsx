@@ -1287,7 +1287,6 @@ export default function FoundationTeamsNewLook({
           />
         }
       >
-        {renderRosterFilterBar()}
         {selectedTeamRosterActionHint ? (
           <p className={`nl-teams-action-hint${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
             <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
