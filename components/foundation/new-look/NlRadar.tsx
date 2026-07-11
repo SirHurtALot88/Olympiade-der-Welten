@@ -24,9 +24,9 @@ export type NlRadarProps = {
   className?: string;
 };
 
-const RADAR_SIZE = 180;
+const RADAR_SIZE = 220;
 const RADAR_CENTER = RADAR_SIZE / 2;
-const RADAR_RADIUS = 62;
+const RADAR_RADIUS = 66;
 const RADAR_RINGS = [0.25, 0.5, 0.75, 1];
 /** Feste Reihenfolge: POW oben, SPE rechts, MEN unten, SOC links. */
 const RADAR_AXIS_ORDER: NlAxisKey[] = ["pow", "spe", "men", "soc"];
@@ -65,7 +65,7 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
     return {
       points,
       polygon: points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
-      labels: RADAR_AXIS_ORDER.map((key, index) => ({ key, ...radarPoint(index, 1.24) })),
+      labels: RADAR_AXIS_ORDER.map((key, index) => ({ key, ...radarPoint(index, 1.3) })),
     };
   }, [axes, max]);
 
@@ -128,8 +128,14 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
             className="nl-radar-label"
             fill={NL_TONE_VAR[label.key]}
           >
-            {NL_AXIS_LABELS[label.key]}
-            {showValues ? ` ${formatNlNumber(value, 0)}` : ""}
+            <tspan x={label.x} dy={showValues ? "-0.35em" : "0"} className="nl-radar-label-name">
+              {NL_AXIS_LABELS[label.key]}
+            </tspan>
+            {showValues ? (
+              <tspan x={label.x} dy="1.15em" className="nl-radar-label-value">
+                {formatNlNumber(value, 0)}
+              </tspan>
+            ) : null}
           </text>
         );
       })}

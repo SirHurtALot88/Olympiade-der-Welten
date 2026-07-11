@@ -6,8 +6,9 @@
  * Ersetzt — nur bei aktivem `useNewLook`-Flag — den Identitäts-/Ratings-Block
  * oben im Spieler-Drawer bzw. auf der Spielerprofil-Seite:
  * Portrait links, Name + Klasse/Rasse + Rolle, das Stat-Vokabular
- * (OVR / PPs / MVS / MW) als StatChips, das POW/SPE/MEN/SOC-Radar und —
- * wenn echte CA/PO-Sterne vorliegen — ein kleines CA→PO-Gauge.
+ * (OVR / PPs / MVS / MW) als StatChips und das POW/SPE/MEN/SOC-Radar.
+ * CA/PO werden bewusst NICHT hier dupliziert — die Sterne stehen bereits
+ * in der Scouting-Karte darunter.
  *
  * Alle Werte kommen unverändert aus `PlayerDetailDrawerData`
  * (`buildPlayerDrawerDataFromGameState`); es werden keine Daten erfunden.
@@ -16,7 +17,6 @@
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
-  NlGauge,
   NlRadar,
   StatChip,
   StatChipRow,
@@ -62,8 +62,6 @@ export type PlayerHeroNewLookProps = {
 export default function PlayerHeroNewLook({
   data,
   roleLabel,
-  caStars,
-  poStars,
   isFreeAgent,
   onClose,
   onOpenLeagueLeaders,
@@ -90,8 +88,6 @@ export default function PlayerHeroNewLook({
     }
     return () => {};
   };
-
-  const showGauge = caStars != null && poStars != null && poStars > 0;
 
   return (
     <section className="is-new-look nl-player-hero" data-testid="player-hero-new-look" data-new-look="true">
@@ -174,17 +170,6 @@ export default function PlayerHeroNewLook({
           className="nl-player-hero-radar"
           aria-label={`Achsen-Radar für ${data.name}`}
         />
-        {showGauge ? (
-          <NlGauge
-            className="nl-player-hero-gauge"
-            value={caStars}
-            max={poStars}
-            label="CA→PO"
-            tone="accent"
-            format={(value, max) => `${formatNlNumber(value, 1)}→${formatNlNumber(max, 1)}★`}
-            title="Aktuelle Stärke (CA) im Verhältnis zum Potential (PO), in Sternen."
-          />
-        ) : null}
       </div>
       <button className="nl-player-hero-close" type="button" onClick={onClose}>
         Schliessen

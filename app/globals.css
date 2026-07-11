@@ -41186,10 +41186,22 @@ button.foundation-team-portrait-card {
 }
 .is-new-look .nl-radar-label {
   font-family: var(--nl-sans);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-radar-label-name {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.is-new-look .nl-radar-label-value {
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* --- NlMedalBadge ------------------------------------------------- */
@@ -43333,8 +43345,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-player-hero-portrait {
-  width: 96px;
-  height: 96px;
+  width: 140px;
+  height: 140px;
   flex: 0 0 auto;
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
@@ -43347,7 +43359,7 @@ button.foundation-team-portrait-card {
   place-items: center;
   background: var(--nl-accent-soft);
   color: var(--nl-accent);
-  font-size: 26px;
+  font-size: 40px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -43410,7 +43422,7 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-player-hero-radar {
-  width: 170px;
+  width: 216px;
   height: auto;
   flex: 0 0 auto;
 }
