@@ -2567,6 +2567,15 @@ export function useFoundationShellRouterBodyScope({
 
   function closeTeamProfile() {
     setTeamProfileTeamId(null);
+    // Zurück soll auf den Herkunfts-Tab führen (z. B. Saisonstand), von dem das
+    // Team-Profil geöffnet wurde — nicht pauschal auf „Teams". Das Öffnen pusht
+    // einen History-Eintrag (openTeamProfileById, mode: "push"), also bringt uns
+    // der Browser-Back verlässlich dorthin zurück. Nur ohne History fällt es auf
+    // die Teams-Übersicht zurück.
+    if (canFoundationNavigateBack()) {
+      foundationNavigateBack();
+      return;
+    }
     setFoundationView("teams", setActiveView);
     syncFoundationViewInUrl("teams");
   }
