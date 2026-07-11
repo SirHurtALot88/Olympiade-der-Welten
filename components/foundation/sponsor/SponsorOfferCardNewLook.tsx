@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import type {
   GameState,
   SponsorArchetype,
@@ -7,6 +9,7 @@ import type {
   SponsorOffer,
   SponsorOfferComponent,
 } from "@/lib/data/olyDataTypes";
+import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   buildSponsorOfferPresentation,
   buildSponsorRankTierRows,
@@ -42,6 +45,8 @@ export type SponsorOfferCardNewLookProps = {
   onNegotiationProfileChange: (profile: SponsorNegotiationProfile) => void;
   onChoose: () => void;
   formatCash: (value: number) => string;
+  /** #76: markiert dieses Angebot als Cash-stärkstes der aktuellen Saisonauswahl. */
+  isBestCashOffer?: boolean;
 };
 
 export const SPONSOR_ARCHETYPE_META: Record<SponsorArchetype, { label: string; tone: NlTone }> = {
@@ -149,6 +154,7 @@ export function SponsorOfferCardNewLook({
   onNegotiationProfileChange,
   onChoose,
   formatCash,
+  isBestCashOffer = false,
 }: SponsorOfferCardNewLookProps) {
   const presentation = buildSponsorOfferPresentation({ offer, gameState, teamId: offer.teamId });
   const archetypeMeta = SPONSOR_ARCHETYPE_META[offer.archetype];
@@ -160,6 +166,13 @@ export function SponsorOfferCardNewLook({
     0,
   );
   const termSeasons = offer.termSeasons ?? 1;
+
+  // #79: aktuell erreichte Gewinnstufe live hervorheben — echter Liga-Rang
+  // des Teams (`buildTeamSeasonOverviewRows`), keine erfundene Platzierung.
+  const currentTeamRank = useMemo(() => {
+    const rows = buildTeamSeasonOverviewRows({ gameState });
+    return rows.find((row) => row.teamId === offer.teamId)?.rank ?? null;
+  }, [gameState, offer.teamId]);
 
   return (
     <article
@@ -180,6 +193,11 @@ export function SponsorOfferCardNewLook({
         </div>
         <div className="nl-sponsor-offer-badges">
           {presentation.offerBadge ? <span className="nl-sponsor-offer-badge">{presentation.offerBadge}</span> : null}
+          {isBestCashOffer ? (
+            <span className="nl-sponsor-offer-badge is-cash-best" title="Höchste Cash-Summe im aktuellen Angebotsvergleich">
+              Bestes Cash-Angebot
+            </span>
+          ) : null}
           <span
             className="nl-sponsor-term-chip"
             title="Vertragslaufzeit dieses Angebots. Aktuell vergeben Sponsoren feste 1-Saison-Verträge — die Laufzeit ist beim Abschluss nicht verhandelbar."
@@ -243,25 +261,48 @@ export function SponsorOfferCardNewLook({
         {standardComponents.map((component) => {
           if (component.kind === "rank") {
             const tierRows = buildSponsorRankTierRows({ baseCash, rankCash: component.rewardCash });
+            // #79: höchste Stufe, deren Rang-Schwelle der aktuelle Liga-Rang
+            // erfüllt (Meilensteine sind aufsteigend schwerer sortiert).
+            let currentTierIndex = -1;
+            if (currentTeamRank != null) {
+              tierRows.forEach((row, index) => {
+                if (currentTeamRank <= row.rankAt) {
+                  currentTierIndex = index;
+                }
+              });
+            }
             return (
               <div key={component.componentId} className="nl-sponsor-reward-tile is-rank">
                 <div className="nl-sponsor-reward-tile-head">
                   <SponsorRewardIcon kind="rank" />
                   <span>{getSponsorComponentKindLabel(component.kind)}</span>
                   <strong className="nl-tnum">{formatCash(component.rewardCash)}</strong>
+                  {currentTeamRank != null ? (
+                    <small className="nl-sponsor-rank-current-hint">Aktuell #{currentTeamRank}</small>
+                  ) : null}
                 </div>
                 <ul className="nl-sponsor-rank-ladder" data-testid="sponsor-rank-tier-list">
-                  {tierRows.map((row, index) => (
-                    <li key={row.label} className="nl-sponsor-rank-rung">
-                      <span
-                        className="nl-sponsor-rank-rung-bar"
-                        aria-hidden="true"
-                        style={{ width: `${Math.round(((index + 1) / tierRows.length) * 100)}%` }}
-                      />
-                      <span className="nl-sponsor-rank-rung-label">{row.label}</span>
-                      <span className="nl-sponsor-rank-rung-payout nl-tnum">{formatCash(row.absolutePayout)}</span>
-                    </li>
-                  ))}
+                  {tierRows.map((row, index) => {
+                    const isReached = currentTierIndex >= 0 && index <= currentTierIndex;
+                    const isCurrent = index === currentTierIndex;
+                    return (
+                      <li
+                        key={row.label}
+                        className={`nl-sponsor-rank-rung${isReached ? " is-reached" : ""}${isCurrent ? " is-current" : ""}`}
+                      >
+                        <span
+                          className="nl-sponsor-rank-rung-bar"
+                          aria-hidden="true"
+                          style={{ width: `${Math.round(((index + 1) / tierRows.length) * 100)}%` }}
+                        />
+                        <span className="nl-sponsor-rank-rung-label">
+                          {row.label}
+                          {isCurrent ? <span className="nl-sponsor-rank-rung-live">● aktuell</span> : null}
+                        </span>
+                        <span className="nl-sponsor-rank-rung-payout nl-tnum">{formatCash(row.absolutePayout)}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );

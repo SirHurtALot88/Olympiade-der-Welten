@@ -14,11 +14,13 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlRadar,
   NlSparkline,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
+  type NlAxisKey,
 } from "@/components/foundation/new-look";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 
@@ -140,6 +142,8 @@ export default function TransferHistoryV2NewLook({
   onSelectTransfer,
 }: TransferHistoryV2NewLookProps) {
   const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
+  // #73: Teambewegungs-Liste sortierbar über Sub-Tabs.
+  const [teamSort, setTeamSort] = useState<"volume" | "income" | "net">("income");
 
   // MW-Verlauf des gewählten Spielers über alle seine Deals im aktuellen Scope
   // (chronologisch nach happenedAt) — echte Werte aus filteredRows.
@@ -179,6 +183,51 @@ export default function TransferHistoryV2NewLook({
       })),
     [seasonBreakdown],
   );
+
+  // #74: Season-Balken klickbar → Saison-Filter. Mappt den Season-Label aus
+  // `seasonBreakdown` auf die echte `seasonId` aus `seasonOptions` (gleiche
+  // kanonische Labels) — ohne Match bleibt der Balken nicht-klickbar statt
+  // eine ID zu erfinden.
+  const seasonIdByLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const option of seasonOptions) {
+      map.set(option.label, option.seasonId);
+    }
+    return map;
+  }, [seasonOptions]);
+
+  // #73: Teambewegungs-Liste sortierbar (Volumen/Erlös/Netto) — reine
+  // Umsortierung der bereits berechneten `activityCards`, keine neuen Werte.
+  const sortedActivityCards = useMemo(() => {
+    const list = [...activityCards];
+    list.sort((left, right) => {
+      if (teamSort === "volume") return right.volume - left.volume;
+      if (teamSort === "net") return right.net - left.net;
+      return right.income - left.income;
+    });
+    return list;
+  }, [activityCards, teamSort]);
+
+  // #20: POW/SPE/MEN/SOC-Radar im Spotlight — nur reale, endliche Achsenwerte.
+  const selectedRowAxes = useMemo(() => {
+    if (!selectedRow) return [];
+    const axes: { key: NlAxisKey; value: number }[] = [];
+    if (typeof selectedRow.pow === "number" && Number.isFinite(selectedRow.pow)) axes.push({ key: "pow", value: selectedRow.pow });
+    if (typeof selectedRow.spe === "number" && Number.isFinite(selectedRow.spe)) axes.push({ key: "spe", value: selectedRow.spe });
+    if (typeof selectedRow.men === "number" && Number.isFinite(selectedRow.men)) axes.push({ key: "men", value: selectedRow.men });
+    if (typeof selectedRow.soc === "number" && Number.isFinite(selectedRow.soc)) axes.push({ key: "soc", value: selectedRow.soc });
+    return axes;
+  }, [selectedRow]);
+
+  // #28: Fee-vs-Marktwert Deal-Bewertung (fee − marketValue) — nur wenn ein
+  // realer Marktwert > 0 vorliegt, sonst keine erfundene Bewertung.
+  const selectedFeeVsMarketValue = useMemo(() => {
+    if (!selectedRow) return null;
+    if (!Number.isFinite(selectedRow.fee) || !Number.isFinite(selectedRow.marketValue) || selectedRow.marketValue <= 0) {
+      return null;
+    }
+    return selectedRow.fee - selectedRow.marketValue;
+  }, [selectedRow]);
 
   return (
     <div className="nl-thist" data-new-look="true">
@@ -282,8 +331,22 @@ export default function TransferHistoryV2NewLook({
 
       <StatChipRow className="nl-thist-summary" aria-label="Transferbilanz">
         <StatChip label="Deals" value={summary.count} tone="accent" sub={isAllSeasons ? "mehrere Seasons" : "aktuelle Season"} />
-        <StatChip label="Ausgaben" value={formatTransfermarktCurrency(summary.buyFee)} tone="risk" sub="Käufe gesamt" />
-        <StatChip label="Einnahmen" value={formatTransfermarktCurrency(summary.sellFee)} tone="good" sub="Verkäufe gesamt" />
+        <StatChip
+          label="Ausgaben"
+          value={formatTransfermarktCurrency(summary.buyFee)}
+          tone="risk"
+          sub="Käufe gesamt"
+          onClick={() => onTypeFilterChange("buy")}
+          title="Nur Käufe anzeigen"
+        />
+        <StatChip
+          label="Einnahmen"
+          value={formatTransfermarktCurrency(summary.sellFee)}
+          tone="good"
+          sub="Verkäufe gesamt"
+          onClick={() => onTypeFilterChange("sell")}
+          title="Nur Verkäufe anzeigen"
+        />
         <StatChip
           label="Netto"
           value={formatNlSignedMoney(summary.netTransferBalance)}
@@ -299,27 +362,54 @@ export default function TransferHistoryV2NewLook({
         />
       </StatChipRow>
 
+      {/* #2: Story-Kacheln als Portale — Klick wählt den jeweiligen Deal
+          (Spotlight) bzw. öffnet das aktivste Team; nur klickbar, wenn ein
+          echter Zieldatensatz existiert. */}
       <div className="nl-thist-story-grid">
-        <NlCard className="nl-thist-story-card is-buy" eyebrow="Teuerster Kauf" title={biggestBuy?.playerName ?? "—"}>
+        <NlCard
+          className="nl-thist-story-card is-buy"
+          eyebrow="Teuerster Kauf"
+          title={biggestBuy?.playerName ?? "—"}
+          interactive={!!biggestBuy}
+          onClick={biggestBuy ? () => onSelectTransfer(biggestBuy.transferId) : undefined}
+        >
           <p className="nl-thist-story-meta">
             {biggestBuy
               ? `${biggestBuy.toTeamName ?? biggestBuy.toTeamId ?? "—"} · ${formatTransfermarktCurrency(biggestBuy.fee)}`
               : "keine Kaufbewegung"}
           </p>
         </NlCard>
-        <NlCard className="nl-thist-story-card is-sell" eyebrow="Teuerster Verkauf" title={biggestSale?.playerName ?? "—"}>
+        <NlCard
+          className="nl-thist-story-card is-sell"
+          eyebrow="Teuerster Verkauf"
+          title={biggestSale?.playerName ?? "—"}
+          interactive={!!biggestSale}
+          onClick={biggestSale ? () => onSelectTransfer(biggestSale.transferId) : undefined}
+        >
           <p className="nl-thist-story-meta">
             {biggestSale
               ? `${biggestSale.fromTeamName ?? biggestSale.fromTeamId ?? "—"} · ${formatTransfermarktCurrency(biggestSale.fee)}`
               : "kein Verkauf"}
           </p>
         </NlCard>
-        <NlCard className="nl-thist-story-card is-profit" eyebrow="Bester GuV" title={bestProfit?.playerName ?? "—"}>
+        <NlCard
+          className="nl-thist-story-card is-profit"
+          eyebrow="Bester GuV"
+          title={bestProfit?.playerName ?? "—"}
+          interactive={!!bestProfit}
+          onClick={bestProfit ? () => onSelectTransfer(bestProfit.transferId) : undefined}
+        >
           <p className="nl-thist-story-meta">
             {bestProfit?.guv != null ? formatNlSignedMoney(bestProfit.guv) : "kein belastbarer Gewinnwert"}
           </p>
         </NlCard>
-        <NlCard className="nl-thist-story-card is-activity" eyebrow="Meiste Bewegung" title={mostActiveTeam?.teamName ?? "—"}>
+        <NlCard
+          className="nl-thist-story-card is-activity"
+          eyebrow="Meiste Bewegung"
+          title={mostActiveTeam?.teamName ?? "—"}
+          interactive={!!mostActiveTeam}
+          onClick={mostActiveTeam ? () => onOpenTeam(mostActiveTeam.teamId) : undefined}
+        >
           <p className="nl-thist-story-meta">
             {mostActiveTeam
               ? `${mostActiveTeam.volume} Deals · Netto ${formatNlSignedMoney(mostActiveTeam.net)}`
@@ -347,38 +437,57 @@ export default function TransferHistoryV2NewLook({
           }
         >
           {historyLayout === "timeline" ? (
-            <div className="nl-thist-timeline" role="list" aria-label="Deal-Timeline">
+            <div className="nl-thist-timeline is-spine" role="list" aria-label="Deal-Timeline">
               {visibleRows.length ? (
-                visibleRows.map((row) => (
-                  <button
-                    key={row.transferId}
-                    type="button"
-                    role="listitem"
-                    className={`nl-thist-timeline-card ${getNlTransferToneClass(row.type)}${
-                      selectedTransferId === row.transferId ? " is-selected" : ""
-                    }`}
-                    onClick={() => onSelectTransfer(row.transferId)}
-                  >
-                    <NlThistPortraitChip row={row} />
-                    <span className="nl-thist-timeline-copy">
-                      <span className="nl-thist-timeline-head">
-                        <span className={`nl-thist-type-pill ${getNlTransferToneClass(row.type)}`}>
-                          {formatNlTransferType(row.type)}
-                        </span>
-                        <small>{new Date(row.happenedAt).toLocaleString("de-DE")}</small>
-                      </span>
-                      <strong>{row.playerName}</strong>
-                      <small className="nl-thist-timeline-target">{getNlTimelineTargetLabel(row)}</small>
-                    </span>
-                    <span className="nl-thist-timeline-numbers">
-                      <strong className="nl-tnum">{formatTransfermarktCurrency(row.fee)}</strong>
-                      <small>{row.phase ?? row.matchdayId ?? row.seasonLabel}</small>
-                      {row.guv != null ? (
-                        <NlDeltaChip value={row.guv} format={() => formatNlSignedMoney(row.guv)} title="GuV dieses Deals" />
-                      ) : null}
-                    </span>
-                  </button>
-                ))
+                (() => {
+                  // #75: echte Zeit-Spine mit Saison-/Matchday-Gruppierung —
+                  // reine Gruppierungs-Marker vor der bestehenden, unveränderten
+                  // Sortierung von `visibleRows`; keine Umsortierung.
+                  let lastGroupKey: string | null = null;
+                  return visibleRows.map((row) => {
+                    const groupLabel = `${row.seasonLabel} · ${row.phase ?? row.matchdayId ?? "—"}`;
+                    const groupKey = `${row.seasonId}__${row.phase ?? row.matchdayId ?? "—"}`;
+                    const isNewGroup = groupKey !== lastGroupKey;
+                    lastGroupKey = groupKey;
+                    return (
+                      <div key={row.transferId} className="nl-thist-spine-row">
+                        {isNewGroup ? (
+                          <div className="nl-thist-spine-marker">
+                            <span className="nl-thist-spine-dot" aria-hidden="true" />
+                            <span className="nl-thist-spine-label">{groupLabel}</span>
+                          </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          role="listitem"
+                          className={`nl-thist-timeline-card ${getNlTransferToneClass(row.type)}${
+                            selectedTransferId === row.transferId ? " is-selected" : ""
+                          }`}
+                          onClick={() => onSelectTransfer(row.transferId)}
+                        >
+                          <NlThistPortraitChip row={row} />
+                          <span className="nl-thist-timeline-copy">
+                            <span className="nl-thist-timeline-head">
+                              <span className={`nl-thist-type-pill ${getNlTransferToneClass(row.type)}`}>
+                                {formatNlTransferType(row.type)}
+                              </span>
+                              <small>{new Date(row.happenedAt).toLocaleString("de-DE")}</small>
+                            </span>
+                            <strong>{row.playerName}</strong>
+                            <small className="nl-thist-timeline-target">{getNlTimelineTargetLabel(row)}</small>
+                          </span>
+                          <span className="nl-thist-timeline-numbers">
+                            <strong className="nl-tnum">{formatTransfermarktCurrency(row.fee)}</strong>
+                            <small>{row.phase ?? row.matchdayId ?? row.seasonLabel}</small>
+                            {row.guv != null ? (
+                              <NlDeltaChip value={row.guv} format={() => formatNlSignedMoney(row.guv)} title="GuV dieses Deals" />
+                            ) : null}
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  });
+                })()
               ) : (
                 <div className="nl-thist-empty">
                   <strong>Keine Transfers im aktuellen Filter</strong>
@@ -575,6 +684,28 @@ export default function TransferHistoryV2NewLook({
                   />
                 ) : null}
               </StatChipRow>
+              {selectedFeeVsMarketValue != null ? (
+                <p className="nl-thist-spotlight-dealcheck">
+                  <span className="nl-thist-eyebrow">Deal-Bewertung · Fee vs. MW</span>
+                  <NlDeltaChip
+                    value={selectedFeeVsMarketValue}
+                    invert
+                    format={(value) => formatNlSignedMoney(value)}
+                    title="Fee minus Marktwert zum Zeitpunkt des Deals — positiv heißt teurer als der Marktwert"
+                  />
+                </p>
+              ) : null}
+              {selectedRowAxes.length ? (
+                <div className="nl-thist-spotlight-radar">
+                  <span className="nl-thist-eyebrow">Achsenprofil zum Zeitpunkt des Deals</span>
+                  <NlRadar
+                    axes={selectedRowAxes}
+                    showValues
+                    aria-label={`Achsenprofil von ${selectedRow.playerName}`}
+                    className="nl-thist-spotlight-radar-chart"
+                  />
+                </div>
+              ) : null}
               {selectedPlayerMwPoints.length >= 2 ? (
                 <div className="nl-thist-spotlight-trend">
                   <span className="nl-thist-eyebrow">
@@ -598,9 +729,28 @@ export default function TransferHistoryV2NewLook({
           )}
         </NlCard>
 
-        <NlCard className="nl-thist-teams-card" eyebrow="Teambewegung" title={`${activityCards.length} Teams`}>
+        <NlCard
+          className="nl-thist-teams-card"
+          eyebrow="Teambewegung"
+          title={`${activityCards.length} Teams`}
+          actions={
+            activityCards.length ? (
+              <NlSubTabs
+                className="nl-thist-team-sort-tabs"
+                aria-label="Teambewegung sortieren"
+                activeId={teamSort}
+                onSelect={(id) => setTeamSort(id as "volume" | "income" | "net")}
+                items={[
+                  { id: "volume", label: "Volumen" },
+                  { id: "income", label: "Erlös" },
+                  { id: "net", label: "Netto" },
+                ]}
+              />
+            ) : null
+          }
+        >
           <div className="nl-thist-team-list">
-            {activityCards.map((team) => (
+            {sortedActivityCards.map((team) => (
               <button
                 key={team.teamId}
                 type="button"
@@ -634,6 +784,34 @@ export default function TransferHistoryV2NewLook({
                 format={(value) => formatNlNumber(value, 0)}
                 className="nl-thist-season-chart"
               />
+              {/* #74: Season-Balken klickbar → Saison-Filter. NlBarChart hat
+                  keinen Klick-Hook pro Balken (Kit-Datei, nicht editierbar) —
+                  daher eine begleitende, klickbare Season-Leiste mit
+                  denselben echten Werten aus `seasonBars`. */}
+              <div className="nl-thist-season-pills" role="list" aria-label="Season wählen">
+                {seasonBars.map((bar) => {
+                  const matchedSeasonId = seasonIdByLabel.get(bar.label);
+                  const isActive = matchedSeasonId != null && seasonFilter === matchedSeasonId;
+                  return matchedSeasonId ? (
+                    <button
+                      key={bar.label}
+                      type="button"
+                      role="listitem"
+                      className={`nl-thist-season-pill${isActive ? " is-active" : ""}`}
+                      onClick={() => onSeasonFilterChange(matchedSeasonId)}
+                      title={`Nur ${bar.label} anzeigen`}
+                    >
+                      <span>{bar.label}</span>
+                      <strong className="nl-tnum">{bar.value}</strong>
+                    </button>
+                  ) : (
+                    <span key={bar.label} className="nl-thist-season-pill is-static">
+                      <span>{bar.label}</span>
+                      <strong className="nl-tnum">{bar.value}</strong>
+                    </span>
+                  );
+                })}
+              </div>
               {seasonMwVolume.some((entry) => entry.value > 0) ? (
                 <div className="nl-thist-season-mw">
                   <span className="nl-thist-eyebrow">MW-Volumen pro Season</span>

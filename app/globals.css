@@ -51595,3 +51595,362 @@ span.nl-facility-ampel-chip {
   text-transform: uppercase;
   color: var(--nl-mut);
 }
+
+/* ============================================================
+   NEUER LOOK — Batch b9: Historie (nl-thist-*) & Sponsoren
+   (nl-sponsor-*). Nur aktiv unterhalb von `.is-new-look`
+   (Flag-gated, additiv). Ergänzt bestehende Regeln, ändert keine.
+   ============================================================ */
+
+/* --- Historie #2: Story-Kacheln als Portale (nutzt .nl-card.is-interactive) --- */
+.is-new-look .nl-thist-story-card.is-interactive {
+  cursor: pointer;
+}
+
+/* --- Historie #28: Fee-vs-Marktwert Deal-Bewertung --- */
+.is-new-look .nl-thist-spotlight-dealcheck {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin: 0;
+}
+
+/* --- Historie #20: POW/SPE/MEN/SOC-Radar im Spotlight --- */
+.is-new-look .nl-thist-spotlight-radar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-thist-spotlight-radar-chart {
+  width: 100%;
+  max-width: 220px;
+}
+
+/* --- Historie #73: Teambewegung sortierbar --- */
+.is-new-look .nl-thist-team-sort-tabs {
+  flex-wrap: wrap;
+}
+
+/* --- Historie #74: Season-Balken klickbar → Saison-Filter --- */
+.is-new-look .nl-thist-season-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-thist-season-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+button.is-new-look .nl-thist-season-pill,
+.is-new-look button.nl-thist-season-pill {
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-thist-season-pill:hover {
+  border-color: var(--nl-accent);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-thist-season-pill.is-active {
+  border-color: var(--nl-accent);
+  color: var(--nl-ink);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-thist-season-pill.is-static {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* --- Historie #75: Zeit-Spine mit Saison-/Matchday-Gruppierung --- */
+.is-new-look .nl-thist-timeline.is-spine {
+  position: relative;
+  padding-left: var(--nl-s3);
+}
+
+.is-new-look .nl-thist-timeline.is-spine::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--nl-line-2);
+}
+
+.is-new-look .nl-thist-spine-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-thist-spine-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-left: -14px;
+  padding-top: var(--nl-s2);
+}
+
+.is-new-look .nl-thist-spine-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nl-accent);
+  box-shadow: 0 0 0 3px var(--nl-bg);
+  flex-shrink: 0;
+}
+
+.is-new-look .nl-thist-spine-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+/* --- Sponsoren #22: Live-Ziel-Tracker im aktiven Vertrag --- */
+.is-new-look .nl-sponsor-hero-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-sponsor-hero-tracker-head {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-sponsor-hero-tracker-headline {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-hero-tracker small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-hero-tracker-reward {
+  color: var(--nl-warn);
+  font-size: 12px;
+}
+
+/* --- Sponsoren #21: Sponsor-Auszahlungs-Timeline --- */
+.is-new-look .nl-sponsor-payout-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-sponsor-payout-event {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-sponsor-payout-event.is-activation_bonus {
+  border-left: 3px solid var(--nl-good);
+}
+
+.is-new-look .nl-sponsor-payout-event.is-clause_trigger {
+  border-left: 3px solid var(--nl-warn);
+}
+
+.is-new-look .nl-sponsor-payout-event.is-partner_conflict {
+  border-left: 3px solid var(--nl-risk);
+}
+
+.is-new-look .nl-sponsor-payout-matchday {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-payout-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.is-new-look .nl-sponsor-payout-copy small {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+/* --- Sponsoren #76: Angebotsvergleich --- */
+.is-new-look .nl-sponsor-compare-chart {
+  width: 100%;
+  max-width: 480px;
+}
+
+.is-new-look .nl-sponsor-offer-badge.is-cash-best {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, transparent);
+  color: var(--nl-good);
+}
+
+/* --- Sponsoren #77: aufklappbares Kommerz-Rating-Treiber-Portal --- */
+.is-new-look .nl-sponsor-rating-toggle {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-sponsor-rating-toggle:hover,
+.is-new-look .nl-sponsor-rating-toggle:focus-visible {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-sponsor-rating-inputs {
+  flex-wrap: wrap;
+  margin-top: var(--nl-s1);
+}
+
+/* --- Sponsoren #78: Liga-Sponsorenübersicht --- */
+.is-new-look .nl-sponsor-league-sort-tabs {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-sponsor-league-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-sponsor-league-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 6px var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid transparent;
+}
+
+.is-new-look .nl-sponsor-league-row.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-sponsor-league-team {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  flex: 1;
+}
+
+.is-new-look .nl-sponsor-league-code {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-league-sponsor {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-league-sponsor.is-security {
+  color: var(--nl-men);
+}
+
+.is-new-look .nl-sponsor-league-sponsor.is-performance {
+  color: var(--nl-pow);
+}
+
+.is-new-look .nl-sponsor-league-sponsor.is-identity {
+  color: var(--nl-soc);
+}
+
+.is-new-look .nl-sponsor-league-sponsor.is-empty {
+  color: var(--nl-mut-2);
+  font-style: italic;
+}
+
+.is-new-look .nl-sponsor-league-cash {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */
+.is-new-look .nl-sponsor-rank-current-hint {
+  margin-left: auto;
+  color: var(--nl-mut);
+  font-weight: 400;
+}
+
+.is-new-look .nl-sponsor-rank-rung.is-reached .nl-sponsor-rank-rung-bar {
+  background: color-mix(in srgb, var(--nl-good) 20%, transparent);
+}
+
+.is-new-look .nl-sponsor-rank-rung.is-reached .nl-sponsor-rank-rung-label {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-rank-rung.is-current .nl-sponsor-rank-rung-bar {
+  background: color-mix(in srgb, var(--nl-good) 38%, transparent);
+}
+
+.is-new-look .nl-sponsor-rank-rung.is-current {
+  border: 1px solid color-mix(in srgb, var(--nl-good) 55%, transparent);
+}
+
+.is-new-look .nl-sponsor-rank-rung-live {
+  margin-left: 6px;
+  color: var(--nl-good);
+  font-weight: 700;
+  font-size: 10px;
+}
+
+/* --- Reduced Motion (Batch b9) ------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-thist-season-pill,
+  .is-new-look .nl-sponsor-rating-toggle {
+    transition: none;
+  }
+}
