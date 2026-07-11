@@ -57,6 +57,17 @@ export function marginalStrength(
   return quality * coverageMultiplier;
 }
 
+/**
+ * Soft OPT brake: the marginal player's strength is damped as the roster approaches and passes the
+ * (GM-modulated) optTarget — a squad-level diminishing return on top of the per-discipline one. This
+ * is the roster-SIZE governor: below opt it's ~1 (buy freely), around opt it halves, a couple slots
+ * past opt it collapses so STOP wins. Elite-small teams (low opt) stop earlier, depth teams later.
+ */
+function rosterFullnessFactor(rosterSize: number, optTarget: number): number {
+  const over = rosterSize - optTarget;
+  return clamp(1 / (1 + Math.exp(1.6 * (over - 0.5))), 0, 1);
+}
+
 /** Salary hurts more when the team is already bleeding cash (negative sustainability margin). */
 function wageStrain(player: OrganicPlayerView, state: OrganicTeamState): number {
   const bleed = Math.max(0, -state.forecast.sustainabilityMargin);
@@ -70,7 +81,8 @@ function wageStrain(player: OrganicPlayerView, state: OrganicTeamState): number 
  */
 export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): number {
   const w = state.weights;
-  const deltaStrength = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights);
+  const fullness = rosterFullnessFactor(state.rosterSize, w.optTarget);
+  const deltaStrength = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights) * fullness;
   const price = Math.max(0, player.marketValue);
   const potential = Math.max(0, player.potential ?? 0);
   return (
