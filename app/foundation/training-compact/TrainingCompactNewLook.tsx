@@ -539,6 +539,7 @@ function NlTrainingPlayerCard({
             <button
               type="button"
               className="nl-training-inline-button"
+              data-testid="training-player-profile-button"
               onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
             >
               Profil öffnen
