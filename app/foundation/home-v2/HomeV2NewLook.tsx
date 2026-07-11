@@ -1,7 +1,9 @@
 "use client";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import type { HomeV2ClientProps, HomeV2TodayCard } from "@/app/foundation/home-v2/home-v2-types";
+import type { HomeV2ClientProps, HomeV2TodayCard, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
+import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import {
   NlCard,
   NlProgressBar,
@@ -69,6 +71,20 @@ function getTodayCardTone(tone: HomeV2TodayCard["tone"]): NlTone {
   if (tone === "warning") return "warn";
   if (tone === "ready") return "good";
   return "accent";
+}
+
+/* --- Top-6 Portraitkarten: identische Zuordnung wie HomeV2Client --- */
+function getPlayerHighlightLabel(card: HomeV2TopPlayerCard) {
+  if (card.highlight === "prospect") return "Talent";
+  if (card.highlight === "top") return "Top";
+  return null;
+}
+
+function getPlayerRankFrameClass(index: number) {
+  if (index === 0) return " is-rank-gold";
+  if (index === 1) return " is-rank-silver";
+  if (index === 2) return " is-rank-bronze";
+  return "";
 }
 
 /* --- Inline-SVG Icons (kein Emoji) ------------------------------- */
@@ -194,6 +210,7 @@ export default function HomeV2NewLook({
   nextStepDetail,
   warnings,
   topPlayers,
+  leagueHeatPools,
   facilities,
   inboxItems,
   inboxCriticalCount = 0,
@@ -301,6 +318,53 @@ export default function HomeV2NewLook({
             </NlCard>
           ))}
         </div>
+      </section>
+
+      {/* --- Top-Kader: Top-6 Portraitkarten (wie im bestehenden Home) --- */}
+      <section className="nl-home-section" aria-label="Top-Kader">
+        <div className="nl-home-section-head">
+          <span className="nl-home-section-icon"><IconUsers /></span>
+          <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
+        </div>
+        {topPlayers.length > 0 ? (
+          <div className="nl-home-portrait-grid">
+            {topPlayers.slice(0, HOME_V2_TOP_PLAYER_COUNT).map((player, index) => (
+              <FoundationPlayerPortraitCard
+                key={player.playerId}
+                playerId={player.playerId}
+                name={player.name}
+                portraitUrl={player.portraitUrl}
+                portraitPlaceholderUrl={player.portraitPlaceholderUrl}
+                portraitInitials={player.portraitInitials}
+                playerOvr={player.playerOvr}
+                playerMvs={player.playerMvs}
+                playerPps={player.playerPps}
+                ovrRank={player.ovrRank}
+                mvsRank={player.mvsRank}
+                ppsRank={player.ppsRank}
+                pow={player.pow}
+                spe={player.spe}
+                men={player.men}
+                soc={player.soc}
+                leagueHeatPools={leagueHeatPools}
+                rosterRank={player.rosterRank}
+                highlight={getPlayerHighlightLabel(player)}
+                rankFrameClass={getPlayerRankFrameClass(index)}
+                caRating={player.caRating}
+                poRangeMin={player.poRangeMin}
+                poRangeMax={player.poRangeMax}
+                variant="home"
+                context="teamGrid"
+                portraitLoading={index < 2 ? "eager" : "lazy"}
+                portraitFetchPriority={index < 2 ? "high" : "auto"}
+                onOpen={() => onOpenPlayer(player.playerId)}
+                title={`${player.name} öffnen · Top-6 Kader #${index + 1}`}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="nl-home-empty-note">Noch keine Kaderdaten.</p>
+        )}
       </section>
 
       <div className="nl-home-grid">
@@ -424,37 +488,6 @@ export default function HomeV2NewLook({
             </ul>
           ) : (
             <p className="nl-home-empty-note">Alles erledigt — keine offenen Entscheidungen.</p>
-          )}
-        </NlCard>
-
-        {/* --- Top-Kader kompakt: StatChip-Vokabular ------------------ */}
-        <NlCard
-          className="nl-home-squad-card"
-          eyebrow={<span className="nl-home-card-eyebrow-icon"><IconUsers /> Kader</span>}
-          title="Top-Kader"
-        >
-          {topPlayers.length > 0 ? (
-            <ul className="nl-home-player-list">
-              {topPlayers.slice(0, 6).map((player) => (
-                <li key={player.playerId}>
-                  <button
-                    type="button"
-                    className="nl-home-player-row"
-                    onClick={() => onOpenPlayer(player.playerId)}
-                    title={`${player.name} öffnen`}
-                  >
-                    <span className="nl-home-player-name">{player.name}</span>
-                    <span className="nl-home-player-chips">
-                      <StatChip label="OVR" value={formatNlNumber(player.playerOvr, 0)} />
-                      <StatChip label="PPs" value={formatNlNumber(player.playerPps, 1)} />
-                      <StatChip label="MW" value={formatNlMoney(player.marketValue)} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="nl-home-empty-note">Noch keine Kaderdaten.</p>
           )}
         </NlCard>
 

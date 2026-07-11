@@ -41430,11 +41430,39 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Feste 12-Spalten-Spur: gleiche Spaltenbreiten + gleiche Zeilenhöhen
+   (align-items: stretch ist der Grid-Default) statt unregelmäßiger
+   auto-fit-Kacheln — behebt das "unaufgeräumte" Raster. */
 .is-new-look .nl-home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--nl-s4);
-  align-items: start;
+}
+
+.is-new-look .nl-home-board-card,
+.is-new-look .nl-home-league-card,
+.is-new-look .nl-home-inbox-card {
+  grid-column: span 4;
+}
+
+.is-new-look .nl-home-facility-card {
+  grid-column: span 12;
+}
+
+@media (max-width: 980px) {
+  .is-new-look .nl-home-board-card,
+  .is-new-look .nl-home-league-card,
+  .is-new-look .nl-home-inbox-card {
+    grid-column: span 12;
+  }
+}
+
+/* --- Top-Kader: Top-6 Portraitkarten (identisch zum bestehenden
+   Home, reponsive über auto-fit statt fixer Spaltenzahl) ---------- */
+.is-new-look .nl-home-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--nl-s4);
 }
 
 .is-new-look .nl-home-board-meta {
