@@ -94,6 +94,7 @@ export type TransfermarktV2NewLookProps = {
   availabilityLabel: string;
   marketBusy: boolean;
   marketError: string | null;
+  onRetryMarket?: () => void;
   buySuccess: string | null;
   onDismissBuySuccess: () => void;
   // Budget-Board
@@ -286,6 +287,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     availabilityLabel,
     marketBusy,
     marketError,
+    onRetryMarket,
     buySuccess,
     onDismissBuySuccess,
     teamCash,
@@ -462,7 +464,19 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             </button>
           </div>
         </div>
-        {marketError ? <p className="nl-market-error">{marketError}</p> : null}
+        {marketError ? (
+          <div className="nl-market-error" role="alert">
+            <div className="nl-market-error-copy">
+              <strong>Transfermarkt konnte nicht geladen werden.</strong>
+              <small>{marketError}</small>
+            </div>
+            {onRetryMarket ? (
+              <button type="button" className="nl-market-pill is-reset" onClick={onRetryMarket}>
+                Erneut laden
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </NlCard>
 
       <div className="nl-market-main-grid">
@@ -536,8 +550,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 Kandidaten laden…
               </p>
             ) : null}
-            {!marketBusy && candidates.length === 0 ? (
+            {!marketBusy && !marketError && candidates.length === 0 ? (
               <p className="nl-market-muted">Keine Kandidaten im aktuellen Filter — Suche oder Limits weiter stellen.</p>
+            ) : null}
+            {!marketBusy && marketError && candidates.length === 0 ? (
+              <p className="nl-market-muted">Feed nicht geladen — oben „Erneut laden“ nutzen.</p>
             ) : null}
           </div>
         </NlCard>

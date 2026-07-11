@@ -2195,7 +2195,7 @@ export default function TransfermarktV2Client({
   }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
   useEffect(() => {
-    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId) {
+    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId || defaultSaveId === "loading-save") {
       return;
     }
 
@@ -2343,7 +2343,7 @@ export default function TransfermarktV2Client({
   }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
-    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSeasonId === "loading") {
+    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSaveId === "loading-save" || defaultSeasonId === "loading") {
       setPoolBracketItems([]);
       setPoolBracketBusy(false);
       return;
@@ -2831,6 +2831,7 @@ export default function TransfermarktV2Client({
         availabilityLabel={availabilityLabel}
         marketBusy={marketBusy}
         marketError={marketError}
+        onRetryMarket={() => setReloadToken((current) => current + 1)}
         buySuccess={buySuccess}
         onDismissBuySuccess={() => setBuySuccess(null)}
         teamCash={marketContext?.teamCash ?? null}
