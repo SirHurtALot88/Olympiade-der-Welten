@@ -2609,8 +2609,11 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
   const activePlayer = input.context.activePlayers.find((entry) =>
     input.activePlayerId ? entry.id === input.activePlayerId : entry.playerId === input.playerId,
   ) ?? null;
-  const attributeVisibility: AttributeVisibility =
-    (input.context.team as { humanControlled?: boolean }).humanControlled === false ? "scouted" : "exact";
+  const attributeVisibility: AttributeVisibility = DEBUG_FORCE_PLAYER_VISIBILITY
+    ? "exact"
+    : (input.context.team as { humanControlled?: boolean }).humanControlled === false
+      ? "scouted"
+      : "exact";
   const playerCatalog = input.playerCatalogById ? [...input.playerCatalogById.values()] : catalogPlayer ? [catalogPlayer] : [];
   const activePlayerIds = Array.from(new Set(input.context.activePlayers.map((entry) => entry.playerId).filter(Boolean)));
   const coreAxisRankMaps = buildCoreAxisRankMaps(playerCatalog, activePlayerIds);
