@@ -15,9 +15,15 @@ import type { PlayerProgressionForecast, PlayerProgressionRatingTier } from "@/l
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
 import {
   officialDisciplineWeightLabels,
+  officialDisciplineWeightOrder,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
-import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
+import {
+  buildLeagueDisciplineRatingsForPlayers,
+  buildLeagueDisciplineRatingsWithAttributeOverrides,
+  calculateRawDisciplineScore,
+  mapRankToDisciplineStat,
+} from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndFacilityPreviewLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -163,6 +169,21 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+/** Count of entries strictly greater than `value` in a descending-sorted array (binary search). */
+function countStrictlyGreater(sortedDescending: number[], value: number) {
+  let lo = 0;
+  let hi = sortedDescending.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedDescending[mid]! > value) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
 }
 
 function getAttributeValue(player: Player, attribute: PlayerGeneratorAttributeName) {
@@ -524,6 +545,72 @@ export function buildSeasonEndProgressionPreview(input: {
       Boolean(entry.player),
     );
   const requestByPlayerId = new Map((input.upgradeRequests ?? []).map((request) => [request.playerId, request] as const));
+
+  // Loop-invariant league-wide discipline ranking, hoisted out of the per-row map below.
+  // Discipline ratings are league-RELATIVE (each player's stat comes from its competition rank of
+  // a weighted attribute score across the whole league). Recomputing the full-league ranking twice
+  // per roster row was O(rosterSize x leagueSize). Instead we compute the no-override league baseline
+  // once, and precompute per-discipline sorted baseline scores so a single-player attribute override
+  // resolves that player's post-upgrade rank via a binary-search count (O(disciplines x log league)).
+  const leagueBaselineDisciplineRatings = buildLeagueDisciplineRatingsForPlayers(input.gameState.players);
+  const baselineDisciplineScoresByPlayerId = new Map<string, Partial<Record<OfficialDisciplineWeightId, number>>>();
+  const sortedBaselineScoresByDiscipline = new Map<OfficialDisciplineWeightId, number[]>();
+  for (const disciplineId of officialDisciplineWeightOrder) {
+    sortedBaselineScoresByDiscipline.set(disciplineId, []);
+  }
+  for (const leaguePlayer of input.gameState.players) {
+    const attributes = toGeneratorAttributes(leaguePlayer);
+    if (!attributes) continue;
+    const scores: Partial<Record<OfficialDisciplineWeightId, number>> = {};
+    for (const disciplineId of officialDisciplineWeightOrder) {
+      const score = calculateRawDisciplineScore(attributes, disciplineId);
+      if (score != null) {
+        scores[disciplineId] = score;
+        sortedBaselineScoresByDiscipline.get(disciplineId)!.push(score);
+      }
+    }
+    baselineDisciplineScoresByPlayerId.set(leaguePlayer.id, scores);
+  }
+  for (const scores of sortedBaselineScoresByDiscipline.values()) {
+    scores.sort((left, right) => right - left);
+  }
+
+  // Equivalent to buildPreviewDisciplineRatingsFromAttributes({ attributesAfter: baselineAttributes,
+  // leaguePlayers: input.gameState.players }): the self-override equals the player's own attributes,
+  // so the league ranking is identical to the no-override baseline.
+  const resolveBaselineDisciplineRatings = (player: Player, baselineAttributes: PlayerGeneratorAttributes | null) => {
+    if (!baselineAttributes) {
+      return player.disciplineRatings ?? {};
+    }
+    return leagueBaselineDisciplineRatings.get(player.id) ?? player.disciplineRatings ?? {};
+  };
+
+  // Equivalent to buildPreviewDisciplineRatingsFromAttributes({ attributesAfter, leaguePlayers: ... }):
+  // only the target player's attributes change, so the target's per-discipline competition rank is
+  // 1 + (league players whose baseline score is strictly greater than the target's post-upgrade score),
+  // excluding the target's own baseline score from that count.
+  const resolvePreviewDisciplineRatings = (player: Player, attributesAfter: PlayerGeneratorAttributes | null) => {
+    if (!attributesAfter) {
+      return player.disciplineRatings ?? {};
+    }
+    const baselineScores = baselineDisciplineScoresByPlayerId.get(player.id);
+    const ratings: Record<string, number> = {};
+    for (const disciplineId of officialDisciplineWeightOrder) {
+      const targetScore = calculateRawDisciplineScore(attributesAfter, disciplineId);
+      if (targetScore == null) continue;
+      const sortedScores = sortedBaselineScoresByDiscipline.get(disciplineId) ?? [];
+      let strictlyGreater = countStrictlyGreater(sortedScores, targetScore);
+      const targetBaselineScore = baselineScores?.[disciplineId];
+      if (targetBaselineScore != null && targetBaselineScore > targetScore) {
+        strictlyGreater -= 1;
+      }
+      const stat = mapRankToDisciplineStat(strictlyGreater + 1);
+      if (stat == null) continue;
+      ratings[disciplineId] = roundValue(stat, 2);
+    }
+    return Object.keys(ratings).length > 0 ? ratings : player.disciplineRatings ?? {};
+  };
+
   const rows: SeasonEndProgressionPreviewRow[] = rosterRows.map(({ player, team }) => {
     const forecast = input.forecastsByPlayerId.get(player.id);
     const organic = input.organicByPlayerId?.get(player.id) ?? null;
@@ -556,17 +643,10 @@ export function buildSeasonEndProgressionPreview(input: {
               : null;
     const shouldBuildAfterPreview = blockReason == null;
     const baselineAttributes = toGeneratorAttributes(player);
-    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: baselineAttributes,
-      leaguePlayers: input.gameState.players,
-    });
-    const previewDisciplineRatings = buildPreviewDisciplineRatings({
-      player,
-      attribute: selectedAttribute,
-      attributeAfter,
-      leaguePlayers: input.gameState.players,
-    });
+    const attributesAfter =
+      attributeAfter == null ? null : toGeneratorAttributes(player, { attribute: selectedAttribute, value: attributeAfter });
+    const baselineDisciplineRatings = resolveBaselineDisciplineRatings(player, baselineAttributes);
+    const previewDisciplineRatings = resolvePreviewDisciplineRatings(player, attributesAfter);
     const disciplineDeltas = buildSeasonEndDisciplineDeltas({
       disciplines: input.gameState.disciplines,
       lastSeasonDisciplineValues: baselineDisciplineRatings,
