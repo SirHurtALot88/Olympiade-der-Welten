@@ -2910,8 +2910,9 @@ export default function TransfermarktV2Client({
         onRemoveWishlist={onRemoveWishlist}
         marketItemsById={marketItemByPlayerId}
         rosterRows={selectedRosterRows}
-        budgetStatusLabel={formatToneLabel(marketContext?.affordabilityStatus)}
-        readinessStatusLabel={formatReadinessLabel(marketContext?.readinessStatus)}
+        disciplines={orderedDisciplines}
+        budgetStatusLabel={marketContext?.affordabilityStatus ? formatToneLabel(marketContext.affordabilityStatus) : null}
+        readinessStatusLabel={marketContext?.readinessStatus ? formatReadinessLabel(marketContext.readinessStatus) : null}
         onSellRow={
           canSellRoster && onSell
             ? (row) =>
