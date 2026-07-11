@@ -3,9 +3,11 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import { SponsorOfferCard } from "@/components/foundation/sponsor/SponsorOfferCard";
+import FoundationSponsorsNewLook from "@/app/foundation/sponsors-v2/FoundationSponsorsNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { GameState, SponsorCommercialRating, SponsorNegotiationProfile, SponsorOffer, SponsorOfferComponent, SponsorTermSeasons, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
-type FoundationSponsorsPanelProps = {
+export type FoundationSponsorsPanelProps = {
   gameState: GameState;
   selectedTeamName: string;
   selectedTeamCommercialRating: SponsorCommercialRating | null;
@@ -31,23 +33,29 @@ type FoundationSponsorsPanelProps = {
   prizeFinanceTab: "sponsors" | "prize";
 };
 
-export default function FoundationSponsorsPanel({
-  gameState,
-  selectedTeamName,
-  selectedTeamCommercialRating,
-  selectedTeamSponsorContract,
-  selectedTeamSponsorOffers,
-  sponsorChoiceMessage,
-  sponsorChoiceProfiles,
-  sponsorChoiceBusy,
-  selectedTeamCanManage,
-  formatMoney,
-  applySponsorNegotiationToComponents,
-  getSponsorNegotiationMultiplier,
-  setSponsorChoiceProfiles,
-  chooseTeamSponsor,
-  prizeFinanceTab,
-}: FoundationSponsorsPanelProps) {
+export default function FoundationSponsorsPanel(props: FoundationSponsorsPanelProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neue Sponsoren-Ansicht mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <FoundationSponsorsNewLook {...props} />;
+
+  const {
+    gameState,
+    selectedTeamName,
+    selectedTeamCommercialRating,
+    selectedTeamSponsorContract,
+    selectedTeamSponsorOffers,
+    sponsorChoiceMessage,
+    sponsorChoiceProfiles,
+    sponsorChoiceBusy,
+    selectedTeamCanManage,
+    formatMoney,
+    applySponsorNegotiationToComponents,
+    getSponsorNegotiationMultiplier,
+    setSponsorChoiceProfiles,
+    chooseTeamSponsor,
+  } = props;
+
   return (
     <div data-testid="foundation-sponsors">
       <section

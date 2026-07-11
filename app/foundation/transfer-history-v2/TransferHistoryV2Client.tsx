@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 
 import ClassIcon from "@/app/foundation/ClassIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
+import TransferHistoryV2NewLook from "@/app/foundation/transfer-history-v2/TransferHistoryV2NewLook";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 export type TransferHistoryV2Row = {
   transferId: string;
@@ -39,7 +41,7 @@ export type TransferHistoryV2Row = {
   remainingContractLength?: number | null;
 };
 
-type TransferHistoryV2ClientProps = {
+export type TransferHistoryV2ClientProps = {
   sourceBadgeLabel: string;
   saveName: string;
   requestedScopeLabel: string;
@@ -90,7 +92,7 @@ type TransferHistoryV2ClientProps = {
   onLoadMore?: () => void;
 };
 
-type ActivityCard = {
+export type ActivityCard = {
   teamId: string;
   teamName: string;
   shortCode: string;
@@ -178,49 +180,54 @@ function getActivitySummary(rows: TransferHistoryV2Row[], teamOptions: TransferH
   });
 }
 
-export default function TransferHistoryV2Client({
-  sourceBadgeLabel,
-  saveName,
-  requestedScopeLabel,
-  resolvedScopeLabel,
-  totalLoaded,
-  totalAvailable,
-  seasonBreakdown,
-  summary,
-  filteredRows,
-  visibleRows,
-  historyVisibleRangeLabel,
-  isAllSeasons,
-  historyPage,
-  historyPageCount,
-  onPrevPage,
-  onNextPage,
-  scopeWarning,
-  error,
-  seasonFilter,
-  allSeasonsValue,
-  seasonOptions,
-  teamFilter,
-  teamOptions,
-  typeFilter,
-  classFilter,
-  sourceFilter,
-  classOptions,
-  sourceOptions,
-  search,
-  onSeasonFilterChange,
-  onTeamFilterChange,
-  onTypeFilterChange,
-  onClassFilterChange,
-  onSourceFilterChange,
-  onSearchChange,
-  onResetFilters,
-  onOpenPlayer,
-  onOpenTeam,
-  hasMore = false,
-  loadingMore = false,
-  onLoadMore,
-}: TransferHistoryV2ClientProps) {
+export default function TransferHistoryV2Client(props: TransferHistoryV2ClientProps) {
+  const {
+    sourceBadgeLabel,
+    saveName,
+    requestedScopeLabel,
+    resolvedScopeLabel,
+    totalLoaded,
+    totalAvailable,
+    seasonBreakdown,
+    summary,
+    filteredRows,
+    visibleRows,
+    historyVisibleRangeLabel,
+    isAllSeasons,
+    historyPage,
+    historyPageCount,
+    onPrevPage,
+    onNextPage,
+    scopeWarning,
+    error,
+    seasonFilter,
+    allSeasonsValue,
+    seasonOptions,
+    teamFilter,
+    teamOptions,
+    typeFilter,
+    classFilter,
+    sourceFilter,
+    classOptions,
+    sourceOptions,
+    search,
+    onSeasonFilterChange,
+    onTeamFilterChange,
+    onTypeFilterChange,
+    onClassFilterChange,
+    onSourceFilterChange,
+    onSearchChange,
+    onResetFilters,
+    onOpenPlayer,
+    onOpenTeam,
+    hasMore = false,
+    loadingMore = false,
+    onLoadMore,
+  } = props;
+  // "Neuer Look" Flag-Gate (additiv): alle Hooks laufen unverändert vor dem
+  // Gate (stabile Hook-Reihenfolge beim Umschalten des Flags); Flag aus =>
+  // bestehende Ansicht unverändert.
+  const [newLook] = useNewLook();
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
   const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
   const timelineListRef = useRef<HTMLDivElement | null>(null);
@@ -268,6 +275,22 @@ export default function TransferHistoryV2Client({
     () => (selectedTransferId ? timelineRows.findIndex((row) => row.transferId === selectedTransferId) : -1),
     [selectedTransferId, timelineRows],
   );
+
+  if (newLook) {
+    return (
+      <TransferHistoryV2NewLook
+        {...props}
+        activityCards={activityCards}
+        mostActiveTeam={mostActiveTeam}
+        biggestBuy={biggestBuy}
+        biggestSale={biggestSale}
+        bestProfit={bestProfit}
+        selectedRow={selectedRow}
+        selectedTransferId={selectedTransferId}
+        onSelectTransfer={setSelectedTransferId}
+      />
+    );
+  }
 
   function moveTimelineSelection(key: "ArrowDown" | "ArrowUp" | "Home" | "End") {
     if (!timelineRows.length) {

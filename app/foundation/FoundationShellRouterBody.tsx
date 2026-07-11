@@ -6,6 +6,9 @@ import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMoun
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
+import { useNewLook } from "@/lib/ui/new-look-preference";
+import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -140,6 +143,7 @@ import {
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
+import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
   DisciplineCategoryFilter,
   FacilityId,
@@ -190,6 +194,7 @@ type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 type MarketSellAreaRow = { key: string; value: number | null; tone: string };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
+  const [newLookEnabled] = useNewLook();
   const {
   activeContextMeta,
   activeContextStatusChips,
@@ -224,6 +229,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   aiTeams,
   applyNewGamePreset,
   bootstrapError,
+  buildTeamDetailDrawerData,
   canonicalSeasonLabel,
   cashApplyFeed,
   changeFoundationSaveMode,
@@ -715,10 +721,36 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   };
 
   const isTeamSettingsViewActive = activeView === "teamSettings";
+
+  // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
+  // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
+  const newLookBreadcrumbData = newLookEnabled ? getFoundationBreadcrumb(activeView as FoundationViewId) : null;
+  const newLookBreadcrumb = newLookBreadcrumbData ? (
+    <nav className="foundation-shell-breadcrumb nl-breadcrumb" aria-label="Brotkrumen-Navigation" data-testid="foundation-breadcrumb">
+      <span className="foundation-shell-breadcrumb-crumb is-root">{newLookBreadcrumbData.group}</span>
+      <span className="foundation-shell-breadcrumb-sep" aria-hidden="true">›</span>
+      <strong className="foundation-shell-breadcrumb-crumb is-view">{newLookBreadcrumbData.view}</strong>
+      {activeView === "teams" && selectedTeam ? (
+        <>
+          <span className="foundation-shell-breadcrumb-sep" aria-hidden="true">›</span>
+          <span className="foundation-shell-breadcrumb-crumb is-context">{selectedTeam.name}</span>
+        </>
+      ) : null}
+    </nav>
+  ) : undefined;
+
+  // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
+  const inboxAllBadgeCount =
+    newLookEnabled && Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
+      ? activeTeamOpenInboxItems.length
+      : null;
+  const teamsRosterBadgeCount =
+    newLookEnabled && Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
+
   return (
     (
     <FoundationSharedProvider>
-    <main className="app-shell foundation-shell foundation-app">
+    <main className={`app-shell foundation-shell foundation-app${newLookEnabled ? " is-new-look" : ""}`}>
       {bootstrapError && gameState?.season?.id === "loading" ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{bootstrapError}</strong>
@@ -756,6 +788,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         onPrefetchView={prefetchFoundationPanel}
         isPending={isPending}
         activities={foundationActivities}
+        breadcrumb={newLookBreadcrumb}
         subNav={
           activeView === "marketV2" ? (
             <FoundationSubNav
@@ -825,7 +858,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
-                { id: "ALL", label: "Alle" },
+                { id: "ALL", label: "Alle", count: inboxAllBadgeCount },
                 { id: "task", label: "Aufgaben" },
                 { id: "warning", label: "Warnungen" },
                 { id: "transfer", label: "Transfers" },
@@ -883,7 +916,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
-                { id: "roster", label: "Kader" },
+                { id: "roster", label: "Kader", count: teamsRosterBadgeCount },
                 { id: "portraits", label: "Portraits" },
                 { id: "contracts", label: "Verträge" },
                 { id: "transfer", label: "Transfers" },
@@ -1490,6 +1523,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </div>
         ) : null}
         <div className="foundation-context-chips" aria-label="Spielstand- und Saisonkontext">
+          <NewLookToggle />
           <span className="pill foundation-context-tag">{resolveScenarioMetaLabel(activeContextMeta)}</span>
           <span className="pill">{formatScenarioTypeLabel(activeContextMeta?.scenarioType)}</span>
           {readMeta.readOnly ? (
@@ -2629,33 +2663,65 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         }
                         if (column.id === "team") {
                           const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
+                          const teamButton = (
+                            <button
+                              className="players-table-team-cell players-table-team-button"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (row.team) {
+                                  openTeamProfileById(row.team.teamId);
+                                }
+                              }}
+                            >
+                              {teamLogo?.src ? (
+                                <BudgetedMediaImage
+                                  className="players-table-team-logo"
+                                  src={teamLogo.src}
+                                  alt={`${row.team?.name ?? "Team"} Logo`}
+                                  loading="lazy"
+                                  fetchPriority="low"
+                                />
+                              ) : (
+                                <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
+                                  {teamLogo?.initials ?? "FA"}
+                                </span>
+                              )}
+                              <span>{row.team?.name ?? "Free Agent"}</span>
+                            </button>
+                          );
+                          const rowTeamId = row.team?.teamId ?? null;
                           return (
                             <td key={column.id}>
-                              <button
-                                className="players-table-team-cell players-table-team-button"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (row.team) {
-                                    openTeamProfileById(row.team.teamId);
-                                  }
-                                }}
-                              >
-                                {teamLogo?.src ? (
-                                  <BudgetedMediaImage
-                                    className="players-table-team-logo"
-                                    src={teamLogo.src}
-                                    alt={`${row.team?.name ?? "Team"} Logo`}
-                                    loading="lazy"
-                                    fetchPriority="low"
-                                  />
-                                ) : (
-                                  <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
-                                    {teamLogo?.initials ?? "FA"}
-                                  </span>
-                                )}
-                                <span>{row.team?.name ?? "Free Agent"}</span>
-                              </button>
+                              {rowTeamId ? (
+                                <FoundationTeamPortraitPreview
+                                  resolveCardData={() => {
+                                    const teamDetail = buildTeamDetailDrawerData(rowTeamId, "full");
+                                    if (!teamDetail) return null;
+                                    return {
+                                      teamId: teamDetail.teamId,
+                                      teamName: teamDetail.teamName,
+                                      shortCode: teamDetail.shortCode,
+                                      logoUrl: teamDetail.logoUrl,
+                                      logoInitials: teamDetail.logoInitials,
+                                      rosterSize: teamDetail.rosterSize,
+                                      cash: teamDetail.cash,
+                                      salaryTotal: teamDetail.salaryTotal,
+                                      marketValueTotal: teamDetail.marketValueTotal,
+                                      powRank: teamDetail.powRank,
+                                      speRank: teamDetail.speRank,
+                                      menRank: teamDetail.menRank,
+                                      socRank: teamDetail.socRank,
+                                      generalManagerName: teamDetail.generalManager?.name ?? null,
+                                      boardConfidence: teamDetail.boardConfidence?.value ?? null,
+                                    };
+                                  }}
+                                >
+                                  {teamButton}
+                                </FoundationTeamPortraitPreview>
+                              ) : (
+                                teamButton
+                              )}
                             </td>
                           );
                         }

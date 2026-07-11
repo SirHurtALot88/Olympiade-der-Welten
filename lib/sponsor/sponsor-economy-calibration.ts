@@ -1,7 +1,11 @@
+import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
 import type { GameState, SponsorArchetype, SponsorOffer, SponsorOfferComponent, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+
+const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
+  rows: Array<{ rank: number | null; prizeMoney: number | null }>;
+};
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
@@ -34,9 +38,8 @@ function loadPrizeMoneyByRank(): Map<number, number> {
   if (prizeMoneyByRankCache) {
     return prizeMoneyByRankCache;
   }
-  const rows = (prizeMoneyNormalized as { rows: Array<{ rank: number | null; prizeMoney: number | null }> }).rows;
   prizeMoneyByRankCache = new Map(
-    rows
+    PRIZE_MONEY_NORMALIZED.rows
       .filter((row) => row.rank != null && row.prizeMoney != null)
       .map((row) => [row.rank as number, row.prizeMoney as number]),
   );

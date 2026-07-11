@@ -9666,6 +9666,7 @@ export function useFoundationShellRouterBodyScope({
     aiTeams,
     applyNewGamePreset,
     bootstrapError,
+    buildTeamDetailDrawerData,
     canonicalSeasonLabel,
     cashApplyFeed,
     changeFoundationSaveMode,

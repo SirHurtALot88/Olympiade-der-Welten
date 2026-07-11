@@ -42,6 +42,12 @@ import { resolveOrganicRegressionCombinedTotal } from "@/lib/training/organic-se
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
+import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
+import { NlSparkline } from "@/components/foundation/new-look";
+import PlayerHeroNewLook from "./PlayerHeroNewLook";
+import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -1201,6 +1207,20 @@ export default function PlayerDetailDrawer({
     [data?.trainingHistoryRows],
   );
 
+  // "Neuer Look" (flag-gated, additive): career series for the Werdegang panel.
+  // With the flag OFF this stays null and nothing new is rendered.
+  const [newLookEnabled] = useNewLook();
+  const foundationState = useFoundationStateOptional();
+  const werdegangGameState = foundationState?.gameState ?? null;
+  const werdegangPlayerId = data?.playerId ?? null;
+  const werdegangSeries = useMemo(
+    () =>
+      newLookEnabled && werdegangGameState && werdegangPlayerId
+        ? buildPlayerCareerSeries(werdegangGameState, werdegangPlayerId)
+        : null,
+    [newLookEnabled, werdegangGameState, werdegangPlayerId],
+  );
+
   if (!data) {
     return null;
   }
@@ -1282,6 +1302,9 @@ export default function PlayerDetailDrawer({
     isPlausibleSalaryDeltaReference(data.salary, data.normalSalary) && Math.abs(data.salary! - data.normalSalary!) >= 0.01
       ? data.salary! - data.normalSalary!
       : null;
+  // "Neuer Look" (flag-gated, additiv): echte CA/PO-Sterne für das Hero-Gauge
+  // nur bei aktivem Flag auflösen — mit Flag OFF bleibt alles unverändert.
+  const newLookCaPo = newLookEnabled ? resolveCaPoDisplay(data) : null;
   const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
     (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
   );
@@ -1392,6 +1415,19 @@ export default function PlayerDetailDrawer({
   const profileContent = (
     <>
           {renderInjuryStatusBanner(data)}
+          {/* "Neuer Look" (flag-gated): ersetzt nur den Identitäts-/Ratings-Header.
+              Mit Flag OFF rendert exakt der bisherige Header — byte-identisch. */}
+          {newLookEnabled ? (
+            <PlayerHeroNewLook
+              data={data}
+              roleLabel={formatRoleTag(transferContext.roleTag)}
+              caStars={newLookCaPo?.caStars ?? null}
+              poStars={newLookCaPo?.poStars ?? null}
+              isFreeAgent={isFreeAgent}
+              onClose={onClose}
+              onOpenLeagueLeaders={onOpenLeagueLeaders}
+            />
+          ) : (
           <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.portraitUrl ? (
@@ -1527,6 +1563,7 @@ export default function PlayerDetailDrawer({
             Schliessen
           </button>
         </div>
+          )}
 
         <div className="player-drawer-body">
           <section className="player-drawer-section player-drawer-hero-surface" id="player-drawer-profile">
@@ -1960,6 +1997,18 @@ export default function PlayerDetailDrawer({
                       ? []
                       : preview?.topDisciplineDeltas ?? [];
                 const showCostChip = data.teamHumanControlled === false ? Boolean(aiPlan) : Boolean(preview);
+                // "Neuer Look" (#61): Mini-Sparkline der realen Attribut-Historie
+                // (`attributeHistoryRows` aus Baseline + organischen Progression-
+                // Events je Saison). Nur für exakt sichtbare Attribute (eigener
+                // Spieler / Scouting maximiert) und nur ab 2 realen Saisonpunkten —
+                // bei einer einzigen Saison erscheint schlicht keine Kurve.
+                const attributeSparkPoints =
+                  newLookEnabled && data.attributeVisibility === "exact" && showExactAttribute
+                    ? data.attributeHistoryRows
+                        .map((row) => (row.attributes as Partial<Record<string, number>>)[entry.key])
+                        .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+                    : [];
+                const showAttributeSparkline = attributeSparkPoints.length >= 2;
                 return (
                   <article
                     key={entry.key}
@@ -1992,6 +2041,22 @@ export default function PlayerDetailDrawer({
                       {attributePrimaryLabel}
                       {showExactAttribute && plannedAttributeDelta ? ` → ${formatValue(plannedNextValue, 0)}` : ""}
                     </strong>
+                    {showAttributeSparkline ? (
+                      <span
+                        className="is-new-look nl-attr-spark"
+                        title={`${entry.label}-Verlauf über ${attributeSparkPoints.length} Saisonpunkte: ${formatValue(
+                          attributeSparkPoints[0],
+                          0,
+                        )} → ${formatValue(attributeSparkPoints[attributeSparkPoints.length - 1], 0)}`}
+                      >
+                        <NlSparkline
+                          points={attributeSparkPoints}
+                          tone="accent"
+                          aria-label={`${entry.label}: Attribut-Verlauf über Saisons`}
+                          className="nl-attr-spark-line"
+                        />
+                      </span>
+                    ) : null}
                     {variant !== "page" ? (
                     <div className="player-drawer-chip-row">
                       {showExactAttribute ? (
@@ -2418,6 +2483,17 @@ export default function PlayerDetailDrawer({
                 {(!isScoutedProfile || scoutingLevel >= 4) && data.developmentInsight?.recommendation ? (
                   <p className="muted">{data.developmentInsight.recommendation}</p>
                 ) : null}
+            </section>
+          ) : null}
+
+          {werdegangSeries ? (
+            <section className="player-drawer-section player-drawer-panel" id="player-drawer-werdegang">
+              <WerdegangPanel
+                variant="player"
+                entityName={data.name}
+                series={werdegangSeries}
+                onOpenLeagueLeaders={onOpenLeagueLeaders}
+              />
             </section>
           ) : null}
 

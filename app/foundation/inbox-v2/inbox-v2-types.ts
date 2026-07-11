@@ -18,6 +18,12 @@ export type InboxV2ClientProps = {
   openCount?: number;
   criticalCount?: number;
   mode?: InboxV2Mode;
+  /**
+   * Optionaler Mode-Umschalter (additiv, aktuell von keinem Mount gesetzt).
+   * Nur die "Neuer Look"-Ansicht rendert dafür eine echte Umschalt-Leiste;
+   * ohne Handler bleibt der Modus rein extern gesteuert.
+   */
+  onModeChange?: (mode: InboxV2Mode) => void;
   categoryFilter?: string;
   onCategoryFilterChange?: (value: string) => void;
   includeDone?: boolean;

@@ -405,6 +405,61 @@ function getIdleTierGlowClass(fitTier: string | null | undefined) {
   }
 }
 
+/**
+ * v1 decision-clarity signals (Einsatzliste).
+ * Feature B — "Vorsprungs-Signal": how decisive is the best pick for a slot vs. the #2 candidate.
+ * Tunable thresholds, ranked from most to least decisive.
+ */
+const LINEUP_LEAD_ALTERNATIVLOS_MIN = 10;
+const LINEUP_LEAD_KLAR_MIN = 4;
+const LINEUP_LEAD_KNAPP_MIN = 1.5;
+
+function getLineupLeadTier(lead: number): { label: string; tone: string } {
+  if (lead >= LINEUP_LEAD_ALTERNATIVLOS_MIN) return { label: "Alternativlos", tone: "is-positive" };
+  if (lead >= LINEUP_LEAD_KLAR_MIN) return { label: "Klar bester", tone: "is-info" };
+  if (lead >= LINEUP_LEAD_KNAPP_MIN) return { label: "Knapp vor #2", tone: "is-neutral" };
+  return { label: "Enges Rennen", tone: "is-risk" };
+}
+
+/**
+ * Feature C — "Lane-Meter": does a candidate's best-case projection favor Diszi 1 or Diszi 2?
+ * Default rendering is a single compact verdict chip (compactLabel/deltaLabel); the two-row
+ * D1/D2 meter is progressive disclosure, revealed on hover/focus of the candidate row (see CSS
+ * `.legacy-lineup-v2-lane-detail`) so the rail stays uncluttered by default.
+ */
+const LINEUP_LANE_FLEX_MAX = 3;
+
+function getLineupLaneVerdict(
+  bestD1: number | null,
+  bestD2: number | null,
+): { compactLabel: string; deltaLabel: string | null; fullLabel: string } | null {
+  if (bestD1 == null && bestD2 == null) return null;
+  if (bestD1 == null) return { compactLabel: "Nur D2", deltaLabel: null, fullLabel: "Nur D2-Projektion bekannt" };
+  if (bestD2 == null) return { compactLabel: "Nur D1", deltaLabel: null, fullLabel: "Nur D1-Projektion bekannt" };
+  const diff = bestD2 - bestD1;
+  if (Math.abs(diff) < LINEUP_LANE_FLEX_MAX) {
+    return { compactLabel: "Flexibel", deltaLabel: null, fullLabel: "Flexibel — D1 und D2 fast gleichauf" };
+  }
+  if (diff > 0) {
+    return { compactLabel: "D2-Typ", deltaLabel: formatSignedDecimalScore(diff), fullLabel: `Stärker in D2 (${formatSignedDecimalScore(diff)})` };
+  }
+  return { compactLabel: "D1-Typ", deltaLabel: formatSignedDecimalScore(-diff), fullLabel: `Stärker in D1 (${formatSignedDecimalScore(-diff)})` };
+}
+
+function LegacyLineupLaneMeterRow({ label, value, maxValue }: { label: string; value: number | null; maxValue: number }) {
+  const hasValue = value != null && Number.isFinite(value);
+  const pct = hasValue ? Math.max(6, Math.min(100, (value / maxValue) * 100)) : 0;
+  return (
+    <span className="legacy-lineup-v2-lane-row">
+      <span className="legacy-lineup-v2-lane-row-label">{label}</span>
+      <span className="legacy-lineup-v2-lane-row-track">
+        {hasValue ? <span className="legacy-lineup-v2-lane-row-fill" style={{ width: `${pct}%` }} /> : null}
+      </span>
+      <span className="legacy-lineup-v2-lane-row-value">{hasValue ? formatDecimalScore(value, 1) : "—"}</span>
+    </span>
+  );
+}
+
 export default function LegacyLineupFocusV2Board({
   context,
   slots,
@@ -1053,6 +1108,16 @@ export default function LegacyLineupFocusV2Board({
                     const slotPreview = slotPreviewByKey.get(slot.key) ?? null;
                     const slotCandidates = slotCandidateSummaryByKey.get(slot.key)?.topCandidates ?? [];
                     const topCandidate = slotCandidates[0] ?? null;
+                    const secondCandidate = slotCandidates[1] ?? null;
+                    const slotLead =
+                      topCandidate?.projectedScore != null
+                        ? Number((topCandidate.projectedScore - (secondCandidate?.projectedScore ?? topCandidate.projectedScore)).toFixed(1))
+                        : null;
+                    const slotLeadTier = slotLead != null ? getLineupLeadTier(slotLead) : null;
+                    const slotLeadMarkerPct =
+                      topCandidate?.projectedScore != null && topCandidate.projectedScore > 0
+                        ? Math.max(4, Math.min(96, ((secondCandidate?.projectedScore ?? topCandidate.projectedScore) / topCandidate.projectedScore) * 100))
+                        : 100;
                     const isActive = activeSlotKey === slot.key;
                     const projected = slotPreview?.projected.totalProjected ?? null;
                     const readiness = getSlotReadinessLabel(Boolean(rosterCard), projected, topCandidate?.projectedScore ?? null);
@@ -1183,6 +1248,20 @@ export default function LegacyLineupFocusV2Board({
                           >
                             {topCandidate.name} · {formatNullableScore(topCandidate.projectedScore)}
                           </button>
+                        ) : null}
+
+                        {slotLead != null && slotLeadTier ? (
+                          <span
+                            className={`legacy-lineup-v2-slot-lead ${slotLeadTier.tone}`}
+                            title={`Vorsprung zu #2: ${formatSignedDecimalScore(slotLead)}`}
+                          >
+                            <span className="legacy-lineup-v2-slot-lead-tag">
+                              {slotLeadTier.label} <strong>{formatSignedDecimalScore(slotLead)}</strong>
+                            </span>
+                            <span className="legacy-lineup-v2-slot-lead-bar" aria-hidden="true">
+                              <span className="legacy-lineup-v2-slot-lead-bar-marker" style={{ left: `${slotLeadMarkerPct}%` }} />
+                            </span>
+                          </span>
                         ) : null}
 
                         {issues[0] ? (
@@ -1363,6 +1442,10 @@ export default function LegacyLineupFocusV2Board({
                         showBestSlotTag && bestSlot && projectedScore != null && bestSlot.projectedScore != null
                           ? Number((bestSlot.projectedScore - projectedScore).toFixed(1))
                           : null;
+                      const laneBestD1 = bestSlotEntries.find((slotEntry) => slotEntry.disciplineSide === "d1")?.projectedScore ?? null;
+                      const laneBestD2 = bestSlotEntries.find((slotEntry) => slotEntry.disciplineSide === "d2")?.projectedScore ?? null;
+                      const laneVerdict = getLineupLaneVerdict(laneBestD1, laneBestD2);
+                      const laneMaxValue = Math.max(laneBestD1 ?? 0, laneBestD2 ?? 0, 0.01);
 
                       return (
                         <div
@@ -1407,6 +1490,18 @@ export default function LegacyLineupFocusV2Board({
                                 <span className="legacy-lineup-v2-best-slot-tag" title="Slot mit der besten Projektion für diesen Spieler">
                                   Bester Slot: {bestSlot.disciplineSide.toUpperCase()}-{bestSlot.slotIndex + 1}
                                   {bestSlotDeltaVsHere != null ? ` (${formatSignedDecimalScore(bestSlotDeltaVsHere)})` : ""}
+                                </span>
+                              ) : null}
+                              {laneVerdict ? (
+                                <span className="legacy-lineup-v2-lane" title={laneVerdict.fullLabel}>
+                                  <span className="legacy-lineup-v2-lane-chip">
+                                    {laneVerdict.compactLabel}
+                                    {laneVerdict.deltaLabel ? ` · ${laneVerdict.deltaLabel}` : ""}
+                                  </span>
+                                  <span className="legacy-lineup-v2-lane-detail" aria-hidden="true">
+                                    <LegacyLineupLaneMeterRow label="D1" value={laneBestD1} maxValue={laneMaxValue} />
+                                    <LegacyLineupLaneMeterRow label="D2" value={laneBestD2} maxValue={laneMaxValue} />
+                                  </span>
                                 </span>
                               ) : null}
                               {activeSlotScoreScale && projectedScore != null ? (

@@ -2,9 +2,11 @@
 
 import type * as React from "react";
 
+import FoundationRanksNewLook from "@/app/foundation/ranks-v2/FoundationRanksNewLook";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import type { SortState } from "@/lib/foundation/tabs/cockpit-types";
 import type { Team } from "@/lib/data/olyDataTypes";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 export interface FoundationRanksPanelProps {
   sortedPpAreaRows: Array<{
@@ -44,16 +46,22 @@ export interface FoundationRanksPanelProps {
   }>;
 }
 
-export default function FoundationRanksPanel({
-  sortedPpAreaRows,
-  ppAreaRankClassMaps,
-  ppAreaMetricPools,
-  tableSorts,
-  toggleTableSort,
-  openTeamProfileById,
-  renderPpAreaMetricCell,
-  SortableHeader,
-}: FoundationRanksPanelProps) {
+export default function FoundationRanksPanel(props: FoundationRanksPanelProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neues Leaderboard mit
+  // denselben Props; Flag aus => bestehende Tabelle unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <FoundationRanksNewLook {...props} />;
+
+  const {
+    sortedPpAreaRows,
+    ppAreaRankClassMaps,
+    ppAreaMetricPools,
+    tableSorts,
+    toggleTableSort,
+    openTeamProfileById,
+    renderPpAreaMetricCell,
+    SortableHeader,
+  } = props;
   return (
     <section className="panel foundation-ranks-panel" data-testid="foundation-ranks" id="foundation-ranks">
             <div className="panel-header">

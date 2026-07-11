@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/foundation/EmptyState";
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
+import TransfermarktV2NewLook from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -65,6 +66,7 @@ import {
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
@@ -156,7 +158,7 @@ type PoolBracketSortState = {
   key: PoolBracketSortKey;
   direction: "asc" | "desc";
 };
-type TransfermarktV2RosterRow = {
+export type TransfermarktV2RosterRow = {
   activePlayerId: string;
   playerId: string;
   teamId: string;
@@ -1170,6 +1172,10 @@ export default function TransfermarktV2Client({
   onSell,
   roomContext: roomContextProp = null,
 }: TransfermarktV2ClientProps) {
+  // "Neuer Look" Flag (additiv): der Hook läuft immer, das eigentliche Gate
+  // sitzt unten direkt vor dem Haupt-Return — nach ALLEN Hooks, damit die
+  // Hook-Reihenfolge beim Umschalten des Flags stabil bleibt.
+  const [newLook] = useNewLook();
   const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
   useEffect(() => {
     roomContextRef.current = roomContextProp ?? readFoundationRoomContextFromLocation();
@@ -2813,6 +2819,159 @@ export default function TransfermarktV2Client({
 
     return `${parts.join(" · ")} = ${formatCompactNumber(breakdown.totalScore, 0)}`;
   }, [selectedPlayer]);
+
+  // "Neuer Look" Gate (additiv): alle Hooks oben sind gelaufen, ab hier nur
+  // noch Darstellung. Flag aus => bestehendes Markup unverändert.
+  if (newLook) {
+    const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId));
+    return (
+      <TransfermarktV2NewLook
+        teamName={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
+        teamShortCode={selectedTeam?.shortCode ?? null}
+        availabilityLabel={availabilityLabel}
+        marketBusy={marketBusy}
+        marketError={marketError}
+        buySuccess={buySuccess}
+        onDismissBuySuccess={() => setBuySuccess(null)}
+        teamCash={marketContext?.teamCash ?? null}
+        teamSalaryTotal={marketContext?.teamSalary ?? null}
+        rosterCount={marketContext?.rosterCount ?? null}
+        rosterLimit={selectedTeam?.rosterLimit ?? null}
+        rosterGapOpenCount={rosterGapOpenCount}
+        search={search}
+        onSearchChange={setSearch}
+        sortMode={sortMode}
+        onSortModeChange={(mode) => setSortMode(mode)}
+        selectedClassAxes={selectedClassAxes}
+        onToggleClassAxis={(axis) => setSelectedClassAxes((current) => toggleSelection(current, axis))}
+        onResetFilters={resetMarketFilters}
+        activeFilterCount={selectedClassNames.length + selectedRaceNames.length + selectedAxes.length + selectedClassAxes.length}
+        candidates={renderedVisibleItems}
+        totalVisibleCount={visibleItems.length}
+        selectedPlayerId={selectedPlayer?.playerId ?? null}
+        onSelectCandidate={(playerId) => {
+          shouldFocusSelectedCandidateRef.current = false;
+          setSelectedPlayerId(playerId);
+        }}
+        selectedPlayer={selectedPlayer}
+        onOpenPlayerDetails={onOpenPlayerDetails}
+        onOpenDeal={openBuyModal}
+        dealOpenDisabledReason={dealOpenDisabledReason}
+        buyBusy={buyBusy}
+        selectedPlayerWishlisted={selectedPlayerWishlisted}
+        wishlistDisabledReason={wishlistDisabledReason}
+        onToggleSelectedWishlist={() => {
+          if (selectedPlayer) {
+            onToggleWishlist?.(selectedPlayer);
+          }
+        }}
+        selectedPlayerScoutingWatched={selectedPlayerScoutingWatched}
+        scoutingWatchDisabledReason={scoutingWatchDisabledReason}
+        onToggleSelectedScoutingWatch={() => {
+          if (selectedPlayer) {
+            onToggleScoutingWatch?.(selectedPlayer);
+          }
+        }}
+        selectedPlayerScoutCertainty={selectedPlayerScoutCertainty}
+        contractLength={contractLength}
+        onContractLengthChange={setContractLength}
+        previewError={previewError}
+        buyPreviewCanBuy={buyPreview?.canBuy ?? null}
+        previewPurchasePrice={previewPurchasePrice}
+        previewSalaryLabel={previewSalaryLabel}
+        previewCashBefore={previewCashBefore}
+        previewCashAfter={previewCashAfter}
+        previewTeamSalaryBefore={previewTeamSalaryBefore}
+        previewTeamSalaryAfter={previewTeamSalaryAfter}
+        previewRosterBefore={previewRosterBefore}
+        previewRosterAfter={previewRosterAfter}
+        previewMarketValueBefore={previewMarketValueBefore}
+        previewMarketValueAfter={previewMarketValueAfter}
+        buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
+        buyWarnings={(buyPreview?.warnings ?? []).map(formatNegotiationSignalLabel)}
+        topSixCount={topSixCount}
+        topSixAxisImpact={topSixAxisImpact}
+        topSixCompositeBefore={topSixCompositeBefore}
+        topSixCompositeDelta={topSixCompositeDelta}
+        topSixAxisRankEstimates={topSixAxisRankEstimates}
+        selectedScoutingConfidence={selectedScoutingConfidence}
+        disciplineImpact={selectedTopDisciplineImpact}
+        wishlistAxes={wishlistAxes}
+        wishlistDisciplines={wishlistDisciplines}
+        wishlistEntries={selectedWishlistEntries}
+        scoutingIntelByPlayerId={scoutingIntelByPlayerId}
+        scoutingActiveWishlistPlayerIds={scoutingActiveWishlistPlayerIds}
+        scoutingPipelineCapacity={scoutingPipelineCapacity}
+        onFocusWishlistEntry={(entry) => {
+          void focusWishlistEntry(entry);
+        }}
+        onOpenWishlistDeal={openWishlistDeal}
+        onRemoveWishlist={onRemoveWishlist}
+        marketItemsById={marketItemByPlayerId}
+        rosterRows={selectedRosterRows}
+        budgetStatusLabel={formatToneLabel(marketContext?.affordabilityStatus)}
+        readinessStatusLabel={formatReadinessLabel(marketContext?.readinessStatus)}
+        onSellRow={
+          canSellRoster && onSell
+            ? (row) =>
+                onSell({
+                  activePlayerId: row.activePlayerId,
+                  playerId: row.playerId,
+                  playerName: row.name,
+                  className: row.className,
+                  race: row.race ?? null,
+                  portraitUrl: row.portraitUrl ?? null,
+                })
+            : null
+        }
+        historyItems={historyItems}
+        buyModalOpen={buyModalOpen}
+        buyModalSlot={
+          <FoundationShellRouterMarketBuy
+            active={buyModalOpen}
+            hostProps={{
+              buyModalRef,
+              buyModalBodyRef,
+              source,
+              selectedTeam,
+              selectedPlayer,
+              buyModalWishlistEntry,
+              selectedPortrait,
+              selectedTeamCanManage,
+              selectedTeamId,
+              buyPreview,
+              previewBusy,
+              previewError,
+              buyBusy,
+              buySuccess,
+              buyNegotiationOutcome,
+              contractLength,
+              contractShape,
+              offeredSalary,
+              salaryEditedManually,
+              derivationsInput: {
+                source,
+                selectedTeamCanManage,
+                selectedTeamReadOnlyReason,
+                selectedTeamId,
+                previewBusy,
+                buyBusy,
+              },
+              onContractLengthChange: setContractLength,
+              onContractShapeChange: setContractShape,
+              onOfferedSalaryChange: setOfferedSalary,
+              onSalaryEditedManuallyChange: setSalaryEditedManually,
+              onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
+              closeBuyModal,
+              negotiateBuy,
+              confirmBuy,
+              resetBuyDemandFrame,
+            }}
+          />
+        }
+      />
+    );
+  }
 
   return (
     <section className={`market-v2-shell${buyModalOpen ? " is-offer-mode" : ""}`}>

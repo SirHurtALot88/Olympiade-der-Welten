@@ -134,6 +134,9 @@ export function useSeasonV2PanelModel({
           rosterCount: row.rosterCount ?? 0,
           avgContractLength: row.avgContractLength ?? null,
           isSelected: selectedTeamId === row.teamId,
+          // Saisonübergreifende Rang-/Punkte-Historie (nur vom "Neuer
+          // Look"-Saisonstand gelesen; der bestehende Render ignoriert sie).
+          historicalPointsBySeason: row.historicalPointsBySeason ?? [],
         };
       }),
     [gameState, selectedTeamId, sortedSeasonStandRows],

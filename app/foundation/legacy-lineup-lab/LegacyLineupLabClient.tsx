@@ -5,6 +5,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import LegacyLineupFocusV2Board from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
+import LineupNewLook from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
 import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
@@ -1920,6 +1922,9 @@ function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: 
 
 export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps) {
   const uiVariant = props.uiVariant ?? "classic";
+  // "Neuer Look" Flag (additiv): Hook läuft unverändert vor allen anderen Hooks;
+  // das eigentliche Gate sitzt NACH allen Hooks/Derivations (siehe vor `const inner`).
+  const [newLook] = useNewLook();
   const [params, setParams] = useState(() => defaultParamsFromProps(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
   const [options, setOptions] = useState<LabOptions>({
@@ -1965,7 +1970,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
   const [focusV2CandidateTab, setFocusV2CandidateTab] = useState<LegacyLineupCandidateTab>("all");
-  const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("all");
+  // v1 decision-clarity default: land on "Frei" (undeployed players) so the rail leads with the
+  // players who still need a slot — each already carries its "Bester Slot"-Empfehlung. Users can
+  // still switch back to "Alle"/"Eingesetzt"/"Blockiert" via the Teamdeck-Filter buttons.
+  const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("free");
   const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("fit");
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
   const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(false);
@@ -6903,6 +6911,135 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       isExpertModeEnabled ? "true" : "false",
     );
   }, [isExpertModeEnabled]);
+
+  // "Neuer Look" Flag-Gate (additiv): alle Hooks und Derivations sind an dieser
+  // Stelle bereits gelaufen (stabile Hook-Reihenfolge beim Umschalten). Der neue
+  // Squad-Builder konsumiert dieselben abgeleiteten Daten und ruft dieselben
+  // Handler auf wie der focusV2-Pfad; Flag aus => bestehende Ansicht unverändert.
+  if (newLook) {
+    return (
+      <LineupNewLook
+        context={context}
+        slots={slots}
+        selections={selections}
+        activeSlotKey={activeSlot?.key ?? null}
+        nextOpenSlotKey={nextOpenSlotKey}
+        onActiveSlotChange={(slotKey) => {
+          setActiveSlotKey(slotKey);
+          const slot = slots.find((entry) => entry.key === slotKey);
+          if (slot) {
+            setFocusedDisciplineSide(slot.disciplineSide);
+          }
+        }}
+        rosterCardByActivePlayerId={rosterCardByActivePlayerId}
+        slotCandidateSummaryByKey={slotCandidateSummaryByKey}
+        slotPreviewByKey={slotPreviewByKey}
+        slotRoleByKey={slotRoleByKey}
+        slotIssuesByKey={slotIssuesByKey}
+        candidateGroups={teamdeckCandidateGroups}
+        candidateTab={focusV2CandidateTab}
+        onCandidateTabChange={setFocusV2CandidateTab}
+        playerBestSlotSummaryByActivePlayerId={playerBestSlotSummaryByActivePlayerId}
+        captains={captains}
+        captainSelectEntriesBySide={{
+          d1: getCaptainSelectEntriesForSide("d1"),
+          d2: getCaptainSelectEntriesForSide("d2"),
+        }}
+        captainInfoBySide={captainCandidateInfoBySide}
+        captainDraftRemaining={captainDraftRemaining}
+        captainSeasonUsedWithDraft={captainSeasonUsedWithDraft}
+        captainSeasonLimit={captainSeasonLimit}
+        onUpdateCaptain={updateCaptain}
+        lineupMeta={lineupMeta}
+        d1Rank={d1Rank}
+        d2Rank={d2Rank}
+        getSelectedOptionMeta={getSelectedOptionMeta}
+        assignPulse={lineupAssignPulse}
+        onAssignPlayer={(slotKey, activePlayerId) => {
+          updateSelection(slotKey, activePlayerId, { advanceFocusToNextOpenSlot: true });
+          const slot = slots.find((entry) => entry.key === slotKey);
+          if (slot) {
+            setFocusedDisciplineSide(slot.disciplineSide);
+          }
+        }}
+        onClearSlot={(slotKey) => updateSelection(slotKey, "")}
+        onOpenPlayer={(playerId, activePlayerId) => openPlayerDetails(playerId, activePlayerId)}
+        isReadOnly={isReadOnly}
+        isBusy={isBusy}
+        matchdayPreviewCards={matchdayPreviewCards}
+        lineupFlowSummary={lineupFlowSummary}
+        lineupSaveCta={lineupSaveCta}
+        lineupReadyToSave={lineupReadyToSave}
+        lineupFinishItems={lineupFinishItems}
+        formatProjectedMetricWindow={formatProjectedMetricWindow}
+        onFocusNextOpenSlot={focusNextOpenSlot}
+        onAutoFillOpenSlots={handleAutoFillOpenSlots}
+        onSaveDraft={() => void handleSaveDraft()}
+        getDisciplineIntensity={getDisciplineIntensity}
+        onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
+        playerFilter={playerFilter}
+        onPlayerFilterChange={setPlayerFilter}
+        arenaReady={focusV2ArenaReady}
+        onNavigateArena={
+          props.onOpenArena
+            ? () => {
+                if (typeof window !== "undefined") {
+                  window.sessionStorage.setItem("lineup-v2-arena-handoff", "1");
+                }
+                props.onOpenArena?.({
+                  saveId: params.saveId,
+                  seasonId: params.seasonId,
+                  matchdayId: params.matchdayId,
+                  teamId: params.teamId,
+                });
+              }
+            : undefined
+        }
+        disciplineTacticPreviewBySide={focusV2DisciplineTacticPreviewBySide}
+        recentlyAssignedSlotKey={recentlyAssignedSlotKey}
+        undoInfo={lineupUndoSnapshot ? { label: lineupUndoSnapshot.label, detail: lineupUndoSnapshot.detail } : null}
+        onUndo={restoreLineupUndo}
+        statusMessage={message}
+        errors={errors}
+        controlsSlot={
+          <>
+            <label>
+              <span>Spieltag</span>
+              <select
+                className={`input legacy-lineup-select${selectedMatchdayIsReady ? " is-complete" : ""}`}
+                value={params.matchdayId}
+                onChange={(event) => void loadContext({ matchdayId: event.target.value }, source)}
+              >
+                {options.matchdays.map((matchday) => (
+                  <option key={matchday.id} value={matchday.id}>
+                    {formatMatchdayOptionLabel(matchday)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Team</span>
+              <select
+                className={`input legacy-lineup-select${selectedTeamIsReady ? " is-complete" : ""}`}
+                value={params.teamId}
+                onChange={(event) => {
+                  const nextTeamId = event.target.value;
+                  props.onTeamChange?.(nextTeamId);
+                  void loadContext({ teamId: nextTeamId }, source);
+                }}
+              >
+                {filteredTeamOptions.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {formatTeamOptionLabel(team)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        }
+      />
+    );
+  }
 
   const inner = (
     <div className="stack legacy-lineup-lab-grid is-draft-workspace">

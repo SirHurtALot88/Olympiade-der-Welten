@@ -11,6 +11,11 @@ import { groupObjectivesByCategory } from "@/lib/foundation/team-board-objective
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTypes";
 
+import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
+import { buildTeamCareerSeries } from "@/lib/foundation/career-series";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
+import { useNewLook } from "@/lib/ui/new-look-preference";
+
 import { getClassColorClassName } from "./ClassColorChip";
 import OptimizedMediaImage from "./OptimizedMediaImage";
 
@@ -399,6 +404,20 @@ export default function TeamDetailDrawer({
     [data?.objectives],
   );
 
+  // "Neuer Look" (flag-gated, additive): season-over-season career series for
+  // the Werdegang panel. With the flag OFF this stays null and nothing changes.
+  const [newLookEnabled] = useNewLook();
+  const foundationState = useFoundationStateOptional();
+  const werdegangGameState = foundationState?.gameState ?? null;
+  const werdegangTeamId = data?.teamId ?? null;
+  const werdegangSeries = useMemo(
+    () =>
+      newLookEnabled && werdegangGameState && werdegangTeamId
+        ? buildTeamCareerSeries(werdegangGameState, werdegangTeamId)
+        : null,
+    [newLookEnabled, werdegangGameState, werdegangTeamId],
+  );
+
   if (!data) {
     return null;
   }
@@ -587,6 +606,11 @@ export default function TeamDetailDrawer({
               </div>
             ) : null}
           </section>
+          {werdegangSeries ? (
+            <section className="player-drawer-section player-drawer-panel" id="team-drawer-werdegang">
+              <WerdegangPanel variant="team" entityName={data.teamName} series={werdegangSeries} />
+            </section>
+          ) : null}
           </>
           ) : null}
 

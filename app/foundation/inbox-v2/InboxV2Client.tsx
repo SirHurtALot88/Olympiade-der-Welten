@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 
+import InboxV2NewLook from "@/app/foundation/inbox-v2/InboxV2NewLook";
 import type { InboxV2ClientProps } from "@/app/foundation/inbox-v2/inbox-v2-types";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 const INBOX_DECISION_CATEGORY_FILTERS = [
   { value: "ALL", label: "Alle" },
@@ -23,29 +25,35 @@ const INBOX_CHRONICLE_CATEGORY_FILTERS = [
   { value: "transfer", label: "Transfers" },
 ] as const;
 
-export default function InboxV2Client({
-  items,
-  selectedItemId,
-  onSelectItem,
-  teamLabel,
-  openCount = 0,
-  criticalCount = 0,
-  mode = "decisions",
-  categoryFilter = "ALL",
-  onCategoryFilterChange,
-  includeDone = false,
-  onIncludeDoneChange,
-  includeDismissed = false,
-  onIncludeDismissedChange,
-  onRunChoice,
-  onMarkDone,
-  onDismiss,
-  hideCategoryFilters = false,
-}: InboxV2ClientProps) {
+export default function InboxV2Client(props: InboxV2ClientProps) {
+  const {
+    items,
+    selectedItemId,
+    onSelectItem,
+    teamLabel,
+    openCount = 0,
+    criticalCount = 0,
+    mode = "decisions",
+    categoryFilter = "ALL",
+    onCategoryFilterChange,
+    includeDone = false,
+    onIncludeDoneChange,
+    includeDismissed = false,
+    onIncludeDismissedChange,
+    onRunChoice,
+    onMarkDone,
+    onDismiss,
+    hideCategoryFilters = false,
+  } = props;
+  // "Neuer Look" Flag-Gate (additiv): Hooks laufen unverändert vor dem
+  // Gate (stabile Hook-Reihenfolge beim Umschalten des Flags); Flag aus
+  // => bestehende Liste/Detail-Ansicht unverändert.
+  const [newLook] = useNewLook();
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
     [items, selectedItemId],
   );
+  if (newLook) return <InboxV2NewLook {...props} />;
   const categoryFilters = mode === "chronicle" ? INBOX_CHRONICLE_CATEGORY_FILTERS : INBOX_DECISION_CATEGORY_FILTERS;
   const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
   const emptyLabel =

@@ -8,6 +8,8 @@ import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { useSeasonPreviewDerivations } from "@/lib/foundation/tabs/use-season-preview-derivations";
 import type { ColumnVisibilityManager as ColumnVisibilityManagerComponent, SortableHeader as SortableHeaderComponent } from "@/components/foundation/FoundationTableUi";
+import { useNewLook } from "@/lib/ui/new-look-preference";
+import SeasonPreviewNewLook from "@/app/foundation/season-preview-v2/SeasonPreviewNewLook";
 
 type ColumnVisibilityManagerProps = ComponentProps<typeof ColumnVisibilityManagerComponent>;
 
@@ -43,34 +45,37 @@ export type FoundationSeasonPreviewShellHostProps = {
  * Season preview shell host (Strangler Phase 5.3). Mounts standings preview panel
  * only while the seasonPreview tab is active.
  */
-export default function FoundationSeasonPreviewShellHost({
-  activeSaveId,
-  gameState,
-  standingsPreviewFeed,
-  tableColumnPreferences,
-  tableSorts,
-  isTableColumnVisible,
-  setTableColumnVisible,
-  getTableColumnWidth,
-  getTableHeaderDragProps,
-  startTableColumnResize,
-  resetTableColumnWidth,
-  toggleTableSort,
-  getTablePinnedLeftIds,
-  getTablePinnedRightIds,
-  ColumnVisibilityManager,
-  SortableHeader,
-  openTeamProfileById,
-}: FoundationSeasonPreviewShellHostProps) {
+export default function FoundationSeasonPreviewShellHost(props: FoundationSeasonPreviewShellHostProps) {
   const { standingsPreviewColumns, visibleStandingsPreviewColumns, sortedStandingsPreviewRows } =
     useSeasonPreviewDerivations({
-      standingsPreviewFeed,
-      tableColumnPreferences,
-      standingsPreviewSort: tableSorts.standingsPreview,
-      isTableColumnVisible,
-      getTablePinnedLeftIds,
-      getTablePinnedRightIds,
+      standingsPreviewFeed: props.standingsPreviewFeed,
+      tableColumnPreferences: props.tableColumnPreferences,
+      standingsPreviewSort: props.tableSorts.standingsPreview,
+      isTableColumnVisible: props.isTableColumnVisible,
+      getTablePinnedLeftIds: props.getTablePinnedLeftIds,
+      getTablePinnedRightIds: props.getTablePinnedRightIds,
     });
+  // "Neuer Look" Flag-Gate (additiv): Flag an => Projektions-Board mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <SeasonPreviewNewLook {...props} />;
+
+  const {
+    activeSaveId,
+    gameState,
+    standingsPreviewFeed,
+    tableSorts,
+    isTableColumnVisible,
+    setTableColumnVisible,
+    getTableColumnWidth,
+    getTableHeaderDragProps,
+    startTableColumnResize,
+    resetTableColumnWidth,
+    toggleTableSort,
+    ColumnVisibilityManager,
+    SortableHeader,
+    openTeamProfileById,
+  } = props;
 
   return (
     <section className="panel" id="standings-preview">

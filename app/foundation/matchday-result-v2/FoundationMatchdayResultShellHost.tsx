@@ -10,6 +10,8 @@ import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing"
 import type { MatchdaySummary, MatchdaySummaryTeamRow } from "@/lib/foundation/matchday-summary";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import { useMatchdayResultDerivations } from "@/lib/foundation/tabs/use-matchday-result-derivations";
+import { useNewLook } from "@/lib/ui/new-look-preference";
+import MatchdayResultNewLook from "@/app/foundation/matchday-result-v2/MatchdayResultNewLook";
 
 function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -52,20 +54,26 @@ export type FoundationMatchdayResultShellHostProps = {
  * Matchday result shell host (Strangler Phase 5.3). Mounts result-only tab state
  * and full Spieltagsergebnis panel only while the matchdayResult tab is active.
  */
-export default function FoundationMatchdayResultShellHost({
-  sourceBadgeLabel,
-  matchdaySummary,
-  activeMatchdaySummaryId,
-  matchdaySummaryOptions,
-  activeTeamMatchdaySummaryRow,
-  activeManagerTeamId,
-  selectedTeam,
-  resolvedTeamControlSettings,
-  setSelectedMatchdaySummaryId,
-  setActiveView,
-  openTeamProfileById,
-}: FoundationMatchdayResultShellHostProps) {
+export default function FoundationMatchdayResultShellHost(props: FoundationMatchdayResultShellHostProps) {
   const { matchdaySummaryTab, setMatchdaySummaryTab } = useMatchdayResultDerivations();
+  // "Neuer Look" Flag-Gate (additiv): Flag an => Ergebnis-Bühne + Board mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <MatchdayResultNewLook {...props} />;
+
+  const {
+    sourceBadgeLabel,
+    matchdaySummary,
+    activeMatchdaySummaryId,
+    matchdaySummaryOptions,
+    activeTeamMatchdaySummaryRow,
+    activeManagerTeamId,
+    selectedTeam,
+    resolvedTeamControlSettings,
+    setSelectedMatchdaySummaryId,
+    setActiveView,
+    openTeamProfileById,
+  } = props;
 
   return (
     <section className="panel" id="foundation-matchday-result" data-testid="foundation-matchday-result">

@@ -6,8 +6,10 @@ import { FoundationCard } from "@/components/foundation/FoundationCard";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import FoundationGameDecisionBoard from "@/components/foundation/modern-game/FoundationGameDecisionBoard";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import HomeV2NewLook from "@/app/foundation/home-v2/HomeV2NewLook";
 import type { HomeV2ClientProps, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -61,45 +63,51 @@ function buildDevelopmentHighlights(topPlayers: HomeV2TopPlayerCard[]) {
   return { winners, risks };
 }
 
-export default function HomeV2Client({
-  teamName,
-  teamCode,
-  teamLogoUrl,
-  teamLogoInitials,
-  seasonName,
-  matchdayLabel,
-  controlModeLabel,
-  rank,
-  points,
-  cash,
-  salaryTotal,
-  guv,
-  rosterCount,
-  gmStoryLabel,
-  gmStoryTone,
-  boardPressure,
-  boardRating,
-  boardObjectives,
-  nextStepLabel,
-  nextStepStatus,
-  warnings,
-  topPlayers,
-  leagueHeatPools,
-  facilities,
-  inboxItems,
-  inboxCriticalCount = 0,
-  todayCards,
-  onContinue,
-  onOpenLineup,
-  onOpenMarket,
-  onOpenTraining,
-  onOpenOffice,
-  onOpenSeason,
-  onOpenInbox,
-  onCompleteInboxItem,
-  onOpenBoardObjectives,
-  onOpenPlayer,
-}: HomeV2ClientProps) {
+export default function HomeV2Client(props: HomeV2ClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => neues Cockpit mit
+  // denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <HomeV2NewLook {...props} />;
+
+  const {
+    teamName,
+    teamCode,
+    teamLogoUrl,
+    teamLogoInitials,
+    seasonName,
+    matchdayLabel,
+    controlModeLabel,
+    rank,
+    points,
+    cash,
+    salaryTotal,
+    guv,
+    rosterCount,
+    gmStoryLabel,
+    gmStoryTone,
+    boardPressure,
+    boardRating,
+    boardObjectives,
+    nextStepLabel,
+    nextStepStatus,
+    warnings,
+    topPlayers,
+    leagueHeatPools,
+    facilities,
+    inboxItems,
+    inboxCriticalCount = 0,
+    todayCards,
+    onContinue,
+    onOpenLineup,
+    onOpenMarket,
+    onOpenTraining,
+    onOpenOffice,
+    onOpenSeason,
+    onOpenInbox,
+    onCompleteInboxItem,
+    onOpenBoardObjectives,
+    onOpenPlayer,
+  } = props;
   const visibleTodayCards = todayCards.slice(0, 3);
   const primaryTodayCard = visibleTodayCards[0] ?? null;
   const developmentHighlights = buildDevelopmentHighlights(topPlayers);
