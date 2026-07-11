@@ -56,6 +56,8 @@ export type ScoutingReportData = {
   axisImpactComposite: { before: number | null; after: number | null; delta: number | null };
   disciplineImpact: TransfermarktDisciplineTopSixImpactRow[];
   disciplineTiers: ScoutingReportDisciplineTier[];
+  /** Absolute current rating (0..99). Feeds the shared CA→stars scale (matches PO/roster/drawer). */
+  caRating: number | null;
   caDisplay: string | null;
   poDisplay: string | null;
   poPotentialRating: number | null;
@@ -76,6 +78,17 @@ export type ScoutingReportData = {
  * POW/SPE/MEN/SOC, CA/PO stars, and revealed traits — gated by the same
  * fog-of-war rules used across Transfermarkt.
  */
+/** Absolute current rating for the shared CA→stars scale: OVR → rating → mean of core stats. */
+function resolveAbsoluteCurrentRating(player: GameState["players"][number]): number | null {
+  if (typeof player.ovr === "number" && Number.isFinite(player.ovr)) return player.ovr;
+  if (typeof player.rating === "number" && Number.isFinite(player.rating)) return player.rating;
+  const coreValues = Object.values(player.coreStats ?? {}).filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  if (coreValues.length === 0) return null;
+  return coreValues.reduce((sum, value) => sum + value, 0) / coreValues.length;
+}
+
 export function buildScoutingReport(input: {
   gameState: GameState;
   teamId: string;
@@ -218,6 +231,7 @@ export function buildScoutingReport(input: {
     axisImpactComposite,
     disciplineImpact,
     disciplineTiers,
+    caRating: resolveAbsoluteCurrentRating(player),
     caDisplay: starFields.caDisplay ?? null,
     poDisplay: starFields.poDisplay ?? null,
     poPotentialRating,

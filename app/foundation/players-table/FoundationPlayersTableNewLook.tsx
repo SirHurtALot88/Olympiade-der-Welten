@@ -383,6 +383,11 @@ export default function FoundationPlayersTableNewLook({
             context="teamGrid"
             playerClassName={row.player.className}
             subMeta={row.team?.name ?? "Free Agent"}
+            previewDensity="full"
+            newLook
+            known={false}
+            caScore={row.playerOvr}
+            poScore={row.player.potential ?? null}
           >
             {portrait.src ? (
               <BudgetedMediaImage

@@ -743,6 +743,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
                     {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay ? (
                       <NlAbilityStars
+                        caScore={selectedPlayer.ovr}
                         caStars={selectedPlayer.axisStarsOverall ?? selectedPlayer.axisStarsDisplay}
                         poStarRange={
                           selectedPlayer.potentialStarsMin != null && selectedPlayer.potentialStarsMax != null

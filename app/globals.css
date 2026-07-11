@@ -32416,7 +32416,7 @@ button.market-v2-bucket-card.is-selected {
   color: rgba(103, 89, 61, 0.58);
 }
 
-/* NlAbilityStars — shared CA/PO star+number renderer (see components/foundation/velo-ui/NlAbilityStars.tsx).
+/* NlAbilityStars — shared CA-beside-PO stars-only renderer (see components/foundation/velo-ui/NlAbilityStars.tsx).
    Global (like .velo-*) so callers that also appear in a flag-off path stay intact; reuses the gold star visuals. */
 .nl-ability-stars {
   display: inline-flex;
@@ -32441,16 +32441,6 @@ button.market-v2-bucket-card.is-selected {
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.nl-ability-num {
-  color: rgba(235, 239, 247, 0.9);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.nl-ability-stars.is-compact .nl-ability-num {
-  font-size: 0.76rem;
 }
 
 .nl-ability-empty {
@@ -32534,12 +32524,15 @@ button.market-v2-bucket-card.is-selected {
 /* Portrait-Karten-Slot für NlAbilityStars (Tier-3 Rosterkarten: Home Top-Kader, Teams-Kader,
    Team-Profil). Additiv und nur unterhalb von `.is-new-look` gerendert — siehe
    `FoundationPlayerPortraitCard`'s `newLook`/`showAbilityStars`. */
-.is-new-look .nl-portrait-ability-stars {
+/* `.nl-portrait-ability-stars` only exists when `newLook` is set (never in flag-off), so the
+   base layout is ungated — this also covers the hover-preview card, which renders in a
+   portal on document.body (outside the `.is-new-look` ancestor). */
+.nl-portrait-ability-stars {
   display: flex;
   margin-top: 2px;
 }
 
-.is-new-look .nl-portrait-ability-stars .nl-ability-stars {
+.nl-portrait-ability-stars .nl-ability-stars {
   flex-wrap: wrap;
   row-gap: 2px;
 }

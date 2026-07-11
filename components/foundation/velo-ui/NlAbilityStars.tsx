@@ -3,18 +3,26 @@
 /**
  * NlAbilityStars — the single shared way to show player ability/potential.
  *
- * Design language (app-wide): STARS everywhere, PLUS the exact CA/PO number when the
- * value is KNOWN (own team / scouted-exact / build phase), and a STAR-RANGE (+ number
- * range "72–80") with an uncertain overlay when it is UNKNOWN (fog of war).
+ * Design language (app-wide): STARS ONLY, CA beside PO. Both metrics share ONE
+ * absolute scale so a given ability value always renders the same number of
+ * stars everywhere (drawer, transfermarkt, roster cards, hover previews …).
  *
- * Star fill + uncertain-overlay math is NOT reinvented here — it is promoted from
+ * Scale: `potentialScoreToStars` (score 35–99 → 2.0–5.0★) is used for BOTH CA and
+ * PO. CA stars are derived from the absolute current rating (`caScore`), NOT from
+ * the league-percentile axis profile — that percentile→stars mapping is what made
+ * "5★ = 58" on one player and "5★ = 94" on another. Passing an absolute `caScore`
+ * guarantees the same rating → the same stars on every surface.
+ *
+ * Fog of war: `known === true` renders exact stars; `known === false` renders the
+ * potential star-RANGE with the dark uncertain overlay (visual uncertainty only —
+ * no numbers are ever shown).
+ *
+ * No numeric CA/PO text / ranges are rendered — the legacy `caScore` (used as the
+ * CA scale driver), `poScore` and `poScoreRange` props feed the star math only.
+ *
+ * Star fill + uncertain-overlay math is promoted from
  * `lib/progression/player-potential-service.ts` (`buildAbilityStarRangeSlots`,
- * `potentialScoreToStars`), the same source the drawer range renderer uses.
- *
- * Styling: `.nl-ability-stars*` in `app/globals.css`, reusing the existing gold star
- * visuals (shared with `.velo-star-*` / `.player-drawer-star-*`). Rendered only from
- * new-look surfaces; the classes are global (like `.velo-*`) so a caller that also
- * lives in a flag-off code path stays visually intact.
+ * `potentialScoreToStars`). Styling: `.nl-ability-*` in `app/globals.css`.
  */
 
 import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
@@ -26,19 +34,22 @@ import {
 type NlRange = { min: number; max: number };
 
 export type NlAbilityStarsProps = {
-  /** Current-ability stars (0..5). A display label ("3.5", "3,5 ★") is parsed too. */
-  caStars: number | string | null | undefined;
-  /** Exact CA number (developmentInsight.currentRating). Appended only when `known`. */
+  /**
+   * Absolute current rating (0..99) — the PRIMARY CA driver. Converted to stars
+   * via the shared absolute scale so CA matches PO and is consistent everywhere.
+   */
   caScore?: number | null;
-  /** Single potential stars (0..5). Used when known, or when no PO range is supplied. */
+  /** Legacy fallback CA stars (0..5, or a label like "3,5") — only used when no `caScore`. */
+  caStars?: number | string | null;
+  /** Single potential stars (0..5). Used when known, or when no PO range/score is supplied. */
   poStars?: number | string | null;
   /** Potential star range in star-space (0..5) — preferred when the site already has revealed min/max stars. */
   poStarRange?: NlRange | null;
-  /** Exact PO number. Appended only when `known`. */
+  /** Exact PO score (0..99). Drives exact stars when `known`. */
   poScore?: number | null;
-  /** Potential score range (0..100): drives the "72–80" text and, absent `poStarRange`, the star range. */
+  /** Potential score range (0..99): drives the star range via the shared absolute scale. */
   poScoreRange?: NlRange | null;
-  /** Fog-of-war flag. Exact numbers appended only when true; range + uncertain overlay when false. */
+  /** Fog-of-war flag. `true` → exact stars; `false` → PO star-range with uncertain overlay. */
   known: boolean;
   compact?: boolean;
   /** Optional group label prefix used in the accessible description. */
@@ -46,6 +57,10 @@ export type NlAbilityStarsProps = {
   tone?: "gold" | "danger";
   className?: string;
 };
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
 
 function parseStarValue(value: number | string | null | undefined): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -56,12 +71,22 @@ function parseStarValue(value: number | string | null | undefined): number | nul
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** CA stars from the absolute current rating (shared scale) with a legacy star-value fallback. */
+function resolveCaStars(props: NlAbilityStarsProps): number | null {
+  if (isFiniteNumber(props.caScore)) return potentialScoreToStars(props.caScore);
+  return parseStarValue(props.caStars);
+}
+
 function resolvePoStarRange(props: NlAbilityStarsProps): NlRange | null {
   if (props.poStarRange && Number.isFinite(props.poStarRange.min) && Number.isFinite(props.poStarRange.max)) {
     return { min: props.poStarRange.min, max: props.poStarRange.max };
   }
   if (props.poScoreRange && Number.isFinite(props.poScoreRange.min) && Number.isFinite(props.poScoreRange.max)) {
     return { min: potentialScoreToStars(props.poScoreRange.min), max: potentialScoreToStars(props.poScoreRange.max) };
+  }
+  if (isFiniteNumber(props.poScore)) {
+    const single = potentialScoreToStars(props.poScore);
+    return { min: single, max: single };
   }
   const single = parseStarValue(props.poStars);
   return single != null ? { min: single, max: single } : null;
@@ -108,37 +133,20 @@ function StarRow({ min, max, uncertain }: { min: number; max: number; uncertain:
 
 export function NlAbilityStars(props: NlAbilityStarsProps) {
   const { known, compact = false, label, tone = "gold", className = "" } = props;
-  const caStars = parseStarValue(props.caStars);
+  const caStars = resolveCaStars(props);
   const poRange = resolvePoStarRange(props);
   const poUncertain = !known && poRange != null && poRange.max > poRange.min;
-
-  const caNumber = known && props.caScore != null && Number.isFinite(props.caScore) ? formatVeloNumber(props.caScore, 0) : null;
-  const poNumber = (() => {
-    if (known) {
-      if (props.poScore != null && Number.isFinite(props.poScore)) return formatVeloNumber(props.poScore, 0);
-      if (props.poScoreRange) {
-        const { min, max } = props.poScoreRange;
-        return min === max ? formatVeloNumber(min, 0) : `${formatVeloNumber(min, 0)}–${formatVeloNumber(max, 0)}`;
-      }
-      return null;
-    }
-    if (props.poScoreRange) {
-      const { min, max } = props.poScoreRange;
-      return min === max ? formatVeloNumber(min, 0) : `${formatVeloNumber(min, 0)}–${formatVeloNumber(max, 0)}`;
-    }
-    return null;
-  })();
 
   const ariaParts: string[] = [];
   if (label) ariaParts.push(label);
   if (caStars != null) {
-    ariaParts.push(`Aktuell ${formatVeloNumber(caStars, 1)} Sterne${caNumber ? ` (${caNumber})` : ""}`);
+    ariaParts.push(`Aktuell ${formatVeloNumber(caStars, 1)} Sterne`);
   }
   if (poRange != null) {
     ariaParts.push(
       poUncertain
-        ? `Potenzial ${formatVeloNumber(poRange.min, 1)} bis ${formatVeloNumber(poRange.max, 1)} Sterne (unsicher${poNumber ? `, ${poNumber}` : ""})`
-        : `Potenzial ${formatVeloNumber(poRange.max, 1)} Sterne${poNumber ? ` (${poNumber})` : ""}`,
+        ? `Potenzial ${formatVeloNumber(poRange.min, 1)} bis ${formatVeloNumber(poRange.max, 1)} Sterne (geschätzt)`
+        : `Potenzial ${formatVeloNumber(poRange.max, 1)} Sterne`,
     );
   }
   ariaParts.push(known ? "bekannt" : "geschätzt");
@@ -157,7 +165,6 @@ export function NlAbilityStars(props: NlAbilityStarsProps) {
         ) : (
           <span className="nl-ability-empty">—</span>
         )}
-        {caNumber ? <span className="nl-ability-num nl-tnum">{caNumber}</span> : null}
       </span>
       <span className="nl-ability-metric">
         <small className="nl-ability-metric-label">PO</small>
@@ -166,7 +173,6 @@ export function NlAbilityStars(props: NlAbilityStarsProps) {
         ) : (
           <span className="nl-ability-empty">—</span>
         )}
-        {poNumber ? <span className="nl-ability-num nl-tnum">{poNumber}</span> : null}
       </span>
     </span>
   );

@@ -133,6 +133,7 @@ export default function ScoutingReportPanel({
           <div className="scouting-report-stars">
             {newLook ? (
               <NlAbilityStars
+                caScore={report.caRating}
                 caStars={report.caDisplay}
                 poStarRange={
                   report.poStarMin != null && report.poStarMax != null

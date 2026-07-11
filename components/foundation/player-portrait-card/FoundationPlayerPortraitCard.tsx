@@ -57,6 +57,7 @@ export type FoundationPlayerPortraitCardProps = {
   poStars?: number | string | null;
   poStarRange?: { min: number; max: number } | null;
   caScore?: number | null;
+  poScore?: number | null;
   poScoreRange?: { min: number; max: number } | null;
   className?: string;
   variant?: "home" | "team";
@@ -121,6 +122,7 @@ export default function FoundationPlayerPortraitCard({
   poStars = null,
   poStarRange = null,
   caScore = null,
+  poScore = null,
   poScoreRange = null,
   className = "",
   variant = "home",
@@ -159,6 +161,9 @@ export default function FoundationPlayerPortraitCard({
     (caStars != null ||
       poStars != null ||
       poStarRange != null ||
+      caScore != null ||
+      poScore != null ||
+      poScoreRange != null ||
       caRating != null ||
       poRangeMin != null ||
       poRangeMax != null);
@@ -193,6 +198,7 @@ export default function FoundationPlayerPortraitCard({
           caScore={caScore ?? caRating ?? null}
           poStars={poStars}
           poStarRange={poStarRange}
+          poScore={poScore}
           poScoreRange={poScoreRange ?? (poRangeMin != null && poRangeMax != null ? { min: poRangeMin, max: poRangeMax } : null)}
           known={known}
           compact

@@ -946,7 +946,7 @@ function PlayerCaPoStarStack({ data, newLook = false }: { data: PlayerDetailDraw
       <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
         <NlAbilityStars
           caStars={caStars}
-          caScore={known ? (data.developmentInsight?.currentRating ?? null) : null}
+          caScore={data.developmentInsight?.currentRating ?? null}
           poStars={poStars}
           poScoreRange={poScoreRange}
           known={known}
