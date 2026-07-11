@@ -659,6 +659,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   toggleGameModeOwnershipTeam,
   toggleNewGameTeam,
   toggleScoutingWatch,
+  teamBeliebtheit,
   toggleTableSort,
   toggleTransferSellMarker,
   toggleTransferWishlist,
@@ -1904,6 +1905,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
                   recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
                 }}
+                beliebtheit={teamBeliebtheit}
                 trainingFacilityEffectPreview={trainingFacilityEffectPreview}
                 facilityRows={trainingFacilityRows}
                 specialistWingVariant={specialistWingVariantDraft}

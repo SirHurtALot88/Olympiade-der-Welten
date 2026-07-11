@@ -8,6 +8,7 @@ import {
 } from "@/lib/facilities/facility-catalog";
 import { calculateFacilitySeasonUpkeep, getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { degradeFacilityCondition } from "@/lib/facilities/facility-condition";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -32,6 +33,8 @@ export type FacilitySeasonEndFinancePreview = {
   facilityIncomeTotal: number;
   fanShopIncome: number;
   arenaIncome: number;
+  /** Beliebtheitsfaktor des Teams (1.0 = Liga-Durchschnitt), mit dem die Arena-Basis skaliert wurde. */
+  arenaPopularityFactor: number;
   netFacilityResult: number;
   cashAfterFacilities: number | null;
   disabledFacilities: FacilitySeasonEndFinanceFacilityRow[];
@@ -84,7 +87,12 @@ function getRawFacilityLevel(teamFacilities: TeamFacilityCollection, facilityId:
   return Math.max(0, Math.min(5, Math.round(raw)));
 }
 
-function buildRows(teamFacilities: TeamFacilityCollection, cashBefore: number | null, seasonId: string) {
+function buildRows(
+  teamFacilities: TeamFacilityCollection,
+  cashBefore: number | null,
+  seasonId: string,
+  arenaPopularityFactor: number,
+) {
   const enabledRows = FACILITY_CATALOG.map((facility) => {
     const state = teamFacilities.facilities[facility.facilityId];
     const rawLevel = getRawFacilityLevel(teamFacilities, facility.facilityId);
@@ -92,13 +100,15 @@ function buildRows(teamFacilities: TeamFacilityCollection, cashBefore: number | 
     const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
     const definition = getFacilityLevelDefinition(facility.facilityId, effectLevel);
     const enabled = Boolean(state?.enabled) && rawLevel > 0;
+    // Arena-Einnahme = Basis × Beliebtheit(Team). Alle anderen Gebäude flach.
+    const popularityFactor = facility.facilityId === "arena_upgrade" ? arenaPopularityFactor : 1;
     return {
       facilityId: facility.facilityId,
       label: facility.label,
       level: rawLevel,
       enabled,
       upkeep: calculateFacilitySeasonUpkeep(facility.facilityId, teamFacilities),
-      income: roundValue(((definition?.seasonIncome ?? 0) * efficiencyPct) / 100),
+      income: roundValue(((definition?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) / 100),
       status: rawLevel <= 0 ? "not_built" : enabled ? "enabled" : "disabled",
       warning: !enabled && rawLevel > 0 ? state?.disabledReason ?? "facility_disabled" : null,
     } satisfies FacilitySeasonEndFinanceFacilityRow;
@@ -142,7 +152,10 @@ export function previewFacilitySeasonEndFinance(
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   const cashBeforeFacilities = team?.cash ?? null;
-  const rows = buildRows(teamFacilities, cashBeforeFacilities, gameState.season.id);
+  // Beliebtheit skaliert die Arena-Einnahme (real cash). Läuft für Menschen- UND
+  // KI-Teams; fehlt der Team-/Kontext, liefert die Funktion neutral 1.0.
+  const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
+  const rows = buildRows(teamFacilities, cashBeforeFacilities, gameState.season.id, arenaPopularityFactor);
   const disabledFacilities = rows.filter((row) => row.status === "will_disable_unpaid");
   const paidUpkeepTotal = roundValue(rows.filter((row) => row.status === "paid").reduce((sum, row) => sum + row.upkeep, 0));
   const facilityIncomeTotal = roundValue(rows.reduce((sum, row) => sum + row.income, 0));
@@ -182,6 +195,7 @@ export function previewFacilitySeasonEndFinance(
     facilityIncomeTotal,
     fanShopIncome,
     arenaIncome,
+    arenaPopularityFactor,
     netFacilityResult,
     cashAfterFacilities,
     disabledFacilities,

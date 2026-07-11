@@ -6874,6 +6874,7 @@ export function useFoundationShellRouterBodyScope({
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
+    teamBeliebtheit,
     trainingV2ModeOptions,
   } = useFoundationCrossTabTraining({
     // Compact-tab derivations now live in `FoundationTrainingCompactShellHost`
@@ -10108,6 +10109,7 @@ export function useFoundationShellRouterBodyScope({
     toggleTransferWishlist,
     trainingDevelopmentFilter,
     trainingDevelopmentSummary,
+    teamBeliebtheit,
     trainingFacilityEffectPreview,
     trainingFacilityRows,
     trainingFacilitySeasonEndFinance,

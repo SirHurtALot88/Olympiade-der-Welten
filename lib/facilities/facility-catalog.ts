@@ -128,13 +128,16 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "fan_shop",
     label: "Fan Shop",
-    description: "Erzeugt langsames saisonales Cash-Income.",
+    description: "Erzeugt langsames saisonales Cash-Income (flach, verlässlich — nicht beliebtheitsskaliert).",
     maxLevel: 5,
     effectType: "season_income",
     effectDescription: "Season Cash Income",
+    // BALANCE (tunable): Frühe Ausbaukosten L1/L2 bewusst angehoben (Anti-No-Brainer),
+    // damit L1-Payback ~3.5+ Saisons statt ~2.3 dauert. L1 7→10 (+43%), L2 14→19 (+36%).
+    // L3–L5 unverändert. seasonIncome/seasonUpkeep bleiben wie gehabt.
     levels: [
-      { level: 1, effectDescription: "+3.5 Cash/Saison", upgradeCost: 7, seasonUpkeep: 0.4, seasonIncome: 3.5 },
-      { level: 2, effectDescription: "+7 Cash/Saison", upgradeCost: 14, seasonUpkeep: 0.8, seasonIncome: 7 },
+      { level: 1, effectDescription: "+3.5 Cash/Saison", upgradeCost: 10, seasonUpkeep: 0.4, seasonIncome: 3.5 },
+      { level: 2, effectDescription: "+7 Cash/Saison", upgradeCost: 19, seasonUpkeep: 0.8, seasonIncome: 7 },
       { level: 3, effectDescription: "+11 Cash/Saison", upgradeCost: 23, seasonUpkeep: 1.4, seasonIncome: 11 },
       { level: 4, effectDescription: "+16 Cash/Saison", upgradeCost: 36, seasonUpkeep: 2.2, seasonIncome: 16 },
       { level: 5, effectDescription: "+24 Cash/Saison", upgradeCost: 56, seasonUpkeep: 3.4, seasonIncome: 24 },
@@ -143,16 +146,23 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
   {
     facilityId: "arena_upgrade",
     label: "Arena Upgrade",
-    description: "Erzeugt langsames saisonales Arena-Cash.",
+    description: "Erzeugt saisonales Arena-Cash. Basis × Beliebtheit — starke/beliebte Teams verdienen mehr.",
     maxLevel: 5,
     effectType: "season_income",
-    effectDescription: "Season Arena Income",
+    effectDescription: "Season Arena Income (Basis × Beliebtheit)",
+    // BALANCE (tunable): Arena-Basis-Einnahmen jetzt GLEICH dem Fan-Shop je Stufe
+    // (vorher 4/8/13/20/30 → jetzt 3.5/7/11/16/24). Die EFFEKTIVE Arena-Einnahme
+    // ist Basis × Beliebtheit(Team) (siehe lib/economy/team-beliebtheit.ts +
+    // facility-season-end-service). Ein Liga-Durchschnittsteam (Beliebtheit 1.0)
+    // verdient damit ~ wie der Fan-Shop; ein beliebtes mehr, ein schwaches weniger.
+    // Upkeep unverändert. Frühe Ausbaukosten L1/L2 wie Fan-Shop angehoben
+    // (Anti-No-Brainer): L1 10→13 (+30%), L2 18→24 (+33%). L3–L5 unverändert.
     levels: [
-      { level: 1, effectDescription: "+4 Cash/Saison", upgradeCost: 10, seasonUpkeep: 0.8, seasonIncome: 4 },
-      { level: 2, effectDescription: "+8 Cash/Saison", upgradeCost: 18, seasonUpkeep: 1.4, seasonIncome: 8 },
-      { level: 3, effectDescription: "+13 Cash/Saison", upgradeCost: 30, seasonUpkeep: 2.4, seasonIncome: 13 },
-      { level: 4, effectDescription: "+20 Cash/Saison", upgradeCost: 46, seasonUpkeep: 3.6, seasonIncome: 20 },
-      { level: 5, effectDescription: "+30 Cash/Saison", upgradeCost: 72, seasonUpkeep: 5.4, seasonIncome: 30 },
+      { level: 1, effectDescription: "+3.5 Cash/Saison (Basis × Beliebtheit)", upgradeCost: 13, seasonUpkeep: 0.8, seasonIncome: 3.5 },
+      { level: 2, effectDescription: "+7 Cash/Saison (Basis × Beliebtheit)", upgradeCost: 24, seasonUpkeep: 1.4, seasonIncome: 7 },
+      { level: 3, effectDescription: "+11 Cash/Saison (Basis × Beliebtheit)", upgradeCost: 30, seasonUpkeep: 2.4, seasonIncome: 11 },
+      { level: 4, effectDescription: "+16 Cash/Saison (Basis × Beliebtheit)", upgradeCost: 46, seasonUpkeep: 3.6, seasonIncome: 16 },
+      { level: 5, effectDescription: "+24 Cash/Saison (Basis × Beliebtheit)", upgradeCost: 72, seasonUpkeep: 5.4, seasonIncome: 24 },
     ],
   },
   {

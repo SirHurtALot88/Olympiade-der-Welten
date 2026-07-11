@@ -46639,6 +46639,16 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Arena-Karte: Hinweis, dass die Einnahme mit der Beliebtheit skaliert. */
+.is-new-look .nl-facility-arena-popularity {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--nl-accent, var(--nl-mut));
+  opacity: 0.9;
+}
+
 .is-new-look .nl-facility-card-stats {
   display: flex;
   justify-content: space-between;

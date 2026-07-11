@@ -139,7 +139,21 @@ describe("facility effects", () => {
       arena_upgrade: { level: 1, enabled: true },
     });
 
-    expect(calculateFacilityIncome(teamFacilities)).toBe(11);
+    // BALANCE: Arena-Basis je Stufe jetzt = Fan-Shop (L1 4→3.5). Ohne Beliebtheits-
+    // Faktor (Default 1.0) also 7 (fan_shop L2) + 3.5 (arena L1) = 10.5.
+    expect(calculateFacilityIncome(teamFacilities)).toBe(10.5);
+  });
+
+  it("scales only arena income by the Beliebtheit factor, fan shop stays flat", () => {
+    const teamFacilities = facilities({
+      fan_shop: { level: 2, enabled: true },
+      arena_upgrade: { level: 1, enabled: true },
+    });
+
+    // Fan-Shop 7 flach + Arena 3.5 × 1.2 = 4.2 → 11.2.
+    expect(calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: 1.2 })).toBe(11.2);
+    // Schwaches Team: Arena 3.5 × 0.5 = 1.75 → 8.75.
+    expect(calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: 0.5 })).toBe(8.75);
   });
 
   it("sums upkeep correctly", () => {

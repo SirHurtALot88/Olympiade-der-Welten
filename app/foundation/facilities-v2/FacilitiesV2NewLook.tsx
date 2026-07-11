@@ -35,6 +35,16 @@ import { FacilityDecisionModal, formatFacilityActionReason } from "@/app/foundat
 const FACILITY_MAX_LEVEL = 5;
 
 /**
+ * Anzeige-Schwellen für den Beliebtheits-Chip (nur Präsentation, kein Balance).
+ * Beliebtheit liegt real in [0.5, 1.5] mit 1.0 = Liga-Durchschnitt.
+ */
+const BELIEBTHEIT_HIGH_THRESHOLD = 1.15;
+const BELIEBTHEIT_LOW_THRESHOLD = 0.85;
+
+const TIP_BELIEBTHEIT =
+  "Die Beliebtheit (1.0 = Liga-Durchschnitt) treibt die Arena-Einnahme: Effektiv = Basis × Beliebtheit. Sie steigt mit sportlichem Erfolg (Tabellenplatz), dem Anteil an Fan-Favoriten im Kader und der Stärke der Top-Spieler. Ein beliebtes Team verdient an der Arena mehr, ein schwaches weniger. Der Fan-Shop bleibt davon unberührt.";
+
+/**
  * Erklärtexte (E5): Konzepte in einfachem Deutsch, Schwellen kommen aus den
  * echten Konstanten in `lib/facilities/facility-condition.ts` — keine
  * erfundenen Zahlen.
@@ -275,6 +285,7 @@ export default function FacilitiesV2NewLook({
   onOpenFacilityPanel,
   onCloseFacilityPanel,
   summary,
+  beliebtheit = null,
   trainingFacilityEffectPreview = null,
   facilityRows,
   specialistWingVariant,
@@ -539,6 +550,21 @@ export default function FacilitiesV2NewLook({
             onClick={() => setSort({ key: "net", direction: "desc" })}
           />
           <StatChip label="Recovery" value={formatNlNumber(summary.recoveryAfterTraining, 1)} tone="spe" />
+          {beliebtheit ? (
+            <StatChip
+              label="Beliebtheit"
+              value={`×${formatNlNumber(beliebtheit.value, 2)}`}
+              tone={
+                beliebtheit.value >= BELIEBTHEIT_HIGH_THRESHOLD
+                  ? "good"
+                  : beliebtheit.value <= BELIEBTHEIT_LOW_THRESHOLD
+                    ? "warn"
+                    : "accent"
+              }
+              sub="treibt Arena-Einnahme"
+              title={TIP_BELIEBTHEIT}
+            />
+          ) : null}
           {trainingFacilityEffectPreview ? (
             <StatChip
               label="Trainingseffekt"
@@ -623,6 +649,14 @@ export default function FacilitiesV2NewLook({
                   </span>
                 </div>
                 <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
+                {facility.id === "arena_upgrade" && beliebtheit ? (
+                  <small
+                    className="nl-facility-arena-popularity"
+                    title={TIP_BELIEBTHEIT}
+                  >
+                    Einnahme: Basis ×{formatNlNumber(beliebtheit.value, 2)} Beliebtheit
+                  </small>
+                ) : null}
                 {facility.level > 0 ? (
                   /* E6: Zustands-Bar mit Schwellen-Marke — unterhalb von
                      FACILITY_CONDITION_WARNING% sinkt die Effizienz. */

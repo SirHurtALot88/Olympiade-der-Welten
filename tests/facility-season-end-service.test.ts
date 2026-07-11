@@ -101,13 +101,17 @@ describe("facility season-end finance service", () => {
       "team-1",
     );
 
+    // BALANCE: Arena-Basis je Stufe jetzt = Fan-Shop (L1 4→3.5) und effektiv
+    // Basis × Beliebtheit. Dieses Ein-Team-Setup ohne Kader/Tabelle liefert den
+    // neutralen Faktor 1.0 → Arena L1 = 3.5 × 1.0 = 3.5 (vorher 4).
     expect(preview.facilityUpkeepTotal).toBe(2.4);
     expect(preview.fanShopIncome).toBe(7);
-    expect(preview.arenaIncome).toBe(4);
-    expect(preview.facilityIncomeTotal).toBe(11);
-    expect(preview.netFacilityResult).toBe(8.6);
+    expect(preview.arenaIncome).toBe(3.5);
+    expect(preview.arenaPopularityFactor).toBe(1);
+    expect(preview.facilityIncomeTotal).toBe(10.5);
+    expect(preview.netFacilityResult).toBe(8.1);
     expect(preview.cashBeforeFacilities).toBe(100);
-    expect(preview.cashAfterFacilities).toBe(108.6);
+    expect(preview.cashAfterFacilities).toBe(108.1);
   });
 
   it("disables facilities when upkeep cannot be paid and removes their effects after apply", () => {
