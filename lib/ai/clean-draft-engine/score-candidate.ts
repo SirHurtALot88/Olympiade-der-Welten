@@ -1,5 +1,10 @@
 import type { Player } from "@/lib/data/olyDataTypes";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
+import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
+// Reuse the EXACT existing spam-regression mechanism (no re-derivation, no drift):
+// computeColorspamPenalty = first 5 same form-color free, then -4 per extra (6th onward);
+// computeClassspamPenalty = first 3 same class free, then -4 per extra (4th onward).
+import { computeColorspamPenalty, computeClassspamPenalty } from "@/lib/ai/ai-needs-picks-compare-service";
 
 import { resolveCleanTeamTraits, type CleanTeamTraits } from "./plan-team-lanes";
 import type { CleanThemeTarget, ScoreCandidateInput, ScoreCandidateResult } from "./types";
@@ -190,5 +195,22 @@ export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult
   // represents the identity), so there is no off-theme exception for the marquee slot.
   const theme = themeBonus(input, onTheme) * (isPremiumSlot ? 1.35 : 1);
 
-  return { score: quality + need + identity + value + discipline + potential + theme, onTheme };
+  // Form-color / class anti-monoculture: don't keep stacking the same form-color or class. Race
+  // (theme) and form-color (class) are orthogonal, so a themed team stays on-race while spreading
+  // its classes/colors. Penalties are secondary nudges (far smaller than theme), so identity wins
+  // but the roster doesn't become a single-color pile.
+  const candidateColor = getPlayerClassColor({ className: input.candidate.className } as Player);
+  const candidateClass = String(input.candidate.className ?? "").toLowerCase();
+  let sameColorCount = 0;
+  let sameClassCount = 0;
+  for (const player of input.currentRosterPlayers) {
+    if (candidateColor != null && getPlayerClassColor(player) === candidateColor) sameColorCount += 1;
+    if (String(player.className ?? "").toLowerCase() === candidateClass) sameClassCount += 1;
+  }
+  const spamPenalty = computeColorspamPenalty(sameColorCount) + computeClassspamPenalty(sameClassCount);
+
+  return {
+    score: quality + need + identity + value + discipline + potential + theme + spamPenalty,
+    onTheme,
+  };
 }
