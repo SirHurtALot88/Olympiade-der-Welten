@@ -287,6 +287,33 @@ export function planTeamLanes(input: PlanTeamLanesInput): CleanLanePlan {
     }
   }
 
+  // BODY SPREAD (non-elite): a flat Depth block reads better as a Backup..Core spread. Trade the
+  // cheapest ~quarter of the Depth body DOWN to Backup, then spend the freed budget lifting the top
+  // Depth slots UP to Core — roughly budget-neutral, so the body widens (a few Backup + Depth + a few
+  // Core) instead of a uniform Depth wall. Elite teams (no filler) skip this and keep their tight body.
+  const eliteQualityLeanForSpread = resolveEliteQualityLean(traits);
+  if (eliteQualityLeanForSpread < ELITE_QUALITY_LEAN_THRESHOLD) {
+    const backupIdx = CLEAN_LANE_ORDER.indexOf("backup");
+    const depthSlotIdxs = laneOf.map((lane, i) => (lane === depthIdx ? i : -1)).filter((i) => i >= 0);
+    if (depthSlotIdxs.length >= 3) {
+      // Drop the cheapest quarter (at least one) of Depth slots to Backup, banking the freed budget.
+      const dropCount = clamp(Math.round(depthSlotIdxs.length * 0.25), 1, depthSlotIdxs.length - 2);
+      for (let d = 0; d < dropCount; d += 1) {
+        const slotIdx = depthSlotIdxs[d]!;
+        budgetLeft += means[depthIdx]! - means[backupIdx]!;
+        laneOf[slotIdx] = backupIdx;
+      }
+      // Lift the top Depth slots to Core while the freed budget covers it.
+      for (let d = depthSlotIdxs.length - 1; d >= dropCount; d -= 1) {
+        const slotIdx = depthSlotIdxs[d]!;
+        const cost = means[coreIdx]! - means[depthIdx]!;
+        if (cost > budgetLeft + EPS) break;
+        budgetLeft -= cost;
+        laneOf[slotIdx] = coreIdx;
+      }
+    }
+  }
+
   // Emit slots premium-first (ascending lane index).
   laneOf.sort((left, right) => left - right);
   const slots: CleanLanePlanSlot[] = laneOf.map((idx) => {
