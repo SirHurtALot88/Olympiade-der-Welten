@@ -98,7 +98,7 @@ describe("unified pick planner service", () => {
     expect(biased.coreNeeded).toBe(0);
     expect(biased.cheapFillNeeded).toBe(0);
     expect(biased.backupNeeded).toBeGreaterThan(0);
-    expect(OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD).toBe(15);
+    expect(OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD).toBe(12);
   });
 
   it("keeps premium lane counts when budget per pick is comfortable", () => {
