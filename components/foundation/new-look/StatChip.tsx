@@ -16,6 +16,8 @@ export type StatChipProps = {
   onClick?: () => void;
   title?: string;
   className?: string;
+  /** Expliziter Accessible-Name — sonst liest AT nur Label+Wert vor. */
+  ariaLabel?: string;
 };
 
 /**
@@ -23,7 +25,7 @@ export type StatChipProps = {
  * Label oben, tabularem Wert darunter. Mit `onClick` wird jeder Stat
  * zum Portal in die passende Detailansicht.
  */
-export function StatChip({ label, value, tone = "neutral", sub, onClick, title, className }: StatChipProps) {
+export function StatChip({ label, value, tone = "neutral", sub, onClick, title, className, ariaLabel }: StatChipProps) {
   const classes = ["nl-stat-chip", nlToneClass(tone), onClick ? "is-interactive" : "", className ?? ""]
     .filter(Boolean)
     .join(" ");
@@ -43,7 +45,7 @@ export function StatChip({ label, value, tone = "neutral", sub, onClick, title, 
 
   if (onClick) {
     return (
-      <button type="button" className={classes} onClick={onClick} title={title}>
+      <button type="button" className={classes} onClick={onClick} title={title} aria-label={ariaLabel}>
         {body}
       </button>
     );

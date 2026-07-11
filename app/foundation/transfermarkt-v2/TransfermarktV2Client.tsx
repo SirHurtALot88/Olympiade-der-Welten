@@ -158,6 +158,41 @@ type PoolBracketSortState = {
   key: PoolBracketSortKey;
   direction: "asc" | "desc";
 };
+
+/**
+ * Sortable table header cell. Exposes the sort state to assistive tech via
+ * `aria-sort` on the `<th>` and hides the decorative arrow glyph, so screen
+ * readers announce which column is sorted and in which direction.
+ */
+function MarketSortHeader({
+  label,
+  sortKey,
+  activeKey,
+  direction,
+  onSort,
+}: {
+  label: string;
+  sortKey: string;
+  activeKey: string;
+  direction: "asc" | "desc";
+  onSort: (key: string) => void;
+}) {
+  const isActive = activeKey === sortKey;
+  return (
+    <th aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        className={`sortable-header${isActive ? " is-active" : ""}`}
+        type="button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        <span className="sortable-arrow" aria-hidden="true">
+          {isActive ? (direction === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
 export type TransfermarktV2RosterRow = {
   activePlayerId: string;
   playerId: string;
@@ -3255,8 +3290,8 @@ export default function TransfermarktV2Client({
                     <button type="button" onClick={() => loadFilterPreset(preset)} title={`Filter "${preset.name}" laden`}>
                       {preset.name}
                     </button>
-                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} title={`Filter "${preset.name}" loeschen`}>
-                      x
+                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} aria-label={`Filter "${preset.name}" löschen`} title={`Filter "${preset.name}" loeschen`}>
+                      <span aria-hidden="true">x</span>
                     </button>
                   </span>
                 ))
@@ -4090,43 +4125,20 @@ export default function TransfermarktV2Client({
               <thead>
                 <tr>
                   <th>Bild</th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "playerName" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("playerName")}>
-                      <span>Gemerkter Spieler</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "playerName" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "className" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("className")}>
-                      <span>Klasse</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "className" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "marketValue" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("marketValue")}>
-                      <span>MW</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "marketValue" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "salary" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("salary")}>
-                      <span>Gehalt</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "salary" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "bracket" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("bracket")}>
-                      <span>Bracket</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "bracket" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
+                  <MarketSortHeader label="Gemerkter Spieler" sortKey="playerName" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Klasse" sortKey="className" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="MW" sortKey="marketValue" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Gehalt" sortKey="salary" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Bracket" sortKey="bracket" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
                   {MARKET_AXIS_ORDER.map((axis) => (
-                    <th key={`wishlist-head-${axis}`}>
-                      <button className={`sortable-header${wishlistSort.key === axis ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort(axis)}>
-                        <span>{AXIS_META[axis].label}</span>
-                        <span className="sortable-arrow">{wishlistSort.key === axis ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                      </button>
-                    </th>
+                    <MarketSortHeader
+                      key={`wishlist-head-${axis}`}
+                      label={AXIS_META[axis].label}
+                      sortKey={axis}
+                      activeKey={wishlistSort.key}
+                      direction={wishlistSort.direction}
+                      onSort={(key) => toggleWishlistSort(key as WishlistSortKey)}
+                    />
                   ))}
                   <th aria-label="Aktionen" />
                 </tr>
@@ -4244,6 +4256,14 @@ export default function TransfermarktV2Client({
                       })}
                       <td>
                         <button
+                          className="primary-button inline-button market-v2-wishlist-deal-button"
+                          type="button"
+                          onClick={() => openWishlistDeal(entry)}
+                          title="Kaufdialog für diesen Spieler öffnen."
+                        >
+                          Deal
+                        </button>
+                        <button
                           className="secondary-button inline-button market-v2-remove-wishlist-button"
                           type="button"
                           onClick={() => onRemoveWishlist?.(entry.playerId)}
@@ -4319,8 +4339,8 @@ export default function TransfermarktV2Client({
                   <th>SOC</th>
                   {showRosterDisciplines
                     ? orderedDisciplines.map((discipline) => (
-                        <th className={`market-v2-roster-discipline-head is-${discipline.category}`} key={`roster-discipline-head-${discipline.id}`}>
-                          {getDisciplineAbbreviation(discipline.id, discipline.name)}
+                        <th className={`market-v2-roster-discipline-head is-${discipline.category}`} key={`roster-discipline-head-${discipline.id}`} scope="col" title={discipline.name}>
+                          <abbr title={discipline.name}>{getDisciplineAbbreviation(discipline.id, discipline.name)}</abbr>
                         </th>
                       ))
                     : null}
@@ -4527,55 +4547,22 @@ export default function TransfermarktV2Client({
                   <thead>
                     <tr>
                       <th>Bild</th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "playerName" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("playerName")}>
-                          <span>Spieler</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "playerName" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "className" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("className")}>
-                          <span>Klasse</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "className" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "race" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("race")}>
-                          <span>Rasse</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "race" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "marketValue" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("marketValue")}>
-                          <span>MW</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "marketValue" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "salary" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("salary")}>
-                          <span>Gehalt</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "salary" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "fit" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("fit")}>
-                          <span>Fit</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "fit" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "ovr" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("ovr")}>
-                          <span>OVR</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "ovr" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
+                      <MarketSortHeader label="Spieler" sortKey="playerName" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Klasse" sortKey="className" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Rasse" sortKey="race" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="MW" sortKey="marketValue" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Gehalt" sortKey="salary" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Fit" sortKey="fit" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="OVR" sortKey="ovr" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
                       {MARKET_AXIS_ORDER.map((axis) => (
-                        <th key={`pool-bracket-head-${axis}`}>
-                          <button className={`sortable-header${poolBracketSort.key === axis ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort(axis)}>
-                            <span>{AXIS_META[axis].label}</span>
-                            <span className="sortable-arrow">{poolBracketSort.key === axis ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                          </button>
-                        </th>
+                        <MarketSortHeader
+                          key={`pool-bracket-head-${axis}`}
+                          label={AXIS_META[axis].label}
+                          sortKey={axis}
+                          activeKey={poolBracketSort.key}
+                          direction={poolBracketSort.direction}
+                          onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)}
+                        />
                       ))}
                       <th aria-label="Aktion" />
                     </tr>

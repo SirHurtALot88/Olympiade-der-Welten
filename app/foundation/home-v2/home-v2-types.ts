@@ -87,6 +87,7 @@ export type HomeV2ClientProps = {
   nextStepLabel: string;
   nextStepStatus: string;
   nextStepDetail: string;
+  nextStepBlocked?: boolean;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
   leagueHeatPools: LeaguePlayerHeatPools;

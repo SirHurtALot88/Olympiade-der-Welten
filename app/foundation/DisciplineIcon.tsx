@@ -72,12 +72,16 @@ export default function DisciplineIcon({
     <span
       className={`discipline-icon-chip${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`}
       title={resolvedLabel}
+      // Without a visible label the chip's only cue is `title` (not reliably announced),
+      // so expose the discipline name to assistive tech directly.
+      role={showLabel ? undefined : "img"}
+      aria-label={showLabel ? undefined : resolvedLabel}
     >
       {src ? (
         <img
           className={`discipline-icon${iconClassName ? ` ${iconClassName}` : ""}`}
           src={src}
-          alt={resolvedLabel}
+          alt={showLabel ? resolvedLabel : ""}
           loading="lazy"
           decoding="async"
           fetchPriority="low"

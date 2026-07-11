@@ -428,6 +428,7 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:primary`}
+                            aria-pressed={isPrimaryActive}
                             className={`legacy-lineup-form-board-pick is-primary${isPrimaryActive ? " is-active" : ""}${selectedCard ? ` is-${selectedCard.color}` : ""}${getDragOverClassName(`${entry.matchdayId}:${disciplineSide}:primary`, {
                               matchdayId: entry.matchdayId,
                               disciplineSide,
@@ -469,6 +470,7 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:secondary`}
+                            aria-pressed={isSecondaryActive}
                             className={`legacy-lineup-form-board-pick is-secondary${isSecondaryActive ? " is-active" : ""}${selectedBonusCard ? ` is-${selectedBonusCard.color}` : ""}${getDragOverClassName(`${entry.matchdayId}:${disciplineSide}:secondary`, {
                               matchdayId: entry.matchdayId,
                               disciplineSide,

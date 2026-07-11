@@ -563,6 +563,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 }
               }}
               role="listitem"
+              aria-current={isOwnTeam ? "true" : undefined}
               className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}`}
               style={{
                 ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
@@ -577,9 +578,12 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 />
               ) : null}
               {isOwnTeam ? (
-                <span className="nl-arena-own-flag" aria-hidden="true">
-                  Du
-                </span>
+                <>
+                  <span className="nl-arena-own-flag" aria-hidden="true">
+                    Du
+                  </span>
+                  <span className="sr-only">Dein Team</span>
+                </>
               ) : null}
               <span className="nl-arena-rank">
                 <span className="nl-arena-ranknum nl-tnum">{rank}</span>
@@ -803,6 +807,14 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           />
         </StatChipRow>
       </NlCard>
+
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {loadState === "ready"
+          ? `Phase ${Math.min(phaseIndex + 1, MATCHDAY_ARENA_PHASES.length)} von ${MATCHDAY_ARENA_PHASES.length}: ${
+              MATCHDAY_ARENA_PHASES.find((phase) => phase.id === activePhase)?.label ?? "Slots"
+            }${boardRows[0] ? ` — Führung: ${teamById.get(boardRows[0].teamId)?.name ?? boardRows[0].teamId}` : ""}`
+          : ""}
+      </div>
 
       {loadState === "error" ? (
         <NlCard className="nl-arena-error-card" title="Arena braucht noch Input">

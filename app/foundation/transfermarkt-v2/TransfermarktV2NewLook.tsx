@@ -507,6 +507,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             tone="good"
             onClick={() => scrollToNlMarketSection(".nl-market-deal-card")}
             title="Zum Deal-Desk springen"
+            ariaLabel={`Cash ${teamCash != null ? formatNlNumber(teamCash, 1) : "—"} — zum Deal-Desk springen`}
           />
           <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatNlNumber(teamSalaryTotal, 1) : "—"} tone="accent" />
           <StatChip
@@ -516,6 +517,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             sub={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? `${rosterGapOpenCount} Plätze offen` : undefined}
             onClick={() => scrollToNlMarketSection(".nl-market-roster-card")}
             title="Zum eigenen Kader springen"
+            ariaLabel={`Kader ${effectiveRosterCount ?? "—"} von ${rosterLimit ?? "—"} — zum eigenen Kader springen`}
           />
           <StatChip
             label="Wunschliste"
@@ -528,6 +530,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             }
             onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
             title="Zur Wishlist springen"
+            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wishlist springen`}
           />
           <StatChip label="Filter aktiv" value={activeFilterCount} tone={activeFilterCount > 0 ? "warn" : "neutral"} />
         </StatChipRow>

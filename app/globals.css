@@ -27539,6 +27539,26 @@ a {
   font-size: 0.72rem;
 }
 
+.arena-v2-board-control-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.arena-v2-board-control-tag {
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(214, 220, 230, 0.82);
+}
+
+.arena-v2-board-control-tag.is-own {
+  color: rgba(164, 214, 255, 0.92);
+  border-color: rgba(120, 170, 255, 0.4);
+}
+
 .arena-v2-board-track-wrap {
   display: grid;
   gap: 3px;
@@ -41356,6 +41376,14 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+.is-new-look .nl-home-next-reason {
+  max-width: 22rem;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--nl-tone) 78%, var(--nl-ink));
+}
+
 .is-new-look .nl-home-warning-row {
   display: flex;
   flex-wrap: wrap;
@@ -50060,9 +50088,10 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-lineup-hud-strength {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--nl-s4);
   flex: 1;
-  min-width: 260px;
+  min-width: min(260px, 100%);
   animation: nl-lineup-strength-pulse 700ms var(--nl-ease);
 }
 
