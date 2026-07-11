@@ -51239,3 +51239,240 @@ button.foundation-team-portrait-card {
     transform: none;
   }
 }
+
+/* ============================================================
+   "Neuer Look" — Batch b7: Training-Sortierung, Gebäude-Ampel,
+   Karten-/Listen-Umschalter, Ausbau-Kurve, Konsequenz-Vorschau,
+   Einnahmen-Progression (Gebäude-Übersicht).
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   ============================================================ */
+
+/* --- Training: Sortier-Control neben den Entwicklungsfiltern --- */
+
+.is-new-look .nl-training-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s1) var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-training-sort select {
+  padding: 4px 8px;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: 12px;
+}
+
+.is-new-look .nl-training-sort select:hover,
+.is-new-look .nl-training-sort select:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+/* --- Gebäude: Toolbar (Zustands-Ampel + Karten-/Listen-Umschalter) --- */
+
+.is-new-look .nl-facility-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-facility-ampel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-facility-ampel-label {
+  font-size: 12px;
+  color: var(--nl-mut);
+  margin-right: 2px;
+}
+
+.is-new-look .nl-facility-ampel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease),
+    color var(--nl-t-fast) var(--nl-ease);
+}
+
+span.nl-facility-ampel-chip {
+  cursor: default;
+}
+
+.is-new-look .nl-facility-ampel-chip strong {
+  color: var(--nl-ink);
+  font-size: 12px;
+}
+
+.is-new-look .nl-facility-ampel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nl-mut-2);
+}
+
+.is-new-look .nl-facility-ampel-chip.is-good .nl-facility-ampel-dot {
+  background: var(--nl-good);
+}
+
+.is-new-look .nl-facility-ampel-chip.is-warn .nl-facility-ampel-dot {
+  background: var(--nl-warn);
+}
+
+.is-new-look .nl-facility-ampel-chip.is-risk .nl-facility-ampel-dot {
+  background: var(--nl-risk);
+}
+
+.is-new-look button.nl-facility-ampel-chip:hover,
+.is-new-look button.nl-facility-ampel-chip:focus-visible {
+  border-color: var(--nl-line-2);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-ampel-chip.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-view-tabs {
+  flex-shrink: 0;
+}
+
+/* --- Gebäude: Listen-Ansicht (sortierbare Spalten) --- */
+
+.is-new-look .nl-facility-list-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-facility-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.is-new-look .nl-facility-list-table th,
+.is-new-look .nl-facility-list-table td {
+  padding: var(--nl-s2) var(--nl-s3);
+  text-align: left;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-facility-list-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.is-new-look .nl-facility-list-header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+}
+
+.is-new-look .nl-facility-list-header-button:hover,
+.is-new-look .nl-facility-list-header-button:focus-visible,
+.is-new-look .nl-facility-list-header-button.is-active {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-list-row {
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-facility-list-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-facility-list-row.is-selected {
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-facility-list-row.is-risk td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-risk);
+}
+
+.is-new-look .nl-facility-list-row.is-warn td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-warn);
+}
+
+.is-new-look .nl-facility-list-row.is-good td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-good);
+}
+
+.is-new-look .nl-facility-list-table .is-positive {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-facility-list-table .is-negative {
+  color: var(--nl-risk);
+}
+
+/* --- Gebäude: Ausbau-Kurve (Gebäude-Detail) --- */
+
+.is-new-look .nl-facility-curve-card .nl-barchart {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+}
+
+/* --- Gebäude: Konsequenz-Vorschau in der Aktionsleiste --- */
+
+.is-new-look .nl-facility-action-consequence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: 4px;
+}
+
+/* --- Gebäude-Übersicht: Einnahmen-Progression je Ausbaustufe --- */
+
+.is-new-look .nl-facility-overview-income-curve {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-facility-overview-income-curve-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-overview-income-curve small {
+  color: var(--nl-mut);
+}

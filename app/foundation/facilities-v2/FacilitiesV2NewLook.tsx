@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { NlCard, NlProgressBar, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
+import {
+  NlBarChart,
+  NlCard,
+  NlDeltaChip,
+  NlProgressBar,
+  NlSubTabs,
+  StatChip,
+  StatChipRow,
+  formatNlNumber,
+} from "@/components/foundation/new-look";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 
@@ -169,6 +178,56 @@ function getPrimaryFacilityAction(facility: FacilityRowView): "maintenance" | "u
   return maintenancePossible ? "maintenance" : "upgrade";
 }
 
+type FacilityWearFilter = "all" | "risk" | "warn" | "good";
+type FacilitySortKey = "default" | "name" | "level" | "condition" | "efficiency" | "upkeep" | "net";
+type FacilitySortDirection = "asc" | "desc";
+
+const FACILITY_LIST_COLUMNS: Array<{ key: FacilitySortKey; label: string }> = [
+  { key: "name", label: "Gebäude" },
+  { key: "level", label: "Level" },
+  { key: "condition", label: "Zustand" },
+  { key: "efficiency", label: "Effizienz" },
+  { key: "upkeep", label: "Unterhalt" },
+  { key: "net", label: "Netto" },
+];
+
+/** Nur echte Felder aus `FacilityRowView`; "default" hält die Katalog-Reihenfolge. */
+function facilitySortValue(facility: FacilityRowView, key: FacilitySortKey): number | string {
+  switch (key) {
+    case "name":
+      return facility.name;
+    case "level":
+      return facility.level;
+    case "condition":
+      return facility.conditionPct;
+    case "efficiency":
+      return facility.efficiencyPct;
+    case "upkeep":
+      return facility.currentUpkeep;
+    case "net":
+      return facility.currentIncome - facility.currentUpkeep;
+    default:
+      return 0;
+  }
+}
+
+function sortFacilityRows(
+  rows: FacilityRowView[],
+  sortKey: FacilitySortKey,
+  direction: FacilitySortDirection,
+): FacilityRowView[] {
+  if (sortKey === "default") return rows;
+  const sign = direction === "asc" ? 1 : -1;
+  return [...rows].sort((left, right) => {
+    const a = facilitySortValue(left, sortKey);
+    const b = facilitySortValue(right, sortKey);
+    if (typeof a === "string" || typeof b === "string") {
+      return sign * String(a).localeCompare(String(b), "de");
+    }
+    return sign * (a - b);
+  });
+}
+
 export default function FacilitiesV2NewLook({
   source,
   managementLocked = false,
@@ -203,6 +262,51 @@ export default function FacilitiesV2NewLook({
   const readOnly = source === "prisma" || managementLocked;
   const [selectedFacilityId, setSelectedFacilityId] = useState<FacilityId | null>(() => facilityRows[0]?.id ?? null);
   const [facilityDialog, setFacilityDialog] = useState<FacilityDialogState>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [wearFilter, setWearFilter] = useState<FacilityWearFilter>("all");
+  const [sort, setSort] = useState<{ key: FacilitySortKey; direction: FacilitySortDirection }>({
+    key: "default",
+    direction: "desc",
+  });
+
+  const wearTallies = useMemo(() => {
+    return facilityRows.reduce(
+      (tallies, facility) => {
+        if (facility.level <= 0) {
+          tallies.unbuilt += 1;
+          return tallies;
+        }
+        tallies[getWearTone(facility)] += 1;
+        return tallies;
+      },
+      { good: 0, warn: 0, risk: 0, unbuilt: 0 },
+    );
+  }, [facilityRows]);
+
+  const visibleFacilityRows = useMemo(() => {
+    const filtered =
+      wearFilter === "all" ? facilityRows : facilityRows.filter((facility) => facility.level > 0 && getWearTone(facility) === wearFilter);
+    return sortFacilityRows(filtered, sort.key, sort.direction);
+  }, [facilityRows, wearFilter, sort]);
+
+  function toggleWearFilter(tone: "good" | "warn" | "risk") {
+    if (wearFilter === tone) {
+      setWearFilter("all");
+      setSort({ key: "default", direction: "desc" });
+      return;
+    }
+    setWearFilter(tone);
+    setSort({ key: "condition", direction: tone === "good" ? "desc" : "asc" });
+  }
+
+  function toggleColumnSort(key: FacilitySortKey) {
+    setSort((current) => {
+      if (current.key !== key) {
+        return { key, direction: key === "name" ? "asc" : "desc" };
+      }
+      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+    });
+  }
 
   const selectedFacility = useMemo(
     () => facilityRows.find((facility) => facility.id === selectedFacilityId) ?? facilityRows[0] ?? null,
@@ -344,6 +448,8 @@ export default function FacilitiesV2NewLook({
             value={formatTransfermarktCurrency(summary.netFacilityResult)}
             tone={summary.netFacilityResult >= 0 ? "good" : "risk"}
             sub="Einnahmen − Unterhalt"
+            title="Klick: Gebäude nach Netto (Einnahmen − Unterhalt) sortieren."
+            onClick={() => setSort({ key: "net", direction: "desc" })}
           />
           <StatChip label="Recovery" value={formatNlNumber(summary.recoveryAfterTraining, 1)} tone="spe" />
           {trainingFacilityEffectPreview ? (
@@ -361,55 +467,172 @@ export default function FacilitiesV2NewLook({
         </StatChipRow>
       </NlCard>
 
-      <div className="nl-facility-grid" data-testid="facilities-v2-grid">
-        {facilityRows.map((facility) => {
-          const wearTone = getWearTone(facility);
-          const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
-          return (
+      <div className="nl-facility-toolbar">
+        <div className="nl-facility-ampel" role="group" aria-label="Portfolio-Zustand">
+          <span className="nl-facility-ampel-label">Zustand</span>
+          {(["good", "warn", "risk"] as const).map((tone) => (
             <button
-              key={facility.id}
+              key={tone}
               type="button"
-              className={`nl-facility-card is-${wearTone}${isSelected ? " is-selected" : ""}`}
-              data-testid={`facilities-v2-card-${facility.id}`}
-              onClick={() => setSelectedFacilityId(facility.id)}
-              title={facility.description}
+              className={`nl-facility-ampel-chip is-${tone}${wearFilter === tone ? " is-active" : ""}`}
+              aria-pressed={wearFilter === tone}
+              title={
+                tone === "good"
+                  ? "Guter Zustand — Klick: filtern & nach Zustand sortieren"
+                  : tone === "warn"
+                    ? "Achtung nötig — Klick: filtern & nach Zustand sortieren"
+                    : "Risiko — Klick: filtern & nach Zustand sortieren"
+              }
+              onClick={() => toggleWearFilter(tone)}
             >
-              <div className="nl-facility-motif" aria-hidden="true">
-                <FacilityMotif facilityId={facility.id} />
-              </div>
-              <div className="nl-facility-card-head">
-                <strong>{facility.name}</strong>
-                <span className="nl-facility-card-level nl-tnum">
-                  {facility.level <= 0 ? "Nicht gebaut" : `Level ${facility.level}`}
-                </span>
-              </div>
-              <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
-              {facility.level > 0 ? (
-                <NlProgressBar
-                  className="nl-facility-wear"
-                  label="Zustand"
-                  value={facility.conditionPct}
-                  max={100}
-                  format={(value) => `${formatNlNumber(value, 0)}%`}
-                  title={`Zustand ${formatNlNumber(facility.conditionPct, 0)}% · Effizienz ${formatNlNumber(facility.efficiencyPct, 0)}% (${facility.conditionStatus})`}
-                />
-              ) : (
-                <small className="nl-facility-unbuilt">{facility.effect}</small>
-              )}
-              <div className="nl-facility-card-stats nl-tnum">
-                <span title="Effizienz">Eff. {formatNlNumber(facility.efficiencyPct, 0)}%</span>
-                <span title="Unterhalt pro Saison">−{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
-                <span
-                  title="Netto (Einnahmen − Unterhalt)"
-                  className={facility.currentIncome - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}
-                >
-                  {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}
-                </span>
-              </div>
+              <span className="nl-facility-ampel-dot" aria-hidden="true" />
+              {tone === "good" ? "Gut" : tone === "warn" ? "Achtung" : "Risiko"}
+              <strong className="nl-tnum">{wearTallies[tone]}</strong>
             </button>
-          );
-        })}
+          ))}
+          {wearTallies.unbuilt > 0 ? (
+            <span className="nl-facility-ampel-chip is-unbuilt" title="Noch nicht gebaut">
+              Nicht gebaut
+              <strong className="nl-tnum">{wearTallies.unbuilt}</strong>
+            </span>
+          ) : null}
+        </div>
+        <NlSubTabs
+          className="nl-facility-view-tabs"
+          aria-label="Ansicht"
+          items={[
+            { id: "cards", label: "Karten" },
+            { id: "list", label: "Liste" },
+          ]}
+          activeId={viewMode}
+          onSelect={(id) => setViewMode(id as "cards" | "list")}
+        />
       </div>
+
+      {viewMode === "cards" ? (
+        <div className="nl-facility-grid" data-testid="facilities-v2-grid">
+          {visibleFacilityRows.map((facility) => {
+            const wearTone = getWearTone(facility);
+            const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
+            return (
+              <button
+                key={facility.id}
+                type="button"
+                className={`nl-facility-card is-${wearTone}${isSelected ? " is-selected" : ""}`}
+                data-testid={`facilities-v2-card-${facility.id}`}
+                onClick={() => setSelectedFacilityId(facility.id)}
+                title={facility.description}
+              >
+                <div className="nl-facility-motif" aria-hidden="true">
+                  <FacilityMotif facilityId={facility.id} />
+                </div>
+                <div className="nl-facility-card-head">
+                  <strong>{facility.name}</strong>
+                  <span className="nl-facility-card-level nl-tnum">
+                    {facility.level <= 0 ? "Nicht gebaut" : `Level ${facility.level}`}
+                  </span>
+                </div>
+                <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
+                {facility.level > 0 ? (
+                  <NlProgressBar
+                    className="nl-facility-wear"
+                    label="Zustand"
+                    value={facility.conditionPct}
+                    max={100}
+                    format={(value) => `${formatNlNumber(value, 0)}%`}
+                    title={`Zustand ${formatNlNumber(facility.conditionPct, 0)}% · Effizienz ${formatNlNumber(facility.efficiencyPct, 0)}% (${facility.conditionStatus})`}
+                  />
+                ) : (
+                  <small className="nl-facility-unbuilt">{facility.effect}</small>
+                )}
+                <div className="nl-facility-card-stats nl-tnum">
+                  <span title="Effizienz">Eff. {formatNlNumber(facility.efficiencyPct, 0)}%</span>
+                  <span title="Unterhalt pro Saison">−{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
+                  <span
+                    title="Netto (Einnahmen − Unterhalt)"
+                    className={facility.currentIncome - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}
+                  >
+                    {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="nl-facility-list-wrap" data-testid="facilities-v2-list">
+          <table className="nl-facility-list-table">
+            <thead>
+              <tr>
+                {FACILITY_LIST_COLUMNS.map((column) => (
+                  <th key={column.key}>
+                    <button
+                      type="button"
+                      className={`nl-facility-list-header-button${sort.key === column.key ? " is-active" : ""}`}
+                      onClick={() => toggleColumnSort(column.key)}
+                    >
+                      {column.label}
+                      {sort.key === column.key ? (
+                        <span aria-hidden="true">{sort.direction === "asc" ? " ▲" : " ▼"}</span>
+                      ) : null}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleFacilityRows.map((facility) => {
+                const wearTone = getWearTone(facility);
+                const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
+                return (
+                  <tr
+                    key={facility.id}
+                    className={`nl-facility-list-row is-${wearTone}${isSelected ? " is-selected" : ""}`}
+                    data-testid={`facilities-v2-list-row-${facility.id}`}
+                    onClick={() => setSelectedFacilityId(facility.id)}
+                  >
+                    <td>{facility.name}</td>
+                    <td className="nl-tnum">{facility.level <= 0 ? "—" : `L${facility.level}`}</td>
+                    <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.conditionPct, 0)}%` : "—"}</td>
+                    <td className="nl-tnum">{facility.level > 0 ? `${formatNlNumber(facility.efficiencyPct, 0)}%` : "—"}</td>
+                    <td className="nl-tnum">−{formatTransfermarktCurrency(facility.currentUpkeep)}</td>
+                    <td className={`nl-tnum ${facility.currentIncome - facility.currentUpkeep >= 0 ? "is-positive" : "is-negative"}`}>
+                      {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeFacility ? (
+        <NlCard
+          className="nl-facility-curve-card"
+          eyebrow="Ausbau-Kurve"
+          title={`${activeFacility.name} · Kosten L1→L${FACILITY_MAX_LEVEL}`}
+        >
+          <NlBarChart
+            aria-label={`Upgrade-Kosten je Ausbaustufe für ${activeFacility.name}`}
+            format={(value) => formatTransfermarktCurrency(value)}
+            bars={Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
+              const targetLevel = index + 1;
+              const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
+              return {
+                label: `L${targetLevel}`,
+                value: definition?.upgradeCost ?? 0,
+                tone:
+                  targetLevel <= activeFacility.level
+                    ? "good"
+                    : targetLevel === activeFacility.level + 1
+                      ? "accent"
+                      : "neutral",
+              };
+            })}
+          />
+        </NlCard>
+      ) : null}
 
       {activeFacility ? (
         <footer className="nl-facility-action-bar" data-testid="facilities-v2-action-bar">
@@ -422,6 +645,21 @@ export default function FacilitiesV2NewLook({
                 ? `Upgrade ${formatTransfermarktCurrency(activeFacility.upgradeCost)}`
                 : "Max-Level"}
             </small>
+            {activeFacility.upgradeCost != null ? (
+              <div className="nl-facility-action-consequence" aria-label="Konsequenz-Vorschau nach Upgrade">
+                <NlDeltaChip
+                  value={activeFacility.nextIncome - activeFacility.currentIncome}
+                  format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Einnahmen`}
+                  title="Einnahmen-Änderung nach Upgrade auf die nächste Stufe"
+                />
+                <NlDeltaChip
+                  value={activeFacility.nextUpkeep - activeFacility.currentUpkeep}
+                  format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} Unterhalt`}
+                  invert
+                  title="Unterhalts-Änderung nach Upgrade auf die nächste Stufe"
+                />
+              </div>
+            ) : null}
           </div>
           <div className="nl-facility-action-buttons">
             <button

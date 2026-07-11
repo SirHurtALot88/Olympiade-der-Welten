@@ -123,6 +123,49 @@ function getToneBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
   return "stabil";
 }
 
+/** Sanftes Scrollen respektiert `prefers-reduced-motion` statt es zu ignorieren. */
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+type TrainingSortKey = "default" | "net" | "risk" | "training" | "performance" | "name";
+
+const TRAINING_SORT_OPTIONS: Array<{ id: TrainingSortKey; label: string }> = [
+  { id: "default", label: "Standard" },
+  { id: "net", label: "Netto-Forecast" },
+  { id: "risk", label: "Rückschritt-Risiko" },
+  { id: "training", label: "Trainingsplan" },
+  { id: "performance", label: "Performance" },
+  { id: "name", label: "Name" },
+];
+
+/** Sortiert eine Kopie der echten Kader-Zeilen nach real vorhandenen Feldern. */
+function sortTrainingPlayerRows(rows: TrainingPlayerRowView[], sortKey: TrainingSortKey): TrainingPlayerRowView[] {
+  if (sortKey === "default") return rows;
+  const sorted = [...rows];
+  switch (sortKey) {
+    case "net":
+      sorted.sort((left, right) => right.organicForecast.netSetpoints - left.organicForecast.netSetpoints);
+      break;
+    case "risk":
+      sorted.sort((left, right) => right.forecast.regressionPressure - left.forecast.regressionPressure);
+      break;
+    case "training":
+      sorted.sort((left, right) => right.trainingXp - left.trainingXp);
+      break;
+    case "performance":
+      sorted.sort((left, right) => right.performanceXp - left.performanceXp);
+      break;
+    case "name":
+      sorted.sort((left, right) => left.player.name.localeCompare(right.player.name, "de"));
+      break;
+    default:
+      break;
+  }
+  return sorted;
+}
+
 /**
  * Haupt-Takeaway pro Spieler (immer sichtbar): Netto-Delta + Hauptgrund.
  * Nutzt dieselben echten Forecast-Felder wie die bisherige "Warum?"-Disclosure.
@@ -419,6 +462,8 @@ export default function TrainingCompactNewLook({
   onOpenTeams,
 }: TrainingCompactClientProps) {
   const trainingModeReadOnly = managementLocked;
+  const [sortKey, setSortKey] = useState<TrainingSortKey>("default");
+  const sortedPlayerRows = useMemo(() => sortTrainingPlayerRows(playerRows, sortKey), [playerRows, sortKey]);
   const modeSegments = useMemo(
     () =>
       buildTrainingModeSegments(
@@ -510,7 +555,15 @@ export default function TrainingCompactNewLook({
             value={`${developmentSummary.growth} steigt`}
             sub={`${developmentSummary.stable} stabil · ${developmentSummary.regression} Risiko`}
             tone="good"
-            title="Saisonende-Sicht auf Klasse, Potential und erwartete Richtung."
+            title="Saisonende-Sicht auf Klasse, Potential und erwartete Richtung. Klick: zu Upgrade-bereiten Spielern springen."
+            onClick={() => {
+              onSetDevelopmentFilter("growth");
+              if (typeof document !== "undefined") {
+                document
+                  .getElementById("training-development-filters")
+                  ?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+              }
+            }}
           />
         </StatChipRow>
         <p className="nl-training-topline">
@@ -550,7 +603,7 @@ export default function TrainingCompactNewLook({
         </div>
       </NlCard>
 
-      <div className="nl-training-filter-row" role="group" aria-label="Entwicklungsfilter">
+      <div className="nl-training-filter-row" id="training-development-filters" role="group" aria-label="Entwicklungsfilter">
         {DEVELOPMENT_FILTERS.map((filter) => (
           <button
             key={filter.id}
@@ -564,6 +617,21 @@ export default function TrainingCompactNewLook({
             <strong className="nl-tnum">{developmentSummary[filter.id]}</strong>
           </button>
         ))}
+        <label className="nl-training-sort">
+          <span>Sortierung</span>
+          <select
+            className="input"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as TrainingSortKey)}
+            aria-label="Kader sortieren"
+          >
+            {TRAINING_SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="nl-training-filter-count nl-tnum">
           {playerRows.length}/{allPlayerCount}
         </span>
@@ -578,7 +646,7 @@ export default function TrainingCompactNewLook({
         />
       ) : (
         <div className="nl-training-grid">
-          {playerRows.map((row) => (
+          {sortedPlayerRows.map((row) => (
             <NlTrainingPlayerCard
               key={row.entryId}
               row={row}

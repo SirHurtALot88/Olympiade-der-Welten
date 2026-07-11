@@ -1,6 +1,6 @@
 "use client";
 
-import { NlCard, NlProgressBar, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
+import { NlCard, NlProgressBar, NlSparkline, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 
@@ -27,12 +27,24 @@ function resolveCatalogFacilityId(facilityId: string): FacilityId | null {
   return entry ? entry.facilityId : null;
 }
 
+/** Nur für Cash-Einkommens-Gebäude (`effectType === "season_income"`) hat der Katalog eine echte L1→L5 Einnahmen-Kurve. */
+function resolveIncomeCurve(catalogId: FacilityId | null): number[] | null {
+  if (catalogId == null) return null;
+  const entry = FACILITY_CATALOG.find((catalogEntry) => catalogEntry.facilityId === catalogId);
+  if (!entry || entry.effectType !== "season_income") return null;
+  const values = entry.levels.map((level) => level.seasonIncome ?? 0);
+  return values.every((value) => value === 0) ? null : values;
+}
+
 function FacilityOverviewCard({ facility }: { facility: FacilitiesOverviewV2Snapshot }) {
   const catalogId = resolveCatalogFacilityId(facility.facilityId);
   const nextDefinition =
     catalogId != null && facility.level < facility.maxLevel
       ? getFacilityLevelDefinition(catalogId, facility.level + 1)
       : null;
+  const incomeCurve = resolveIncomeCurve(catalogId);
+  const currentIncome =
+    catalogId != null && facility.level > 0 ? getFacilityLevelDefinition(catalogId, facility.level)?.seasonIncome ?? null : null;
 
   return (
     <NlCard
@@ -55,6 +67,21 @@ function FacilityOverviewCard({ facility }: { facility: FacilitiesOverviewV2Snap
         <span>Wartung / Saison</span>
         <strong>{formatTransfermarktCurrency(facility.upkeep)}</strong>
       </div>
+      {incomeCurve ? (
+        <div className="nl-facility-overview-income-curve" data-testid="nl-facility-overview-income-curve">
+          <span className="nl-facility-overview-income-curve-label">Einnahmen-Progression L1→L{facility.maxLevel}</span>
+          <NlSparkline
+            points={incomeCurve}
+            tone="good"
+            aria-label={`Saison-Einnahmen je Ausbaustufe für ${facility.label}`}
+          />
+          <small className="nl-tnum">
+            {facility.level > 0 && currentIncome != null
+              ? `Aktuell L${facility.level}: ${formatTransfermarktCurrency(currentIncome)}/Saison`
+              : "Noch nicht gebaut"}
+          </small>
+        </div>
+      ) : null}
       {nextDefinition ? (
         <div className="nl-facility-overview-upgrade" data-testid="nl-facility-overview-upgrade">
           <span className="nl-facility-overview-upgrade-kicker">
