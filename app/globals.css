@@ -51125,7 +51125,9 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-teams-development-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* auto-fit, damit die Metriken (Rang/Punkte/MW/Cash) je nach Breite
+     3-/4-spaltig fließen statt eine Einzel-Spalte umzubrechen. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--nl-s3);
 }
 

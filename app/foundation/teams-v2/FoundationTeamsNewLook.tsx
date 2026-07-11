@@ -440,10 +440,14 @@ export default function FoundationTeamsNewLook({
       isFiniteNumber(liveHistoryRow.marketValue) && isFiniteNumber(previousSeasonRow.marketValue)
         ? liveHistoryRow.marketValue - previousSeasonRow.marketValue
         : null;
-    if (rankDelta == null && pointsDelta == null && marketValueDelta == null) {
+    const cashDelta =
+      isFiniteNumber(liveHistoryRow.cash) && isFiniteNumber(previousSeasonRow.cash)
+        ? liveHistoryRow.cash - previousSeasonRow.cash
+        : null;
+    if (rankDelta == null && pointsDelta == null && marketValueDelta == null && cashDelta == null) {
       return null;
     }
-    return { rankDelta, pointsDelta, marketValueDelta };
+    return { rankDelta, pointsDelta, marketValueDelta, cashDelta };
   }, [liveHistoryRow, previousSeasonRow]);
 
   const developmentSeries = useMemo(() => {
@@ -464,6 +468,7 @@ export default function FoundationTeamsNewLook({
         tone: row.isLive ? ("accent" as const) : ("neutral" as const),
       }));
     const marketValueSpark = developmentRows.filter((row) => isFiniteNumber(row.marketValue)).map((row) => row.marketValue as number);
+    const cashSpark = developmentRows.filter((row) => isFiniteNumber(row.cash)).map((row) => row.cash as number);
     return {
       rankSpark,
       bestRank: rankValues.length > 0 ? Math.min(...rankValues) : null,
@@ -474,6 +479,9 @@ export default function FoundationTeamsNewLook({
       marketValueSpark,
       marketValueFirst: marketValueSpark.length > 0 ? marketValueSpark[0] : null,
       marketValueLast: marketValueSpark.length > 0 ? marketValueSpark[marketValueSpark.length - 1] : null,
+      cashSpark,
+      cashFirst: cashSpark.length > 0 ? cashSpark[0] : null,
+      cashLast: cashSpark.length > 0 ? cashSpark[cashSpark.length - 1] : null,
     };
   }, [developmentRows, teamCount]);
 
@@ -495,6 +503,13 @@ export default function FoundationTeamsNewLook({
 
   function handleHeroAxisSortSelect(key: NlAxisKey) {
     setBoardSort({ key, dir: "asc" });
+    scrollToSection(leagueCardRef);
+  }
+
+  // Portal: eine Hero-Kachel (MW/Cash) klicken → Teamtabelle danach sortieren
+  // und dorthin scrollen. „Klick MW → alle Teams nach Marktwert sortiert."
+  function handleHeroBoardSortSelect(key: NlTeamsBoardSortKey, dir: NlTeamsBoardSortDir) {
+    setBoardSort({ key, dir });
     scrollToSection(leagueCardRef);
   }
 
@@ -836,7 +851,16 @@ export default function FoundationTeamsNewLook({
             .filter(isFiniteNumber)
             .map((rank) => teamCount - rank + 1)
         : [];
-    const hasTrend = seasonPointsSpark.length >= 2;
+    // Ökonomie-Trajektorie je Team: echte Snapshot-Endwerte + Live-Wert.
+    // Fehlende Felder werden herausgefiltert (kein Fake).
+    const economySeasons = row.historicalEconomyBySeason ?? [];
+    const marketValueSpark = [...economySeasons.map((entry) => entry.marketValueTotal), row.marketValueTotal].filter(
+      isFiniteNumber,
+    );
+    const cashSpark = [...economySeasons.map((entry) => entry.cash), row.cash].filter(isFiniteNumber);
+    const hasPointsTrend = seasonPointsSpark.length >= 2;
+    const hasEconomyTrend = marketValueSpark.length >= 2 || cashSpark.length >= 2;
+    const hasTrend = hasPointsTrend || hasEconomyTrend;
     if (radarAxes.length === 0 && !hasTrend) {
       return null;
     }
@@ -853,14 +877,28 @@ export default function FoundationTeamsNewLook({
                 {historicalSeasons.length + 1} Saisons
                 {isFiniteNumber(row.historicalBestRank) ? ` · Best #${formatNlNumber(row.historicalBestRank, 0)}` : ""}
               </span>
-              <span className="nl-teams-board-hover-trend">
-                <small>Punkte</small>
-                <NlSparkline points={seasonPointsSpark} tone="accent" />
-              </span>
+              {hasPointsTrend ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Punkte</small>
+                  <NlSparkline points={seasonPointsSpark} tone="accent" />
+                </span>
+              ) : null}
               {seasonRankSpark.length >= 2 ? (
                 <span className="nl-teams-board-hover-trend">
                   <small>Rang (oben = besser)</small>
                   <NlSparkline points={seasonRankSpark} tone="good" />
+                </span>
+              ) : null}
+              {marketValueSpark.length >= 2 ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Marktwert</small>
+                  <NlSparkline points={marketValueSpark} tone="warn" />
+                </span>
+              ) : null}
+              {cashSpark.length >= 2 ? (
+                <span className="nl-teams-board-hover-trend">
+                  <small>Cash</small>
+                  <NlSparkline points={cashSpark} tone="good" />
                 </span>
               ) : null}
             </div>
@@ -1050,15 +1088,14 @@ export default function FoundationTeamsNewLook({
                   label="Cash"
                   value={heroRow?.cash != null ? formatMoney(heroRow.cash) : "—"}
                   tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
+                  title="Cash — sortiert die Teamtabelle nach Cash"
+                  onClick={() => handleHeroBoardSortSelect("cash", "desc")}
                 />
                 <StatChip
                   label="MW"
                   value={formatNlNumber(heroRow?.marketValueTotal, 2)}
-                  title="Marktwert gesamt — öffnet die Kadertabelle"
-                  onClick={() => {
-                    setRosterMode("tabelle");
-                    scrollToSection(rosterCardRef);
-                  }}
+                  title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
+                  onClick={() => handleHeroBoardSortSelect("mw", "desc")}
                 />
                 <StatChip
                   label="Gehalt"
@@ -1235,6 +1272,36 @@ export default function FoundationTeamsNewLook({
                     <p className="nl-teams-development-meta">
                       {developmentSeries.marketValueFirst != null && developmentSeries.marketValueLast != null
                         ? `von ${formatNlNumber(developmentSeries.marketValueFirst, 2)} auf ${formatNlNumber(developmentSeries.marketValueLast, 2)}`
+                        : "—"}
+                    </p>
+                  </article>
+                  <article className="nl-teams-development-metric">
+                    <header className="nl-teams-development-head">
+                      <span className="nl-teams-development-label">Cash</span>
+                      <span className="nl-teams-development-value nl-tnum">
+                        {liveHistoryRow?.cash != null ? formatMoney(liveHistoryRow.cash) : "—"}
+                      </span>
+                      {seasonDeltas?.cashDelta != null ? (
+                        <NlDeltaChip
+                          value={seasonDeltas.cashDelta}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatMoney(n)}`}
+                          title={`Cash ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
+                        />
+                      ) : null}
+                    </header>
+                    {developmentSeries.cashSpark.length >= 2 ? (
+                      <NlSparkline
+                        points={developmentSeries.cashSpark}
+                        tone="good"
+                        className="nl-teams-development-spark"
+                        aria-label={`Cash-Verlauf von ${selectedTeam.name} über ${developmentRows.length} Saisons`}
+                      />
+                    ) : (
+                      <p className="nl-teams-empty">Kein Cash-Verlauf vorhanden.</p>
+                    )}
+                    <p className="nl-teams-development-meta">
+                      {developmentSeries.cashFirst != null && developmentSeries.cashLast != null
+                        ? `von ${formatMoney(developmentSeries.cashFirst)} auf ${formatMoney(developmentSeries.cashLast)}`
                         : "—"}
                     </p>
                   </article>
