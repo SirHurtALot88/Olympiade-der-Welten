@@ -17,6 +17,8 @@ import { getTeamsNeedingPostOptUpgradeDeploy, teamNeedsPostOptUpgradeDeploy } fr
 import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { runPreseasonBatchPickRebuild } from "@/lib/ai/preseason-batch-pick-rebuild-service";
 import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
+import { isInSeasonEngineV2Enabled } from "@/lib/ai/in-season-engine/plan-transfer-window-for-team";
+import { runTransferWindowSessionV2 } from "@/lib/ai/ai-transfer-window-session-v2-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import {
   createLocalTransfermarktRunContext,
@@ -263,7 +265,12 @@ async function runTeamCycle(input: {
   return { appliedSells, appliedBuys, warnings, applyResult: applyResult ?? undefined };
 }
 
-export async function runTransferWindowSession(input: TransferWindowSessionInput): Promise<TransferWindowSessionResult> {
+/**
+ * Legacy in-season transfer-window orchestration. Kept as the proven default until the clean-engine
+ * (V2) driver's internal loop rewrite lands and parity is flipped on. Reached via the
+ * `runTransferWindowSession` dispatcher below (or directly with `OLY_INSEASON_ENGINE_V2=0`).
+ */
+export async function runTransferWindowSessionLegacy(input: TransferWindowSessionInput): Promise<TransferWindowSessionResult> {
   const persistence = input.persistence ?? createPersistenceService();
   const save = persistence.getSaveById(input.saveId);
   if (!save) throw new Error("Save missing for transfer window session.");
@@ -785,4 +792,17 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     skipped: false,
     roundHistory: [],
   };
+}
+
+/**
+ * Public entry point for the in-season transfer window. Dispatches between the proven legacy
+ * orchestration and the clean-engine (V2) driver based on the `OLY_INSEASON_ENGINE_V2` flag. The
+ * flag defaults OFF, so every existing caller keeps running the legacy path unchanged until the
+ * cutover is deliberately flipped in a follow-up. Same input/result contract for both engines.
+ */
+export async function runTransferWindowSession(input: TransferWindowSessionInput): Promise<TransferWindowSessionResult> {
+  if (isInSeasonEngineV2Enabled()) {
+    return runTransferWindowSessionV2(input);
+  }
+  return runTransferWindowSessionLegacy(input);
 }
