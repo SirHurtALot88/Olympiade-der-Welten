@@ -184,6 +184,30 @@ export default function TransferHistoryV2NewLook({
     [seasonBreakdown],
   );
 
+  // Transferbilanz über Seasons: Netto (Einnahmen − Ausgaben) je Season-Label,
+  // gleiche Buy/Sell-Aufteilung wie `summary.netTransferBalance`
+  // (`sellFee − buyFee`, `contract_exit` zählt dort bewusst nicht mit) —
+  // reine Umgruppierung von `filteredRows`, keine neuen Werte.
+  const seasonNetBars = useMemo(() => {
+    const spendByLabel = new Map<string, number>();
+    const incomeByLabel = new Map<string, number>();
+    for (const row of filteredRows) {
+      if (row.type === "buy") {
+        spendByLabel.set(row.seasonLabel, (spendByLabel.get(row.seasonLabel) ?? 0) + row.fee);
+      } else if (row.type === "sell") {
+        incomeByLabel.set(row.seasonLabel, (incomeByLabel.get(row.seasonLabel) ?? 0) + row.fee);
+      }
+    }
+    return seasonBreakdown.map(([label]) => {
+      const net = (incomeByLabel.get(label) ?? 0) - (spendByLabel.get(label) ?? 0);
+      return { label, value: net, tone: net >= 0 ? ("good" as const) : ("risk" as const) };
+    });
+  }, [filteredRows, seasonBreakdown]);
+
+  // Nur zeigen, wenn wirklich mehrere Seasons im Scope stecken — bei genau
+  // einer Season entspricht der Balken 1:1 dem "Netto"-Chip oben.
+  const showSeasonNetChart = isAllSeasons || seasonBreakdown.length >= 2;
+
   // #74: Season-Balken klickbar → Saison-Filter. Mappt den Season-Label aus
   // `seasonBreakdown` auf die echte `seasonId` aus `seasonOptions` (gleiche
   // kanonische Labels) — ohne Match bleibt der Balken nicht-klickbar statt
@@ -824,6 +848,19 @@ export default function TransferHistoryV2NewLook({
                   <small className="nl-thist-spotlight-meta nl-tnum">
                     {seasonMwVolume[0]?.label} – {seasonMwVolume[seasonMwVolume.length - 1]?.label}
                   </small>
+                </div>
+              ) : null}
+              {showSeasonNetChart ? (
+                <div className="nl-thist-season-net">
+                  <span className="nl-thist-eyebrow">Transferbilanz über Seasons (Netto)</span>
+                  <div className="nl-thist-season-net-scroll">
+                    <NlBarChart
+                      bars={seasonNetBars}
+                      format={(value) => formatNlSignedMoney(value)}
+                      aria-label="Netto-Transferbilanz je Season (Einnahmen minus Ausgaben)"
+                      className="nl-thist-season-net-chart"
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>

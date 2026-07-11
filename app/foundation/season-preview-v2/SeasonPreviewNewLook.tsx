@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
+  NlBarChart,
   NlCard,
   NlDeltaChip,
   NlProgressBar,
@@ -132,6 +133,37 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
   const tieGroups = standingsPreviewFeed?.tieGroups ?? [];
 
   const summary = standingsPreviewFeed?.summary ?? null;
+
+  // Eigenes Team: `team.humanControlled`-Marker aus `gameState.teams`
+  // (dieselbe Quelle, die auch die Ranks-/Prize-Seiten als "Dein Team" nutzen).
+  const ownTeamId = useMemo(
+    () => gameState.teams.find((team) => team.humanControlled)?.teamId ?? null,
+    [gameState.teams],
+  );
+  const ownRow = useMemo(
+    () => (ownTeamId != null ? rows.find((row) => row.teamId === ownTeamId) ?? null : null),
+    [ownTeamId, rows],
+  );
+
+  // Punkte-Delta je Team aus diesem Spieltag — existiert nur, wenn die Engine
+  // wirklich projizierte Punkte liefert (`hasProjectedPoints`); sonst leer.
+  const pointsDeltaBars = useMemo(() => {
+    if (!hasProjectedPoints) {
+      return [];
+    }
+    return rows
+      .filter((row) => row.pointsDelta != null)
+      .map((row) => {
+        const team = teamById.get(row.teamId);
+        const delta = row.pointsDelta as number;
+        return {
+          label: team?.shortCode ?? row.teamName.slice(0, 3).toUpperCase(),
+          value: delta,
+          tone: row.teamId === ownTeamId ? ("accent" as const) : delta >= 0 ? ("good" as const) : ("risk" as const),
+        };
+      })
+      .sort((left, right) => right.value - left.value);
+  }, [hasProjectedPoints, rows, teamById, ownTeamId]);
 
   function renderProjectionCell(row: FoundationStandingsPreviewItem) {
     if (!hasProjection || (row.currentRank == null && row.projectedRank == null)) {
@@ -329,6 +361,51 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
           </p>
         ) : null}
       </NlCard>
+
+      {hasProjectedPoints && ownRow ? (
+        <NlCard className="nl-spreview-own-card" eyebrow="Dein Team" title="Rang- und Punkte-Forecast">
+          <StatChipRow aria-label="Forecast-Eckwerte deines Teams">
+            <StatChip label="Rang vorher" value={ownRow.currentRank ?? "—"} tone="neutral" />
+            <StatChip
+              label="Rang projiziert"
+              value={ownRow.projectedRank ?? "—"}
+              tone="accent"
+              sub={
+                ownRow.currentRank != null && ownRow.projectedRank != null && ownRow.currentRank !== ownRow.projectedRank
+                  ? ownRow.currentRank > ownRow.projectedRank
+                    ? `klettert ${ownRow.currentRank - ownRow.projectedRank}`
+                    : `fällt ${ownRow.projectedRank - ownRow.currentRank}`
+                  : undefined
+              }
+            />
+            <StatChip
+              label="Punkte-Delta"
+              value={
+                ownRow.pointsDelta != null
+                  ? `${ownRow.pointsDelta > 0 ? "+" : ""}${formatNlNumber(ownRow.pointsDelta, 1)}`
+                  : "—"
+              }
+              tone={ownRow.pointsDelta == null ? "neutral" : ownRow.pointsDelta >= 0 ? "good" : "risk"}
+              title="Punkte-Delta aus diesem Spieltag"
+            />
+            <StatChip
+              label="Tagesrang"
+              value={ownRow.matchdayRank != null ? `#${ownRow.matchdayRank}` : "—"}
+              tone="neutral"
+            />
+          </StatChipRow>
+          {pointsDeltaBars.length > 0 ? (
+            <div className="nl-spreview-delta-chart-scroll">
+              <NlBarChart
+                bars={pointsDeltaBars}
+                format={(value) => `${value > 0 ? "+" : ""}${formatNlNumber(value, 1)}`}
+                aria-label="Punkte-Delta je Team aus diesem Spieltag (Dein Team hervorgehoben)"
+                className="nl-spreview-delta-chart"
+              />
+            </div>
+          ) : null}
+        </NlCard>
+      ) : null}
 
       {rows.length === 0 ? (
         <NlCard className="nl-spreview-empty-card">

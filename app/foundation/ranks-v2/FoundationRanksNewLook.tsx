@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
+  NlBarChart,
   NlCard,
   NlMedalBadge,
   NlProgressBar,
@@ -122,6 +123,19 @@ export default function FoundationRanksNewLook({
   const ownValue = ownEntry ? getMetricValue(ownEntry.row, metric) : null;
   const gapToTop = ownValue != null ? topValue - ownValue : null;
 
+  // Ein Balken je Team für die aktive Metrik, bereits nach `rankedRows`
+  // (rang-)sortiert; eigenes Team über `humanControlled` hervorgehoben.
+  // Kein Verlauf/History hier — die Props liefern keine Vor-Werte.
+  const metricBars = useMemo(
+    () =>
+      rankedRows.map(({ row }) => ({
+        label: row.team.shortCode,
+        value: getMetricValue(row, metric),
+        tone: row.team.humanControlled ? ("accent" as const) : ("neutral" as const),
+      })),
+    [rankedRows, metric],
+  );
+
   return (
     <section className="nl-ranks" data-testid="foundation-ranks" id="foundation-ranks" data-new-look="true">
       <NlCard
@@ -188,6 +202,16 @@ export default function FoundationRanksNewLook({
               )
             ) : null}
           </StatChipRow>
+        ) : null}
+        {metricBars.length > 0 ? (
+          <div className="nl-ranks-metric-chart-scroll">
+            <NlBarChart
+              bars={metricBars}
+              format={(value) => formatNlNumber(value, 1)}
+              aria-label={`PPs ${activeMetric.label} je Team, sortiert (Dein Team hervorgehoben)`}
+              className="nl-ranks-metric-chart"
+            />
+          </div>
         ) : null}
         <p className="nl-ranks-hint">
           Summe aus POW, SPE, MEN und SOC je Team. Formkartenbonus (z.&nbsp;B. +8) ist bereits in den Punkten enthalten.

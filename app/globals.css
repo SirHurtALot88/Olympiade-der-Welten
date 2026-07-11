@@ -42687,6 +42687,20 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Leaderboard-Balkendiagramm für die aktive Metrik (Gesamt/POW/SPE/MEN/SOC),
+   demselben Grammatik-Muster wie der Prize-Forecast folgend. */
+.is-new-look .nl-ranks-metric-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+  margin: 0 0 var(--nl-s3);
+}
+
+.is-new-look .nl-ranks-metric-chart {
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+}
+
 /* Liga-Überblick (Ø / Spannweite / eigenes Team / Abstand zu #1) über dem Board. */
 .is-new-look .nl-ranks-statrow {
   margin: 0 0 var(--nl-s3);
@@ -46052,6 +46066,26 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s1);
 }
 
+/* Transferbilanz über Seasons: Netto-Balkendiagramm (Ton nach Vorzeichen),
+   demselben Grammatik-Muster wie der Prize-Forecast folgend. */
+.is-new-look .nl-thist-season-net {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-thist-season-net-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-thist-season-net-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 420px;
+  height: auto;
+}
+
 @media (max-width: 1200px) {
   .is-new-look .nl-thist-layout {
     grid-template-columns: minmax(300px, 1.3fr) minmax(260px, 1fr);
@@ -48343,6 +48377,25 @@ button.foundation-team-portrait-card {
   margin: var(--nl-s2) 0 0;
   font-size: 12px;
   color: var(--nl-mut);
+}
+
+/* Forecast-Karte "Dein Team": KPI-Chips + Punkte-Delta-Balkendiagramm,
+   demselben Grammatik-Muster wie die Prize-Forecast-Karte folgend. */
+.is-new-look .nl-spreview-own-card .nl-stat-chip-row {
+  margin: 0 0 var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-spreview-delta-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: var(--nl-s1, 4px);
+}
+
+.is-new-look .nl-spreview-delta-chart {
+  width: 100%;
+  min-width: 360px;
+  max-width: 720px;
+  height: auto;
 }
 
 .is-new-look .nl-spreview-board {
