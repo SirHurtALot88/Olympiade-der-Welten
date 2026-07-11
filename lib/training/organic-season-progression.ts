@@ -161,7 +161,7 @@ const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
  * reflected in progression. "leicht"/"hart" stay at their prior balance. Small and
  * graduated on purpose (+12%); see progress-log.md for the pre/post comparison.
  */
-const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, number> = {
+export const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, number> = {
   leicht: 1.0,
   mittel: 1.12,
   hart: 1.0,

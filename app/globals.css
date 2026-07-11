@@ -46054,6 +46054,148 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* ------------------------------------------------------------
+   Training — D1/D2 Pro-Spieler, pro-Intensität Prognose +
+   Potential-Indikator und D3 Klassen-Vorschlag. Additiv,
+   flag-gated (nur unter .is-new-look). Nutzt nur echte,
+   aus buildTrainingIntensityProjection abgeleitete Werte.
+   ------------------------------------------------------------ */
+.is-new-look .nl-training-intensity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-2, 10px);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-training-intensity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-training-intensity-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-training-potential {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-training-potential.is-high {
+  color: var(--nl-good);
+  border-color: color-mix(in srgb, var(--nl-good) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-good) 12%, transparent);
+}
+
+.is-new-look .nl-training-potential.is-good {
+  color: var(--nl-accent);
+  border-color: color-mix(in srgb, var(--nl-accent) 40%, transparent);
+}
+
+.is-new-look .nl-training-potential.is-low {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 40%, transparent);
+}
+
+.is-new-look .nl-training-intensity-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-training-intensity-row {
+  display: grid;
+  grid-template-columns: 66px 1fr auto auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: var(--nl-r-1, 6px);
+}
+
+.is-new-look .nl-training-intensity-row.is-current {
+  background: color-mix(in srgb, var(--nl-accent) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-training-intensity-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--nl-ink, var(--nl-mut));
+}
+
+.is-new-look .nl-training-intensity-current {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-training-intensity-bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-line);
+  overflow: hidden;
+}
+
+.is-new-look .nl-training-intensity-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--nl-good);
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .nl-training-intensity-row.is-current .nl-training-intensity-fill {
+  background: var(--nl-accent);
+}
+
+.is-new-look .nl-training-intensity-gain {
+  font-weight: 700;
+  color: var(--nl-good);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-training-intensity-gain small {
+  font-weight: 500;
+  color: var(--nl-mut);
+  margin-left: 2px;
+}
+
+.is-new-look .nl-training-intensity-net {
+  justify-self: end;
+}
+
+.is-new-look .nl-training-intensity-foot {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-training-chip.is-class-suggest {
+  color: var(--nl-soc);
+  border-color: color-mix(in srgb, var(--nl-soc) 50%, transparent);
+  background: color-mix(in srgb, var(--nl-soc) 12%, transparent);
+}
+
 /* ============================================================
    "Neuer Look" — Seite: Gebäude (.nl-facility) + Übersicht
    Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
