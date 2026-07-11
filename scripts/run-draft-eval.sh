@@ -46,4 +46,6 @@ console.log(`--- Liga-Ø: Kern% ${Math.round(kernSum/n)} · MW ${Math.round(mwSu
 const mid=rows.reduce((s,r)=>s+r.c.Core+r.c.Depth+r.c.Backup,0), res=rows.reduce((s,r)=>s+r.c.Reserve,0), star=rows.reduce((s,r)=>s+r.c.Superstar+r.c.Star,0);
 console.log(`--- Liga gesamt: Stars ${star} · Mitte(Core/Depth/Backup) ${mid} · Reserve ${res}`);
 ' "$SAVE" 2>/dev/null
+echo; echo "===== Dispersion & Identitäts-Korrelation ====="
+npx tsx scripts/export-dispersion-metrics.ts --save-id "$SAVE" 2>/dev/null
 echo "[draft-eval] done · $OUT"
