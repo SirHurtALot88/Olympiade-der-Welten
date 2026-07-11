@@ -56596,3 +56596,363 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .nl-records-career-list {
   gap: 4px;
 }
+
+/* ===================================================================
+   "Neuer Look" — Scouting-Center Wave 2 (Erkenntnis-Ladder + Shortlist-Board)
+   Scratch file — merge under `.is-new-look` in app/globals.css.
+   Namespacing: everything below is `.nl-scout-ladder-*` (task 1,
+   ScoutingKnowledgeLadder) or `.nl-scout-shortlist-*` (task 2,
+   ScoutingShortlistBoard) — both sub-families of the existing
+   `.nl-scout-*` scouting-center namespace, so they only ever apply
+   inside `.is-new-look` and never leak into the old look.
+   =================================================================== */
+
+/* --- Erkenntnis-Ladder (ScoutingKnowledgeLadder) ------------------- */
+
+.is-new-look .nl-scout-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-bottom: var(--nl-s3);
+  padding-bottom: var(--nl-s3);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-scout-ladder-rail {
+  display: flex;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-scout-ladder-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 58px;
+  flex: 1 1 0;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut-2);
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-ladder-step small {
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-scout-ladder-dot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-ladder-step.is-reached {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-accent) 35%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-scout-ladder-step.is-reached .nl-scout-ladder-dot {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-ladder-step.is-current {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  box-shadow: 0 0 0 1px var(--nl-accent), var(--nl-e1);
+}
+
+.is-new-look .nl-scout-ladder-step.is-current .nl-scout-ladder-dot {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-scout-ladder-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* "Vorher → Nachher"-Reveal-Moment */
+.is-new-look .nl-scout-ladder-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 40%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-good) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-scout-ladder-reveal-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-ladder-reveal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  font-size: 12.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-ladder-reveal-row strong {
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-ladder-reveal-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.is-new-look .nl-scout-ladder-trait-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-scout-ladder-trait-pill.is-positive {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-ladder-trait-pill.is-negative {
+  border-color: color-mix(in srgb, var(--nl-risk) 50%, var(--nl-line-2));
+  color: var(--nl-risk);
+}
+
+/* --- Shortlist-Analytics-Board (ScoutingShortlistBoard) ------------ */
+
+.is-new-look .nl-scout-shortlist-card .nl-card-body {
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-scout-shortlist-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-scout-shortlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.is-new-look .nl-scout-shortlist-table th,
+.is-new-look .nl-scout-shortlist-table td {
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-table th {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-sort-th {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.is-new-look .nl-scout-shortlist-sort-th:hover,
+.is-new-look .nl-scout-shortlist-sort-th:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-sort-th:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-row {
+  transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-shortlist-row:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-scout-shortlist-row.is-loaded {
+  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
+}
+
+.is-new-look .nl-scout-shortlist-row.is-selected {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: -1px;
+}
+
+.is-new-look .nl-scout-shortlist-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: var(--nl-ink);
+  text-align: left;
+}
+
+.is-new-look .nl-scout-shortlist-name strong {
+  font-weight: 700;
+}
+
+.is-new-look .nl-scout-shortlist-name small {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-scout-shortlist-name:hover strong,
+.is-new-look .nl-scout-shortlist-name:focus-visible strong {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-name:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-nowrap {
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-focus {
+  border-color: color-mix(in srgb, var(--nl-accent) 50%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-ready {
+  border-color: color-mix(in srgb, var(--nl-good) 50%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-active {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-status-pill.is-waiting {
+  color: var(--nl-mut-2);
+  opacity: 0.75;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  font-size: 10.5px;
+  font-weight: 700;
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-elite {
+  border-color: color-mix(in srgb, var(--nl-good) 55%, var(--nl-line-2));
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-high {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line-2));
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-medium {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-low {
+  color: var(--nl-mut-2);
+  opacity: 0.8;
+}
+
+.is-new-look .nl-scout-shortlist-potential-pill.is-unknown {
+  color: var(--nl-mut-2);
+  opacity: 0.6;
+}
+
+.is-new-look .nl-scout-shortlist-compare {
+  appearance: none;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-scout-shortlist-compare:hover:not(:disabled),
+.is-new-look .nl-scout-shortlist-compare:focus-visible:not(:disabled) {
+  border-color: var(--nl-accent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-scout-shortlist-compare:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-scout-shortlist-compare:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-scout-shortlist-row,
+  .is-new-look .nl-scout-shortlist-compare {
+    transition: none;
+  }
+}

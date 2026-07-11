@@ -2,6 +2,7 @@
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import ScoutingKnowledgeLadder from "@/app/foundation/scouting-center-v2/ScoutingKnowledgeLadder";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { formatScoutedImpactDelta } from "@/lib/market/transfermarkt-scouting";
@@ -126,6 +127,8 @@ export default function ScoutingReportPanel({
           ) : null}
         </div>
       </header>
+
+      {newLook ? <ScoutingKnowledgeLadder report={report} /> : null}
 
       <section className="scouting-report-grid">
         <article className="scouting-report-card">

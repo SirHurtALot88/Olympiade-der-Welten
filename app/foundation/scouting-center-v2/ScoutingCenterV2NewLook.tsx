@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { ScoutingHubV2ClientProps, ScoutingHubV2TabId } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import ScoutingPriorityQueue from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
 import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingReportPanel";
+import ScoutingShortlistBoard from "@/app/foundation/scouting-center-v2/ScoutingShortlistBoard";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
@@ -161,6 +162,7 @@ export default function ScoutingCenterV2NewLook({
   hiddenAtTier,
   baseInfoAlwaysVisible,
   activeScoutTargets = [],
+  bookmarkedTargets = [],
   scoutPipeline = null,
   activeTab: controlledActiveTab,
   onActiveTabChange,
@@ -194,6 +196,9 @@ export default function ScoutingCenterV2NewLook({
   // L5 sind die Achswerte real freigegeben, decken sich mit den Roh-Achsen).
   // Teil-gescoutete Ziele bekommen bewusst kein Radar (kein Leak verdeckter Werte).
   const axisTargetById = new Map(activeScoutTargets.map((target) => [target.playerId, target] as const));
+  // #Shortlist-Board — aktive + nur gemerkte Ziele zusammen, damit die
+  // GESAMTE Wishlist (queueEntries) ihre CA/PO/Marktwert-Felder findet.
+  const shortlistTargets = [...activeScoutTargets, ...bookmarkedTargets];
   const getReadyRadarAxes = (playerId: string): NlRadarAxis[] => {
     const target = axisTargetById.get(playerId);
     if (!target) {
@@ -389,6 +394,27 @@ export default function ScoutingCenterV2NewLook({
                 setActiveTab("reports");
               }}
               onOpenMarket={onOpenMarket}
+            />
+          </NlCard>
+
+          <NlCard
+            className="nl-scout-shortlist-card"
+            eyebrow="Shortlist-Analyse"
+            title="Shortlist vergleichen"
+            data-testid="scouting-shortlist-card"
+          >
+            <p className="nl-scout-muted">
+              Alle Wishlist-Spieler nebeneinander — sortierbar nach Intel, Erkenntnisstufe, CA/PO-Decke, Potenzial, Fee
+              und Team-Impact. "Vergleichen" lädt den Scouting Report der Zeile, damit der echte Top-6-Impact
+              erscheint.
+            </p>
+            <ScoutingShortlistBoard
+              entries={queueEntries}
+              targets={shortlistTargets}
+              report={report}
+              selectedReportPlayerId={selectedReportPlayerId}
+              onSelectReportPlayer={onSelectReportPlayer}
+              onOpenPlayer={onOpenPlayer}
             />
           </NlCard>
         </>
