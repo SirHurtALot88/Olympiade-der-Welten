@@ -7186,6 +7186,19 @@ function scoreCandidate(input: {
           ? -clamp(((price / Math.max(averageSkeletonBudget * 1.5, 1)) - 1) * 8, 0, 12)
           : 0
       : 0;
+  // A3: spend-concentration discipline for premium lanes. The per-slot skeleton penalty above skips
+  // star/superstar (returns 0) and only fires below min-roster — so nothing stopped a team from
+  // dumping a large share of its cash (and wage bill) into one budget-wrecking star. Add a soft,
+  // growing malus once a single premium buy eats more than ~30% of spendable cash. No hard cap: a
+  // genuinely cash-rich team can still afford a star; it just won't blow the roster on the priciest
+  // one when a cheaper, similar-quality option keeps cash spread across slots.
+  const spendConcentrationPenalty =
+    (input.budgetLane.lane === "superstar" || input.budgetLane.lane === "star") &&
+    price != null &&
+    remainingCash != null &&
+    remainingCash > 0
+      ? -clamp((price / remainingCash - 0.3) * 55, 0, 26)
+      : 0;
   const harmonyFitScore = identityBreakdown.harmonyPenalty;
   const riskPenalty = roundValue(
     -clamp(
@@ -7495,6 +7508,7 @@ function scoreCandidate(input: {
     phaseCapPenalty +
     riskPenalty +
     earlySkeletonCostPenalty +
+    spendConcentrationPenalty +
     duplicateProfilePenalty +
     offThemePenalty +
     classSpamPenalty +
@@ -7565,6 +7579,7 @@ function scoreCandidate(input: {
           hardBudgetPenalty +
           minimumReservePenalty +
           earlySkeletonCostPenalty +
+          spendConcentrationPenalty +
           laneNeedGatePenalty +
           laneThemeGatePenalty,
         1,
