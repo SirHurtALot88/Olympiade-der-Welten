@@ -43,6 +43,7 @@ import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
+import { NlSparkline } from "@/components/foundation/new-look";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
@@ -1996,6 +1997,18 @@ export default function PlayerDetailDrawer({
                       ? []
                       : preview?.topDisciplineDeltas ?? [];
                 const showCostChip = data.teamHumanControlled === false ? Boolean(aiPlan) : Boolean(preview);
+                // "Neuer Look" (#61): Mini-Sparkline der realen Attribut-Historie
+                // (`attributeHistoryRows` aus Baseline + organischen Progression-
+                // Events je Saison). Nur für exakt sichtbare Attribute (eigener
+                // Spieler / Scouting maximiert) und nur ab 2 realen Saisonpunkten —
+                // bei einer einzigen Saison erscheint schlicht keine Kurve.
+                const attributeSparkPoints =
+                  newLookEnabled && data.attributeVisibility === "exact" && showExactAttribute
+                    ? data.attributeHistoryRows
+                        .map((row) => (row.attributes as Partial<Record<string, number>>)[entry.key])
+                        .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+                    : [];
+                const showAttributeSparkline = attributeSparkPoints.length >= 2;
                 return (
                   <article
                     key={entry.key}
@@ -2028,6 +2041,22 @@ export default function PlayerDetailDrawer({
                       {attributePrimaryLabel}
                       {showExactAttribute && plannedAttributeDelta ? ` → ${formatValue(plannedNextValue, 0)}` : ""}
                     </strong>
+                    {showAttributeSparkline ? (
+                      <span
+                        className="is-new-look nl-attr-spark"
+                        title={`${entry.label}-Verlauf über ${attributeSparkPoints.length} Saisonpunkte: ${formatValue(
+                          attributeSparkPoints[0],
+                          0,
+                        )} → ${formatValue(attributeSparkPoints[attributeSparkPoints.length - 1], 0)}`}
+                      >
+                        <NlSparkline
+                          points={attributeSparkPoints}
+                          tone="accent"
+                          aria-label={`${entry.label}: Attribut-Verlauf über Saisons`}
+                          className="nl-attr-spark-line"
+                        />
+                      </span>
+                    ) : null}
                     {variant !== "page" ? (
                     <div className="player-drawer-chip-row">
                       {showExactAttribute ? (
@@ -2459,7 +2488,12 @@ export default function PlayerDetailDrawer({
 
           {werdegangSeries ? (
             <section className="player-drawer-section player-drawer-panel" id="player-drawer-werdegang">
-              <WerdegangPanel variant="player" entityName={data.name} series={werdegangSeries} />
+              <WerdegangPanel
+                variant="player"
+                entityName={data.name}
+                series={werdegangSeries}
+                onOpenLeagueLeaders={onOpenLeagueLeaders}
+              />
             </section>
           ) : null}
 

@@ -20,6 +20,16 @@ export type NlRadarProps = {
   max?: number;
   /** Werte an den Achsen-Labels mit anzeigen. */
   showValues?: boolean;
+  /**
+   * Optionales Vergleichs-Polygon (z. B. Vorsaison) hinter dem Haupt-Radar.
+   * Wird nur gezeichnet, wenn alle vier Achsen endliche Werte tragen —
+   * ein Teil-Ghost mit 0-Achsen wäre irreführend.
+   */
+  ghostAxes?: NlRadarAxis[];
+  /** Beschriftung des Ghost-Polygons für Tooltip/Screenreader, z. B. "Saison 1". */
+  ghostLabel?: string;
+  /** Macht die Achsen-Labels zu Portalen (Klick/Enter auf POW/SPE/MEN/SOC). */
+  onAxisClick?: (key: NlAxisKey) => void;
   "aria-label"?: string;
   className?: string;
 };
@@ -43,7 +53,16 @@ function radarPoint(axisIndex: number, ratio: number) {
  * Achsen-Radar (handgerolltes SVG) für die vier Spiel-Achsen
  * POW/SPE/MEN/SOC — Punkte und Labels tragen die Achsenfarben.
  */
-export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ariaLabel, className }: NlRadarProps) {
+export function NlRadar({
+  axes,
+  max = 100,
+  showValues = false,
+  ghostAxes,
+  ghostLabel,
+  onAxisClick,
+  "aria-label": ariaLabel,
+  className,
+}: NlRadarProps) {
   const geometry = useMemo(() => {
     const safeMax = Number.isFinite(max) && max > 0 ? max : 100;
     const valueByKey = new Map<NlAxisKey, number>();
@@ -62,12 +81,33 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
       return { key, value, ...radarPoint(index, ratio) };
     });
 
+    // Ghost-Polygon (Vorsaison-Vergleich): nur zeichnen, wenn ALLE vier
+    // Achsen reale endliche Werte tragen — keine 0-Auffüllung erfinden.
+    const ghostValueByKey = new Map<NlAxisKey, number>();
+    for (const axis of ghostAxes ?? []) {
+      if (axis && Number.isFinite(axis.value)) {
+        ghostValueByKey.set(axis.key, axis.value);
+      }
+    }
+    const ghostComplete = RADAR_AXIS_ORDER.every((key) => ghostValueByKey.has(key));
+    const ghostPoints = ghostComplete
+      ? RADAR_AXIS_ORDER.map((key, index) => {
+          const value = ghostValueByKey.get(key) ?? 0;
+          const ratio = Math.max(0, Math.min(value / safeMax, 1));
+          return { key, value, ...radarPoint(index, ratio) };
+        })
+      : null;
+
     return {
       points,
       polygon: points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
+      ghostPoints,
+      ghostPolygon: ghostPoints
+        ? ghostPoints.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ")
+        : null,
       labels: RADAR_AXIS_ORDER.map((key, index) => ({ key, ...radarPoint(index, 1.3) })),
     };
-  }, [axes, max]);
+  }, [axes, ghostAxes, max]);
 
   if (!geometry) {
     return <p className={["nl-radar", "is-empty", className ?? ""].filter(Boolean).join(" ")}>Keine Achsen-Daten.</p>;
@@ -108,6 +148,17 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
           />
         );
       })}
+      {geometry.ghostPoints && geometry.ghostPolygon ? (
+        <polygon points={geometry.ghostPolygon} className="nl-radar-ghost">
+          <title>
+            {ghostLabel
+              ? `${ghostLabel}: ${geometry.ghostPoints
+                  .map((point) => `${NL_AXIS_LABELS[point.key]} ${formatNlNumber(point.value)}`)
+                  .join(", ")}`
+              : "Vergleichswerte"}
+          </title>
+        </polygon>
+      ) : null}
       <polygon points={geometry.polygon} className="nl-radar-shape" />
       {geometry.points.map((point) => (
         <circle key={`nl-radar-dot-${point.key}`} cx={point.x} cy={point.y} r={3.5} fill={NL_TONE_VAR[point.key]}>
@@ -118,6 +169,7 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
       ))}
       {geometry.labels.map((label) => {
         const value = geometry.points.find((point) => point.key === label.key)?.value ?? 0;
+        const handleAxisClick = onAxisClick ? () => onAxisClick(label.key) : undefined;
         return (
           <text
             key={`nl-radar-label-${label.key}`}
@@ -125,8 +177,26 @@ export function NlRadar({ axes, max = 100, showValues = false, "aria-label": ari
             y={label.y}
             textAnchor="middle"
             dominantBaseline="middle"
-            className="nl-radar-label"
+            className={`nl-radar-label${handleAxisClick ? " is-clickable" : ""}`}
             fill={NL_TONE_VAR[label.key]}
+            role={handleAxisClick ? "button" : undefined}
+            tabIndex={handleAxisClick ? 0 : undefined}
+            aria-label={
+              handleAxisClick
+                ? `${NL_AXIS_LABELS[label.key]} ${formatNlNumber(value)} — Liga-Leaders öffnen`
+                : undefined
+            }
+            onClick={handleAxisClick}
+            onKeyDown={
+              handleAxisClick
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleAxisClick();
+                    }
+                  }
+                : undefined
+            }
           >
             <tspan x={label.x} dy={showValues ? "-0.35em" : "0"} className="nl-radar-label-name">
               {NL_AXIS_LABELS[label.key]}

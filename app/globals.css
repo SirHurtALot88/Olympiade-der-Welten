@@ -50987,3 +50987,255 @@ button.foundation-team-portrait-card {
     scroll-behavior: auto;
   }
 }
+
+/* ============================================================
+   "Neuer Look" — Spieler-Entwicklung: Radar-Ghost, Werdegang-
+   Scrubber, Rang-/Peak-Kurven, Team-Bereichsentwicklung,
+   sticky Profil-Untertabs, Attribut-Sparklines.
+   Alles flag-gated unterhalb von .is-new-look.
+   ============================================================ */
+
+/* --- Radar: Vorsaison-Ghost + klickbare Achsen-Portale --- */
+
+.is-new-look .nl-radar-ghost {
+  fill: color-mix(in srgb, var(--nl-mut, #93a3bd) 14%, transparent);
+  stroke: color-mix(in srgb, var(--nl-mut, #93a3bd) 65%, transparent);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+  stroke-linejoin: round;
+}
+
+.is-new-look .nl-radar-label.is-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+  transition: opacity 140ms ease;
+}
+
+.is-new-look .nl-radar-label.is-clickable:hover,
+.is-new-look .nl-radar-label.is-clickable:focus-visible {
+  opacity: 0.75;
+  outline: none;
+}
+
+.is-new-look .nl-player-hero-radar-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 2px 0 0;
+  font-size: 10.5px;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-player-hero-radar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-player-hero-radar-legend-swatch {
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--nl-accent, #5b9bff);
+  border-radius: 2px;
+}
+
+.is-new-look .nl-player-hero-radar-legend-item.is-ghost .nl-player-hero-radar-legend-swatch {
+  border-top-style: dashed;
+  border-top-color: color-mix(in srgb, var(--nl-mut, #93a3bd) 75%, transparent);
+}
+
+/* --- Werdegang: Hover-Scrubber / Fadenkreuz auf den Karriere-Kurven --- */
+
+.is-new-look .nl-curve-svg {
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+
+.is-new-look .nl-curve-crosshair-line {
+  stroke: color-mix(in srgb, var(--wg-ink, #dbe6f7) 40%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.is-new-look .nl-curve-crosshair-dot {
+  fill: var(--wg-curve, var(--nl-accent, #5b9bff));
+  stroke: var(--wg-panel, #101724);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.is-new-look .nl-curve-bubble-bg {
+  fill: color-mix(in srgb, var(--wg-panel-soft, rgba(22, 32, 50, 0.92)) 92%, transparent);
+  stroke: var(--wg-line-strong, rgba(142, 174, 220, 0.4));
+  stroke-width: 0.75;
+  pointer-events: none;
+}
+
+.is-new-look .nl-curve-bubble-text {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  fill: var(--wg-ink, #dbe6f7);
+  pointer-events: none;
+}
+
+/* --- Werdegang: Peak-/Bestwert-Marker --- */
+
+.is-new-look .nl-curve-peak-ring {
+  fill: none;
+  stroke: color-mix(in srgb, #e6b455 85%, transparent);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.is-new-look .nl-curve-peak-star {
+  font-size: 9px;
+  fill: #e6b455;
+  pointer-events: none;
+}
+
+/* --- Werdegang: Kopf-Kacheln als Portale vs. statische Kacheln --- */
+
+.is-new-look .nl-werdegang-chip-portal {
+  position: relative;
+  padding-right: 26px;
+}
+
+.is-new-look .nl-werdegang-chip-arrow {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 11px;
+  color: var(--wg-muted, #93a3bd);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.is-new-look .nl-werdegang-chip-portal:hover .nl-werdegang-chip-arrow {
+  color: var(--wg-ink, #dbe6f7);
+  transform: translateX(2px);
+}
+
+.is-new-look .nl-werdegang-chip-static {
+  cursor: default;
+}
+
+.is-new-look .nl-werdegang-chip-static:hover {
+  border-color: var(--wg-line);
+  background: var(--wg-panel);
+  transform: none;
+}
+
+/* --- Werdegang: Team-Bereichsentwicklung (POW/SPE/MEN/SOC) --- */
+
+.is-new-look .nl-werdegang-area-line {
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.is-new-look .nl-werdegang-area-dot {
+  stroke: var(--wg-panel, #101724);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.is-new-look .nl-werdegang-area-legend {
+  display: inline-flex;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-werdegang-area-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--wg-muted, #93a3bd);
+}
+
+.is-new-look .nl-werdegang-area-readout strong {
+  color: var(--wg-ink, #dbe6f7);
+  font-weight: 600;
+}
+
+/* --- Werdegang: Saisonkarte <-> Kurven wechselseitig hervorheben --- */
+
+.is-new-look .nl-season-active {
+  border-color: var(--wg-line-strong, rgba(142, 174, 220, 0.4));
+  background: var(--wg-panel-soft, rgba(22, 32, 50, 0.6));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-accent, #5b9bff) 35%, transparent);
+}
+
+/* --- Profilseite: sticky Untertabs (NlSubTabs) --- */
+
+.is-new-look.nl-profile-subtabs-sentinel,
+.is-new-look .nl-profile-subtabs-sentinel {
+  height: 1px;
+}
+
+.is-new-look.nl-profile-subtabs,
+.is-new-look .nl-profile-subtabs {
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  margin: 0 0 10px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.is-new-look.nl-profile-subtabs.is-stuck,
+.is-new-look .nl-profile-subtabs.is-stuck {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.is-new-look.nl-profile-subtabs .nl-subtabs,
+.is-new-look .nl-profile-subtabs .nl-subtabs {
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--wg-panel, #101724) 88%, transparent);
+  border: 1px solid var(--wg-line, rgba(142, 174, 220, 0.24));
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+}
+
+/* --- Attribut-Karten: Mini-Sparkline der Attribut-Historie --- */
+
+.is-new-look.nl-attr-spark,
+.is-new-look .nl-attr-spark {
+  display: block;
+  margin-top: 2px;
+  max-width: 96px;
+}
+
+.is-new-look.nl-attr-spark .nl-attr-spark-line,
+.is-new-look .nl-attr-spark .nl-attr-spark-line {
+  display: block;
+  width: 100%;
+  height: 20px;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-radar-label.is-clickable,
+  .is-new-look .nl-werdegang-chip-arrow,
+  .is-new-look.nl-profile-subtabs,
+  .is-new-look .nl-profile-subtabs {
+    transition: none;
+  }
+
+  .is-new-look.nl-profile-subtabs,
+  .is-new-look .nl-profile-subtabs {
+    transform: none;
+  }
+}

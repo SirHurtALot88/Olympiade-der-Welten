@@ -44,6 +44,27 @@ function formatHeroRank(rank: number | null | undefined) {
   return rank != null && Number.isFinite(rank) ? `#${formatNlNumber(rank, 0)} Liga` : undefined;
 }
 
+/**
+ * Sub-Zeile der Hero-StatChips: Liga-Rang plus Trend-Delta (Vergleich zur
+ * Vorsaison aus `ovrDelta`/`ppsDelta`/`mvsDelta`). Ohne reale Delta-Quelle
+ * bleibt es beim Rang — es wird nichts erfunden.
+ */
+function formatHeroSub(rank: number | null | undefined, delta: number | null | undefined) {
+  const rankPart = formatHeroRank(rank);
+  const deltaPart =
+    delta != null && Number.isFinite(delta) && delta !== 0
+      ? `${delta > 0 ? "▲" : "▼"} ${formatNlNumber(Math.abs(delta), 1)}`
+      : undefined;
+  if (rankPart && deltaPart) {
+    return `${rankPart} · ${deltaPart}`;
+  }
+  return deltaPart ?? rankPart;
+}
+
+function appendDeltaSource(baseTitle: string, deltaSourceLabel: string | null | undefined) {
+  return deltaSourceLabel ? `${baseTitle} · ${deltaSourceLabel}` : baseTitle;
+}
+
 export type PlayerHeroNewLookProps = {
   data: PlayerDetailDrawerData;
   /** Bereits formatiertes Rollen-Label (formatRoleTag im Drawer), z. B. "Starter". */
@@ -77,6 +98,29 @@ export default function PlayerHeroNewLook({
     .filter((entry): entry is readonly [NlRadarAxis["key"], number] => entry[1] != null && Number.isFinite(entry[1]))
     .map(([key, value]) => ({ key, value }));
 
+  // Vorsaison-Ghost (#12): Achswerte der letzten abgeschlossenen Saison aus den
+  // realen Snapshot-History-Rows (gleiche Quelle wie die Delta-Berechnung im
+  // Builder: erste nicht-aktive Zeile). NlRadar zeichnet den Ghost nur, wenn
+  // alle vier Achswerte real vorliegen — bei nur einer gespielten Saison
+  // erscheint schlicht kein Vergleichs-Polygon.
+  const previousSeasonRow = data.historyRows.find((row) => !row.isActiveSeason) ?? null;
+  const ghostAxes: NlRadarAxis[] = previousSeasonRow
+    ? (
+        [
+          ["pow", previousSeasonRow.pow],
+          ["spe", previousSeasonRow.spe],
+          ["men", previousSeasonRow.men],
+          ["soc", previousSeasonRow.soc],
+        ] as const
+      )
+        .filter(
+          (entry): entry is readonly [NlRadarAxis["key"], number] => entry[1] != null && Number.isFinite(entry[1]),
+        )
+        .map(([key, value]) => ({ key, value }))
+    : [];
+  const showGhost = ghostAxes.length === 4;
+  const ghostLabel = showGhost && previousSeasonRow ? previousSeasonRow.seasonName : undefined;
+
   // Portal-Navigation: identisch zu den bestehenden KPI-Hero-Karten des
   // Drawers führen OVR/PPs/MVS über `onOpenLeagueLeaders` in die
   // Liga-Leaders-Spielerliste (nach der jeweiligen Kennzahl sortiert).
@@ -88,6 +132,16 @@ export default function PlayerHeroNewLook({
     }
     return () => {};
   };
+
+  // Radar-Achsen als Portale (#60): POW/SPE/MEN/SOC sind reale
+  // Liga-Leaders-Kategorien — Klick auf ein Achsen-Label öffnet die nach
+  // dieser Achse sortierte Leaders-Liste. Ohne Handler / für Free Agents
+  // bleiben die Labels rein informativ.
+  const handleRadarAxisClick =
+    onOpenLeagueLeaders != null && !isFreeAgent
+      ? (axisKey: NlRadarAxis["key"]) =>
+          onOpenLeagueLeaders(axisKey, { playerId: data.playerId, playerName: data.name })
+      : undefined;
 
   return (
     <section className="is-new-look nl-player-hero" data-testid="player-hero-new-look" data-new-look="true">
@@ -131,24 +185,27 @@ export default function PlayerHeroNewLook({
               label="OVR"
               value={formatNlNumber(data.ovr, 1)}
               tone="accent"
-              sub={formatHeroRank(data.ovrRank)}
-              title="Overall-Rating · öffnet die Liga-Leaders-Liste"
+              sub={formatHeroSub(data.ovrRank, data.ovrDelta)}
+              title={appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)}
               onClick={buildLeadersClick("ovr", data.ovrRank)}
             />
             <StatChip
               label="PPs"
               value={formatNlNumber(data.pps ?? data.ppsRating, 1)}
               tone="spe"
-              sub={formatHeroRank(data.ppsRank)}
-              title="Performance-Punkte · öffnet die Liga-Leaders-Liste"
+              sub={formatHeroSub(data.ppsRank, data.ppsDelta)}
+              title={appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)}
               onClick={buildLeadersClick("pps", data.ppsRank)}
             />
             <StatChip
               label="MVS"
               value={formatNlNumber(data.mvs, 1)}
               tone="soc"
-              sub={formatHeroRank(data.mvsRank)}
-              title="Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste"
+              sub={formatHeroSub(data.mvsRank, data.mvsDelta)}
+              title={appendDeltaSource(
+                "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
+                data.mvsDeltaSourceLabel,
+              )}
               onClick={buildLeadersClick("mvs", data.mvsRank)}
             />
             <StatChip
@@ -167,9 +224,24 @@ export default function PlayerHeroNewLook({
           axes={radarAxes}
           max={100}
           showValues
+          ghostAxes={showGhost ? ghostAxes : undefined}
+          ghostLabel={ghostLabel}
+          onAxisClick={handleRadarAxisClick}
           className="nl-player-hero-radar"
           aria-label={`Achsen-Radar für ${data.name}`}
         />
+        {showGhost && ghostLabel ? (
+          <p className="nl-player-hero-radar-legend" aria-label="Radar-Legende">
+            <span className="nl-player-hero-radar-legend-item is-current">
+              <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+              Aktuell
+            </span>
+            <span className="nl-player-hero-radar-legend-item is-ghost">
+              <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+              {ghostLabel}
+            </span>
+          </p>
+        ) : null}
       </div>
       <button className="nl-player-hero-close" type="button" onClick={onClose}>
         Schliessen
