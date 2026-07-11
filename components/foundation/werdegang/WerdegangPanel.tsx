@@ -306,8 +306,8 @@ export default function WerdegangPanel(props: WerdegangPanelProps) {
         },
         {
           id: "mvs",
-          title: "MVS · Ruhm",
-          hint: "Market Value Score — Ruhm, nicht Geld",
+          title: "MVS",
+          hint: "Market Value Score — treibt Marktwert und Angebote, nicht Geld",
           tone: "mvs" as const,
           digits: 1,
           points: playerSeries.seasons.map((entry) => ({ seasonLabel: entry.seasonLabel, value: entry.mvs })),

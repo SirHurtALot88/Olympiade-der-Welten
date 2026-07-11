@@ -144,11 +144,11 @@ export default function PlayerHeroNewLook({
               onClick={buildLeadersClick("pps", data.ppsRank)}
             />
             <StatChip
-              label="MVS · Ruhm"
+              label="MVS"
               value={formatNlNumber(data.mvs, 1)}
               tone="soc"
               sub={formatHeroRank(data.mvsRank)}
-              title="Market Value Score (Ruhm): treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste"
+              title="Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste"
               onClick={buildLeadersClick("mvs", data.mvsRank)}
             />
             <StatChip
