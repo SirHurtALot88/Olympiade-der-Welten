@@ -46785,3 +46785,1023 @@ button.foundation-team-portrait-card {
     transition: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Matchday-Arena / 32-Team-Scoreboard (nl-arena-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-arena {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-arena-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-arena-button {
+  padding: 6px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-arena-button:hover:not(:disabled) {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-arena-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-arena-button.is-primary {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 18%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-arena-header-chips {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-arena-phase-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .nl-arena-phase-tabs {
+  flex: 1 1 auto;
+  overflow-x: auto;
+}
+
+/* --- Board: absolut positionierte Zeilen, Rang-Bewegung via top ---- */
+.is-new-look .nl-arena-board {
+  position: relative;
+}
+
+.is-new-look .nl-arena-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: grid;
+  grid-template-columns: 72px minmax(150px, 0.9fr) minmax(160px, 1.4fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 4px 10px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  transition: top 420ms var(--nl-ease);
+  will-change: top;
+}
+
+.is-new-look .nl-arena-row.is-own-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-arena-row.is-moving-up {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-good) 45%, transparent);
+}
+
+.is-new-look .nl-arena-row.is-moving-down {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-risk) 35%, transparent);
+}
+
+.is-new-look .nl-arena-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-arena-ranknum {
+  min-width: 22px;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: right;
+}
+
+.is-new-look .nl-arena-rankdelta {
+  font-size: 10px;
+}
+
+.is-new-look .nl-arena-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-arena-team:hover .nl-arena-teamname,
+.is-new-look .nl-arena-team:focus-visible .nl-arena-teamname {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-arena-crest {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-arena-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-teamname {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-arena-track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-arena-track-stack {
+  display: flex;
+  height: 100%;
+  transition: width 420ms var(--nl-ease);
+}
+
+.is-new-look .nl-arena-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--team-tag-border, var(--nl-accent));
+  transition: width 420ms var(--nl-ease);
+}
+
+.is-new-look .nl-arena-track-segment {
+  min-width: 2px;
+  background: var(--team-tag-border, var(--nl-accent));
+}
+
+.is-new-look .nl-arena-track-segment.is-positive {
+  background: var(--nl-good);
+}
+
+.is-new-look .nl-arena-track-segment.is-negative {
+  background: var(--nl-risk);
+}
+
+.is-new-look .nl-arena-track-segment + .nl-arena-track-segment {
+  border-left: 1px solid var(--nl-panel);
+}
+
+.is-new-look .nl-arena-rowstats {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-score {
+  min-width: 56px;
+  text-align: right;
+  font-size: 14px;
+}
+
+.is-new-look .nl-arena-points,
+.is-new-look .nl-arena-sidepoints {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+/* --- Gesamt-Board -------------------------------------------------- */
+.is-new-look .nl-arena-totalboard {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-arena-totalrow {
+  display: grid;
+  grid-template-columns: 48px minmax(150px, 0.9fr) minmax(160px, 1.4fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-arena-totalrow.is-own-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+/* --- MVP-Callouts --------------------------------------------------- */
+.is-new-look .nl-arena-mvp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-arena-mvp-column {
+  border: 1px solid var(--nl-line);
+  border-top: 3px solid var(--nl-tone, var(--nl-line-2));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  padding: var(--nl-s3);
+}
+
+.is-new-look .nl-arena-mvp-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nl-mut);
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-mvp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-mvp-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-mvp-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-arena-mvp-player,
+.is-new-look .nl-arena-mvp-team {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-arena-mvp-player {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-arena-mvp-player:hover,
+.is-new-look .nl-arena-mvp-team:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-arena-mvp-team {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-mvp-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.is-new-look .nl-arena-mvp-stats small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-mvp-empty,
+.is-new-look .nl-arena-mvp-teaser,
+.is-new-look .nl-arena-error-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* --- Diagnose & Skeleton -------------------------------------------- */
+.is-new-look .nl-arena-diagnose,
+.is-new-look .nl-result-diagnose,
+.is-new-look .nl-spreview-diagnose {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .nl-arena-diagnose summary,
+.is-new-look .nl-result-diagnose summary,
+.is-new-look .nl-spreview-diagnose summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-diagnose-body,
+.is-new-look .nl-spreview-diagnose-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-diagnose-line,
+.is-new-look .nl-spreview-diagnose-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-diagnose-list,
+.is-new-look .nl-result-diagnose-list,
+.is-new-look .nl-spreview-diagnose-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-skeleton,
+.is-new-look .nl-spreview-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-skeleton-row {
+  height: 44px;
+  border-radius: var(--nl-r-sm);
+  background: linear-gradient(90deg, var(--nl-panel) 0%, var(--nl-panel-2) 50%, var(--nl-panel) 100%);
+  background-size: 200% 100%;
+  animation: nl-arena-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes nl-arena-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ============================================================
+   NEUER LOOK — Spieltagsergebnis / Ergebnis-Bühne (nl-result-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-result-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-select select {
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+}
+
+.is-new-look .nl-result-button {
+  padding: 6px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.is-new-look .nl-result-button:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-button.is-primary {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 18%, var(--nl-panel-2));
+}
+
+/* --- Hero-Bühne ----------------------------------------------------- */
+.is-new-look .nl-result-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-result-hero-stage {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-result-hero-crest {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 2px solid var(--nl-line-2);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-result-hero-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-result-hero-teamname {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-result-hero-rankline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-result-hero-ranklabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-hero-rank {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.is-new-look .nl-result-hero-points {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-result-hero-points-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-result-hero-points-label {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-movement {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-result-movement.is-empty {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-movement-ranks {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-result-hero-chips {
+  flex-wrap: wrap;
+}
+
+/* --- Board ---------------------------------------------------------- */
+.is-new-look .nl-result-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-result-row {
+  display: grid;
+  grid-template-columns: 44px minmax(160px, 1fr) 72px minmax(180px, 1.2fr) minmax(150px, 0.8fr) 90px;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-result-row.is-active-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-result-rank {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.is-new-look .nl-result-ranknum {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.is-new-look .nl-result-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-result-team:hover .nl-result-teamname {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-crest {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-result-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-team-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-result-teamname {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-result-teamcode {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-points {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.is-new-look .nl-result-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.is-new-look .nl-result-scorebar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 10px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-result-scorebar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+  opacity: 0.75;
+  transition: width 420ms var(--nl-ease);
+}
+
+.is-new-look .nl-result-scorebar-value {
+  position: absolute;
+  right: 6px;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-cumulative {
+  font-size: 12px;
+  color: var(--nl-mut);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* --- Daten-Tabelle --------------------------------------------------- */
+.is-new-look .nl-result-table-shell,
+.is-new-look .nl-spreview-table-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.is-new-look .nl-result-table th,
+.is-new-look .nl-result-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--nl-line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-result-table th:first-child,
+.is-new-look .nl-result-table td:first-child {
+  text-align: left;
+}
+
+.is-new-look .nl-result-table tbody tr {
+  cursor: pointer;
+}
+
+.is-new-look .nl-result-table tbody tr:hover {
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-result-table tbody tr.is-active-team {
+  outline: 1px solid var(--nl-accent);
+  outline-offset: -1px;
+}
+
+/* --- Highlights ------------------------------------------------------ */
+.is-new-look .nl-result-highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-result-highlight {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-result-highlight-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--nl-line-2);
+  background: color-mix(in srgb, var(--nl-accent) 14%, var(--nl-panel-2));
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--nl-accent);
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-result-highlight-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-result-highlight-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-highlight-value {
+  font-size: 13px;
+}
+
+.is-new-look .nl-result-empty-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* ============================================================
+   NEUER LOOK — Saison-Preview / Projektions-Board (nl-spreview-*)
+   Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-spreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-spreview-intro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-blocked-hint {
+  margin: var(--nl-s2) 0 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 45%, transparent);
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 10%, var(--nl-panel));
+  font-size: 13px;
+}
+
+.is-new-look .nl-spreview-tie-hint {
+  margin: var(--nl-s2) 0 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-spreview-row {
+  display: grid;
+  grid-template-columns: 36px minmax(160px, 1fr) minmax(140px, 0.9fr) minmax(150px, 0.9fr) minmax(170px, 1fr) auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-spreview-rank {
+  font-weight: 700;
+  font-size: 14px;
+  text-align: right;
+}
+
+.is-new-look .nl-spreview-team {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-spreview-team:hover .nl-spreview-teamname {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-spreview-crest {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line-2);
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-spreview-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-team-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-spreview-teamname {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-spreview-teamcode {
+  font-size: 10px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-projection,
+.is-new-look .nl-spreview-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spreview-projection.is-empty {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-projection-arrow {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-spreview-projection-rank {
+  font-size: 13px;
+}
+
+.is-new-look .nl-spreview-projection-rank.is-projected {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-spreview-points-current {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-spreview-points-projected {
+  font-size: 13px;
+}
+
+.is-new-look .nl-spreview-matchday {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-spreview-matchday-rank {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spreview-scorebars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 60px;
+}
+
+.is-new-look .nl-spreview-scorebar {
+  height: 6px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-spreview-scorebar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-tone, var(--nl-accent));
+  opacity: 0.75;
+}
+
+.is-new-look .nl-spreview-matchday-score {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-spreview-status {
+  display: inline-flex;
+  gap: var(--nl-s1);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.is-new-look .nl-spreview-badge {
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 12%, var(--nl-panel));
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-spreview-empty-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+/* --- Reduced Motion (nl-arena / nl-result / nl-spreview) ------------ */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-arena-row,
+  .is-new-look .nl-arena-track-stack,
+  .is-new-look .nl-arena-track-fill,
+  .is-new-look .nl-result-scorebar-fill {
+    transition: none;
+  }
+
+  .is-new-look .nl-arena-skeleton-row {
+    animation: none;
+  }
+}

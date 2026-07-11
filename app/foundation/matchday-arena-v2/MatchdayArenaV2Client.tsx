@@ -4,6 +4,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type UIEvent }
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import ArenaRevealPlaybackPanel from "@/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel";
+import MatchdayArenaNewLook from "@/app/foundation/matchday-arena-v2/MatchdayArenaNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 import MatchdayArenaPlayerCard from "@/components/matchday-arena/MatchdayArenaPlayerCard";
 import { VeloImpactStrip, VeloStatOrbitRow, type VeloAxisKey } from "@/components/foundation/velo-ui";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
@@ -60,7 +62,7 @@ import {
   setMatchdayArenaResolvePreview,
 } from "@/lib/foundation/matchday-arena-session-cache";
 
-type MatchdayArenaV2ClientProps = {
+export type MatchdayArenaV2ClientProps = {
   initialSource?: "sqlite" | "prisma";
   defaultSaveId: string;
   defaultSeasonId: string;
@@ -830,6 +832,11 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
 });
 
 export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps) {
+  // "Neuer Look" Flag-Gate (additiv): Flag an => 32-Team-Scoreboard mit
+  // Phasen-Reveal aus denselben Props; Flag aus => bestehendes Layout unverändert.
+  const [newLook] = useNewLook();
+  if (newLook) return <MatchdayArenaNewLook {...props} />;
+
   const [params, setParams] = useState(() => defaultArenaParams(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
   const [loadStage, setLoadStage] = useState<ArenaLoadStage>("idle");
