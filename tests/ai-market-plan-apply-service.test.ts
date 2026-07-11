@@ -16,6 +16,9 @@ const createLocalTransfermarktRunContext = vi.fn(() => ({
   },
 }));
 const flushLocalTransfermarktRunContext = vi.fn();
+const resolveTransferBuyAffordabilityCash = vi.fn(
+  (input: { teamCash: number }) => input.teamCash,
+);
 
 const persistenceState = {
   save: {
@@ -116,6 +119,7 @@ vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
+  resolveTransferBuyAffordabilityCash,
 }));
 
 vi.mock("@/lib/persistence/persistence-service", () => ({
