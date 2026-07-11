@@ -15,6 +15,63 @@ Eine Liga, in der sich **von selbst** unterschiedliche Team-Profile herausbilden
 Kurz: die Komposition soll ein **emergentes Ergebnis** von Team-Zielen sein, kein vorab verteiltes
 Slot-Raster.
 
+## 0.1 Leitbild (North Star) — an diesem misst sich JEDE Entscheidung
+
+> **Team-Identität ist der Grundcharakter, der alles rahmt. Sie muss sich sichtbar in „Sparen vs.
+> Ausgeben" UND in den Picks spiegeln.** GM = aktuelle Handschrift obendrauf. Alles andere
+> (Kadergröße, Star-Anzahl, Sparen) *emergiert* aus Zielen unter wenigen harten Constraints.
+
+Die **Definition of Done** in einem Bild: sichtbare, mit Identität/GM **korrelierte** Streuung —
+einige Teams horten Cash & bleiben klein (~8–10), andere geben voll aus & haben Stars, der Rest solide
+Mitte; Superstars nur bei wenigen Teams — **und** finanziell **und** sportlich plausibel, ohne
+Constraint-Verletzung.
+
+## 0.2 Eingelockte Entscheidungen (Stand der Abstimmung)
+
+**Vision / Ziele**
+- Ausgeben lohnt **kurzfristig**, mit **echtem Nachhaltigkeitspreis** (Cash-Bleed → später Verkaufsdruck).
+  Kein Pay-to-win ohne Folgen.
+- **Realismus mit Reibung**: reiche/ambitionierte Teams haben Vorteil, aber Missmanagement/Nachhaltigkeit
+  hält die Liga offen.
+- **Superstars sind knapp & besonders** — nur wenige Teams leisten sich einen; die meisten bauen auf
+  Stars/Core.
+- **Mehrjahres-Zyklen** erwünscht: aufbauen → Erfolgsfenster → verjüngen → neu aufbauen (ermöglicht den
+  „Sparer, der auf ein Fenster spart").
+- **Scheitern in Maßen erlaubt** — ein Team darf sich kaputtwirtschaften; die harte Cash-Untergrenze
+  verhindert die Todesspirale.
+- **Ziel-Priorität bei Konflikt:** Identität rahmt alles; *innerhalb* der Identität führt das
+  Sport-/Board-Ziel, mit **Finanzen als Leitplanke**.
+- **GM-Archetyp-Wechsel bei Misserfolg:** scheitert ein Typ (z.B. Star-Chaser), probiert das Board mit
+  **hoher Wahrscheinlichkeit einen *anderen* Archetyp** aus dem Pool (nicht denselben Typ nachbesetzen).
+- KI-Teams sind **echte Rivalen mit eigenen, sichtbaren Zielen** (kein Rubberbanding).
+
+**Modell / Mechanik**
+- **Stärke/Qualität rein aus Stats:** POW/SPE/MEN/SOC + Anzahl Disziplinen über Skill-Schwelle
+  (>60 solide, >80 specialist). **`mvs`/`ovr` sind am Transfermarkt = 0/null** (kein Scouting/keine
+  Historie bei S1) → dürfen NICHT als Qualität verwendet werden. Der bereits committete Value-Tilt
+  (execute) läuft daher im Draft ins Leere und wird in Phase 1 durch das Stats-Maß ersetzt.
+- **Marktwert (MW) = ausschließlich Preis/Kosten**, nie Qualitätssignal.
+- **Stat-Gewichtung team-/disziplin-abhängig** (Bedarf-Disziplinen höher; nutzt `bestNeedDisciplineId`).
+- **Rollen-Achse Hybrid:** Disziplin-Bedarf bestimmt *wo* gekauft wird, Qualität *wie gut*.
+- **Cash-Optionswert (Sparen) = Puffer/Risiko, season-by-season** (Board-Risiko + Gehalts-Runway).
+- **Kein Wage-Budget.** Nachhaltigkeit = rollierender **Cash-Flow-Forecast**: Sponsor + erwartetes Prize
+  (nur zur Planung, NICHT doppelt gutgeschrieben) + Netto-Transfererlöse + Gebäude-Einkommen − zukünftige
+  Gehälter. Board-vermittelt über die Gehaltsquote `Gehalt/(Cash+Gehalt)`, weich.
+- **Roster-Range fix: MIN = 8, MAX = 14** (harte Constraints). **OPT ist weich**, aus Identität
+  abgeleitet und **GM-moduliert**: Elite-GMs drücken OPT runter (kleiner Kader), Depth-GMs rauf (breit) —
+  innerhalb [8, 14]. *(Heute setzt nur `identity.playerOpt` das OPT; die GM-Modulation muss ergänzt werden.)*
+- **Cash: harte Untergrenze (Puffer)** — einer der wenigen legitimen Hard-Blocker.
+- **GM- & Identitäts-Achsen wiederverwenden:** Identität (`ambition`/`finances`/`harmony`/`boardConfidence`)
+  = Grund-Aggressivität + Basis-OPT; GM-Bias (`starPriority`/`valuePriority`/`rosterDepthPreference`/
+  `riskTolerance`/`cashPriority`/`eliteSmallRosterPreference`/`loyaltyBias`) moduliert die Nutzen-Gewichte
+  (w_win/w_thrift/w_patience/w_asset) + den OPT-Shift.
+
+**Die einzigen harten Blocker:** Roster ∈ [8, 14] · Cash ≥ Puffer. Alles andere emergiert.
+
+**Noch offen (Mechanik M1–M10, wird beim Beantworten ergänzt):** Aufstellung vs. ganzer Kader ·
+Fatigue/Verletzungen → Tiefe · exakte Disziplin-Struktur · Potenzial/Jugend GM-gewichtet ·
+Verkaufs-Auslöser · Deckungs-Schwelle (1/2/OPT) · Qualitäts-Aggregation.
+
 ## 1. Warum wir das aktuell NICHT erreichen (Diagnose)
 
 ### 1.1 Messbeleg: das System ist ein Messer-Schneiden-Gebilde
