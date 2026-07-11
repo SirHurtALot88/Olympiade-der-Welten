@@ -14,7 +14,11 @@ import {
   nlToneClass,
 } from "@/components/foundation/new-look";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
-import type { MatchdaySummaryHighlight, MatchdaySummaryTeamRow } from "@/lib/foundation/matchday-summary";
+import type {
+  MatchdaySummaryHighlight,
+  MatchdaySummaryTeamRow,
+  MatchdaySummaryTopPlayer,
+} from "@/lib/foundation/matchday-summary";
 import { getTeamLogoBrowserUrl, getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { setFoundationView } from "@/lib/foundation/foundation-navigation";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
@@ -40,6 +44,34 @@ const NL_RESULT_MODE_ITEMS: Array<{ id: NlResultMode; label: string }> = [
   { id: "board", label: "Board" },
   { id: "daten", label: "Daten" },
 ];
+
+type NlResultSortKey = "team" | "rank" | "points" | "d1" | "d2" | "before" | "after" | "delta" | "cumulative";
+type NlResultSortDir = "asc" | "desc";
+
+function getNlResultSortValue(row: MatchdaySummaryTeamRow, key: NlResultSortKey): number | string {
+  switch (key) {
+    case "team":
+      return row.teamName;
+    case "rank":
+      return row.matchdayRank ?? Number.POSITIVE_INFINITY;
+    case "points":
+      return row.matchdayPoints ?? Number.NEGATIVE_INFINITY;
+    case "d1":
+      return row.d1Score ?? Number.NEGATIVE_INFINITY;
+    case "d2":
+      return row.d2Score ?? Number.NEGATIVE_INFINITY;
+    case "before":
+      return row.seasonRankBeforeMatchday ?? Number.POSITIVE_INFINITY;
+    case "after":
+      return row.seasonRankAfterMatchday ?? Number.POSITIVE_INFINITY;
+    case "delta":
+      return row.rankDelta ?? Number.NEGATIVE_INFINITY;
+    case "cumulative":
+      return row.cumulativePoints ?? Number.NEGATIVE_INFINITY;
+    default:
+      return "";
+  }
+}
 
 /** Zähler-Animation, die `prefers-reduced-motion` respektiert. */
 function useCountUp(target: number | null, durationMs = 900): number | null {
@@ -140,6 +172,8 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   } = props;
 
   const [mode, setMode] = useState<NlResultMode>("board");
+  const [sortKey, setSortKey] = useState<NlResultSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<NlResultSortDir>("asc");
 
   const boardRows = useMemo(
     () =>
@@ -154,6 +188,42 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
     [matchdaySummary.teamRows],
   );
 
+  const datenRows = useMemo(() => {
+    if (!sortKey) {
+      return boardRows;
+    }
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...boardRows].sort((left, right) => {
+      const leftValue = getNlResultSortValue(left, sortKey);
+      const rightValue = getNlResultSortValue(right, sortKey);
+      if (typeof leftValue === "string" || typeof rightValue === "string") {
+        return dir * String(leftValue).localeCompare(String(rightValue), "de");
+      }
+      return dir * (leftValue - rightValue);
+    });
+  }, [boardRows, sortKey, sortDir]);
+
+  function handleDatenSort(key: NlResultSortKey) {
+    if (sortKey === key) {
+      setSortDir((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir("asc");
+  }
+
+  function renderSortableTh(key: NlResultSortKey, label: string) {
+    const isActive = sortKey === key;
+    return (
+      <th aria-sort={isActive ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+        <button type="button" className="nl-result-th-sort" onClick={() => handleDatenSort(key)}>
+          {label}
+          {isActive ? <span className="nl-result-th-sort-arrow">{sortDir === "asc" ? "▲" : "▼"}</span> : null}
+        </button>
+      </th>
+    );
+  }
+
   const maxD1 = boardRows.reduce((max, row) => (row.d1Score != null && row.d1Score > max ? row.d1Score : max), 0);
   const maxD2 = boardRows.reduce((max, row) => (row.d2Score != null && row.d2Score > max ? row.d2Score : max), 0);
 
@@ -166,6 +236,43 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
       : null;
   const heroPoints = useCountUp(heroRow?.matchdayPoints ?? null);
   const championRow = matchdaySummary.topTeams[0] ?? boardRows[0] ?? null;
+  const topPlayers = matchdaySummary.topPlayers.slice(0, 5);
+
+  function renderTopPlayerRow(player: MatchdaySummaryTopPlayer, index: number) {
+    const medalKind = index === 0 ? "gold" : index === 1 ? "silver" : index === 2 ? "bronze" : null;
+    return (
+      <li key={`${player.playerId}-${player.disciplineId}`} className="nl-result-mvp-row">
+        <span className="nl-result-rank">
+          {medalKind ? (
+            <NlMedalBadge kind={medalKind} title={`MVP-Platz ${index + 1}`} />
+          ) : (
+            <span className="nl-result-ranknum nl-tnum">{index + 1}</span>
+          )}
+        </span>
+        <span className="nl-result-mvp-copy">
+          <span className="nl-result-mvp-player">{player.playerName}</span>
+          <button
+            type="button"
+            className="nl-result-mvp-team"
+            onClick={() => openTeamProfileById(player.teamId)}
+            title={`${player.teamName} öffnen`}
+          >
+            {player.teamShortCode} · {player.teamName}
+          </button>
+        </span>
+        <span
+          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "pow" : "men")}`}
+          title={player.disciplineName}
+        >
+          {player.disciplineSide === "d1" ? "D1" : "D2"}
+        </span>
+        <span className="nl-result-mvp-stats nl-tnum">
+          <strong>{formatNlNumber(player.finalPlayerScore, 1)}</strong>
+          <small>{player.points != null ? `${formatNlNumber(player.points, 1)} PPs` : "—"}</small>
+        </span>
+      </li>
+    );
+  }
 
   function renderBoardRow(row: MatchdaySummaryTeamRow) {
     const isActive = row.teamId === activeManagerTeamId;
@@ -233,19 +340,19 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         <table className="nl-result-table nl-tnum">
           <thead>
             <tr>
-              <th>Team</th>
-              <th>Tagesrang</th>
-              <th>Punkte</th>
-              <th>{matchdaySummary.d1.disciplineName ?? "D1"}</th>
-              <th>{matchdaySummary.d2.disciplineName ?? "D2"}</th>
-              <th>vorher</th>
-              <th>nachher</th>
-              <th>Δ</th>
-              <th>Kumuliert</th>
+              {renderSortableTh("team", "Team")}
+              {renderSortableTh("rank", "Tagesrang")}
+              {renderSortableTh("points", "Punkte")}
+              {renderSortableTh("d1", matchdaySummary.d1.disciplineName ?? "D1")}
+              {renderSortableTh("d2", matchdaySummary.d2.disciplineName ?? "D2")}
+              {renderSortableTh("before", "vorher")}
+              {renderSortableTh("after", "nachher")}
+              {renderSortableTh("delta", "Δ")}
+              {renderSortableTh("cumulative", "Kumuliert")}
             </tr>
           </thead>
           <tbody>
-            {boardRows.map((row) => (
+            {datenRows.map((row) => (
               <tr
                 key={row.teamId}
                 className={row.teamId === activeManagerTeamId ? "is-active-team" : undefined}
@@ -408,6 +515,16 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </ol>
         ) : (
           renderDatenTable()
+        )}
+      </NlCard>
+
+      <NlCard className="nl-result-mvp-card" title="Tages-MVPs" eyebrow="Beste Einzelleistungen dieses Spieltags">
+        {topPlayers.length === 0 ? (
+          <p className="nl-result-empty-text">Für diesen Spieltag liegen noch keine Spieler-Wertungen vor.</p>
+        ) : (
+          <ol className="nl-result-mvp-list" aria-label="Tages-MVPs">
+            {topPlayers.map((player, index) => renderTopPlayerRow(player, index))}
+          </ol>
         )}
       </NlCard>
 

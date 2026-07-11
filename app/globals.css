@@ -48092,3 +48092,216 @@ button.foundation-team-portrait-card {
   font-size: 12px;
   color: var(--nl-mut);
 }
+
+/* ── Batch b2: Arena — aufklappbare Board-Zeilen (Phasen-Herkunft), ──── */
+/* ── Own-Team-Leiste, Reveal-Autoplay ────────────────────────────────── */
+.is-new-look .nl-arena-score-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-arena-score-toggle:hover,
+.is-new-look .nl-arena-score-toggle:focus-visible {
+  border-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-arena-row.is-expanded {
+  z-index: 5;
+}
+
+.is-new-look .nl-arena-row-breakdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  padding: var(--nl-s2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  box-shadow: 0 8px 20px color-mix(in srgb, #000 25%, transparent);
+  z-index: 6;
+}
+
+.is-new-look .nl-arena-row-breakdown-item {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  font-size: 11px;
+  min-width: 76px;
+}
+
+.is-new-look .nl-arena-row-breakdown-item.is-positive {
+  border-color: color-mix(in srgb, var(--nl-good) 45%, var(--nl-line));
+}
+
+.is-new-look .nl-arena-row-breakdown-item.is-negative {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+}
+
+.is-new-look .nl-arena-row-breakdown-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+  font-size: 10px;
+}
+
+.is-new-look .nl-arena-row-breakdown-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-arena-owncall {
+  position: sticky;
+  top: 8px;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-owncall-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 6px 12px;
+  border: 1px solid var(--nl-accent);
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-accent) 18%, var(--nl-panel));
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-arena-owncall-btn:hover {
+  background: color-mix(in srgb, var(--nl-accent) 28%, var(--nl-panel));
+}
+
+.is-new-look .nl-arena-owncall-rank {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.is-new-look .nl-arena-autoplay-toggle[aria-pressed="true"] {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 22%, var(--nl-panel-2));
+}
+
+/* ── Batch b2: Ergebnis — Tages-MVPs, sortierbare Datentabelle ──────── */
+.is-new-look .nl-result-mvp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-result-mvp-row {
+  display: grid;
+  grid-template-columns: 28px minmax(120px, 1.6fr) auto auto;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-result-mvp-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.is-new-look .nl-result-mvp-player {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-result-mvp-team {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-result-mvp-team:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-mvp-discipline {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 12%, var(--nl-panel));
+  white-space: nowrap;
+}
+
+.is-new-look .nl-result-mvp-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.is-new-look .nl-result-mvp-stats small {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-result-th-sort:hover,
+.is-new-look .nl-result-th-sort:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-th-sort-arrow {
+  font-size: 10px;
+  color: var(--nl-accent);
+}
+
+/* ── Batch b2: Reduced Motion (Arena-Breakdown, Own-Team-Sprung) ────── */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-arena-row-breakdown {
+    transition: none;
+  }
+}
