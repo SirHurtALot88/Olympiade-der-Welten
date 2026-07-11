@@ -50878,6 +50878,464 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* --- Resolve-Show: Slot-für-Slot-Auflösung (Projektion) ------------------ */
+/* Staging-Sprache bewusst synchron zur Arena-Reveal-Show (Play/Pause/Replay/
+   Überspringen); alle Animationen rein dekorativ und via Reduced Motion aus. */
+
+.is-new-look .nl-lineup-show {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-lineup-show-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-lineup-show-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-lineup-show-title strong {
+  font-family: var(--nl-display);
+  font-size: 16px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-lineup-show-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-lineup-show-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+/* Scorebar: Phasen-Pips links, kumulierter Team-Score rechts */
+
+.is-new-look .nl-lineup-show-scorebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-lineup-show-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.is-new-look .nl-lineup-show-phase {
+  padding: 3px 10px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease),
+    background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-lineup-show-phase.is-reached {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-lineup-show-phase.is-current {
+  color: var(--nl-accent);
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-lineup-show-phase:hover,
+.is-new-look .nl-lineup-show-phase:focus-visible {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-lineup-show-score {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-lineup-show-score small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-score strong {
+  font-family: var(--nl-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--nl-ink);
+  animation: nl-lineup-show-score-pop 320ms var(--nl-ease);
+}
+
+@keyframes nl-lineup-show-score-pop {
+  0% {
+    transform: scale(1.14);
+    color: var(--nl-accent);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Slot-Karten: verdeckt (?) → enthüllt, letzte Enthüllung mit Akzent-Ring */
+
+.is-new-look .nl-lineup-show-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-lineup-show-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .nl-lineup-show-side-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.is-new-look .nl-lineup-show-slot {
+  flex: 1 1 128px;
+  min-width: 0;
+  max-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-lineup-show-slot.is-hidden {
+  border-style: dashed;
+  align-items: center;
+  justify-content: center;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-slot.is-revealed {
+  animation: nl-lineup-show-slot-in 360ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-slot.is-latest {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-accent) 40%, transparent);
+}
+
+@keyframes nl-lineup-show-slot-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.is-new-look .nl-lineup-show-slot-tag {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-slot-captain {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 0 4px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-lineup-show-slot-name {
+  font-size: 12px;
+  color: var(--nl-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-new-look .nl-lineup-show-slot-score {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-lineup-show-slot-veil {
+  font-family: var(--nl-display);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.is-new-look .nl-lineup-show-slot-fatigue {
+  align-self: flex-start;
+}
+
+/* Phasen-Karten: Fatigue (zieht runter), Formkarten (on top), Boni */
+
+.is-new-look .nl-lineup-show-phasecard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s3) var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-lineup-show-phasecard strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-lineup-show-phasecard-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-phasecard.is-fatigue {
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 8%, var(--nl-panel-2));
+  animation: nl-lineup-show-drop-in 420ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-phasecard.is-fatigue .nl-lineup-show-phasecard-label {
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, transparent);
+}
+
+/* Fatigue kommt von oben "runter" — unterstreicht den Abzug. */
+@keyframes nl-lineup-show-drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.is-new-look .nl-lineup-show-phasecard.is-form {
+  border-color: color-mix(in srgb, var(--nl-accent) 40%, transparent);
+  animation: nl-lineup-show-drop-in 420ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-phasecard.is-form .nl-lineup-show-phasecard-label {
+  color: var(--nl-accent);
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
+}
+
+.is-new-look .nl-lineup-show-phasecard.is-bonus {
+  animation: nl-lineup-show-drop-in 420ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-formcards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Formkarte flippt "on top" ein */
+.is-new-look .nl-lineup-show-formcard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e2);
+  transform-origin: top center;
+  animation: nl-lineup-show-formcard-in 460ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-formcard.is-unknown {
+  border-style: dashed;
+  border-color: var(--nl-line-2);
+  box-shadow: none;
+}
+
+@keyframes nl-lineup-show-formcard-in {
+  0% {
+    opacity: 0;
+    transform: perspective(480px) rotateX(-70deg);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(480px) rotateX(0deg);
+  }
+}
+
+.is-new-look .nl-lineup-show-formcard small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-formcard strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-lineup-show-formcard-hint {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-bonuslist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.is-new-look .nl-lineup-show-bonus {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 3px 10px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  font-size: 12px;
+  color: var(--nl-ink);
+}
+
+/* Finale */
+
+.is-new-look .nl-lineup-show-final {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s3);
+  padding: var(--nl-s3) var(--nl-s4);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 50%, var(--nl-line));
+  border-radius: var(--nl-r-md);
+  background: var(--nl-accent-soft);
+  animation: nl-lineup-show-drop-in 420ms var(--nl-ease) backwards;
+}
+
+.is-new-look .nl-lineup-show-final-copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.is-new-look .nl-lineup-show-final-copy small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-lineup-show-final-copy strong {
+  font-family: var(--nl-display);
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-lineup-show-final-hint {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+@media (max-width: 760px) {
+  .is-new-look .nl-lineup-show-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .is-new-look .nl-lineup-show-scorebar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-lineup-show-score strong,
+  .is-new-look .nl-lineup-show-slot.is-revealed,
+  .is-new-look .nl-lineup-show-phasecard.is-fatigue,
+  .is-new-look .nl-lineup-show-phasecard.is-form,
+  .is-new-look .nl-lineup-show-phasecard.is-bonus,
+  .is-new-look .nl-lineup-show-formcard,
+  .is-new-look .nl-lineup-show-final {
+    animation: none;
+  }
+
+  .is-new-look .nl-lineup-show-phase {
+    transition: none;
+  }
+}
+
 /* --- Responsive ---------------------------------------------------------- */
 
 @media (max-width: 1100px) {

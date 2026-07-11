@@ -886,6 +886,16 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                         setIsAutoPlaying(false);
                         return;
                       }
+                      // Reduced Motion: keine getaktete Show — direkt zum Ergebnis.
+                      const reduceMotion =
+                        typeof window !== "undefined" &&
+                        typeof window.matchMedia === "function" &&
+                        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                      if (reduceMotion) {
+                        setExpandedTeamId(null);
+                        setPhaseIndex(MATCHDAY_ARENA_PHASES.length - 1);
+                        return;
+                      }
                       if (phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1) {
                         setExpandedTeamId(null);
                         setPhaseIndex(0);
@@ -894,6 +904,18 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                     }}
                   >
                     {isAutoPlaying ? "❚❚ Pause" : phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1 ? "↺ Replay" : "▶ Play"}
+                  </button>
+                  <button
+                    className="nl-arena-button"
+                    type="button"
+                    disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1}
+                    title="Show überspringen — direkt zur Ergebnis-Phase"
+                    onClick={() => {
+                      setIsAutoPlaying(false);
+                      setPhaseIndex(MATCHDAY_ARENA_PHASES.length - 1);
+                    }}
+                  >
+                    Überspringen ⏭
                   </button>
                   <button
                     className="nl-arena-button nl-arena-speed"
