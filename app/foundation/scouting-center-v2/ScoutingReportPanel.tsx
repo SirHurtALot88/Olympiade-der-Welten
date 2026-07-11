@@ -6,7 +6,7 @@ import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { formatScoutedImpactDelta } from "@/lib/market/transfermarkt-scouting";
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
-import { VeloPotentialStars, VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { NlAbilityStars, VeloPotentialStars, VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 
 type ScoutingReportPanelProps = {
   report: ScoutingReportData | null;
@@ -14,6 +14,8 @@ type ScoutingReportPanelProps = {
   onPromoteToFocus?: (playerId: string) => void;
   onRemove?: (playerId: string) => void;
   canPromoteToFocus?: boolean;
+  /** Neuer Look: unifiziertes CA/PO-Sterne-Rendering (NlAbilityStars) statt getrennter Velo-Sterne. */
+  newLook?: boolean;
 };
 
 function getInitials(name: string) {
@@ -47,6 +49,7 @@ export default function ScoutingReportPanel({
   onPromoteToFocus,
   onRemove,
   canPromoteToFocus = false,
+  newLook = false,
 }: ScoutingReportPanelProps) {
   if (!report) {
     return (
@@ -128,11 +131,32 @@ export default function ScoutingReportPanel({
         <article className="scouting-report-card">
           <span className="eyebrow">Fähigkeiten</span>
           <div className="scouting-report-stars">
-            <VeloStarRating value={report.caDisplay} label="CA" />
-            {report.poPotentialRating != null ? (
-              <VeloPotentialStars rating={report.poPotentialRating} />
+            {newLook ? (
+              <NlAbilityStars
+                caStars={report.caDisplay}
+                poStarRange={
+                  report.poStarMin != null && report.poStarMax != null
+                    ? { min: report.poStarMin, max: report.poStarMax }
+                    : null
+                }
+                poScoreRange={
+                  report.poStarMin != null && report.poStarMax != null
+                    ? { min: report.poStarMin * 20, max: report.poStarMax * 20 }
+                    : null
+                }
+                poStars={report.poPotentialRating != null ? report.poPotentialRating / 20 : null}
+                known={report.isFullyScouted}
+                label="Fähigkeiten"
+              />
             ) : (
-              <span className="scouting-report-po">PO {report.poDisplay ?? "—"}</span>
+              <>
+                <VeloStarRating value={report.caDisplay} label="CA" />
+                {report.poPotentialRating != null ? (
+                  <VeloPotentialStars rating={report.poPotentialRating} />
+                ) : (
+                  <span className="scouting-report-po">PO {report.poDisplay ?? "—"}</span>
+                )}
+              </>
             )}
             {report.potentialBand ? <span className="scouting-report-potential-band">{report.potentialBand}</span> : null}
           </div>

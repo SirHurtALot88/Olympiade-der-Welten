@@ -32416,6 +32416,121 @@ button.market-v2-bucket-card.is-selected {
   color: rgba(103, 89, 61, 0.58);
 }
 
+/* NlAbilityStars — shared CA/PO star+number renderer (see components/foundation/velo-ui/NlAbilityStars.tsx).
+   Global (like .velo-*) so callers that also appear in a flag-off path stay intact; reuses the gold star visuals. */
+.nl-ability-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  vertical-align: middle;
+}
+
+.nl-ability-stars.is-compact {
+  gap: 10px;
+}
+
+.nl-ability-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nl-ability-metric-label {
+  color: rgba(235, 239, 247, 0.66);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nl-ability-num {
+  color: rgba(235, 239, 247, 0.9);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.nl-ability-stars.is-compact .nl-ability-num {
+  font-size: 0.76rem;
+}
+
+.nl-ability-empty {
+  color: rgba(235, 239, 247, 0.62);
+}
+
+.nl-ability-star-row {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
+}
+
+.nl-ability-star-row.is-range {
+  filter: none;
+}
+
+.nl-ability-stars.is-danger .nl-ability-star-row {
+  filter: drop-shadow(0 0 9px rgba(255, 96, 86, 0.35));
+}
+
+.nl-ability-star {
+  position: relative;
+  display: inline-block;
+  width: 0.86em;
+  color: rgba(111, 91, 48, 0.72);
+  font-size: 0.94rem;
+}
+
+.nl-ability-stars.is-compact .nl-ability-star {
+  font-size: 0.82rem;
+}
+
+.nl-ability-star-empty {
+  color: rgba(103, 89, 61, 0.58);
+}
+
+.nl-ability-star.is-inactive .nl-ability-star-empty {
+  color: rgba(103, 89, 61, 0.28);
+}
+
+.nl-ability-star-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  overflow: hidden;
+  color: #ffd76a;
+  text-shadow:
+    0 0 3px rgba(255, 245, 181, 0.95),
+    0 0 9px rgba(255, 191, 49, 0.8),
+    0 1px 0 rgba(85, 47, 7, 0.65);
+}
+
+.nl-ability-stars.is-danger .nl-ability-star-fill {
+  color: #ff8d84;
+  text-shadow:
+    0 0 3px rgba(255, 214, 210, 0.95),
+    0 0 9px rgba(255, 96, 86, 0.75);
+}
+
+.nl-ability-star-uncertain {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  color: #12151c;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.18),
+    0 1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.nl-ability-star.has-uncertain .nl-ability-star-uncertain {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nl-ability-star-fill {
+    transition: width 160ms ease;
+  }
+}
+
 .velo-star-stack,
 .training-v2-rider-star-stack {
   display: grid;

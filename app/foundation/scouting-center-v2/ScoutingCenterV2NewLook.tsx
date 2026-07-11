@@ -448,6 +448,7 @@ export default function ScoutingCenterV2NewLook({
             onPromoteToFocus={(playerId) => onReorderQueue?.(playerId, 0)}
             onRemove={(playerId) => onRemoveFromQueue?.(playerId)}
             canPromoteToFocus={queueEntries.length > 1}
+            newLook
           />
           {queueEntries.length > 1 ? (
             <div className="nl-scout-report-picker">

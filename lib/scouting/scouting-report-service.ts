@@ -59,6 +59,8 @@ export type ScoutingReportData = {
   caDisplay: string | null;
   poDisplay: string | null;
   poPotentialRating: number | null;
+  poStarMin: number | null;
+  poStarMax: number | null;
   potentialBand: string | null | undefined;
   traits: {
     visiblePositive: string[];
@@ -219,6 +221,8 @@ export function buildScoutingReport(input: {
     caDisplay: starFields.caDisplay ?? null,
     poDisplay: starFields.poDisplay ?? null,
     poPotentialRating,
+    poStarMin: starFields.poMin ?? null,
+    poStarMax: starFields.poMax ?? null,
     potentialBand: starFields.potentialBand ?? null,
     traits: {
       visiblePositive: traitView.visiblePositiveTraits,

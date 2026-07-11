@@ -44,6 +44,7 @@ import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/f
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import { NlSparkline } from "@/components/foundation/new-look";
+import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
@@ -935,8 +936,26 @@ function resolveCaPoDisplay(data: PlayerDetailDrawerData) {
   };
 }
 
-function PlayerCaPoStarStack({ data }: { data: PlayerDetailDrawerData }) {
+function PlayerCaPoStarStack({ data, newLook = false }: { data: PlayerDetailDrawerData; newLook?: boolean }) {
   const { caStars, poStars, caDisplay, poDisplay } = resolveCaPoDisplay(data);
+
+  if (newLook) {
+    const known = data.attributeVisibility === "exact";
+    const poScoreRange = data.developmentInsight?.potentialRangeDisplay ?? null;
+    return (
+      <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
+        <NlAbilityStars
+          caStars={caStars}
+          caScore={known ? (data.developmentInsight?.currentRating ?? null) : null}
+          poStars={poStars}
+          poScoreRange={poScoreRange}
+          known={known}
+          label="Fähigkeiten"
+          compact
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
@@ -1533,7 +1552,7 @@ export default function PlayerDetailDrawer({
                 </span>
                 {isFreeAgent ? (
                   <div className="player-drawer-header-scout-compact" data-testid="player-drawer-header-scout-compact">
-                    {hasKnownCaPoStars(data) ? <PlayerCaPoStarStack data={data} /> : null}
+                    {hasKnownCaPoStars(data) ? <PlayerCaPoStarStack data={data} newLook={newLookEnabled} /> : null}
                     <span className="player-drawer-header-metric">
                       <small>Scouting</small>
                       <strong>L{data.scoutingLevel ?? 0}</strong>
@@ -1587,7 +1606,7 @@ export default function PlayerDetailDrawer({
                       Rolle {formatRoleTag(transferContext.roleTag)}
                       {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
                     </p>
-                    <PlayerCaPoStarStack data={data} />
+                    <PlayerCaPoStarStack data={data} newLook={newLookEnabled} />
                     <div className="player-drawer-scout-meta">
                       <span>Scouting L{data.scoutingLevel ?? 0}</span>
                       <span title={buildFatigueImpactTooltip(data)}>

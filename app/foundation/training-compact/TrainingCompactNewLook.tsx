@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
-import { VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
+import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -411,15 +411,22 @@ function NlTrainingPlayerCard({
             {row.organicForecast.classBefore === row.organicForecast.classAfter
               ? row.player.className
               : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
-            {row.developmentStars.currentAbilityRating != null
-              ? ` · CA ${formatNlNumber(row.developmentStars.currentAbilityRating, 0)}`
-              : ""}
-            {row.developmentStars.potentialStars
-              ? ` · PO ${row.developmentStars.potentialStars}`
-              : row.developmentStars.potentialRating != null
-                ? ` · PO ${formatNlNumber(row.developmentStars.potentialRating, 0)}`
-                : ""}
           </small>
+          {row.developmentStars.currentAbilityStars != null ||
+          row.developmentStars.currentAbilityRating != null ||
+          row.developmentStars.potentialStars != null ||
+          row.developmentStars.potentialRating != null ? (
+            <NlAbilityStars
+              caStars={row.developmentStars.currentAbilityStars}
+              caScore={row.developmentStars.currentAbilityRating}
+              poStars={row.developmentStars.potentialStars}
+              poScore={row.developmentStars.potentialRating}
+              known
+              compact
+              className="nl-training-player-stars"
+              label="Fähigkeiten"
+            />
+          ) : null}
         </div>
         <span className={`nl-training-player-badge is-${tone}`}>{getToneBadgeLabel(tone)}</span>
       </header>
