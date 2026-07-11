@@ -1,9 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { getSportTargetV2 } from "@/lib/board/team-season-objectives-service";
+import { calculateBoardConfidence, getSportTargetV2 } from "@/lib/board/team-season-objectives-service";
 import { isBoardObjectivesV2Enabled } from "@/lib/board/board-objectives-config";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
-import type { TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
+
+function failedObjectives(count: number): TeamSeasonObjectiveRecord[] {
+  return Array.from({ length: count }, (_, i) => ({
+    seasonId: "season-1",
+    teamId: "T",
+    objectiveId: `obj-${i}`,
+    category: "sport",
+    label: "x",
+    targetValue: 1,
+    currentValue: 0,
+    status: "failed",
+    boardConfidenceDelta: -0.6,
+    source: "test",
+  })) as TeamSeasonObjectiveRecord[];
+}
+
+function withV2<T>(fn: () => T): T {
+  const prev = process.env.OLY_BOARD_OBJECTIVES_V2;
+  process.env.OLY_BOARD_OBJECTIVES_V2 = "1";
+  try {
+    return fn();
+  } finally {
+    if (prev == null) delete process.env.OLY_BOARD_OBJECTIVES_V2;
+    else process.env.OLY_BOARD_OBJECTIVES_V2 = prev;
+  }
+}
 
 function row(teamId: string, ppsTotal: number, marketValueTotal: number): TeamManagementSnapshotRow {
   return { teamId, ppsTotal, marketValueTotal } as TeamManagementSnapshotRow;
@@ -73,5 +99,39 @@ describe("Board-Objectives V2 — calibrated sport target", () => {
         expect(t.rank).toBeLessThanOrEqual(4);
       }
     }
+  });
+});
+
+describe("Board-Objectives V2 — perceived-pressure layer", () => {
+  const boardIdentity = (boardConfidence: number, harmony: number): TeamIdentity =>
+    ({ boardConfidence, harmony } as TeamIdentity);
+
+  it("emits perceivedPressure + pressureMomentum only under V2", () => {
+    const objectives = failedObjectives(2);
+    const v1 = calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives });
+    expect(v1.perceivedPressure).toBeUndefined();
+    expect(v1.pressureMomentum).toBeUndefined();
+    const v2 = withV2(() => calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives }));
+    expect(typeof v2.perceivedPressure).toBe("number");
+    expect(typeof v2.pressureMomentum).toBe("number");
+  });
+
+  it("a patient (high-confidence, high-harmony) board feels less pressure than a volatile one", () => {
+    const objectives = failedObjectives(3);
+    const patient = withV2(() => calculateBoardConfidence({ teamId: "T", identity: boardIdentity(9, 9), objectives }));
+    const volatile = withV2(() => calculateBoardConfidence({ teamId: "T", identity: boardIdentity(2, 2), objectives }));
+    expect(patient.perceivedPressure!).toBeLessThan(volatile.perceivedPressure!);
+  });
+
+  it("momentum lags: high prior momentum keeps perceived pressure elevated after failures clear", () => {
+    const noFailures: TeamSeasonObjectiveRecord[] = [];
+    const calm = withV2(() =>
+      calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives: noFailures, storedBoard: { teamId: "T", value: 5, pressure: 5, warnings: [], pressureMomentum: 0 } }),
+    );
+    const lagging = withV2(() =>
+      calculateBoardConfidence({ teamId: "T", identity: boardIdentity(5, 5), objectives: noFailures, storedBoard: { teamId: "T", value: 5, pressure: 5, warnings: [], pressureMomentum: 3 } }),
+    );
+    // Same current (zero) gap, but the team that was under pressure recently still feels more of it.
+    expect(lagging.perceivedPressure!).toBeGreaterThan(calm.perceivedPressure!);
   });
 });

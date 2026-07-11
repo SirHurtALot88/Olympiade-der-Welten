@@ -1474,7 +1474,7 @@ function mergeStoredTeamObjectives(input: {
   return [...merged, ...input.generated.filter((objective) => !storedIds.has(objective.objectiveId))];
 }
 
-function calculateBoardConfidence(input: {
+export function calculateBoardConfidence(input: {
   teamId: string;
   identity: TeamIdentity | null;
   objectives: TeamSeasonObjectiveRecord[];
@@ -1483,12 +1483,14 @@ function calculateBoardConfidence(input: {
   gmChangedThisSeason?: boolean;
   neutralPreseasonBoard?: boolean;
 }): TeamBoardConfidenceRecord {
+  const boardV2 = isBoardObjectivesV2Enabled();
   if (input.neutralPreseasonBoard) {
     return {
       teamId: input.teamId,
       value: DEFAULT_BOARD_RATING,
       pressure: DEFAULT_BOARD_RATING,
       warnings: [],
+      ...(boardV2 ? { perceivedPressure: DEFAULT_BOARD_RATING, pressureMomentum: 0 } : {}),
     };
   }
   const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
@@ -1509,11 +1511,27 @@ function calculateBoardConfidence(input: {
   const atRisk = input.objectives.filter((objective) => objective.status === "at_risk").length;
   const value = roundValue(clamp(base + delta, 1, 10), 1);
   const pressure = roundValue(clamp(11 - value + failed * 0.8 + atRisk * 0.35, 1, 10), 1);
+
+  // V2 perceived-pressure layer: momentum-smoothed pressure minus a patience damp derived from the
+  // board's temperament. Goals never move; only the *felt* pressure has its own (laggier) dynamics.
+  // Slice 3 makes `patience` dynamic (disposition); here it's an identity-temperament proxy.
+  let perceivedPressure: number | undefined;
+  let pressureMomentum: number | undefined;
+  if (boardV2) {
+    const rawGap = failed * 0.8 + atRisk * 0.35;
+    const prevMomentum = input.storedBoard?.pressureMomentum ?? rawGap;
+    pressureMomentum = roundValue(0.6 * prevMomentum + 0.4 * rawGap, 2);
+    const patience = clamp(0.5 * (identitySeed / 10) + 0.5 * ((input.identity?.harmony ?? 5) / 10), 0.1, 0.95);
+    const patienceDamp = 2.5 * patience;
+    perceivedPressure = roundValue(clamp(11 - value + pressureMomentum - patienceDamp, 1, 10), 1);
+  }
+
+  const effectivePressure = perceivedPressure ?? pressure;
   const warnings = [
     input.storedBoard ? "board_confidence_source_saved_state" : null,
     failed > 0 ? "board_objectives_failed" : null,
     atRisk > 0 ? "board_objectives_at_risk" : null,
-    pressure >= 8 ? "high_board_pressure" : null,
+    effectivePressure >= 8 ? "high_board_pressure" : null,
   ].filter((warning): warning is string => Boolean(warning));
 
   return {
@@ -1521,6 +1539,7 @@ function calculateBoardConfidence(input: {
     value,
     pressure,
     warnings,
+    ...(boardV2 ? { perceivedPressure, pressureMomentum } : {}),
   };
 }
 
@@ -1580,7 +1599,8 @@ function buildAiBias(input: {
     }
   }
   const hasAxisPushNeed = Object.values(axisPriorities).some((value) => (value ?? 0) >= 0.7);
-  const pressureFactor = input.board.pressure / 10;
+  // V2: react to the perceived-pressure layer when present (falls back to raw pressure under V1).
+  const pressureFactor = (input.board.perceivedPressure ?? input.board.pressure) / 10;
   const budgetConservatism = clamp((hasFinanceRisk ? 0.65 : 0.35) + pressureFactor * 0.15, 0, 1);
   const sellAggression = clamp((hasFinanceRisk ? 0.7 : 0.35) + pressureFactor * 0.25, 0, 1);
   const buyAggression = clamp(

@@ -722,7 +722,8 @@ export function getBoardReplacementProbability(
 ): number {
   if (!board) return 0;
   const confidence = Number(board.value ?? 5);
-  const pressure = Number(board.pressure ?? 0);
+  // Board-Objectives V2: fire on the perceived-pressure layer when present (falls back to raw pressure).
+  const pressure = Number(board.perceivedPressure ?? board.pressure ?? 0);
 
   // Always safe
   if (confidence >= 6.5 && pressure <= 4) return 0;

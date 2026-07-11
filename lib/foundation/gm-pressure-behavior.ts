@@ -1,6 +1,7 @@
 import type { GameState, TeamGeneralManagerProfile, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import { isBoardObjectivesV2Enabled } from "@/lib/board/board-objectives-config";
 
 export type GmPressureLevel = "stable" | "watch" | "hot";
 
@@ -48,8 +49,14 @@ function archetypePressureStyle(profile: TeamGeneralManagerProfile | null): {
 export function resolveGmPressureBehavior(gameState: GameState, teamId: string): GmPressureBehavior {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
   const gm = getTeamGeneralManager(gameState, teamId);
-  const boardPressure = getBoardPressure(identity);
-  const boardConfidenceValue = identity?.boardConfidence ?? 5;
+  // Bug #1 fix (V2 only): read the DYNAMIC per-season board state (how the team is actually doing)
+  // instead of the static identity seed, which ignored in-season performance entirely. V1 keeps the
+  // legacy static-seed behaviour so nothing shifts with the flag off.
+  const dynamicBoard = isBoardObjectivesV2Enabled() ? gameState.seasonState.boardConfidence?.[teamId] ?? null : null;
+  const boardPressure = dynamicBoard
+    ? clamp((dynamicBoard.perceivedPressure ?? dynamicBoard.pressure) / 10, 0, 1)
+    : getBoardPressure(identity);
+  const boardConfidenceValue = dynamicBoard ? dynamicBoard.value : identity?.boardConfidence ?? 5;
   const story = buildGmStoryView({
     source: gm?.assignment.source ?? null,
     previousGmId: gm?.assignment.previousGmId ?? null,
