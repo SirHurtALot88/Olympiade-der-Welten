@@ -353,6 +353,7 @@ export default function FoundationTeamsNewLook({
   const [boardSort, setBoardSort] = useState<NlTeamsBoardSort>({ key: "rank", dir: "asc" });
   const [hoveredBoardTeamId, setHoveredBoardTeamId] = useState<string | null>(null);
 
+  const heroCardRef = useRef<HTMLDivElement | null>(null);
   const developmentCardRef = useRef<HTMLDivElement | null>(null);
   const rosterCardRef = useRef<HTMLDivElement | null>(null);
   const leagueCardRef = useRef<HTMLDivElement | null>(null);
@@ -546,10 +547,28 @@ export default function FoundationTeamsNewLook({
           const body = (
             <>
               <span className="nl-teams-axis-label">{label}</span>
-              <span className="nl-teams-axis-rank nl-tnum">{rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}</span>
-              {!compact && points != null ? (
-                <span className="nl-teams-axis-points nl-tnum">{formatNlNumber(points, 1)} PP</span>
-              ) : null}
+              {compact ? (
+                <span className="nl-teams-axis-rank nl-tnum">
+                  {rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}
+                </span>
+              ) : (
+                // Wert (Bereichspunkte) UND Liga-Rang klar nebeneinander: "58 · #14".
+                // Fehlt ein echter Rang, bleibt nur der Wert stehen — kein Fake.
+                <span className="nl-teams-axis-figures nl-tnum">
+                  {points != null ? (
+                    <span className="nl-teams-axis-value">{formatNlNumber(points, 1)}</span>
+                  ) : null}
+                  {points != null && rank != null ? (
+                    <span className="nl-teams-axis-sep" aria-hidden="true">
+                      ·
+                    </span>
+                  ) : null}
+                  {rank != null ? (
+                    <span className="nl-teams-axis-rank">#{formatNlNumber(rank, 0)}</span>
+                  ) : null}
+                  {points == null && rank == null ? <span className="nl-teams-axis-rank">—</span> : null}
+                </span>
+              )}
             </>
           );
           if (onSelectAxis) {
@@ -572,39 +591,6 @@ export default function FoundationTeamsNewLook({
             </span>
           );
         })}
-      </div>
-    );
-  }
-
-  function renderRosterFilterBar() {
-    return (
-      <div className="nl-teams-filters">
-        <div className="nl-teams-filterbar" role="group" aria-label="Kaderrollen filtern">
-          {teamRosterRoleFilterOptions.map((option) => (
-            <button
-              key={`nl-teams-role-${option.id}`}
-              type="button"
-              className={`nl-teams-filter${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
-              onClick={() => setTeamRosterRoleFilter(option.id)}
-            >
-              {option.label}
-              <span className="nl-teams-filter-count nl-tnum">{option.count}</span>
-            </button>
-          ))}
-        </div>
-        <div className="nl-teams-filterbar" role="group" aria-label="Kaderfokus wählen">
-          {teamRosterFocusOptions.map((option) => (
-            <button
-              key={`nl-teams-focus-${option.id}`}
-              type="button"
-              className={`nl-teams-filter${teamRosterFocusMode === option.id ? " is-active" : ""}`}
-              onClick={() => setTeamRosterFocusMode(option.id)}
-            >
-              {option.label}
-              <span className="nl-teams-filter-count nl-tnum">{option.count}</span>
-            </button>
-          ))}
-        </div>
       </div>
     );
   }
@@ -884,6 +870,39 @@ export default function FoundationTeamsNewLook({
     );
   }
 
+  // Aktive Sortierung als Zeilenwert: zeigt in jeder Zeile genau den Wert, nach
+  // dem gerade sortiert wird, wenn er nicht ohnehin schon in der Zeile steht
+  // (Rang/Punkte/Cash/Medaillen/Achsen sind bereits sichtbar). So sieht man
+  // beim Sortieren nach MW/Gehalt/Kader auch die zugehörige Zahl.
+  function renderBoardSortValue(row: TeamsViewRow) {
+    const key = boardSort.key;
+    if (key === "mw") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Team-Marktwert">
+          <small>MW</small>
+          {formatNlNumber(row.marketValueTotal, 2)}
+        </span>
+      );
+    }
+    if (key === "salary") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Gehaltsblock">
+          <small>Gehalt</small>
+          {formatNlNumber(row.salaryTotal, 2)}
+        </span>
+      );
+    }
+    if (key === "roster") {
+      return (
+        <span className="nl-teams-board-sortval nl-tnum" title="Kadergröße">
+          <small>Kader</small>
+          {formatNlNumber(row.rosterCount, 0)}
+        </span>
+      );
+    }
+    return null;
+  }
+
   function renderBoardRow(row: TeamsViewRow) {
     const isSelected = row.team.teamId === selectedTeam.teamId;
     const boardRank = getBoardRank(row);
@@ -903,8 +922,14 @@ export default function FoundationTeamsNewLook({
         <button
           type="button"
           className="nl-teams-boardrow-main"
-          onClick={() => scheduleActiveManagerTeam(row.team.teamId, "manual_select")}
-          title={`${row.teamName} auswählen`}
+          onClick={() => {
+            // Zeile anklicken = dieses Team in den Fokus holen (Hero oben wird
+            // sein Profil) und nach oben scrollen. Ein separater „Profil"-Knopf
+            // ist damit überflüssig.
+            scheduleActiveManagerTeam(row.team.teamId, "manual_select");
+            scrollToSection(heroCardRef);
+          }}
+          title={`${row.teamName} in den Fokus holen`}
         >
           <span className="nl-teams-board-rank">
             {medalKind ? (
@@ -941,6 +966,7 @@ export default function FoundationTeamsNewLook({
           </span>
           {renderAxisRankBadges(row, row.teamName, true)}
           <span className="nl-teams-board-meta">
+            {renderBoardSortValue(row)}
             {row.goldCount > 0 ? <NlMedalBadge kind="gold" count={row.goldCount} /> : null}
             {row.silverCount > 0 ? <NlMedalBadge kind="silver" count={row.silverCount} /> : null}
             {row.bronzeCount > 0 ? <NlMedalBadge kind="bronze" count={row.bronzeCount} /> : null}
@@ -949,20 +975,13 @@ export default function FoundationTeamsNewLook({
             </span>
           </span>
         </button>
-        <button
-          type="button"
-          className="nl-teams-board-profile"
-          onClick={() => openTeamProfileById(row.team.teamId)}
-          title={`${row.teamName} Profil öffnen`}
-        >
-          Profil
-        </button>
       </li>
     );
   }
 
   return (
     <div className="nl-teams foundation-teams-view-panel" data-testid="nl-teams-view" data-new-look="true">
+      <div ref={heroCardRef} className="nl-teams-anchor">
       <NlCard className="nl-teams-hero-card" data-testid="nl-teams-hero">
         <div className="nl-teams-hero" style={getSeasonV2TeamTagStyle(heroRow?.teamCode ?? null)}>
           <div className="nl-teams-hero-identity">
@@ -1103,16 +1122,21 @@ export default function FoundationTeamsNewLook({
           <div className="nl-teams-hero-axes">
             {renderAxisRankBadges(heroRow, selectedTeam.name, false, handleHeroAxisSortSelect)}
             {heroRadarAxes.length > 0 ? (
-              <NlRadar
-                axes={heroRadarAxes}
-                max={teamCount}
-                className="nl-teams-hero-radar"
-                aria-label={`Bereichs-Ränge von ${selectedTeam.name} (außen = besser)`}
-              />
+              <figure className="nl-teams-hero-radar-figure">
+                <NlRadar
+                  axes={heroRadarAxes}
+                  max={teamCount}
+                  className="nl-teams-hero-radar"
+                  onAxisClick={handleHeroAxisSortSelect}
+                  aria-label={`Stärkenprofil von ${selectedTeam.name}: Bereichs-Ränge im Liga-Vergleich, außen = stärker`}
+                />
+                <figcaption className="nl-teams-hero-radar-caption">Stärkenprofil · außen = liga-stark</figcaption>
+              </figure>
             ) : null}
           </div>
         </div>
       </NlCard>
+      </div>
 
       {selectedTeamsHistoryData != null ? (
         <div ref={developmentCardRef} className="nl-teams-anchor">
