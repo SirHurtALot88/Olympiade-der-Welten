@@ -1,5 +1,6 @@
 import playerPortraitMap from "@/data/generated/player-portrait-map.json";
 import portraitFileIndex from "@/data/generated/portrait-files.json";
+import teamLogoFileIndex from "@/data/generated/team-logo-files.json";
 import teamLogoMap from "@/data/generated/team-logo-map.json";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { hydratePlayersWithAttributeSheet } from "@/lib/data/playerAttributeSheetData";
@@ -76,6 +77,42 @@ export function getTeamLogoPathById(teamId: string) {
   return teamLogoPathByTeamId[teamId] ?? null;
 }
 
+// Repo-relative team logos. Drop image files into public/team-logos/ and run
+// `npm run team-logos:index` (see public/team-logos/README.md) to regenerate
+// data/generated/team-logo-files.json. Files here always take priority over
+// the legacy absolute-path map below, and with no files present this is a
+// no-op (falls through to the existing map / initials fallback).
+//
+// Team ids in this game are already short codes (e.g. "A-A"), so unlike
+// portraits there is no separate "name slug" to also match against — the
+// file is simply named "<teamId>.<ext>" (case-insensitive).
+const TEAM_LOGO_STATIC_DIR = "/team-logos";
+const teamLogoFileBasenames = teamLogoFileIndex as string[];
+const teamLogoFileByKey = new Map<string, string>();
+for (const filename of teamLogoFileBasenames) {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0) {
+    continue;
+  }
+  const key = filename.slice(0, dot).toLowerCase();
+  if (!teamLogoFileByKey.has(key)) {
+    teamLogoFileByKey.set(key, filename);
+  }
+}
+
+function getStaticTeamLogoUrl(teamId: string): string | null {
+  if (teamLogoFileByKey.size === 0) {
+    return null;
+  }
+
+  const byId = teamLogoFileByKey.get(teamId.toLowerCase());
+  if (byId) {
+    return `${TEAM_LOGO_STATIC_DIR}/${byId}`;
+  }
+
+  return null;
+}
+
 export type MediaBrowserUrlOptions = {
   variant?: MediaImageVariant;
 };
@@ -113,6 +150,11 @@ export function getTeamLogoBrowserUrl(teamId: string, logoPath?: string | null, 
 
   if (logoPath?.startsWith("/") && !logoPath.startsWith("/Users/")) {
     return appendMediaImageVariant(logoPath, variant);
+  }
+
+  const staticTeamLogoUrl = getStaticTeamLogoUrl(teamId);
+  if (staticTeamLogoUrl) {
+    return staticTeamLogoUrl;
   }
 
   if (teamLogoPathByTeamId[teamId] || logoPath?.startsWith("/Users/")) {
@@ -184,5 +226,6 @@ export function getMediaMappingSummary() {
     mappedTeamLogos: Object.keys(teamLogoPathByTeamId).length,
     mappedPlayerPortraits: Object.keys(portraitPathByPlayerId).length,
     staticPortraitFiles: portraitFileByKey.size,
+    staticTeamLogoFiles: teamLogoFileByKey.size,
   };
 }

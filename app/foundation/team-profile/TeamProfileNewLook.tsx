@@ -517,19 +517,16 @@ export default function TeamProfileNewLook({
       <NlCard className="nl-teamprofile-hero-card" data-testid="nl-teamprofile-hero">
         <div className="nl-teamprofile-hero" style={getSeasonV2TeamTagStyle(data.shortCode)}>
           <div className="nl-teamprofile-hero-identity">
-            {data.logoUrl ? (
-              <OptimizedMediaImage
-                className="nl-teamprofile-crest"
-                src={data.logoUrl}
-                alt={`${data.teamName} Logo`}
-                width={72}
-                height={72}
-                loading="eager"
-                fetchPriority="high"
-              />
-            ) : (
-              <span className="nl-teamprofile-crest nl-teamprofile-crest-fallback">{data.logoInitials}</span>
-            )}
+            <OptimizedMediaImage
+              className="nl-teamprofile-crest"
+              src={data.logoUrl}
+              alt={`${data.teamName} Logo`}
+              width={72}
+              height={72}
+              loading="eager"
+              fetchPriority="high"
+              fallback={<span className="nl-teamprofile-crest nl-teamprofile-crest-fallback">{data.logoInitials}</span>}
+            />
             <div className="nl-teamprofile-hero-copy">
               <span className="nl-teamprofile-hero-eyebrow">
                 Team-Profil · {data.shortCode} · {controlModeLabel}
