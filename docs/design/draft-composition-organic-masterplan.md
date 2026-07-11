@@ -68,9 +68,23 @@ Constraint-Verletzung.
 
 **Die einzigen harten Blocker:** Roster ∈ [8, 14] · Cash ≥ Puffer. Alles andere emergiert.
 
-**Noch offen (Mechanik M1–M10, wird beim Beantworten ergänzt):** Aufstellung vs. ganzer Kader ·
-Fatigue/Verletzungen → Tiefe · exakte Disziplin-Struktur · Potenzial/Jugend GM-gewichtet ·
-Verkaufs-Auslöser · Deckungs-Schwelle (1/2/OPT) · Qualitäts-Aggregation.
+**Spielmechanik (geklärt, M1–M10):**
+- **Ergebnis = begrenzte Aufstellung:** pro Spieltag werden **≤ 12 Spieler** eingesetzt, **2–6 pro Disziplin**.
+  Mit Roster [8, 14] ist der Rotationspuffer dünn (14 = nur 2 Reserve) → Tiefe ist knapp & wertvoll.
+- **Fatigue spürbar** (+ Verletzungen/Sperren) → Rotation nötig → Tiefe hat echten Wert.
+- **20 Disziplinen** über den 4 Kern-Attributen POW/SPE/MEN/SOC; Spieler haben Skill je Disziplin;
+  **vielseitige Spieler decken mehrere Disziplinen** ab.
+- **Qualität eines Spielers** = POW/SPE/MEN/SOC (team-/bedarfs-gewichtet) + Anzahl Disziplinen
+  **>60 (solide) / >80 (specialist)**. `mvs`/`ovr` am Transfermarkt = 0 → verboten als Qualität. MW = nur Preis.
+- **Deckungs-*Kurve* pro (gesuchter) Disziplin** (ersetzt eine feste Schwelle): Grenznutzen steigt bis
+  **Sweetspot 3–4** Spieler über Schwelle, bleibt **stark bei 5–6**, **fällt ab 7 rapide** (und ab der
+  ≤12-Einsatzgrenze der Disziplin ohnehin).
+- **Potenzial ja, Alter nein:** „Build-for-future" = Potenzial-Term (GM-gewichtet), es gibt **keine
+  Alters-Achse**.
+- **Verkauf** aus demselben Kalkül, mehrere organische Auslöser (Cash für besseren Kauf · überzählig in
+  gedeckter Disziplin · Kader über OPT · Verkaufswert > Grenznutzen im Kader).
+- **Gewichte aus bestehenden Daten:** GM-Bias-Achsen → Utility-Gewichte + OPT-Shift; Identität → Basis-
+  Aggressivität + Basis-OPT (kein neues Datenmodell).
 
 ## 1. Warum wir das aktuell NICHT erreichen (Diagnose)
 
@@ -128,51 +142,86 @@ der sie gegeneinander abwägt. Das ist die Lücke.
 
 ## 3. Der Reframe: Greedy Marginal-Utility Squad Builder
 
-Ersetze den top-down Slot-Quoten-Allocator durch einen **team-eigenen, schrittweisen Nutzen-Optimierer**:
+Ersetze den top-down Slot-Quoten-Allocator durch einen **team-eigenen, schrittweisen Nutzen-Optimierer**.
+Jeder Schritt bewertet Kandidaten-Aktionen in *einer* Währung und nimmt die beste, bis STOP gewinnt oder
+ein harter Constraint bindet.
 
 ```
-Zustand: aktueller Kader, Cash, Gehaltsspielraum, Bedarf je Rolle
-Wiederhole:
-  Kandidaten-Aktionen:
-    - bester verfügbarer Spieler je Rolle/Preisklasse (Kauf)
-    - (in-season) Verkauf eines Kader-Spielers
+Zustand: Kader, Cash, Bedarf je Disziplin (Deckungs-Count), Gehaltssumme, Forecast
+Wiederhole bis STOP gewinnt oder roster = MAX(14) oder cash < Puffer:
+  Kandidaten:
+    - je gesuchter Disziplin: bester bezahlbarer Free Agent
+    - (in-season) Verkauf je überzähligem Kader-Spieler
     - STOP / Geld behalten
-  bewerte jede Aktion mit Grenznutzen:
-    U(kauf) =  ΔTeamstärke(RollenFit, abnehmend) · w_win
-             − Preis                              · w_thrift
-             − GehaltsWirkung                     · w_sustain
-             + Wiederverkauf/Potenzial            · w_asset
-    U(stop) =  Optionswert(Cash | offene Fenster, Board-Risiko, Ziel)  · w_patience
-  wähle max-Nutzen-Aktion
-  bis STOP gewinnt ODER ein HARTER Constraint bindet
-Harte Constraints (die einzigen Blocker):
-  roster ∈ [min, max] · cash ≥ Puffer · Gehalt ≤ Cap
+  Nutzen:
+    U_buy(p)  =  w_win     · ΔStärke(p | Kader, Deckungskurve, ≤12-Einsatz)
+               − w_thrift  · Preis(p) / Budget-Skala
+               − w_sustain · Gehaltslast(p | Forecast)
+               + w_asset   · Potenzial(p)
+    U_sell(q) =  w_thrift  · Verkaufswert(q)
+               − w_win     · ΔStärke_Verlust(q)            # klein, wenn q in gedeckter Disziplin
+               + w_patience· Cash-Optionswert-Gewinn
+    U_stop    =  w_patience· Cash-Optionswert(cash, Forecast, Board-Risiko, OPT-Nähe)
+  wähle argmax; STOP darf erst gewinnen, wenn roster ≥ MIN(8)
+Harte Blocker (die EINZIGEN): roster ∈ [8, 14] · cash ≥ Puffer
 ```
 
-Alles andere — Anzahl Stars, Kadergröße, Sparen — **emergiert** aus den Gewichten `w_*`, die aus Identität
-+ GM kommen.
+### Die Terme im Detail
 
-### Warum das die gewünschte Vielfalt liefert
+- **ΔStärke(p)** — der marginale Stärkegewinn:
+  `Qualität(p)` = gewichtete POW/SPE/MEN/SOC der **Bedarf-Disziplinen** + Bonus je Disziplin **>60/>80**,
+  durch die **Deckungskurve** gedämpft: für jede Disziplin, die `p` abdeckt, hängt der Grenzwert vom
+  aktuellen Count in dieser Disziplin ab — steigend bis **3–4**, stark bis **5–6**, Absturz ab **7** (und ab
+  der ≤12-Einsatzgrenze der Disziplin → ~0). Vielseitige Spieler summieren über mehrere Disziplinen. So
+  stoppt „alles Stars" **ohne Cap**: ist eine Achse gedeckt, fällt der Grenznutzen unter den einer offenen.
+- **Preis/Budget-Skala** — `w_thrift`-gewichtete Kosten; die Skala ist das Team-Budget, damit der Term
+  budget-relativ wirkt. Das ist der **systemische Value-Tilt**: günstig-solide schlägt teuer, wenn ΔStärke/€
+  besser ist (→ „hier und da ein 60er/70er").
+- **Gehaltslast(p | Forecast)** — nicht ein Wage-Cap, sondern der Beitrag zur **rollierenden Cash-Flow-
+  Prognose**: Sponsor + erwartetes Prize (nur Planung) + Netto-Transfer + Gebäude − zukünftige Gehälter.
+  Bläht das Gehalt den Forecast ins Minus, steigt `w_sustain`-Strafe (board-vermittelt über die
+  Gehaltsquote).
+- **Potenzial(p)** — Build-for-future-Term (kein Alter), `w_asset`-gewichtet; Entwickler-GMs werten hoch.
+- **Cash-Optionswert** — der sensible Knopf: hoch, wenn Cash knapp am Puffer / Board-Risiko groß / Kader
+  schon **≥ OPT**; niedrig bei Cash-Überfluss weit über Puffer. So entsteht **Sparen** rational und die
+  **weiche OPT-Bremse** (Kader nähert sich OPT → STOP wird attraktiver).
 
-- **Ambitioniert + reich** (hoch `w_win`, niedrig `w_thrift`): kauft Qualität bis der Grenznutzen fällt →
-  Stars + solider Core, gibt viel aus.
-- **Sparsam / klamm** (hoch `w_thrift` + `w_patience`): STOP gewinnt früh → **Geld auf der Bank**, kleiner
-  oder schlank gefüllter Kader → der **Sparer**.
-- **Depth-GM** (Grenznutzen belohnt jede gefüllte Rolle): viele Depth-Spieler → **breiter Kader**.
-- **Star-Picker-GM** (konkave Stärkekurve favorisiert *ein* Elite-Asset): wenige teure → **kleiner Elite-Kader**.
-- **60er/70er tauchen auf**, weil ein günstiger Spieler mit gutem RollenFit einen besseren Grenznutzen/€ hat
-  als der teuerste im Band (das ist der schon gebaute Value-Tilt, aber jetzt *systemisch* statt als Patch).
+### OPT weich, GM-moduliert (kein Slot-Zwang)
+
+MIN(8)/MAX(14) sind hart. **OPT** kommt aus `identity.playerOpt` und wird vom GM verschoben
+(`eliteSmallRosterPreference` runter, `rosterDepthPreference` rauf, innerhalb [8, 14]). OPT ist **kein
+Slot-Zwang**, sondern nur die Schwelle, ab der der Cash-Optionswert den Kauf-Nutzen zu überholen beginnt —
+Elite-Teams stoppen früher (kleiner Kader), Depth-Teams später (breit).
+
+### Gewichts-Ableitung aus Identität + GM (recycelt, kein neues Datenmodell)
+
+- **Identität (Basis):** `ambition`↑→`w_win`↑ · `finances`↓→`w_thrift`↑ · Board-Druck↑→`w_win`↑ +
+  `w_patience`↓ (win-now) · Basis-OPT aus `identity.playerOpt`.
+- **GM (Modulation obendrauf):** `starPriority`↑→`w_win`↑ · `valuePriority`↑→`w_thrift`↑ ·
+  `cashPriority`↑→`w_patience`↑ · `riskTolerance`↑→`w_win`↑ + toleriert Gehaltslast ·
+  `rosterDepthPreference`↑→OPT↑ + Deckungs-Sweetspot höher · `eliteSmallRosterPreference`↑→OPT↓ +
+  `w_win`/Slot↑ · `loyaltyBias`↑→Verkaufs-Hemmung.
+
+### Warum das die gewünschte Vielfalt liefert (am North Star)
+
+- **Sparer** (hoch `w_thrift`+`w_patience`): STOP gewinnt früh → **Cash auf der Bank**, kleiner Kader.
+- **Ausgeber** (hoch `w_win`, niedrig `w_thrift`): kauft Qualität bis die Deckungskurve flacht → Stars + Core.
+- **Kleiner Elite-Kader** (`eliteSmallRoster`-GM): niedriges OPT + hoher `w_win`/Slot → wenige teure, tief in
+  den Schlüssel-Disziplinen.
+- **Breiter Kader** (`rosterDepth`-GM): hohes OPT + Sweetspot 3–4 über mehr Disziplinen → viele solide Spieler.
+- **Superstar-Knappheit** emergiert: der Grenznutzen eines Superstars muss `w_thrift`·(riesiger Preis) **und**
+  die Opportunität, mehr Disziplinen zu decken, schlagen — das schaffen nur wenige high-`w_win`/high-Budget-Teams.
+- **Identität sichtbar in Sparen/Ausgeben & Picks** (die Kern-DoD) = direkter Ausdruck der Gewichte.
 
 ### Warum das den Messer-Schneiden-Effekt beseitigt
 
-Es ist **eine** Funktion mit interpretierbaren Gewichten. `w_thrift` hoch → weniger Ausgaben, **monoton
-und vorhersehbar**. Keine Kaskade, kein „ein Knopf kippt die Liga". Jedes Gewicht hat eine klare Bedeutung
-und ein klares Vorzeichen. Das ist der eigentliche architektonische Fix.
+Es ist **eine** Funktion mit interpretierbaren, vorzeichen-klaren Gewichten. `w_thrift` +10% → weniger
+Ausgaben, **monoton**, ohne Kaskade. Kein „ein Knopf kippt die Liga" mehr — der eigentliche architektonische Fix.
 
 ## 4. Harte Blocker: was bleibt, was fällt
 
-**Bleibt (echte Constraints):** Roster-Min/Max, Cash ≥ Puffer, Gehalt ≤ Cap. Das sind Solvenz-/Regelgrenzen,
-keine Geschmacksregeln.
+**Bleibt (echte Constraints):** Roster **∈ [8, 14]**, Cash ≥ Puffer. Solvenz-/Regelgrenzen, kein Geschmack.
+(Kein Wage-Cap — Gehalt wirkt weich über den Forecast.)
 
 **Fällt (wird emergent):** Premium-Caps, Tail-Reserve-Gating, Pyramid-Enforcement, Min-Core-Garantie,
 `underMin → cheap_fill`-Zwang, reconcile-Downgrade-Kaskade. Alle acht Heuristiken aus §1.2 verschwinden
@@ -196,12 +245,17 @@ und werden durch die Nutzenkurve ersetzt.
 
 ## 6. Metriken für „organisch" (Definition of Done)
 
-1. **Streuung**: Kadergröße, Ausgaben, Star-Anzahl, Cash haben *sichtbare* Liga-Streuung (nicht alle gleich).
-2. **Korrelation**: die Streuung folgt Identität/GM (ambitioniert↔Ausgaben, sparsam↔Cash), nicht Zufall.
-3. **Keine Constraint-Verletzung**: 0 Teams unter Min, kein negativer Cash, Gehalt im Rahmen.
-4. **Monotones Tuning**: ein Gewicht ±10% bewegt genau seine Achse, ohne die Liga zu kippen.
-5. **Ökonomische Plausibilität**: die meisten Teams sind über mehrere Seasons finanziell tragfähig
-   (kein struktureller Dauerverlust) — greift in die Financial-Discipline-Arbeit.
+1. **Identität sichtbar (Kern-DoD):** man erkennt am Save, ob ein Klub **spart oder klotzt** — an Cash,
+   Kadergröße **und an den Picks**. Die Handschrift des Teams ist ablesbar, kein Einheitsbrei.
+2. **Korrelierte Streuung**: Kadergröße (8–14), Ausgaben, Star-Anzahl, gehaltener Cash streuen *sichtbar*
+   und folgen **Identität/GM** (ambitioniert↔Ausgaben, sparsam↔Cash, Elite↔klein, Depth↔breit) — nicht Zufall.
+3. **Superstar-Knappheit**: echte Superstars nur bei **wenigen** Teams, nicht flächendeckend.
+4. **Finanzielle Plausibilität**: die meisten Teams über Seasons tragfähig (kein struktureller Dauerverlust);
+   Scheitern einzelner Teams erlaubt, aber Cash-Untergrenze hält.
+5. **Sportliche Plausibilität**: Tabelle spiegelt Kaderstärke; Ausgeben zahlt sich **kurzfristig** sichtbar
+   aus, kostet aber nachhaltig.
+6. **Keine Constraint-Verletzung**: 0 Teams unter MIN(8), kein Kader über MAX(14), kein negativer Cash.
+7. **Monotones Tuning**: ein Gewicht ±10% bewegt genau seine Achse, ohne die Liga zu kippen (Anti-Knife-Edge).
 
 ## 7. Verhältnis zu laufender Arbeit
 
@@ -213,14 +267,18 @@ und werden durch die Nutzenkurve ersetzt.
 - Die GMs, die du schon hast, werden vom **Lane-Bias-Kipper** zum **Utility-Gewichts-Setzer** aufgewertet —
   dieselben Daten, ehrlichere Wirkung.
 
-## 8. Risiken / offene Fragen
+## 8. Risiken / offene Punkte
 
-- **Rollen-/Bedarfsmodell**: die Grenznutzenkurve braucht ein sauberes „Rolle gefüllt ja/nein" je Achse.
-  Prüfen, ob `computeIdentityLaneAppetite`/Theme-Context das schon genug hergibt oder ob ein schlankes
-  Rollen-Bedarfsmodell nötig ist.
-- **Cash-Optionswert kalibrieren**: zu hoch → alle horten; zu niedrig → keiner spart. Das ist der eine
-  sensible Knopf — muss messgetrieben eingestellt werden.
+- **Disziplin-Bedarfsmodell**: die Deckungskurve braucht je Team einen sauberen **Count „Spieler > Schwelle
+  je Disziplin"** (mit Mehrfach-Zählung vielseitiger Spieler) und eine **Bedarfsgewichtung** der 20
+  Disziplinen aus Identität/Theme. Prüfen, ob `bestNeedDisciplineId`/Theme-Context das genug hergibt oder
+  ein schlankes Bedarfsmodell nötig ist (Phase 1).
+- **Cash-Optionswert kalibrieren**: der eine sensible Knopf — zu hoch → alle horten, zu niedrig → keiner
+  spart. Messgetrieben über die Dispersions-Metriken einstellen.
+- **Deckungskurve kalibrieren**: Sweetspot 3–4 / stark 5–6 / Absturz ab 7 gegen die ≤12-Einsatz- und
+  [8,14]-Kadergrenzen abgleichen, damit breite Teams nicht künstlich verhungern.
 - **Perf**: der greedy Optimierer bewertet je Schritt mehrere Kandidaten; muss den Draft-Perf-Hoist
   (in-memory Free-Agent-Pool) respektieren, damit die Läufe schnell bleiben.
-- **Umfang**: das ist der größte Umbau seit dem In-Season-Engine-Cutover. Deshalb Flag + Phasen + A/B, kein
-  Big-Bang.
+- **GM-OPT-Modulation fehlt heute**: `deriveRosterTargets` nimmt nur `identity.playerOpt`; die GM-Verschiebung
+  (Elite runter / Depth rauf) muss ergänzt werden.
+- **Umfang**: größter Umbau seit dem In-Season-Engine-Cutover → Flag + Phasen + A/B, kein Big-Bang.
