@@ -142,6 +142,7 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
+import FoundationPlayersTableNewLook from "@/app/foundation/players-table/FoundationPlayersTableNewLook";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
@@ -2496,6 +2497,29 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
 
           {activeView === "players" ? (
+          // "Neuer Look" Flag-Gate (additiv): Flag an => komplett neu gebaute
+          // Spieler-Ansicht mit denselben Daten/Filtern/Sortierungen; Flag
+          // aus => bestehende Tabelle unverändert.
+          newLookEnabled ? (
+            <FoundationPlayersTableNewLook
+              rows={sortedPlayersTableRows}
+              gameState={gameState}
+              leaguePlayerHeatPools={leaguePlayerHeatPools}
+              sortState={tableSorts.playersTable}
+              onToggleSort={(columnKey: string) => toggleTableSort("playersTable", columnKey)}
+              playerScope={playerScope}
+              onChangeScope={setPlayerScope}
+              teams={gameState.teams}
+              playerTeamFilter={playerTeamFilter}
+              onChangeTeamFilter={setPlayerTeamFilter}
+              playerClassFilter={playerClassFilter}
+              playerClassOptions={playerClassOptions}
+              onChangeClassFilter={setPlayerClassFilter}
+              playerBracketCounts={playerBracketCounts}
+              openPlayerDrawerById={openPlayerDrawerById}
+              openTeamProfileById={openTeamProfileById}
+            />
+          ) : (
           <section className={`panel${getViewClass("players")}`} id="players-table">
             <div className="panel-header">
               <h2>Players</h2>
@@ -2803,6 +2827,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               Farben sind liga-relativ: jede Stufe steht fuer ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
             </p>
           </section>
+          )
           ) : null}
 
           {activeView === "ranks" ? (
