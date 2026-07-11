@@ -14,6 +14,7 @@ import {
 } from "@/lib/foundation/foundation-sidebar-order";
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 type FoundationSidebarProps = {
   activeView: FoundationViewId;
@@ -35,9 +36,16 @@ export default function FoundationSidebar({
   attentionByViewId,
   seasonContextLabel,
 }: FoundationSidebarProps) {
+  const [newLookEnabled] = useNewLook();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
+
+  // "S1 · MD 1" → ["S1", "MD 1"]; Trennzeichen stammt aus buildSeasonContextLabel.
+  const contextParts = seasonContextLabel ? seasonContextLabel.split(" · ") : [];
+  const seasonPart = contextParts[0] ?? null;
+  const matchdayPart = contextParts[1] ?? null;
+  const canSplitContext = Boolean(newLookEnabled && seasonPart && matchdayPart);
 
   useEffect(() => {
     const savedOrder = loadFoundationSidebarOrder();
@@ -139,13 +147,40 @@ export default function FoundationSidebar({
         </Link>
         <strong>Oly Manager</strong>
         {seasonContextLabel ? (
-          <span
-            className="foundation-sidebar-season-context"
-            data-testid="foundation-season-context"
-            title={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
-          >
-            {seasonContextLabel}
-          </span>
+          canSplitContext ? (
+            <div
+              className="foundation-sidebar-context-portal"
+              data-testid="foundation-season-context"
+              role="group"
+              aria-label={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
+            >
+              <button
+                type="button"
+                className="foundation-sidebar-context-chip"
+                title={`${seasonPart} — zum Saisonstand`}
+                onClick={() => onNavigate("seasonV2")}
+              >
+                {seasonPart}
+              </button>
+              <span className="foundation-sidebar-context-sep" aria-hidden="true">·</span>
+              <button
+                type="button"
+                className="foundation-sidebar-context-chip"
+                title={`${matchdayPart} — zur Arena`}
+                onClick={() => onNavigate("matchdayArena")}
+              >
+                {matchdayPart}
+              </button>
+            </div>
+          ) : (
+            <span
+              className="foundation-sidebar-season-context"
+              data-testid="foundation-season-context"
+              title={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
+            >
+              {seasonContextLabel}
+            </span>
+          )
         ) : null}
       </div>
       <div className="foundation-sidebar-newlook">

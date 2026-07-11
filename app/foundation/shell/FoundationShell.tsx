@@ -17,6 +17,7 @@ type FoundationShellProps = {
   matchdayDisplayLabel?: string | null;
   currentMatchday?: number | null;
   headerActions?: ReactNode;
+  breadcrumb?: ReactNode;
   subNav?: ReactNode;
   children: ReactNode;
   isPending?: boolean;
@@ -46,6 +47,7 @@ export default function FoundationShell({
   matchdayDisplayLabel,
   currentMatchday,
   headerActions,
+  breadcrumb,
   subNav,
   children,
   isPending = false,
@@ -68,6 +70,7 @@ export default function FoundationShell({
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         <FoundationActivityStrip activities={activities} />
         <header className="foundation-shell-header">
+          {breadcrumb ? <div className="foundation-shell-breadcrumb-slot">{breadcrumb}</div> : null}
           <div className="foundation-shell-header-actions">{headerActions}</div>
         </header>
         {subNav}

@@ -51954,3 +51954,268 @@ button.is-new-look .nl-thist-season-pill,
     transition: none;
   }
 }
+
+/* ============================================================
+   Batch b10 — App-Shell & Design-System (Neuer Look)
+   Shell-Chrome (Sidebar/Subnav/Header/Activity) an die nl-Tokens
+   koppeln. AUSSCHLIESSLICH unter `.is-new-look` — Flag-AUS bleibt
+   byte-identisch. Zusätzlich: Kontext-Portal (#43), Breadcrumb (#81),
+   Zähler-Badges (#82).
+   ============================================================ */
+
+/* --- #80 Sidebar --------------------------------------------- */
+.is-new-look .foundation-sidebar {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  box-shadow: var(--nl-e2);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-sidebar-brand strong {
+  color: var(--nl-ink);
+  letter-spacing: 0.01em;
+}
+
+.is-new-look .foundation-sidebar-save-link {
+  color: var(--nl-mut);
+  opacity: 1;
+}
+
+.is-new-look .foundation-sidebar-save-link:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .foundation-sidebar-group-label {
+  color: var(--nl-mut-2);
+  opacity: 1;
+}
+
+.is-new-look .foundation-sidebar-item {
+  border-radius: var(--nl-r-md);
+  color: var(--nl-mut);
+  transition:
+    background var(--nl-t-fast) var(--nl-ease),
+    border-color var(--nl-t-fast) var(--nl-ease),
+    color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .foundation-sidebar-item:hover {
+  background: var(--nl-bg-2);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-sidebar-item.is-active {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-sidebar-item.is-active .foundation-sidebar-icon {
+  color: var(--nl-accent);
+  opacity: 1;
+}
+
+.is-new-look .foundation-sidebar-item.is-attention {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 18%, transparent);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-sidebar-item.is-attention.is-active {
+  border-color: color-mix(in srgb, var(--nl-risk) 70%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 26%, transparent);
+}
+
+.is-new-look .foundation-sidebar-icon {
+  color: var(--nl-mut);
+}
+
+/* --- #43 Kontext-Portal (Saison → Saisonstand, Spieltag → Arena) --- */
+.is-new-look .foundation-sidebar-context-portal {
+  display: inline-flex;
+  align-self: start;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-bg-2);
+}
+
+.is-new-look .foundation-sidebar-context-chip {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background var(--nl-t-fast) var(--nl-ease),
+    color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .foundation-sidebar-context-chip:hover {
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-sidebar-context-chip:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+
+.is-new-look .foundation-sidebar-context-sep {
+  color: var(--nl-mut-2);
+  font-weight: 700;
+}
+
+/* --- #80 Activity-Strip -------------------------------------- */
+.is-new-look .foundation-activity-strip {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .foundation-activity-chip {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-bg-2);
+}
+
+.is-new-look .foundation-activity-chip-copy strong {
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-activity-chip-copy span {
+  color: var(--nl-mut);
+}
+
+.is-new-look .foundation-activity-chip-indicator {
+  background: var(--nl-accent);
+}
+
+/* --- #81 Header + Breadcrumb --------------------------------- */
+.is-new-look .foundation-shell-header {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.is-new-look .foundation-shell-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.is-new-look .foundation-shell-breadcrumb-crumb {
+  font-size: 0.82rem;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .foundation-shell-breadcrumb-crumb.is-root {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .foundation-shell-breadcrumb-crumb.is-view {
+  color: var(--nl-ink);
+  font-weight: 700;
+  font-size: 0.94rem;
+}
+
+.is-new-look .foundation-shell-breadcrumb-crumb.is-context {
+  color: var(--nl-accent);
+  font-weight: 600;
+}
+
+.is-new-look .foundation-shell-breadcrumb-sep {
+  color: var(--nl-mut-2);
+}
+
+/* --- #80 Subnav + #82 Zähler-Badges -------------------------- */
+.is-new-look .foundation-subnav {
+  gap: var(--nl-s1);
+  padding: 3px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-bg-2);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.is-new-look .foundation-subnav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-weight: 600;
+  transition:
+    background var(--nl-t-fast) var(--nl-ease),
+    color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .foundation-subnav-item:hover {
+  color: var(--nl-ink);
+  background: var(--nl-panel);
+}
+
+.is-new-look .foundation-subnav-item.is-active {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-subnav-item.is-attention {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 18%, transparent);
+  color: var(--nl-ink);
+}
+
+.is-new-look .foundation-subnav-item.is-attention.is-active {
+  border-color: color-mix(in srgb, var(--nl-risk) 70%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 26%, transparent);
+}
+
+.is-new-look .foundation-subnav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-line-2);
+  color: var(--nl-ink);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .foundation-subnav-item.is-active .foundation-subnav-count {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .foundation-sidebar-item,
+  .is-new-look .foundation-sidebar-context-chip,
+  .is-new-look .foundation-subnav-item {
+    transition: none;
+  }
+}

@@ -5,6 +5,12 @@ export type FoundationSubNavItem = {
   label: string;
   title?: string;
   needsAttention?: boolean;
+  /**
+   * Optionaler echter Zähler (z.B. offene Inbox-Items, Kadergröße). Nur die
+   * "Neuer Look"-Ansicht setzt diesen Wert (additiv); ohne Wert bleibt die
+   * Untertab-Leiste byte-identisch zur Flag-AUS-Darstellung.
+   */
+  count?: number | null;
 };
 
 type FoundationSubNavProps = {
@@ -33,6 +39,11 @@ export default function FoundationSubNav({ items, activeId, onSelect, className 
           onClick={() => onSelect(item.id)}
         >
           {item.label}
+          {item.count != null ? (
+            <span className="foundation-subnav-count" data-testid={`foundation-subnav-count-${item.id}`}>
+              {item.count}
+            </span>
+          ) : null}
         </button>
       ))}
     </nav>
