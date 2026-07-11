@@ -3,8 +3,14 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 /** MW cap for reserve/backup lane — aligned with AI_RESERVE_MARKET_VALUE_CAP. */
 export const PLANNER_RESERVE_LANE_MW_CAP = 20;
 
-/** Tight-budget threshold (~12M/player) for preferring reserve lane over cheap_fill. */
-export const PLANNER_TIGHT_BUDGET_CASH_PER_SLOT = 15;
+/**
+ * Tight-budget threshold (MW cash per open slot) below which a team abandons core/depth lanes and
+ * collapses into backup/reserve (see `prefersReserveLaneOverCheapFill`). Lowered 15 -> 12 so the
+ * reserve collapse fires only under genuinely tight budgets; teams in the 12-15 MW/slot band now keep
+ * buying real core/depth/star instead of dumping into reserve. Organic nudge (no hard quotas); aligns
+ * the constant with its own long-documented "~12M/player" intent.
+ */
+export const PLANNER_TIGHT_BUDGET_CASH_PER_SLOT = 12;
 
 export type PlannedBuyCandidate = {
   price?: number | null;

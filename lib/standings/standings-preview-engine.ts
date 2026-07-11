@@ -163,7 +163,7 @@ function toWarningsArray(value: unknown) {
 
 function hasStandingsBeforeAfterFixtures() {
   const standingsDir = path.join(
-    "/Users/chrisfalk/Documents/Codex/Olympiade der Welten",
+    process.cwd(),
     "references",
     "golden-master-fixtures",
     "standings",

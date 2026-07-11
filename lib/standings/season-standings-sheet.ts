@@ -10,7 +10,11 @@ import {
 export const SEASON_STANDINGS_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1Y4DJWoLBcEAWuS4dXTqnZK_6UXZe7NJtRD-rNjYc8Fk/export?format=csv&gid=589766543";
 
-const WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+// Repo-relative root so the bundled reference sheets resolve on any machine/CI, not just the
+// original macOS workspace. Previously a hardcoded absolute macOS path, which made rank-to-points /
+// standings sheets unresolvable off that machine — blocking matchday resolution (points_table_missing)
+// and thus season completion + sponsor settlement.
+const WORKSPACE_ROOT = process.cwd();
 
 export const LOCAL_STANDINGS_CSV_PATH = path.join(
   WORKSPACE_ROOT,

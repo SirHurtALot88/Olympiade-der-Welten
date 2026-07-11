@@ -63,6 +63,8 @@ import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/seas
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 import { buildTransferFinanceAudit, isTransferFinanceViolationForSeason } from "@/lib/season/transfer-finance-audit";
 import {
@@ -591,6 +593,17 @@ async function runCanonicalPreseasonStart(saveId: string, seasonId: string, pers
   let save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save missing before canonical preseason start.");
   save = normalizeGeneralManagers(save, persistence);
+  // Establish season sponsor payout contracts if none exist yet. chooseSponsorOfferForAiTeams
+  // normally runs during the S1->S2+ season transition (preseason-workflow-service), but a fresh S1
+  // seed never transitions, so its teams reach season_end with no sponsor contract -> settlement
+  // pays nothing AND emits sponsor_contract_missing, which is a HARD long-run blocker that aborts the
+  // season before its summary is recorded (seasonsCompleted stays 0). Idempotent: only runs when no
+  // team has a current contract, so S2+ (already signed via the transition) are untouched. Signs with
+  // deferBaseFirstPayout (chooseSponsorOfferForAiTeams default) so no mid-season base cash is paid —
+  // sponsors settle organically at season_end. Prize money is unaffected (separate benchmark-only path).
+  if (save.gameState.teams.every((team) => getTeamSponsorContract(save.gameState, team.teamId) == null)) {
+    save = persistence.saveSingleplayerState(save.saveId, chooseSponsorOfferForAiTeams(save.gameState));
+  }
   const performanceRows: PhaseMetric[] = [];
   const managerStartedAt = Date.now();
   const manager = applyCanonicalManagerPlan(save, persistence, `preseason_${seasonId}`);

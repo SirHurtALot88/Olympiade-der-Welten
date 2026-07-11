@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const WORKSPACE_ROOT = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+// Repo-relative root so the bundled prize-money reference sheets resolve on any machine/CI, not just
+// the original macOS workspace (was a hardcoded absolute macOS path -> expected_prize_source_missing
+// off that machine).
+const WORKSPACE_ROOT = process.cwd();
 
 export const PRIZE_MONEY_RAW_CSV_PATH = path.join(
   WORKSPACE_ROOT,

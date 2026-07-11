@@ -859,7 +859,7 @@ function getDiversityAdjustedBuyScore(input: {
   return baseScore + noveltyBonus + stableJitter + coverageValueNudge + scoutingWatchBonus + intelBonus - repeatPenalty;
 }
 
-function rankFinalBuyCandidates(input: {
+export function rankFinalBuyCandidates(input: {
   gameState: GameState;
   teamId: string;
   candidates: AiMarketPlanBuyPlan["candidates"];
