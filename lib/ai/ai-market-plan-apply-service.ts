@@ -547,7 +547,7 @@ function getTeamCashBuffer(gameState: GameState, teamId: string, coverageFallbac
   return resolveMarketPlannerCashBuffer(gameState, teamId, { coverageFallback });
 }
 
-function buildFinalBuyGate(input: {
+export function buildFinalBuyGate(input: {
   gameState: GameState;
   team: AiMarketPlanTeamEntry;
   candidates: AiMarketPlanBuyPlan["candidates"];
@@ -864,7 +864,7 @@ function getDiversityAdjustedBuyScore(input: {
   return baseScore + noveltyBonus + stableJitter + coverageValueNudge + scoutingWatchBonus + intelBonus - repeatPenalty;
 }
 
-function rankFinalBuyCandidates(input: {
+export function rankFinalBuyCandidates(input: {
   gameState: GameState;
   teamId: string;
   candidates: AiMarketPlanBuyPlan["candidates"];

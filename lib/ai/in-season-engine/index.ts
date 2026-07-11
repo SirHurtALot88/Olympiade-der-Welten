@@ -33,3 +33,8 @@ export {
   type TeamSellNeedInput,
   type TeamMaintenanceNeedInput,
 } from "@/lib/ai/in-season-engine/need-detection";
+
+export {
+  buildFinalBuyGate,
+  rankFinalBuyCandidates,
+} from "@/lib/ai/in-season-engine/buy-scoring-pipeline";
