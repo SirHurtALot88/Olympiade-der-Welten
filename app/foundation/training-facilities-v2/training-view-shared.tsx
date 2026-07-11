@@ -764,7 +764,7 @@ export function TrainingPlayerLane({
                     {onOpenPlayerDetails ? (
                       <button
                         type="button"
-                        className="table-link-button training-v2-open-profile"
+                        className="table-link-button training-v2-open-profile training-v2-rider-portrait-button"
                         onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
                       >
                         Profil öffnen

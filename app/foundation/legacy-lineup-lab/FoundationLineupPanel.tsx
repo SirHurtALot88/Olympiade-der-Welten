@@ -29,10 +29,10 @@ export default function FoundationLineupPanel({
   return (
     <section
       className="panel foundation-lineup-panel foundation-lineup-v2-panel"
-      data-testid="foundation-lineup-v2"
+      data-testid="foundation-lineup"
       id="foundation-lineup-v2"
     >
-      <div className="panel-header">
+      <div className="panel-header" data-testid="foundation-lineup-v2">
         <div className="stack season-panel-head">
           <TooltipHeading as="h2" tooltip={teamTooltip}>
             Einsatzliste

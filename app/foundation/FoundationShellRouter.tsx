@@ -194,7 +194,7 @@ function FoundationShellRouterCockpitContent({ hostProps }: { hostProps: Foundat
   return (
     <>
       {!hostMounted ? (
-        <section className="panel" id="foundation-cockpit" data-testid="foundation-cockpit">
+        <section className="panel" data-testid="foundation-cockpit-loading">
           <FoundationPanelSkeleton variant="default" label="Cockpit wird geladen…" />
         </section>
       ) : null}

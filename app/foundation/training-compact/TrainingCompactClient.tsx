@@ -165,10 +165,16 @@ export default function TrainingCompactClient({
         </TooltipHeading>
 
         <p className="muted training-v2-top-risk-line">
-          Top: <strong>{topGrowth?.player.name ?? "—"}</strong>
-          {topGrowth ? ` (+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Risiko:{" "}
-          <strong>{topRisk?.player.name ?? "—"}</strong>
-          {topRisk ? ` (Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)})` : ""}
+          {topGrowth || topRisk ? (
+            <>
+              Top Steigerer: <strong>{topGrowth?.player.name ?? "—"}</strong>
+              {topGrowth ? ` (+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Groesstes Risiko:{" "}
+              <strong>{topRisk?.player.name ?? "—"}</strong>
+              {topRisk ? ` (Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)})` : ""}
+            </>
+          ) : (
+            "Kein aktiver Kader"
+          )}
         </p>
 
         {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
