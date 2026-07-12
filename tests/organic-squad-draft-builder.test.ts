@@ -179,4 +179,18 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
     // The sold body is gone from the final squad.
     expect(result.finalSquad.some((player) => player.playerId === "tdm-held-3")).toBe(false);
   });
+
+  it("never trades down a freshly-bought player on an empty-start draft (no phantom sells)", () => {
+    // Regression: on an empty starting squad the builder must NOT 'sell' a player it just planned to
+    // buy — those aren't on the live roster, so the executor can't realize the proceeds and the later
+    // buys they were meant to fund fail with insufficient_cash. Give it a tight budget so it gets stuck
+    // below opt mid-draft; the correct behaviour is to simply stop, not to shed a planned buy.
+    const tight = baseInput({ cash: 120, cashBuffer: 20 });
+    const result = buildOrganicSquadPlan(tight);
+    // No trade-downs at all from an empty start.
+    expect(result.sellDecisions).toHaveLength(0);
+    // And no player is ever both bought and sold in the same plan.
+    const soldIds = new Set(result.sellDecisions.map((sell) => sell.playerId));
+    expect(result.decisions.every((buy) => !soldIds.has(buy.playerId))).toBe(true);
+  });
 });

@@ -113,6 +113,12 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const decisions: OrganicBuyDecision[] = [];
   const sellDecisions: OrganicTradeDownDecision[] = [];
   const optTarget = input.economy.weights.optTarget;
+  // Trade-down may ONLY shed players that were on the roster BEFORE this plan — those are the real,
+  // sellable bodies the executor can turn into cash. A freshly-planned buy is not on the live roster,
+  // so "selling" it would be a phantom (the executor can't realize the proceeds), leaving the later
+  // buys it was meant to fund unaffordable. On an empty-start draft (S1) this set is empty ⇒ no
+  // trade-down at all, which is correct: there is nothing real to trade down yet.
+  const originalSquadIds = new Set(input.startingSquad.map((player) => player.playerId));
   let cash = input.economy.cash;
   let salaryTotal = input.economy.salaryTotal;
 
@@ -196,6 +202,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
         let sellTarget: OrganicPlayerView | null = null;
         let bestTradeability = 0; // strictly > 0: only shed a player worth more as cash than as strength
         for (const held of squad) {
+          // Only trade down a REAL pre-existing roster player (never a freshly-planned buy — see above).
+          if (!originalSquadIds.has(held.playerId)) continue;
           const tradeability =
             price(held) - marginalStrength(held, state.disciplineNeeds, state.needAxisWeights);
           if (tradeability > bestTradeability) {
