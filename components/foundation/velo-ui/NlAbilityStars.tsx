@@ -52,6 +52,12 @@ export type NlAbilityStarsProps = {
   /** Fog-of-war flag. `true` → exact stars; `false` → PO star-range with uncertain overlay. */
   known: boolean;
   compact?: boolean;
+  /**
+   * Stacks the CA row above the PO row (vertical layout) instead of the
+   * default side-by-side layout — saves horizontal width in dense table
+   * cells. Purely a layout switch; the star math is unaffected.
+   */
+  stacked?: boolean;
   /** Optional group label prefix used in the accessible description. */
   label?: string;
   tone?: "gold" | "danger";
@@ -77,19 +83,40 @@ function resolveCaStars(props: NlAbilityStarsProps): number | null {
   return parseStarValue(props.caStars);
 }
 
-function resolvePoStarRange(props: NlAbilityStarsProps): NlRange | null {
+/**
+ * Resolves the PO star range from whichever prop the caller supplied, then
+ * clamps it so PO never renders as FEWER stars than CA — potential falling
+ * below current ability is illogical (it would imply the player gets
+ * worse). `caStars` is the already-resolved CA star value (same absolute
+ * scale, see `resolveCaStars`); both `min` and `max` of the PO range are
+ * floored at `caStars` so the whole range (exact or fog-of-war) sits at or
+ * above CA. Applied here (not per-caller) so every surface that renders
+ * `NlAbilityStars` — home, teams, team-profile, scouting, players-table —
+ * gets the fix uniformly. Fog-of-war behavior (range vs. exact, uncertain
+ * overlay) is otherwise unchanged; clamping can only narrow/raise the
+ * range, never widen it artificially.
+ */
+function resolvePoStarRange(props: NlAbilityStarsProps, caStars: number | null): NlRange | null {
+  let range: NlRange | null = null;
   if (props.poStarRange && Number.isFinite(props.poStarRange.min) && Number.isFinite(props.poStarRange.max)) {
-    return { min: props.poStarRange.min, max: props.poStarRange.max };
-  }
-  if (props.poScoreRange && Number.isFinite(props.poScoreRange.min) && Number.isFinite(props.poScoreRange.max)) {
-    return { min: potentialScoreToStars(props.poScoreRange.min), max: potentialScoreToStars(props.poScoreRange.max) };
-  }
-  if (isFiniteNumber(props.poScore)) {
+    range = { min: props.poStarRange.min, max: props.poStarRange.max };
+  } else if (props.poScoreRange && Number.isFinite(props.poScoreRange.min) && Number.isFinite(props.poScoreRange.max)) {
+    range = { min: potentialScoreToStars(props.poScoreRange.min), max: potentialScoreToStars(props.poScoreRange.max) };
+  } else if (isFiniteNumber(props.poScore)) {
     const single = potentialScoreToStars(props.poScore);
-    return { min: single, max: single };
+    range = { min: single, max: single };
+  } else {
+    const single = parseStarValue(props.poStars);
+    range = single != null ? { min: single, max: single } : null;
   }
-  const single = parseStarValue(props.poStars);
-  return single != null ? { min: single, max: single } : null;
+
+  if (range != null && caStars != null) {
+    const min = Math.max(range.min, caStars);
+    const max = Math.max(range.max, caStars, min);
+    range = { min, max };
+  }
+
+  return range;
 }
 
 /** Renders the 5-star row for a star range. Solid fill when `uncertain` is false; adds the dark uncertain overlay otherwise. */
@@ -132,9 +159,9 @@ function StarRow({ min, max, uncertain }: { min: number; max: number; uncertain:
 }
 
 export function NlAbilityStars(props: NlAbilityStarsProps) {
-  const { known, compact = false, label, tone = "gold", className = "" } = props;
+  const { known, compact = false, stacked = false, label, tone = "gold", className = "" } = props;
   const caStars = resolveCaStars(props);
-  const poRange = resolvePoStarRange(props);
+  const poRange = resolvePoStarRange(props, caStars);
   const poUncertain = !known && poRange != null && poRange.max > poRange.min;
 
   const ariaParts: string[] = [];
@@ -153,7 +180,9 @@ export function NlAbilityStars(props: NlAbilityStarsProps) {
 
   return (
     <span
-      className={`nl-ability-stars is-${tone}${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
+      className={`nl-ability-stars is-${tone}${compact ? " is-compact" : ""}${stacked ? " is-stacked" : ""}${
+        className ? ` ${className}` : ""
+      }`}
       data-known={known ? "true" : "false"}
       role="img"
       aria-label={ariaParts.join(", ")}

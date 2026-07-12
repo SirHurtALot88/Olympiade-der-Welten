@@ -75,14 +75,13 @@ import {
 } from "@/components/foundation/new-look";
 import { NlAbilityStars } from "@/components/foundation/velo-ui/NlAbilityStars";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import type { GameState, SeasonDisciplineScheduleSlot, Team } from "@/lib/data/olyDataTypes";
+import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
   formatLeaguePercentile,
   getPoolHeatTone,
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
-import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 export type FoundationPlayersTableNewLookProps = {
@@ -241,12 +240,6 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   { id: "appearances", label: "Einsätze", sortKey: "appearances", align: "right" },
   { id: "bestDiscipline", label: "Beste Diszi", sortKey: "bestDiscipline", align: "left" },
   {
-    id: "nextDisciplines",
-    label: "Nächster Spieltag",
-    align: "left",
-    tooltip: "Eignung für die Disziplinen des nächsten Spieltags (stark / okay / schwach, liga-relativ).",
-  },
-  {
     id: "careerLeague",
     label: "Alltime",
     sortKey: "careerLeague",
@@ -295,6 +288,56 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
       {compact ? formatCompactPercentile(label) : label}
     </span>
   );
+}
+
+/**
+ * Absoluter Liga-Rang-Chip ("#N") — ersetzt den Perzentil-Chip in der
+ * OVR-Spalte (Produkt-Feedback: absoluter Rang ist griffiger als "Top X%").
+ * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung). Ton bleibt
+ * die bestehende 3-stufige Heat-Einordnung (`getPoolHeatTone`) — an dieser
+ * Spalte wurde keine Farb-Änderung angefragt, nur der angezeigte Wert.
+ */
+function renderMetricRankChip(value: number | null | undefined, pool: number[]) {
+  const rank = getLeagueRank(value, pool);
+  if (rank == null) {
+    return null;
+  }
+  const tone = getPoolHeatTone(value, pool);
+  return (
+    <span className={`nl-ptable-percentile ${nlToneClass(tone)}`} title={`Liga-Rang #${rank} von ${pool.length}`}>
+      #{formatNlNumber(rank, 0)}
+    </span>
+  );
+}
+
+/**
+ * 4-stufiger Ampel-Ton (blau → grün → gelb → rot) für den Achsen-Rang
+ * (POW/SPE/MEN/SOC) — dieselbe Konvention wie das bestehende App-weite
+ * `heat-band-1..8`-Farbschema (blau = Spitzenwerte, grün = stark, gelb =
+ * Mitte, rot = schwach; siehe `.heat-band-*` in `app/globals.css`), nur auf
+ * die 4 `NlTone`-Äquivalente `accent`/`good`/`warn`/`risk` verdichtet, die
+ * bereits app-weit exakt diese Farben tragen (`nl-tones.ts`:
+ * `--nl-accent`=blau, `--nl-good`=grün, `--nl-warn`=gelb, `--nl-risk`=rot).
+ * Erfindet keine neue Skala — bucketet nur `getPoolHeatClass`s bestehende
+ * 8 Bänder (liga-perzentil-basiert) auf die 4 Ampel-Farben.
+ */
+function getAxisRankTone(value: number | null | undefined, pool: number[]): NlTone {
+  const heatClass = getPoolHeatClass(value, pool);
+  const match = heatClass.match(/heat-band-(\d)/);
+  const band = match ? Number(match[1]) : null;
+  if (band == null) {
+    return "neutral";
+  }
+  if (band >= 7) {
+    return "accent"; // Top-Band (7-8): blau, "alternativlos das Beste".
+  }
+  if (band >= 5) {
+    return "good"; // Bänder 5-6: grün.
+  }
+  if (band >= 3) {
+    return "warn"; // Bänder 3-4: gelb.
+  }
+  return "risk"; // Bänder 1-2: rot.
 }
 
 export default function FoundationPlayersTableNewLook({
@@ -393,23 +436,17 @@ export default function FoundationPlayersTableNewLook({
   const hasMoreRows = rows.length > visibleRows.length;
 
   /**
-   * Disziplin(en) des nächsten Spieltags (bis zu 2, wie im echten Spielplan
-   * pro Spieltag) — dieselbe kanonische Spielplan-Quelle wie im restlichen
-   * Foundation-Code (`getSeasonDisciplineSchedule`), kein eigener Ersatzplan.
-   * `currentMatchday` ist 1-basiert ("aktueller" Spieltag), Index
-   * `currentMatchday` im 0-basierten Array ist daher der nächste Spieltag.
+   * Klasse für die aktuell sortierte Spalte (Header + jede Körperzelle
+   * dieser Spalte) — sorgt für einen echten, deterministischen
+   * "aktive Sortierspalte"-Zustand (heller Blau-Hintergrund) statt der
+   * zufälligen Heat-Band-Färbung einzelner Zellen. Wird mit
+   * kontrastsicherem, dunklem Text kombiniert (siehe Scratch-CSS
+   * `.is-active-sort`), damit Ton-Chips (grün/gelb/rot) auf dem hellen Blau
+   * lesbar bleiben.
    */
-  const nextDisciplineSlots = useMemo((): SeasonDisciplineScheduleSlot[] => {
-    const schedule = getSeasonDisciplineSchedule(gameState);
-    const nextIndex = Math.max(0, gameState.season.currentMatchday);
-    const entry = schedule[nextIndex] ?? null;
-    if (!entry) {
-      return [];
-    }
-    return [entry.discipline1, entry.discipline2].filter(
-      (slot): slot is SeasonDisciplineScheduleSlot => Boolean(slot?.disciplineId),
-    );
-  }, [gameState]);
+  function sortCellClass(sortKey: string | undefined): string {
+    return sortKey && sortState?.key === sortKey ? " is-active-sort" : "";
+  }
 
   function ariaSortFor(sortKey: string | undefined): "ascending" | "descending" | "none" | undefined {
     if (!sortKey) {
@@ -469,6 +506,11 @@ export default function FoundationPlayersTableNewLook({
    * engen 2×2-Clusters — Label, Balken und Wert stehen so nie horizontal
    * nebeneinander benachbarter Achsen und laufen nicht zusammen
    * ("91SPE" statt "91 · SPE"). Jede Achse ist einzeln lesbar.
+   *
+   * Rechts zeigt jede Achse den absoluten Liga-Rang ("#N") statt eines
+   * Perzentil-Chips, eingefärbt nach der 4-stufigen Ampel-Konvention
+   * (`getAxisRankTone` — blau = Spitze, grün, gelb, rot = schwach). Ohne
+   * validen Rang/Pool wird nichts erfunden — "—".
    */
   function renderAxisBars(row: FoundationPlayerScopeRow) {
     return (
@@ -479,14 +521,13 @@ export default function FoundationPlayersTableNewLook({
             value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
           const pool = leaguePlayerHeatPools[key];
           const rank = getLeagueRank(value, pool);
-          const percentileLabel = formatLeaguePercentile(rank, pool.length);
-          const percentileTone = getPoolHeatTone(value, pool);
+          const rankTone = getAxisRankTone(value, pool);
           return (
             <span
               key={key}
               className={`nl-players-axis nl-ptable-axis-enhanced ${nlToneClass(key)}`}
               title={`${label}: ${formatNlNumber(value, 0)} von 100${
-                percentileLabel ? ` — Liga-Perzentil: ${percentileLabel} (Rang #${rank} von ${pool.length})` : ""
+                rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
               }`}
             >
               <span className="nl-players-axis-label">{label}</span>
@@ -494,9 +535,9 @@ export default function FoundationPlayersTableNewLook({
                 <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
               </span>
               <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-              {percentileLabel ? (
-                <span className={`nl-ptable-axis-percentile ${nlToneClass(percentileTone)}`} aria-hidden="true">
-                  {formatCompactPercentile(percentileLabel)}
+              {rank != null ? (
+                <span className={`nl-ptable-axis-percentile ${nlToneClass(rankTone)}`} aria-hidden="true">
+                  #{formatNlNumber(rank, 0)}
                 </span>
               ) : (
                 <span className="nl-ptable-axis-percentile is-empty" aria-hidden="true" />
@@ -523,51 +564,9 @@ export default function FoundationPlayersTableNewLook({
         poScore={row.player.potential ?? null}
         known={false}
         compact
+        stacked
         label={`${row.player.name} Fähigkeiten`}
       />
-    );
-  }
-
-  /**
-   * Eignungs-Strip für die Disziplin(en) des nächsten Spieltags: pro
-   * Disziplin ein Icon-Chip, dessen Ton (stark/okay/schwach) aus dem echten
-   * `disciplineRatings`-Wert des Spielers ligaweit eingeordnet wird
-   * (`leaguePlayerHeatPools.disciplines`, dieselbe Heat-Logik wie OVR/PPs/MVS).
-   * Ohne bekannten Spielplan oder Rating wird nichts erfunden — "—".
-   */
-  function renderDisciplineFitStrip(row: FoundationPlayerScopeRow) {
-    if (nextDisciplineSlots.length === 0) {
-      return "—";
-    }
-    return (
-      <div
-        className="nl-ptable-discipline-fit"
-        role="group"
-        aria-label={`Disziplin-Eignung nächster Spieltag — ${row.player.name}`}
-      >
-        {nextDisciplineSlots.map((slot) => {
-          const rating = row.player.disciplineRatings[slot.disciplineId] ?? null;
-          const pool = leaguePlayerHeatPools.disciplines[slot.disciplineId] ?? [];
-          const tone = rating != null ? getPoolHeatTone(rating, pool) : "neutral";
-          const rank = getLeagueRank(rating, pool);
-          const percentileLabel = formatLeaguePercentile(rank, pool.length);
-          const ratingText = rating != null ? formatNlNumber(rating, 0) : "—";
-          return (
-            <span
-              key={slot.disciplineId}
-              className={`nl-ptable-discipline-chip ${nlToneClass(tone)}`}
-              title={`${slot.displayName}: ${ratingText}${percentileLabel ? ` — ${percentileLabel}` : ""}`}
-            >
-              <DisciplineIcon
-                disciplineId={slot.disciplineId}
-                label={slot.displayName}
-                showLabel={false}
-                className="nl-ptable-discipline-icon"
-              />
-            </span>
-          );
-        })}
-      </div>
     );
   }
 
@@ -688,7 +687,7 @@ export default function FoundationPlayersTableNewLook({
             )}
           </FoundationPlayerPortraitPreview>
         </td>
-        <td className="nl-players-td-name">
+        <td className={`nl-players-td-name${sortCellClass("name")}`}>
           <button
             type="button"
             className="nl-players-name-button"
@@ -702,7 +701,7 @@ export default function FoundationPlayersTableNewLook({
             <span className="nl-players-status">{row.transferStatus}</span>
           </button>
         </td>
-        <td className="nl-players-td-team">
+        <td className={`nl-players-td-team${sortCellClass("team")}`}>
           <button
             type="button"
             className="nl-players-team-button"
@@ -738,20 +737,20 @@ export default function FoundationPlayersTableNewLook({
             <span className="nl-players-team-name">{row.team?.name ?? "Free Agent"}</span>
           </button>
         </td>
-        <td className="nl-players-td-icon">
+        <td className={`nl-players-td-icon${sortCellClass("class")}`}>
           <ClassIcon
             classNameValue={row.player.className}
             className="table-identity-icon-chip"
             iconClassName="table-identity-icon-image"
           />
         </td>
-        <td className="nl-players-td-icon">
+        <td className={`nl-players-td-icon${sortCellClass("race")}`}>
           <RaceIcon race={row.player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
         </td>
-        <td className="nl-ptable-td-ability">{renderAbilityStars(row)}</td>
+        <td className="nl-ptable-td-ability nl-ptable-td-ability-stacked">{renderAbilityStars(row)}</td>
         <td className="nl-players-td-axes">{renderAxisBars(row)}</td>
         <td
-          className={`nl-players-td-metric nl-players-td-pps is-highlight-primary ${
+          className={`nl-players-td-metric nl-players-td-pps is-highlight-primary${sortCellClass("pps")} ${
             row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
           }`}
         >
@@ -778,17 +777,17 @@ export default function FoundationPlayersTableNewLook({
           </span>
         </td>
         <td
-          className={`nl-players-td-metric is-highlight-secondary ${
+          className={`nl-players-td-metric is-highlight-secondary${sortCellClass("ovr")} ${
             row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""
           }`}
         >
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
-            {renderMetricPercentileChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
+            {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
           </span>
         </td>
         <td
-          className={`nl-players-td-metric ${
+          className={`nl-players-td-metric${sortCellClass("mvs")} ${
             row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""
           }`}
         >
@@ -797,7 +796,7 @@ export default function FoundationPlayersTableNewLook({
             {renderMetricPercentileChip(row.playerMvs, leaguePlayerHeatPools.mvs)}
           </span>
         </td>
-        <td className="nl-players-td-money">
+        <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(marketValue, 2)}</span>
             {marketValueDelta != null && marketValueDelta !== 0 ? (
@@ -809,7 +808,7 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
-        <td className="nl-players-td-money">
+        <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(annualSalary, 2)}</span>
             {salaryDelta != null && salaryDelta !== 0 ? (
@@ -827,7 +826,7 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
-        <td className="nl-players-td-contract">
+        <td className={`nl-players-td-contract${sortCellClass("contract")}`}>
           {row.roster ? (
             <span className="nl-players-contract">
               {contractShapeShort ? (
@@ -841,15 +840,14 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
-        <td className="nl-players-td-metric">
+        <td className={`nl-players-td-metric${sortCellClass("appearances")}`}>
           {row.seasonPerformance ? row.seasonPerformance.appearances : "—"}
         </td>
-        <td className="nl-players-td-disc">
+        <td className={`nl-players-td-disc${sortCellClass("bestDiscipline")}`}>
           <DisciplineIcon label={row.bestDiscipline ?? "—"} showLabel={Boolean(row.bestDiscipline)} />
         </td>
-        <td className="nl-ptable-td-disciplines">{renderDisciplineFitStrip(row)}</td>
         <td
-          className="nl-players-td-career"
+          className={`nl-players-td-career${sortCellClass("careerLeague")}`}
           title={
             careerStats
               ? `Alltime Liga: ${careerStats.seasonsPlayed} Saison(en) · ${careerStats.appearances} Einsätze · ${formatLocalePoints(careerStats.totalPps, 1)} PPs`
@@ -867,7 +865,7 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
-        <td className="nl-players-td-traits" title={traitsText}>
+        <td className={`nl-players-td-traits${sortCellClass("traits")}`} title={traitsText}>
           {traitsText}
         </td>
       </tr>
@@ -1065,7 +1063,7 @@ export default function FoundationPlayersTableNewLook({
                       scope="col"
                       className={`nl-players-th is-${column.align ?? "left"}${
                         column.highlight ? ` is-highlight-${column.highlight}` : ""
-                      }`}
+                      }${sortCellClass(column.sortKey)}`}
                       aria-sort={ariaSortFor(column.sortKey)}
                     >
                       {column.sortKey ? (

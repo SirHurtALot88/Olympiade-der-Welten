@@ -58458,3 +58458,119 @@ button.is-new-look .nl-thist-season-pill,
   vertical-align: -1px;
   color: var(--nl-good, #4cc56b);
 }
+
+/* ============================================================
+   Scratch CSS — Spieler-Verzeichnis (players-table) fixes.
+
+   Scope of the TSX/TS changes this CSS supports:
+     - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
+     - components/foundation/velo-ui/NlAbilityStars.tsx
+
+   Intended merge target: app/globals.css, near the existing
+   "Wave 3 — Spieler-Verzeichnis" block (search for
+   `.is-new-look .nl-ptable-td-ability`). Everything below is ADDITIVE —
+   no existing selector is redefined, only new classes
+   (`.is-active-sort`, `.nl-ptable-td-ability-stacked`,
+   `.nl-ability-stars.is-stacked`) are introduced.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Fix #4 (CRITICAL) — aktive Sortierspalte, kontrastsicher.
+
+   Vorher gab es keinen echten "aktive Sortierspalte"-Zustand: Zellen
+   bekamen nur zufällig ein helles Blau, wenn ihr eigener Wert liga-perzentil
+   in den obersten `heat-band-7/8`-Bändern landete (`getPoolHeatClass`,
+   `--heat-elite-bg`/`--heat-best-bg` = `--heat-blue-light`/`--heat-blue-dark`
+   aus app/globals.css `:root`) — Perzentil-/Rang-Chips setzen aber ihre
+   eigene Ton-Farbe (grün/gelb/rot) direkt auf sich selbst, was auf dem
+   hellen Blau zu Kontrastproblemen führt (z. B. grüner Chip-Text auf
+   hellblauem Zellenhintergrund).
+
+   Diese Regeln fügen einen ECHTEN, deterministischen "aktive Spalte"-
+   Zustand hinzu (`.is-active-sort`, in der TSX an `<th>`/`<td>` der
+   Spalte gesetzt, deren `sortKey` gerade `sortState.key` entspricht) und
+   erzwingen dort dunklen, kontrastsicheren Text für JEDEN Zahlen-/Chip-Typ
+   in dieser Spalte — alle anderen (nicht aktiv sortierten) Spalten/Zellen
+   behalten ihre normale Ton-Färbung unverändert. Die Hintergrundfarbe
+   wiederverwendet bewusst dasselbe "helles Blau" (`--heat-blue-light`),
+   das die bestehende `heat-band-7`-Stufe schon nutzt, statt eine neue
+   Farbe zu erfinden.
+
+   Spezifität: jede Regel hier trägt eine zusätzliche Klasse
+   (`.is-active-sort`) plus Element-Typ (`td`/`th`) gegenüber den
+   bestehenden `.is-new-look .nl-ptable-percentile` / `.heat-band-N` /
+   `.nl-delta-chip.is-good` Regeln — sie gewinnt daher rein über
+   CSS-Spezifität (kein `!important` nötig), unabhängig davon, wo dieser
+   Block am Ende in globals.css eingefügt wird.
+   ------------------------------------------------------------ */
+.is-new-look .nl-players-th.is-active-sort {
+  background: var(--heat-blue-light, #7fa2d1);
+  color: var(--heat-elite-text, #0b1220);
+}
+
+.is-new-look .nl-players-th.is-active-sort .nl-players-sort-th,
+.is-new-look .nl-players-th.is-active-sort .nl-players-sort-th.is-active,
+.is-new-look .nl-players-th.is-active-sort .nl-players-sort-th b {
+  color: var(--heat-elite-text, #0b1220);
+}
+
+.is-new-look td.is-active-sort {
+  background: color-mix(in srgb, var(--heat-blue-light, #7fa2d1) 45%, var(--nl-panel) 55%);
+  color: #0b1220;
+}
+
+/* Erzwingt dunklen Text für jede Zahl/jeden Chip-Typ, der in der Tabelle
+   vorkommt — Perzentil-/Rang-Chips (PPs/OVR/MVS), Achsen-Rang-Badges,
+   Name/Status, Team-Name, Geld-/Vertrags-/Karriere-Zellen, Traits. Deckt
+   alle Spalten ab, die `sortCellClass(...)` in der TSX tragen können. */
+.is-new-look td.is-active-sort .nl-tnum,
+.is-new-look td.is-active-sort .nl-ptable-percentile,
+.is-new-look td.is-active-sort .nl-ptable-axis-percentile,
+.is-new-look td.is-active-sort .nl-players-name,
+.is-new-look td.is-active-sort .nl-players-status,
+.is-new-look td.is-active-sort .nl-players-team-name,
+.is-new-look td.is-active-sort .nl-players-money,
+.is-new-look td.is-active-sort .nl-players-career,
+.is-new-look td.is-active-sort .nl-players-career small,
+.is-new-look td.is-active-sort .nl-players-contract,
+.is-new-look td.is-active-sort .nl-players-contract-shape,
+.is-new-look td.is-active-sort .nl-players-salary-season,
+.is-new-look td.is-active-sort .nl-players-td-traits {
+  color: #0b1220;
+}
+
+/* Delta-Chips (MW-/Gehalts-Entwicklung ▲/▼) behalten ihre grün/rot
+   Bedeutung im Pfeil, aber der Zahlentext wird auf denselben dunklen Ton
+   gesetzt, damit er auf dem hellen Blau lesbar bleibt. */
+.is-new-look td.is-active-sort .nl-delta-chip {
+  color: #0b1220;
+}
+
+/* ------------------------------------------------------------
+   Fix #5 — CA/PO gestapelt (CA über PO) NUR in der Spieler-Tabelle.
+
+   `NlAbilityStars` bekommt einen neuen, rein optionalen `stacked`-Prop
+   (Default: false / unverändertes Seite-an-Seite-Layout). Nur die
+   Spieler-Tabelle setzt ihn (`renderAbilityStars` in
+   FoundationPlayersTableNewLook.tsx) — alle anderen Call-Sites (Home,
+   Teams, Team-Profil, Scouting, Hover-Preview) bleiben unangetastet, weil
+   sie `stacked` nicht übergeben.
+   ------------------------------------------------------------ */
+.nl-ability-stars.is-stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.nl-ability-stars.is-stacked.is-compact {
+  gap: 2px;
+}
+
+/* Schmalere Spaltenbreite für die gestapelte Variante (spart horizontalen
+   Platz) — additiv neben der bestehenden `.nl-ptable-td-ability` Regel
+   (min-width: 96px), die weiterhin vertical-align: middle liefert; diese
+   Klasse wird zusätzlich auf demselben `<td>` gesetzt und überschreibt nur
+   `min-width`. */
+.is-new-look .nl-ptable-td-ability.nl-ptable-td-ability-stacked {
+  min-width: 60px;
+}
