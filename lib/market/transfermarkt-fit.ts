@@ -111,7 +111,22 @@ export function applyMercenaryNegativeFitPenaltyToFinalPickScore(input: {
   return Number((input.finalPickScoreBeforePenalty + input.mercenaryNegativeFitPenalty).toFixed(1));
 }
 
-function buildTokenCounts(players: TokenizedPlayer[]) {
+/** Roster token-frequency maps used by calculateTransfermarktFit. Depends ONLY on the roster, so a
+ * hot loop scoring many candidates against the SAME roster should build this ONCE and pass it in
+ * (via calculateTransfermarktFit's `rosterTokenCounts` option) instead of rebuilding it per candidate. */
+export type TransfermarktRosterTokenCounts = {
+  races: Map<string, number>;
+  alignments: Map<string, number>;
+  subclasses: Map<string, number>;
+  traits: Map<string, number>;
+};
+
+/** Precompute the roster token counts once for reuse across many candidate fit scorings. */
+export function buildTransfermarktRosterTokenCounts(players: TokenizedPlayer[]): TransfermarktRosterTokenCounts {
+  return buildTokenCounts(players);
+}
+
+function buildTokenCounts(players: TokenizedPlayer[]): TransfermarktRosterTokenCounts {
   const races = new Map<string, number>();
   const alignments = new Map<string, number>();
   const subclasses = new Map<string, number>();
@@ -158,6 +173,10 @@ export function calculateTransfermarktFit(
   rosterPlayers: TokenizedPlayer[],
   options?: {
     teamId?: string | null;
+    /** Precomputed roster token counts (see buildTransfermarktRosterTokenCounts). Pass this when
+     * scoring MANY candidates against the same roster to avoid rebuilding it per candidate — it is a
+     * pure speedup, identical to the value buildTokenCounts(rosterPlayers) would return. */
+    rosterTokenCounts?: TransfermarktRosterTokenCounts;
   },
 ): TransfermarktFitBreakdown {
   if (!rosterPlayers.length && !options?.teamId) {
@@ -170,7 +189,7 @@ export function calculateTransfermarktFit(
     };
   }
 
-  const tokenCounts = buildTokenCounts(rosterPlayers);
+  const tokenCounts = options?.rosterTokenCounts ?? buildTokenCounts(rosterPlayers);
   const raceKey = normalizeTransfermarktToken(player.race);
   const alignmentKey = normalizeTransfermarktToken(player.alignment);
   const subclassKeys = player.subclasses.map(normalizeTransfermarktToken).filter(Boolean);

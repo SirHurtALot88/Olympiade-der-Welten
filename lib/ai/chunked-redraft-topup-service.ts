@@ -48,7 +48,12 @@ import {
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
-import { calculateTransfermarktFit, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
+import {
+  buildTransfermarktRosterTokenCounts,
+  calculateTransfermarktFit,
+  hasMercenaryTrait,
+  type TransfermarktRosterTokenCounts,
+} from "@/lib/market/transfermarkt-fit";
 import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -1356,9 +1361,13 @@ function getCandidateTeamFitFromRosterPlayers(input: {
   team: GameState["teams"][number];
   rosterPlayers: Player[];
   candidate: Candidate;
+  /** Precomputed once per roster (buildTransfermarktRosterTokenCounts) — pure speedup for hot
+   * candidate loops that score many candidates against the same roster. */
+  rosterTokenCounts?: TransfermarktRosterTokenCounts;
 }) {
   return calculateTransfermarktFit(input.candidate.player, input.rosterPlayers, {
     teamId: input.team.teamId,
+    rosterTokenCounts: input.rosterTokenCounts,
   }).teamFit ?? 0;
 }
 
@@ -3787,11 +3796,16 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         });
         const unpickedCandidates = candidatePool.filter((candidate) => !pickedPlayerIds.has(candidate.player.id));
         const cashReachableCandidates = unpickedCandidates.filter((candidate) => candidate.marketValue <= latestTeam.cash);
+        // The roster token counts are identical for every candidate in this pick — build them ONCE here
+        // instead of rebuilding the whole roster tokenization inside each candidate's fit call (that
+        // per-candidate rebuild was the candidate_stage0 hotspot that blew the phase watchdog).
+        const rosterTokenCounts = buildTransfermarktRosterTokenCounts(teamRosterPlayers);
         const fitChecked = cashReachableCandidates.map((candidate) => {
           const teamFit = getCandidateTeamFitFromRosterPlayers({
             team: latestTeam,
             rosterPlayers: teamRosterPlayers,
             candidate,
+            rosterTokenCounts,
           });
           const mercenary = hasMercenaryTrait(candidate.player);
           return {
@@ -4849,11 +4863,13 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         });
       counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
       const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
+      const rosterTokenCounts = buildTransfermarktRosterTokenCounts(teamRosterPlayers);
       const fitChecked = cashAffordableCandidates.map((candidate) => {
         const teamFit = getCandidateTeamFitFromRosterPlayers({
           team: latestTeam,
           rosterPlayers: teamRosterPlayers,
           candidate,
+          rosterTokenCounts,
         });
         const mercenary = hasMercenaryTrait(candidate.player);
         return {
