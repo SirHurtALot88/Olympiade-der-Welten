@@ -316,6 +316,12 @@ export type OrganicSellPlanInput = {
    * in sellUtility so a trader club sheds players it can flip at a gain. Absent ⇒ no profit signal.
    */
   purchasePriceByPlayerId?: Record<string, number>;
+  /**
+   * At SEASON END the roster may shed below ROSTER_MIN (empty is fine — preseason rebuilds). Pass true
+   * there so profit/surplus sells fire even when the draft left the team exactly at min. In-season
+   * mid-window contexts leave it false to keep a fieldable squad.
+   */
+  allowBelowMin?: boolean;
   /** Conservative forecast planning inputs (mirrors the draft planner; optional). */
   forecast?: {
     expectedPrize?: number;
@@ -348,7 +354,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   const held = input.roster.map((player) =>
     toOrganicPlayerView(player, undefined, input.purchasePriceByPlayerId?.[player.id]),
   );
-  const rosterMin = ROSTER_MIN;
+  // Season-end may empty the roster (rebuild in preseason); in-season keeps a fieldable floor.
+  const rosterMin = input.allowBelowMin ? 0 : ROSTER_MIN;
 
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
@@ -379,8 +386,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     };
   };
 
-  // Hard floor: never sell below ROSTER_MIN. Composition above the floor is fully emergent (the
-  // highest-sellUtility body goes first; the loop stops once nothing left clears SELL_THRESHOLD).
+  // Floor is ROSTER_MIN in-season, 0 at season end (allowBelowMin). Only players clearing
+  // SELL_THRESHOLD are shed, highest-sellUtility first — keepers (negative sellUtility) never sell.
   while (held.length > rosterMin) {
     const state = buildState();
     let best: OrganicPlayerView | null = null;

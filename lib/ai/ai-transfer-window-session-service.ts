@@ -312,6 +312,9 @@ async function runTeamCycle(input: {
       identity,
       roster: entries.map((entry) => entry.player),
       purchasePriceByPlayerId,
+      // Season-end sell cycle: allow shedding below ROSTER_MIN (empty is fine — preseason rebuilds),
+      // so profit/surplus sells fire even when the draft left the team exactly at min.
+      allowBelowMin: true,
     });
     warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
     const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
