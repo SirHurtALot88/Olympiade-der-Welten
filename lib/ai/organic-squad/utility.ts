@@ -45,8 +45,16 @@ const SUPPORT_QUALITY_BASELINE = 68;
  * A player costing one whole remaining-OPT-slot of budget costs PRICE_SLOT_SCALE utility before wThrift.
  * This is the "Preis / Budget-Skala": a star is cheap to a rich/elite club (few slots, high budget/slot)
  * and expensive to a depth club (many slots, low budget/slot) — the driver of roster-SIZE variety.
+ *
+ * It is ALSO the sole "why not just buy the most expensive star" governor — there is NO artificial MW
+ * ceiling. A high value makes the planner weigh a player's price against the club's ACTUAL cash: given
+ * the current economy a ~50 MW body is usually the most a club will justify as its "star", and only a
+ * genuinely rich/star-biased club (few slots, high budget/slot) organically reaches a 60-70 MW player.
+ * The ceiling emerges from each club's money, not from a fixed cap. It also self-corrects OPT-fill: a
+ * club that doesn't blow its budget on a star keeps more budget-per-slot, so its remaining cheap fills
+ * stay cheap and it reaches OPT.
  */
-const PRICE_SLOT_SCALE = 18;
+const PRICE_SLOT_SCALE = 30;
 
 /**
  * Baseline value of a body for rotation/fatigue depth (≤12 deploy per matchday, fatigue), independent
@@ -66,7 +74,7 @@ const ROTATION_VALUE = 92;
  * default, weaker individual players are acceptable". Big enough to clear a cheap filler's price/wage
  * and the (low, cash-comfortable) STOP value, but it vanishes exactly at opt so nobody overfills.
  */
-const BELOW_OPT_FILL_FLOOR = 45;
+const BELOW_OPT_FILL_FLOOR = 25;
 
 /**
  * A player's real cost is the transfer price PLUS the recurring wage bill over its expected tenure.
@@ -85,15 +93,10 @@ const SALARY_CAPITALIZATION = 2;
  */
 const THEME_FIT_VALUE = 12;
 
-/**
- * Soft premium-price aversion (product wish: "in S1 no player should cost >70 MW" — a WISH, not a
- * hard cap). Above the knee the penalty grows linearly, so a ~65-70 MW top star is fine but an
- * 85-113 MW superstar becomes not worth it versus a star + core for the same money — which also frees
- * budget to fill toward OPT. Flat (applies to every club) so the effective ceiling emerges league-wide;
- * a genuinely exceptional player can still clear it, so it never hard-blocks.
- */
-const PREMIUM_PRICE_KNEE = 60;
-const PREMIUM_PRICE_SLOPE = 2.5;
+// NOTE (deliberately no premium-price / MW-cap term): an earlier version subtracted a flat penalty for
+// every MW above a knee, which is an artificial league-wide price ceiling — exactly what the design
+// forbids (organic levers only, no hard/soft caps). Whether a star is "too expensive" must emerge from
+// the club's own economy via the budget-relative PRICE_SLOT_SCALE term above, not from a fixed MW line.
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -175,17 +178,16 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const belowOpt = state.rosterSize < w.optTarget ? 1 : 0;
   const rotationValue = ROTATION_VALUE * belowOptFraction + BELOW_OPT_FILL_FLOOR * belowOpt;
   const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
-  // Soft premium-price aversion: makes 65+ MW superstars rare (only the few clubs that value them
-  // enough clear it) and >70 MW essentially not worth it in S1 — a wish, not a hard cap.
-  const premiumAversion = PREMIUM_PRICE_SLOPE * Math.max(0, Math.max(0, player.marketValue) - PREMIUM_PRICE_KNEE);
+  // No MW-cap / premium term: "too expensive" is judged purely by wThrift·priceInSlots·PRICE_SLOT_SCALE
+  // — the player's price measured against THIS club's actual budget-per-slot — so the star ceiling
+  // emerges from each club's economy, not a fixed line.
   return (
     w.wWin * deltaStrength +
     rotationValue -
     w.wThrift * priceInSlots * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential +
-    themeFitValue -
-    premiumAversion
+    themeFitValue
   );
 }
 
