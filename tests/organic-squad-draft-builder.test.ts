@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildOrganicSquadPlan, type OrganicSquadPlanInput } from "@/lib/ai/organic-squad/draft-builder";
 import {
@@ -192,5 +192,61 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
     // And no player is ever both bought and sold in the same plan.
     const soldIds = new Set(result.sellDecisions.map((sell) => sell.playerId));
     expect(result.decisions.every((buy) => !soldIds.has(buy.playerId))).toBe(true);
+  });
+
+  it("SEED-based draft jitter: reproducible per seed, varies composition across seeds on near-tied candidates", async () => {
+    // Build a pool of EXACT ties per discipline (identical stats/price) so buyUtility is dead-even
+    // within a group — the only thing that can pick a WINNER among ties is the seed-keyed jitter.
+    function tiedCandidate(id: string, disciplineId: string): OrganicPlayerView {
+      return {
+        playerId: id,
+        pow: 78,
+        spe: 60,
+        men: 60,
+        soc: 60,
+        disciplineRatings: { [disciplineId]: 80 },
+        marketValue: 30,
+        salary: 8,
+      };
+    }
+    function makeTiedPool(): OrganicPlayerView[] {
+      const pool: OrganicPlayerView[] = [];
+      for (const d of DISCIPLINES) {
+        for (let i = 0; i < 6; i += 1) {
+          pool.push(tiedCandidate(`${d.id}-tied-${i}`, d.id));
+        }
+      }
+      return pool;
+    }
+
+    const previousEnv = process.env.OLY_ORGANIC_DRAFT_JITTER;
+    process.env.OLY_ORGANIC_DRAFT_JITTER = "20";
+    vi.resetModules();
+    try {
+      // ORGANIC_DRAFT_JITTER is read ONCE at module load, so a fresh dynamic import is required to
+      // pick up the env var set above (module-level const, not read per-call).
+      const { buildOrganicSquadPlan: buildWithJitter } = await import("@/lib/ai/organic-squad/draft-builder");
+
+      const seedAInput: OrganicSquadPlanInput = { ...baseInput({}), candidates: makeTiedPool(), draftSeed: "save-A:team-1" };
+      const seedAInput2: OrganicSquadPlanInput = { ...baseInput({}), candidates: makeTiedPool(), draftSeed: "save-A:team-1" };
+      const seedBInput: OrganicSquadPlanInput = { ...baseInput({}), candidates: makeTiedPool(), draftSeed: "save-B:team-2" };
+
+      const resultA1 = buildWithJitter(seedAInput);
+      const resultA2 = buildWithJitter(seedAInput2);
+      const resultB = buildWithJitter(seedBInput);
+
+      // Reproducibility: identical seed ⇒ identical finalSquad (same players, same order).
+      expect(resultA1.finalSquad.map((p) => p.playerId)).toEqual(resultA2.finalSquad.map((p) => p.playerId));
+
+      // Seed variance: different seeds ⇒ at least one different player in the final squad.
+      const idsA = new Set(resultA1.finalSquad.map((p) => p.playerId));
+      const idsB = new Set(resultB.finalSquad.map((p) => p.playerId));
+      const differs = [...idsA].some((id) => !idsB.has(id)) || [...idsB].some((id) => !idsA.has(id));
+      expect(differs).toBe(true);
+    } finally {
+      if (previousEnv === undefined) delete process.env.OLY_ORGANIC_DRAFT_JITTER;
+      else process.env.OLY_ORGANIC_DRAFT_JITTER = previousEnv;
+      vi.resetModules();
+    }
   });
 });

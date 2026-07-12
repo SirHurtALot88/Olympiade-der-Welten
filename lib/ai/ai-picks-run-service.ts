@@ -3016,6 +3016,7 @@ function runOrganicTeamDraftExecute(input: {
     identity,
     startingSquad,
     candidates,
+    draftSeed: `${saveId}:${teamId}`,
   });
   teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
   if (plan.stoppedBelowMin) {

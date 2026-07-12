@@ -22,6 +22,18 @@ import {
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { buyUtility, marginalStrength, stopUtility } from "@/lib/ai/organic-squad/utility";
+import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
+
+/**
+ * Small additive jitter (in buyUtility units) applied ONLY inside the greedy buy comparison, keyed by
+ * `${draftSeed}:${playerId}` (hash-based, reproducible — no Math.random). It exists SOLELY to break
+ * near-ties between similarly-attractive candidates so different save/team seeds can land on different
+ * (but comparably good) picks — composition variance across saves, not randomness overriding the
+ * model. It must never be large enough to flip a clear preference: a genuinely better candidate always
+ * wins regardless of jitter amplitude choice by the caller. Default 0 (env unset) ⇒ bit-identical to the
+ * pre-jitter deterministic behaviour (golden tests unaffected). Amplitude is ENV-tunable for tuning/QA.
+ */
+const ORGANIC_DRAFT_JITTER = Number(process.env.OLY_ORGANIC_DRAFT_JITTER ?? 0) || 0;
 
 export type OrganicBuyDecision = {
   playerId: string;
@@ -72,6 +84,11 @@ export type OrganicSquadPlanInput = {
     /** Hard lower roster bound, defaults to ROSTER_MIN (8). */
     rosterMin?: number;
   };
+  /**
+   * Optional per-(save, team) seed for the reproducible buy-utility jitter (see ORGANIC_DRAFT_JITTER).
+   * Null/undefined ⇒ no jitter regardless of the env amplitude — the builder stays fully deterministic.
+   */
+  draftSeed?: string | null;
 };
 
 export type OrganicSquadPlanResult = {
@@ -168,7 +185,11 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     let bestUtility = -Infinity;
     for (const candidate of pool) {
       if (cash - price(candidate) - reserveForMin < affordFloor) continue;
-      const utility = buyUtility(candidate, state);
+      const jitter =
+        input.draftSeed && ORGANIC_DRAFT_JITTER > 0
+          ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
+          : 0;
+      const utility = buyUtility(candidate, state) + jitter;
       if (utility > bestUtility) {
         bestUtility = utility;
         best = candidate;
@@ -181,7 +202,11 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     if (!best && belowMin) {
       for (const candidate of pool) {
         if (cash - price(candidate) < 0) continue;
-        const utility = buyUtility(candidate, state);
+        const jitter =
+          input.draftSeed && ORGANIC_DRAFT_JITTER > 0
+            ? ORGANIC_DRAFT_JITTER * (draftUnit(`${input.draftSeed}:${candidate.playerId}`) - 0.5)
+            : 0;
+        const utility = buyUtility(candidate, state) + jitter;
         if (utility > bestUtility) {
           bestUtility = utility;
           best = candidate;

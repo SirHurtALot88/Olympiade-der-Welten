@@ -31,6 +31,7 @@ import {
 } from "@/lib/ai/organic-squad/types";
 import { sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
+import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
@@ -231,6 +232,8 @@ export type OrganicDraftPlanInput = {
     facilityNet?: number;
     netTransfer?: number;
   };
+  /** Optional per-(save, team) seed for the reproducible buy-utility jitter (see draft-builder.ts). */
+  draftSeed?: string | null;
 };
 
 export type OrganicDraftPlanResult = {
@@ -319,6 +322,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
     },
+    draftSeed: input.draftSeed ?? null,
   });
 
   return {
@@ -339,6 +343,14 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
  * the utility sign, not this constant.
  */
 const SELL_THRESHOLD = 0;
+
+/**
+ * Small additive jitter (in sellUtility units) applied ONLY inside the greedy sell comparison, keyed by
+ * `${draftSeed}:${playerId}` (hash-based, reproducible — no Math.random). Mirrors ORGANIC_DRAFT_JITTER
+ * in draft-builder.ts but for the sell path, with its OWN env knob so buy/sell variance can be tuned
+ * independently. Default 0 (env unset) ⇒ bit-identical to the pre-jitter deterministic behaviour.
+ */
+const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 0) || 0;
 
 export type OrganicSellDecision = {
   /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
@@ -373,6 +385,8 @@ export type OrganicSellPlanInput = {
     facilityNet?: number;
     netTransfer?: number;
   };
+  /** Optional per-(save, team) seed for the reproducible sell-utility jitter (see ORGANIC_SELL_JITTER). */
+  draftSeed?: string | null;
 };
 
 export type OrganicSellPlanResult = {
@@ -437,7 +451,11 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const view of held) {
-      const utility = sellUtility(view, state);
+      const jitter =
+        input.draftSeed && ORGANIC_SELL_JITTER > 0
+          ? ORGANIC_SELL_JITTER * (draftUnit(`${input.draftSeed}:${view.playerId}`) - 0.5)
+          : 0;
+      const utility = sellUtility(view, state) + jitter;
       if (utility > bestUtility) {
         bestUtility = utility;
         best = view;

@@ -315,6 +315,7 @@ async function runTeamCycle(input: {
       // Season-end sell cycle: allow shedding below ROSTER_MIN (empty is fine — preseason rebuilds),
       // so profit/surplus sells fire even when the draft left the team exactly at min.
       allowBelowMin: true,
+      draftSeed: `${input.saveId}:${input.teamId}`,
     });
     warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
     const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
@@ -416,7 +417,14 @@ async function runTeamCycle(input: {
     }
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
     // Preseason buys reuse the draft planner with the CURRENT roster as the startingSquad.
-    const plan = planOrganicDraftForTeam({ gameState, team, identity, startingSquad, candidates });
+    const plan = planOrganicDraftForTeam({
+      gameState,
+      team,
+      identity,
+      startingSquad,
+      candidates,
+      draftSeed: `${input.saveId}:${input.teamId}`,
+    });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
 
