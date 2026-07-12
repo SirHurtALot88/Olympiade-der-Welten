@@ -40976,6 +40976,26 @@ button.foundation-team-portrait-card {
   text-transform: uppercase;
   color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
 }
+.is-new-look .nl-stat-chip-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.28em;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-mut) 55%, transparent);
+  font-size: 0.72em;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--nl-mut);
+  vertical-align: baseline;
+  cursor: help;
+}
+.is-new-look .nl-stat-chip:hover .nl-stat-chip-help {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-mut) 85%, transparent);
+}
 .is-new-look .nl-stat-chip-value {
   font-size: var(--nl-fs-xl);
   line-height: 1.15;

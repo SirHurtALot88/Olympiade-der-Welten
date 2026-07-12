@@ -22,6 +22,7 @@ import {
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
+import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
 import {
   formatTransfermarktCurrency,
   formatTransfermarktRatio,
@@ -631,12 +632,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </small>
                     {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
                     <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
-                      <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`}>Fit {item.fitDisplay}</span>
-                      <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`}>
+                      <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`} title={getGameTermShort("Fit") ?? undefined}>Fit {item.fitDisplay}</span>
+                      <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`} title={getGameTermShort("Value") ?? undefined}>
                         Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}
                       </span>
                       {item.needMatchScore != null ? (
-                        <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`}>
+                        <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`} title={getGameTermShort("Bedarf") ?? undefined}>
                           Bedarf {formatNlNumber(item.needMatchScore, 0)}
                         </span>
                       ) : null}

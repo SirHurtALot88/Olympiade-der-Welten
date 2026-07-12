@@ -3,6 +3,15 @@ import {
   getSaisonstandExpertContractColumns,
   saisonstandColumnContract,
 } from "@/lib/foundation/saisonstand-column-contract";
+import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
+
+/** "mini_dm" → "Mini Dm", "schach" → "Schach" — disambiguiert die kurzen Spalten-Kuerzel. */
+function humanizeColumnKey(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+}
 
 export function buildFoundationSeasonTableColumns(): FoundationTableColumn[] {
   const contractColumns = saisonstandColumnContract.columns.map((column) => ({
@@ -12,10 +21,12 @@ export function buildFoundationSeasonTableColumns(): FoundationTableColumn[] {
     defaultWidth: Math.max(Math.round(column.columnSize ?? 96), 52),
     minWidth: column.normalizedKey === "mannschaft" ? 150 : 52,
     visibleByDefault: column.compactVisible,
+    // Jede Spalte bekommt einen Hover-Tooltip: erst das Lexikon (GuV etc.),
+    // sonst der ausgeschriebene Spaltenname statt nur des Kuerzels.
     tooltip:
       column.normalizedKey === "bonuspunkte"
         ? `${column.sourceDescription} ${column.transformNote ?? ""}`.trim()
-        : undefined,
+        : getGameTermShort(column.displayLabel) ?? humanizeColumnKey(column.normalizedKey),
   }));
 
   return [
