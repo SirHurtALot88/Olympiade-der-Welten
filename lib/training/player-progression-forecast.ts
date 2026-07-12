@@ -836,7 +836,12 @@ export function buildPlayerProgressionForecast(input: {
     currentAbilityStars: axisStarSnapshot?.revealedCurrentStars.displayLabel ?? getStarLabel(currentAbilityRating),
     potentialRating,
     potentialTier: getRatingTier(potentialRating),
-    potentialStars: axisStarSnapshot?.revealedPotentialStars.displayLabel ?? getStarLabel(potentialRating),
+    // PO-Sterne aus dem GESAMT-Potenzial (potentialRating), NICHT aus dem
+    // besten Achsen-Ceiling: revealedPotentialStars nahm das stärkste Attribut-
+    // Ceiling, wodurch fast jeder Spieler auf ★★★★★ sprang (Potenzial 60er →
+    // eigentlich ~3 Sterne). Gesamt-Potenzial macht die PO-Sterne wieder
+    // aussagekräftig (gestreut 2–5). CA-Sterne bleiben achsenbasiert.
+    potentialStars: getStarLabel(potentialRating),
     developmentFactors: netDevelopment.developmentFactors,
     maintenanceBreakdown: netDevelopment.maintenanceBreakdown,
     regressionBreakdown: netDevelopment.regressionBreakdown,
