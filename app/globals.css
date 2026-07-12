@@ -59789,3 +59789,24 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+
+/* Training-Karten: Spieler-Portrait im Avatar-Kreis (statt nur Initialen) */
+.is-new-look .nl-training-player-avatar {
+  overflow: hidden;
+  padding: 0;
+}
+.is-new-look img.nl-training-player-avatar-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.is-new-look span.nl-training-player-avatar-media.optimized-media-image-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}

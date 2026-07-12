@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
 import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
@@ -544,9 +546,21 @@ function NlTrainingPlayerCard({
       data-testid="nl-training-player-card"
     >
       <header className="nl-training-player-head">
-        <span className="nl-training-player-avatar" aria-hidden="true">
-          {getInitials(row.player.name)}
-        </span>
+        {(() => {
+          const portrait = getPlayerPortraitModel(row.player);
+          return (
+            <span className="nl-training-player-avatar">
+              <OptimizedMediaImage
+                className="nl-training-player-avatar-media"
+                src={portrait.previewSrc ?? portrait.src}
+                alt={`${row.player.name} Portrait`}
+                fallbackLabel={portrait.initials || getInitials(row.player.name)}
+                onErrorClassName="nl-training-player-avatar-media"
+                loading="lazy"
+              />
+            </span>
+          );
+        })()}
         <div className="nl-training-player-copy">
           {onOpenPlayerDetails ? (
             <button
