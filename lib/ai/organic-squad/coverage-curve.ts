@@ -1,9 +1,19 @@
 /**
  * Organic marginal-utility squad builder — discipline coverage curve (Master-Plan P1).
  *
- * See docs/design/draft-composition-organic-masterplan.md. PURE function, not wired into any
- * game logic yet. Encodes diminishing returns for stacking "solide" players in a single
- * discipline: a sweet spot around 3–4 players, still strong at 5–6, then a cliff from 7 on.
+ * See docs/design/draft-composition-organic-masterplan.md. PURE function. Encodes diminishing
+ * returns for stacking "solide" players in a single discipline: a sweet spot around 3–4 players,
+ * still strong at 5–6, then a cliff from 7 on.
+ *
+ * WHY the 2nd/3rd body stays nearly as valuable as the 1st (0.95 / 0.85), i.e. why a lone strong
+ * player is NOT enough: on a matchday disciplines are contested in PAIRED groups (e.g. a 6er AND a
+ * 5er, or two 6ers) that must be fielded at the SAME time from ≤12 deployable players. A single
+ * strong body can only be in one of two simultaneously-contested disciplines — you must commit it
+ * to one and leave the other weak, losing points. So contesting an axis properly needs several
+ * distinct solide bodies (to field both halves of a pairing at once), not one superstar + reserves.
+ * That real deployment constraint is what makes "guter Core + Depth" beat "Superstar + Reserve", and
+ * it is why this curve keeps the early plateau high (depth pays) while the star PREMIUM (see
+ * disciplineSupportFactor) only unlocks once a discipline already carries that supporting depth.
  */
 
 /**
