@@ -163,15 +163,40 @@ const NL_AXIS_AREA_LABEL: Record<NlAxisKey, string> = { pow: "POW", spe: "SPE", 
 
 /* --- Kleinteile ------------------------------------------------------- */
 
-function NlCompletenessRing({ selected, total, ready }: { selected: number; total: number; ready: boolean }) {
+/**
+ * Ring-Zähler (#Slot-Label-Klarheit): zeigt IMMER "belegt / verfügbare Slots"
+ * — dieselbe Bedeutung wie die Slot-Karten-Zahl im Discipline-Header
+ * (`{sideSelected}/{sideSlots.length}`). Das Pflicht-Minimum (`minRequired`,
+ * = Summe `requiredPlayers` beider Seiten) wird separat als "min. N"
+ * ausgewiesen statt — wie zuvor — fälschlich als Nenner der Bruchzahl zu
+ * dienen (das ergab z. B. "9/5", weil mehr Slots belegt als Pflicht waren).
+ */
+function NlCompletenessRing({
+  selected,
+  total,
+  ready,
+  minRequired,
+}: {
+  selected: number;
+  total: number;
+  ready: boolean;
+  minRequired?: number;
+}) {
   const radius = 26;
   const circumference = 2 * Math.PI * radius;
   const pct = total > 0 ? Math.min(1, selected / total) : 0;
+  const subLabel = ready ? "bereit" : minRequired != null && minRequired > 0 ? `min. ${minRequired}` : "belegt";
+  const readyDetail =
+    ready
+      ? ", bereit zum Speichern"
+      : minRequired != null && minRequired > 0
+        ? `, mindestens ${minRequired} nötig`
+        : "";
   return (
     <div
       className={`nl-lineup-ring${ready ? " is-ready" : pct >= 1 ? " is-full" : ""}`}
       role="img"
-      aria-label={`Aufstellung ${selected} von ${total || "—"} Slots besetzt${ready ? ", bereit zum Speichern" : ""}`}
+      aria-label={`Aufstellung ${selected} von ${total || "—"} Slots belegt${readyDetail}`}
     >
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <circle className="nl-lineup-ring-track" cx="32" cy="32" r={radius} />
@@ -189,7 +214,7 @@ function NlCompletenessRing({ selected, total, ready }: { selected: number; tota
         <strong className="nl-tnum">
           {selected}/{total || "—"}
         </strong>
-        <small>{ready ? "bereit" : "Slots"}</small>
+        <small>{subLabel}</small>
       </span>
     </div>
   );
@@ -876,6 +901,12 @@ export default function LineupNewLook({
 
   const totalRequired = lineupFlowSummary.totalRequired;
   const selectedCount = lineupFlowSummary.selectedCount;
+  // Verfügbare Slot-Karten insgesamt (d1 + d2) — derselbe Nenner wie im
+  // Discipline-Header, s. `sideSlots.length` in `renderSide`. Ersetzt den
+  // vorherigen Ring-Nenner `totalRequired` (Pflicht-Minimum), der eine
+  // unsinnige Bruchzahl wie "9/5" erzeugte, sobald mehr Slots belegt waren
+  // als Pflicht.
+  const totalAvailableSlots = slots.length;
 
   // Resolve-Show: staged Slot-für-Slot-Auflösung aus dem bestehenden
   // Preview-Feed. null => Abschnitt erscheint gar nicht (Seite unverändert).
@@ -925,7 +956,12 @@ export default function LineupNewLook({
               <strong>{discipline?.displayName ?? "—"}</strong>
               <small>
                 {axis ? `${NL_AXIS_AREA_LABEL[axis]} · ` : ""}
-                Rank {rank ?? "—"} · {sideSelected}/{sideRequired || "—"} Slots
+                {/* Slot-Label-Klarheit: "belegt/verfügbar" statt der früheren
+                    Bruchzahl {sideSelected}/{sideRequired} — die verglich belegte
+                    Slots mit dem Pflicht-Minimum und ergab z. B. "6/2" (6 belegte
+                    von 6 verfügbaren Slots, davon 2 Pflicht). Pflicht-Minimum
+                    steht jetzt separat als "min. N". */}
+                Rank {rank ?? "—"} · {sideSelected}/{sideSlots.length || "—"} belegt · min. {sideRequired || "—"}
               </small>
             </div>
           </div>
@@ -1072,7 +1108,12 @@ export default function LineupNewLook({
       {/* --- HUD: Completeness-Ring · Teamstärke · Aktionen ------------- */}
       <header className="nl-lineup-hud">
         <div className="nl-lineup-hud-status">
-          <NlCompletenessRing selected={selectedCount} total={totalRequired} ready={lineupReadyToSave} />
+          <NlCompletenessRing
+            selected={selectedCount}
+            total={totalAvailableSlots}
+            minRequired={totalRequired}
+            ready={lineupReadyToSave}
+          />
           <div className="nl-lineup-hud-copy">
             <span className="nl-lineup-eyebrow">Einsatzliste</span>
             <strong>

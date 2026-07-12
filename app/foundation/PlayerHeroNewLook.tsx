@@ -23,6 +23,10 @@ import {
   formatNlNumber,
   type NlRadarAxis,
 } from "@/components/foundation/new-look";
+import {
+  getPlayerDisplaySalary,
+  getRosterEntryDisplaySalary,
+} from "@/app/foundation/foundation-page-client-exports";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
@@ -98,6 +102,22 @@ export default function PlayerHeroNewLook({
   // dann liefert `formatLeaguePercentile` schlicht kein Perzentil-Label.
   const foundationState = useFoundationStateOptional();
   const leaguePoolSize = foundationState?.gameState.players.length ?? null;
+
+  // GEHALT-Chip (neben MW): reales Saison-Gehalt — Kader-Eintrag bevorzugt
+  // (`getRosterEntryDisplaySalary`, gleiche Auflösung wie Kader-/Marktliste),
+  // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
+  // Roster-Auflösung spiegelt `resolveRosterEntry` im Drawer-Builder:
+  // `activePlayerId` (Kader-Eintrags-ID) hat Vorrang vor der reinen
+  // Spieler-ID, damit z. B. Leihen/Duplikate im selben Kader-Scope bleiben.
+  const rosterEntry = foundationState
+    ? (data.activePlayerId
+        ? (foundationState.gameState.rosters.find((entry) => entry.id === data.activePlayerId) ?? null)
+        : (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null))
+    : null;
+  const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
+  const heroSalary = rosterEntry
+    ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer)
+    : getPlayerDisplaySalary(heroPlayer);
 
   const radarAxes: NlRadarAxis[] = (
     [
@@ -227,6 +247,13 @@ export default function PlayerHeroNewLook({
               tone="neutral"
               sub="Marktwert"
               title="Marktwert"
+            />
+            <StatChip
+              label="GEHALT"
+              value={formatNlNumber(heroSalary, 1)}
+              tone="neutral"
+              sub="pro Saison"
+              title="Gehalt pro Saison"
             />
           </StatChipRow>
         </div>

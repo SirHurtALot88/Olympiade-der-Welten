@@ -1387,6 +1387,30 @@ function formatTeamOptionLabel(team: LabOptions["teams"][number]) {
   return team.currentMatchdayReady ? `✓ ${baseLabel}` : baseLabel;
 }
 
+/**
+ * "Neuer Look"-Team-Dropdown (nur hier verwendet, s. `controlsSlot` im
+ * flag-gated `LineupNewLook`-Zweig): `formatTeamOptionLabel`/`statusLabel`
+ * bleiben für den Alt-Look unangetastet, deren Kurzform "Lineup X/Y" ist dort
+ * unverändert — sie zählt aber SAISON-weit gespeicherte Aufstellungen
+ * (`lineupFilledCount`/`totalLineupSides`, s. `countSeasonLineupDisciplineSides`
+ * / `buildLineupDisciplineContract` in `lib/lineups/lineup-discipline-contract.ts`),
+ * NICHT die heute im Board belegten Slots. Genau diese Doppel-Bedeutung von
+ * "Lineup X/Y" (heute vs. Saison) hat für die gemeldete Verwechslung
+ * gesorgt ("9/5" oben vs. "0/20" hier). Diese Variante macht den Saison-Scope
+ * explizit, ohne die zugrunde liegende Zählung zu verändern.
+ */
+function formatNlTeamOptionLabel(team: LabOptions["teams"][number]) {
+  const readyMark = team.currentMatchdayReady ? "✓ " : "";
+  if (team.totalLineupSides != null && team.lineupFilledCount != null) {
+    const captainPart =
+      team.captainUsedCount != null && team.captainSlots != null
+        ? ` · Captain (Saison) ${team.captainUsedCount}/${team.captainSlots}`
+        : "";
+    return `${readyMark}${team.name} · Saison-Aufstellungen gespeichert ${team.lineupFilledCount}/${team.totalLineupSides}${captainPart}`;
+  }
+  return formatTeamOptionLabel(team);
+}
+
 function getTopAttributeWeights(
   weights: LegacyLineupLoadedContext["disciplineWeights"] | null | undefined,
   disciplineId: string | null | undefined,
@@ -7054,7 +7078,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               >
                 {filteredTeamOptions.map((team) => (
                   <option key={team.id} value={team.id}>
-                    {formatTeamOptionLabel(team)}
+                    {formatNlTeamOptionLabel(team)}
                   </option>
                 ))}
               </select>
