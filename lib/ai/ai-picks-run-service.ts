@@ -6,6 +6,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import {
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
+  executeLocalTransfermarktSell,
   listLocalTransfermarktFreeAgents,
   createLocalTransfermarktRunContext,
   flushLocalTransfermarktRunContext,
@@ -3019,6 +3020,36 @@ function runOrganicTeamDraftExecute(input: {
   teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
   if (plan.stoppedBelowMin) {
     teamWarnings.push("organic_squad_builder_stopped_below_min");
+  }
+
+  // 3b. TRADE-DOWN sells FIRST: the plan may have shed an expendable expensive body to raise the cash
+  //     that funds the buys below (a cash-poor club refilling toward opt, selling even at a loss). These
+  //     MUST execute before the buys — they are what makes the buys affordable. Map each planned sell's
+  //     playerId to its live roster-entry id (activePlayerId) and apply via the shared sell primitive.
+  if (plan.sellDecisions.length > 0) {
+    const activePlayerIdByPlayerId = new Map(
+      getTeamRosterPlayers(gameState, teamId).map((item) => [item.player.id, item.entry.id]),
+    );
+    let appliedTradeDowns = 0;
+    for (const sell of plan.sellDecisions) {
+      const activePlayerId = activePlayerIdByPlayerId.get(sell.playerId);
+      if (!activePlayerId) continue;
+      const sellResult = executeLocalTransfermarktSell({
+        saveId,
+        seasonId,
+        teamId,
+        activePlayerId,
+        transferSource: "ai_organic_squad_sell",
+        localRunContext: teamRunContext,
+        deferPersist: true,
+      });
+      if (!sellResult.transferCreated) {
+        teamBlockingReasons.push(...sellResult.blockingReasons.slice(0, 2), "organic_squad_builder_trade_down_skipped");
+        continue;
+      }
+      appliedTradeDowns += 1;
+    }
+    if (appliedTradeDowns > 0) teamWarnings.push(`organic_squad_builder_trade_down:sold=${appliedTradeDowns}`);
   }
 
   // 4. Execute each decision in order via the shared buy primitive. The plan is a RANKED wishlist,

@@ -21,7 +21,7 @@ import {
   type OrganicPlayerView,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
-import { buyUtility, stopUtility } from "@/lib/ai/organic-squad/utility";
+import { buyUtility, marginalStrength, stopUtility } from "@/lib/ai/organic-squad/utility";
 
 export type OrganicBuyDecision = {
   playerId: string;
@@ -29,6 +29,21 @@ export type OrganicBuyDecision = {
   step: number;
   /** The buy utility at the moment it was chosen (for the decision log / diagnostics). */
   utility: number;
+};
+
+/**
+ * A TRADE-DOWN sell chosen mid-build: a cash-poor club below its opt sheds an expendable expensive body
+ * to fund cheaper fills (raise cash, cut wage) so it can still reach opt with a broader — if weaker —
+ * squad instead of stalling under-filled. The executor must apply these sells BEFORE the buy decisions
+ * (they are what makes the buys affordable). See buildOrganicSquadPlan's `!best` branch.
+ */
+export type OrganicTradeDownDecision = {
+  /** Domain player id of the roster player sold to raise cash. */
+  playerId: string;
+  /** 0-based order in which this trade-down was chosen. */
+  step: number;
+  /** Sale proceeds credited (its market value). */
+  saleValue: number;
 };
 
 export type OrganicSquadPlanInput = {
@@ -61,6 +76,8 @@ export type OrganicSquadPlanInput = {
 
 export type OrganicSquadPlanResult = {
   decisions: OrganicBuyDecision[];
+  /** Trade-down sells chosen to fund fills (apply BEFORE the buys). Empty when the club never got stuck. */
+  sellDecisions: OrganicTradeDownDecision[];
   finalSquad: OrganicPlayerView[];
   finalCash: number;
   finalSalaryTotal: number;
@@ -94,6 +111,8 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const squad = [...input.startingSquad];
   const pool = [...input.candidates];
   const decisions: OrganicBuyDecision[] = [];
+  const sellDecisions: OrganicTradeDownDecision[] = [];
+  const optTarget = input.economy.weights.optTarget;
   let cash = input.economy.cash;
   let salaryTotal = input.economy.salaryTotal;
 
@@ -165,6 +184,43 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     }
 
     if (!best) {
+      // TRADE-DOWN: nothing affordable, but still short of opt. A cash-poor club (e.g. after paying
+      // renewal salaries) sheds its most EXPENDABLE expensive body — highest (price − marginalStrength),
+      // i.e. worth more as cash than as squad strength — to fund cheaper fills and still reach opt with a
+      // broader (if weaker) squad. This is the "sell even at a loss to refill" behaviour: the sale raises
+      // cash AND cuts wage, unblocking the next buy. Gated so it only fires when the proceeds actually
+      // make the cheapest fill affordable — so every trade-down is followed by a buy (strict progress
+      // toward opt, no idle liquidation), which also bounds the sells and guarantees termination.
+      if (pool.length > 0 && squad.length < optTarget) {
+        const cheapestFill = cheapestPriceSum(pool, 1);
+        let sellTarget: OrganicPlayerView | null = null;
+        let bestTradeability = 0; // strictly > 0: only shed a player worth more as cash than as strength
+        for (const held of squad) {
+          const tradeability =
+            price(held) - marginalStrength(held, state.disciplineNeeds, state.needAxisWeights);
+          if (tradeability > bestTradeability) {
+            bestTradeability = tradeability;
+            sellTarget = held;
+          }
+        }
+        if (sellTarget) {
+          const cashAfterSell = cash + price(sellTarget);
+          const belowMinAfterSell = squad.length - 1 < rosterMin;
+          // After the sell the buy uses floor 0 below min (partial-fill fallback) or the buffer above it.
+          const floorAfterSell = belowMinAfterSell ? 0 : cashBuffer;
+          if (cashAfterSell - cheapestFill >= floorAfterSell) {
+            cash = cashAfterSell;
+            salaryTotal = Math.max(0, salaryTotal - Math.max(0, sellTarget.salary));
+            squad.splice(squad.indexOf(sellTarget), 1);
+            sellDecisions.push({
+              playerId: sellTarget.playerId,
+              step: sellDecisions.length,
+              saleValue: price(sellTarget),
+            });
+            continue;
+          }
+        }
+      }
       // Nothing affordable at all (truly out of cash for even the cheapest player).
       if (squad.length < rosterMin) stoppedBelowMin = true;
       break;
@@ -184,6 +240,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
 
   return {
     decisions,
+    sellDecisions,
     finalSquad: squad,
     finalCash: cash,
     finalSalaryTotal: salaryTotal,

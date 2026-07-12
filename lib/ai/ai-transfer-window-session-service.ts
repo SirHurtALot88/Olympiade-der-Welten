@@ -419,6 +419,35 @@ async function runTeamCycle(input: {
     const plan = planOrganicDraftForTeam({ gameState, team, identity, startingSquad, candidates });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+
+    // TRADE-DOWN sells FIRST: a cash-poor club may have planned to shed an expendable expensive body to
+    // fund the fills below (selling even at a loss to refill toward opt). Apply before the buys — they
+    // raise the cash the buys spend. Map planned sell playerIds to their live roster-entry activePlayerId.
+    if (plan.sellDecisions.length > 0) {
+      const activePlayerIdByPlayerId = new Map(
+        organicRosterEntries(gameState, input.teamId).map((entry) => [entry.player.id, entry.activePlayerId]),
+      );
+      for (const sell of plan.sellDecisions) {
+        const activePlayerId = activePlayerIdByPlayerId.get(sell.playerId);
+        if (!activePlayerId) continue;
+        const sellResult = executeLocalTransfermarktSell({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          teamId: input.teamId,
+          activePlayerId,
+          transferSource: "ai_organic_squad_sell",
+          localRunContext: input.sessionRunContext,
+          deferPersist: true,
+        });
+        if (!sellResult.transferCreated) {
+          warnings.push(...sellResult.blockingReasons.slice(0, 2), "organic_squad_builder_trade_down_skipped");
+          continue;
+        }
+        appliedSells += 1;
+        input.excludeSellPlayerIds.add(sell.playerId);
+      }
+    }
+
     for (const decision of plan.decisions) {
       if (input.excludeBuyPlayerIds.has(decision.playerId)) continue;
       const buyResult = executeLocalTransfermarktBuy({

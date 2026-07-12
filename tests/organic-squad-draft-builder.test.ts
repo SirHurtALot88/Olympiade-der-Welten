@@ -130,4 +130,53 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
     expect(result.finalSquad.length).toBeLessThan(ROSTER_MIN);
     expect(result.stoppedBelowMin).toBe(true);
   });
+
+  it("trades down: a cash-poor club below min sheds an expendable expensive body to refill toward opt", () => {
+    // Reproduce the S-C stall: 7 players, cash too low to buy the cheapest free agent, but the roster
+    // holds a pricey surplus (a 4th body in an already-covered discipline → low marginalStrength, high
+    // price). The club must SELL that body (even at a loss) to fund the cheap fills and reach min/opt.
+    const surplusRoster: OrganicPlayerView[] = [];
+    // Three tdm bodies already cover that discipline well; the 4th (expensive) is pure surplus.
+    for (let i = 0; i < 4; i += 1) {
+      surplusRoster.push({
+        playerId: `tdm-held-${i}`,
+        pow: 78,
+        spe: 60,
+        men: 60,
+        soc: 60,
+        disciplineRatings: { tdm: 80 },
+        marketValue: i === 3 ? 60 : 8, // the 4th body is the pricey, expendable one
+        salary: i === 3 ? 12 : 4,
+      });
+    }
+    // Three more cheap bodies spread over other disciplines → roster of 7, still below min (8) and opt.
+    for (const d of ["spurt", "tennis", "showcase"]) {
+      surplusRoster.push({
+        playerId: `${d}-held`,
+        pow: 70,
+        spe: 60,
+        men: 60,
+        soc: 60,
+        disciplineRatings: { [d]: 74 },
+        marketValue: 8,
+        salary: 4,
+      });
+    }
+
+    const input = baseInput({ cash: 6, cashBuffer: 5, salaryTotal: 32 });
+    input.startingSquad = surplusRoster;
+    // Cheapest free agent (marketValue 20) is unaffordable from cash 6 — only a trade-down unblocks it.
+
+    const result = buildOrganicSquadPlan(input);
+
+    expect(result.sellDecisions.length).toBeGreaterThanOrEqual(1);
+    // The pricey 4th tdm body is the one shed (highest price − marginalStrength).
+    expect(result.sellDecisions.some((sell) => sell.playerId === "tdm-held-3")).toBe(true);
+    // Having freed the cash, the club fills back up to at least the hard minimum.
+    expect(result.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
+    expect(result.stoppedBelowMin).toBe(false);
+    expect(result.finalCash).toBeGreaterThanOrEqual(0);
+    // The sold body is gone from the final squad.
+    expect(result.finalSquad.some((player) => player.playerId === "tdm-held-3")).toBe(false);
+  });
 });
