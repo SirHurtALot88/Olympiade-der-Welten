@@ -223,6 +223,7 @@ export default function InboxV2NewLook({
   items,
   selectedItemId,
   onSelectItem,
+  onOpenItem,
   teamLabel,
   openCount = 0,
   criticalCount = 0,
@@ -240,6 +241,12 @@ export default function InboxV2NewLook({
 }: InboxV2ClientProps) {
   const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
   const categoryFilters = mode === "chronicle" ? NL_INBOX_CHRONICLE_CATEGORY_FILTERS : NL_INBOX_DECISION_CATEGORY_FILTERS;
+
+  // Klick auf eine Karte: springt zum Ziel-Screen (Deep-Link), wenn der Host
+  // `onOpenItem` durchreicht; sonst waehlt er die Karte nur aus. Eine Quelle
+  // fuer alle Karten-Klicks, damit Entscheidungs- und Chronik-Karten gleich
+  // reagieren.
+  const activateItem = (itemId: string) => (onOpenItem ?? onSelectItem)(itemId);
 
   // Kategorie-Filter als klickbare Portale (#3). Der Mount reicht aktuell
   // keinen `onCategoryFilterChange`-Handler durch (Host setzt
@@ -387,7 +394,7 @@ export default function InboxV2NewLook({
       <div key={item.id} id={getInboxItemDomId(item.id)}>
         <NlCard
           interactive
-          onClick={() => onSelectItem(item.id)}
+          onClick={() => activateItem(item.id)}
           className={`nl-chronicle-lead ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
           eyebrow={renderChronicleEyebrow(meta, statusLabel)}
           title={item.title}
@@ -414,7 +421,7 @@ export default function InboxV2NewLook({
       >
         <NlCard
           interactive
-          onClick={() => onSelectItem(item.id)}
+          onClick={() => activateItem(item.id)}
           className={`nl-chronicle-story ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
           eyebrow={renderChronicleEyebrow(meta, statusLabel)}
           title={item.title}
@@ -549,7 +556,7 @@ export default function InboxV2NewLook({
               <li key={item.id} id={getInboxItemDomId(item.id)} className="nl-inbox-list-row">
                 <NlCard
                   interactive
-                  onClick={() => onSelectItem(item.id)}
+                  onClick={() => activateItem(item.id)}
                   className={`nl-inbox-card ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
                   data-testid={`nl-inbox-card-${item.id}`}
                 >

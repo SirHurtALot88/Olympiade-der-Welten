@@ -90,6 +90,7 @@ export type HomeV2ClientProps = {
   nextStepLabel: string;
   nextStepStatus: string;
   nextStepDetail: string;
+  nextStepBlocked?: boolean;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
   leagueHeatPools: LeaguePlayerHeatPools;
@@ -105,6 +106,7 @@ export type HomeV2ClientProps = {
   onOpenMarket: () => void;
   onOpenTraining: () => void;
   onOpenOffice: () => void;
+  onOpenFacilities?: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
   onCompleteInboxItem?: (itemId: string) => void;

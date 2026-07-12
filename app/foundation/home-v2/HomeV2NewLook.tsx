@@ -267,6 +267,7 @@ export default function HomeV2NewLook({
   nextStepLabel,
   nextStepStatus,
   nextStepDetail,
+  nextStepBlocked = false,
   warnings,
   topPlayers,
   leagueHeatPools,
@@ -277,8 +278,10 @@ export default function HomeV2NewLook({
   todayCards,
   onContinue,
   onOpenLineup,
+  onOpenTeams,
   onOpenSeason,
   onOpenOffice,
+  onOpenFacilities,
   onOpenInbox,
   onCompleteInboxItem,
   onOpenBoardObjectives,
@@ -359,6 +362,9 @@ export default function HomeV2NewLook({
               Weiter · {nextStepLabel}
             </button>
             <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
+            {nextStepBlocked ? (
+              <span className={`nl-home-next-reason ${nlToneClass("warn")}`}>{nextStepDetail}</span>
+            ) : null}
           </div>
         }
       >
@@ -367,7 +373,7 @@ export default function HomeV2NewLook({
             {teamLogoUrl ? (
               <OptimizedMediaImage className="nl-home-hero-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={56} height={56} />
             ) : (
-              <span className="nl-home-hero-logo nl-home-hero-logo-fallback">{teamLogoInitials}</span>
+              <span className="nl-home-hero-logo nl-home-hero-logo-fallback" role="img" aria-label={`${teamName} Logo`}>{teamLogoInitials}</span>
             )}
             <div className="nl-home-hero-copy">
               <span className="nl-home-eyebrow">{seasonName} · {matchdayLabel}</span>
@@ -393,10 +399,10 @@ export default function HomeV2NewLook({
           </StatChipRow>
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
+            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} onClick={onOpenOffice} title="Gewinn und Verlust — zum Front Office" />
             <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
-            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} />
-            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} />
+            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
+            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
           </StatChipRow>
         </div>
       </NlCard>
@@ -415,15 +421,17 @@ export default function HomeV2NewLook({
           <ol className="nl-home-schedule-track">
             {scheduleItems.map((item) => {
               const state = item.isCurrent ? "is-current" : item.isPast ? "is-past" : "is-upcoming";
+              const stateLabel = item.isCurrent ? "aktuell" : item.isPast ? "gespielt" : "kommend";
               return (
                 <li
                   key={item.matchdayId}
                   className={`nl-home-schedule-node ${state}`}
                   aria-current={item.isCurrent ? "step" : undefined}
-                  title={item.label}
+                  title={`${item.label} · ${stateLabel}`}
                 >
                   <span className="nl-home-schedule-dot" aria-hidden="true" />
                   <span className="nl-home-schedule-label">{item.label}</span>
+                  <span className="sr-only">{stateLabel}</span>
                 </li>
               );
             })}
@@ -596,7 +604,11 @@ export default function HomeV2NewLook({
                   >
                     {current != null && target != null && target > 0 ? (
                       <NlProgressBar
-                        label={objective.label}
+                        label={
+                          tone === "risk" || tone === "warn"
+                            ? `${objective.label} · ${formatObjectiveStatusLabel(objective.status)}`
+                            : objective.label
+                        }
                         value={current}
                         max={target}
                         tone={tone}
@@ -673,6 +685,7 @@ export default function HomeV2NewLook({
                 <li key={item.id} className="nl-home-inbox-row">
                   <button type="button" className={`nl-home-inbox-item ${nlToneClass(item.severity === "critical" ? "risk" : item.severity === "warning" ? "warn" : "accent")}`} onClick={onOpenInbox}>
                     <span className="nl-home-inbox-dot" aria-hidden="true" />
+                    <span className="sr-only">{item.severity === "critical" ? "kritisch" : item.severity === "warning" ? "Warnung" : "Info"}: </span>
                     <span className="nl-home-inbox-copy">
                       <strong>{item.title}</strong>
                       {item.detail ? <small>{item.detail}</small> : null}
@@ -706,6 +719,7 @@ export default function HomeV2NewLook({
             className="nl-home-facility-card"
             eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBuilding /> Gebäude</span>}
             title="Infrastruktur"
+            onClick={onOpenFacilities}
           >
             <StatChipRow aria-label="Facility-Level">
               {facilities.map((facility) => (

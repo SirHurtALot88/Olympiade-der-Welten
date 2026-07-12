@@ -512,6 +512,7 @@ function NlTrainingPlayerCard({
             <button
               type="button"
               className="nl-training-player-name-button"
+              data-testid="training-player-profile-button"
               title={`${row.player.name} Profil öffnen`}
               onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
             >

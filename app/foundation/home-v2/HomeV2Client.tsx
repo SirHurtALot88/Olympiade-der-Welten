@@ -90,6 +90,8 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
     boardObjectives,
     nextStepLabel,
     nextStepStatus,
+    nextStepDetail,
+    nextStepBlocked = false,
     warnings,
     topPlayers,
     leagueHeatPools,
@@ -127,7 +129,15 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
   };
 
   const relevantWarnings = warnings.filter(
-    (warning) => !["no_active_team", "season_started_no_results"].includes(warning),
+    (warning) =>
+      ![
+        "no_active_team",
+        "season_started_no_results",
+        // Warnings arrive pre-formatted (formatHomeWarningLabel), so the suppression
+        // list must match the German labels too, not just the raw keys.
+        "Kein aktives Team",
+        "Saison ohne Ergebnis",
+      ].includes(warning),
   );
 
   return (
@@ -137,7 +147,7 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
           {teamLogoUrl ? (
             <OptimizedMediaImage className="home-v2-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={64} height={64} />
           ) : (
-            <span className="home-v2-logo team-logo-placeholder">{teamLogoInitials}</span>
+            <span className="home-v2-logo team-logo-placeholder" role="img" aria-label={`${teamName} Logo`}>{teamLogoInitials}</span>
           )}
           <div className="home-v2-hero-copy">
             <span className="eyebrow">{seasonName} · {matchdayLabel}</span>
@@ -145,7 +155,7 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
             <p className="muted">{teamCode} · {controlModeLabel}</p>
           </div>
         </div>
-        <div className="home-v2-hero-stats" aria-label="Team KPIs">
+        <div className="home-v2-hero-stats" role="group" aria-label="Team KPIs">
           <div className="home-v2-hero-stat">
             <span>Rang</span>
             <strong>{rank != null ? `#${rank}` : "—"}</strong>
@@ -275,7 +285,11 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
               <h3 title={nextStepStatus}>{nextStepLabel}</h3>
             </div>
             <span className={`transfer-status-pill ${getNextStepToneClass(nextStepStatus)}`}>{nextStepStatus}</span>
-            <p className="muted">{primaryTodayCard?.detail ?? "„Weiter“ oben springt direkt zur empfohlenen Aktion."}</p>
+            <p className="muted">
+              {nextStepBlocked
+                ? nextStepDetail
+                : primaryTodayCard?.detail ?? "„Weiter“ oben springt direkt zur empfohlenen Aktion."}
+            </p>
           </FoundationCard>
 
           <FoundationCard as="section" variant="panel" className="home-v2-panel home-v2-board-panel">

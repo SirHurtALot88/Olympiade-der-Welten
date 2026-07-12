@@ -1037,10 +1037,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <span className="foundation-flow-coach-mode" title="Schwere Tabellen und Zusatzpanels werden erst beim Oeffnen vorbereitet.">
             Schnellmodus
           </span>
+          {/* Der "Weiter"-Header-Button ist die einzige kanonische Next-Action
+              (Leertaste). Das Label hier wäre reine Dopplung — nur der
+              Loop-Stepper darunter bleibt zur Orientierung. */}
           <span className="foundation-flow-coach-shortcut">{activeFlowCoach.shortcut}</span>
-          <small className="muted" title={globalNextTitle}>
-            Naechster Schritt: {globalNextLabel}
-          </small>
         </div>
         <div className="foundation-flow-loop" aria-label="Gameplay Loop">
           {foundationFlowLoopStages.map((stage: FoundationFlowLoopStage, index: number) => (

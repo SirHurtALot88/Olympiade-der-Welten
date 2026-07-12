@@ -182,6 +182,8 @@ export default function FoundationHomeV2Host({
             : gameFlowActionStep.warnings[0]
               ? formatCockpitReason(gameFlowActionStep.warnings[0])
               : "Flow bereit — weiter zum naechsten Schritt.",
+        nextStepBlocked:
+          gameFlowActionStep.blockers.length > 0 || gameFlowActionStep.warnings.length > 0,
         warnings: overviewDerivations.homeWarnings.map(formatHomeWarningLabel),
         topPlayers: overviewDerivations.homeV2TopPlayers,
         leagueHeatPools: leaguePlayerHeatPools,
@@ -196,6 +198,7 @@ export default function FoundationHomeV2Host({
         onOpenMarket: () => onNavigateView("marketV2"),
         onOpenTraining: () => onNavigateView("trainingCompact"),
         onOpenOffice: () => navigateHomeTab("office"),
+        onOpenFacilities: () => onNavigateView("facilitiesOverviewV2"),
         onOpenSeason: () => onNavigateView("seasonV2"),
         onOpenInbox: () => onNavigateView("inboxV2"),
         onOpenBoardObjectives: () => {

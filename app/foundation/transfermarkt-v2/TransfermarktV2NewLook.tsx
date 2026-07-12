@@ -22,6 +22,7 @@ import {
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
+import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
 import {
   formatTransfermarktCurrency,
   formatTransfermarktRatio,
@@ -508,6 +509,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             tone="good"
             onClick={() => scrollToNlMarketSection(".nl-market-deal-card")}
             title="Zum Deal-Desk springen"
+            ariaLabel={`Cash ${teamCash != null ? formatNlNumber(teamCash, 1) : "—"} — zum Deal-Desk springen`}
           />
           <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatNlNumber(teamSalaryTotal, 1) : "—"} tone="accent" />
           <StatChip
@@ -517,6 +519,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             sub={rosterGapOpenCount != null && rosterGapOpenCount > 0 ? `${rosterGapOpenCount} Plätze offen` : undefined}
             onClick={() => scrollToNlMarketSection(".nl-market-roster-card")}
             title="Zum eigenen Kader springen"
+            ariaLabel={`Kader ${effectiveRosterCount ?? "—"} von ${rosterLimit ?? "—"} — zum eigenen Kader springen`}
           />
           <StatChip
             label="Wunschliste"
@@ -529,6 +532,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             }
             onClick={() => scrollToNlMarketSection(".nl-market-wishlist-card")}
             title="Zur Wishlist springen"
+            ariaLabel={`Wunschliste ${wishlistEntries.length} — zur Wishlist springen`}
           />
           <StatChip label="Filter aktiv" value={activeFilterCount} tone={activeFilterCount > 0 ? "warn" : "neutral"} />
         </StatChipRow>
@@ -628,12 +632,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </small>
                     {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
                     <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
-                      <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`}>Fit {item.fitDisplay}</span>
-                      <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`}>
+                      <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`} title={getGameTermShort("Fit") ?? undefined}>Fit {item.fitDisplay}</span>
+                      <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`} title={getGameTermShort("Value") ?? undefined}>
                         Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}
                       </span>
                       {item.needMatchScore != null ? (
-                        <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`}>
+                        <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`} title={getGameTermShort("Bedarf") ?? undefined}>
                           Bedarf {formatNlNumber(item.needMatchScore, 0)}
                         </span>
                       ) : null}

@@ -130,6 +130,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
     setSelectedMatchdaySummaryId,
     setActiveView,
     openTeamProfileById,
+    triggerGlobalNext,
   } = props;
 
   const [mode, setMode] = useState<NlResultMode>("board");
@@ -621,7 +622,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         className="nl-result-highlight-card"
         title="Highlights"
         actions={
-          <button className="nl-result-button is-primary" type="button" onClick={() => setFoundationView("cockpit", setActiveView)}>
+          <button className="nl-result-button is-primary" type="button" onClick={() => void triggerGlobalNext()}>
             Weiter zum nächsten Schritt
           </button>
         }
