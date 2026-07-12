@@ -44,7 +44,7 @@ const PRICE_SLOT_SCALE = 18;
  * what makes a depth club big and an elite club small. Weighted flat (every club needs a squad), not
  * by wWin, so low-ambition depth clubs still fill out.
  */
-const ROTATION_VALUE = 50;
+const ROTATION_VALUE = 70;
 
 /**
  * A player's real cost is the transfer price PLUS the recurring wage bill over its expected tenure.
@@ -62,6 +62,16 @@ const SALARY_CAPITALIZATION = 2;
  * affordability (wThrift·price) or discipline need (ΔStrength). themeFit undefined ⇒ no term added.
  */
 const THEME_FIT_VALUE = 12;
+
+/**
+ * Soft premium-price aversion (product wish: "in S1 no player should cost >70 MW" — a WISH, not a
+ * hard cap). Above the knee the penalty grows linearly, so a ~65-70 MW top star is fine but an
+ * 85-113 MW superstar becomes not worth it versus a star + core for the same money — which also frees
+ * budget to fill toward OPT. Flat (applies to every club) so the effective ceiling emerges league-wide;
+ * a genuinely exceptional player can still clear it, so it never hard-blocks.
+ */
+const PREMIUM_PRICE_KNEE = 65;
+const PREMIUM_PRICE_SLOPE = 2.5;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -127,13 +137,17 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));
   const rotationValue = ROTATION_VALUE * belowOptFraction;
   const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
+  // Soft premium-price aversion: makes 65+ MW superstars rare (only the few clubs that value them
+  // enough clear it) and >70 MW essentially not worth it in S1 — a wish, not a hard cap.
+  const premiumAversion = PREMIUM_PRICE_SLOPE * Math.max(0, Math.max(0, player.marketValue) - PREMIUM_PRICE_KNEE);
   return (
     w.wWin * deltaStrength +
     rotationValue -
     w.wThrift * priceInSlots * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential +
-    themeFitValue
+    themeFitValue -
+    premiumAversion
   );
 }
 
