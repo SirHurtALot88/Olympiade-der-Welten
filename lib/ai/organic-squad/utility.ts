@@ -54,6 +54,15 @@ const ROTATION_VALUE = 50;
  */
 const SALARY_CAPITALIZATION = 2;
 
+/**
+ * Modest additive nudge toward team-theme/identity fit (OrganicPlayerView.themeFit, 0..1, from
+ * team-theme-composition-service via draft-adapter.computeThemeFit). Deliberately small relative to
+ * ROTATION_VALUE (50) and typical wWin·ΔStrength magnitudes: theme should make identity VISIBLE in
+ * the picks (tilt ties, nudge close calls toward the themed candidate) but never override
+ * affordability (wThrift·price) or discipline need (ΔStrength). themeFit undefined ⇒ no term added.
+ */
+const THEME_FIT_VALUE = 12;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -117,12 +126,14 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   // Rotation/depth baseline: fades from full (empty squad) to 0 at optTarget.
   const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));
   const rotationValue = ROTATION_VALUE * belowOptFraction;
+  const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
   return (
     w.wWin * deltaStrength +
     rotationValue -
     w.wThrift * priceInSlots * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
-    w.wAsset * potential
+    w.wAsset * potential +
+    themeFitValue
   );
 }
 

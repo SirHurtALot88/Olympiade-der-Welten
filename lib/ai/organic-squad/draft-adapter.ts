@@ -24,6 +24,11 @@ import {
 import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import {
+  buildTeamThemeCompositionRuntimeContext,
+  calculateThemeCompositionScore,
+  type TeamThemeCompositionRuntimeContext,
+} from "@/lib/ai/team-theme-composition-service";
 
 /** Small flat solvency buffer (MW) — the only cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
@@ -36,7 +41,7 @@ function normId(value: number | null | undefined): number {
 }
 
 /** Build the utility player view from a domain Player (quality from stats; marketValue = price only). */
-export function toOrganicPlayerView(player: Player): OrganicPlayerView {
+export function toOrganicPlayerView(player: Player, themeFit?: number): OrganicPlayerView {
   return {
     playerId: player.id,
     pow: player.coreStats?.pow ?? 0,
@@ -47,7 +52,50 @@ export function toOrganicPlayerView(player: Player): OrganicPlayerView {
     marketValue: Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0),
     salary: Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0),
     potential: player.potential ?? null,
+    themeFit,
   };
+}
+
+/**
+ * Maps a team-theme-composition-service `themeTier` to a 0..1 fit signal for the organic model.
+ * Ordered by how central the tier is to the club's IDENTITY (not its market-value/quality override
+ * eligibility) — core theme match is a full "1", plain outsiders/avoid-tag players are "0".
+ */
+const THEME_TIER_FIT: Record<string, number> = {
+  core_theme: 1,
+  secondary_theme: 0.6,
+  soft_theme: 0.3,
+  outsider_exception: 0.1,
+  outsider: 0,
+  avoid: 0,
+};
+
+/**
+ * Cheap per-(team, player) theme-fit signal (0..1), reusing calculateThemeCompositionScore from
+ * lib/ai/team-theme-composition-service.ts instead of reinventing theme rules. Callers MUST build
+ * `runtimeContext` ONCE per team (buildTeamThemeCompositionRuntimeContext) and pass it in here per
+ * candidate, so the roster-share/themed-pool-count lookups are not repeated per player. Returns
+ * undefined when the team has no theme target (no signal, treated as 0 downstream).
+ */
+export function computeThemeFit(
+  gameState: GameState,
+  team: Pick<Team, "teamId" | "name">,
+  player: Player,
+  runtimeContext: TeamThemeCompositionRuntimeContext,
+): number | undefined {
+  if (!runtimeContext.target) return undefined;
+  const score = calculateThemeCompositionScore({
+    gameState,
+    team,
+    player,
+    // Quality/role-fit are irrelevant to "does this player match the team's identity" — the pure
+    // theme signal we want lives in themeTier, which is tag-derived (race/class/subclass/gender/
+    // trait), not in the quality-override escape hatch.
+    candidateQuality: 0,
+    candidateRoleFit: 0,
+    runtimeContext,
+  });
+  return THEME_TIER_FIT[score.themeTier] ?? 0;
 }
 
 /** Team playstyle axis emphasis from identity.pow/spe/men/soc, normalized to sum 1 (fallback equal). */
@@ -123,9 +171,12 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
   const identityAxisWeights = buildIdentityAxisWeights(input.identity);
   const disciplines = resolveOrganicDisciplines(input.gameState);
 
-  const startingSquad = input.startingSquad.map(toOrganicPlayerView);
+  // Build the team's theme runtime context ONCE (cached rosterShare/themedPoolCount), then reuse it
+  // for every candidate's themeFit lookup below — never recomputed per player.
+  const themeRuntimeContext = buildTeamThemeCompositionRuntimeContext(input.gameState, input.team);
+  const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player));
   const candidates = input.candidates
-    .map(toOrganicPlayerView)
+    .map((player) => toOrganicPlayerView(player, computeThemeFit(input.gameState, input.team, player, themeRuntimeContext)))
     .filter((view) => view.marketValue > 0);
 
   const cash = input.team.cash ?? 0;

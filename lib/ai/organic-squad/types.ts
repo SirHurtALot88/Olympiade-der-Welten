@@ -57,6 +57,14 @@ export type OrganicPlayerView = {
   salary: number;
   /** Build-for-future signal (potential; there is NO age dimension in this game). Null if unknown. */
   potential?: number | null;
+  /**
+   * Team-identity/theme fit for THIS candidate against THIS team, 0..1: 1 = perfect primary-theme
+   * match (race/class/subclass/gender/trait tags the club is themed around, e.g. "succubus/female/
+   * undead"), 0 = no signal (team has no theme target, or player is a plain outsider/avoid tag).
+   * Derived from lib/ai/team-theme-composition-service.ts (calculateThemeCompositionScore themeTier),
+   * NOT reinvented here — see draft-adapter.ts computeThemeFit. Undefined ⇔ 0 (no theme signal).
+   */
+  themeFit?: number;
 };
 
 /** A discipline definition (id + which core axis it loads on). */
