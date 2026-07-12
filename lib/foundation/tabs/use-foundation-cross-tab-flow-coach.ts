@@ -41,15 +41,15 @@ export function useFoundationCrossTabFlowCoach(input: {
           ...base,
           kicker: "Briefing-Flow",
           title: "Kurz lesen, dann direkt in Markt, HQ oder Einsatzliste springen.",
-          detail: "Home zeigt nur die wichtigsten Signale fuer die ersten Minuten: Next Play, Druck, Chancen und Spieltag.",
+          detail: "Home zeigt nur die wichtigsten Signale für die ersten Minuten: Next Play, Druck, Chancen und Spieltag.",
           terms: ["PPs", "MVS", "OVR"],
           progressLabel: "Orientierung",
           progressPct: 18,
           shortcut: "Space = Next Play",
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
-            { label: "Office", targetView: "hq", detail: "Druck & Prioritaeten" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Slots fuellen" },
+            { label: "Office", targetView: "hq", detail: "Druck & Prioritäten" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Slots füllen" },
           ],
         };
       case "homeV2":
@@ -62,9 +62,9 @@ export function useFoundationCrossTabFlowCoach(input: {
             terms: ["Cash", "Moral", "Kader", "Druck"],
             progressLabel: "Prioritäten",
             progressPct: 34,
-            shortcut: "Space = naechste Baustelle",
+            shortcut: "Space = nächste Baustelle",
             actions: [
-              { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderluecken", tone: "primary" },
+              { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderlücken", tone: "primary" },
               { label: "Training", targetView: "trainingCompact", detail: "Entwicklung" },
               { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
             ],
@@ -81,8 +81,8 @@ export function useFoundationCrossTabFlowCoach(input: {
           shortcut: "Space = Next Play",
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
-            { label: "Office", targetView: "hq", detail: "Druck & Prioritaeten" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Slots fuellen" },
+            { label: "Office", targetView: "hq", detail: "Druck & Prioritäten" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Slots füllen" },
           ],
         };
       case "hq":
@@ -94,9 +94,9 @@ export function useFoundationCrossTabFlowCoach(input: {
           terms: ["Cash", "Moral", "Kader", "Druck"],
           progressLabel: "Prioritäten",
           progressPct: 34,
-          shortcut: "Space = naechste Baustelle",
+          shortcut: "Space = nächste Baustelle",
           actions: [
-            { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderluecken", tone: "primary" },
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderlücken", tone: "primary" },
             { label: "Training", targetView: "trainingCompact", detail: "Entwicklung" },
             { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
           ],
@@ -105,40 +105,40 @@ export function useFoundationCrossTabFlowCoach(input: {
         return {
           ...base,
           kicker: "Einsatz-Flow",
-          title: "Slot waehlen, Kandidat pruefen, Team-Boost setzen, speichern.",
-          detail: "Leertaste springt zum naechsten offenen Schritt. Boosts gelten teamweit, nicht mehr pro Spieler.",
+          title: "Slot wählen, Kandidat prüfen, Team-Boost setzen, speichern.",
+          detail: "Leertaste springt zum nächsten offenen Schritt. Boosts gelten teamweit, nicht mehr pro Spieler.",
           terms: ["Slot", "Boost", "D1", "D2"],
           progressLabel: "Vorbereitung",
           progressPct: 44,
-          shortcut: "Space = naechster offener Slot",
+          shortcut: "Space = nächster offener Slot",
           actions: [
-            { label: "Arena oeffnen", targetView: "matchdayArena", detail: "Reveal", tone: "primary" },
+            { label: "Arena öffnen", targetView: "matchdayArena", detail: "Reveal", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Blocker" },
-            { label: "Training", targetView: "trainingCompact", detail: "Erschoepfung" },
+            { label: "Training", targetView: "trainingCompact", detail: "Erschöpfung" },
           ],
         };
       case "matchdayArena":
         return {
           ...base,
           kicker: "Arena-Flow",
-          title: "Reveal anschauen, Gewinner verstehen, danach Tabelle oder Training pruefen.",
-          detail: "PPs zeigen den echten Spieltagsbeitrag; Arena veraendert nichts mehr, sie macht das Ergebnis lesbar.",
+          title: "Reveal anschauen, Gewinner verstehen, danach Tabelle oder Training prüfen.",
+          detail: "PPs zeigen den echten Spieltagsbeitrag; Arena verändert nichts mehr, sie macht das Ergebnis lesbar.",
           terms: ["PPs", "Rank", "D1", "D2"],
           progressLabel: "Spieltag",
           progressPct: 68,
-          shortcut: "Space = naechster Flow-Schritt",
+          shortcut: "Space = nächster Flow-Schritt",
           actions: [
             { label: "Saisonstand", targetView: "seasonV2", detail: "Ranking", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Folgen" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Zurueck" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Zurück" },
           ],
         };
       case "teams":
         return {
           ...base,
           kicker: "Kader-Flow",
-          title: "Teamprofil lesen, Fokus setzen, Problemspieler direkt oeffnen.",
-          detail: "Nutze Gehaltsdruck, Value, Vertraege und Training als Arbeitsmodi statt die Tabelle zu durchsuchen.",
+          title: "Teamprofil lesen, Fokus setzen, Problemspieler direkt öffnen.",
+          detail: "Nutze Gehaltsdruck, Value, Verträge und Training als Arbeitsmodi statt die Tabelle zu durchsuchen.",
           terms: ["Value", "Gehalt", "LZ", "POW"],
           progressLabel: "Kaderarbeit",
           progressPct: 36,
@@ -152,16 +152,16 @@ export function useFoundationCrossTabFlowCoach(input: {
       case "trainingV2":
         return {
           ...base,
-          kicker: "Gebaeude-Flow",
+          kicker: "Gebäude-Flow",
           title: "Upgrade, Wartung und Unterhalt direkt am aktiven Save steuern.",
           detail: "Facilities V2 zeigt Zustand, Effizienz, Kosten und Wirkung auf Training, Recovery und Scouting.",
           terms: ["Upgrade", "Wartung", "Unterhalt", "Effizienz"],
           progressLabel: "Infrastruktur",
           progressPct: 48,
-          shortcut: "Upgrade pruefen = Vorschau laden",
+          shortcut: "Upgrade prüfen = Vorschau laden",
           actions: [
             { label: "Training", targetView: "trainingCompact", detail: "Kader", tone: "primary" },
-            { label: "Office", targetView: "hq", detail: "Prioritaeten" },
+            { label: "Office", targetView: "hq", detail: "Prioritäten" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Budget" },
           ],
         };
@@ -170,15 +170,15 @@ export function useFoundationCrossTabFlowCoach(input: {
         return {
           ...base,
           kicker: "Entwicklungs-Flow",
-          title: "Steigerer zuerst, Rueckschritt-Risiko danach, Upgrades direkt beim Spieler.",
-          detail: "XP kann Upgrades ermoeglichen; schwache Entwicklung und negative Netto-XP koennen Werte auch senken.",
+          title: "Steigerer zuerst, Rückschritt-Risiko danach, Upgrades direkt beim Spieler.",
+          detail: "XP kann Upgrades ermöglichen; schwache Entwicklung und negative Netto-XP können Werte auch senken.",
           terms: ["XP", "OVR", "MVS", "Fatigue"],
           progressLabel: "Entwicklung",
           progressPct: 52,
           shortcut: "Upgrade-Button = Spielerfokus",
           actions: [
-            { label: "Office", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Fit pruefen" },
+            { label: "Office", targetView: "hq", detail: "Prioritäten", tone: "primary" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Fit prüfen" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Bedarf" },
           ],
         };
@@ -187,14 +187,14 @@ export function useFoundationCrossTabFlowCoach(input: {
           ...base,
           kicker: "Markt-Alt",
           title: "Die alte Marktansicht bleibt lesbar, der Hauptflow liegt aber in Transfermarkt v2.",
-          detail: "Wenn du handeln willst, fuehrt dich der Hauptpfad immer in die modernere Deal-Ansicht.",
+          detail: "Wenn du handeln willst, führt dich der Hauptpfad immer in die modernere Deal-Ansicht.",
           terms: ["MW", "Value", "Gehalt", "OVR"],
           progressLabel: "Transfers",
           progressPct: 42,
           shortcut: "/ oder Ctrl+K = Suchen",
           actions: [
             { label: "Transfermarkt v2", targetView: "marketV2", detail: "Hauptansicht", tone: "primary" },
-            { label: "Office", targetView: "hq", detail: "Prioritaeten" },
+            { label: "Office", targetView: "hq", detail: "Prioritäten" },
             { label: "Historie", targetView: "history", detail: "Deals" },
           ],
         };
@@ -209,7 +209,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           progressPct: 48,
           shortcut: "Suche + Teamfilter = Deal-Funnel",
           actions: [
-            { label: "Office", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
+            { label: "Office", targetView: "hq", detail: "Prioritäten", tone: "primary" },
             { label: "Einsatzliste", targetView: "lineup", detail: "wenn bereit" },
             { label: "Historie", targetView: "history", detail: "Deals" },
           ],
@@ -219,7 +219,7 @@ export function useFoundationCrossTabFlowCoach(input: {
         return {
           ...base,
           kicker: "Tabellen-Flow",
-          title: "Rang, Punkte und Bereichsstaerken als Story lesen.",
+          title: "Rang, Punkte und Bereichsstärken als Story lesen.",
           detail: "POW/SPE/MEN/SOC zeigen, warum Teams in bestimmten Disziplinen tragen oder wackeln.",
           terms: ["Rank", "PPs", "POW", "SOC"],
           progressLabel: "Liga-Lage",
@@ -235,8 +235,8 @@ export function useFoundationCrossTabFlowCoach(input: {
         return {
           ...base,
           kicker: "Spieler-Flow",
-          title: "Erst Leistung scannen, dann Profil, Training oder Verkauf oeffnen.",
-          detail: "OVR ist der Schnellvergleich; PPs und MVS sagen mehr ueber echten Nutzen im Spiel.",
+          title: "Erst Leistung scannen, dann Profil, Training oder Verkauf öffnen.",
+          detail: "OVR ist der Schnellvergleich; PPs und MVS sagen mehr über echten Nutzen im Spiel.",
           terms: ["OVR", "PPs", "MVS", "MW"],
           progressLabel: "Scouting",
           progressPct: 34,
@@ -252,7 +252,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           ...base,
           kicker: "Lexikon",
           title: "Kennzahlen und Systeme transparent nachlesen.",
-          detail: "Suche nach Abkuerzungen, klicke GameTerm-Chips oder springe direkt von OVR, MVS und PPs in die Erklaerung.",
+          detail: "Suche nach Abkürzungen, klicke GameTerm-Chips oder springe direkt von OVR, MVS und PPs in die Erklärung.",
           terms: ["OVR", "PPs", "MVS", "XP"],
           progressLabel: "Transparenz",
           progressPct: 60,
@@ -260,15 +260,15 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Spieler", targetView: "players", detail: "Kennzahlen sehen", tone: "primary" },
             { label: "Einsatzliste", targetView: "lineup", detail: "Score anwenden" },
-            { label: "Training", targetView: "trainingCompact", detail: "Setpoints pruefen" },
+            { label: "Training", targetView: "trainingCompact", detail: "Setpoints prüfen" },
           ],
         };
       default:
         return {
           ...base,
           kicker: "Flow",
-          title: "Nutze Next Play und die Schnellnavigation fuer den naechsten sinnvollen Schritt.",
-          detail: "Die Hilfepunkte an Abkuerzungen erklaeren Werte direkt im Kontext.",
+          title: "Nutze Next Play und die Schnellnavigation für den nächsten sinnvollen Schritt.",
+          detail: "Die Hilfepunkte an Abkürzungen erklären Werte direkt im Kontext.",
           terms: ["OVR", "PPs", "MVS", "Value"],
           progressLabel: "Navigation",
           progressPct: 24,

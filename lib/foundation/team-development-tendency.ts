@@ -12,7 +12,7 @@ export type TeamDevelopmentTendency = {
 };
 
 const DEVELOPMENT_ARCHETYPES = ["teacher", "mentor", "leader", "captain", "scholar", "tactician"];
-const DEVELOPMENT_KEYWORDS = ["develop", "entwickl", "prospect", "youth", "train", "mentor", "lehrer", "teacher", "guenstig", "günstig", "schueler", "schüler"];
+const DEVELOPMENT_KEYWORDS = ["develop", "entwickl", "prospect", "youth", "train", "mentor", "lehrer", "teacher", "günstig", "günstig", "schueler", "schüler"];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);

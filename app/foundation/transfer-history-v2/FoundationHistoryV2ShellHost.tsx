@@ -24,6 +24,8 @@ export type FoundationHistoryV2ShellHostProps = {
   activeSaveId: string;
   saveName: string;
   gameState: GameState;
+  /** #D10: Eigenes/gemanagtes Team für die kumulative Netto-Ausgaben-Sparkline (fog-safe). */
+  ownTeamId?: string | null;
   historyFeed: FoundationTransferHistoryResponse | null;
   playerRatingsById: HistoryV2PlayerRatingsById;
   transferHistorySort: SortState;
@@ -56,6 +58,7 @@ export default function FoundationHistoryV2ShellHost({
   activeSaveId,
   saveName,
   gameState,
+  ownTeamId,
   historyFeed,
   playerRatingsById,
   transferHistorySort,
@@ -126,6 +129,7 @@ export default function FoundationHistoryV2ShellHost({
       <TransferHistoryV2Client
         sourceBadgeLabel={sourceBadgeLabel}
         saveName={saveName}
+        ownTeamId={ownTeamId ?? null}
         requestedScopeLabel={`${historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} / ${transferHistoryRequestedSeasonLabel}`}
         resolvedScopeLabel={`${historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} / ${transferHistoryResolvedSeasonLabel}`}
         totalLoaded={historyFeed?.items.length ?? 0}

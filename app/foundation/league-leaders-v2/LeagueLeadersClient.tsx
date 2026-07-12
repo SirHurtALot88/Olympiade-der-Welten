@@ -2,6 +2,7 @@
 
 import LeagueLeadersNewLook from "@/app/foundation/league-leaders-v2/LeagueLeadersNewLook";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeagueLeaderCategory } from "@/lib/foundation/league-leaders-service";
 import { joinClassNames } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { useNewLook } from "@/lib/ui/new-look-preference";
@@ -10,6 +11,12 @@ export interface LeagueLeadersClientProps {
   categories: LeagueLeaderCategory[];
   selectedTeamId: string | null;
   seasonLabel: string;
+  /**
+   * Voller GameState für die "Neuer Look" Rekord-/Erfolge-Sektionen (Season-
+   * Bestwerte, Meilensteine). Optional/nullbar, damit der Legacy-Pfad und
+   * Isolation ohne State weiter funktionieren.
+   */
+  gameState?: GameState | null;
   returnContext?: { playerId: string; playerName: string } | null;
   onReturnToPlayer?: () => void;
   onOpenPlayer: (playerId: string) => void;
@@ -40,7 +47,7 @@ export default function LeagueLeadersClient(props: LeagueLeadersClientProps) {
         <div className="stack">
           <TooltipHeading
             as="h2"
-            tooltip="Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick oeffnet das Spielerprofil."
+            tooltip="Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick öffnet das Spielerprofil."
           >
             Liga-Leaders
           </TooltipHeading>

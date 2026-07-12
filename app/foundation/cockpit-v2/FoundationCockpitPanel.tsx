@@ -3,6 +3,7 @@
 import type * as React from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type {
   CashPrizeApplyLogRecord,
@@ -96,7 +97,7 @@ export interface FoundationCockpitPanelProps {
   cockpitLineupStatus: { status: "open"; message: string; } | { status: "warning"; message: string; } | { status: "ready"; message: string; };
   cockpitMatchdayAdvanceStatus: { status: "applied"; message: string; } | { status: "blocked"; message: string; } | { status: "ready"; message: string; } | { status: "open"; message: string; };
   cockpitMatchdayMvpScoringStatus: { status: "open"; message: string; } | { status: "blocked"; message: string; } | { status: "applied"; message: string; } | { status: "warning"; message: string; } | { status: "ready"; message: string; };
-  cockpitOverallStatus: "Matchday offen" | "Matchday abgeschlossen" | "bereit fuer Matchday-Abschluss" | "bereit fuer Cash Apply" | "bereit fuer Standings Apply" | "bereit fuer Result Apply" | "bereit fuer AI-Lineup-Save" | "Warnings offen" | "blockiert";
+  cockpitOverallStatus: "Matchday offen" | "Matchday abgeschlossen" | "bereit für Matchday-Abschluss" | "bereit für Cash Apply" | "bereit für Standings Apply" | "bereit für Result Apply" | "bereit für AI-Lineup-Save" | "Warnings offen" | "blockiert";
   cockpitPrizePreviewStatus: { status: "open"; message: string; } | { status: "blocked"; message: string; } | { status: "ready"; message: string; } | { status: "warning"; message: string; };
   cockpitQuickLinks: { id: FoundationView; label: string; }[];
   cockpitResolveStatus: { status: "open"; message: string; } | { status: "ready"; message: string; } | { status: "blocked"; message: string; } | { status: "warning"; message: string; };
@@ -435,7 +436,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
             <div className="cockpit-live-banner">
               <strong>{currentMatchdayDisplayLabel} aktiv</strong>
               <span>
-                Lokaler Spielstand bleibt die Schreibquelle. Pruefen, Testlauf und Anwenden bleiben sichtbar getrennt.
+                Lokaler Spielstand bleibt die Schreibquelle. Prüfen, Testlauf und Anwenden bleiben sichtbar getrennt.
               </span>
             </div>
 
@@ -667,7 +668,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                 <div className="stack season-panel-head">
                   <h3>Feature Audit</h3>
                   <p className="muted">
-                    Lebende Matrix fuer Kernfeatures, Tests, Smokes, Write-Safety, Multiplayer-Stand und bekannte Luecken.
+                    Lebende Matrix für Kernfeatures, Tests, Smokes, Write-Safety, Multiplayer-Stand und bekannte Lücken.
                   </p>
                 </div>
                 <div className="cockpit-actions balance-export-links">
@@ -902,7 +903,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     title={
                       cockpitBusyKey != null
                         ? getCockpitBusyReason()
-                        : "Laedt die Season-End-Preview fuer Preisgeld, Rangbewegung und Cash."
+                        : "Lädt die Season-End-Preview für Preisgeld, Rangbewegung und Cash."
                     }
                     onClick={() => {
                       setCockpitBusyKey("resolve-preview");
@@ -954,7 +955,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   disabled={isSaveBusy || readMeta.readOnly}
                   onClick={() => {
                     const confirmed = window.confirm(
-                      "Erstellt einen neuen lokalen Testspielstand fuer Season 1. Bestehende Saves bleiben erhalten.",
+                      "Erstellt einen neuen lokalen Testspielstand für Season 1. Bestehende Saves bleiben erhalten.",
                     );
                     if (!confirmed) {
                       return;
@@ -985,7 +986,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                 <div className="metric-grid cockpit-mini-grid">
                   <article className="metric-card">
                     <span>Team</span>
-                    <strong>{marketSelectedTeam?.name ?? "Team waehlen"}</strong>
+                    <strong>{marketSelectedTeam?.name ?? "Team wählen"}</strong>
                   </article>
                   <article className="metric-card">
                     <span>Free Agents</span>
@@ -1010,7 +1011,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     syncFoundationViewInUrl("marketV2");
                   }}
                 >
-                  Transfermarkt oeffnen
+                  Transfermarkt öffnen
                 </button>
               </article>
 
@@ -1061,14 +1062,14 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       syncFoundationViewInUrl("lineup");
                     }}
                   >
-                    Einsatzliste oeffnen
+                    Einsatzliste öffnen
                   </button>
                 </div>
                 <div className="panel inset-panel" style={{ marginTop: 14 }}>
                   <div className="panel-header">
                     <div className="stack">
                       <h4>Matchday Auto-Run</h4>
-                      <p className="muted">Fuehrt den lokalen Spieltag bis Ergebnis, Tabelle und naechstem Spieltag aus. Kein Prisma-Write, keine Transfers.</p>
+                      <p className="muted">Führt den lokalen Spieltag bis Ergebnis, Tabelle und nächstem Spieltag aus. Kein Prisma-Write, keine Transfers.</p>
                     </div>
                     <span className={getCockpitStatusPillClass(cockpitAutoRunStatus.status)}>{getCockpitStatusLabel(cockpitAutoRunStatus.status)}</span>
                   </div>
@@ -1157,7 +1158,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         void runCockpitMatchdayAutoRun(false);
                       }}
                     >
-                      Auto-Run DryRun pruefen
+                      Auto-Run DryRun prüfen
                     </button>
                     <button
                       className="primary-button"
@@ -1484,7 +1485,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                 <div className="panel-header">
                   <div className="stack">
                     <h3>5. Alle Teams auf Zielkader bringen</h3>
-                    <p className="muted">Vor jedem Matchday-Scoring werden alle 32 Teams im aktiven Save ueber echte lokale Kauefe auf ihre Zielspieleranzahl gebracht. Keine stillen Kader-Inserts, keine Fremd-Saves.</p>
+                    <p className="muted">Vor jedem Matchday-Scoring werden alle 32 Teams im aktiven Save über echte lokale Kauefe auf ihre Zielspieleranzahl gebracht. Keine stillen Kader-Inserts, keine Fremd-Saves.</p>
                   </div>
                   <span className={getCockpitStatusPillClass(
                     rosterFillFeed?.status === "applied"
@@ -1506,7 +1507,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     )}
                   </span>
                 </div>
-                <p>MW und Gehaelter laufen ueber die interne Economy-/Vertragsberechnung. Fuer diesen expliziten Matchday-Setup-Schritt duerfen auch manuelle Teams aufgefuellt werden, aber nur ueber den echten lokalen Buy-Pfad mit Cash-, Gehalts- und Historien-Spur.</p>
+                <p>MW und Gehaelter laufen über die interne Economy-/Vertragsberechnung. Für diesen expliziten Matchday-Setup-Schritt dürfen auch manuelle Teams aufgefüllt werden, aber nur über den echten lokalen Buy-Pfad mit Cash-, Gehalts- und Historien-Spur.</p>
                 <div className="metric-grid cockpit-mini-grid">
                   <article className="metric-card">
                     <span>Teams gesamt</span>
@@ -1525,11 +1526,11 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     <strong>{rosterFillFeed?.summary.teamsNeedingBuys ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Geplante Kaeufe</span>
+                    <span>Geplante Käufe</span>
                     <strong>{rosterFillFeed?.summary.plannedBuys ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Ausgefuehrte Kaeufe</span>
+                    <span>Ausgefuehrte Käufe</span>
                     <strong>{rosterFillFeed?.summary.appliedBuys ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
@@ -1600,7 +1601,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         return;
                       }
                       const confirmed = window.confirm(
-                        `Jetzt ${rosterFillFeed.summary.plannedBuys} echte lokale Kaeufe ausfuehren, um alle Teams fuer Matchday 1 auf Zielgroesse zu bringen?`,
+                        `Jetzt ${rosterFillFeed.summary.plannedBuys} echte lokale Käufe ausführen, um alle Teams für Matchday 1 auf Zielgroesse zu bringen?`,
                       );
                       if (!confirmed) return;
                       void runCockpitRosterFill(true);
@@ -1615,7 +1616,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       <li>Target gefunden: {rosterFillFeed.summary.targetResolvedTeams}</li>
                       <li>Teams mit Kaufbedarf: {rosterFillFeed.summary.teamsNeedingBuys}</li>
                       <li>Schon voll: {rosterFillFeed.summary.alreadyAtTargetTeams}</li>
-                      <li>Historien-Eintraege: {rosterFillFeed.summary.historyWrites}</li>
+                      <li>Historien-Einträge: {rosterFillFeed.summary.historyWrites}</li>
                     </ul>
                     {(rosterFillFeed.warnings.length || rosterFillFeed.blockingReasons.length) ? (
                       <ul className="warning-list compact-list cockpit-detail-list cockpit-detail-list-warning">
@@ -1669,13 +1670,13 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     </div>
                     {rosterFillFeed.executed ? (
                       <p className="muted" style={{ marginTop: 10 }}>
-                        Jeder erfolgreiche Setup-Kauf muss im selben Save sofort in Transferhistorie, Transfer Recap, Cash, Gehalt und Kadergroesse sichtbar sein.
+                        Jeder erfolgreiche Setup-Kauf muss im selben Save sofort in Transferhistorie, Transfer Recap, Cash, Gehalt und Kadergröße sichtbar sein.
                       </p>
                     ) : null}
                   </>
                 ) : (
                   <p className="muted" style={{ marginTop: 10 }}>
-                    Dieser Schritt liest pro Team die echte Zielspieleranzahl, plant nur reale Kaeufe im aktuellen Save und zieht erst danach die Matchday-Logik nach.
+                    Dieser Schritt liest pro Team die echte Zielspieleranzahl, plant nur reale Käufe im aktuellen Save und zieht erst danach die Matchday-Logik nach.
                   </p>
                 )}
               </article>
@@ -1695,11 +1696,11 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     <strong>{cockpitAiBatchApplyFeed?.summary.aiEligibleTeams ?? aiLineupApplyTeams.length}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Gefuehrte uebersprungen</span>
+                    <span>Geführte übersprungen</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.skippedManual ?? manualTeams.length}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Beobachtete uebersprungen</span>
+                    <span>Beobachtete übersprungen</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.skippedPassive ?? passiveTeams.length}</strong>
                   </article>
                   <article className="metric-card">
@@ -1738,7 +1739,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                 </div>
                 <div className="transfer-context-banner" style={{ marginTop: 12 }}>
                   <strong>Nur Einsatzlisten</strong>
-                  <span>Manual und Passive Teams bleiben unveraendert. Es gibt hier keine Result-, Standings- oder Cash-Aktion.</span>
+                  <span>Manual und Passive Teams bleiben unverändert. Es gibt hier keine Result-, Standings- oder Cash-Aktion.</span>
                 </div>
                 <div className="inline-toggle-row" style={{ marginTop: 12 }}>
                   <label className="inline-checkbox">
@@ -1814,9 +1815,9 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   <>
                     <ul className="warning-list compact-list cockpit-detail-list" style={{ marginTop: 12 }}>
                       <li>AI Eligible: {cockpitAiBatchApplyFeed.summary.aiEligibleTeams}</li>
-                      <li>Manual uebersprungen: {cockpitAiBatchApplyFeed.summary.skippedManual}</li>
-                      <li>Passive uebersprungen: {cockpitAiBatchApplyFeed.summary.skippedPassive}</li>
-                      <li>Disabled uebersprungen: {cockpitAiBatchApplyFeed.summary.skippedDisabled}</li>
+                      <li>Manual übersprungen: {cockpitAiBatchApplyFeed.summary.skippedManual}</li>
+                      <li>Passive übersprungen: {cockpitAiBatchApplyFeed.summary.skippedPassive}</li>
+                      <li>Disabled übersprungen: {cockpitAiBatchApplyFeed.summary.skippedDisabled}</li>
                       <li>Ready to Save: {cockpitAiBatchApplyFeed.summary.readyToSave}</li>
                       <li>Warnings: {cockpitAiBatchApplyFeed.summary.warningTeams}</li>
                       <li>Existing: {cockpitAiBatchApplyFeed.summary.existingLineups}</li>
@@ -1836,7 +1837,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   </>
                 ) : (
                   <p className="muted" style={{ marginTop: 10 }}>
-                    DryRun zeigt zuerst, welche AI-Teams gespeichert wuerden und welche Manual-/Passive-Teams geschuetzt bleiben.
+                    DryRun zeigt zuerst, welche AI-Teams gespeichert würden und welche Manual-/Passive-Teams geschützt bleiben.
                   </p>
                 )}
               </article>
@@ -2182,7 +2183,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   </>
                 ) : (
                   <p className="muted" style={{ marginTop: 10 }}>
-                    Der DryRun liest die echten Season-Diszis des ersten Spieltags, erzeugt nur bei Bedarf lokale Auto-Lineups und zeigt danach beide 32er-Scoreboards plus die spaetere Standings-Schreibbarkeit.
+                    Der DryRun liest die echten Season-Diszis des ersten Spieltags, erzeugt nur bei Bedarf lokale Auto-Lineups und zeigt danach beide 32er-Scoreboards plus die spätere Standings-Schreibbarkeit.
                   </p>
                 )}
               </article>
@@ -2274,7 +2275,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       void runCockpitResultApply(false);
                     }}
                   >
-                    1. Result DryRun pruefen
+                    1. Result DryRun prüfen
                   </button>
                   <button
                     className="primary-button"
@@ -2362,7 +2363,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       void runCockpitStandingsApply(false);
                     }}
                   >
-                    1. Standings DryRun pruefen
+                    1. Standings DryRun prüfen
                   </button>
                   <button
                     className="primary-button"
@@ -2390,7 +2391,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   <span className={getCockpitStatusPillClass(prizeApplyState.status)}>{prizeApplyState.label}</span>
                 </div>
                 <p className="muted cockpit-step-hint">
-                  Prominenter Season-End-Finance-Check fuer dein aktives Team. Preisgeld bleibt idempotent und wird nicht doppelt angewendet.
+                  Prominenter Season-End-Finance-Check für dein aktives Team. Preisgeld bleibt idempotent und wird nicht doppelt angewendet.
                 </p>
                 <div className="teams-summary-grid history-summary-grid">
                   <article className="metric-card">
@@ -2431,7 +2432,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   <h3>1. Preisgeld & Finanzen Preview</h3>
                   <span className={getCockpitStatusPillClass(cockpitPrizePreviewStatus.status)}>{getCockpitStatusLabel(cockpitPrizePreviewStatus.status)}</span>
                 </div>
-                <p>Dieser Block gehoert nicht zum Spieltagsflow. Preisgeld und Cash werden nur einmal am Saisonende geprueft und verrechnet.</p>
+                <p>Dieser Block gehört nicht zum Spieltagsflow. Preisgeld und Cash werden nur einmal am Saisonende geprüft und verrechnet.</p>
                 <p className="muted cockpit-step-hint">Season-End Reihenfolge: Season Review, Preisgeld & Finanzen, Facilities, XP, Verkaufen, Verlängern, Kaufen, Season Setup.</p>
                 <div className="cockpit-actions">
                   <button
@@ -2472,7 +2473,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   <h3>Season-End: Cash Apply</h3>
                   <span className={getCockpitStatusPillClass(cockpitCashApplyStatus.status)}>{getCockpitStatusLabel(cockpitCashApplyStatus.status)}</span>
                 </div>
-                <p>Cash wird nicht im Spieltag verrechnet. Dieser Schritt bleibt nur fuer den Saisonabschluss sichtbar.</p>
+                <p>Cash wird nicht im Spieltag verrechnet. Dieser Schritt bleibt nur für den Saisonabschluss sichtbar.</p>
                 <p className="muted cockpit-step-hint">Nicht Teil des Matchday-Resolve-Flows. Transferfenster danach: erst Verkauf, dann Kauf.</p>
                 <div className="cockpit-actions">
                   <button
@@ -2486,13 +2487,13 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                           ? getCockpitBusyReason()
                           : !prizePreviewFeed
                             ? "Bitte zuerst die Preisgeld-Preview laden."
-                            : "Prueft den lokalen Cash-Apply einmal trocken."
+                            : "Prüft den lokalen Cash-Apply einmal trocken."
                     }
                     onClick={() => {
                       void runCockpitCashApply(false);
                     }}
                   >
-                    1. Cash DryRun pruefen
+                    1. Cash DryRun prüfen
                   </button>
                   <button
                     className="primary-button"
@@ -2505,7 +2506,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                           ? getCockpitBusyReason()
                           : cockpitCashApplyStatus.status !== "ready"
                             ? cockpitCashApplyStatus.message
-                            : "Schreibt die lokalen Cash-Werte fuer den Saisonabschluss."
+                            : "Schreibt die lokalen Cash-Werte für den Saisonabschluss."
                     }
                     onClick={() => {
                       const confirmed = window.confirm("Cash Apply schreibt nur lokale Cash-Werte. Fortfahren?");
@@ -2541,9 +2542,9 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     {preSeasonWorkflowFeed?.applied ? "applied" : preSeasonWorkflowFeed ? "preview" : "idle"}
                   </span>
                 </div>
-                <p>Wizard fuer Finanzen, Facilities, Entwicklung, Sell-before-Buy und Season-2-Setup. Nicht alles heimlich in einem Klick.</p>
+                <p>Wizard für Finanzen, Facilities, Entwicklung, Sell-before-Buy und Season-2-Setup. Nicht alles heimlich in einem Klick.</p>
                 <p className="muted cockpit-step-hint">
-                  Gefuehrte Teams: warten auf deine Entscheidung · Auto-Teams: Verkauf/Kauf bereit · Beobachtete Teams: uebersprungen
+                  Geführte Teams: warten auf deine Entscheidung · Auto-Teams: Verkauf/Kauf bereit · Beobachtete Teams: übersprungen
                 </p>
                 <div className="cockpit-actions">
                   <button
@@ -2555,7 +2556,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         ? getReadOnlyActionReason("die Pre-Season-Preview")
                         : preSeasonWorkflowBusy
                           ? getBusyActionReason("Die Pre-Season-Preview")
-                          : "Laedt die komplette Pre-Season-Vorschau fuer Finanzen, Facilities, Entwicklung und Markt."
+                          : "Lädt die komplette Pre-Season-Vorschau für Finanzen, Facilities, Entwicklung und Markt."
                     }
                     onClick={() => {
                       void runPreSeasonWorkflowPreview();
@@ -2572,7 +2573,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         ? getReadOnlyActionReason("den Saisonwechsel-Assistenten")
                         : preSeasonWorkflowBusy
                           ? getBusyActionReason("Die Pre-Season-Preview")
-                          : "Prueft den Saisonwechsel als gefuehrten Assistenten."
+                          : "Prüft den Saisonwechsel als gefuehrten Assistenten."
                     }
                     onClick={() => {
                       void runSeasonTransition("preview");
@@ -2590,8 +2591,8 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         : preSeasonWorkflowBusy
                           ? getBusyActionReason("Der Pre-Season-Workflow")
                           : preSeasonWorkflowFeed?.ok
-                            ? "Schreibt Snapshot, Progression, neue Schedule/Formkarten und startet die naechste Season."
-                            : "Erst Pre-Season Preview laden und Blocker pruefen."
+                            ? "Schreibt Snapshot, Progression, neue Schedule/Formkarten und startet die nächste Season."
+                            : "Erst Pre-Season Preview laden und Blocker prüfen."
                     }
                     onClick={() => {
                       const confirmed = window.confirm("Neue Saison starten? Das schreibt Snapshot, Progression, neue Schedule, Formkarten und setzt den Flow auf Seasonstart.");
@@ -2608,7 +2609,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       ? getReadOnlyActionReason("die neue Saison")
                       : preSeasonWorkflowBusy
                         ? getBusyActionReason("Der Pre-Season-Workflow")
-                        : "Erst Pre-Season Preview laden und Blocker pruefen."}
+                        : "Erst Pre-Season Preview laden und Blocker prüfen."}
                   </p>
                 ) : null}
                 {preSeasonWorkflowFeed ? (
@@ -2618,7 +2619,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       <strong>{preSeasonWorkflowFeed.saveContext.seasonId}</strong>
                       <span>Nächste Season</span>
                       <strong>{preSeasonWorkflowFeed.saveContext.nextSeasonLabel}</strong>
-                      <span>Gefuehrte Teams</span>
+                      <span>Geführte Teams</span>
                       <strong>{preSeasonWorkflowFeed.controlSummary.manualTeams}</strong>
                       <span>Auto-Teams</span>
                       <strong>{preSeasonWorkflowFeed.controlSummary.aiTeams}</strong>
@@ -2660,7 +2661,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   </span>
                 </div>
                 <p>Saison sauber schließen: Board-Ziele, Preisgeld, Beziehungen, Snapshot, neue Saison und AI-Einsatz werden zusammen geprüft.</p>
-                <p className="muted cockpit-step-hint">Erst Abschluss pruefen, dann ausfuehren. Der echte Write laeuft atomar mit Recovery, damit der Save nicht halb im Saisonwechsel haengen bleibt.</p>
+                <p className="muted cockpit-step-hint">Erst Abschluss prüfen, dann ausführen. Der echte Write läuft atomar mit Recovery, damit der Save nicht halb im Saisonwechsel hängen bleibt.</p>
                 <div className="cockpit-actions">
                   <button
                     className="secondary-button"
@@ -2671,7 +2672,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         ? getReadOnlyActionReason("den Saisonwechsel-Assistenten")
                         : seasonTransitionBusy
                           ? getBusyActionReason("Der Saisonwechsel-Assistent")
-                          : "Zeigt die naechsten Saisonwechsel-Schritte erst einmal nur als Preview."
+                          : "Zeigt die nächsten Saisonwechsel-Schritte erst einmal nur als Preview."
                     }
                     onClick={() => {
                       void runSeasonTransition("preview");
@@ -2683,12 +2684,12 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                     className="secondary-button"
                     type="button"
                     disabled={readMeta.readOnly || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Prueft Board-Ziele, Preisgeld, Beziehungen, Snapshot, naechste Saison und AI-Audit ohne zu schreiben"}
+                    title={localSeasonTransitionGate.disabledReason ?? "Prüft Board-Ziele, Preisgeld, Beziehungen, Snapshot, nächste Saison und AI-Audit ohne zu schreiben"}
                     onClick={() => {
                       void runSeasonCompletion(false);
                     }}
                   >
-                    Abschluss pruefen
+                    Abschluss prüfen
                   </button>
                   <button
                     className="primary-button"
@@ -2736,7 +2737,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                         </strong>
                         <small>
                           {seasonCompletionFeed.status === "blocked"
-                            ? seasonCompletionFeed.blockingReasons.map(formatCockpitReason).slice(0, 2).join(" · ") || "Offene Blocker pruefen."
+                            ? seasonCompletionFeed.blockingReasons.map(formatCockpitReason).slice(0, 2).join(" · ") || "Offene Blocker prüfen."
                             : "Board, Geld, Beziehungen, Snapshot, Transition und AI-Audit sind im gleichen Lauf sichtbar."}
                         </small>
                       </div>
@@ -2818,7 +2819,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       <div className="training-warning-strip">
                         <span className="transfer-status-pill is-ready">Konsequenzen</span>
                         <span>
-                          Board-Ziele: {seasonCompletionFeed.seasonReview.objectiveSettlement.totals.completed} erfuellt ·{" "}
+                          Board-Ziele: {seasonCompletionFeed.seasonReview.objectiveSettlement.totals.completed} erfüllt ·{" "}
                           {seasonCompletionFeed.seasonReview.objectiveSettlement.totals.failed} verfehlt · Board{" "}
                           {formatSignedNumber(seasonCompletionFeed.seasonReview.objectiveSettlement.totals.boardConfidenceDelta, 2)}
                         </span>
@@ -2860,17 +2861,14 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                               return (
                                 <>
                                   <div className="season-review-hero-logo">
-                                    {logo?.src ? (
-                                      <img
-                                        src={logo.src}
-                                        alt={`${champion?.name ?? "Champion"} Logo`}
-                                        loading="lazy"
-                                        decoding="async"
-                                        fetchPriority="low"
-                                      />
-                                    ) : (
-                                      <span>{logo?.initials ?? "CH"}</span>
-                                    )}
+                                    <OptimizedMediaImage
+                                      className="season-review-hero-logo-img"
+                                      src={logo?.src}
+                                      alt={`${champion?.name ?? "Champion"} Logo`}
+                                      loading="lazy"
+                                      fetchPriority="low"
+                                      fallback={<span>{logo?.initials ?? "CH"}</span>}
+                                    />
                                   </div>
                                   <div>
                                     <span className="eyebrow">Champion</span>
@@ -2928,7 +2926,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                               <div className="season-review-objective-summary">
                                 <strong>Board-Ziele</strong>
                                 <span>
-                                  {seasonTransitionFeed.seasonReview.objectiveSettlement.totals.completed} erfuellt ·{" "}
+                                  {seasonTransitionFeed.seasonReview.objectiveSettlement.totals.completed} erfüllt ·{" "}
                                   {seasonTransitionFeed.seasonReview.objectiveSettlement.totals.failed} verfehlt · Cash{" "}
                                   {formatSignedNumber(seasonTransitionFeed.seasonReview.objectiveSettlement.totals.cashDelta, 1)} · Board{" "}
                                   {formatSignedNumber(seasonTransitionFeed.seasonReview.objectiveSettlement.totals.boardConfidenceDelta, 2)}
@@ -3033,7 +3031,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       void runSeasonSnapshotAction(false);
                     }}
                   >
-                    1. Snapshot DryRun pruefen
+                    1. Snapshot DryRun prüfen
                   </button>
                   <button
                     className="primary-button"
@@ -3080,14 +3078,14 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                       void runCockpitMatchdayAdvance(false);
                     }}
                   >
-                    1. Matchday DryRun pruefen
+                    1. Matchday DryRun prüfen
                   </button>
                   <button
                     className="primary-button"
                     type="button"
                     disabled={readMeta.readOnly || cockpitBusyKey != null || cockpitMatchdayAdvanceStatus.status !== "ready"}
                     onClick={() => {
-                      const confirmed = window.confirm("Der aktuelle Spieltag wird lokal abgeschlossen und der Save auf den naechsten Matchday gesetzt. Fortfahren?");
+                      const confirmed = window.confirm("Der aktuelle Spieltag wird lokal abgeschlossen und der Save auf den nächsten Matchday gesetzt. Fortfahren?");
                       if (!confirmed) return;
                       void runCockpitMatchdayAdvance(true);
                     }}
@@ -3099,7 +3097,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                   <li>Result Apply: {resultApplyFeed?.applied ? "geschrieben" : "offen"}</li>
                   <li>Standings Apply: {standingsApplyFeed?.applied ? "geschrieben" : "offen"}</li>
                   <li>Preisgeld/Cash: season_end_only</li>
-                  <li>Naechster Matchday: {typeof matchdayAdvanceFeed?.summary?.nextMatchdayLabel === "string" ? matchdayAdvanceFeed.summary.nextMatchdayLabel : "—"}</li>
+                  <li>Nächster Matchday: {typeof matchdayAdvanceFeed?.summary?.nextMatchdayLabel === "string" ? matchdayAdvanceFeed.summary.nextMatchdayLabel : "—"}</li>
                   <li>Lineups gesperrt: {typeof matchdayAdvanceFeed?.summary?.lockedLineups === "number" ? matchdayAdvanceFeed.summary.lockedLineups : "—"}</li>
                   <li>Prisma bleibt: read-only</li>
                 </ul>

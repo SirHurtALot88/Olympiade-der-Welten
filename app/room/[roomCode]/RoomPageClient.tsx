@@ -35,7 +35,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       if (seatToken) {
         socket.emit("rejoinRoom", { roomCode, seatToken });
       } else {
-        setError("Kein Sitzplatz gefunden. Bitte ueber die Startseite beitreten.");
+        setError("Kein Sitzplatz gefunden. Bitte über die Startseite beitreten.");
       }
     }
 
@@ -123,13 +123,13 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
 
   const infoText = useMemo(() => {
     if (!state || !role) {
-      return "Warte auf gueltigen Raumzustand.";
+      return "Warte auf gültigen Raumzustand.";
     }
 
     if (state.activeRole === role) {
       return state.moveCommittedThisTurn
         ? "Dein Move ist gesetzt. Du kannst jetzt den Zug beenden."
-        : "Du bist aktiv. Waehle eines deiner Tokens.";
+        : "Du bist aktiv. Wähle eines deiner Tokens.";
     }
 
     return "Der andere Coach ist gerade am Zug.";
@@ -173,7 +173,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
               onTokenSelect={(tokenId) => {
                 const seatToken = localStorage.getItem(roomStorageKey(roomCode));
                 if (!seatToken) {
-                  setError("Kein Sitzplatz fuer diesen Raum gespeichert.");
+                  setError("Kein Sitzplatz für diesen Raum gespeichert.");
                   return;
                 }
 
@@ -289,7 +289,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                 <div>
                   <h2>Arena Sync</h2>
                   <p className="muted">
-                    Gemeinsamer Reveal-State fuer Spieltag, Diszi, Phase und Slot-Step.
+                    Gemeinsamer Reveal-State für Spieltag, Diszi, Phase und Slot-Step.
                   </p>
                 </div>
                 <span className={`pill${arenaSyncState?.status === "revealing" ? " is-ready" : " is-warning"}`}>
@@ -486,7 +486,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
               onEndTurn={() => {
                 const seatToken = localStorage.getItem(roomStorageKey(roomCode));
                 if (!seatToken) {
-                  setError("Kein Sitzplatz fuer diesen Raum gespeichert.");
+                  setError("Kein Sitzplatz für diesen Raum gespeichert.");
                   return;
                 }
 

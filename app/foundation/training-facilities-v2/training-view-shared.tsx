@@ -199,6 +199,8 @@ export type TrainingClassGainEstimate = {
   /** Geschätzter Trainings-SP-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. */
   estimatedGain: number;
   isCurrent: boolean;
+  /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
+  rank: number;
 };
 
 /**
@@ -217,7 +219,10 @@ export type TrainingClassGainEstimate = {
 export function buildTrainingClassGainRanking(
   row: TrainingPlayerRowView,
   trainingClassOptions: TrainingClassOption[],
+  options?: { limit?: number; includeCurrent?: boolean },
 ): TrainingClassGainEstimate[] {
+  const limit = options?.limit ?? 3;
+  const includeCurrent = options?.includeCurrent ?? false;
   const budget = row.organicForecast.trainingSetpoints;
   if (!(budget > 0)) return [];
   const currentClass = normalizeProgressionClassName(row.trainingClass);
@@ -246,7 +251,16 @@ export function buildTrainingClassGainRanking(
     };
   });
 
-  return estimates.sort((left, right) => right.estimatedGain - left.estimatedGain).slice(0, 3);
+  const sorted = estimates
+    .sort((left, right) => right.estimatedGain - left.estimatedGain)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const top = sorted.slice(0, Math.max(0, limit));
+  // Aktuelle Klasse immer zum Vergleich sichtbar halten, auch wenn außerhalb der Top-N.
+  if (includeCurrent && !top.some((entry) => entry.isCurrent)) {
+    const current = sorted.find((entry) => entry.isCurrent);
+    if (current) top.push(current);
+  }
+  return top;
 }
 
 export type TrainingBudgetBreakdownStep = {
@@ -282,7 +296,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "base",
       label: `Basis-Training (${modePresentation.label})`,
       value: `+${formatVeloNumber(baseBudget, 2)}`,
-      detail: "Fixer Startwert je Trainingsintensitaet, noch ohne Boni.",
+      detail: "Fixer Startwert je Trainingsintensität, noch ohne Boni.",
     },
     {
       key: "trait",
@@ -313,7 +327,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "add",
       label: "Weitere Boni (Rolle/Fokus)",
       value: formatSignedPercent(otherBonusPct),
-      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschluesselt.",
+      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschlüsselt.",
     });
   }
 
@@ -323,14 +337,14 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "result",
       label: "= Trainingsbudget",
       value: `+${formatVeloNumber(row.organicForecast.trainingSetpoints, 2)}`,
-      detail: "Gesamtbudget, das ueber alle 12 Attribute verteilt wird (Klassenprofil + Affinitaet).",
+      detail: "Gesamtbudget, das über alle 12 Attribute verteilt wird (Klassenprofil + Affinität).",
     },
     {
       key: "applied-training",
       operator: "add",
       label: "Angewendet auf Stats",
       value: `+${formatVeloNumber(appliedTraining, 2)}`,
-      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinitaet und Attribut-Decke.",
+      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinität und Attribut-Decke.",
     },
     {
       key: "performance",
@@ -346,7 +360,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "subtract",
       label: "− Regression",
       value: formatVeloNumber(appliedRegression, 2),
-      detail: "Laufende Basis-Abnutzung plus zusaetzlicher Marktwert-Druck bei teuren Spielern.",
+      detail: "Laufende Basis-Abnutzung plus zusätzlicher Marktwert-Druck bei teuren Spielern.",
     },
     {
       key: "net",
@@ -390,7 +404,7 @@ export function TrainingBudgetBreakdownDisclosure({ row }: { row: TrainingPlayer
         </small>
       </div>
       {expanded ? (
-        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt fuer Schritt">
+        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt für Schritt">
           {steps.map((step) => (
             <div className={`training-budget-breakdown-step is-${step.operator}`} key={step.key} title={step.detail}>
               <span className="training-budget-breakdown-operator">{BREAKDOWN_OPERATOR_SYMBOL[step.operator]}</span>
@@ -426,7 +440,7 @@ function getDevelopmentBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
 function getDemandStatusLabel(status: PlayerDemandStatus) {
   switch (status) {
     case "fulfilled":
-      return "erfuellt";
+      return "erfüllt";
     case "at_risk":
       return "unter Druck";
     case "failed":
@@ -638,7 +652,7 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
 
           <p
             className="muted training-v2-reality-note"
-            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt."
+            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt."
           >
             Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
             {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
@@ -736,7 +750,7 @@ export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowV
               {entry.ceilingState === "capped" ? (
                 <span
                   className="training-v2-ceiling-mark is-capped"
-                  title="Potential erreicht — kaum noch Trainingswachstum moeglich"
+                  title="Potential erreicht — kaum noch Trainingswachstum möglich"
                 >
                   Limit
                 </span>
@@ -771,7 +785,7 @@ type TrainingModeGuideProps = {
 
 export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProps) {
   return (
-    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklaerung">
+    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklärung">
       {trainingModeOptions.map((option) => (
         <article
           className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
@@ -805,7 +819,7 @@ export function TrainingModeGuideDisclosure({ trainingModeOptions }: TrainingMod
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
       >
-        {expanded ? "Trainings-Erklaerung ausblenden" : "Wie funktioniert Training?"}
+        {expanded ? "Trainings-Erklärung ausblenden" : "Wie funktioniert Training?"}
       </button>
       {expanded ? <TrainingModeGuide trainingModeOptions={trainingModeOptions} /> : null}
     </div>
@@ -1005,7 +1019,7 @@ export function TrainingPlayerLane({
               <TrainingCardCompactBadges row={row} />
               {tone === "regression" ? (
                 <FoundationCard variant="decision" className="training-v2-regression-callout">
-                  <span className="eyebrow">Rueckschritt sichtbar</span>
+                  <span className="eyebrow">Rückschritt sichtbar</span>
                   <strong>
                     {row.organicForecast.netSetpoints < 0
                       ? `Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)}`
@@ -1022,7 +1036,7 @@ export function TrainingPlayerLane({
           );
         })}
         {playerRows.length === 0 ? (
-          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder waehle ein anderes Team." />
+          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder wähle ein anderes Team." />
         ) : null}
       </div>
     </>

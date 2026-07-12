@@ -213,7 +213,7 @@ function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
   return null;
 }
 
-/** Marktwert fuer organische Regression — bewusst ohne MVS/displayMarketValue. */
+/** Marktwert für organische Regression — bewusst ohne MVS/displayMarketValue. */
 export function getMarktwertForRegression(player: Player) {
   const value = player.marketValue;
   if (!isFiniteNumber(value)) return 0;

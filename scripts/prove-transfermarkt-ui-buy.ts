@@ -75,7 +75,7 @@ async function waitForMarketV2Candidates(page: Page) {
 }
 
 function assertBuyPreviewLoaded(dialogText: string) {
-  const loadingHint = "Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.";
+  const loadingHint = "Kaufvorschau wird geladen oder ist für diesen Kontext noch nicht verfügbar.";
   if (dialogText.includes(loadingHint)) {
     return false;
   }
@@ -187,7 +187,7 @@ async function pickTeamClassic(page: Page, targetTeamId: string) {
     const selects = Array.from(document.querySelectorAll("select"));
     const candidates = selects.filter((select) => Array.from(select.options).some((option) => option.value === teamId));
     const transfermarktTeamSelect =
-      candidates.find((select) => Array.from(select.options).some((option) => option.textContent?.includes("Team waehlen"))) ??
+      candidates.find((select) => Array.from(select.options).some((option) => option.textContent?.includes("Team wählen"))) ??
       candidates.find((select) => Array.from(select.options).some((option) => option.textContent?.includes("·"))) ??
       candidates[0];
 

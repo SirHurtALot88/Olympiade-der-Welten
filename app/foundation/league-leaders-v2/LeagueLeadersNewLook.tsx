@@ -22,6 +22,18 @@ import {
   buildLeagueRecordsHallOfFame,
   type LeagueRecordsHallOfFame,
 } from "@/lib/foundation/league-records-hall-of-fame";
+import {
+  buildLeagueSeasonBests,
+  buildOwnTeamLeaderboardFootprint,
+  type LeagueSeasonBests,
+  type OwnTeamLeaderboardFootprint,
+} from "@/lib/foundation/league-season-bests";
+import {
+  buildLeagueAchievements,
+  getLeagueAchievementGroupLabel,
+  type LeagueAchievement,
+  type LeagueAchievements,
+} from "@/lib/foundation/league-achievements";
 
 /**
  * "Neuer Look" Liga-Leaders — Kategorie-Karten mit Leader-Podium (flag-gated, additiv).
@@ -90,17 +102,19 @@ function getCategoryStatDecimals(categoryId: string): number {
   return categoryId === "mvs" || categoryId === "ovr" ? 0 : 1;
 }
 
-type NlLeagueLeadersSubTab = "leaders" | "records";
+type NlLeagueLeadersSubTab = "leaders" | "records" | "achievements";
 
 const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = [
   { id: "leaders", label: "Liga-Leaders" },
   { id: "records", label: "Rekorde & Hall of Fame" },
+  { id: "achievements", label: "Erfolge" },
 ];
 
 export default function LeagueLeadersNewLook({
   categories,
   selectedTeamId,
   seasonLabel,
+  gameState,
   returnContext,
   onReturnToPlayer,
   onOpenPlayer,
@@ -150,11 +164,34 @@ export default function LeagueLeadersNewLook({
   // GameState (Season-Snapshots über alle archivierten Saisons). Fehlt der
   // Kontext (z. B. Isolation/Storybook), fällt die Sektion ehrlich auf den
   // "noch keine Rekorde"-Leerzustand zurück statt Fake-Daten zu zeigen.
+  // GameState kommt bevorzugt als Prop aus dem Shell-Scope (verlässlich im
+  // echten App-Pfad); der optionale Context dient nur als Fallback (Isolation).
   const foundationState = useFoundationStateOptional();
-  const foundationGameState = foundationState?.gameState ?? null;
+  const foundationGameState = gameState ?? foundationState?.gameState ?? null;
   const records = useMemo<LeagueRecordsHallOfFame | null>(
     () => (foundationGameState ? buildLeagueRecordsHallOfFame(foundationGameState) : null),
     [foundationGameState],
+  );
+
+  // D7 — In-Season-Bestwerte ("Saison-Bestwerte (laufend)"): seedet den Rekord-
+  // Tab, damit er ab S1/MD1 lebt statt bis zur ersten archivierten Saison leer
+  // zu bleiben. Rein aus öffentlichen Kategorie-Leadern + laufendem Kaderwert.
+  const seasonBests = useMemo<LeagueSeasonBests>(
+    () => buildLeagueSeasonBests({ categories, gameState: foundationGameState, selectedTeamId, seasonLabel }),
+    [categories, foundationGameState, selectedTeamId, seasonLabel],
+  );
+
+  // D11 — Own-Team-Leaderboard-Footprint: Top-5-Slots + beste Platzierung des
+  // Manager-Teams, rein aus den öffentlichen Ranglisten-Einträgen (fog-safe).
+  const footprint = useMemo<OwnTeamLeaderboardFootprint>(
+    () => buildOwnTeamLeaderboardFootprint({ categories, selectedTeamId }),
+    [categories, selectedTeamId],
+  );
+
+  // D6 — Erfolge / Meilensteine: read-time aus gameState + Kategorien abgeleitet.
+  const achievements = useMemo<LeagueAchievements>(
+    () => buildLeagueAchievements({ gameState: foundationGameState, categories, selectedTeamId }),
+    [foundationGameState, categories, selectedTeamId],
   );
 
   return (
@@ -180,6 +217,7 @@ export default function LeagueLeadersNewLook({
         <p className="nl-leaders-hint">
           Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick öffnet das Spielerprofil.
         </p>
+        {footprint.hasTeam ? <OwnTeamFootprintSummary footprint={footprint} onOpenPlayer={onOpenPlayer} /> : null}
         <NlSubTabs
           items={NL_LEADERS_SUBTABS}
           activeId={subTab}
@@ -190,7 +228,9 @@ export default function LeagueLeadersNewLook({
       </NlCard>
 
       {subTab === "records" ? (
-        <LeagueRecordsPanel records={records} onOpenPlayer={onOpenPlayer} />
+        <LeagueRecordsPanel records={records} seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+      ) : subTab === "achievements" ? (
+        <LeagueAchievementsPanel achievements={achievements} onOpenPlayer={onOpenPlayer} />
       ) : (
       <div className="nl-leaders-grid">
         {categories.map((category) => {
@@ -340,18 +380,28 @@ export default function LeagueLeadersNewLook({
  */
 function LeagueRecordsPanel({
   records,
+  seasonBests,
   onOpenPlayer,
 }: {
   records: LeagueRecordsHallOfFame | null;
+  seasonBests: LeagueSeasonBests;
   onOpenPlayer: (playerId: string) => void;
 }) {
+  const seasonBestsSection = <SeasonBestsSection seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />;
+
+  // D7: Season-Bestwerte werden immer gezeigt (ab S1/MD1 lebendig). Der
+  // All-Time-Teil erscheint erst, wenn mindestens eine Saison archiviert ist —
+  // sonst bleibt ein ehrlicher Hinweis statt Platzhalterwerten.
   if (!records || !records.hasHistory) {
     return (
-      <NlCard className="nl-records-empty-card" title="Rekorde & Hall of Fame">
-        <p className="nl-records-empty-text">
-          Noch keine Rekorde — sobald die erste Saison archiviert ist, erscheinen hier ligaweite Bestmarken.
-        </p>
-      </NlCard>
+      <div className="nl-records" data-testid="nl-league-records">
+        {seasonBestsSection}
+        <NlCard className="nl-records-empty-card" title="All-Time-Rekorde & Hall of Fame">
+          <p className="nl-records-empty-text">
+            Noch keine All-Time-Rekorde — sobald die erste Saison archiviert ist, erscheinen hier ligaweite Bestmarken über alle Saisons.
+          </p>
+        </NlCard>
+      </div>
     );
   }
 
@@ -368,6 +418,7 @@ function LeagueRecordsPanel({
 
   return (
     <div className="nl-records" data-testid="nl-league-records">
+      {seasonBestsSection}
       <NlCard
         className="nl-records-champions-card"
         eyebrow={`${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} archiviert`}
@@ -537,6 +588,7 @@ function RecordCard({
   value,
   tone,
   onClick,
+  isOwn = false,
 }: {
   label: string;
   holder: string | null;
@@ -544,6 +596,7 @@ function RecordCard({
   value: string | null;
   tone: NlTone;
   onClick?: () => void;
+  isOwn?: boolean;
 }) {
   const hasData = holder != null && value != null;
   const bodyContent = (
@@ -555,8 +608,11 @@ function RecordCard({
   );
 
   return (
-    <article className={`nl-records-card ${nlToneClass(tone)}`}>
-      <span className="nl-records-card-label">{label}</span>
+    <article className={`nl-records-card ${nlToneClass(tone)}${isOwn ? " is-own-team" : ""}`}>
+      <span className="nl-records-card-label">
+        {label}
+        {isOwn ? <span className="nl-records-own-tag">dein Team</span> : null}
+      </span>
       {!hasData ? (
         <p className="nl-records-empty-text">Keine Daten</p>
       ) : onClick ? (
@@ -568,4 +624,231 @@ function RecordCard({
       )}
     </article>
   );
+}
+
+/**
+ * D11 — Own-Team-Leaderboard-Footprint: kompakte Zusammenfassung im Header,
+ * wie viele Top-5-Slots das Manager-Team hält und was die beste Platzierung ist.
+ * Rein aus den öffentlichen Ranglisten-Einträgen (fog-safe).
+ */
+function OwnTeamFootprintSummary({
+  footprint,
+  onOpenPlayer,
+}: {
+  footprint: OwnTeamLeaderboardFootprint;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const hasTop5 = footprint.top5SlotCount > 0;
+  return (
+    <StatChipRow className="nl-leaders-footprint" aria-label="Dein Team in den Ranglisten">
+      <StatChip
+        label="Dein Team"
+        value={hasTop5 ? `${formatNlNumber(footprint.top5SlotCount, 0)}× Top-5` : "—"}
+        sub={
+          hasTop5
+            ? `in ${formatNlNumber(footprint.categoriesWithTop5, 0)} von ${formatNlNumber(footprint.trackedCategories, 0)} Kategorien`
+            : "noch kein Top-5-Eintrag"
+        }
+        tone={hasTop5 ? "good" : "neutral"}
+      />
+      {footprint.bestPlacement ? (
+        <StatChip
+          label="Beste Platzierung"
+          value={`#${formatNlNumber(footprint.bestPlacement.rank, 0)}`}
+          sub={`${footprint.bestPlacement.categoryLabel} · ${footprint.bestPlacement.playerName}`}
+          tone="accent"
+          onClick={() => onOpenPlayer(footprint.bestPlacement!.playerId)}
+          title={`${footprint.bestPlacement.playerName} öffnen`}
+        />
+      ) : null}
+      {footprint.leaderCount > 0 ? (
+        <StatChip
+          label="Liga-Anführer"
+          value={`${formatNlNumber(footprint.leaderCount, 0)}× Rang 1`}
+          tone="warn"
+        />
+      ) : null}
+    </StatChipRow>
+  );
+}
+
+/**
+ * D7 — "Saison-Bestwerte (laufend)": ab S1/MD1 lebendige Bestmarken aus
+ * öffentlichen/laufenden Daten (Kategorie-Leader + höchster Kaderwert). Klar von
+ * den archivierten All-Time-Rekorden abgegrenzt.
+ */
+function SeasonBestsSection({
+  seasonBests,
+  onOpenPlayer,
+}: {
+  seasonBests: LeagueSeasonBests;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  return (
+    <NlCard
+      className="nl-records-seasonbests-card"
+      eyebrow={seasonBests.seasonLabel}
+      title="Saison-Bestwerte (laufend)"
+      data-testid="nl-league-season-bests"
+    >
+      {seasonBests.entries.length > 0 ? (
+        <div className="nl-records-grid nl-records-seasonbests-grid">
+          {seasonBests.entries.map((entry) => (
+            <RecordCard
+              key={entry.key}
+              label={entry.label}
+              holder={entry.holderName}
+              sub={entry.holderSub}
+              value={entry.displayValue}
+              tone={entry.tone}
+              isOwn={entry.isOwn}
+              onClick={entry.playerId ? () => onOpenPlayer(entry.playerId as string) : undefined}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="nl-records-empty-text">
+          Noch keine laufenden Bestwerte — sobald Spielerwerte vorliegen, erscheinen hier die aktuellen Saison-Bestmarken.
+        </p>
+      )}
+    </NlCard>
+  );
+}
+
+/**
+ * D6 — "Erfolge / Meilensteine": read-time aus gameState + Kategorien
+ * abgeleitete Meilensteine des Manager-Teams. Erreichte zuerst (mit Haken und —
+ * wo bekannt — Saison), offene gesperrt mit Ziel. Fog-safe: nur öffentliche
+ * Metriken des eigenen Teams.
+ */
+function LeagueAchievementsPanel({
+  achievements,
+  onOpenPlayer,
+}: {
+  achievements: LeagueAchievements;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  if (!achievements.hasTeam) {
+    return (
+      <NlCard className="nl-achievements-empty-card" title="Erfolge & Meilensteine">
+        <p className="nl-records-empty-text">
+          Wähle ein Manager-Team, um seine Erfolge und Meilensteine zu sehen.
+        </p>
+      </NlCard>
+    );
+  }
+  if (!achievements.hasData) {
+    return (
+      <NlCard className="nl-achievements-empty-card" title="Erfolge & Meilensteine">
+        <p className="nl-records-empty-text">Erfolge werden geladen …</p>
+      </NlCard>
+    );
+  }
+
+  const reached = achievements.achievements.filter((achievement) => achievement.state === "reached");
+  const locked = achievements.achievements.filter((achievement) => achievement.state === "locked");
+
+  return (
+    <div className="nl-achievements" data-testid="nl-league-achievements">
+      <NlCard
+        className="nl-achievements-head-card"
+        eyebrow={achievements.teamName ?? undefined}
+        title="Erfolge & Meilensteine"
+      >
+        <p className="nl-records-empty-text nl-achievements-progress">
+          {formatNlNumber(achievements.reachedCount, 0)} von {formatNlNumber(achievements.totalCount, 0)} Meilensteinen erreicht.
+        </p>
+        <div
+          className="nl-achievements-progress-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={achievements.totalCount}
+          aria-valuenow={achievements.reachedCount}
+          aria-label="Erreichte Meilensteine"
+        >
+          <span
+            className="nl-achievements-progress-fill"
+            style={{
+              width: `${achievements.totalCount > 0 ? (achievements.reachedCount / achievements.totalCount) * 100 : 0}%`,
+            }}
+          />
+        </div>
+      </NlCard>
+
+      {reached.length > 0 ? (
+        <div className="nl-achievements-group">
+          <h3 className="nl-achievements-group-title">Erreicht ({formatNlNumber(reached.length, 0)})</h3>
+          <div className="nl-achievements-list">
+            {reached.map((achievement) => (
+              <AchievementRow key={achievement.id} achievement={achievement} onOpenPlayer={onOpenPlayer} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {locked.length > 0 ? (
+        <div className="nl-achievements-group">
+          <h3 className="nl-achievements-group-title">Als Nächstes ({formatNlNumber(locked.length, 0)})</h3>
+          <div className="nl-achievements-list">
+            {locked.map((achievement) => (
+              <AchievementRow key={achievement.id} achievement={achievement} onOpenPlayer={onOpenPlayer} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AchievementRow({
+  achievement,
+  onOpenPlayer,
+}: {
+  achievement: LeagueAchievement;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const isReached = achievement.state === "reached";
+  const interactive = isReached && achievement.playerId != null;
+  const metaLine = isReached
+    ? achievement.detail ?? achievement.progressLabel
+    : achievement.progressLabel ?? achievement.targetLabel;
+
+  const body = (
+    <>
+      <span className={`nl-achievement-icon ${nlToneClass(isReached ? achievement.tone : "neutral")}`} aria-hidden="true">
+        {isReached ? "✓" : "🔒"}
+      </span>
+      <span className="nl-achievement-copy">
+        <span className="nl-achievement-headline">
+          <strong className="nl-achievement-label">{achievement.label}</strong>
+          <span className="nl-achievement-group-tag">{getLeagueAchievementGroupLabel(achievement.group)}</span>
+        </span>
+        <span className="nl-achievement-desc">{achievement.description}</span>
+        {metaLine ? <span className="nl-achievement-meta nl-tnum">{metaLine}</span> : null}
+        {!isReached && achievement.targetLabel && achievement.targetLabel !== metaLine ? (
+          <span className="nl-achievement-target">{achievement.targetLabel}</span>
+        ) : null}
+      </span>
+      {isReached && achievement.contextLabel ? (
+        <span className="nl-achievement-context">{achievement.contextLabel}</span>
+      ) : null}
+    </>
+  );
+
+  const className = `nl-achievement-row${isReached ? " is-reached" : " is-locked"}`;
+
+  if (interactive) {
+    return (
+      <button
+        type="button"
+        className={`${className} is-interactive`}
+        onClick={() => onOpenPlayer(achievement.playerId as string)}
+        title="Spielerprofil öffnen"
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return <div className={className}>{body}</div>;
 }

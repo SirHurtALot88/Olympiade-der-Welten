@@ -7,7 +7,7 @@ import type {
 const COCKPIT_BUSY_LABELS: Record<string, string> = {
   "ai-market-apply": "AI-Markt wird angewendet",
   "ai-market-dry-run": "AI-Markt Dry-Run",
-  "roster-fill-apply": "Kader wird aufgefuellt",
+  "roster-fill-apply": "Kader wird aufgefüllt",
   "roster-fill-dry-run": "Kader-Fill Dry-Run",
   "ai-lineup-apply": "AI-Lineups werden gespeichert",
   "ai-lineup-dry-run": "AI-Lineup Dry-Run",
@@ -19,23 +19,23 @@ const COCKPIT_BUSY_LABELS: Record<string, string> = {
   "standings-dry-run": "Tabellen Dry-Run",
   "cash-apply": "Preisgeld wird angewendet",
   "cash-dry-run": "Preisgeld Dry-Run",
-  "preseason-preview": "Preseason-Vorschau laeuft",
-  "preseason-next-season-setup": "Naechste Saison wird vorbereitet",
-  "season-transition-start": "Saisonuebergang startet",
-  "season-transition-preview": "Saisonuebergang Vorschau",
-  "season-completion-execute": "Saisonabschluss laeuft",
+  "preseason-preview": "Preseason-Vorschau läuft",
+  "preseason-next-season-setup": "Nächste Saison wird vorbereitet",
+  "season-transition-start": "Saisonübergang startet",
+  "season-transition-preview": "Saisonübergang Vorschau",
+  "season-completion-execute": "Saisonabschluss läuft",
   "season-completion-preview": "Saisonabschluss Vorschau",
   "matchday-advance": "Spieltag wird fortgeschaltet",
   "matchday-advance-dry-run": "Spieltag Dry-Run",
-  "matchday-auto-run-execute": "Matchday Auto-Run laeuft",
+  "matchday-auto-run-execute": "Matchday Auto-Run läuft",
   "matchday-auto-run-dry-run": "Matchday Auto-Run Dry-Run",
-  "whole-season-dryrun": "Whole-Season Dry-Run laeuft",
+  "whole-season-dryrun": "Whole-Season Dry-Run läuft",
   "season-snapshot-apply": "Season-Snapshot wird angewendet",
   "season-snapshot-dry-run": "Season-Snapshot Dry-Run",
   "cockpit-refresh": "Cockpit wird aktualisiert",
-  "resolve-preview": "Resolve-Vorschau laeuft",
-  "standings-preview": "Tabellen-Vorschau laeuft",
-  "prize-preview": "Preisgeld-Vorschau laeuft",
+  "resolve-preview": "Resolve-Vorschau läuft",
+  "standings-preview": "Tabellen-Vorschau läuft",
+  "prize-preview": "Preisgeld-Vorschau läuft",
 };
 
 function getPreseasonModeLabel(mode: FoundationActivityPreseasonRunSnapshot["mode"]) {
@@ -47,10 +47,10 @@ function getPreseasonModeLabel(mode: FoundationActivityPreseasonRunSnapshot["mod
 function buildPreseasonDetail(run: FoundationActivityPreseasonRunSnapshot, aiTeamsCount: number) {
   const parts = [`${run.aiTeamsCompleted}/${run.aiTeamsTotal || aiTeamsCount} Teams`];
   if (run.transferBuysApplied > 0) {
-    parts.push(`${run.transferBuysApplied} ${run.mode === "setup_draft" ? "Picks" : "Kaeufe"}`);
+    parts.push(`${run.transferBuysApplied} ${run.mode === "setup_draft" ? "Picks" : "Käufe"}`);
   }
   if (run.transferSellsApplied > 0) {
-    parts.push(`${run.transferSellsApplied} Verkaeufe`);
+    parts.push(`${run.transferSellsApplied} Verkäufe`);
   }
   if (run.managerActionsApplied > 0) {
     parts.push(`${run.managerActionsApplied} Setup-Aktionen`);
@@ -67,7 +67,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
   if (input.isSaveBusy) {
     activities.push({
       id: "save-load",
-      label: "Save laedt",
+      label: "Save lädt",
       detail: "Spielstand wird gewechselt",
       tone: "running",
     });
@@ -110,7 +110,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     activities.push({
       id: "admin-season-sim-busy",
       label: "Season-Simulation",
-      detail: "API-Aufruf laeuft",
+      detail: "API-Aufruf läuft",
       tone: "running",
     });
   } else if (adminStatus === "running" || adminStatus === "paused") {
@@ -127,8 +127,8 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
   if (input.seasonTransitionBusy) {
     activities.push({
       id: "season-transition",
-      label: "Saisonuebergang",
-      detail: "Transition laeuft im Hintergrund",
+      label: "Saisonübergang",
+      detail: "Transition läuft im Hintergrund",
       tone: "running",
     });
   }
@@ -137,7 +137,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     activities.push({
       id: "preseason-workflow",
       label: "Preseason-Workflow",
-      detail: "Workflow-Schritte werden ausgefuehrt",
+      detail: "Workflow-Schritte werden ausgeführt",
       tone: "running",
     });
   }
@@ -146,7 +146,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     activities.push({
       id: "season-start-reset",
       label: "Saison-Start-Reset",
-      detail: "Save wird zurueckgesetzt",
+      detail: "Save wird zurückgesetzt",
       tone: "running",
     });
   }
@@ -164,7 +164,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     activities.push({
       id: "roster-fill",
       label: "Kader-Fill",
-      detail: "Roster wird automatisch ergaenzt",
+      detail: "Roster wird automatisch ergänzt",
       tone: "running",
     });
   }
@@ -188,25 +188,25 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
   }
 
   if (input.marketBuyBusy) {
-    activities.push({ id: "market-buy", label: "Transfer-Kauf", detail: "Kauf wird ausgefuehrt", tone: "running" });
+    activities.push({ id: "market-buy", label: "Transfer-Kauf", detail: "Kauf wird ausgeführt", tone: "running" });
   }
   if (input.marketSellBusy) {
-    activities.push({ id: "market-sell", label: "Transfer-Verkauf", detail: "Verkauf wird ausgefuehrt", tone: "running" });
+    activities.push({ id: "market-sell", label: "Transfer-Verkauf", detail: "Verkauf wird ausgeführt", tone: "running" });
   }
   if (input.contractRenewalBusy) {
     activities.push({ id: "contract-renewal", label: "Vertragsverhandlung", detail: "Vertrag wird bearbeitet", tone: "running" });
   }
   if (input.sponsorChoiceBusy) {
-    activities.push({ id: "sponsor-choice", label: "Sponsor waehlen", detail: "Sponsor wird gespeichert", tone: "running" });
+    activities.push({ id: "sponsor-choice", label: "Sponsor wählen", detail: "Sponsor wird gespeichert", tone: "running" });
   }
   if (input.facilityUpgradeBusy) {
-    activities.push({ id: "facility-upgrade", label: "Gebaeude-Upgrade", detail: "Upgrade wird ausgefuehrt", tone: "running" });
+    activities.push({ id: "facility-upgrade", label: "Gebäude-Upgrade", detail: "Upgrade wird ausgeführt", tone: "running" });
   }
   if (input.facilityMaintenanceBusy) {
-    activities.push({ id: "facility-maintenance", label: "Gebaeude-Wartung", detail: "Wartung wird ausgefuehrt", tone: "running" });
+    activities.push({ id: "facility-maintenance", label: "Gebäude-Wartung", detail: "Wartung wird ausgeführt", tone: "running" });
   }
   if (input.assignTeamCaptainBusy) {
-    activities.push({ id: "assign-captain", label: "Kapitaen ernennen", detail: "Kapitaen wird gesetzt", tone: "running" });
+    activities.push({ id: "assign-captain", label: "Kapitän ernennen", detail: "Kapitän wird gesetzt", tone: "running" });
   }
   if (input.marketAiPreviewBusy) {
     activities.push({ id: "market-ai-preview", label: "AI-Markt-Vorschau", detail: "Vorschau wird berechnet", tone: "running" });
@@ -233,8 +233,8 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
   if (input.fetchSlowWarning) {
     activities.push({
       id: "fetch-slow",
-      label: "Laedt laenger als erwartet",
-      detail: "Server antwortet verzoegert",
+      label: "Lädt länger als erwartet",
+      detail: "Server antwortet verzögert",
       tone: "warning",
     });
   }

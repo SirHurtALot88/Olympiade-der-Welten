@@ -137,6 +137,8 @@ export type TransfermarktV2NewLookProps = {
   teamName: string | null;
   teamShortCode: string | null;
   availabilityLabel: string;
+  /** Read-only-Hinweis bei geschlossenem Transferfenster; null = Fenster offen. */
+  marketWindowNotice: string | null;
   marketBusy: boolean;
   marketError: string | null;
   onRetryMarket?: () => void;
@@ -334,6 +336,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     teamName,
     teamShortCode,
     availabilityLabel,
+    marketWindowNotice,
     marketBusy,
     marketError,
     onRetryMarket,
@@ -481,6 +484,20 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
 
   return (
     <section className={`nl-market${buyModalOpen ? " is-offer-mode" : ""}`} data-new-look="true">
+      {marketWindowNotice ? (
+        <div
+          className="transfer-callout is-blocked nl-market-window-notice"
+          role="status"
+          data-testid="nl-market-window-notice"
+        >
+          <div className="transfer-callout-title">
+            <strong>Transferfenster geschlossen</strong>
+            <span className="transfer-status-pill is-blocked">nur Ansicht</span>
+          </div>
+          <span>{marketWindowNotice}</span>
+        </div>
+      ) : null}
+
       {buySuccess ? (
         <div className="nl-market-signed" role="status" aria-live="polite" data-testid="nl-market-signed">
           <div className="nl-market-signed-card">

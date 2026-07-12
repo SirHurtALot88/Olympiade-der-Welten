@@ -90,6 +90,9 @@ export function hydrateSeasonDerivations(record: PersistedSeasonDerivationsRecor
     performanceByPlayerId: new Map(
       Object.entries(record.performanceByPlayerId) as Array<[string, PlayerSeasonPerformanceSummary]>,
     ),
+    // Platzhalter — der Feld-Rennen-Ledger wird billig aus dem GameState
+    // nachgerechnet (siehe readPersistedSeasonDerivations), statt ihn zu persistieren.
+    fieldRaceLedger: { seasonId: record.seasonId, matchdays: [], rowsByTeamId: new Map() },
   };
 }
 
@@ -104,6 +107,9 @@ export function readPersistedSeasonDerivations(
   if (persisted.seasonId !== gameState.season.id) {
     return null;
   }
+  // fieldRaceLedger bleibt der leere Platzhalter aus hydrateSeasonDerivations —
+  // der Shell-Scope-Hook baut ihn on-demand (reine UI-Ableitung, siehe
+  // computeSeasonDerivationsFresh).
   return hydrateSeasonDerivations(persisted);
 }
 

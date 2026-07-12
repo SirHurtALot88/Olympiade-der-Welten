@@ -45,14 +45,14 @@ export function formatFacilityActionReason(reason: string) {
   const mapped: Record<string, string> = {
     insufficient_cash: "Nicht genug Cash.",
     facility_max_level: "Max-Level erreicht.",
-    facility_disabled: "Gebaeude deaktiviert.",
-    specialist_wing_variant_required: "Variante waehlen.",
+    facility_disabled: "Gebäude deaktiviert.",
+    specialist_wing_variant_required: "Variante wählen.",
     specialist_wing_variant_switch_not_supported: "Variante nach Bau nicht wechselbar.",
     team_not_found: "Team nicht gefunden.",
     save_not_active: "Spielstand nicht aktiv.",
     save_not_found: "Spielstand nicht gefunden.",
     local_team_not_owned_or_ai_controlled: "Nur eigene Teams.",
-    confirm_token_required: "Erst pruefen, dann bestaetigen.",
+    confirm_token_required: "Erst prüfen, dann bestätigen.",
     facility_upgrade_preview_stale: "Preview veraltet.",
     facility_maintenance_preview_stale: "Preview veraltet.",
   };
@@ -183,7 +183,7 @@ export function FacilityDecisionModal({
               <strong>{selectedFacility.currentEffect}</strong>
             </div>
             <div>
-              <span>Naechstes Level</span>
+              <span>Nächstes Level</span>
               <strong>{selectedFacility.nextLevelEffect}</strong>
               <small>
                 {selectedFacility.upgradeCost != null ? formatTransfermarktCurrency(selectedFacility.upgradeCost) : "Max"} · Unterhalt{" "}
@@ -335,7 +335,7 @@ export function FacilityDecisionModal({
               onClick={onConfirmMaintenance}
               title={activeConfirmReason ?? undefined}
             >
-              {activeBusy ? "Wartung…" : "Wartung bestaetigen"}
+              {activeBusy ? "Wartung…" : "Wartung bestätigen"}
             </button>
           ) : (
             <button
@@ -349,8 +349,8 @@ export function FacilityDecisionModal({
               {activeBusy
                 ? "…"
                 : facilityDialog.action === "downgrade"
-                  ? "Downgrade bestaetigen"
-                  : "Upgrade bestaetigen"}
+                  ? "Downgrade bestätigen"
+                  : "Upgrade bestätigen"}
             </button>
           )}
         </div>

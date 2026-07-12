@@ -16,6 +16,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  formatNlMoney,
   nlToneClass,
   type NlBarChartBar,
   type NlRankingDrawerRow,
@@ -43,18 +44,16 @@ import {
  *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
  * - kein "Titelrennen"-Hero,
- * - keine Auf-/Abstiegszonen (kein Zonen-Konzept im Datenmodell),
- * - kein Rang-Verlauf pro Spieltag (existiert nicht) — Rang-Entwicklung
- *   gibt es nur saisonübergreifend aus `historicalPointsBySeason`.
+ * - keine Auf-/Abstiegszonen (kein Zonen-Konzept im Datenmodell).
  *
- * Momentum/Formtrend im Board: `SeasonV2StandingsRow` (und damit diese
- * Props) enthält keine Pro-Spieltag-Punktereihe — der Season-Points-Ledger
- * (`lib/foundation/season-points-ledger.ts`) liefert Punkte nur pro
- * *Spieler*-Performance, nicht als team-aggregierte Serie über Spieltage,
- * und wird hier ohnehin nicht durchgereicht. Statt einer erfundenen
- * Sparkline nutzt der Momentum-Chip pro Zeile deshalb `row.rankDiff`
- * (Rang-Bewegung seit Saisonstart) — dasselbe Feld, das `momentumTeam` in
- * `use-season-v2-panel-model.ts` bereits als "Momentum" behandelt.
+ * Rang-Movement pro Spieltag (Wave D · D4): `row.fieldRaceRankDelta` trägt
+ * jetzt die Δ-Rang-Bewegung gegenüber dem LETZTEN Spieltag aus dem bereits
+ * gebauten Feld-Rennen-Ledger (`build-field-race-ledger.ts`,
+ * `rankDeltaVsPrev`). Das ist die eigentliche "wer bewegt sich"-Kennzahl des
+ * Feldrennens — der Board-Zeilen-Chip liest dieses Feld (▲ Plätze gut / ▼ ab /
+ * — am ersten Spieltag). Der Rang-Cell-Chip `row.rankDiff` bleibt die
+ * saisonübergreifende Bewegung (aus `historicalPointsBySeason`) und ist davon
+ * bewusst getrennt.
  */
 
 type NlStandingsMode = "board" | "daten";
@@ -186,8 +185,28 @@ export default function SeasonStandingsNewLook({
     });
   }, [boardRows, tableSort]);
 
+  // B3: Das Podium folgt exakt den ANGEZEIGTEN Punkten (nicht dem gespeicherten
+  // `rank`, falls beide in den Rohdaten auseinanderlaufen). Reihenfolge, Medaille,
+  // "Spitze" und Rückstands-Label stützen sich damit auf dieselbe Kennzahl — der
+  // Platz 1 ist garantiert das Team mit den meisten Punkten. Gleichstände lösen
+  // wir über den Standings-Rang und dann den Teamnamen auf.
   const podiumRows = useMemo(
-    () => boardRows.filter((row) => row.rank != null && row.rank >= 1 && row.rank <= 3).slice(0, 3),
+    () =>
+      [...boardRows]
+        .filter((row) => row.points != null && Number.isFinite(row.points))
+        .sort((left, right) => {
+          const pointsDelta = (right.points as number) - (left.points as number);
+          if (pointsDelta !== 0) {
+            return pointsDelta;
+          }
+          const leftRank = left.rank != null && Number.isFinite(left.rank) ? left.rank : Number.POSITIVE_INFINITY;
+          const rightRank = right.rank != null && Number.isFinite(right.rank) ? right.rank : Number.POSITIVE_INFINITY;
+          if (leftRank !== rightRank) {
+            return leftRank - rightRank;
+          }
+          return left.teamName.localeCompare(right.teamName, "de-DE");
+        })
+        .slice(0, 3),
     [boardRows],
   );
 
@@ -358,28 +377,31 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
-   * Momentum-Chip (Board-Zeile): mangels Pro-Spieltag-Punktereihe die
-   * ehrliche leichte Alternative zur Sparkline — `row.rankDiff` (Rang seit
-   * Saisonstart) mit Richtung/Ton, wie auch `momentumTeam` andernorts in
-   * dieser Session dieses Feld als "Momentum" liest.
+   * Rang-Movement-Chip (Board-Zeile, Wave D · D4): Δ Gesamtrang gegenüber dem
+   * LETZTEN Spieltag aus dem Feld-Rennen-Ledger (`fieldRaceRankDelta`). Das ist
+   * die eigentliche Pro-Spieltag-Bewegung des Feldrennens (▲ Plätze gut / ▼ ab).
+   * Am ersten Spieltag (kein Vorwert) bewusst "—" statt eines erfundenen Deltas.
    */
   function renderMomentumChip(row: SeasonV2StandingsRow) {
-    const hasMomentum = row.rankDiff != null && Number.isFinite(row.rankDiff);
+    const delta = row.fieldRaceRankDelta;
+    const hasDelta = delta != null && Number.isFinite(delta);
     return (
       <span
         className="nl-standings-momentum-chip"
-        title="Formtrend: Rang-Bewegung seit Saisonstart (keine Punkte-Serie pro Spieltag verfügbar)"
+        title="Rang-Movement: Δ Gesamtrang gegenüber dem letzten Spieltag"
       >
-        <span className="nl-standings-momentum-chip-label">Form</span>
-        {hasMomentum ? (
+        <span className="nl-standings-momentum-chip-label">Spieltag</span>
+        {hasDelta ? (
           <NlDeltaChip
-            value={row.rankDiff as number}
+            value={delta as number}
             format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
-            title="Rang-Bewegung seit Saisonstart"
+            title="Rang-Bewegung gegenüber dem letzten Spieltag"
             className="nl-standings-momentum-delta"
           />
         ) : (
-          <span className="nl-standings-momentum-delta is-flat nl-tnum">—</span>
+          <span className="nl-standings-momentum-delta is-flat nl-tnum" title="Erster Spieltag — noch keine Bewegung">
+            —
+          </span>
         )}
       </span>
     );
@@ -619,7 +641,7 @@ export default function SeasonStandingsNewLook({
             />
             <StatChip
               label="MW"
-              value={formatNlNumber(row.marketValueTotal, 1)}
+              value={formatNlMoney(row.marketValueTotal)}
               onClick={() => openRankingDrawer("mw", row.teamId)}
               title={`Marktwert-Rangliste — ${row.teamName}`}
             />
@@ -668,7 +690,7 @@ export default function SeasonStandingsNewLook({
         />
         <StatChip
           label="MW"
-          value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+          value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
           onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
           title="Marktwert-Rangliste"
         />
@@ -783,7 +805,7 @@ export default function SeasonStandingsNewLook({
               {formatNlNumber(getAreaValue(row, group.id), 1)}
             </td>
           ))}
-          <td className="nl-standings-td-mw">{formatNlNumber(row.marketValueTotal, 1)}</td>
+          <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
@@ -801,11 +823,18 @@ export default function SeasonStandingsNewLook({
     if (podiumRows.length === 0) {
       return null;
     }
+    // Spitzenreiter = Team mit den meisten Punkten (erste Zeile, s.o.). Alle
+    // Rückstände beziehen sich auf genau diesen Wert, damit Platz 1 immer "Spitze"
+    // (Abstand 0) zeigt und kein tiefer platziertes Team fälschlich führt.
+    const podiumLeaderPoints = podiumRows[0].points;
     return (
-      <ol className="nl-standings-podium" aria-label="Podium — Top 3">
-        {podiumRows.map((row) => {
-          const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : "bronze";
-          const gap = row.points != null && Number.isFinite(row.points) ? row.points - leaderPoints : null;
+      <ol className="nl-standings-podium" aria-label="Podium — Top 3 nach Punkten">
+        {podiumRows.map((row, index) => {
+          const medalKind = index === 0 ? "gold" : index === 1 ? "silver" : "bronze";
+          const gap =
+            row.points != null && Number.isFinite(row.points) && podiumLeaderPoints != null
+              ? row.points - podiumLeaderPoints
+              : null;
           return (
             <li key={row.teamId} className={`nl-standings-podium-card is-${medalKind}`} style={getSeasonV2TeamTagStyle(row.teamCode)}>
               <button
@@ -815,7 +844,7 @@ export default function SeasonStandingsNewLook({
                 title={`${row.teamName} öffnen`}
               >
                 <span className="nl-standings-podium-medal">
-                  <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
+                  <NlMedalBadge kind={medalKind} title={`Platz ${index + 1} nach Punkten`} />
                 </span>
                 <span className="nl-standings-podium-copy">
                   <span className="nl-standings-podium-name">{row.teamName}</span>
@@ -926,7 +955,7 @@ export default function SeasonStandingsNewLook({
               />
               <StatChip
                 label="MW"
-                value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+                value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
                 title="Marktwert-Rangliste"
               />

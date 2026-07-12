@@ -79,6 +79,13 @@ export type SeasonV2StandingsRow = {
   logoInitials: string;
   rank: number | null;
   rankDiff: number | null;
+  /**
+   * Wave D · D4 Rang-Movement: Δ Gesamtrang gegenüber dem letzten Spieltag
+   * (Feld-Rennen-Ledger, `rankDeltaVsPrev`). >0 = Plätze gutgemacht (▲),
+   * <0 = abgerutscht (▼), `null` am ersten Spieltag. Additiv/optional — der
+   * bestehende Render liest dieses Feld nur im "Neuer Look"-Board.
+   */
+  fieldRaceRankDelta?: number | null;
   points: number | null;
   pps: number | null;
   pow: number | null;
@@ -1174,7 +1181,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
                     <h4>{gmTitle}</h4>
                     <p>{row.description ?? row.lineupDoctrine ?? "Kein GM-Profil aktiv."}</p>
                   </div>
-                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und moeglichen Wechselgruenden.">
+                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und möglichen Wechselgruenden.">
                     <strong>
                       {getGmStoryLabel({
                         source: row.source,

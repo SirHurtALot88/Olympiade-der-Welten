@@ -30,8 +30,8 @@ export type TrainingModePresentation = {
 
 const TRAINING_MODE_NOTES: Record<PlayerTrainingMode, string> = {
   leicht: "Schonend, weniger Base-XP, bessere Regeneration.",
-  mittel: "Standardfokus fuer stabile Entwicklung und normale Erholung.",
-  hart: "Mehr Base-XP, aber spuerbar schlechtere Regeneration.",
+  mittel: "Standardfokus für stabile Entwicklung und normale Erholung.",
+  hart: "Mehr Base-XP, aber spürbar schlechtere Regeneration.",
 };
 
 const TRAINING_MODE_FATIGUE_RISK: Record<PlayerTrainingMode, TrainingModePresentation["fatigueRisk"]> = {

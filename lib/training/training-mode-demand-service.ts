@@ -140,7 +140,7 @@ export function buildTrainingModeDemand(input: {
   const fatigue = input.player.fatigue ?? 0;
   const detail =
     preferredMode === "leicht"
-      ? `${input.player.name} will wegen Erschoepfung (${Math.round(fatigue)}) oder Persoenlichkeit lieber ${preferredLabel} statt ${currentLabel}.`
+      ? `${input.player.name} will wegen Erschöpfung (${Math.round(fatigue)}) oder Persoenlichkeit lieber ${preferredLabel} statt ${currentLabel}.`
       : `${input.player.name} will wegen Anspruch und Form lieber ${preferredLabel} statt ${currentLabel}.`;
 
   return {

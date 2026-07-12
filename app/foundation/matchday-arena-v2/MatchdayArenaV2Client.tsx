@@ -417,7 +417,7 @@ function formatArenaWarning(message: string) {
     return `${planningTargetMatch[1]}: Einsatzliste noch nicht voll geplant (${planningTargetMatch[2]}).`;
   }
   if (message === "missing_lineups") {
-    return "Es fehlen noch Einsatzlisten fuer diesen Spieltag.";
+    return "Es fehlen noch Einsatzlisten für diesen Spieltag.";
   }
   if (message.startsWith("resolve_preview:")) {
     return `Resolve-Vorschau fehlt: ${message.replace("resolve_preview:", "")}`;
@@ -791,11 +791,14 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
             </span>
           ) : null}
         </span>
-        {row.teamLogoUrl ? (
-          <OptimizedMediaImage className="arena-v2-board-logo" src={row.teamLogoUrl} alt={`${row.teamName} Logo`} width={32} height={32} />
-        ) : (
-          <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
-        )}
+        <OptimizedMediaImage
+          className="arena-v2-board-logo"
+          onErrorClassName="arena-v2-board-logo arena-v2-board-logo-fallback"
+          src={row.teamLogoUrl}
+          alt={`${row.teamName} Logo`}
+          width={32}
+          height={32}
+        />
         <div className="arena-v2-board-copy">
           <button
             type="button"
@@ -3324,12 +3327,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   }}
                 >
                   {phaseIndex === slotsPhaseIndex && revealedSlotCount < maxSlotRevealCount
-                    ? "Naechster Reveal"
+                    ? "Nächster Reveal"
                     : !canShowResultLayer && activeDisciplinePhase === "d1" && activeDisciplineRevealComplete
                       ? `${d2Label} freischalten`
                       : !canShowResultLayer && activeDisciplinePhase === "d2" && activeDisciplineRevealComplete
                         ? "Result freischalten"
-                        : "Naechster Reveal"}
+                        : "Nächster Reveal"}
                 </button>
               )}
             </div>
@@ -3590,10 +3593,10 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   <article className="arena-v2-focus-card">
                     <span>Reveal</span>
                     <strong>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Slots"}</strong>
-                    <small>Weiter addiert den naechsten freigegebenen Baustein.</small>
+                    <small>Weiter addiert den nächsten freigegebenen Baustein.</small>
                   </article>
                   <article className="arena-v2-focus-card">
-                    <span>Naechste Freigabe</span>
+                    <span>Nächste Freigabe</span>
                     <strong>{activeDisciplinePhase === "d1" ? d2Label : "Result"}</strong>
                     <small>{activeDisciplineRevealComplete ? "Mit Weiter freischalten." : "Nach Abschluss dieser Disziplin."}</small>
                   </article>
@@ -3836,7 +3839,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           ) : null}
           {isResultPhase && canShowResultLayer ? (
             <div className="arena-v2-next-step-links" data-testid="arena-v2-next-steps">
-              <strong>Naechster sinnvoller Schritt</strong>
+              <strong>Nächster sinnvoller Schritt</strong>
               <div className="arena-v2-next-step-actions">
                 {props.onOpenMatchdayResult ? (
                   <button type="button" className="secondary-button inline-button" onClick={props.onOpenMatchdayResult}>

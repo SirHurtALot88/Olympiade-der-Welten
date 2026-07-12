@@ -181,7 +181,7 @@ export default function FoundationHomeV2Host({
             ? formatCockpitReason(gameFlowActionStep.blockers[0])
             : gameFlowActionStep.warnings[0]
               ? formatCockpitReason(gameFlowActionStep.warnings[0])
-              : "Flow bereit — weiter zum naechsten Schritt.",
+              : "Flow bereit — weiter zum nächsten Schritt.",
         nextStepBlocked:
           gameFlowActionStep.blockers.length > 0 || gameFlowActionStep.warnings.length > 0,
         warnings: overviewDerivations.homeWarnings.map(formatHomeWarningLabel),

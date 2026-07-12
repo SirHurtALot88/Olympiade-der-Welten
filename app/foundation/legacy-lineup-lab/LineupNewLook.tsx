@@ -163,15 +163,49 @@ const NL_AXIS_AREA_LABEL: Record<NlAxisKey, string> = { pow: "POW", spe: "SPE", 
 
 /* --- Kleinteile ------------------------------------------------------- */
 
-function NlCompletenessRing({ selected, total, ready }: { selected: number; total: number; ready: boolean }) {
+/**
+ * Ring-Zähler (#Ring-Label-Klarheit): EINE eindeutige Bruchzahl
+ * "besetzte Slots / benötigte Slots" plus ein Status-Wort — keine dritte,
+ * konkurrierende Zahl mehr.
+ *
+ * Zuvor standen drei Werte nebeneinander ("selected / verfügbare Slots · min. N"),
+ * die auseinanderlaufen konnten und Widersprüche wie "10 / 9 · min. 10" ergaben
+ * (mehr besetzt als Slot-Karten am Board; Minimum größer als der Nenner).
+ * Ursache: `total` (gerenderte Slot-Karten = `disciplinePlayerCounts`) und
+ * `minRequired` (Pflicht-Minimum aus dem Contract = Summe `requiredPlayers`)
+ * stammen aus verschiedenen Pfaden und sind im Normalfall identisch, können
+ * aber desyncen. Wir bilden daher EIN Ziel aus dem Maximum aller drei Größen,
+ * sodass der Zähler nie den Nenner und das Minimum nie den Nenner übersteigt.
+ */
+function NlCompletenessRing({
+  selected,
+  total,
+  ready,
+  minRequired,
+}: {
+  selected: number;
+  total: number;
+  ready: boolean;
+  minRequired?: number;
+}) {
   const radius = 26;
   const circumference = 2 * Math.PI * radius;
-  const pct = total > 0 ? Math.min(1, selected / total) : 0;
+  // Benötigte Slots = so viele muss die Aufstellung füllen, um komplett zu sein.
+  const target = Math.max(total, minRequired ?? 0, selected);
+  const filled = Math.min(selected, target);
+  const open = Math.max(0, target - filled);
+  const pct = target > 0 ? Math.min(1, filled / target) : 0;
+  const subLabel = ready ? "bereit" : open > 0 ? `${open} offen` : "belegt";
+  const readyDetail = ready
+    ? ", bereit zum Speichern"
+    : open > 0
+      ? `, noch ${open} offen`
+      : "";
   return (
     <div
       className={`nl-lineup-ring${ready ? " is-ready" : pct >= 1 ? " is-full" : ""}`}
       role="img"
-      aria-label={`Aufstellung ${selected} von ${total || "—"} Slots besetzt${ready ? ", bereit zum Speichern" : ""}`}
+      aria-label={`Aufstellung ${filled} von ${target || "—"} Slots besetzt${readyDetail}`}
     >
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <circle className="nl-lineup-ring-track" cx="32" cy="32" r={radius} />
@@ -187,9 +221,9 @@ function NlCompletenessRing({ selected, total, ready }: { selected: number; tota
       </svg>
       <span className="nl-lineup-ring-copy">
         <strong className="nl-tnum">
-          {selected}/{total || "—"}
+          {filled}/{target || "—"}
         </strong>
-        <small>{ready ? "bereit" : "Slots"}</small>
+        <small>{subLabel}</small>
       </span>
     </div>
   );
@@ -879,6 +913,12 @@ export default function LineupNewLook({
 
   const totalRequired = lineupFlowSummary.totalRequired;
   const selectedCount = lineupFlowSummary.selectedCount;
+  // Verfügbare Slot-Karten insgesamt (d1 + d2) — dieselbe Basis wie im
+  // Discipline-Header, s. `sideSlots.length` in `renderSide`. Der Ring bildet
+  // aus diesem Wert, `totalRequired` (Pflicht-Minimum) und `selectedCount` EIN
+  // Ziel (Maximum), damit die Bruchzahl nie widersprüchlich wird (s.
+  // NlCompletenessRing).
+  const totalAvailableSlots = slots.length;
 
   // Resolve-Show: staged Slot-für-Slot-Auflösung aus dem bestehenden
   // Preview-Feed. null => Abschnitt erscheint gar nicht (Seite unverändert).
@@ -928,7 +968,12 @@ export default function LineupNewLook({
               <strong>{discipline?.displayName ?? "—"}</strong>
               <small>
                 {axis ? `${NL_AXIS_AREA_LABEL[axis]} · ` : ""}
-                Rank {rank ?? "—"} · {sideSelected}/{sideRequired || "—"} Slots
+                {/* Slot-Label-Klarheit: "belegt/verfügbar" statt der früheren
+                    Bruchzahl {sideSelected}/{sideRequired} — die verglich belegte
+                    Slots mit dem Pflicht-Minimum und ergab z. B. "6/2" (6 belegte
+                    von 6 verfügbaren Slots, davon 2 Pflicht). Pflicht-Minimum
+                    steht jetzt separat als "min. N". */}
+                Rank {rank ?? "—"} · {sideSelected}/{sideSlots.length || "—"} belegt · min. {sideRequired || "—"}
               </small>
             </div>
           </div>
@@ -1076,7 +1121,12 @@ export default function LineupNewLook({
       {/* --- HUD: Completeness-Ring · Teamstärke · Aktionen ------------- */}
       <header className="nl-lineup-hud">
         <div className="nl-lineup-hud-status">
-          <NlCompletenessRing selected={selectedCount} total={totalRequired} ready={lineupReadyToSave} />
+          <NlCompletenessRing
+            selected={selectedCount}
+            total={totalAvailableSlots}
+            minRequired={totalRequired}
+            ready={lineupReadyToSave}
+          />
           <div className="nl-lineup-hud-copy">
             <span className="nl-lineup-eyebrow">Einsatzliste</span>
             <strong>
@@ -1259,7 +1309,14 @@ export default function LineupNewLook({
                   <strong>{focusPlayer.name}</strong>
                   <small>
                     {focusPlayer.className ?? "—"}
-                    {focusPlayer.playerOvr != null ? ` · OVR ${formatScore(focusPlayer.playerOvr)}` : ""}
+                    {focusPlayer.playerOvr != null ? (
+                      <span title="Basis-OVR aus dem Spielerprofil — auf Home steht die liga-normalisierte OVR, daher weicht der Wert ab.">
+                        {" · Basis-OVR "}
+                        {formatScore(focusPlayer.playerOvr)}
+                      </span>
+                    ) : (
+                      ""
+                    )}
                   </small>
                   {focusLaneVerdict ? (
                     <span className="nl-lineup-chip is-neutral" title={focusLaneVerdict.detail}>

@@ -23,6 +23,10 @@ import {
   formatNlNumber,
   type NlRadarAxis,
 } from "@/components/foundation/new-look";
+import {
+  getPlayerDisplaySalary,
+  getRosterEntryDisplaySalary,
+} from "@/app/foundation/foundation-page-client-exports";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
@@ -98,6 +102,31 @@ export default function PlayerHeroNewLook({
   // dann liefert `formatLeaguePercentile` schlicht kein Perzentil-Label.
   const foundationState = useFoundationStateOptional();
   const leaguePoolSize = foundationState?.gameState.players.length ?? null;
+
+  // GEHALT-Chip (neben MW): reales Saison-Gehalt.
+  //
+  // PRIMÄRQUELLE ist `data.salary` aus dem Drawer-Builder
+  // (`buildPlayerDrawerDataFromGameState`) — dort wird der echte Kader-Eintrag
+  // via `resolveRosterEntry` aufgelöst und das Gehalt aus derselben Economy
+  // gezogen wie MW/Vertrag (jetzt aktuelles Saison-Gehalt zuerst, s.
+  // `salary`-Feld im Builder). Das ist die zuverlässige Quelle für den
+  // ANGEZEIGTEN Spieler und UNABHÄNGIG vom Client-`foundationState`-Kontext:
+  // auf der Profil-Route ist `useFoundationStateOptional()` bzw. dessen
+  // `rosters` je nach Mount-Scope null/leer, weshalb eine reine
+  // Client-seitige Kader-Suche hier für gekaufte Spieler fälschlich "—"
+  // ergab. `data.salary` ist für jeden rostierten (gekauften) Spieler
+  // gesetzt → die harte Regel "Gehalt kann nicht '—' sein, wenn gekauft" hält.
+  //
+  // Sekundär (nur falls `data.salary` ausnahmsweise null ist, z. B. Isolation
+  // ohne Builder-Economy): eigene Kader-Auflösung über `foundationState`,
+  // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
+  const rosterEntry = foundationState
+    ? (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
+    : null;
+  const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
+  const heroSalary =
+    data.salary ??
+    (rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer) : getPlayerDisplaySalary(heroPlayer));
 
   const radarAxes: NlRadarAxis[] = (
     [
@@ -227,6 +256,13 @@ export default function PlayerHeroNewLook({
               tone="neutral"
               sub="Marktwert"
               title="Marktwert"
+            />
+            <StatChip
+              label="GEHALT"
+              value={formatNlNumber(heroSalary, 1)}
+              tone="neutral"
+              sub="pro Saison"
+              title="Gehalt pro Saison"
             />
           </StatChipRow>
         </div>

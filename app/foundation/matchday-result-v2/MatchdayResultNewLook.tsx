@@ -136,6 +136,8 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   const [mode, setMode] = useState<NlResultMode>("board");
   const [sortKey, setSortKey] = useState<NlResultSortKey | null>(null);
   const [sortDir, setSortDir] = useState<NlResultSortDir>("asc");
+  // Tagessieger-Reveal (D3): kurzer, überspringbarer Moment über dem Detail.
+  const [tagessiegerDismissed, setTagessiegerDismissed] = useState(false);
 
   const boardRows = useMemo(
     () =>
@@ -222,6 +224,9 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         style={{ ...getSeasonV2TeamTagStyle(row.teamShortCode), "--nl-reveal-i": revealIndex } as CSSProperties}
       >
         <NlMedalBadge kind={medalKind} title={`Tagesrang ${rank}`} className="nl-result-podium-medal" />
+        {/* Explizites Rang-Label: die 2·1·3-Anordnung darf nicht als "wir haben
+            gewonnen" fehlgelesen werden — die Platzierung bleibt eindeutig (#6). */}
+        <span className="nl-result-podium-rank-label">Tagesrang {rank}</span>
         <BudgetedMediaImage
           src={logoSrc}
           alt={`${row.teamName} Logo`}
@@ -276,7 +281,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </button>
         </span>
         <span
-          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "pow" : "men")}`}
+          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "accent" : "neutral")}`}
           title={player.disciplineName}
         >
           {player.disciplineSide === "d1" ? "D1" : "D2"}
@@ -337,7 +342,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               className="nl-result-scorebar-progress"
               value={getBarPercent(row.d1Score, maxD1)}
               max={100}
-              tone="pow"
+              tone="accent"
               showValue={false}
             />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d1Score, 1)}</span>
@@ -347,7 +352,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               className="nl-result-scorebar-progress"
               value={getBarPercent(row.d2Score, maxD2)}
               max={100}
-              tone="men"
+              tone="neutral"
               showValue={false}
             />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d2Score, 1)}</span>
@@ -498,13 +503,13 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
             <StatChip
               label="D1"
               value={matchdaySummary.d1.disciplineName ?? "—"}
-              tone="pow"
+              tone="accent"
               sub={heroRow?.d1Score != null ? `${formatNlNumber(heroRow.d1Score, 1)} Score` : undefined}
             />
             <StatChip
               label="D2"
               value={matchdaySummary.d2.disciplineName ?? "—"}
-              tone="men"
+              tone="neutral"
               sub={heroRow?.d2Score != null ? `${formatNlNumber(heroRow.d2Score, 1)} Score` : undefined}
             />
             {championRow ? (
@@ -520,6 +525,77 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </StatChipRow>
         </div>
       </NlCard>
+
+      {championRow && !tagessiegerDismissed ? (
+        <section
+          className="nl-result-reveal"
+          data-testid="nl-result-tagessieger-reveal"
+          aria-label="Tagessieger-Reveal"
+        >
+          <div className="nl-result-reveal-inner">
+            <span
+              className="nl-result-reveal-eyebrow nl-reveal"
+              style={{ "--nl-reveal-i": 0 } as CSSProperties}
+            >
+              Spieltag {matchdaySummary.matchdayNumber ?? "—"} · Tagessieger
+            </span>
+            <div
+              className="nl-result-reveal-champion nl-reveal"
+              style={{ "--nl-reveal-i": 1 } as CSSProperties}
+            >
+              <NlMedalBadge kind="gold" title="Tagessieger" className="nl-result-reveal-medal" />
+              <BudgetedMediaImage
+                src={getTeamLogoBrowserUrl(championRow.teamId, null, { variant: "thumb" })}
+                alt={`${championRow.teamName} Logo`}
+                className="nl-result-reveal-crest"
+                width={64}
+                height={64}
+                fallback={
+                  <span className="nl-result-reveal-crest nl-result-reveal-crest-fallback">
+                    {championRow.teamShortCode}
+                  </span>
+                }
+              />
+              <div className="nl-result-reveal-copy">
+                <button
+                  type="button"
+                  className="nl-result-reveal-team"
+                  onClick={() => openTeamProfileById(championRow.teamId)}
+                  title={`${championRow.teamName} öffnen`}
+                >
+                  {championRow.teamName}
+                </button>
+                <span className="nl-result-reveal-points nl-tnum">
+                  <strong>
+                    <NlCountUpValue
+                      value={championRow.matchdayPoints}
+                      format={(value) => formatNlNumber(value, 1)}
+                    />
+                  </strong>
+                  <small>Tagespunkte</small>
+                </span>
+              </div>
+            </div>
+            {heroRow ? (
+              <p
+                className="nl-result-reveal-you nl-reveal nl-tnum"
+                style={{ "--nl-reveal-i": 2 } as CSSProperties}
+              >
+                Du: <strong>{heroRow.matchdayRank != null ? `#${heroRow.matchdayRank}` : "—"}</strong>{" "}
+                von {boardRows.length}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nl-result-reveal-skip"
+            onClick={() => setTagessiegerDismissed(true)}
+            aria-label="Tagessieger-Reveal überspringen"
+          >
+            Überspringen
+          </button>
+        </section>
+      ) : null}
 
       {podiumRows.length > 0 ? (
         <NlCard
@@ -585,7 +661,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
                     </button>
                   </div>
                   <span
-                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "pow" : "men")}`}
+                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "accent" : "neutral")}`}
                     title={mvpPlayer.disciplineName}
                   >
                     {mvpPlayer.disciplineName}

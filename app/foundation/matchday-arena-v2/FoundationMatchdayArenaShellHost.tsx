@@ -151,9 +151,9 @@ export default function FoundationMatchdayArenaShellHost({
                   data-testid="arena-finish-matchday-button"
                   disabled={readOnly || cockpitBusyKey != null}
                   onClick={() => void runFinishMatchdaySimple()}
-                  title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum naechsten Spieltag."
+                  title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum nächsten Spieltag."
                 >
-                  {cockpitBusyKey === "matchday-auto-run-execute" ? "Laeuft..." : "Spieltag abschliessen"}
+                  {cockpitBusyKey === "matchday-auto-run-execute" ? "Läuft..." : "Spieltag abschliessen"}
                 </button>
               )}
             </div>

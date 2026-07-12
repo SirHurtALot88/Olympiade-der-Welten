@@ -29,16 +29,18 @@ import { getTeamLogoModel } from "@/lib/data/mediaAssets";
  * `FoundationRanksPanel` fällt ohne Flag unverändert auf die bestehende
  * Tabelle zurück. Konsumiert exakt dieselben Props/Daten wie die alte Tabelle.
  *
- * Liga-Überblick im Kopf (Ø/Spannweite/eigenes Team/Abstand zu #1) ist rein
- * aus den vorhandenen `sortedPpAreaRows` berechnet; "eigenes Team" nutzt den
- * `team.humanControlled`-Marker, der auch im Foundation-Shell die
+ * Liga-Überblick im Kopf (Ø/Median/Spannweite/eigenes Team/Abstand zu #1) ist
+ * rein aus den vorhandenen `sortedPpAreaRows` berechnet; "eigenes Team" nutzt
+ * den `team.humanControlled`-Marker, der auch im Foundation-Shell die
  * Team-Auflösung als Fallback bestimmt.
  *
- * Bewusst weggelassen, weil es dafür keine echten Daten in den Props gibt:
- * - keine Rang-Bewegung (die `sortedPpAreaRows` tragen keinen Vor-Rang /
- *   kein `rankDiff` — Bewegung existiert nur in der Disziplin-Rang-Tabelle
- *   des Shell-Routers, nicht in diesem Panel),
- * - kein Verlauf pro Spieltag (existiert nicht in den Props).
+ * Rang-Bewegung (▲/▼ Δ zum letzten Spieltag) fehlt bewusst als echter Wert:
+ * die `sortedPpAreaRows` tragen keinen Vor-Rang / kein `rankDiff`, und für die
+ * kumulative PP-Bereichswertung existiert keine Spieltag-Historie in den Props
+ * (die einzige Bewegungsquelle der App — `rankDeltas` in der Disziplin-Rang-
+ * Matrix des Shell-Routers — ist saison-, nicht spieltagbezogen). Statt einen
+ * Wert zu erfinden, zeigt jede Zeile einen sauberen Platzhalter ("—") mit
+ * erklärendem Tooltip.
  */
 
 type NlRanksMetric = "total" | "pow" | "spe" | "men" | "soc";
@@ -108,18 +110,21 @@ export default function FoundationRanksNewLook({
     [metric, rankedRows],
   );
 
-  // Liga-Ø und Spannweite für die aktive Metrik — direkt aus denselben Zeilen.
+  // Liga-Ø, Median und Spannweite für die aktive Metrik — direkt aus denselben Zeilen.
   const metricStats = useMemo(() => {
     const values = sortedPpAreaRows
       .map((row) => getMetricValue(row, metric))
-      .filter((value) => Number.isFinite(value));
+      .filter((value) => Number.isFinite(value))
+      .sort((left, right) => left - right);
     if (values.length === 0) {
       return null;
     }
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const min = values[0];
+    const max = values[values.length - 1];
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-    return { mean, min, max, count: values.length };
+    const mid = Math.floor(values.length / 2);
+    const median = values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
+    return { mean, median, min, max, count: values.length };
   }, [metric, sortedPpAreaRows]);
 
   // Eigenes Team: bester (rang-höchster) Eintrag mit `humanControlled`-Marker.
@@ -199,6 +204,12 @@ export default function FoundationRanksNewLook({
               title={`Rangliste ${activeMetric.label} — Durchschnitt über ${formatNlNumber(metricStats.count, 0)} Teams`}
             />
             <StatChip
+              label={`Median · ${activeMetric.label}`}
+              value={formatNlNumber(metricStats.median, 1)}
+              tone={activeMetric.tone}
+              title={`Mittlerer Wert der Liga (${activeMetric.label}) — robuster als der Ø gegenüber Ausreißern`}
+            />
+            <StatChip
               label="Spannweite"
               value={formatNlNumber(metricStats.max - metricStats.min, 1)}
               sub={`${formatNlNumber(metricStats.min, 1)} – ${formatNlNumber(metricStats.max, 1)}`}
@@ -220,7 +231,7 @@ export default function FoundationRanksNewLook({
                   label="Abstand zu #1"
                   value="Spitze"
                   sub="Dein Team führt"
-                  tone="good"
+                  tone="accent"
                   title={`Dein Team ist Rang 1 in ${activeMetric.label}`}
                 />
               ) : (
@@ -247,8 +258,10 @@ export default function FoundationRanksNewLook({
         ) : null}
         <p className="nl-ranks-hint">
           Summe aus POW, SPE, MEN und SOC je Team. Formkartenbonus (z.&nbsp;B. +8) ist bereits in den Punkten enthalten.
-          Klick auf ein Team öffnet das Teamprofil.
+          Klick auf ein Team öffnet das Teamprofil. Rang-Bewegung (▲/▼) gegenüber dem letzten Spieltag wird für diese
+          kumulative Saisonwertung noch nicht erfasst und bleibt vorerst leer&nbsp;(—).
         </p>
+        <div className="nl-ranks-board-scroll">
         <ol className={`nl-ranks-board ${nlToneClass(activeMetric.tone)}`} aria-label={`Ranking ${activeMetric.label}`}>
           {rankedRows.map(({ row, displayRank }) => {
             const logo = getTeamLogoModel(row.team);
@@ -276,6 +289,15 @@ export default function FoundationRanksNewLook({
                     ) : (
                       <span className="nl-ranks-ranknum nl-tnum">{displayRank}</span>
                     )}
+                    {/* Rang-Bewegung-Platzhalter: echte Spieltag-Bewegung existiert nicht in
+                        den Props — sauberer "—"-Marker statt erfundener Werte (#1). */}
+                    <span
+                      className="nl-ranks-trend is-empty"
+                      title="Rang-Bewegung gegenüber dem letzten Spieltag wird für die kumulative Saisonwertung noch nicht erfasst"
+                      aria-label="Rang-Bewegung nicht verfügbar"
+                    >
+                      —
+                    </span>
                   </span>
                   <button
                     type="button"
@@ -366,6 +388,29 @@ export default function FoundationRanksNewLook({
             );
           })}
         </ol>
+        </div>
+        {metricStats && rankedRows.length > 0 ? (
+          <div
+            className={`nl-ranks-summaryrow ${nlToneClass(activeMetric.tone)}`}
+            aria-label={`Liga-Überblick ${activeMetric.label}: Durchschnitt ${formatNlNumber(metricStats.mean, 1)}, Median ${formatNlNumber(metricStats.median, 1)}`}
+          >
+            <span className="nl-ranks-summaryrow-label">Liga · {activeMetric.label}</span>
+            <span className="nl-ranks-summaryrow-stat">
+              <small>Ø</small>
+              <strong className="nl-tnum">{formatNlNumber(metricStats.mean, 1)}</strong>
+            </span>
+            <span className="nl-ranks-summaryrow-stat">
+              <small>Median</small>
+              <strong className="nl-tnum">{formatNlNumber(metricStats.median, 1)}</strong>
+            </span>
+            <span className="nl-ranks-summaryrow-stat">
+              <small>Spanne</small>
+              <strong className="nl-tnum">
+                {formatNlNumber(metricStats.min, 1)} – {formatNlNumber(metricStats.max, 1)}
+              </strong>
+            </span>
+          </div>
+        ) : null}
         {rankedRows.length === 0 ? <p className="nl-ranks-empty">Noch keine PP-Daten für diese Saison.</p> : null}
       </NlCard>
 

@@ -89,7 +89,7 @@ describe("foundation gesamtkonzept contract", () => {
     const persistenceSource = readFileSync(join(root, "lib/foundation/tabs/use-foundation-persistence-actions.ts"), "utf8");
 
     expect(shellBodySource).toContain("foundation-bootstrap-overlay");
-    expect(shellBodySource).toContain("Foundation laedt");
+    expect(shellBodySource).toContain("Foundation lädt");
     expect(persistenceSource).toContain("foundationFetchWithRetry");
     expect(persistenceSource).toContain("loadPersistentState");
     expect(existsSync(join(root, "docs/ACCESSIBILITY_CONCEPT.md"))).toBe(true);

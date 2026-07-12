@@ -14,7 +14,7 @@ const INBOX_DECISION_CATEGORY_FILTERS = [
   { value: "transfer", label: "Transfers" },
   { value: "finance", label: "Finanzen" },
   { value: "training", label: "Training" },
-  { value: "contract", label: "Vertraege" },
+  { value: "contract", label: "Verträge" },
   { value: "facility", label: "Facilities" },
   { value: "sponsor", label: "Sponsoren" },
 ] as const;

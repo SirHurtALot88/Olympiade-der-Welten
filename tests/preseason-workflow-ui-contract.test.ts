@@ -12,9 +12,9 @@ describe("pre-season workflow ui contract", () => {
     expect(fileText).toContain("/api/season/preseason-workflow");
     expect(fileText).toContain("Pre-Season Preview laden");
     expect(fileText).toContain("Saisonwechsel-Assistent prüfen");
-    expect(fileText).toContain("Gefuehrte Teams: warten auf deine Entscheidung");
+    expect(fileText).toContain("Geführte Teams: warten auf deine Entscheidung");
     expect(fileText).toContain("Auto-Teams: Verkauf/Kauf bereit");
-    expect(fileText).toContain("Beobachtete Teams: uebersprungen");
+    expect(fileText).toContain("Beobachtete Teams: übersprungen");
     expect(fileText).toContain("Preisgeld & Finanzen");
     expect(fileText).toContain("Sponsor");
     expect(fileText).toContain("Facilities");

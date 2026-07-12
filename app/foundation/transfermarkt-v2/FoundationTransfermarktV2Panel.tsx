@@ -74,7 +74,7 @@ export default function FoundationTransfermarktV2Panel({
         <span>
           {transferWindowStatus.open
             ? "Markt-Timing ist aktiv: Verkauf und Kauf folgen getrennten Fenstern."
-            : `Transferaktionen sind in ${formatGamePhaseLabel(transferWindowStatus.phase)} gesperrt.`}
+            : `Der Transfermarkt bleibt zur Ansicht geöffnet — Käufe und Verkäufe sind in der Phase „${formatGamePhaseLabel(transferWindowStatus.phase)}“ jedoch gesperrt.`}
         </span>
         <div className="room-meta foundation-admin-meta">
           <span className={`transfer-status-pill ${transferWindowStatus.canSell ? "is-ready" : "is-blocked"}`}>
@@ -91,7 +91,16 @@ export default function FoundationTransfermarktV2Panel({
           {activeSaveName} · {seasonId} · Aktives Team {selectedTeamLabel}
         </span>
       </div>
-      <TransfermarktV2Client key={clientKey} {...client} />
+      <TransfermarktV2Client
+        key={clientKey}
+        {...client}
+        transferWindow={{
+          open: transferWindowStatus.open,
+          canBuy: transferWindowStatus.canBuy,
+          canSell: transferWindowStatus.canSell,
+          phaseLabel: formatGamePhaseLabel(transferWindowStatus.phase),
+        }}
+      />
     </section>
   );
 }

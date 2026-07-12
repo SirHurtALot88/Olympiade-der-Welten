@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { NextResponse } from "next/server";
@@ -32,6 +32,64 @@ function resolveMediaSourcePath(sourcePath: string): string {
     return path.join(root, sourcePath.slice(MAC_DROPBOX_PREFIX.length));
   }
   return sourcePath;
+}
+
+// The absolute paths in the media maps were captured on macOS (case-insensitive
+// filesystem). On a case-sensitive Linux host (e.g. the Hetzner deploy) a single
+// segment whose case differs — e.g. a folder synced as "logos" instead of
+// "Logos" — makes stat() fail and the UI silently falls back to initials. When
+// the exact path is missing, walk it segment by segment and match each directory
+// entry case-insensitively so a case drift on the server still resolves.
+async function resolveExistingPathCaseInsensitive(candidate: string): Promise<string | null> {
+  try {
+    await stat(candidate);
+    return candidate;
+  } catch {
+    // fall through to case-insensitive walk
+  }
+
+  if (!path.isAbsolute(candidate)) {
+    return null;
+  }
+
+  const segments = candidate.split(path.sep).filter((segment) => segment.length > 0);
+  let resolved: string = path.sep;
+
+  for (const segment of segments) {
+    const exact = path.join(resolved, segment);
+    try {
+      await stat(exact);
+      resolved = exact;
+      continue;
+    } catch {
+      // segment not present with this exact case — scan the directory
+    }
+
+    let entries: string[];
+    try {
+      entries = await readdir(resolved);
+    } catch {
+      return null;
+    }
+
+    const lower = segment.toLowerCase();
+    const match = entries.find((entry) => entry.toLowerCase() === lower);
+    if (!match) {
+      return null;
+    }
+    resolved = path.join(resolved, match);
+  }
+
+  return resolved;
+}
+
+async function statMediaSource(sourcePath: string) {
+  const resolvedPath = await resolveExistingPathCaseInsensitive(sourcePath);
+  if (!resolvedPath) {
+    // Preserve the original ENOENT semantics for the caller's catch block.
+    return { path: sourcePath, stat: await stat(sourcePath) };
+  }
+  return { path: resolvedPath, stat: await stat(resolvedPath) };
 }
 
 function getVariantCachePath(kind: string, assetId: string, variant: MediaImageVariant, mtimeMs: number) {
@@ -89,8 +147,8 @@ export async function serveMediaAsset(options: {
   sourcePath: string;
 }) {
   const variant: MediaImageVariant = parseMediaImageVariant(options.request);
-  const sourcePath = resolveMediaSourcePath(options.sourcePath);
-  const fileStat = await stat(sourcePath);
+  const requestedPath = resolveMediaSourcePath(options.sourcePath);
+  const { path: sourcePath, stat: fileStat } = await statMediaSource(requestedPath);
   const mtimeToken = Math.floor(fileStat.mtimeMs);
 
   if (isResizedMediaVariant(variant)) {

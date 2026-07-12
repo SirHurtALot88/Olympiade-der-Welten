@@ -213,9 +213,9 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>("saves");
 
   const exportDisabledReason = !selectedTeam
-    ? "Waehle zuerst ein Team aus."
+    ? "Wähle zuerst ein Team aus."
     : !selectedIdentityDraft || !selectedTeamStrategyDraft
-      ? "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
+      ? "Für dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
       : null;
 
   /** Draft-Verwerfen: identisch zum alten Panel (Identity/Control/Strategy). */
@@ -255,7 +255,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <span className="nl-teamsettings-hint">Baseline · Startbudget · Ownership</span>
         </header>
         <p className="nl-teamsettings-note">
-          Erst pruefen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save
+          Erst prüfen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save
           aktiv.
         </p>
         <div className="nl-teamsettings-field-grid">
@@ -268,7 +268,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("den Spielmodus")
                   : newGameBusy
                     ? getBusyActionReason("Das New-Game-Setup")
-                    : "Waehlt das Basissetup fuer das neue Spiel."
+                    : "Wählt das Basissetup für das neue Spiel."
               }
               onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
             >
@@ -288,7 +288,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("den Save-Namen")
                   : newGameBusy
                     ? getBusyActionReason("Das New-Game-Setup")
-                    : "Optionaler Name fuer den neuen lokalen Spielstand."
+                    : "Optionaler Name für den neuen lokalen Spielstand."
               }
               placeholder="Optional, sonst automatisch"
               onChange={(event) => {
@@ -328,7 +328,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("die Team-Zuordnung")
                   : newGameBusy
                     ? getBusyActionReason("Das New-Game-Setup")
-                    : "Waehle genau 1 Team fuer den Solo-Spielstand."
+                    : "Wähle genau 1 Team für den Solo-Spielstand."
               }
               onChange={(event) => {
                 if (event.target.value) {
@@ -337,7 +337,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               }}
             >
               <option value="" disabled>
-                Team waehlen
+                Team wählen
               </option>
               {[...gameState.teams]
                 .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
@@ -400,7 +400,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                                 ? getReadOnlyActionReason("die Team-Zuordnung")
                                 : newGameBusy
                                   ? getBusyActionReason("Das New-Game-Setup")
-                                  : "Ordnet dieses Team Chris/User fuer den neuen Spielstand zu."
+                                  : "Ordnet dieses Team Chris/User für den neuen Spielstand zu."
                           }
                           onClick={() => toggleNewGameTeam("chris", team.teamId)}
                         >
@@ -417,7 +417,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                                 ? getReadOnlyActionReason("die Team-Zuordnung")
                                 : newGameBusy
                                   ? getBusyActionReason("Das New-Game-Setup")
-                                  : "Ordnet dieses Team Franky fuer den neuen Spielstand zu."
+                                  : "Ordnet dieses Team Franky für den neuen Spielstand zu."
                           }
                           onClick={() => toggleNewGameTeam("franky", team.teamId)}
                         >
@@ -441,11 +441,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 ? getReadOnlyActionReason("das New-Game-Setup")
                 : newGameBusy
                   ? getBusyActionReason("Das New-Game-Setup")
-                  : "Prueft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
+                  : "Prüft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
             }
             onClick={() => void runNewGameSetup(true)}
           >
-            {newGameBusy ? "Prueft..." : "Setup pruefen"}
+            {newGameBusy ? "Prüft..." : "Setup prüfen"}
           </button>
           <button
             type="button"
@@ -457,10 +457,10 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 : newGameBusy
                   ? getBusyActionReason("Das New-Game-Setup")
                   : !newGamePreview
-                    ? "Bitte zuerst das Setup pruefen."
+                    ? "Bitte zuerst das Setup prüfen."
                     : newGamePreview.blockers.length > 0
                       ? `Noch offen: ${newGamePreview.blockers.map((reason: string) => formatCockpitReason(reason)).join(" · ")}`
-                      : "Erstellt den neuen lokalen Spielstand mit dem geprueften Setup."
+                      : "Erstellt den neuen lokalen Spielstand mit dem geprüften Setup."
             }
             onClick={() => void runNewGameSetup(false)}
           >
@@ -679,7 +679,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     ? getReadOnlyActionReason("den Save-Bereich")
                     : isSaveBusy
                       ? getBusyActionReason("Der Save-Wechsel")
-                      : "Waehlt, in welchem Bereich lokale Spielstaende angezeigt und gesteuert werden."
+                      : "Wählt, in welchem Bereich lokale Spielstände angezeigt und gesteuert werden."
                 }
                 onChange={(event) => changeFoundationSaveMode(normalizeFoundationSaveMode(event.target.value))}
               >
@@ -697,12 +697,12 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 disabled={isSaveBusy || readMeta.readOnly || saveSummaries.length === 0}
                 title={
                   saveSummaries.length === 0
-                    ? "In diesem Save-Bereich gibt es gerade keine Spielstaende."
+                    ? "In diesem Save-Bereich gibt es gerade keine Spielstände."
                     : readMeta.readOnly
                       ? getReadOnlyActionReason("den aktiven Spielstand")
                       : isSaveBusy
                         ? getBusyActionReason("Der Save-Wechsel")
-                        : "Waehlt den lokalen Spielstand, mit dem du weiterarbeitest."
+                        : "Wählt den lokalen Spielstand, mit dem du weiterarbeitest."
                 }
                 onChange={(event) => {
                   const nextSaveId = event.target.value;
@@ -761,11 +761,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("ein neues Spiel")
                   : isSaveBusy
                     ? getBusyActionReason("Die Save-Aktion")
-                    : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu loeschen."
+                    : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu löschen."
               }
               onClick={() => {
                 const confirmed = window.confirm(
-                  "Erstellt einen neuen lokalen Testspielstand fuer Season 1. Bestehende Saves bleiben erhalten.",
+                  "Erstellt einen neuen lokalen Testspielstand für Season 1. Bestehende Saves bleiben erhalten.",
                 );
                 if (!confirmed) {
                   return;
@@ -810,13 +810,13 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ? getReadOnlyActionReason("den Season-Start-Reset")
                   : seasonStartResetBusy
                     ? getBusyActionReason("Der Season-Start-Reset")
-                    : "Prueft, wie der aktuelle Save auf den Season-Start zurueckgesetzt wuerde."
+                    : "Prüft, wie der aktuelle Save auf den Season-Start zurückgesetzt würde."
               }
               onClick={() => {
                 void runSeasonStartReset(false);
               }}
             >
-              {seasonStartResetBusy ? "Laedt..." : "Season-Start-Reset pruefen"}
+              {seasonStartResetBusy ? "Lädt..." : "Season-Start-Reset prüfen"}
             </button>
             <button
               type="button"
@@ -828,15 +828,15 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   : seasonStartResetBusy
                     ? getBusyActionReason("Der Season-Start-Reset")
                     : !seasonStartResetFeed || !seasonStartResetFeed.dryRun
-                      ? "Bitte zuerst den Reset trocken pruefen."
-                      : "Setzt den aktuellen lokalen Save hart auf den Season-Start zurueck."
+                      ? "Bitte zuerst den Reset trocken prüfen."
+                      : "Setzt den aktuellen lokalen Save hart auf den Season-Start zurück."
               }
               onClick={() => {
                 if (!seasonStartResetFeed) {
                   return;
                 }
                 const confirmed = window.confirm(
-                  `Aktuellen Save jetzt hart auf Season-Start zuruecksetzen? ${seasonStartResetFeed.summary.currentTransfers} Transfers, ${seasonStartResetFeed.summary.currentRosterEntries} Roster-Eintraege und gespeicherte Spieltagsdaten werden entfernt.`,
+                  `Aktuellen Save jetzt hart auf Season-Start zurücksetzen? ${seasonStartResetFeed.summary.currentTransfers} Transfers, ${seasonStartResetFeed.summary.currentRosterEntries} Roster-Einträge und gespeicherte Spieltagsdaten werden entfernt.`,
                 );
                 if (!confirmed) {
                   return;
@@ -844,7 +844,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 void runSeasonStartReset(true);
               }}
             >
-              Season-Start-Reset ausfuehren
+              Season-Start-Reset ausführen
             </button>
           </div>
 
@@ -854,7 +854,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <div className="nl-teamsettings-savelist">
             {saveSummaries.length === 0 ? (
               <p className="nl-teamsettings-msg is-warn">
-                <strong>Keine Spielstaende in diesem Bereich</strong> Wechsle den Save-Bereich oder starte ein neues
+                <strong>Keine Spielstände in diesem Bereich</strong> Wechsle den Save-Bereich oder starte ein neues
                 Spiel in diesem Modus.
               </p>
             ) : null}
@@ -971,11 +971,11 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           data-testid="nl-teamsettings-team-selection"
         >
           <p className="nl-teamsettings-note">
-            Waehlt das Team fuer Identity, Strategy Profile und Control Settings. Der Wechsel bleibt ueber die URL
+            Wählt das Team für Identity, Strategy Profile und Control Settings. Der Wechsel bleibt über die URL
             teilbar.
           </p>
           <div className="nl-teamsettings-field-grid is-selector">
-            <NlField label="Team waehlen">
+            <NlField label="Team wählen">
               <select value={selectedTeamId} onChange={(event) => selectTeamSettingsTeam(event.target.value)}>
                 {gameState.teams.map((team: Team) => (
                   <option key={team.teamId} value={team.teamId}>
@@ -1017,7 +1017,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1
                   ? "Du bist bereits beim letzten Team der Liste."
-                  : "Springt zum naechsten Team in der aktuellen Liste."
+                  : "Springt zum nächsten Team in der aktuellen Liste."
               }
               onClick={() => {
                 const nextTeam = gameState.teams[selectedTeamSettingsIndex + 1];
@@ -1026,7 +1026,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 }
               }}
             >
-              Naechstes
+              Nächstes
             </button>
           </div>
           <div className="nl-teamsettings-pill-row nl-tnum">
@@ -1073,7 +1073,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               type="button"
               className="nl-teamsettings-btn is-small"
               disabled={!selectedTeam}
-              title={selectedTeam ? "Teamprofil öffnen" : "Waehle zuerst ein Team aus."}
+              title={selectedTeam ? "Teamprofil öffnen" : "Wähle zuerst ein Team aus."}
               onClick={() => selectedTeam && openTeamProfileById(selectedTeam.teamId)}
             >
               Teamprofil
@@ -1081,7 +1081,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           }
         >
           <p className="nl-teamsettings-note">
-            Das aktuell ausgewaehlte Team steht hier im Zentrum — Roster {selectedRoster.length} · GM{" "}
+            Das aktuell ausgewählte Team steht hier im Zentrum — Roster {selectedRoster.length} · GM{" "}
             {selectedTeamGeneralManager?.profile.archetype ?? "—"}.
           </p>
           <div className="nl-teamsettings-metric-grid">
@@ -1091,7 +1091,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               sub={
                 selectedTeam
                   ? `${formatTeamControlModeLabel(selectedTeamControl?.controlMode)} · ${selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "noch ohne Rang"}`
-                  : "Waehle oben ein Team fuer Identity, Strategy und Control."
+                  : "Wähle oben ein Team für Identity, Strategy und Control."
               }
             />
             <NlMetric
@@ -1135,7 +1135,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 <p className="nl-teamsettings-note">
                   {selectedTeamGeneralManager.profile.title} wirkt aktuell zu{" "}
                   <strong className="nl-tnum">{selectedTeamGeneralManager.assignment.influencePct}%</strong> auf
-                  Teamidentitaet, Pick-Fokus, Cash-Risiko und Vertragsstil.
+                  Teamidentität, Pick-Fokus, Cash-Risiko und Vertragsstil.
                 </p>
                 {selectedTeamGmAxisShares ? (
                   <div className="nl-teamsettings-gm-axes nl-tnum" aria-label="GM Achsen">
@@ -1211,7 +1211,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 readMeta.readOnly
                   ? getReadOnlyActionReason("den Team-Control-Draft")
-                  : "Setzt alle lokalen Entwurfs-Aenderungen auf den gespeicherten Stand zurueck."
+                  : "Setzt alle lokalen Entwurfs-Änderungen auf den gespeicherten Stand zurück."
               }
               onClick={discardDrafts}
             >
@@ -1221,8 +1221,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         }
       >
         <p className="nl-teamsettings-note">
-          Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere laeuft als AI.
-          Aenderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
+          Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere läuft als AI.
+          Änderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
         </p>
         {readMeta.readOnly ? (
           <p className="nl-teamsettings-msg is-warn">Warum nicht: {getReadOnlyActionReason("die Team-Control-Settings")}</p>
@@ -1249,9 +1249,9 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </header>
           <p className="nl-teamsettings-note">
             {activeSaveGameMode === "online_4v4"
-              ? "Waehle genau 4 Teams fuer Chris und 4 fuer Franky. Alle anderen Teams bleiben AI."
+              ? "Wähle genau 4 Teams für Chris und 4 für Franky. Alle anderen Teams bleiben AI."
               : activeSaveGameMode === "solo_1"
-                ? "Waehle genau 1 Team fuer dich. Alle anderen Teams bleiben AI."
+                ? "Wähle genau 1 Team für dich. Alle anderen Teams bleiben AI."
                 : `Maximal ${gameModeOwnershipLimits.chrisMax} Chris-Team(s)${gameModeOwnershipLimits.frankyMax ? ` und ${gameModeOwnershipLimits.frankyMax} Franky-Team(s)` : ""}.`}
           </p>
           {activeSaveGameMode === "solo_1" || (gameModeOwnershipLimits.chrisMax === 1 && gameModeOwnershipLimits.frankyMax === 0) ? (
@@ -1267,7 +1267,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 }}
               >
                 <option value="" disabled>
-                  Team waehlen
+                  Team wählen
                 </option>
                 {gameState.teams.map((team: Team) => (
                   <option key={`solo-team-${team.teamId}`} value={team.teamId}>
@@ -1346,7 +1346,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <h4>AI-Automation (nur AI-Teams)</h4>
           </header>
           <p className="nl-teamsettings-note">
-            Preview- und Apply-Flags fuer automatisierte AI-Teams. Ownership bleibt unveraendert.
+            Preview- und Apply-Flags für automatisierte AI-Teams. Ownership bleibt unverändert.
           </p>
           <div className="nl-teamsettings-table-shell">
             <table className="nl-teamsettings-table">
@@ -1461,8 +1461,8 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         <NlCard className="nl-teamsettings-card" eyebrow="Strategie" title="Identity & Strategy Profile">
           <p className="nl-teamsettings-empty">
             {!selectedTeam
-              ? "Waehle zuerst im Bereich Team-Fokus ein Team aus."
-              : "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."}
+              ? "Wähle zuerst im Bereich Team-Fokus ein Team aus."
+              : "Für dieses Team fehlen noch lokale Identity- oder Strategy-Daten."}
           </p>
         </NlCard>
       );
@@ -1484,7 +1484,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         }
       >
         <p className="nl-teamsettings-note">
-          Ausfuehrlicher lokaler Lore- und Bias-Kontext fuer AI-Erklaerungen. Keine Automatik, keine Auto-Apply-Aktion.
+          Ausführlicher lokaler Lore- und Bias-Kontext für AI-Erklärungen. Keine Automatik, keine Auto-Apply-Aktion.
         </p>
 
         <div className="nl-teamsettings-metric-grid">
@@ -1517,7 +1517,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               <span className="nl-teamsettings-hint">Default: {selectedIdentityDraft.sourceNote ?? "—"}</span>
             </header>
             <p className="nl-teamsettings-note">
-              Exakte Team-Identitaet aus den lokalen Quellen. Diese Rohwerte werden nicht auf generische 50er- oder
+              Exakte Team-Identität aus den lokalen Quellen. Diese Rohwerte werden nicht auf generische 50er- oder
               60er-Biaswerte geglaettet.
             </p>
             <div className="nl-teamsettings-field-grid">
@@ -1591,7 +1591,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 title={
                   readMeta.readOnly
                     ? getReadOnlyActionReason("die Team-Identity")
-                    : "Setzt die Team-Identity fuer dieses Team auf den Default zurueck."
+                    : "Setzt die Team-Identity für dieses Team auf den Default zurück."
                 }
                 onClick={() => {
                   const resetIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, {});
@@ -1605,7 +1605,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     ...current,
                     [selectedTeam.teamId]: resetIdentity,
                   }));
-                  setTeamIdentityMessage(`Default-Identity fuer ${selectedTeam.name} wiederhergestellt.`);
+                  setTeamIdentityMessage(`Default-Identity für ${selectedTeam.name} wiederhergestellt.`);
                 }}
               >
                 Identity auf Default
@@ -1882,10 +1882,10 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </div>
 
           <details className="nl-teamsettings-details">
-            <summary>Legacy-Kompatibilitaet / Debug</summary>
+            <summary>Legacy-Kompatibilität / Debug</summary>
             <p className="nl-teamsettings-note">
-              Diese Werte dienen nur der Rueckwaertskompatibilitaet und sind nicht die primaere Team Identity oder die
-              fuehrende AI-Bias-Quelle.
+              Diese Werte dienen nur der Rückwärtskompatibilität und sind nicht die primäre Team Identity oder die
+              führende AI-Bias-Quelle.
             </p>
             <div className="nl-teamsettings-field-grid is-wide">
               {teamStrategyListFieldLabels.map((field: (typeof teamStrategyListFieldLabels)[number]) => (
@@ -1955,7 +1955,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 readMeta.readOnly
                   ? getReadOnlyActionReason("das Strategy-Profil")
-                  : "Verwirft ungespeicherte Strategy-Aenderungen und springt auf den aktuellen Save-Stand zurueck."
+                  : "Verwirft ungespeicherte Strategy-Änderungen und springt auf den aktuellen Save-Stand zurück."
               }
               onClick={() => {
                 setTeamStrategyDraft(
@@ -1965,10 +1965,10 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     gameState.seasonState.teamStrategyProfiles,
                   ),
                 );
-                setTeamStrategyMessage("Strategy-Profile-Draft wurde auf den lokalen Save-Stand zurueckgesetzt.");
+                setTeamStrategyMessage("Strategy-Profile-Draft wurde auf den lokalen Save-Stand zurückgesetzt.");
               }}
             >
-              Strategy Draft zuruecksetzen
+              Strategy Draft zurücksetzen
             </button>
             <button
               type="button"
@@ -1977,7 +1977,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 readMeta.readOnly
                   ? getReadOnlyActionReason("das Strategy-Profil")
-                  : "Setzt das Strategy-Profil dieses Teams auf die Default-Werte zurueck."
+                  : "Setzt das Strategy-Profil dieses Teams auf die Default-Werte zurück."
               }
               onClick={() => {
                 const defaults = buildTeamStrategyProfileMap(gameState.teams, gameState.teamIdentities);
@@ -1989,7 +1989,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   ...current,
                   [selectedTeam.teamId]: resetProfile,
                 }));
-                setTeamStrategyMessage(`Default-Profil fuer ${selectedTeam.name} wiederhergestellt.`);
+                setTeamStrategyMessage(`Default-Profil für ${selectedTeam.name} wiederhergestellt.`);
               }}
             >
               Reset auf Default
@@ -1997,7 +1997,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </div>
           {readMeta.readOnly ? (
             <p className="nl-teamsettings-note">
-              Prisma/Supabase bleibt read-only. Profile koennen dort nicht gespeichert werden.
+              Prisma/Supabase bleibt read-only. Profile können dort nicht gespeichert werden.
             </p>
           ) : null}
           {selectedTeamStrategyProfile ? (
@@ -2021,7 +2021,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <span className="nl-teamsettings-eyebrow">Control Room · {canonicalSeasonLabel}</span>
             <h2 className="nl-teamsettings-title">Team-Einstellungen</h2>
             <p className="nl-teamsettings-note">
-              Der Spielmodus ist die einzige Wahrheit fuer Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
+              Der Spielmodus ist die einzige Wahrheit für Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
             </p>
             <StatChipRow className="nl-teamsettings-header-chips" aria-label="Team-Einstellungen Kennzahlen">
               <StatChip
@@ -2063,7 +2063,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                 label="Draft"
                 value={selectedTeamHasUnsavedChanges ? "offen" : "synchron"}
                 tone={selectedTeamHasUnsavedChanges ? "warn" : "good"}
-                title={selectedTeamHasUnsavedChanges ? "Es gibt ungespeicherte Aenderungen." : "Alles synchron."}
+                title={selectedTeamHasUnsavedChanges ? "Es gibt ungespeicherte Änderungen." : "Alles synchron."}
               />
             </StatChipRow>
             <div className="nl-teamsettings-pill-row nl-tnum">
@@ -2104,7 +2104,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               title={
                 readMeta.readOnly
                   ? getReadOnlyActionReason("den Team-Settings-Draft")
-                  : "Setzt alle lokalen Entwurfs-Aenderungen auf den gespeicherten Stand zurueck."
+                  : "Setzt alle lokalen Entwurfs-Änderungen auf den gespeicherten Stand zurück."
               }
               onClick={discardDrafts}
             >

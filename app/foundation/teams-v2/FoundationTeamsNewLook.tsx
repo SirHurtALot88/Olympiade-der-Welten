@@ -8,6 +8,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlFieldRaceFormStrip,
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
@@ -16,6 +17,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  formatNlMoney,
   nlToneClass,
   type NlAxisKey,
   type NlTone,
@@ -28,6 +30,7 @@ import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data
 import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import type { TeamsViewRow } from "@/lib/foundation/tabs/teams-view-derivations";
@@ -124,6 +127,13 @@ export type FoundationTeamsNewLookProps = {
    * `null`, solange die Ableitung (Hydration) noch nicht gebaut wurde.
    */
   selectedTeamsHistoryData: TeamDetailDrawerData | null;
+  /**
+   * Wave D · D1 Feld-Form-Strip: letzte bis zu 5 Spieltage des gezeigten Teams
+   * aus dem Feld-Rennen-Ledger (fog-sicher, optional). `fieldRacePlayedMatchdayCount`
+   * speist den Frühphasen-Zustand (S1/MD1).
+   */
+  fieldRaceRecentForm?: FieldRaceLedgerEntry[];
+  fieldRacePlayedMatchdayCount?: number;
   filteredSelectedRosterTableRows: NlTeamsRosterRow[];
   teamRosterRoleFilter: TeamRosterRoleFilter;
   setTeamRosterRoleFilter: (value: TeamRosterRoleFilter) => void;
@@ -393,17 +403,19 @@ function compareDisciplineByStrength(left: NlTeamDisciplineEntry, right: NlTeamD
   return left.label.localeCompare(right.label, "de-DE");
 }
 
-/** Ton nach Liga-Rang-Drittel (oberstes Drittel = good, unterstes = risk) —
- * dieselbe Drittel-Logik wie andernorts für Rating-Bänder, nur auf Rang
- * statt Rating angewandt. */
+/** Ton nach Liga-Rang-Quartil auf der Haus-Farbskala blau→grün→gelb→rot
+ * (blau = Spitze/Rang 1 = das Beste, grün, gelb, rot = schwächstes) —
+ * dieselbe 4-Stufen-Logik wie `getAxisRankTone` (players-table), nur auf
+ * den Liga-Rang statt auf Rating-Bänder angewandt. */
 function getDisciplineRankTone(rank: number | null, teamCount: number): NlTone {
   if (rank == null || teamCount <= 1) {
     return "neutral";
   }
   const ratio = (rank - 1) / (teamCount - 1);
-  if (ratio <= 1 / 3) return "good";
-  if (ratio <= 2 / 3) return "warn";
-  return "risk";
+  if (ratio <= 1 / 4) return "accent"; // Spitzen-Viertel: blau, "das Beste".
+  if (ratio <= 1 / 2) return "good"; // grün.
+  if (ratio <= 3 / 4) return "warn"; // gelb.
+  return "risk"; // rot = schwächstes.
 }
 
 type NlTeamDisciplineRadarAxis = {
@@ -560,6 +572,8 @@ export default function FoundationTeamsNewLook({
   selectedTeamDetailTab,
   sortedTeamsViewRows,
   selectedTeamsHistoryData,
+  fieldRaceRecentForm,
+  fieldRacePlayedMatchdayCount,
   filteredSelectedRosterTableRows,
   teamRosterRoleFilter,
   setTeamRosterRoleFilter,
@@ -948,7 +962,7 @@ export default function FoundationTeamsNewLook({
               economyStats={[
                 {
                   label: "MW",
-                  value: formatNlNumber(marketValue, 2),
+                  value: formatNlMoney(marketValue),
                   delta:
                     marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
                       ? `${marketValueDelta > 0 ? "+" : ""}${formatNlNumber(marketValueDelta, 2)}`
@@ -1039,7 +1053,7 @@ export default function FoundationTeamsNewLook({
                   <td>{formatNlNumber(row.playerPps, 1)}</td>
                   <td>
                     <span className="nl-teams-money-stack">
-                      <span>{formatNlNumber(marketValue, 2)}</span>
+                      <span>{formatNlMoney(marketValue)}</span>
                       {marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01 ? (
                         <small className={marketValueDelta >= 0 ? "text-positive" : "text-negative"}>
                           {`${marketValueDelta > 0 ? "+" : ""}${formatNlNumber(marketValueDelta, 2)}`}
@@ -1212,7 +1226,7 @@ export default function FoundationTeamsNewLook({
       return (
         <span className="nl-teams-board-sortval nl-tnum" title="Team-Marktwert">
           <small>MW</small>
-          {formatNlNumber(row.marketValueTotal, 2)}
+          {formatNlMoney(row.marketValueTotal)}
         </span>
       );
     }
@@ -1220,7 +1234,7 @@ export default function FoundationTeamsNewLook({
       return (
         <span className="nl-teams-board-sortval nl-tnum" title="Gehaltsblock">
           <small>Gehalt</small>
-          {formatNlNumber(row.salaryTotal, 2)}
+          {formatNlMoney(row.salaryTotal)}
         </span>
       );
     }
@@ -1303,7 +1317,7 @@ export default function FoundationTeamsNewLook({
             {row.silverCount > 0 ? <NlMedalBadge kind="silver" count={row.silverCount} /> : null}
             {row.bronzeCount > 0 ? <NlMedalBadge kind="bronze" count={row.bronzeCount} /> : null}
             <span className="nl-teams-board-cash nl-tnum" title="Cash">
-              {row.cash != null ? formatMoney(row.cash) : "—"}
+              {row.cash != null ? formatNlMoney(row.cash) : "—"}
             </span>
           </span>
         </button>
@@ -1380,20 +1394,20 @@ export default function FoundationTeamsNewLook({
                 />
                 <StatChip
                   label="Cash"
-                  value={heroRow?.cash != null ? formatMoney(heroRow.cash) : "—"}
+                  value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
                   tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
                   title="Cash — sortiert die Teamtabelle nach Cash"
                   onClick={() => handleHeroBoardSortSelect("cash", "desc")}
                 />
                 <StatChip
                   label="MW"
-                  value={formatNlNumber(heroRow?.marketValueTotal, 2)}
+                  value={formatNlMoney(heroRow?.marketValueTotal)}
                   title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
                   onClick={() => handleHeroBoardSortSelect("mw", "desc")}
                 />
                 <StatChip
                   label="Gehalt"
-                  value={heroRow != null ? formatNlNumber(heroRow.salaryTotal, 2) : "—"}
+                  value={heroRow != null ? formatNlMoney(heroRow.salaryTotal) : "—"}
                   title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
                   onClick={() => {
                     setRosterMode("tabelle");
@@ -1442,11 +1456,18 @@ export default function FoundationTeamsNewLook({
                       <NlDeltaChip
                         value={seasonDeltas.marketValueDelta}
                         format={(n) => formatSignedNlNumber(n, 2)}
-                        title={`Marktwert: ${formatNlNumber(previousSeasonRow.marketValue, 2)} → ${formatNlNumber(liveHistoryRow?.marketValue, 2)}`}
+                        title={`Marktwert: ${formatNlMoney(previousSeasonRow.marketValue)} → ${formatNlMoney(liveHistoryRow?.marketValue)}`}
                       />
                     </span>
                   ) : null}
                 </div>
+              ) : null}
+              {fieldRaceRecentForm != null ? (
+                <NlFieldRaceFormStrip
+                  entries={fieldRaceRecentForm}
+                  playedMatchdayCount={fieldRacePlayedMatchdayCount}
+                  className="nl-teams-hero-form"
+                />
               ) : null}
             </div>
           </div>
@@ -1622,7 +1643,7 @@ export default function FoundationTeamsNewLook({
                   <article className="nl-teams-development-metric">
                     <header className="nl-teams-development-head">
                       <span className="nl-teams-development-label">Marktwert</span>
-                      <span className="nl-teams-development-value nl-tnum">{formatNlNumber(liveHistoryRow?.marketValue, 2)}</span>
+                      <span className="nl-teams-development-value nl-tnum">{formatNlMoney(liveHistoryRow?.marketValue)}</span>
                       {seasonDeltas?.marketValueDelta != null ? (
                         <NlDeltaChip
                           value={seasonDeltas.marketValueDelta}
@@ -1643,7 +1664,7 @@ export default function FoundationTeamsNewLook({
                     )}
                     <p className="nl-teams-development-meta">
                       {developmentSeries.marketValueFirst != null && developmentSeries.marketValueLast != null
-                        ? `von ${formatNlNumber(developmentSeries.marketValueFirst, 2)} auf ${formatNlNumber(developmentSeries.marketValueLast, 2)}`
+                        ? `von ${formatNlMoney(developmentSeries.marketValueFirst)} auf ${formatNlMoney(developmentSeries.marketValueLast)}`
                         : "—"}
                     </p>
                   </article>
@@ -1651,12 +1672,12 @@ export default function FoundationTeamsNewLook({
                     <header className="nl-teams-development-head">
                       <span className="nl-teams-development-label">Cash</span>
                       <span className="nl-teams-development-value nl-tnum">
-                        {liveHistoryRow?.cash != null ? formatMoney(liveHistoryRow.cash) : "—"}
+                        {liveHistoryRow?.cash != null ? formatNlMoney(liveHistoryRow.cash) : "—"}
                       </span>
                       {seasonDeltas?.cashDelta != null ? (
                         <NlDeltaChip
                           value={seasonDeltas.cashDelta}
-                          format={(n) => `${n > 0 ? "+" : ""}${formatMoney(n)}`}
+                          format={(n) => `${n > 0 ? "+" : ""}${formatNlMoney(n)}`}
                           title={`Cash ggü. ${previousSeasonRow?.seasonName ?? "Vorsaison"}`}
                         />
                       ) : null}
@@ -1673,7 +1694,7 @@ export default function FoundationTeamsNewLook({
                     )}
                     <p className="nl-teams-development-meta">
                       {developmentSeries.cashFirst != null && developmentSeries.cashLast != null
-                        ? `von ${formatMoney(developmentSeries.cashFirst)} auf ${formatMoney(developmentSeries.cashLast)}`
+                        ? `von ${formatNlMoney(developmentSeries.cashFirst)} auf ${formatNlMoney(developmentSeries.cashLast)}`
                         : "—"}
                     </p>
                   </article>
@@ -1685,7 +1706,7 @@ export default function FoundationTeamsNewLook({
                       className={`nl-teams-development-season${row.isLive ? " is-live" : ""}`}
                       title={`${row.seasonName}${row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""}${
                         row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""
-                      }${row.marketValue != null ? ` · MW ${formatNlNumber(row.marketValue, 2)}` : ""}`}
+                      }${row.marketValue != null ? ` · MW ${formatNlMoney(row.marketValue)}` : ""}`}
                     >
                       <span className="nl-teams-development-season-name">
                         {formatNlSeasonShortLabel(row.seasonName, row.seasonId)}

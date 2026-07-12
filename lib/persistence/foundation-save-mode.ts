@@ -13,7 +13,7 @@ type SaveModeInput = {
 const PRESET_SAVE_MODES: FoundationSaveModePreset[] = ["solo_1", "solo_2", "solo_4", "online_4v4", "custom"];
 
 export const FOUNDATION_SAVE_MODE_OPTIONS: Array<{ value: FoundationSaveMode; label: string }> = [
-  { value: "all", label: "Alle Spielstaende" },
+  { value: "all", label: "Alle Spielstände" },
   { value: "solo_1", label: "Solo 1 Team" },
   { value: "solo_2", label: "Solo 2 Teams" },
   { value: "solo_4", label: "Solo 4 Teams" },

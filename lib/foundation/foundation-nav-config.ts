@@ -22,14 +22,14 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event.", icon: "◉" },
-      { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstaerken.", icon: "▤" },
+      { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
     ],
   },
   {
     id: "team",
     label: "Team",
     items: [
-      { id: "teams", label: "Teams", tooltip: "Kader, Vertraege und Teamdetails.", icon: "◈" },
+      { id: "teams", label: "Teams", tooltip: "Kader, Verträge und Teamdetails.", icon: "◈" },
       { id: "players", label: "Spieler", tooltip: "Spieler suchen und Profil öffnen.", icon: "◎" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
@@ -50,6 +50,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
       { id: "diszis", label: "Diszis", tooltip: "Disziplinen und Mutatoren.", icon: "◫" },
+      { id: "leagueLeaders", label: "Leaders", tooltip: "Liga-Leaders je Kategorie plus Rekorde & Hall of Fame.", icon: "★" },
       { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "€" },
       { id: "encyclopedia", label: "Lexikon", tooltip: "Spielbegriffe und Regeln.", icon: "?" },
     ],

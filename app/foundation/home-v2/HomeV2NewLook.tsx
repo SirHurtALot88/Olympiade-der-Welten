@@ -9,6 +9,7 @@ import FoundationPlayerPortraitCard from "@/components/foundation/player-portrai
 import {
   NlCard,
   NlDeltaChip,
+  NlFieldRaceFormStrip,
   NlProgressBar,
   NlRadar,
   StatChip,
@@ -24,11 +25,11 @@ import {
 import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 
 /**
- * "Neuer Look" Manager-Cockpit fuer Home V2 (flag-gated, additive).
+ * "Neuer Look" Manager-Cockpit für Home V2 (flag-gated, additive).
  *
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
- * `HomeV2Client` faellt ohne Flag unveraendert auf das bestehende Layout
- * zurueck. Konsumiert exakt dieselben Props/Daten wie der alte Client;
+ * `HomeV2Client` fällt ohne Flag unverändert auf das bestehende Layout
+ * zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client;
  * es gibt keine Zeit-/Uhr-Simulation, daher bewusst keine Countdown- oder
  * "vs. letzte Woche"-Elemente.
  *
@@ -261,6 +262,10 @@ export default function HomeV2NewLook({
   salaryTotal,
   guv,
   rosterCount,
+  fieldRaceForm,
+  fieldRacePlayedMatchdays,
+  fieldRaceTotalTeams,
+  fieldRaceRankMovement,
   boardPressure,
   boardRating,
   boardObjectives,
@@ -289,6 +294,21 @@ export default function HomeV2NewLook({
 }: HomeV2ClientProps) {
   const visibleTodayCards = todayCards.slice(0, 3);
   const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
+
+  // D2 Feld-relative Rang-KPI: "#{rank} von {total} · Top {pct}%". Perzentil aus
+  // Rang/Feldgröße (Beispiel: #31 von 32 → Top 97%). Fog-sicher — nur die
+  // öffentliche Feldgröße und der eigene Rang, keine fremden Werte.
+  const fieldRankPercentile =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? Math.max(1, Math.min(100, Math.round((rank / fieldRaceTotalTeams) * 100)))
+      : null;
+  const rankFieldSub =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? `von ${formatNlNumber(fieldRaceTotalTeams, 0)}${fieldRankPercentile != null ? ` · Top ${fieldRankPercentile}%` : ""}`
+      : undefined;
+  // D4 Rang-Movement (Δ vs. letzter Spieltag): >0 ▲ Plätze gut, <0 ▼. Am ersten
+  // Spieltag (kein Vorwert) bewusst "neu" statt eines erfundenen Deltas.
+  const isFirstFieldRaceMatchday = (fieldRacePlayedMatchdays ?? 0) <= 1;
 
   // Hero-/KPI-Zähler (#Wave2): nur die Headline-Zahlen zählen hoch — Tabellen
   // und Listen bleiben unverändert. Fixe Anzahl Top-Level-Hooks (kein Loop),
@@ -358,9 +378,11 @@ export default function HomeV2NewLook({
         data-testid="nl-home-hero"
         actions={
           <div className="nl-home-hero-next">
-            <button type="button" className="nl-home-continue" onClick={onContinue}>
-              Weiter · {nextStepLabel}
-            </button>
+            {/* CC7: the "Weiter · …" advance action is rendered once in the global
+                top-bar (foundation-global-next-button, wired to triggerGlobalNext).
+                The hero no longer duplicates that button — it only surfaces the
+                current flow status so the richer context stays without a second
+                advance control. */}
             <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
             {nextStepBlocked ? (
               <span className={`nl-home-next-reason ${nlToneClass("warn")}`}>{nextStepDetail}</span>
@@ -383,13 +405,35 @@ export default function HomeV2NewLook({
           </div>
 
           <StatChipRow className="nl-home-hero-kpis" aria-label="Team KPIs">
-            <StatChip
-              label="Rang"
-              value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
-              tone="accent"
-              onClick={onOpenSeason}
-              title="Zum Saisonstand"
-            />
+            <span className="nl-home-rank-portal">
+              <StatChip
+                label="Rang"
+                value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
+                tone="accent"
+                sub={rankFieldSub}
+                onClick={onOpenSeason}
+                title={
+                  rankFieldSub
+                    ? `Rang ${rank} von ${fieldRaceTotalTeams} im Feld — zum Saisonstand`
+                    : "Zum Saisonstand"
+                }
+              />
+              {fieldRaceRankMovement != null ? (
+                <NlDeltaChip
+                  value={fieldRaceRankMovement}
+                  format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
+                  title="Rang-Bewegung gegenüber dem letzten Spieltag"
+                  className="nl-home-rank-move"
+                />
+              ) : rank != null && isFirstFieldRaceMatchday ? (
+                <span
+                  className="nl-home-rank-move is-new nl-tnum"
+                  title="Erster Spieltag — noch keine Rang-Bewegung"
+                >
+                  neu
+                </span>
+              ) : null}
+            </span>
             <StatChip
               label="Cash"
               value={formatNlMoney(animatedCash ?? cash)}
@@ -398,9 +442,18 @@ export default function HomeV2NewLook({
             />
           </StatChipRow>
 
+          {fieldRaceForm != null ? (
+            <NlFieldRaceFormStrip
+              entries={fieldRaceForm}
+              playedMatchdayCount={fieldRacePlayedMatchdays}
+              compact
+              className="nl-home-hero-form"
+            />
+          ) : null}
+
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
             <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} onClick={onOpenOffice} title="Gewinn und Verlust — zum Front Office" />
-            <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
+            <StatChip label="Saisonpunkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Saison-Punktestand — identisch zum Saisonstand" />
             <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
             <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
           </StatChipRow>
@@ -473,6 +526,9 @@ export default function HomeV2NewLook({
         <div className="nl-home-section-head">
           <span className="nl-home-section-icon"><IconUsers /></span>
           <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
+          <span className="nl-home-section-hint" title="Reihenfolge: Rolle (Stammspieler zuerst), dann Saisonleistung (PPS), MVS und OVR">
+            sortiert nach Rolle &amp; Saisonleistung
+          </span>
         </div>
         {topPlayers.length > 0 ? (
           <div className="nl-home-portrait-grid">

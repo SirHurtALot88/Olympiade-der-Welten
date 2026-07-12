@@ -145,28 +145,28 @@ export function applyStoredColumnOrder(
 }
 
 export const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
-  { id: "home", label: "Home", tooltip: "Manager-Zentrale: naechste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
-  { id: "season", label: "Saisonstand", tooltip: "Tabelle, Manager, Teamstaerken und Punkteentwicklung." },
-  { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost waehlen und Spieltag vorbereiten." },
+  { id: "home", label: "Home", tooltip: "Manager-Zentrale: nächste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
+  { id: "season", label: "Saisonstand", tooltip: "Tabelle, Manager, Teamstärken und Punkteentwicklung." },
+  { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost wählen und Spieltag vorbereiten." },
   { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event ansehen und Ergebnis verstehen." },
-  { id: "teams", label: "Teams", tooltip: "Kader, Vertraege, Value, Achsenprofil und Teamdetails pruefen." },
+  { id: "teams", label: "Teams", tooltip: "Kader, Verträge, Value, Achsenprofil und Teamdetails prüfen." },
   { id: "trainingCompact", label: "Training", tooltip: "Kompakte Trainingssteuerung: Modus, Klasse, Forecast und Risiko pro Spieler." },
   { id: "trainingV2", label: "Gebäude", tooltip: "Facilities V2: Upgrade, Wartung, Unterhalt und Wirkung am aktiven Spielstand." },
-  { id: "players", label: "Spieler", tooltip: "Spieler suchen, vergleichen und Profil/Training/Markt oeffnen." },
-  { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks nach Gesamtstaerke und Achsen." },
-  { id: "diszis", label: "Diszis", tooltip: "Disziplinen, Mutatoren und Gewichtungen pruefen." },
+  { id: "players", label: "Spieler", tooltip: "Spieler suchen, vergleichen und Profil/Training/Markt öffnen." },
+  { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks nach Gesamtstärke und Achsen." },
+  { id: "diszis", label: "Diszis", tooltip: "Disziplinen, Mutatoren und Gewichtungen prüfen." },
   { id: "prize", label: "Preisgeld", tooltip: "Preisgeld- und Saisonende-Ausblick nach Tabellenplatz." },
-  { id: "market", label: "Transfermarkt", tooltip: "Kaufen, verkaufen, Value pruefen und Budgets absichern." },
+  { id: "market", label: "Transfermarkt", tooltip: "Kaufen, verkaufen, Value prüfen und Budgets absichern." },
   { id: "history", label: "Transferhistorie", tooltip: "Vergangene Deals, Gewinne, Risiken und Kaderbewegungen." },
 ];
 
 export const foundationAdminViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
-	  { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern, Status pruefen und naechste Phase vorbereiten." },
+	  { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern, Status prüfen und nächste Phase vorbereiten." },
 	  { id: "homeV2", label: "Home v2", tooltip: "Velo-Victory-artiges Manager-Dashboard mit Top-Spielern und KPIs (Preview)." },
-	  { id: "facilitiesOverviewV2", label: "Facilities v2", tooltip: "Legacy-Overview — oeffnet jetzt die volle Gebaeude-V2 mit Save-Anbindung." },
+	  { id: "facilitiesOverviewV2", label: "Facilities v2", tooltip: "Legacy-Overview — öffnet jetzt die volle Gebäude-V2 mit Save-Anbindung." },
 	  { id: "scoutingCenterV2", label: "Scouting Hub", tooltip: "Scouting-Zusammenfassung und Handoff in den Transfermarkt — kein separates Center (Preview)." },
-	  { id: "generator", label: "Player Generator", tooltip: "Spieler generieren und Draftwerte pruefen." },
-  { id: "teamSettings", label: "Team Settings", tooltip: "Teamnamen, Manager, Identitaet und Steuerung konfigurieren." },
+	  { id: "generator", label: "Player Generator", tooltip: "Spieler generieren und Draftwerte prüfen." },
+  { id: "teamSettings", label: "Team Settings", tooltip: "Teamnamen, Manager, Identität und Steuerung konfigurieren." },
   { id: "admin", label: "Admin", tooltip: "Technische Steuerung, Import, Simulationen und Debug-Hilfen." },
 ];
 
@@ -265,6 +265,8 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
       return "discipline-ranks";
     case "diszis":
       return "foundation-diszis";
+    case "leagueLeaders":
+      return "league-leaders";
     default:
       return null;
   }
@@ -697,13 +699,13 @@ export const trainingModeConfigs: Record<
     label: "Mittel",
     baseXp: PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.mittel,
     fatigueRisk: "mittel",
-    note: "Standardfokus fuer stabile Entwicklung und normale Erholung.",
+    note: "Standardfokus für stabile Entwicklung und normale Erholung.",
   },
   hart: {
     label: "Hart",
     baseXp: PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.hart,
     fatigueRisk: "hoch",
-    note: "Mehr Setpoints, aber spuerbar schlechtere Regeneration.",
+    note: "Mehr Setpoints, aber spürbar schlechtere Regeneration.",
   },
 };
 
@@ -843,7 +845,7 @@ export function isInboxItemOwnedByTeam(item: GameInboxItem, teamId: string | nul
 export const initialGameState: GameState = {
   season: {
     id: "loading",
-    name: "Foundation laedt",
+    name: "Foundation lädt",
     year: 0,
     currentMatchday: 1,
     matchdayIds: [],
@@ -865,7 +867,7 @@ export const initialGameState: GameState = {
     {
       teamId: "loading-team",
       shortCode: "LOAD",
-      name: "Foundation laedt",
+      name: "Foundation lädt",
       logoPath: null,
       budget: 0,
       cash: 0,

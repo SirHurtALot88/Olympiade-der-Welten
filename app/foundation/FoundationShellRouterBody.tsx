@@ -2,16 +2,17 @@
 /* eslint-disable */
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
+import dynamic from "next/dynamic";
 import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
-import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
+import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
-import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
-import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import type { RoomParticipant } from "@/types/game";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
@@ -25,35 +26,23 @@ import {
   FACILITY_CATALOG,
   FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
   FOUNDATION_SAVE_MODE_OPTIONS,
-  FacilitiesV2Client,
-  FoundationHomeV2Panel,
-  FoundationLineupPanel,
-  FoundationMatchdayArenaPanel,
   FoundationPlayerPortraitPreview,
-  FoundationSeasonV2Panel,
   FoundationShell,
   FoundationSubNav,
-  FoundationTeamsDetailPanel,
   GAME_ENCYCLOPEDIA_ENTRIES,
   GameTerm,
   HISTORY_ALL_SEASONS_FILTER,
-  InboxV2Client,
   MappingHighlight,
   NEW_GAME_PRESET_DEFAULTS,
   NEW_GAME_VISIBLE_PRESET_IDS,
   PLAYER_PROFILE_TABS,
   PROGRESSION_CLASS_ORDER,
-  PlayerGeneratorPanel,
   PlayerPortrait,
-  PlayerProfileClient,
   RaceIcon,
   SEASON_TRANSITION_STATIC_STEPS,
   SPECIALIST_WING_VARIANTS,
-  ScoutingCenterV2Client,
   SortableHeader,
-  TeamProfileClient,
   TooltipHeading,
-  TransferHistoryV2Client,
   WarningList,
   buildResolvedTeamIdentities,
   buildScenarioWarning,
@@ -143,8 +132,6 @@ import {
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
 } from "@/app/foundation/foundation-page-client-exports";
-import FoundationPlayersTableNewLook from "@/app/foundation/players-table/FoundationPlayersTableNewLook";
-import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamPortraitPreview from "@/components/foundation/team-portrait-card/FoundationTeamPortraitPreview";
 import type {
   DisciplineCategoryFilter,
@@ -179,6 +166,89 @@ import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui
 import type { GameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import type { InboxV2Item } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import type { Discipline, GameInboxItem, MappingWarning, Player, PlayerScoutIntelRecord, Team } from "@/lib/data/olyDataTypes";
+
+// Perf/DX (#57): these view panels used to come in eagerly through the
+// `foundation-page-client-exports` barrel (or, for the last five, a direct
+// top-level import), which forced Next/webpack to compile every large view's
+// full dependency graph just to render the /foundation shell once — this is
+// the main cause of the ~15s+ cold compile. Every one of these components is
+// only ever mounted behind a single `activeView === "…"` (or equivalent)
+// gate below, so lazy-loading them via next/dynamic lets each view's chunk
+// compile on demand instead of all up front. ssr:false is used throughout:
+// this shell only ever renders client-side (see FoundationSharedProvider /
+// the "use client" pragma above and the `gameState.season.id === "loading"`
+// bootstrap gate), so there is no server-rendered markup for these panels to
+// match — ssr:false simply skips a wasted server render of code that would
+// never produce visible output pre-hydration anyway. `prefetchFoundationPanel`
+// (lib/foundation/foundation-panel-prefetch.ts) already calls `import(...)`
+// against these same real module paths ahead of navigation, independent of
+// this wrapping, so hover/focus prefetch keeps warming these exact chunks.
+const FoundationHomeV2Panel = dynamic(() => import("@/app/foundation/home-v2/FoundationHomeV2Panel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
+});
+const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Spielerprofil wird geladen…" />,
+});
+const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Teamprofil wird geladen…" />,
+});
+const FacilitiesV2Client = dynamic(() => import("@/app/foundation/facilities-v2/FacilitiesV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Gebäude werden geladen…" />,
+});
+const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-center-v2/ScoutingCenterV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Scouting wird geladen…" />,
+});
+const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Inbox wird geladen…" />,
+});
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Player Generator wird geladen…" />,
+});
+const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+});
+const FoundationMatchdayArenaPanel = dynamic(
+  () => import("@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton label="Matchday Arena wird geladen…" />,
+  },
+);
+const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
+});
+const FoundationPlayersTableNewLook = dynamic(
+  () => import("@/app/foundation/players-table/FoundationPlayersTableNewLook"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton label="Spielerliste wird geladen…" />,
+  },
+);
+const FoundationTeamSettingsHost = dynamic(() => import("@/app/foundation/team-settings/FoundationTeamSettingsHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Team-Einstellungen werden geladen…" />,
+});
+const FoundationRanksHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationRanksHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Rangliste wird geladen…" />,
+});
+const FoundationLeagueLeadersHost = dynamic(() => import("@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Liga-Leader werden geladen…" />,
+});
+const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationDiszisHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -524,6 +594,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedRosterTableRows,
   selectedSeasonOverviewLabel,
   selectedStandingRow,
+  selectedTeamFieldRaceForm,
+  fieldRacePlayedMatchdayCount,
+  fieldRaceTotalTeams,
+  homeFieldRaceRankMovement,
   selectedTeam,
   selectedTeamAverageAxisStats,
   selectedTeamCanManage,
@@ -765,7 +839,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       {gameState?.season?.id === "loading" && !bootstrapError ? (
         <div className="foundation-bootstrap-overlay" role="status" aria-live="polite">
           <div className="foundation-bootstrap-overlay-card">
-            <strong>Foundation laedt</strong>
+            <strong>Foundation lädt</strong>
             <span>Spielstand wird vorbereitet …</span>
           </div>
         </div>
@@ -1092,7 +1166,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <div className="foundation-flow-coach-cta">
             <span className="foundation-flow-coach-shortcut">{activeFlowCoach.shortcut}</span>
             <small className="muted" title={globalNextTitle}>
-              Naechster Schritt: {globalNextLabel}
+              Nächster Schritt: {globalNextLabel}
             </small>
           </div>
           <div className="foundation-flow-loop foundation-flow-loop-compact" aria-label="Gameplay Loop">
@@ -1201,7 +1275,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <article>
                   <span>Salary Factor</span>
                   <strong>{seasonBriefingData.currentFactor != null ? `${formatLocalePoints(seasonBriefingData.currentFactor, 2)}x` : "—"}</strong>
-                  <small>Basis fuer Gehaelter, Preisgeld und Forecast</small>
+                  <small>Basis für Gehaelter, Preisgeld und Forecast</small>
                 </article>
                 <article>
                   <span>Matchdays</span>
@@ -1211,12 +1285,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <article>
                   <span>POW / SPE / MEN / SOC</span>
                   <strong>{seasonBriefingTeamAxes}</strong>
-                  <small>{selectedTeam ? `${selectedTeam.shortCode} Team-Identity` : "Team waehlen"}</small>
+                  <small>{selectedTeam ? `${selectedTeam.shortCode} Team-Identity` : "Team wählen"}</small>
                 </article>
                 <article>
                   <span>Cash</span>
                   <strong>{seasonBriefingTeamCash == null ? "—" : formatTransfermarktCurrency(seasonBriefingTeamCash)}</strong>
-                  <small>Startbudget fuer Transfers</small>
+                  <small>Startbudget für Transfers</small>
                 </article>
               </section>
 
@@ -1282,7 +1356,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         </span>
                       ))
                     ) : (
-                      <p className="muted">Slot-Groessen folgen mit dem Diszi-Plan.</p>
+                      <p className="muted">Slot-Größen folgen mit dem Diszi-Plan.</p>
                     )}
                   </div>
                 </article>
@@ -1414,17 +1488,18 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           <div className="foundation-manager-team" data-testid="active-manager-team">
             {(() => {
               const logo = getTeamLogoModel(selectedTeam);
-              return logo.src ? (
-                <img
+              return (
+                <OptimizedMediaImage
                   className="foundation-manager-team-logo"
                   src={logo.src}
                   alt={`${selectedTeam.name} Logo`}
                   loading="eager"
-                  decoding="async"
                   fetchPriority="high"
+                  fallbackLabel={selectedTeam.shortCode}
+                  fallback={
+                    <span className="foundation-manager-team-logo team-logo-placeholder">{selectedTeam.shortCode}</span>
+                  }
                 />
-              ) : (
-                <span className="foundation-manager-team-logo team-logo-placeholder">{selectedTeam.shortCode}</span>
               );
             })()}
             <label className="foundation-manager-team-select">
@@ -1494,7 +1569,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   onChange={(event) => setTeamContextFilter(event.target.value as TeamControlFilter)}
                 >
                   <option value="my_teams">Meine Teams</option>
-                  <option value="human">Gefuehrte Teams</option>
+                  <option value="human">Geführte Teams</option>
                   <option value="ai">Automatische Teams</option>
                   <option value="passive">Beobachtete Teams</option>
                   <option value="all">Alle Teams</option>
@@ -1636,9 +1711,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <div className="foundation-encyclopedia-hero">
               <div>
                 <span className="eyebrow">Lexikon</span>
-                <h2>Info-Buch fuer Kennzahlen und Systeme</h2>
+                <h2>Info-Buch für Kennzahlen und Systeme</h2>
                 <p>
-                  Abkuerzungen, Werte und wichtige Formellogik ohne Tabellenballast. Die Eintraege zeigen bewusst Faktoren
+                  Abkürzungen, Werte und wichtige Formellogik ohne Tabellenballast. Die Einträge zeigen bewusst Faktoren
                   und Lesart, nicht jede interne Nachkommastelle.
                 </p>
               </div>
@@ -1721,6 +1796,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               salaryTotal: selectedStandingRow?.salaryTotal ?? null,
               guv: selectedStandingRow?.guv ?? null,
               rosterCount: selectedRosterTableRows.length,
+              // Wave D · Feld-Rennen (D1/D2/D4) — fog-sicher, additiv.
+              fieldRaceForm: selectedTeamFieldRaceForm,
+              fieldRacePlayedMatchdays: fieldRacePlayedMatchdayCount,
+              fieldRaceTotalTeams,
+              fieldRaceRankMovement: homeFieldRaceRankMovement,
               gmStoryLabel: selectedHqGmStory?.label ?? null,
               gmStoryDetail: selectedHqGmStory?.detail ?? null,
               gmStoryTone: selectedHqGmStory?.tone ?? null,
@@ -1734,7 +1814,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   ? formatCockpitReason(gameFlowActionStep.blockers[0])
                   : gameFlowActionStep.warnings[0]
                     ? formatCockpitReason(gameFlowActionStep.warnings[0])
-                    : "Flow bereit — weiter zum naechsten Schritt.",
+                    : "Flow bereit — weiter zum nächsten Schritt.",
               warnings: homeWarnings.map(formatHomeWarningLabel),
               topPlayers: homeV2TopPlayers,
               leagueHeatPools: leaguePlayerHeatPools,
@@ -1899,7 +1979,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 managementLocked={isSelectedTeamManagementLocked}
                 managementLockedReason={
                   isSelectedTeamManagementLocked
-                    ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind nur zur Ansicht offen.`
+                    ? `${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Gebäude sind nur zur Ansicht offen.`
                     : null
                 }
                 selectedTeam={selectedTeam}
@@ -1966,11 +2046,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 scoutingFacilityLabel={
                   FACILITY_CATALOG.find((entry) => entry.facilityId === "scouting_office")?.label ?? "Scouting Office"
                 }
-                recruitmentBudget={selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}
+                recruitmentBudget={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
                 rosterCount={selectedRosterTableRows.length}
                 rosterMinimum={selectedStandingRow?.playerMin ?? null}
                 rosterOptimum={selectedStandingRow?.playerOpt ?? null}
-                draftContextNote="Teams starten mit Budget und leerem Kader. Base-Infos im Transfermarkt reichen fuer den ersten Draft — Scouting verfeinert die Sicht, ersetzt aber nicht den Markt."
+                draftContextNote="Teams starten mit Budget und leerem Kader. Base-Infos im Transfermarkt reichen für den ersten Draft — Scouting verfeinert die Sicht, ersetzt aber nicht den Markt."
                 disclosureLevel={getTransfermarktScoutingDisclosure(scoutingHubV2Visibility.scoutingLevel).level}
                 visibleAtTier={scoutingHubV2Visibility.visibleAtTier}
                 hiddenAtTier={scoutingHubV2Visibility.hiddenAtTier}
@@ -2328,7 +2408,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             teamTooltip={
               selectedTeam
                 ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
-                : "Matchday Room fuer Teamwahl, Slots und Preview."
+                : "Matchday Room für Teamwahl, Slots und Preview."
             }
             client={{
               embedded: true,
@@ -2420,9 +2500,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         data-testid="arena-finish-matchday-button"
                         disabled={readMeta.readOnly || cockpitBusyKey != null}
                         onClick={() => void runFinishMatchdaySimple()}
-                        title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum naechsten Spieltag."
+                        title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum nächsten Spieltag."
                       >
-                        {cockpitBusyKey === "matchday-auto-run-execute" ? "Laeuft..." : "Spieltag abschliessen"}
+                        {cockpitBusyKey === "matchday-auto-run-execute" ? "Läuft..." : "Spieltag abschliessen"}
                       </button>
                     )}
                   </div>
@@ -2665,22 +2745,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 playerClassName={row.player.className}
                                 subMeta={row.team?.name ?? "Free Agent"}
                               >
-                                {portrait.src ? (
-                                  <img
-                                    className="transfermarkt-portrait"
-                                    src={portrait.src}
-                                    alt={row.player.name}
-                                    width={56}
-                                    height={56}
-                                    loading="lazy"
-                                    decoding="async"
-                                    fetchPriority="low"
-                                  />
-                                ) : (
-                                  <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
-                                    {portrait.initials}
-                                  </div>
-                                )}
+                                <OptimizedMediaImage
+                                  className="transfermarkt-portrait"
+                                  src={portrait.src}
+                                  alt={row.player.name}
+                                  width={56}
+                                  height={56}
+                                  loading="lazy"
+                                  fetchPriority="low"
+                                  fallback={
+                                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
+                                      {portrait.initials}
+                                    </div>
+                                  }
+                                />
                               </FoundationPlayerPortraitPreview>
                             </td>
                           );
@@ -2843,7 +2921,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </table>
             </div>
             <p className="muted players-footnote">
-              Farben sind liga-relativ: jede Stufe steht fuer ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
+              Farben sind liga-relativ: jede Stufe steht für ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
             </p>
           </section>
           )
@@ -2858,7 +2936,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   as="h2"
                   tooltip="Retool-Logik: Pro Team zaehlen je Disziplin die Top 6 aktiven Spieler, ihre Werte werden summiert und ligaweit gerankt. TOT / POW / SPE / MEN / SOC zeigen die aggregierten Teamranks derselben Quelle."
                 >
-                  Ranks - Teamstaerke pro Diszi
+                  Ranks - Teamstärke pro Diszi
                 </TooltipHeading>
                 <div className="ranks-season-toolbar">
                   <label className="filter-field ranks-season-select">
@@ -2899,7 +2977,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onResetToDefault={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
               />
             </div>
-            <section className="ranks-leader-grid" aria-label="Aktuelle Teamstaerke Leader">
+            <section className="ranks-leader-grid" aria-label="Aktuelle Teamstärke Leader">
               {rankLeaderCards.map((entry: FoundationDisciplineLeaderEntry) => (
                 <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
                   <span>{entry.label}</span>
@@ -3024,9 +3102,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </div>
           </section>
           <FoundationRanksHost {...foundationRanksHostProps} />
-          <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} />
           </>
           ) : null}
+
+          {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
 
@@ -3070,22 +3149,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     return (
                       <div className="transfer-buy-player-line transfer-sell-hero-line">
                         <div className="transfer-modal-player-hero transfer-sell-hero">
-                          {portraitSrc ? (
-                            <img
-                              className="transfermarkt-portrait transfer-sell-portrait"
-                              src={portraitSrc}
-                              alt={playerName}
-                              width={72}
-                              height={72}
-                              loading="lazy"
-                              decoding="async"
-                              fetchPriority="low"
-                            />
-                          ) : (
-                            <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait" aria-label={`${playerName} placeholder`}>
-                              {playerName.slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
+                          <OptimizedMediaImage
+                            className="transfermarkt-portrait transfer-sell-portrait"
+                            src={portraitSrc}
+                            alt={playerName}
+                            width={72}
+                            height={72}
+                            loading="lazy"
+                            fetchPriority="low"
+                            fallback={
+                              <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait" aria-label={`${playerName} placeholder`}>
+                                {playerName.slice(0, 2).toUpperCase()}
+                              </div>
+                            }
+                          />
                           <div className="transfer-modal-player-summary">
                             <div className="transfer-modal-player-head">
                               <strong>{playerName}</strong>
@@ -3093,7 +3170,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 <ClassColorChip className={className} />
                                 <span className="muted">{race}</span>
                                 <span className="pill">
-                                  {marketSellPreview?.team?.shortCode ?? selectedTeam?.shortCode ?? "—"} · {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewaehlt"}
+                                  {marketSellPreview?.team?.shortCode ?? selectedTeam?.shortCode ?? "—"} · {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewählt"}
                                 </span>
                               </div>
                             </div>
@@ -3164,7 +3241,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                             <small>Rang {marketSellPlayerContext?.rating?.ppsSeasonRank ?? "—"}</small>
                           </article>
                           <article className="metric-card">
-                            <span>Einsaetze</span>
+                            <span>Einsätze</span>
                             <strong>{marketSellPlayerContext?.performance?.appearances ?? "—"}</strong>
                             <small>Top 10 {marketSellPlayerContext?.performance?.top10Count ?? "—"} · MVP {marketSellPlayerContext?.performance?.mvpCount ?? "—"}</small>
                           </article>
@@ -3249,7 +3326,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       <div className="transfer-sell-history-grid">
                         <div className="transfer-modal-section">
                           <div className="transfer-callout-title">
-                            <strong>Letzte Einsaetze</strong>
+                            <strong>Letzte Einsätze</strong>
                             <span className="muted">{marketSellPlayerContext?.recentMatchdays.length ?? 0}</span>
                           </div>
                           {marketSellPlayerContext?.recentMatchdays.length ? (
@@ -3268,7 +3345,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                               ))}
                             </div>
                           ) : (
-                            <p className="muted transfer-empty-hint">Noch keine Matchday-Historie fuer diesen Spieler.</p>
+                            <p className="muted transfer-empty-hint">Noch keine Matchday-Historie für diesen Spieler.</p>
                           )}
                         </div>
 
@@ -3294,7 +3371,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                               ))}
                             </div>
                           ) : (
-                            <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfuegbar.</p>
+                            <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfügbar.</p>
                           )}
                         </div>
 
@@ -3392,7 +3469,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                             <article className="metric-card">
                               <span>Auto-Empfehlung</span>
                               <strong>{marketSellPreview.coaching.sellDecisionLabel ?? "—"}</strong>
-                              <small>Prioritaet {marketSellPreview.coaching.sellPriority ?? "—"}</small>
+                              <small>Priorität {marketSellPreview.coaching.sellPriority ?? "—"}</small>
                             </article>
                             <article className="metric-card">
                               <span>GM</span>
@@ -3429,7 +3506,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           ) : null}
                           <div className="transfer-buy-meta-grid">
                             <div className="transfer-callout">
-                              <strong>Gruende fuer Verkauf</strong>
+                              <strong>Gruende für Verkauf</strong>
                               {marketSellPreview.coaching.reasonsToSell.length ? (
                                 <ul className="warning-list">
                                   {marketSellPreview.coaching.reasonsToSell.map((reason: string) => (
@@ -3505,7 +3582,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     </>
                   ) : (
                     <p className="muted transfer-empty-hint">
-                      Verkaufsvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.
+                      Verkaufsvorschau wird geladen oder ist für diesen Kontext noch nicht verfügbar.
                     </p>
                   )}
                 </div>
@@ -3540,7 +3617,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       void confirmTransfermarktSell();
                     }}
                   >
-                    {marketSellBusy ? "Verkauf laeuft..." : "Verkauf bestaetigen"}
+                    {marketSellBusy ? "Verkauf läuft..." : "Verkauf bestätigen"}
                   </button>
                 </div>
             </section>

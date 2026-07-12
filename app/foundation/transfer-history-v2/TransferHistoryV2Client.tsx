@@ -44,6 +44,8 @@ export type TransferHistoryV2Row = {
 export type TransferHistoryV2ClientProps = {
   sourceBadgeLabel: string;
   saveName: string;
+  /** #D10: Eigenes/gemanagtes Team (für die kumulative Netto-Ausgaben-Sparkline). Fog-safe: nur eigene, ohnehin sichtbare Deals. */
+  ownTeamId?: string | null;
   requestedScopeLabel: string;
   resolvedScopeLabel: string;
   totalLoaded: number;

@@ -30,11 +30,11 @@ export function buildLineupTeamTooltip(input: {
   if (input.variant === "focusV2") {
     return input.selectedTeam
       ? `${input.selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
-      : "Matchday Room fuer Teamwahl, Slots und Preview.";
+      : "Matchday Room für Teamwahl, Slots und Preview.";
   }
 
   if (!input.selectedTeam) {
-    return "Matchday Room fuer Teamwahl, Slots und Preview.";
+    return "Matchday Room für Teamwahl, Slots und Preview.";
   }
 
   const modeLabel =
