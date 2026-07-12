@@ -5471,6 +5471,51 @@ export function useFoundationShellRouterBodyScope({
       }
       return;
     }
+    if (gameFlowActionStep.stepId === "finalize_transfers" && gameFlowActionStep.status === "ready") {
+      if (readMeta.readOnly) {
+        showReadOnlyNotice();
+        return;
+      }
+      const teamId = gameFlowActionStep.teamId ?? activeManagerTeamId;
+      if (!activeSaveId || activeSaveId === "loading-save" || !teamId) {
+        setShowGameFlowPanel(true);
+        return;
+      }
+      setCockpitBusyKey("finalize-transfers");
+      try {
+        const params = appendRoomContextToParams(
+          new URLSearchParams({
+            saveId: activeSaveId,
+            seasonId: gameState.season.id,
+            matchdayId: gameState.matchdayState.matchdayId,
+            teamId,
+          }),
+          roomContext,
+        );
+        const response = await fetch(`/api/lineups/legacy/finalize-transfers?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomContextBody({}, roomContext)),
+        });
+        if (!response.ok) {
+          setShowGameFlowPanel(true);
+          return;
+        }
+        // Re-hydrate gameState.seasonState (incl. formCards) for the already-active
+        // save without disrupting the current view -- loadSave() only clears
+        // save-scoped feeds / caches when switching to a *different* saveId, so
+        // calling it with the current activeSaveId is a light, in-place refresh.
+        await loadSave(activeSaveId);
+        acknowledgeFlowStep("finalize_transfers");
+        navigateToGameFlowStep("lineup", resolveLineupIssueTeamId(teamId));
+      } catch (error) {
+        console.error(error);
+        setShowGameFlowPanel(true);
+      } finally {
+        setCockpitBusyKey(null);
+      }
+      return;
+    }
     if (gameFlowActionStep.stepId === "scouting_facilities") {
       updateNewGameFlowStepStatus("training_facilities", "completed");
     }
