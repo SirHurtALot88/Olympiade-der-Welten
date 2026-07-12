@@ -235,13 +235,16 @@ function NlLaneMeter({ bestD1, bestD2 }: { bestD1: number | null; bestD2: number
     { label: "D1", value: bestD1 },
     { label: "D2", value: bestD2 },
   ];
+  const laneSummary = rows
+    .map((row) => `${row.label} ${row.value != null && Number.isFinite(row.value) ? formatScore(row.value as number) : "—"}`)
+    .join(", ");
   return (
-    <span className="nl-lineup-lane-meter" aria-hidden="true">
+    <span className="nl-lineup-lane-meter" role="img" aria-label={`Lane-Stärke ${laneSummary}`}>
       {rows.map((row) => {
         const hasValue = row.value != null && Number.isFinite(row.value);
         const pct = hasValue ? Math.max(6, Math.min(100, ((row.value as number) / maxValue) * 100)) : 0;
         return (
-          <span key={row.label} className="nl-lineup-lane-row">
+          <span key={row.label} className="nl-lineup-lane-row" aria-hidden="true">
             <small>{row.label}</small>
             <span className="nl-lineup-lane-track">{hasValue ? <span style={{ width: `${pct}%` }} /> : null}</span>
             <em className="nl-tnum">{hasValue ? formatScore(row.value as number) : "—"}</em>
@@ -984,6 +987,7 @@ export default function LineupNewLook({
                   key={`${disciplineSide}-${stage}`}
                   type="button"
                   className={intensity === stage ? "is-selected" : ""}
+                  aria-pressed={intensity === stage}
                   disabled={isReadOnly || isBusy}
                   onClick={() => onUpdateDisciplineIntensity(disciplineSide, stage)}
                   title={
@@ -1400,6 +1404,9 @@ export default function LineupNewLook({
             </header>
 
             <div className="nl-lineup-candidate-list" onMouseLeave={() => setHoveredCandidateId(null)}>
+              {!activeSlot ? (
+                <p className="nl-lineup-candidate-empty">Erst einen Slot links wählen — dann Kandidaten einsetzen.</p>
+              ) : null}
               {filteredCandidates.length === 0 ? (
                 <p className="nl-lineup-candidate-empty">Keine Kandidaten in dieser Gruppe.</p>
               ) : (

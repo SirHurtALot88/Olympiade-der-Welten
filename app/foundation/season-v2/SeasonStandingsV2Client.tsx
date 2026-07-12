@@ -11,6 +11,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
@@ -631,7 +632,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
     }
     setInternalSeasonV2Mode(mode);
   };
-  const [standingsTableScrollTop, setStandingsTableScrollTop] = useState(0);
+  const [standingsTableScrollTop, handleStandingsTableScroll] = useRafThrottledScrollTop();
   const [standingsTableViewportHeight, setStandingsTableViewportHeight] = useState(560);
   const standingsTableShellRef = useRef<HTMLDivElement | null>(null);
   const [focusedTeamId, setFocusedTeamId] = useState<string | null>(selectedTeamSummary?.teamId ?? null);
@@ -1306,7 +1307,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
             className={`table-shell season-v2-table-shell season-v2-table-shell-full${mobileCardsView ? " is-mobile-cards" : ""}`}
             ref={standingsTableShellRef}
             data-virtualized={standingsTableVirtualWindow.enabled ? "true" : undefined}
-            onScroll={(event) => setStandingsTableScrollTop(event.currentTarget.scrollTop)}
+            onScroll={handleStandingsTableScroll}
           >
             {mobileCardsView ? (
               <div className="season-v2-mobile-card-grid" data-testid="season-v2-mobile-cards">

@@ -39,9 +39,15 @@ function getVariantCachePath(kind: string, assetId: string, variant: MediaImageV
   return path.join(cacheRoot, `${assetId}-${variant}-${Math.floor(mtimeMs)}.${MEDIA_THUMB_FORMAT}`);
 }
 
-async function readOrCreateVariantBuffer(sourcePath: string, cachePath: string, variant: MediaImageVariant) {
+type VariantResult = { buffer: Buffer; contentType: string };
+
+async function readOrCreateVariantBuffer(
+  sourcePath: string,
+  cachePath: string,
+  variant: MediaImageVariant,
+): Promise<VariantResult> {
   try {
-    return await readFile(cachePath);
+    return { buffer: await readFile(cachePath), contentType: "image/webp" };
   } catch {
     const maxSize = getMediaVariantMaxSize(variant);
     if (!maxSize) {
@@ -49,17 +55,30 @@ async function readOrCreateVariantBuffer(sourcePath: string, cachePath: string, 
     }
 
     const sourceBuffer = await readFile(sourcePath);
-    const variantBuffer = await sharp(sourceBuffer)
-      .resize(maxSize, maxSize, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: getMediaVariantQuality(variant) })
-      .toBuffer();
 
-    await mkdir(path.dirname(cachePath), { recursive: true });
-    await writeFile(cachePath, variantBuffer);
-    return variantBuffer;
+    try {
+      // failOn: "none" makes sharp tolerant of slightly truncated / non-standard
+      // JPEGs (progressive quirks, trailing garbage) that browsers render fine
+      // but sharp's default strict mode would reject.
+      const variantBuffer = await sharp(sourceBuffer, { failOn: "none" })
+        .resize(maxSize, maxSize, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({ quality: getMediaVariantQuality(variant) })
+        .toBuffer();
+
+      await mkdir(path.dirname(cachePath), { recursive: true });
+      await writeFile(cachePath, variantBuffer);
+      return { buffer: variantBuffer, contentType: "image/webp" };
+    } catch {
+      // Last resort: sharp cannot decode the image at all. Serve the original
+      // bytes unresized so the browser can still display it instead of the
+      // route returning an "unreadable" error and the UI falling back to initials.
+      const ext = path.extname(sourcePath).toLocaleLowerCase();
+      const contentType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
+      return { buffer: sourceBuffer, contentType };
+    }
   }
 }
 
@@ -88,12 +107,12 @@ export async function serveMediaAsset(options: {
       });
     }
 
-    const variantBuffer = await readOrCreateVariantBuffer(sourcePath, cachePath, variant);
+    const variantResult = await readOrCreateVariantBuffer(sourcePath, cachePath, variant);
 
-    return new NextResponse(new Uint8Array(variantBuffer), {
+    return new NextResponse(new Uint8Array(variantResult.buffer), {
       headers: {
-        "Content-Type": "image/webp",
-        "Content-Length": String(variantBuffer.byteLength),
+        "Content-Type": variantResult.contentType,
+        "Content-Length": String(variantResult.buffer.byteLength),
         "Cache-Control": "public, max-age=31536000, immutable",
         ETag: etag,
       },

@@ -44,6 +44,32 @@ Die Datei `deploy/hetzner/.env` wird aus `.env.example` erstellt und bekommt die
 OLY_DOMAIN=deine-domain.de
 ```
 
+## Auto-Deploy (Aenderungen automatisch auf den Server)
+
+Damit neue Commits nicht von Hand gezogen werden muessen, pollt der Server per
+Cron den `main`-Branch und baut nur bei echten Aenderungen neu. Das Skript nutzt
+den bereits gespeicherten Git-Zugang — es liegen **keine** Token bei GitHub oder
+in Dateien.
+
+Einmalig auf dem Server einrichten (als root, im Repo-Ordner):
+
+```sh
+# Git-Zugang einmalig speichern (Token als Passwort bei der Abfrage eingeben)
+git config --global credential.helper store
+git pull
+
+# Cron anlegen: alle 5 Minuten nach neuen Commits schauen
+( crontab -l 2>/dev/null; \
+  echo "*/5 * * * * /root/Olympiade-der-Welten/deploy/hetzner/auto-deploy.sh >> /var/log/oly-deploy.log 2>&1" ) \
+  | crontab -
+```
+
+Ablauf danach: Pull Request nach `main` mergen -> innerhalb von ~5 Minuten baut
+der Server automatisch neu. Logs: `tail -f /var/log/oly-deploy.log`.
+
+Anderen Branch deployen (optional): `OLY_DEPLOY_BRANCH=<branch>` als Env setzen.
+Sofort testen ohne Warten: `deploy/hetzner/auto-deploy.sh` einmal von Hand starten.
+
 ## Backup-Regel
 
 Die Server-Backups sichern die ganze Maschine. Zusaetzlich muss die Spielstand-Datenbank bewusst geschuetzt werden:

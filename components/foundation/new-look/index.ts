@@ -29,6 +29,19 @@ export { NlSubTabs, type NlSubTabsProps, type NlSubTabItem } from "@/components/
 export { NlDeltaChip, type NlDeltaChipProps } from "@/components/foundation/new-look/NlDeltaChip";
 export { NlProgressBar, type NlProgressBarProps } from "@/components/foundation/new-look/NlProgressBar";
 export { NlGauge, type NlGaugeProps } from "@/components/foundation/new-look/NlGauge";
+export {
+  NlFatigueGauge,
+  fatigueTone,
+  FATIGUE_MEDIUM,
+  FATIGUE_HIGH,
+  type NlFatigueGaugeProps,
+} from "@/components/foundation/new-look/NlFatigueGauge";
+export {
+  NlIntensityGauge,
+  intensityStageLabel,
+  type NlIntensityGaugeProps,
+  type MatchdayIntensityStage as NlIntensityStage,
+} from "@/components/foundation/new-look/NlIntensityGauge";
 export { NlSparkline, type NlSparklineProps } from "@/components/foundation/new-look/NlSparkline";
 export {
   NlFieldRaceFormStrip,

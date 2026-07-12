@@ -27539,6 +27539,26 @@ a {
   font-size: 0.72rem;
 }
 
+.arena-v2-board-control-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.arena-v2-board-control-tag {
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(214, 220, 230, 0.82);
+}
+
+.arena-v2-board-control-tag.is-own {
+  color: rgba(164, 214, 255, 0.92);
+  border-color: rgba(120, 170, 255, 0.4);
+}
+
 .arena-v2-board-track-wrap {
   display: grid;
   gap: 3px;
@@ -40956,6 +40976,26 @@ button.foundation-team-portrait-card {
   text-transform: uppercase;
   color: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 72%, var(--nl-mut));
 }
+.is-new-look .nl-stat-chip-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.28em;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-mut) 55%, transparent);
+  font-size: 0.72em;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--nl-mut);
+  vertical-align: baseline;
+  cursor: help;
+}
+.is-new-look .nl-stat-chip:hover .nl-stat-chip-help {
+  color: var(--nl-ink);
+  border-color: color-mix(in srgb, var(--nl-mut) 85%, transparent);
+}
 .is-new-look .nl-stat-chip-value {
   font-size: var(--nl-fs-xl);
   line-height: 1.15;
@@ -41255,6 +41295,25 @@ button.foundation-team-portrait-card {
   text-transform: uppercase;
   color: var(--nl-mut-2);
 }
+/* Fatigue-/Intensitaets-Gauges: kompakter, damit sie in Detail-/Briefing-
+   Kontexte (Player-Drawer, Arena-Briefing) passen. */
+.is-new-look .nl-fatigue-gauge,
+.is-new-look .nl-intensity-gauge {
+  width: 76px;
+}
+.is-new-look .nl-fatigue-gauge .nl-gauge-value,
+.is-new-look .nl-intensity-gauge .nl-gauge-value {
+  font-size: 16px;
+}
+.is-new-look .nl-intensity-gauge .nl-gauge-value {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.is-new-look .player-drawer-fatigue-gauge-wrap {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--nl-s2);
+}
 
 /* --- Chart-Primitives (Sparkline / BarChart / Radar) -------------- */
 .is-new-look .nl-sparkline {
@@ -41484,6 +41543,14 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-home-next-status {
   font-size: 12px;
   color: var(--nl-mut);
+}
+
+.is-new-look .nl-home-next-reason {
+  max-width: 22rem;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--nl-tone) 78%, var(--nl-ink));
 }
 
 .is-new-look .nl-home-warning-row {
@@ -47635,6 +47702,78 @@ button.foundation-team-portrait-card {
   flex-wrap: wrap;
 }
 
+/* --- Arena-Briefing (spoilerfreie Ausgangslage vor dem Spieltag) ---- */
+.is-new-look .nl-arena-briefing-card {
+  margin-top: var(--nl-s3);
+}
+.is-new-look .nl-arena-briefing-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3) var(--nl-s5);
+}
+.is-new-look .nl-arena-briefing-rank {
+  display: flex;
+  flex-direction: column;
+  min-width: 116px;
+}
+.is-new-look .nl-arena-briefing-rank-value {
+  font-family: var(--nl-display);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--nl-ink);
+}
+.is-new-look .nl-arena-briefing-rank-label {
+  margin-top: var(--nl-s1);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut-2);
+}
+.is-new-look .nl-arena-briefing-table {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.is-new-look .nl-arena-briefing-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r1);
+  font-size: 13px;
+  color: var(--nl-ink-2);
+}
+.is-new-look .nl-arena-briefing-row.is-own {
+  background: var(--nl-accent-soft, rgba(91, 155, 255, 0.16));
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+.is-new-look .nl-arena-briefing-row-rank {
+  color: var(--nl-mut-2);
+  font-weight: 700;
+  text-align: right;
+}
+.is-new-look .nl-arena-briefing-row.is-own .nl-arena-briefing-row-rank {
+  color: var(--nl-accent);
+}
+.is-new-look .nl-arena-briefing-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-new-look .nl-arena-briefing-row-code {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut-2);
+}
+
 .is-new-look .nl-arena-phase-controls {
   display: flex;
   align-items: center;
@@ -50264,9 +50403,10 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-lineup-hud-strength {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--nl-s4);
   flex: 1;
-  min-width: 260px;
+  min-width: min(260px, 100%);
   animation: nl-lineup-strength-pulse 700ms var(--nl-ease);
 }
 

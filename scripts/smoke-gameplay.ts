@@ -471,7 +471,7 @@ async function gotoFoundation(
     const fallbackTarget = fallbackTestId.startsWith("#")
       ? page.locator(fallbackTestId)
       : page.getByTestId(fallbackTestId);
-    await fallbackTarget.waitFor({ state: "visible", timeout: Math.max(timeoutMs, 45_000) });
+    await fallbackTarget.first().waitFor({ state: "visible", timeout: Math.max(timeoutMs, 45_000) });
   }
   await page.waitForTimeout(400);
 }
@@ -630,7 +630,9 @@ async function main() {
       screenshots: args.screenshots,
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "homeV2", expectedTeamId, expectedSaveId, Math.max(args.timeoutMs, 90_000), "foundation-home-v2");
-        await page.getByTestId("foundation-home-v2").waitFor({ state: "visible", timeout: Math.max(args.timeoutMs, 90_000) });
+        // The home view carries data-testid="foundation-home-v2" on both the panel
+        // wrapper and the inner client, so scope to the first (matches the audit scripts).
+        await page.getByTestId("foundation-home-v2").first().waitFor({ state: "visible", timeout: Math.max(args.timeoutMs, 90_000) });
         const text = await pageText(page);
         assertStep(step, hasAny(text, ["Home", "Manager", "Weiter", "Spieltag", "Nächster Schritt"]), "Home v2 lädt mit Spieltag-Orientierung.");
       },
@@ -788,7 +790,7 @@ async function main() {
         const text = await trainingPanel.innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, hasAny(text, ["Training", "Trainings-Setpoints", "Regeneration"]), "Training-Reiter lädt.");
         assertStep(step, hasAny(text, ["Entwicklung", "Setpoints", "Performance"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
-        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader"]), "Spieler-Forecast ist sichtbar.");
+        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader", "Upgrade bereit", "Rückschritt-Risiko", "Netto-Forecast"]), "Spieler-Forecast ist sichtbar.");
         assertStep(step, hasAny(text, ["Gebäude", "Facility", "Leicht", "Hart"]), "Training-Kontext inkl. Facility/Modus ist sichtbar.");
       },
     }));
@@ -801,9 +803,10 @@ async function main() {
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
         await page.getByTestId("foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
-        let profileButtons = await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").count();
-        let profileButtonSelector =
-          ".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button";
+        const trainingProfileSelector =
+          ".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button, [data-testid=\"training-player-profile-button\"]";
+        let profileButtons = await page.locator(trainingProfileSelector).count();
+        let profileButtonSelector = trainingProfileSelector;
         if (profileButtons === 0) {
           await gotoFoundation(page, args.baseUrl, "lineup", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-lineup");
           await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: viewTimeoutMs });

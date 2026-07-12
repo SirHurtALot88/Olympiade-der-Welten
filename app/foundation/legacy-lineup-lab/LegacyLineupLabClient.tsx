@@ -3,6 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import { useNewLook } from "@/lib/ui/new-look-preference";
@@ -2085,7 +2086,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   } | null>(null);
   const formCardPlanSaveTimerRef = useRef<number | null>(null);
   const pendingFormBoardFocusRef = useRef(false);
-  const [expertPlayerTableScrollTop, setExpertPlayerTableScrollTop] = useState(0);
+  const [expertPlayerTableScrollTop, handleExpertPlayerTableScroll] = useRafThrottledScrollTop();
   const [expertPlayerTableViewportHeight, setExpertPlayerTableViewportHeight] = useState(560);
   const expertPlayerTableShellRef = useRef<HTMLDivElement | null>(null);
   const pendingFormCardPlanRef = useRef<{
@@ -10407,7 +10408,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 className="table-shell legacy-lineup-player-table-shell"
                 ref={expertPlayerTableShellRef}
                 data-virtualized={expertPlayerTableVirtualWindow.enabled ? "true" : undefined}
-                onScroll={(event) => setExpertPlayerTableScrollTop(event.currentTarget.scrollTop)}
+                onScroll={handleExpertPlayerTableScroll}
               >
                 <table className="team-table legacy-lineup-player-table">
                   <colgroup>

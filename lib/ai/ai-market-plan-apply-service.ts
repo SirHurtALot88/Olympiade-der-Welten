@@ -1792,7 +1792,15 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       };
     };
     const beforeTeamRunCloneStartedAt = Date.now();
-    const beforeTeamRun = structuredClone((transferRunContext?.save.gameState ?? resolveLocalSave(persistence, preview.scope.saveId).gameState));
+    // Rollback-Snapshot vor dem Team-Lauf. Im Cycle-Mode (mit Run-Context) baut
+    // jeder Buy/Sell einen NEUEN immutablen gameState (Spread-Replace, keine
+    // In-place-Mutation) — die aktuelle Referenz ist damit bereits ein gueltiger
+    // Snapshot, ein voller structuredClone des kompletten gameState (Tausende
+    // Spieler) pro Team pro Cycle ist reine Verschwendung. Nur ohne Run-Context
+    // (persistenz-basiertes Rollback via rollbackTeamState) klonen wir noch.
+    const beforeTeamRun = transferRunContext
+      ? transferRunContext.save.gameState
+      : structuredClone(resolveLocalSave(persistence, preview.scope.saveId).gameState);
     recordPhase("beforeTeamRunClone", Date.now() - beforeTeamRunCloneStartedAt);
     let teamFailed = false;
 

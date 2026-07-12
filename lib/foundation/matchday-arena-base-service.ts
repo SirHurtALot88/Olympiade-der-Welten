@@ -22,6 +22,44 @@ import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { readStandingsPreviewCache, writeStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
 
+export type ArenaBriefingStandings = {
+  items: Array<{ teamId: string; currentRank: number | null; projectedRank: number | null }>;
+};
+
+/**
+ * Spoilerfreie Ausgangslage fuer das Arena-Briefing: aktueller Liga-Rang je
+ * Team direkt aus `seasonState.standings` (Punkte vor diesem Spieltag). Rein
+ * lesend, keine Projektion — daher immer guenstig und ohne Ergebnis-Spoiler.
+ */
+function buildArenaBriefingStandings(save: PersistedSaveGame): ArenaBriefingStandings {
+  const standings = save.gameState.seasonState?.standings ?? {};
+  const ranked = save.gameState.teams
+    .map((team) => {
+      const points = standings[team.teamId]?.points;
+      return { teamId: team.teamId, teamName: team.name, points: typeof points === "number" ? points : null };
+    })
+    .filter((entry) => entry.points != null)
+    .sort((left, right) => {
+      if ((right.points ?? 0) !== (left.points ?? 0)) {
+        return (right.points ?? 0) - (left.points ?? 0);
+      }
+      return left.teamName.localeCompare(right.teamName, "de");
+    });
+  // Vor dem ersten Spieltag stehen alle bei 0 Punkten — dann ist ein Rang
+  // bedeutungslos. Erst ranken, wenn die Liga ueberhaupt Punkte hat.
+  const hasLeaguePoints = ranked.some((entry) => (entry.points ?? 0) > 0);
+  const rankByTeamId = hasLeaguePoints
+    ? new Map(ranked.map((entry, index) => [entry.teamId, index + 1] as const))
+    : new Map<string, number>();
+  return {
+    items: save.gameState.teams.map((team) => ({
+      teamId: team.teamId,
+      currentRank: rankByTeamId.get(team.teamId) ?? null,
+      projectedRank: null,
+    })),
+  };
+}
+
 function countMatchdayLineupDisciplineSides(input: {
   lineups: Array<{
     teamId: string;
@@ -215,6 +253,7 @@ export async function loadMatchdayArenaBase(input: {
     scoreBlockingReasons: scoreResult.blockingReasons ?? [],
     resolvePreview,
     standingsPreview,
+    briefingStandings: buildArenaBriefingStandings(save),
     saveVersion: save.gameState.saveVersion ?? 0,
     contentSignature,
   };
