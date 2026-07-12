@@ -108,9 +108,10 @@ export function readPersistedSeasonDerivations(
   if (persisted.seasonId !== gameState.season.id) {
     return null;
   }
+  const hydrated = hydrateSeasonDerivations(persisted);
   return {
-    ...hydrateSeasonDerivations(persisted),
-    fieldRaceLedger: buildFieldRaceLedger(gameState, gameState.season.id),
+    ...hydrated,
+    fieldRaceLedger: buildFieldRaceLedger(gameState, gameState.season.id, hydrated.ledger),
   };
 }
 

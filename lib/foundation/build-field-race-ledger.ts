@@ -1,6 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
-import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
 /**
  * Feld-Rennen-Ledger — pro Team eine Zeitreihe über alle bereits gespielten
@@ -67,7 +67,16 @@ function rankByPoints(
   );
 }
 
-export function buildFieldRaceLedger(gameState: GameState, seasonId = gameState.season?.id ?? ""): FieldRaceLedger {
+export function buildFieldRaceLedger(
+  gameState: GameState,
+  seasonId = gameState.season?.id ?? "",
+  /**
+   * Bereits gebautes Punkte-Ledger wiederverwenden (computeSeasonDerivationsFresh
+   * baut es ohnehin). Ohne diesen Parameter wird es neu berechnet — das ist teuer
+   * und im Hot-Path unnötig doppelt, daher immer den vorhandenen durchreichen.
+   */
+  precomputedPointsLedger?: SeasonPointsLedger,
+): FieldRaceLedger {
   const teams = (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name }));
 
   // Defensiv: dieser Ledger läuft im Hot-Path von computeSeasonDerivationsFresh,
@@ -85,7 +94,7 @@ export function buildFieldRaceLedger(gameState: GameState, seasonId = gameState.
   }
 
   const orderedMatchdays = getMatchdaySummaryOptions(gameState, seasonId);
-  const ledger = buildSeasonPointsLedger(gameState, seasonId);
+  const ledger = precomputedPointsLedger ?? buildSeasonPointsLedger(gameState, seasonId);
 
   // Tagespunkte je Spieltag je Team (aus den Punkt-Einträgen des Ledgers).
   const pointsByMatchday = new Map<string, Map<string, number>>();

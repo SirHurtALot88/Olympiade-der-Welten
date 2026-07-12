@@ -10,7 +10,7 @@ export function computeSeasonDerivationsFresh(gameState: GameState, seasonId: st
   const ledger = buildSeasonPointsLedger(gameState, seasonId);
   const ratingsById = buildPlayerRatingContractMap(gameState, ledger);
   const performanceByPlayerId = buildPlayerSeasonPerformanceMap(gameState, ledger);
-  const fieldRaceLedger = buildFieldRaceLedger(gameState, seasonId);
+  const fieldRaceLedger = buildFieldRaceLedger(gameState, seasonId, ledger);
 
   return {
     ledger,
