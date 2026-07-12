@@ -18,6 +18,7 @@ const EMPTY_DERIVATIONS: SeasonDerivations = {
   },
   ratingsById: new Map(),
   performanceByPlayerId: new Map(),
+  fieldRaceLedger: { seasonId: "", matchdays: [], rowsByTeamId: new Map() },
 };
 
 export function useSeasonDerivations(input: {

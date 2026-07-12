@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { buildFieldRaceLedger } from "@/lib/foundation/build-field-race-ledger";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type {
@@ -90,6 +91,9 @@ export function hydrateSeasonDerivations(record: PersistedSeasonDerivationsRecor
     performanceByPlayerId: new Map(
       Object.entries(record.performanceByPlayerId) as Array<[string, PlayerSeasonPerformanceSummary]>,
     ),
+    // Platzhalter — der Feld-Rennen-Ledger wird billig aus dem GameState
+    // nachgerechnet (siehe readPersistedSeasonDerivations), statt ihn zu persistieren.
+    fieldRaceLedger: { seasonId: record.seasonId, matchdays: [], rowsByTeamId: new Map() },
   };
 }
 
@@ -104,7 +108,10 @@ export function readPersistedSeasonDerivations(
   if (persisted.seasonId !== gameState.season.id) {
     return null;
   }
-  return hydrateSeasonDerivations(persisted);
+  return {
+    ...hydrateSeasonDerivations(persisted),
+    fieldRaceLedger: buildFieldRaceLedger(gameState, gameState.season.id),
+  };
 }
 
 export function buildPersistedSeasonDerivationsRecord(gameState: GameState): PersistedSeasonDerivationsRecord {

@@ -1,3 +1,4 @@
+import type { FieldRaceLedger } from "@/lib/foundation/build-field-race-ledger";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -6,6 +7,7 @@ export type SeasonDerivations = {
   ledger: SeasonPointsLedger;
   ratingsById: Map<string, PlayerRatingContractRow>;
   performanceByPlayerId: Map<string, PlayerSeasonPerformanceSummary>;
+  fieldRaceLedger: FieldRaceLedger;
 };
 
 type SeasonDerivationsCacheEntry = {
