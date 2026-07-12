@@ -11,7 +11,6 @@
  */
 
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
-import { resolveCashBufferMw } from "@/lib/ai/market-pick-engine/market-brackets";
 import {
   CATEGORY_TO_AXIS,
   ROSTER_MAX,
@@ -25,6 +24,9 @@ import {
 import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+
+/** Small flat solvency buffer (MW) — the only cash hard blocker; spend above it is emergent. */
+const ORGANIC_CASH_BUFFER = 5;
 
 /** 0..100 (or 0..10 legacy) management value → 0..1, matching normalizeManagementValue. */
 function normId(value: number | null | undefined): number {
@@ -127,6 +129,9 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     .filter((view) => view.marketValue > 0);
 
   const cash = input.team.cash ?? 0;
+  // Small flat solvency buffer (the only cash hard blocker). How much a club keeps ABOVE this is
+  // emergent: aggressive clubs spend down toward it (~0-10 left), savers keep more via wPatience.
+  const cashBuffer = ORGANIC_CASH_BUFFER;
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
   const boardRisk = 1 - normId(input.identity?.boardConfidence);
   const rosterMax = Math.min(ROSTER_MAX, input.team.rosterLimit ?? ROSTER_MAX);
@@ -138,7 +143,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     disciplines,
     economy: {
       cash,
-      cashBuffer: resolveCashBufferMw(cash),
+      cashBuffer,
       salaryTotal,
       boardRisk,
       expectedPrize: input.forecast?.expectedPrize ?? 0,

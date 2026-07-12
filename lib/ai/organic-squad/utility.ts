@@ -44,7 +44,15 @@ const PRICE_SLOT_SCALE = 18;
  * what makes a depth club big and an elite club small. Weighted flat (every club needs a squad), not
  * by wWin, so low-ambition depth clubs still fill out.
  */
-const ROTATION_VALUE = 30;
+const ROTATION_VALUE = 50;
+
+/**
+ * A player's real cost is the transfer price PLUS the recurring wage bill over its expected tenure.
+ * Capitalizing ~this many seasons of salary into the effective cost is what makes the model weigh
+ * "kann ich mir das Gehalt leisten" — an expensive-wage superstar costs far more than its fee, so a
+ * club can't grab three of them without regard to affordability.
+ */
+const SALARY_CAPITALIZATION = 2;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -100,10 +108,11 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const w = state.weights;
   const fullness = rosterFullnessFactor(state.rosterSize, w.optTarget);
   const deltaStrength = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights) * fullness;
-  // Budget-relative price: cost measured in remaining-OPT-slots of budget, not absolute MW.
+  // Budget-relative cost measured in remaining-OPT-slots of budget: transfer price + capitalized wage.
   const optSlotsRemaining = Math.max(1, w.optTarget - state.rosterSize);
   const budgetPerOptSlot = Math.max(1, state.cash / optSlotsRemaining);
-  const priceInSlots = Math.max(0, player.marketValue) / budgetPerOptSlot;
+  const effectiveCost = Math.max(0, player.marketValue) + SALARY_CAPITALIZATION * Math.max(0, player.salary);
+  const priceInSlots = effectiveCost / budgetPerOptSlot;
   const potential = Math.max(0, player.potential ?? 0);
   // Rotation/depth baseline: fades from full (empty squad) to 0 at optTarget.
   const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));

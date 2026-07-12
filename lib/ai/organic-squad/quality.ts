@@ -21,6 +21,16 @@ const SOLIDE_WEIGHT = 2;
 const SPECIALIST_WEIGHT = 4;
 
 /**
+ * Deployment cap (the "you pay a superstar for 20 disciplines but only field ~a few" reality):
+ * with ≤12 players deployed per matchday and fatigue/injury, a single body can only realistically
+ * contribute a handful of its disciplines. So only a player's BEST few solide/specialist disciplines
+ * count toward quality — this bounds the star premium organically instead of letting a 15-discipline
+ * superstar out-score everyone.
+ */
+const DEPLOYABLE_SOLIDE = 5;
+const DEPLOYABLE_SPECIALIST = 3;
+
+/**
  * Score a player's raw quality: need-weighted core-axis strength plus a bonus for depth/peaks
  * in their discipline ratings. Roughly 0–100+ (unbounded above via the specialist bonus).
  *
@@ -40,8 +50,13 @@ export function computePlayerQuality(
     return sum + weight * player[axis];
   }, 0);
 
-  const solide = countDisciplinesAbove(player.disciplineRatings, SOLIDE_THRESHOLD);
-  const specialists = countDisciplinesAbove(player.disciplineRatings, SPECIALIST_THRESHOLD);
+  // Cap counted breadth to realistic per-matchday deployment (fatigue/≤12) so a superstar's 20-discipline
+  // spread doesn't translate into 20 disciplines of value.
+  const solide = Math.min(countDisciplinesAbove(player.disciplineRatings, SOLIDE_THRESHOLD), DEPLOYABLE_SOLIDE);
+  const specialists = Math.min(
+    countDisciplinesAbove(player.disciplineRatings, SPECIALIST_THRESHOLD),
+    DEPLOYABLE_SPECIALIST,
+  );
   const specialistBonus = SOLIDE_WEIGHT * solide + SPECIALIST_WEIGHT * specialists;
 
   return needWeightedCore + specialistBonus;

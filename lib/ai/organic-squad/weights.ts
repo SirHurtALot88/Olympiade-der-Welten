@@ -116,11 +116,12 @@ export function deriveUtilityWeights(
     0,
     3,
   );
-  // Depth GMs value-seek (cheaper players, more of them → they can actually reach a big squad); elite
-  // GMs concentrate budget on fewer, better players. This wThrift shift — alongside optTarget — is what
-  // makes roster SIZE vary: high thrift spreads the budget across many slots, low thrift concentrates it.
+  // Roster SIZE variety comes from optTarget + the rotation drive + budget-relative pricing (a depth
+  // club's high opt → low budget/slot → it naturally buys cheaper, more players), NOT from suppressing
+  // spend via wThrift — a strong depth→thrift makes clubs hoard instead of building out. Keep only a
+  // light nudge so depth GMs lean value and elite GMs lean quality.
   const wThrift = clamp(
-    wThriftBase + valuePriority * 0.6 + rosterDepthPreference * 0.7 - eliteSmallRosterPreference * 0.5,
+    wThriftBase + valuePriority * 0.6 + rosterDepthPreference * 0.2 - eliteSmallRosterPreference * 0.2,
     0,
     3,
   );
