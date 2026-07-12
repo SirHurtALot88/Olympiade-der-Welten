@@ -126,10 +126,10 @@ export type OrganicRegressionBreakdown = {
 };
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.344;
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.337;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
-export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.007;
+export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0069;
 /**
  * Financial/value discipline (B): the market-value regression term scaled linearly and UNBOUNDED, so a
  * near-ceiling high-value star was guaranteed a large negative net — regression fired at full strength
