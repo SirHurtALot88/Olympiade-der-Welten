@@ -278,8 +278,10 @@ export default function HomeV2NewLook({
   todayCards,
   onContinue,
   onOpenLineup,
+  onOpenTeams,
   onOpenSeason,
   onOpenOffice,
+  onOpenFacilities,
   onOpenInbox,
   onCompleteInboxItem,
   onOpenBoardObjectives,
@@ -397,10 +399,10 @@ export default function HomeV2NewLook({
           </StatChipRow>
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
+            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} onClick={onOpenOffice} title="Gewinn und Verlust — zum Front Office" />
             <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
-            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} />
-            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} />
+            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
+            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
           </StatChipRow>
         </div>
       </NlCard>
@@ -717,6 +719,7 @@ export default function HomeV2NewLook({
             className="nl-home-facility-card"
             eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBuilding /> Gebäude</span>}
             title="Infrastruktur"
+            onClick={onOpenFacilities}
           >
             <StatChipRow aria-label="Facility-Level">
               {facilities.map((facility) => (

@@ -45,6 +45,7 @@ import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import {
   NlDeltaChip,
+  NlFatigueGauge,
   NlProgressBar,
   NlRadar,
   NlSparkline,
@@ -2065,6 +2066,11 @@ export default function PlayerDetailDrawer({
                           : ""}
                       </span>
                     </div>
+                    {newLookEnabled ? (
+                      <div className="player-drawer-fatigue-gauge-wrap">
+                        <NlFatigueGauge value={data.fatigue ?? 0} title={buildFatigueImpactTooltip(data)} />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="player-drawer-kpi-hero-grid">

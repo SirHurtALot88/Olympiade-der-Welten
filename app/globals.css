@@ -41295,6 +41295,25 @@ button.foundation-team-portrait-card {
   text-transform: uppercase;
   color: var(--nl-mut-2);
 }
+/* Fatigue-/Intensitaets-Gauges: kompakter, damit sie in Detail-/Briefing-
+   Kontexte (Player-Drawer, Arena-Briefing) passen. */
+.is-new-look .nl-fatigue-gauge,
+.is-new-look .nl-intensity-gauge {
+  width: 76px;
+}
+.is-new-look .nl-fatigue-gauge .nl-gauge-value,
+.is-new-look .nl-intensity-gauge .nl-gauge-value {
+  font-size: 16px;
+}
+.is-new-look .nl-intensity-gauge .nl-gauge-value {
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+.is-new-look .player-drawer-fatigue-gauge-wrap {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--nl-s2);
+}
 
 /* --- Chart-Primitives (Sparkline / BarChart / Radar) -------------- */
 .is-new-look .nl-sparkline {

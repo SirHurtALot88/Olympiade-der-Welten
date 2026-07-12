@@ -14,6 +14,12 @@ export type InboxV2ClientProps = {
   items: InboxV2Item[];
   selectedItemId: string | null;
   onSelectItem: (itemId: string) => void;
+  /**
+   * Optionaler Deep-Link: oeffnet den Ziel-Screen des Items (targetView).
+   * Ist er gesetzt, springt ein Klick auf die Karte direkt zum Vorgang statt
+   * ihn nur auszuwaehlen. Ohne Handler bleibt es beim reinen Auswaehlen.
+   */
+  onOpenItem?: (itemId: string) => void;
   teamLabel?: string | null;
   openCount?: number;
   criticalCount?: number;
