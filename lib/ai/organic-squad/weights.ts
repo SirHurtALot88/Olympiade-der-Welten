@@ -97,7 +97,7 @@ export function deriveUtilityWeights(
   // --- Base weights from identity, chosen to land in a modest ~0.2..2.0 range. ---
   const wWinBase = 0.5 + ambitionN * 0.7 + boardPressureN * 0.5;
   const wThriftBase = 0.4 + (1 - financesN) * 0.9;
-  const wPatienceBase = 0.4 + financesN * 0.8 + (1 - boardPressureN) * 0.4;
+  const wPatienceBase = 0.35 + financesN * 0.5 + (1 - boardPressureN) * 0.25;
   const wSustainBase = 0.5 + (1 - financesN) * 0.3;
   const wAssetBase = 0.3 + financesN * 0.2;
 
