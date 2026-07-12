@@ -67,6 +67,7 @@ import {
   NlSubTabs,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   nlToneClass,
   type NlAxisKey,
@@ -173,7 +174,9 @@ function formatPhubMetricValue(value: number | null, metric: { key: NlPhubMetric
     return "—";
   }
   if (metric.key === "mw") {
-    return formatLocalePoints(value, 2);
+    // Marktwert über den geteilten Geld-Formatter (Einheit " Mio"), damit die
+    // Hub-Kacheln/Rangliste dieselbe Konvention wie der Rest der App tragen.
+    return formatNlMoney(value);
   }
   return formatNlNumber(value, metric.digits);
 }
@@ -250,6 +253,29 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
 ];
 
 const NL_PLAYERS_PAGE_SIZE = 100;
+
+/**
+ * Fog of war: für Spieler, die NICHT zum vom Menschen geführten Team gehören,
+ * ist das Potenzial (PO) verdeckt. Ein konkreter PO-Wert würde in `NlAbilityStars`
+ * als volle Sterne rendern (z. B. ★★★★★) und so fremdes Potenzial leaken. Statt
+ * dessen wird ein unscharfer PO-BEREICH (Score-Space 35..99) übergeben, damit die
+ * Hohl-Kontur-Behandlung (`known={false}`) den Bereich als "geschätzt" zeichnet.
+ * Bandbreite konsistent mit der ungescouteten Scouting-Unsicherheit (±16, vgl.
+ * `getScoutingUncertainty(0)` in `lib/progression/player-potential-service.ts`),
+ * auf 35..99 geklammert. Es wird KEINE PO-Zahl gerendert — nur die Sternmathematik
+ * nutzt den Bereich (die `PO ≥ CA`-Klammerung passiert in `NlAbilityStars`).
+ */
+const NL_FOG_PO_BAND = 16;
+function getFoggedPoScoreRange(potential: number | null | undefined): { min: number; max: number } | null {
+  if (potential == null || !Number.isFinite(potential) || potential <= 0) {
+    return null;
+  }
+  const hidden = Math.round(Math.min(99, Math.max(1, potential)));
+  return {
+    min: Math.round(Math.min(99, Math.max(35, hidden - NL_FOG_PO_BAND))),
+    max: Math.round(Math.min(99, Math.max(35, hidden + NL_FOG_PO_BAND))),
+  };
+}
 
 /** Ligaweiter Rang eines Werts innerhalb eines Heat-Pools (1 = bester). */
 function getLeagueRank(value: number | null | undefined, pool: number[]): number | null {
@@ -489,6 +515,8 @@ export default function FoundationPlayersTableNewLook({
     tone: "accent" | "spe" | "soc" | "neutral",
     digits: number,
     title: string,
+    /** Geldwert (Marktwert): über den geteilten Formatter mit Einheit " Mio" statt bloßer Zahl. */
+    money = false,
   ) {
     if (row == null || value == null) {
       return <StatChip label={label} value="—" tone={tone} title={title} />;
@@ -497,7 +525,7 @@ export default function FoundationPlayersTableNewLook({
     return (
       <StatChip
         label={label}
-        value={formatNlNumber(value, digits)}
+        value={money ? formatNlMoney(value) : formatNlNumber(value, digits)}
         tone={tone}
         sub={[row.player.name, formatLeagueRankSub(rank)].filter(Boolean).join(" · ")}
         title={`${title} — ${row.player.name} öffnen`}
@@ -563,11 +591,17 @@ export default function FoundationPlayersTableNewLook({
    * siehe `components/foundation/velo-ui/NlAbilityStars.tsx`).
    */
   function renderAbilityStars(row: FoundationPlayerScopeRow) {
+    // Nur eigene (vom Menschen geführte) Spieler haben ein bekanntes PO — deren
+    // exakter Wert bleibt erhalten (`known`, solide Sterne). Für fremde Spieler
+    // ist PO verdeckt: unscharfer Bereich statt Einzelwert, damit kein volles
+    // ★★★★★ das verdeckte Potenzial leakt (siehe getFoggedPoScoreRange).
+    const owned = row.team?.humanControlled ?? false;
+    const potential = row.player.potential ?? null;
     return (
       <NlAbilityStars
         caScore={row.playerOvr}
-        poScore={row.player.potential ?? null}
-        known={false}
+        known={owned}
+        {...(owned ? { poScore: potential } : { poScoreRange: getFoggedPoScoreRange(potential) })}
         compact
         stacked
         label={`${row.player.name} Fähigkeiten`}
@@ -639,6 +673,8 @@ export default function FoundationPlayersTableNewLook({
     const traitsText = traits.length > 0 ? traits.join(", ") : "—";
     const isPpsExpanded = expandedPlayerId === row.player.id;
     const ppsDetailId = `nl-players-pps-detail-${row.player.id}`;
+    // Fog of war: nur eigene Spieler haben ein bekanntes PO (siehe renderAbilityStars).
+    const playerOwned = row.team?.humanControlled ?? false;
 
     const rowElement = (
       <tr
@@ -666,9 +702,11 @@ export default function FoundationPlayersTableNewLook({
             subMeta={row.team?.name ?? "Free Agent"}
             previewDensity="full"
             newLook
-            known={false}
+            known={playerOwned}
             caScore={row.playerOvr}
-            poScore={row.player.potential ?? null}
+            {...(playerOwned
+              ? { poScore: row.player.potential ?? null }
+              : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) })}
           >
             {portrait.src ? (
               <BudgetedMediaImage
@@ -958,13 +996,13 @@ export default function FoundationPlayersTableNewLook({
             />
             <StatChip
               label="Ø MW"
-              value={formatNlNumber(summary.avgMw, 1)}
+              value={formatNlMoney(summary.avgMw)}
               tone="neutral"
               title="Durchschnittlicher Marktwert der Auswahl"
             />
             <StatChip
               label="Gehälter"
-              value={formatNlNumber(summary.totalSalary, 1)}
+              value={formatNlMoney(summary.totalSalary)}
               tone="warn"
               title="Summe der Jahresgehälter der Auswahl"
             />
@@ -1008,6 +1046,7 @@ export default function FoundationPlayersTableNewLook({
                 "neutral",
                 2,
                 "Höchster Marktwert der Auswahl",
+                true,
               )}
             </StatChipRow>
             <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl">
