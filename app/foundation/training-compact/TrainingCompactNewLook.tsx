@@ -329,9 +329,15 @@ function getPotentialTone(multiplier: number): "high" | "good" | "neutral" | "lo
 function NlTrainingIntensityProjection({
   row,
   trainingModeOptions,
+  readOnly,
+  demandMode,
+  onSelectMode,
 }: {
   row: TrainingPlayerRowView;
   trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
+  readOnly: boolean;
+  demandMode: PlayerTrainingMode | null;
+  onSelectMode: (mode: PlayerTrainingMode) => void;
 }) {
   const projection = useMemo(
     () => buildTrainingIntensityProjection(row, trainingModeOptions),
@@ -342,9 +348,16 @@ function NlTrainingIntensityProjection({
   const best = projection.reduce((max, entry) => Math.max(max, entry.trainingGain), 0.01);
 
   return (
-    <div className="nl-training-intensity" data-testid="nl-training-intensity" aria-label="Trainingsbudget je Intensität">
+    <div
+      className="nl-training-intensity is-selectable"
+      data-testid="nl-training-intensity"
+      role="radiogroup"
+      aria-label="Trainingsintensität wählen"
+    >
       <div className="nl-training-intensity-head">
-        <span className="nl-training-intensity-title">Entwicklung je Intensität</span>
+        <span className="nl-training-intensity-title">
+          Intensität {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
+        </span>
         <span
           className={`nl-training-potential is-${potentialTone}`}
           title="Potential-Trainingsspeed: höheres Potential ⇒ mehr Zuwachs pro Intensität. Dieser Faktor steckt in jeder Prognose unten."
@@ -354,14 +367,24 @@ function NlTrainingIntensityProjection({
       </div>
       <div className="nl-training-intensity-rows">
         {projection.map((entry) => (
-          <div
+          <button
+            type="button"
             key={`intensity-${row.player.id}-${entry.mode}`}
-            className={`nl-training-intensity-row${entry.isCurrent ? " is-current" : ""}`}
-            title={`${entry.label}: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)} · Regeneration ${formatSignedPercent(entry.recoveryDeltaPct)}`}
+            className={`nl-training-intensity-row${entry.isCurrent ? " is-current" : ""}${
+              demandMode === entry.mode && !entry.isCurrent ? " is-demand" : ""
+            }`}
+            role="radio"
+            aria-checked={entry.isCurrent}
+            disabled={readOnly}
+            onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
+            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)} · Regeneration ${formatSignedPercent(entry.recoveryDeltaPct)}`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
               {entry.isCurrent ? <span className="nl-training-intensity-current">aktiv</span> : null}
+              {demandMode === entry.mode && !entry.isCurrent ? (
+                <span className="nl-training-intensity-demand">will</span>
+              ) : null}
             </span>
             <span className="nl-training-intensity-bar" aria-hidden="true">
               <span
@@ -383,7 +406,7 @@ function NlTrainingIntensityProjection({
               format={(n) => `${formatVeloSignedNumber(n, 1)} SP`}
               className="nl-training-intensity-net"
             />
-          </div>
+          </button>
         ))}
       </div>
       <small className="nl-training-intensity-foot nl-tnum">
@@ -402,9 +425,13 @@ function NlTrainingIntensityProjection({
 function NlTrainingClassRanking({
   row,
   trainingClassOptions,
+  readOnly,
+  onSelectClass,
 }: {
   row: TrainingPlayerRowView;
   trainingClassOptions: TrainingCompactClientProps["trainingClassOptions"];
+  readOnly: boolean;
+  onSelectClass: (className: string) => void;
 }) {
   const ranking = useMemo(() => buildTrainingClassGainRanking(row, trainingClassOptions), [row, trainingClassOptions]);
   if (ranking.length === 0) return null;
@@ -412,17 +439,25 @@ function NlTrainingClassRanking({
 
   return (
     <div
-      className="nl-training-class-ranking"
+      className="nl-training-class-ranking is-selectable"
       data-testid="nl-training-class-ranking"
-      aria-label="Top-3 Klassen nach geschätztem SP-Zugewinn"
+      role="radiogroup"
+      aria-label="Trainingsklasse aus Top-3 wählen"
     >
-      <span className="nl-training-class-ranking-title">Top-3 Klassen · geschätzter SP-Zugewinn</span>
+      <span className="nl-training-class-ranking-title">
+        Top-3 Klassen · SP-Zugewinn {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
+      </span>
       <div className="nl-training-class-ranking-rows">
         {ranking.map((entry, index) => (
-          <div
+          <button
+            type="button"
             key={`class-rank-${row.player.id}-${entry.className}`}
             className={`nl-training-class-ranking-row${entry.isCurrent ? " is-current" : ""}`}
-            title={`${entry.label}: ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
+            role="radio"
+            aria-checked={entry.isCurrent}
+            disabled={readOnly}
+            onClick={() => onSelectClass(entry.className)}
+            title={`${entry.label} als Trainingsklasse wählen: ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
             } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
           >
@@ -438,7 +473,7 @@ function NlTrainingClassRanking({
               />
             </span>
             <span className="nl-training-class-ranking-value nl-tnum">≈+{formatVeloNumber(entry.estimatedGain, 1)} SP</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -448,7 +483,6 @@ function NlTrainingClassRanking({
 function NlTrainingPlayerCard({
   row,
   trainingModeReadOnly,
-  modeSegments,
   trainingModeOptions,
   trainingClassOptions,
   onSetTrainingMode,
@@ -457,7 +491,6 @@ function NlTrainingPlayerCard({
 }: {
   row: TrainingPlayerRowView;
   trainingModeReadOnly: boolean;
-  modeSegments: ReturnType<typeof buildTrainingModeSegments>;
   trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
   trainingClassOptions: TrainingCompactClientProps["trainingClassOptions"];
   onSetTrainingMode: TrainingCompactClientProps["onSetTrainingMode"];
@@ -574,8 +607,19 @@ function NlTrainingPlayerCard({
         </span>
       </small>
 
-      <NlTrainingIntensityProjection row={row} trainingModeOptions={trainingModeOptions} />
-      <NlTrainingClassRanking row={row} trainingClassOptions={trainingClassOptions} />
+      <NlTrainingIntensityProjection
+        row={row}
+        trainingModeOptions={trainingModeOptions}
+        readOnly={trainingModeReadOnly}
+        demandMode={demand && demand.status !== "fulfilled" ? demand.preferredMode : null}
+        onSelectMode={(mode) => onSetTrainingMode(row.player.id, mode)}
+      />
+      <NlTrainingClassRanking
+        row={row}
+        trainingClassOptions={trainingClassOptions}
+        readOnly={trainingModeReadOnly}
+        onSelectClass={(className) => onSetTrainingClass(row.player.id, className)}
+      />
 
       {showRecommendation || hasTraitBoost || hasDemand || isHighRisk || classSuggestion ? (
         <div className="nl-training-chip-row" aria-label="Trainings-Hinweise">
@@ -650,18 +694,13 @@ function NlTrainingPlayerCard({
       {/* Nur die Detail-Berechnung bleibt einklappbar (identische echte Werte). */}
       <TrainingBudgetBreakdownDisclosure row={row} />
 
+      {/* Intensität + Klasse werden oben direkt in den Prognose-Zeilen gewählt
+          (klickbar). Hier nur noch der Vollzugriff auf alle Klassen als Fallback,
+          falls die Wunsch-Klasse nicht unter den Top-3 ist. */}
       <footer className="nl-training-player-controls">
-        <VeloIntensityRail
-          ariaLabel={`${row.player.name} Trainingsmodus`}
-          segments={modeSegments}
-          activeValue={row.mode}
-          demandValue={demand && demand.status !== "fulfilled" ? demand.preferredMode : null}
-          disabled={trainingModeReadOnly}
-          onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
-        />
         <div className="nl-training-player-foot">
           <label className="nl-training-class-select">
-            <span>Trainingsklasse</span>
+            <span>Andere Klasse</span>
             <select
               className="input"
               value={row.trainingClass}
@@ -951,7 +990,6 @@ export default function TrainingCompactNewLook({
               key={row.entryId}
               row={row}
               trainingModeReadOnly={trainingModeReadOnly}
-              modeSegments={modeSegments}
               trainingModeOptions={trainingModeOptions}
               trainingClassOptions={trainingClassOptions}
               onSetTrainingMode={onSetTrainingMode}

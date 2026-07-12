@@ -59227,3 +59227,55 @@ button.is-new-look .nl-thist-season-pill,
   color: color-mix(in srgb, #d4a72c 70%, var(--nl-ink));
 }
 
+
+/* ============================================================
+   Training-Umbau — Intensität & Klasse direkt in den Prognose-Zeilen wählbar
+   (klickbare Buttons statt separater unterer Rail). User-Request Mac-Build.
+   ============================================================ */
+.is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row,
+.is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:hover:not(:disabled):not(.is-current),
+.is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:hover:not(:disabled):not(.is-current) {
+  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--nl-accent) 32%, transparent);
+}
+.is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:focus-visible,
+.is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: 1px;
+}
+.is-new-look .nl-training-intensity.is-selectable .nl-training-intensity-row:disabled,
+.is-new-look .nl-training-class-ranking.is-selectable .nl-training-class-ranking-row:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+/* Wunsch-Modus (Spieler will diese Intensität), aber nicht aktiv gewählt */
+.is-new-look .nl-training-intensity-row.is-demand {
+  border-color: color-mix(in srgb, var(--nl-warn, #e0a53a) 45%, transparent);
+}
+.is-new-look .nl-training-intensity-demand {
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--nl-warn, #e0a53a);
+}
+.is-new-look .nl-training-intensity-hint-inline {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--nl-mut);
+  text-transform: none;
+  letter-spacing: 0;
+}
