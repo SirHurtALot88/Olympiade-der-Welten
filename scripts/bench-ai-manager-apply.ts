@@ -7,7 +7,7 @@
  *   OLY_APP_SQLITE_PATH=/tmp/bench.sqlite npx tsx scripts/bench-ai-manager-apply.ts
  *
  * Measured (32 teams, 138 applied actions) before vs. after the
- * createDeferredPersistence batching:
+ * createCaptureBatchPersistence batching:
  *   before: 43 disk writes, ~43,600 ms
  *   after:   1 disk write,   ~2,100 ms   (~20× faster, writes -98%)
  */

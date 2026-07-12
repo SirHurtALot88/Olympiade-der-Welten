@@ -27,7 +27,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
-import { createDeferredPersistence } from "@/lib/persistence/deferred-persistence";
+import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
@@ -613,7 +613,11 @@ export function applyAiManagerPlan(input: {
   const leaguePlanPreview = buildAiLeagueManagementPreview(input.save.gameState);
   // Batch every per-team/per-action write in memory and flush ONCE at the end,
   // instead of the ~4-5 full-state saves × teams this loop used to do.
-  const deferred = createDeferredPersistence(basePersistence, input.save);
+  const deferred = createCaptureBatchPersistence({
+    delegate: basePersistence,
+    saveId: input.save.saveId,
+    seed: input.save,
+  });
   const persistence = deferred.persistence;
   let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, leaguePlanPreview);
   const appliedIds = new Set<string>();

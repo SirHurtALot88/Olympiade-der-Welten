@@ -49,7 +49,11 @@ export function createCaptureBatchPersistence(input: {
       return input.delegate.bootstrapSingleplayerSave();
     },
     getActiveSave() {
-      return latest ?? input.delegate.getActiveSave();
+      const active = input.delegate.getActiveSave();
+      if (latest && active && active.saveId === input.saveId) {
+        return latest;
+      }
+      return active;
     },
     getSaveById(saveId: string) {
       if (saveId === input.saveId && latest) {
