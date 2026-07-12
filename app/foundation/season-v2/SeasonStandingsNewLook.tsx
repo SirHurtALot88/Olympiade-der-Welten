@@ -16,6 +16,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  formatNlMoney,
   nlToneClass,
   type NlBarChartBar,
   type NlRankingDrawerRow,
@@ -619,7 +620,7 @@ export default function SeasonStandingsNewLook({
             />
             <StatChip
               label="MW"
-              value={formatNlNumber(row.marketValueTotal, 1)}
+              value={formatNlMoney(row.marketValueTotal)}
               onClick={() => openRankingDrawer("mw", row.teamId)}
               title={`Marktwert-Rangliste — ${row.teamName}`}
             />
@@ -668,7 +669,7 @@ export default function SeasonStandingsNewLook({
         />
         <StatChip
           label="MW"
-          value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+          value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
           onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
           title="Marktwert-Rangliste"
         />
@@ -783,7 +784,7 @@ export default function SeasonStandingsNewLook({
               {formatNlNumber(getAreaValue(row, group.id), 1)}
             </td>
           ))}
-          <td className="nl-standings-td-mw">{formatNlNumber(row.marketValueTotal, 1)}</td>
+          <td className="nl-standings-td-mw">{formatNlMoney(row.marketValueTotal)}</td>
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
@@ -926,7 +927,7 @@ export default function SeasonStandingsNewLook({
               />
               <StatChip
                 label="MW"
-                value={formatNlNumber(selectedTeamSummary.marketValueTotal, 1)}
+                value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
                 title="Marktwert-Rangliste"
               />

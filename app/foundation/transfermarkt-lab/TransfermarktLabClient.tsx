@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getTransfermarktBaseColumns } from "@/lib/market/transfermarkt-column-contract";
 import {
   formatTransfermarktCurrency,
@@ -134,7 +135,7 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
       <section className="hero">
         <h1>Transfermarkt Lab</h1>
         <p>
-          <Link href="/foundation">Zurueck zur Foundation</Link>
+          <Link href="/foundation">Zurück zur Foundation</Link>
         </p>
       </section>
 
@@ -231,22 +232,20 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
                         if (column.id === "imageUrl") {
                           return (
                             <td key={column.id}>
-                              {portrait.src ? (
-                                <img
-                                  className="transfermarkt-portrait"
-                                  src={portrait.src}
-                                  alt={item.name}
-                                  width={56}
-                                  height={56}
-                                  loading="lazy"
-                                  decoding="async"
-                                  fetchPriority="low"
-                                />
-                              ) : (
-                                <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${item.name} placeholder`}>
-                                  {portrait.initials}
-                                </div>
-                              )}
+                              <OptimizedMediaImage
+                                className="transfermarkt-portrait"
+                                src={portrait.src}
+                                alt={item.name}
+                                width={56}
+                                height={56}
+                                loading="lazy"
+                                fetchPriority="low"
+                                fallback={
+                                  <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${item.name} placeholder`}>
+                                    {portrait.initials}
+                                  </div>
+                                }
+                              />
                             </td>
                           );
                         }

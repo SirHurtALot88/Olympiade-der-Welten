@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { isSeasonOnePreseasonNeutralBoard } from "@/lib/board/team-season-objectives-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -429,7 +430,7 @@ export function ManagerOfficeClient({
                   detail:
                     selectedHqFinanceWarnings[0] ??
                     `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
-                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex fuer Deals",
+                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex für Deals",
                   tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
                   priority: selectedHqFinanceWarnings.length > 0 ? 92 : 54,
                   accent: "finance",
@@ -518,17 +519,18 @@ export function ManagerOfficeClient({
 	                    onClick={() => selectedTeam?.teamId && onOpenTeam(selectedTeam.teamId)}
 	                    title="Team-Dossier öffnen"
 	                  >
-	                    {homeActiveTeamLogo?.src ? (
-	                      <img
-	                        className="foundation-home-logo"
-	                        src={homeActiveTeamLogo.src}
-	                        alt={`${selectedTeam?.name ?? "Team"} Logo`}
-	                        loading="eager"
-	                        decoding="async"
-	                      />
-	                    ) : (
-	                      <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
-	                    )}
+	                    <OptimizedMediaImage
+	                      className="foundation-home-logo"
+	                      src={homeActiveTeamLogo?.src}
+	                      alt={`${selectedTeam?.name ?? "Team"} Logo`}
+	                      loading="eager"
+	                      fetchPriority="high"
+	                      fallback={
+	                        <span className="foundation-home-logo team-logo-placeholder">
+	                          {homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}
+	                        </span>
+	                      }
+	                    />
 	                    <div className="stack">
 	                      <span className="eyebrow">HQ / Manager-Zentrale</span>
 	                      <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
@@ -589,7 +591,7 @@ export function ManagerOfficeClient({
                     <div
                       className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}
                       data-testid="foundation-hq-gm-story"
-                      title="GM-Mandat aus Board Confidence, Druck und moeglichen Wechselgruenden."
+                      title="GM-Mandat aus Board Confidence, Druck und möglichen Wechselgruenden."
                     >
                       <strong>{selectedHqGmStory.label}</strong>
                       <span>
@@ -819,14 +821,14 @@ export function ManagerOfficeClient({
 	                            ))}
 	                          </div>
 	                        ) : (
-	                          <p className="muted">Noch leer. Gute Targets hier merken und spaeter schneller ziehen.</p>
+	                          <p className="muted">Noch leer. Gute Targets hier merken und später schneller ziehen.</p>
 	                        )}
 	                      </div>
 	                      <div className="foundation-hq-mini-card">
 	                        <span>Marktchance</span>
 	                        {selectedHqAxisSummary?.weakestTwo[0] ? (
 	                          <button className="foundation-hq-mini-row" type="button" onClick={() => onNavigate("marketV2")}>
-	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits pruefen"}</strong>
+	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits prüfen"}</strong>
 	                            <small>
                                 {selectedHqAxisSummary?.weakestTwo[0]
                                   ? `Schwachpunkt #${selectedHqAxisSummary.weakestTwo[0].rank} · Markt direkt auf diese Achse drehen`

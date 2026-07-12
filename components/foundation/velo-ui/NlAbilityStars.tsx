@@ -13,9 +13,13 @@
  * "5★ = 58" on one player and "5★ = 94" on another. Passing an absolute `caScore`
  * guarantees the same rating → the same stars on every surface.
  *
- * Fog of war: `known === true` renders exact stars; `known === false` renders the
- * potential star-RANGE with the dark uncertain overlay (visual uncertainty only —
- * no numbers are ever shown).
+ * Fog of war: `known === true` renders exact SOLID stars; `known === false` renders
+ * the potential star-RANGE where the uncertain upper part (min→max) is drawn as
+ * HOLLOW OUTLINE stars (transparent fill + amber stroke), never as solid fill — so a
+ * fogged PO can NEVER be misread as a confirmed exact/5-star value. Only the certain
+ * lower part (up to `min`) is solid gold (visual uncertainty only — no numbers are
+ * ever shown). Outline treatment: `.nl-fog-uncertain` (scratchpad/waveA-fog.css) plus
+ * the inline text-stroke below, so it renders regardless of stylesheet wiring.
  *
  * No numeric CA/PO text / ranges are rendered — the legacy `caScore` (used as the
  * CA scale driver), `poScore` and `poScoreRange` props feed the star math only.
@@ -144,9 +148,18 @@ function StarRow({ min, max, uncertain }: { min: number; max: number; uncertain:
               </span>
             ) : null}
             {uncertain && slot.showUncertain ? (
+              // Fog-of-war upper range: HOLLOW outline star (transparent fill + amber
+              // stroke). Deliberately NOT a solid fill so the uncertain part reads as
+              // "possible, not confirmed" and a fogged PO is never misread as ★★★★★.
               <span
-                className="nl-ability-star-uncertain"
-                style={{ left: `${slot.minFill * 100}%`, width: `${(slot.maxFill - slot.minFill) * 100}%` }}
+                className="nl-ability-star-uncertain nl-fog-uncertain"
+                style={{
+                  left: `${slot.minFill * 100}%`,
+                  width: `${(slot.maxFill - slot.minFill) * 100}%`,
+                  color: "transparent",
+                  WebkitTextStroke: "1.1px rgba(255, 209, 112, 0.95)",
+                  textShadow: "none",
+                }}
               >
                 ★
               </span>

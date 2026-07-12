@@ -24,11 +24,11 @@ import {
 import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 
 /**
- * "Neuer Look" Manager-Cockpit fuer Home V2 (flag-gated, additive).
+ * "Neuer Look" Manager-Cockpit für Home V2 (flag-gated, additive).
  *
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
- * `HomeV2Client` faellt ohne Flag unveraendert auf das bestehende Layout
- * zurueck. Konsumiert exakt dieselben Props/Daten wie der alte Client;
+ * `HomeV2Client` fällt ohne Flag unverändert auf das bestehende Layout
+ * zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client;
  * es gibt keine Zeit-/Uhr-Simulation, daher bewusst keine Countdown- oder
  * "vs. letzte Woche"-Elemente.
  *
@@ -355,9 +355,11 @@ export default function HomeV2NewLook({
         data-testid="nl-home-hero"
         actions={
           <div className="nl-home-hero-next">
-            <button type="button" className="nl-home-continue" onClick={onContinue}>
-              Weiter · {nextStepLabel}
-            </button>
+            {/* CC7: the "Weiter · …" advance action is rendered once in the global
+                top-bar (foundation-global-next-button, wired to triggerGlobalNext).
+                The hero no longer duplicates that button — it only surfaces the
+                current flow status so the richer context stays without a second
+                advance control. */}
             <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
           </div>
         }

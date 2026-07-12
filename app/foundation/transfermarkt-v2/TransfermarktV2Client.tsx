@@ -321,7 +321,7 @@ const DISCIPLINE_CATEGORY_BY_KEY: Record<string, "power" | "speed" | "mental" | 
 const LABEL_MAP: Record<string, string> = {
   affordable: "bezahlbar",
   under_opt: "unter Soll",
-  over_opt: "ueber Soll",
+  over_opt: "über Soll",
   unknown: "unbekannt",
   ready: "bereit",
   not_ready: "noch roh",
@@ -505,6 +505,10 @@ function formatCompactNumber(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
+  // Never render a negative sign for a value whose magnitude rounds to zero (e.g. "-0 €").
+  if (Math.round(value * 10 ** digits) === 0) {
+    value = 0;
+  }
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
@@ -564,7 +568,7 @@ function formatDevelopmentRouteLabel(value: string | null | undefined) {
     late_bloomer: "Spaetentwickler",
     veteran_plateau: "Plateau halten",
     free_agent_ambient: "freier Markt",
-    regression_watch: "Rueckschritt vermeiden",
+    regression_watch: "Rückschritt vermeiden",
     star_refinement: "Star verfeinern",
     balanced_growth: "balanciert entwickeln",
   };
@@ -578,7 +582,7 @@ function getScoutReliabilityCopy(confidence: number | null | undefined) {
     return "Scouting unscharf: Werte als grobe Richtung lesen.";
   }
   if (confidence >= 75) return "Scouting klar: Range ist relativ eng.";
-  if (confidence >= 50) return "Scouting solide: kleine Abweichungen moeglich.";
+  if (confidence >= 50) return "Scouting solide: kleine Abweichungen möglich.";
   if (confidence >= 30) return "Scouting grob: erst als Tendenz nutzen.";
   return "Scouting roh: grobe Spanne, nicht als exakte Wahrheit lesen.";
 }
@@ -624,10 +628,10 @@ function formatContractPreferenceCurrentStatus(
     return "Aktuell: Laufzeit und Form passen gut";
   }
   if (lengthMatches) {
-    return `Aktuell: Laufzeit passt, Form stoert (${formatContractShapeLabel(contractShape)})`;
+    return `Aktuell: Laufzeit passt, Form stört (${formatContractShapeLabel(contractShape)})`;
   }
   if (shapeMatches) {
-    return `Aktuell: Form passt, Laufzeit stoert (${safeLength ?? "?"} Saisons)`;
+    return `Aktuell: Form passt, Laufzeit stört (${safeLength ?? "?"} Saisons)`;
   }
   return `Aktuell: Laufzeit (${safeLength ?? "?"}) und Form (${formatContractShapeLabel(contractShape)}) weichen ab`;
 }
@@ -732,7 +736,7 @@ function getScoutedTopDisciplineHeadline(item: TransfermarktFreeAgentItem) {
 
 function getScoutedDisciplineLine(item: TransfermarktFreeAgentItem) {
   if (!item.topDisciplineScores.length) {
-    return "keine Diszi-Staerke bekannt";
+    return "keine Diszi-Stärke bekannt";
   }
 
   return item.topDisciplineScores
@@ -921,14 +925,14 @@ function getCandidateFocusAxes(item: TransfermarktFreeAgentItem) {
 function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
     contract_length_override_in_effect: "Laufzeit weicht vom Standarddeal ab.",
-    insufficient_cash: "Cash reicht fuer Kauf oder Gesamtpaket noch nicht.",
+    insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
     low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
     local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
     market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschaetzt.",
-    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus haengen.",
-    negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
+    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
+    negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
+    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
     preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
@@ -956,7 +960,7 @@ function formatDealPreviewErrorLabel(value: string) {
 function formatCandidateAvailabilityLabel(teamCode: string | null | undefined, availableCount: number | null | undefined) {
   const safeCount = typeof availableCount === "number" && Number.isFinite(availableCount) ? availableCount : 0;
   if (teamCode) {
-    return `${safeCount} fuer ${teamCode} verfuegbar`;
+    return `${safeCount} für ${teamCode} verfügbar`;
   }
   return `${safeCount} im Markt`;
 }
@@ -1315,7 +1319,7 @@ export default function TransfermarktV2Client({
 
   function resetMarketFilters() {
     applyMarketFilterSnapshot(createDefaultMarketFilterSnapshot());
-    setFilterPresetMessage("Filter zurueckgesetzt.");
+    setFilterPresetMessage("Filter zurückgesetzt.");
   }
 
   const currentFilterSnapshot = useMemo<MarketFilterSnapshot>(
@@ -1383,7 +1387,7 @@ export default function TransfermarktV2Client({
   function deleteFilterPreset(presetId: string) {
     const preset = filterPresets.find((entry) => entry.id === presetId);
     setFilterPresets((current) => current.filter((entry) => entry.id !== presetId));
-    setFilterPresetMessage(preset ? `Filter "${preset.name}" geloescht.` : "Filter geloescht.");
+    setFilterPresetMessage(preset ? `Filter "${preset.name}" gelöscht.` : "Filter gelöscht.");
   }
 
   function toggleWishlistSort(key: WishlistSortKey) {
@@ -1717,7 +1721,7 @@ export default function TransfermarktV2Client({
   }, [defaultSaveId, marketItemByPlayerId, selectedTeamId, wishlistEntries, wishlistSort]);
   const selectedTeamCanManage = Boolean(selectedTeamId && manageableTeamIdSet.has(selectedTeamId));
   const selectedTeamLockedReason = selectedTeamId && !selectedTeamCanManage
-    ? `${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Du kannst scouten, aber keine Deals abschliessen.`
+    ? `${selectedTeam?.name ?? "Dieses Team"} gehört nicht zu deinen steuerbaren Teams. Du kannst scouten, aber keine Deals abschliessen.`
     : null;
   const selectedTeamReadOnlyReason =
     selectedTeamLockedReason ??
@@ -2617,7 +2621,7 @@ export default function TransfermarktV2Client({
       }
       setBuyPreview(payload.summary);
       setBuySuccess(
-        `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
+        `${payload.summary.player?.name ?? "Spieler"} fix für ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Ablöse, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
       );
       deactivateOfferPanel();
       setBuyNegotiationOutcome(null);
@@ -2682,7 +2686,7 @@ export default function TransfermarktV2Client({
         status: "countered",
         tone: "warning",
         title: "Gegenseite verhandelt nach",
-        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenueber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
+        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
         counterSalary,
       });
       window.requestAnimationFrame(() => {
@@ -2757,7 +2761,7 @@ export default function TransfermarktV2Client({
       }
       setPreviewError(
         shouldApplyAbortMalus
-          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
+          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus für die nächste Runde.`
           : `Kauf von ${playerName} abgebrochen.`,
       );
       window.requestAnimationFrame(() => {
@@ -2804,7 +2808,7 @@ export default function TransfermarktV2Client({
     const parts = [
       { label: "Identity", value: breakdown.identityFitScore },
       { label: "Achse", value: breakdown.axisScore },
-      { label: "Luecke", value: breakdown.rosterGapScore },
+      { label: "Lücke", value: breakdown.rosterGapScore },
       { label: "Tiefe", value: breakdown.depthQualityScore },
       { label: "Diszi", value: breakdown.preferredDisciplineScore },
       { label: "Value", value: breakdown.valueReliefScore },
@@ -3255,7 +3259,7 @@ export default function TransfermarktV2Client({
                     <button type="button" onClick={() => loadFilterPreset(preset)} title={`Filter "${preset.name}" laden`}>
                       {preset.name}
                     </button>
-                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} title={`Filter "${preset.name}" loeschen`}>
+                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} title={`Filter "${preset.name}" löschen`}>
                       x
                     </button>
                   </span>
@@ -3537,7 +3541,7 @@ export default function TransfermarktV2Client({
 
               <div
                 className="market-v2-attribute-grid"
-                title="Scouting L1 zeigt 4 Attribute als Range. Hoehere Scouting-Stufen decken mehr Attribute und spaeter exakte Werte auf."
+                title="Scouting L1 zeigt 4 Attribute als Range. Hoehere Scouting-Stufen decken mehr Attribute und später exakte Werte auf."
               >
                 {orderedAttributeRows.map((entry) => {
                   const shortLabel = ATTRIBUTE_SHORT_LABELS[entry.key as PlayerGeneratorAttributeKey] ?? entry.label.slice(0, 3).toUpperCase();
@@ -3649,7 +3653,7 @@ export default function TransfermarktV2Client({
                         <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt weitere Trainingsstaerken auf.">
                           <b>?</b>
                           <span>
-                            <strong>+{hiddenTrainingPositive} Staerken</strong>
+                            <strong>+{hiddenTrainingPositive} Stärken</strong>
                             <small>mehr Scouting</small>
                           </span>
                         </span>
@@ -3871,7 +3875,7 @@ export default function TransfermarktV2Client({
               <small>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Bitte Team wählen"}</small>
             </div>
             <span className={`transfer-status-pill ${buyPreview?.canBuy ? "is-ready" : "is-info"}`}>
-              {selectedTeamReadOnlyReason ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
+              {selectedTeamReadOnlyReason ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "prüfen"}
             </span>
           </div>
           {previewError ? (

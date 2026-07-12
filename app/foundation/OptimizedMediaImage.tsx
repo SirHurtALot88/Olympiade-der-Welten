@@ -13,8 +13,38 @@ type OptimizedMediaImageProps = {
   loading?: "eager" | "lazy";
   fetchPriority?: "high" | "low" | "auto";
   fallback?: ReactNode;
+  /**
+   * Sauberes Kürzel (Kurzcode/Initialen) für den Platzhalter, wenn Quelle fehlt
+   * oder das Bild 404t. Ohne diesen Wert werden Initialen aus `alt` abgeleitet.
+   */
+  fallbackLabel?: string;
   onErrorClassName?: string;
 };
+
+/**
+ * Leitet ein sauberes Kürzel aus dem Alt-Text ab (z. B. "Armageddon Aftermath
+ * Logo" → "AA"). Angehängte Rollen-Wörter (Logo/Wappen/Crest/Porträt …) werden
+ * entfernt, damit der Platzhalter nie den Roh-Alt-Text zeigt.
+ */
+function deriveInitialsFromAlt(alt: string): string {
+  const cleaned = alt
+    .replace(/\b(Logo|Wappen|Crest|Platzhalter|Portrait|Porträt|Foto|Bild)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return "?";
+  }
+  if (words.length === 1) {
+    return words[0]!.slice(0, 2).toUpperCase();
+  }
+  return (
+    words
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
 
 export default function OptimizedMediaImage({
   src,
@@ -27,6 +57,7 @@ export default function OptimizedMediaImage({
   loading = "lazy",
   fetchPriority = "low",
   fallback = null,
+  fallbackLabel,
   onErrorClassName,
 }: OptimizedMediaImageProps) {
   const [failed, setFailed] = useState(false);
@@ -41,7 +72,16 @@ export default function OptimizedMediaImage({
     if (fallback) {
       return <>{fallback}</>;
     }
-    return <span className={onErrorClassName ?? className} aria-label={`${alt} Platzhalter`}>—</span>;
+    const initials = fallbackLabel?.trim() || deriveInitialsFromAlt(alt);
+    return (
+      <span
+        className={`${onErrorClassName ?? className} optimized-media-image-fallback`}
+        style={style}
+        aria-label={alt.trim() ? alt : undefined}
+      >
+        {initials}
+      </span>
+    );
   }
 
   const progressivePlaceholder =

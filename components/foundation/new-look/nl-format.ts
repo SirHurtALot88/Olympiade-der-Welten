@@ -10,7 +10,12 @@ export function formatNlMoney(value: number | null | undefined): string {
     return "—";
   }
   if (Math.abs(value) < 1 && value !== 0) {
-    return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value * 1000)}k`;
+    const thousands = value * 1000;
+    // Clamp a magnitude that rounds to zero so we never render "-0k".
+    const normalized = Math.round(thousands) === 0 ? 0 : thousands;
+    return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(normalized)}k`;
   }
-  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)} Mio`;
+  // Clamp a magnitude that rounds to zero so we never render "-0,0 Mio".
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
+  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(normalized)} Mio`;
 }

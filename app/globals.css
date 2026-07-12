@@ -58656,3 +58656,139 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-ovr-rank {
   background: color-mix(in srgb, var(--nl-warn, #e0a53a) 55%, transparent);
 }
+
+/* ============================================================
+   WAVE A — Cross-cutting audit fixes (merged from scratch)
+   ============================================================ */
+/* Wave A — crest/logo/portrait fallback */
+
+/*
+ * Default-Platzhalter für OptimizedMediaImage, wenn keine Quelle vorhanden ist
+ * oder das Bild 404t und der Aufrufer keinen eigenen `fallback` übergibt.
+ * Zeigt saubere Initialen/Kurzcode statt Roh-Alt-Text oder Broken-Image-Glyph.
+ * Erbt Form/Größe von der jeweiligen Bild-Klasse (nl-*-crest, *-logo, …) und
+ * zentriert nur den Text.
+ */
+.optimized-media-image-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  text-align: center;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  /* neutraler Chip-Grund, falls die Bild-Klasse keinen eigenen Hintergrund setzt */
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+}
+
+/* Wave A — blau=best color scale */
+
+/*
+ * Bug CC5 #3 — Diszis "POW axis rendered red".
+ *
+ * `.discipline-config-table .discipline-order-cell.is-*` (app/globals.css)
+ * färbt die Reihenfolge-Zelle je Disziplin-KATEGORIE mit den Heat-/Wert-
+ * skala-Farben ein: POW = rot (--heat-red-dark), SPE = grün, MEN = blau,
+ * SOC = gelb. Diese Achsen-IDENTITÄT missbraucht die Wertskala — rot liest
+ * sich als "schlechteste/worst", obwohl es nur "Kategorie POW" markiert.
+ *
+ * Haus-Regel: rot = worst, blau = best. Achsen-Identität darf die Wertskala
+ * nicht wiederverwenden. Da alle vier Kategoriefarben Teil der Wertskala
+ * sind (und MEN bereits das Blau belegt, POW→blau also nur kollidieren
+ * würde), werden hier ALLE vier Kategorie-Zellen auf eine einheitliche,
+ * wertneutrale Fläche gesetzt. Die Kategorie steht ohnehin als Text in der
+ * Namensspalte ("category"), die Farbe war reine Doppelung.
+ *
+ * (globals.css ist read-only; diese Datei überschreibt additiv per gleicher
+ * Spezifität + späterer Quellreihenfolge. Beim Einbinden NACH globals.css
+ * importieren.)
+ */
+.discipline-config-table .discipline-order-cell.is-power,
+.discipline-config-table .discipline-order-cell.is-speed,
+.discipline-config-table .discipline-order-cell.is-mental,
+.discipline-config-table .discipline-order-cell.is-social {
+  /* wertneutral: kein rot/grün/gelb/blau der Wertskala */
+  background: color-mix(in srgb, var(--nl-mut, #93a3bd) 22%, transparent);
+  color: var(--nl-ink, #eaf0fa);
+}
+
+/* Wave A — PO fog-of-war */
+
+/*
+ * Hollow-outline treatment for the UNCERTAIN upper part of a fogged PO star range
+ * (NlAbilityStars, `known === false`). The certain lower part (up to `min`) stays
+ * solid gold; the min→max segment is rendered here as a transparent-filled star with
+ * only an amber stroke, so it reads as "possible, not confirmed" and a fogged PO can
+ * never be misread as a solid ★★★★★. The component also applies these declarations
+ * inline so the treatment renders regardless of whether this stylesheet is wired in.
+ */
+.nl-fog-uncertain {
+  color: transparent;
+  -webkit-text-stroke: 1.1px rgba(255, 209, 112, 0.95);
+  text-stroke: 1.1px rgba(255, 209, 112, 0.95);
+  text-shadow: none;
+}
+
+/* Wave A — shell clip + dup button */
+
+/*
+ * CC6 — "AKTIVES TEAM" save-selector: half-clipped label + ghost bleed-through.
+ *
+ * Root cause: the manager-team control (.foundation-manager-team-select) lives
+ * in a narrow grid column of the shell context-banner. Its uppercase label span
+ * and the native <select> were allowed to overflow their column, so the label
+ * text got hard-cut mid-glyph ("…naged") and the overflow painted a duplicate
+ * "ghost" of the text behind the control on every tab.
+ *
+ * Fix: contain the control to its column (min-width:0 + overflow clip on its own
+ * stacking context so nothing bleeds out or shows through), truncate the label
+ * and the select value cleanly with an ellipsis instead of a mid-glyph cut, and
+ * give the select an opaque background + its own paint layer so no ghost layer
+ * can sit behind it. Scoped to the shell (all tabs) and the flag-gated new look.
+ */
+
+.foundation-shell .foundation-manager-team,
+.is-new-look .foundation-manager-team {
+  overflow: hidden;        /* clip any bleed to the control's own bounds */
+  isolation: isolate;      /* own stacking context — kills ancestor ghost bleed */
+}
+
+.foundation-shell .foundation-manager-team-select,
+.is-new-look .foundation-manager-team-select {
+  position: relative;
+  z-index: 1;
+  min-width: 0;            /* allow the grid column to actually shrink */
+  overflow: hidden;
+}
+
+/* The uppercase "AKTIVES TEAM" label: clean single-line ellipsis, never a
+   half-cut glyph, and never a second copy peeking out behind the select. */
+.foundation-shell .foundation-manager-team-select > span,
+.is-new-look .foundation-manager-team-select > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The native <select>: keep the value inside the control, ellipsis on overflow,
+   opaque background + own layer so nothing bleeds through from behind. */
+.foundation-shell .foundation-manager-team-select .input,
+.is-new-look .foundation-manager-team-select .input {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background-color: #2f2f2f;   /* opaque — matches .foundation-shell .input */
+}
+

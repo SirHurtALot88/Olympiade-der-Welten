@@ -122,10 +122,13 @@ const NL_PLAYERS_VIEW_ITEMS: Array<{ id: NlPlayersView; label: string }> = [
 /**
  * Kennzahlenkatalog des Hub-Leaderboards (#47). `pool` verweist auf den
  * passenden `LeaguePlayerHeatPools`-Schlüssel für den echten ligaweiten Rang
- * (nicht nur Rang innerhalb der aktuellen Auswahl) — MW und Potenzial haben
- * keinen Heat-Pool, dort bleibt der Perzentil-Chip leer statt erfunden.
+ * (nicht nur Rang innerhalb der aktuellen Auswahl) — MW hat keinen Heat-Pool,
+ * dort bleibt der Perzentil-Chip leer statt erfunden.
  */
-type NlPhubMetricKey = "ovr" | "pps" | "mvs" | "mw" | "potential" | "pow" | "spe" | "men" | "soc";
+// NOTE: no "potential" metric here on purpose — a league-wide (all-teams) PO leaderboard
+// would leak other teams' hidden potential (fog of war). PO is only ever surfaced as a
+// fuzzy star RANGE for non-owned players (see NlAbilityStars), never as a rankable number.
+type NlPhubMetricKey = "ovr" | "pps" | "mvs" | "mw" | "pow" | "spe" | "men" | "soc";
 
 const NL_PHUB_METRICS: ReadonlyArray<{
   key: NlPhubMetricKey;
@@ -138,7 +141,6 @@ const NL_PHUB_METRICS: ReadonlyArray<{
   { key: "pps", label: "PPs", tone: "spe", digits: 1, pool: "pps" },
   { key: "mvs", label: "MVS", tone: "soc", digits: 1, pool: "mvs" },
   { key: "mw", label: "Marktwert", tone: "neutral", digits: 2 },
-  { key: "potential", label: "Potenzial", tone: "good", digits: 0 },
   { key: "pow", label: "POW", tone: "pow", digits: 0, pool: "pow" },
   { key: "spe", label: "SPE", tone: "spe", digits: 0, pool: "spe" },
   { key: "men", label: "MEN", tone: "men", digits: 0, pool: "men" },
@@ -156,8 +158,6 @@ function getPhubMetricValue(row: FoundationPlayerScopeRow, metric: NlPhubMetricK
       return row.playerMvs;
     case "mw":
       return getPlayerDisplayMarketValue(row.player);
-    case "potential":
-      return row.player.potential != null && Number.isFinite(row.player.potential) ? row.player.potential : null;
     case "pow":
     case "spe":
     case "men":
@@ -1118,7 +1118,8 @@ export default function FoundationPlayersTableNewLook({
  * Liga-Pool angenommen, der dieser Komponente nicht als Prop vorliegt.
  *
  * Kacheln:
- * - Leaderboard: wählbare Kennzahl (OVR/PPs/MVS/MW/Potenzial/POW/SPE/MEN/SOC),
+ * - Leaderboard: wählbare Kennzahl (OVR/PPs/MVS/MW/POW/SPE/MEN/SOC) — bewusst KEIN
+ *   ligaweites Potenzial-Ranking (das würde fremdes, verdecktes PO leaken),
  *   Top 10 der Auswahl mit Medaillen für die ersten drei, eigene Spieler
  *   (`team.humanControlled`) markiert, Perzentil-Chip aus dem echten
  *   ligaweiten Heat-Pool (`leaguePlayerHeatPools`) wo vorhanden. "Volle
@@ -1128,7 +1129,8 @@ export default function FoundationPlayersTableNewLook({
  * - Auf-/Absteiger: Marktwert-Delta gegenüber der Baseline
  *   (`getPlayerDisplayMarketValueDelta`, dieselbe Quelle wie die
  *   Delta-Chips in der Tabellenzeile), Top 5 je Richtung.
- * - Größtes Potenzial-Polster: `player.potential − playerOvr`, Top 5.
+ * - Größtes Potenzial-Polster: `player.potential − playerOvr`, Top 5 — nur eigene
+ *   Spieler (`team.humanControlled`), da fremdes Potenzial verdeckt ist (Fog of War).
  * - Spezialisierungs-Verteilung: Anzahl Spieler je stärkster Disziplin
  *   (`row.bestDiscipline`, dieselbe Quelle wie die "Beste Diszi"-Spalte).
  *
@@ -1237,10 +1239,18 @@ function FoundationPlayersHub({
     [movers],
   );
 
-  /** Größtes Potenzial-Polster: PO minus aktuelles OVR. */
+  /**
+   * Größtes Potenzial-Polster: PO minus aktuelles OVR — NUR für eigene Spieler
+   * (`team.humanControlled`). Fremdes Potenzial ist verdeckt (Fog of War) und darf
+   * nie als konkreter Wert erscheinen, daher werden hier ausschließlich Spieler des
+   * eigenen, kontrollierten Teams gerankt, deren PO bekannt ist.
+   */
   const headroomRows = useMemo(() => {
     return rows
       .map((row) => {
+        if (!row.team?.humanControlled) {
+          return null;
+        }
         const potential = row.player.potential;
         const ovr = row.playerOvr;
         if (potential == null || !Number.isFinite(potential) || ovr == null || !Number.isFinite(ovr)) {
@@ -1508,9 +1518,11 @@ function FoundationPlayersHub({
           )}
         </NlCard>
 
-        <NlCard className="nl-phub-potential-card" eyebrow="Entwicklung" title="Größtes Potenzial-Polster">
+        <NlCard className="nl-phub-potential-card" eyebrow="Entwicklung · dein Kader" title="Größtes Potenzial-Polster">
           {headroomRows.length === 0 ? (
-            <p className="nl-phub-empty">Keine Spieler mit Potenzial über dem aktuellen OVR in der Auswahl.</p>
+            <p className="nl-phub-empty">
+              Keine eigenen Spieler mit Potenzial über dem aktuellen OVR in der Auswahl.
+            </p>
           ) : (
             <ol className="nl-phub-list">
               {headroomRows.map(({ row, ovr, potential, headroom }, index) => (

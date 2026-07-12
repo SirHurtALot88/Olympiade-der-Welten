@@ -220,7 +220,7 @@ export default function FoundationRanksNewLook({
                   label="Abstand zu #1"
                   value="Spitze"
                   sub="Dein Team führt"
-                  tone="good"
+                  tone="accent"
                   title={`Dein Team ist Rang 1 in ${activeMetric.label}`}
                 />
               ) : (

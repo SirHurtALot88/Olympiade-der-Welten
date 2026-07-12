@@ -171,9 +171,11 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
             <strong>{formatMoney(salaryTotal)}</strong>
           </div>
         </div>
-        <FoundationButton className="home-v2-continue" onClick={onContinue}>
-          Weiter · {nextStepLabel}
-        </FoundationButton>
+        {/* CC7: advance action lives once in the global top-bar
+            (foundation-global-next-button → triggerGlobalNext). The Home hero no
+            longer duplicates it; the richer "Nächster Zug" panel below still
+            shows the next-step label + status. onContinue stays wired for the
+            no-players EmptyState fallback. */}
       </header>
 
       <FoundationGameDecisionBoard

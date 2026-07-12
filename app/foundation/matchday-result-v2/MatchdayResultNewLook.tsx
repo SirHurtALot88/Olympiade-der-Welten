@@ -275,7 +275,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </button>
         </span>
         <span
-          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "pow" : "men")}`}
+          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "accent" : "neutral")}`}
           title={player.disciplineName}
         >
           {player.disciplineSide === "d1" ? "D1" : "D2"}
@@ -336,7 +336,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               className="nl-result-scorebar-progress"
               value={getBarPercent(row.d1Score, maxD1)}
               max={100}
-              tone="pow"
+              tone="accent"
               showValue={false}
             />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d1Score, 1)}</span>
@@ -346,7 +346,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               className="nl-result-scorebar-progress"
               value={getBarPercent(row.d2Score, maxD2)}
               max={100}
-              tone="men"
+              tone="neutral"
               showValue={false}
             />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d2Score, 1)}</span>
@@ -497,13 +497,13 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
             <StatChip
               label="D1"
               value={matchdaySummary.d1.disciplineName ?? "—"}
-              tone="pow"
+              tone="accent"
               sub={heroRow?.d1Score != null ? `${formatNlNumber(heroRow.d1Score, 1)} Score` : undefined}
             />
             <StatChip
               label="D2"
               value={matchdaySummary.d2.disciplineName ?? "—"}
-              tone="men"
+              tone="neutral"
               sub={heroRow?.d2Score != null ? `${formatNlNumber(heroRow.d2Score, 1)} Score` : undefined}
             />
             {championRow ? (
@@ -584,7 +584,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
                     </button>
                   </div>
                   <span
-                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "pow" : "men")}`}
+                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "accent" : "neutral")}`}
                     title={mvpPlayer.disciplineName}
                   >
                     {mvpPlayer.disciplineName}
