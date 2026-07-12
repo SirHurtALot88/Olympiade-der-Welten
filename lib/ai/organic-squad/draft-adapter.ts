@@ -348,9 +348,12 @@ const SELL_THRESHOLD = 0;
  * Small additive jitter (in sellUtility units) applied ONLY inside the greedy sell comparison, keyed by
  * `${draftSeed}:${playerId}` (hash-based, reproducible — no Math.random). Mirrors ORGANIC_DRAFT_JITTER
  * in draft-builder.ts but for the sell path, with its OWN env knob so buy/sell variance can be tuned
- * independently. Default 0 (env unset) ⇒ bit-identical to the pre-jitter deterministic behaviour.
+ * independently. Default 8 — deliberately WEAKER than the buy default (15): selling is more consequential
+ * (shedding a real body), so the jitter only nudges WHICH near-equal surplus/flip gets shed, never flips
+ * a clear keep-vs-sell call. Only engages when a draftSeed is passed (real runs); pure unit tests pass no
+ * seed and stay deterministic. ENV-overridable (OLY_ORGANIC_SELL_JITTER, 0 disables).
  */
-const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 0) || 0;
+const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 8) || 0;
 
 export type OrganicSellDecision = {
   /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
