@@ -2440,7 +2440,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
         : "Keine belegte MVS-Quelle",
     marketValue: economy.marketValue,
     marketValueSource: economy.marketValueSource,
-    salary: economy.annualSalary ?? economy.salary,
+    // AKTUELLES Saison-Gehalt zuerst (`economy.salary`, aus dem Kader-Eintrag
+    // aufgelöst), Jahres-/Nominalwert (`annualSalary`) nur als Fallback —
+    // exakt dieselbe Priorität wie `getRosterEntryDisplaySalary` in der
+    // Spieler-Tabelle/History. Vorher stand `annualSalary` (z. B. konstante
+    // 60 bei geformten Verträgen) vorne, was Drawer UND den neuen Hero-Chip
+    // falsch (bzw. per Kontext-Fallback "—") anzeigen ließ.
+    salary: economy.salary ?? economy.annualSalary,
     salarySource: economy.salarySource,
     normalSalary: economy.expectedSalary ?? getSeasonZeroEconomyForPlayer(input.gameState, player.id)?.salary ?? null,
     normalSalarySource:
@@ -2848,7 +2854,9 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         : "Keine belegte MVS-Quelle",
     marketValue: economy.marketValue,
     marketValueSource: economy.marketValueSource,
-    salary: economy.annualSalary ?? economy.salary,
+    // Aktuelles Saison-Gehalt zuerst, Jahres-/Nominalwert nur Fallback
+    // (gleiche Priorität wie `getRosterEntryDisplaySalary`, s. o.).
+    salary: economy.salary ?? economy.annualSalary,
     salarySource: economy.salarySource,
     normalSalary: economy.expectedSalary,
     normalSalarySource: "calculated_expected",

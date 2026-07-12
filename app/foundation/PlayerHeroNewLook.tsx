@@ -103,27 +103,30 @@ export default function PlayerHeroNewLook({
   const foundationState = useFoundationStateOptional();
   const leaguePoolSize = foundationState?.gameState.players.length ?? null;
 
-  // GEHALT-Chip (neben MW): reales Saison-Gehalt — Kader-Eintrag bevorzugt
-  // (`getRosterEntryDisplaySalary`, gleiche Auflösung wie Kader-/Marktliste),
+  // GEHALT-Chip (neben MW): reales Saison-Gehalt.
+  //
+  // PRIMÄRQUELLE ist `data.salary` aus dem Drawer-Builder
+  // (`buildPlayerDrawerDataFromGameState`) — dort wird der echte Kader-Eintrag
+  // via `resolveRosterEntry` aufgelöst und das Gehalt aus derselben Economy
+  // gezogen wie MW/Vertrag (jetzt aktuelles Saison-Gehalt zuerst, s.
+  // `salary`-Feld im Builder). Das ist die zuverlässige Quelle für den
+  // ANGEZEIGTEN Spieler und UNABHÄNGIG vom Client-`foundationState`-Kontext:
+  // auf der Profil-Route ist `useFoundationStateOptional()` bzw. dessen
+  // `rosters` je nach Mount-Scope null/leer, weshalb eine reine
+  // Client-seitige Kader-Suche hier für gekaufte Spieler fälschlich "—"
+  // ergab. `data.salary` ist für jeden rostierten (gekauften) Spieler
+  // gesetzt → die harte Regel "Gehalt kann nicht '—' sein, wenn gekauft" hält.
+  //
+  // Sekundär (nur falls `data.salary` ausnahmsweise null ist, z. B. Isolation
+  // ohne Builder-Economy): eigene Kader-Auflösung über `foundationState`,
   // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
-  // Auflösung sucht bewusst DIREKT über `playerId` in ALLEN Rostern (nicht
-  // über `data.activePlayerId`) — exakt derselbe Ansatz wie in der
-  // Spieler-Tabelle (`rosterByPlayerId` in
-  // `use-foundation-cross-tab-player-directory.ts`), wo derselbe Spieler
-  // korrekt sein Gehalt zeigt. `data.activePlayerId` referenziert je nach
-  // Aufrufkontext einen spezifischen Kader-Eintrag (`resolveRosterEntry` im
-  // Drawer-Builder) und kann bei diesem `foundationState`-Snapshot ins Leere
-  // laufen, obwohl der Spieler real auf EINEM Kader steht — dann würde ein
-  // rostierter Spieler fälschlich "—" zeigen. Der direkte
-  // `playerId`-Treffer über alle Roster ist robust: jeder Spieler steht in
-  // höchstens einem aktiven Kader-Eintrag.
   const rosterEntry = foundationState
     ? (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
     : null;
   const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
-  const heroSalary = rosterEntry
-    ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer)
-    : getPlayerDisplaySalary(heroPlayer);
+  const heroSalary =
+    data.salary ??
+    (rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer) : getPlayerDisplaySalary(heroPlayer));
 
   const radarAxes: NlRadarAxis[] = (
     [
