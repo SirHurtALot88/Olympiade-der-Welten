@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 type OptimizedMediaImageProps = {
   src: string | null | undefined;
@@ -62,10 +62,21 @@ export default function OptimizedMediaImage({
 }: OptimizedMediaImageProps) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
+  // Ein per SSR gerendertes Bild kann bereits 404en, bevor React hydriert und
+  // den onError-Handler anhängt — das Fehler-Event geht dann verloren, sodass
+  // der Platzhalter nie greifen würde. Wir setzen den Fehlerzustand daher nicht
+  // blind zurück, sondern prüfen beim Mount/Quellwechsel direkt am DOM-Knoten,
+  // ob das aktuelle Bild bereits fehlgeschlagen ist (complete + naturalWidth 0).
   useEffect(() => {
-    setFailed(false);
     setLoaded(false);
+    const node = imgRef.current;
+    if (node && node.complete && node.naturalWidth === 0) {
+      setFailed(true);
+    } else {
+      setFailed(false);
+    }
   }, [src, placeholderSrc]);
 
   if (!src || failed) {
@@ -105,6 +116,7 @@ export default function OptimizedMediaImage({
           fetchPriority={fetchPriority === "high" ? "high" : "low"}
         />
         <img
+          ref={imgRef}
           className={`${className} is-full-layer`}
           src={src}
           alt={alt}
@@ -122,6 +134,7 @@ export default function OptimizedMediaImage({
 
   return (
     <img
+      ref={imgRef}
       className={className}
       src={src}
       alt={alt}
