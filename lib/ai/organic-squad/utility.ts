@@ -93,6 +93,15 @@ const SALARY_CAPITALIZATION = 2;
  */
 const THEME_FIT_VALUE = 12;
 
+/**
+ * Financial-distress SELL overrides (see sellUtility). A cash-strapped, over-salaried club must be able
+ * to sell down even valuable players at a loss to raise cash + cut wages and refill cheaper — these
+ * scale that behaviour and are gated by a distress factor that is ~0 when cash is healthy, so they never
+ * make a solvent club fire-sale.
+ */
+const SELL_DISTRESS_STRENGTH_DISCOUNT = 0.75; // max fraction of the strength-keeping waived at full distress
+const SELL_DISTRESS_SALARY_RELIEF = 1.0; // weight on the capitalized wage relief a sale frees, under distress
+
 // NOTE (deliberately no premium-price / MW-cap term): an earlier version subtracted a flat penalty for
 // every MW above a knee, which is an artificial league-wide price ceiling — exactly what the design
 // forbids (organic levers only, no hard/soft caps). Whether a star is "too expensive" must emerge from
@@ -214,11 +223,24 @@ export function sellUtility(player: OrganicPlayerView, state: OrganicTeamState):
   // needed but cheaply-bought, now-valuable body) into a sale; a loyal club (wProfit ~0) ignores it.
   // Undefined purchasePrice ⇒ unknown cost basis ⇒ no profit signal (draft/buy views are unaffected).
   const profit = player.purchasePrice != null ? Math.max(0, saleValue - player.purchasePrice) : 0;
+  // Financial distress ("teuer eingekauft + teure Gehälter → Cash-Druck → auch mit Verlust verkaufen um
+  // wieder aufzufüllen"): ~0 when cash is comfortably above the buffer, rising toward 1 as cash falls to
+  // 0 or the forecast bleeds. Under distress an over-invested club must raise liquidity and shed wages
+  // even at a strength/value loss — so it (a) discounts the strength it can no longer afford to keep and
+  // (b) values the freed recurring WAGE bill — instead of hoarding a squad it can't pay for. Then it
+  // refills cheaper (fewer expensive bodies → more depth toward OPT). Healthy clubs (distress ~0) keep
+  // the pure profit/surplus behaviour.
+  const cashHealth = state.cash / Math.max(state.cashBuffer, 1);
+  const bleed = Math.max(0, -state.forecast.sustainabilityMargin) / Math.max(state.cashBuffer, 1);
+  const distress = clamp((2 - cashHealth) / 2 + 0.5 * bleed, 0, 1);
+  const salaryRelief = SALARY_CAPITALIZATION * Math.max(0, player.salary);
+  const effectiveStrengthLoss = strengthLoss * (1 - SELL_DISTRESS_STRENGTH_DISCOUNT * distress);
   return (
     w.wThrift * saleValue -
-    w.wWin * strengthLoss +
+    w.wWin * effectiveStrengthLoss +
     w.wPatience * Math.max(0, cashOptionGain) +
-    w.wProfit * profit
+    w.wProfit * profit +
+    w.wSustain * SELL_DISTRESS_SALARY_RELIEF * salaryRelief * distress
   );
 }
 
