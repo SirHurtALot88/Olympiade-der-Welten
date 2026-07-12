@@ -101,6 +101,14 @@ const THEME_FIT_VALUE = 12;
  */
 const SELL_DISTRESS_STRENGTH_DISCOUNT = 0.75; // max fraction of the strength-keeping waived at full distress
 const SELL_DISTRESS_SALARY_RELIEF = 1.0; // weight on the capitalized wage relief a sale frees, under distress
+/**
+ * ANTICIPATION amplifier ("wenn Teams eh schon unter OPT sind und wenig Cash haben müssen sie eigentlich
+ * verkaufen"): a club BELOW its OPT that is ALSO cash-tight faces a refill problem it must plan for — it
+ * needs liquidity now to buy back cheaper toward OPT next window. So being under OPT lifts the distress
+ * factor, but ONLY while cash is tight (cashHealth < 1). A below-OPT club with healthy cash should BUY,
+ * not sell, so the amplifier is gated off there. Scales with how far below OPT the roster sits.
+ */
+const SELL_DISTRESS_UNDER_OPT_WEIGHT = 0.6;
 
 // NOTE (deliberately no premium-price / MW-cap term): an earlier version subtracted a flat penalty for
 // every MW above a knee, which is an artificial league-wide price ceiling — exactly what the design
@@ -232,7 +240,12 @@ export function sellUtility(player: OrganicPlayerView, state: OrganicTeamState):
   // the pure profit/surplus behaviour.
   const cashHealth = state.cash / Math.max(state.cashBuffer, 1);
   const bleed = Math.max(0, -state.forecast.sustainabilityMargin) / Math.max(state.cashBuffer, 1);
-  const distress = clamp((2 - cashHealth) / 2 + 0.5 * bleed, 0, 1);
+  // Under-OPT anticipation: a roster below its OPT that is ALSO cash-tight (cashHealth < 1) must raise
+  // liquidity to refill cheaper next window — being further below OPT lifts distress. Gated off when cash
+  // is healthy (a below-OPT club with cash should buy, not sell).
+  const underOpt = clamp((w.optTarget - state.rosterSize) / Math.max(1, w.optTarget), 0, 1);
+  const underOptPressure = cashHealth < 1 ? SELL_DISTRESS_UNDER_OPT_WEIGHT * underOpt : 0;
+  const distress = clamp((2 - cashHealth) / 2 + 0.5 * bleed + underOptPressure, 0, 1);
   const salaryRelief = SALARY_CAPITALIZATION * Math.max(0, player.salary);
   const effectiveStrengthLoss = strengthLoss * (1 - SELL_DISTRESS_STRENGTH_DISCOUNT * distress);
   return (

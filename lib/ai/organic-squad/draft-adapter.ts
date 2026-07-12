@@ -39,8 +39,28 @@ import {
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 
-/** Small flat solvency buffer (MW) — the only cash hard blocker; spend above it is emergent. */
+/** Small flat solvency buffer (MW) — the floor of the cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
+/**
+ * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
+ * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
+ * high-wage aggressive club can't spend down to ~0 and then be unable to refill next window. It also feeds
+ * the SELL distress factor (cashHealth = cash / buffer): a bigger wage bill raises the buffer, so an
+ * over-salaried club reads as more cash-strapped and sheds expensive/high-wage players harder.
+ */
+const RESERVE_SALARY_FACTOR = 0.35;
+
+/** Sum the team's current roster salaries (same salary source as toOrganicPlayerView). */
+function resolveRosterSalaryTotal(gameState: GameState, teamId: string): number {
+  let total = 0;
+  const players = gameState.players ?? [];
+  for (const entry of gameState.rosters ?? []) {
+    if (entry.teamId !== teamId) continue;
+    const player = players.find((candidate) => candidate.id === entry.playerId);
+    if (player) total += Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0);
+  }
+  return total;
+}
 
 /** 0..100 (or 0..10 legacy) management value → 0..1, matching normalizeManagementValue. */
 function normId(value: number | null | undefined): number {
@@ -259,9 +279,14 @@ function buildOrganicPlanContext(input: {
     // for every candidate's themeFit lookup — never recomputed per player.
     themeRuntimeContext: buildTeamThemeCompositionRuntimeContext(input.gameState, input.team),
     cash: input.team.cash ?? 0,
-    // Small flat solvency buffer (the only cash hard blocker). How much a club keeps ABOVE this is
-    // emergent: aggressive clubs spend down toward it (~0-10 left), savers keep more via wPatience.
-    cashBuffer: ORGANIC_CASH_BUFFER,
+    // Solvency buffer = max(flat floor, 0.35× wage bill). The salary-scaled part makes even aggressive
+    // clubs keep a reserve proportional to what they must pay each season, instead of spending to ~0 and
+    // stranding themselves below min next window; it also sharpens the sell distress factor for
+    // over-salaried clubs. How much a club keeps ABOVE the buffer stays emergent (wPatience).
+    cashBuffer: Math.max(
+      ORGANIC_CASH_BUFFER,
+      RESERVE_SALARY_FACTOR * resolveRosterSalaryTotal(input.gameState, input.team.teamId),
+    ),
     boardRisk: 1 - normId(input.identity?.boardConfidence),
     rosterMax: Math.min(ROSTER_MAX, input.team.rosterLimit ?? ROSTER_MAX),
   };
