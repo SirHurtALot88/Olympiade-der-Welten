@@ -271,9 +271,18 @@ function buildOrganicPlanContext(input: {
   gameState: GameState;
   team: Team;
   identity: TeamIdentity | null | undefined;
+  /** Optional per-(save, team) seed for the reproducible strategy-weight jitter (see weights.ts). */
+  draftSeed?: string | null;
 }): OrganicPlanContext {
   const identityInput = buildOrganicIdentityInput(input.identity);
-  const weights = deriveUtilityWeights(identityInput, resolveGmBias(input.gameState, input.team.teamId));
+  // Per-save/season strategy variance: same team identity + GM handwriting, but a slightly different
+  // "budget feel" across saves/seasons (see STRATEGY_WEIGHT_JITTER/STRATEGY_OPT_JITTER in weights.ts).
+  const variationSeed = input.draftSeed ? `${input.draftSeed}:${input.gameState.season.id}` : null;
+  const weights = deriveUtilityWeights(
+    identityInput,
+    resolveGmBias(input.gameState, input.team.teamId),
+    variationSeed,
+  );
   return {
     weights,
     identityAxisWeights: buildIdentityAxisWeights(input.identity),
@@ -297,7 +306,12 @@ function buildOrganicPlanContext(input: {
 
 /** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
 export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDraftPlanResult {
-  const ctx = buildOrganicPlanContext({ gameState: input.gameState, team: input.team, identity: input.identity });
+  const ctx = buildOrganicPlanContext({
+    gameState: input.gameState,
+    team: input.team,
+    identity: input.identity,
+    draftSeed: input.draftSeed ?? null,
+  });
   const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player));
   const candidates = input.candidates
     .map((player) => toOrganicPlayerView(player, computeThemeFit(input.gameState, input.team, player, ctx.themeRuntimeContext)))
@@ -411,7 +425,12 @@ export type OrganicSellPlanResult = {
  * nothing — the caller applies the returned decisions via the market sell primitive.
  */
 export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSellPlanResult {
-  const ctx = buildOrganicPlanContext({ gameState: input.gameState, team: input.team, identity: input.identity });
+  const ctx = buildOrganicPlanContext({
+    gameState: input.gameState,
+    team: input.team,
+    identity: input.identity,
+    draftSeed: input.draftSeed ?? null,
+  });
   const held = input.roster.map((player) =>
     toOrganicPlayerView(player, undefined, input.purchasePriceByPlayerId?.[player.id]),
   );

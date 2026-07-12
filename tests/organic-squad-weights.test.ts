@@ -52,6 +52,42 @@ describe("deriveUtilityWeights", () => {
     }
   });
 
+  it("applies a reproducible per-seed strategy variance (optTarget and/or weights) without a variationSeed being bitidentical to the un-jittered call", () => {
+    const base = identity();
+    const bias: OrganicGmBiasInput = { starPriority: 6, valuePriority: 4 };
+
+    const unseeded = deriveUtilityWeights(base, bias);
+    const unseededAgain = deriveUtilityWeights(base, bias, null);
+    expect(unseededAgain).toEqual(unseeded);
+
+    const seedA = deriveUtilityWeights(base, bias, "saveA:teamX:season1");
+    const seedARepeat = deriveUtilityWeights(base, bias, "saveA:teamX:season1");
+    const seedB = deriveUtilityWeights(base, bias, "saveB:teamX:season1");
+
+    // Reproducibility: identical seed ⇒ identical output.
+    expect(seedARepeat).toEqual(seedA);
+
+    // Variance: different seeds produce a different optTarget and/or different weights.
+    const seedsDiffer =
+      seedA.optTarget !== seedB.optTarget ||
+      seedA.wWin !== seedB.wWin ||
+      seedA.wThrift !== seedB.wThrift ||
+      seedA.wSustain !== seedB.wSustain ||
+      seedA.wAsset !== seedB.wAsset ||
+      seedA.wPatience !== seedB.wPatience ||
+      seedA.wProfit !== seedB.wProfit;
+    expect(seedsDiffer).toBe(true);
+
+    // Identity band: the seeded weights stay close to (within a small factor of) the un-jittered base,
+    // never flipping the team's underlying character.
+    for (const seeded of [seedA, seedB]) {
+      expect(seeded.optTarget).toBeGreaterThanOrEqual(ROSTER_MIN);
+      expect(seeded.optTarget).toBeLessThanOrEqual(ROSTER_MAX);
+      expect(Math.abs(seeded.optTarget - unseeded.optTarget)).toBeLessThanOrEqual(1);
+      expect(seeded.wWin).toBeGreaterThan(0);
+    }
+  });
+
   it("never produces negative weights, and falls back to the identity-only base when gmBias is empty", () => {
     const scenarios: OrganicIdentityInput[] = [
       identity({ ambition: 0, finances: 0, boardConfidence: 0, harmony: 0, playerOpt: 8 }),
