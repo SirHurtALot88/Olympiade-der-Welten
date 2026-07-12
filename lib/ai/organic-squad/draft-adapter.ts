@@ -26,7 +26,7 @@ import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTy
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
   buildTeamThemeCompositionRuntimeContext,
-  calculateThemeCompositionScore,
+  derivePlayerThemeTags,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 
@@ -59,23 +59,34 @@ export function toOrganicPlayerView(player: Player, themeFit?: number): OrganicP
 /**
  * Maps a team-theme-composition-service `themeTier` to a 0..1 fit signal for the organic model.
  * Ordered by how central the tier is to the club's IDENTITY (not its market-value/quality override
- * eligibility) — core theme match is a full "1", plain outsiders/avoid-tag players are "0".
+ * eligibility). GRADED tag overlap so identity shows through the FLAVOUR, not just a gender flag:
+ * a themed dark-fantasy player (e.g. a succubus with Succubus/Temptress/SexyDemon tags) scores far
+ * above a plain primary-tag match (e.g. any female), and an avoid-tag player (e.g. a Construct on a
+ * dark team) is pushed out — while a strongly-themed off-primary player (e.g. a male incubus) can
+ * still rank above a plain primary match, so the roster leans ~primary but carries real theme flavour.
  */
-const THEME_TIER_FIT: Record<string, number> = {
-  core_theme: 1,
-  secondary_theme: 0.6,
-  soft_theme: 0.3,
-  outsider_exception: 0.1,
-  outsider: 0,
-  avoid: 0,
-};
+const THEME_PRIMARY_WEIGHT = 0.5;
+const THEME_SECONDARY_WEIGHT = 0.3;
+const THEME_SECONDARY_CAP = 2;
+const THEME_SOFT_WEIGHT = 0.1;
+const THEME_SOFT_CAP = 2;
+/** An allowed-outsider tag (e.g. V-D's male animal "pets") makes an off-primary player acceptable. */
+const THEME_OUTSIDER_WEIGHT = 0.3;
+const THEME_AVOID_PENALTY = 0.6;
 
 /**
- * Cheap per-(team, player) theme-fit signal (0..1), reusing calculateThemeCompositionScore from
- * lib/ai/team-theme-composition-service.ts instead of reinventing theme rules. Callers MUST build
- * `runtimeContext` ONCE per team (buildTeamThemeCompositionRuntimeContext) and pass it in here per
- * candidate, so the roster-share/themed-pool-count lookups are not repeated per player. Returns
- * undefined when the team has no theme target (no signal, treated as 0 downstream).
+ * The configured team strictness scales how hard the theme bites: a "hard" 95%-quota club (e.g. V-D)
+ * must land nearly all themed picks, a "soft" club only leans. Multiplies the raw fit (which may go
+ * negative via avoid tags), so hard clubs get a strong positive pull for themed players and a strong
+ * negative push against avoid-tag players, while soft clubs get a gentle nudge.
+ */
+const THEME_STRICTNESS_MULT: Record<string, number> = { hard: 2.5, strong: 1.8, medium: 1.2, soft: 0.7 };
+
+/**
+ * Graded per-(team, player) theme-fit signal (0..1) from actual tag overlap between the player's
+ * derived theme tags and the team's target tag sets. Reuses derivePlayerThemeTags (race/class/
+ * subclass/gender/trait/alignment) — no reinvented theme rules. Callers build `runtimeContext` ONCE
+ * per team and pass it in per candidate. Returns undefined when the team has no theme target.
  */
 export function computeThemeFit(
   gameState: GameState,
@@ -83,19 +94,28 @@ export function computeThemeFit(
   player: Player,
   runtimeContext: TeamThemeCompositionRuntimeContext,
 ): number | undefined {
-  if (!runtimeContext.target) return undefined;
-  const score = calculateThemeCompositionScore({
-    gameState,
-    team,
-    player,
-    // Quality/role-fit are irrelevant to "does this player match the team's identity" — the pure
-    // theme signal we want lives in themeTier, which is tag-derived (race/class/subclass/gender/
-    // trait), not in the quality-override escape hatch.
-    candidateQuality: 0,
-    candidateRoleFit: 0,
-    runtimeContext,
-  });
-  return THEME_TIER_FIT[score.themeTier] ?? 0;
+  const target = runtimeContext.target;
+  if (!target) return undefined;
+  const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
+  const countMatches = (list: string[]) => list.reduce((n, tag) => (tags.has(tag) ? n + 1 : n), 0);
+
+  const primaryMatch = countMatches(target.primaryThemeTags) > 0 ? 1 : 0;
+  const secondaryMatches = Math.min(countMatches(target.secondaryThemeTags), THEME_SECONDARY_CAP);
+  const softMatches = Math.min(countMatches(target.softPreferredTags), THEME_SOFT_CAP);
+  const avoidMatches = countMatches(target.avoidTags);
+  // Off-primary but explicitly allowed (e.g. a female-Amazon team's male animal pets): acceptable,
+  // not preferred over themed primary players.
+  const outsiderMatch = !primaryMatch && countMatches(target.allowedOutsiderTags) > 0 ? 1 : 0;
+
+  const rawFit =
+    THEME_PRIMARY_WEIGHT * primaryMatch +
+    THEME_SECONDARY_WEIGHT * secondaryMatches +
+    THEME_SOFT_WEIGHT * softMatches +
+    THEME_OUTSIDER_WEIGHT * outsiderMatch -
+    THEME_AVOID_PENALTY * avoidMatches;
+  const strictnessMult = THEME_STRICTNESS_MULT[target.strictness] ?? 1;
+  // May be negative (avoid) for hard clubs, so buyUtility actively pushes those players out.
+  return Math.min(3, Math.max(-2, strictnessMult * rawFit));
 }
 
 /** Team playstyle axis emphasis from identity.pow/spe/men/soc, normalized to sum 1 (fallback equal). */
