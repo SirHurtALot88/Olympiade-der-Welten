@@ -48,6 +48,8 @@ export type FoundationMatchdayResultShellHostProps = {
   setSelectedMatchdaySummaryId: Dispatch<SetStateAction<string | null>>;
   setActiveView: Dispatch<SetStateAction<FoundationViewId>>;
   openTeamProfileById: (teamId: string) => void;
+  /** Kanonische "Weiter"-Aktion (schließt den Loop / startet den nächsten Spieltag). */
+  triggerGlobalNext: () => void | Promise<void>;
 };
 
 /**
@@ -224,7 +226,7 @@ export default function FoundationMatchdayResultShellHost(props: FoundationMatch
       <section className="panel">
         <div className="panel-header">
           <h3>Highlights</h3>
-          <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("cockpit", setActiveView)}>
+          <button className="primary-button inline-button" type="button" onClick={() => void props.triggerGlobalNext()}>
             Weiter zum nächsten Schritt
           </button>
         </div>

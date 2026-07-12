@@ -78,6 +78,8 @@ export type MatchdayArenaV2ClientProps = {
   onOpenMatchdayResult?: (() => void) | null;
   onOpenSeason?: (() => void) | null;
   onOpenTraining?: (() => void) | null;
+  /** Schließt den Loop: startet den nächsten Spieltag (kanonische "Weiter"-Aktion). */
+  onAdvanceMatchday?: (() => void) | null;
 };
 
 type ArenaLabOptions = {

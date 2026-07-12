@@ -27,6 +27,10 @@ export function setFoundationView(
   setActiveView: Dispatch<SetStateAction<FoundationViewId>>,
   options?: { push?: boolean },
 ) {
+  // Default to pushing a history entry so the browser Back button walks the
+  // game loop (Home → Einsatzliste → Arena → Ergebnis → …). Programmatic
+  // redirects (legacy→v2 view normalization) opt out with `{ push: false }`.
+  const pushHistory = options?.push !== false;
   const applyViewChange = () => {
     onFoundationNavigationStart?.();
     const targetView = getDefaultFoundationViewTarget(view);
@@ -43,7 +47,7 @@ export function setFoundationView(
         facilityId: null,
         facilityAction: null,
       },
-      { mode: options?.push ? "push" : "replace" },
+      { mode: pushHistory ? "push" : "replace" },
     );
   };
   runFoundationNavigationTransition(applyViewChange);

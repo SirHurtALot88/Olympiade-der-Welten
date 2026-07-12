@@ -4140,20 +4140,22 @@ export function useFoundationShellRouterBodyScope({
   }, [activeView, isFoundationBootstrapState]);
 
   useEffect(() => {
+    // Legacy→v2 view normalization: replace (no history entry), otherwise Back
+    // would land on the legacy id and immediately redirect again (a trap).
     if (activeView === "home") {
-      setFoundationView("homeV2", setActiveView);
+      setFoundationView("homeV2", setActiveView, { push: false });
     }
     if (activeView === "inbox") {
-      setFoundationView("inboxV2", setActiveView);
+      setFoundationView("inboxV2", setActiveView, { push: false });
     }
     if (activeView === "market") {
-      setFoundationView("marketV2", setActiveView);
+      setFoundationView("marketV2", setActiveView, { push: false });
     }
     if (activeView === "history") {
-      setFoundationView("historyV2", setActiveView);
+      setFoundationView("historyV2", setActiveView, { push: false });
     }
     if (activeView === "season") {
-      setFoundationView("seasonV2", setActiveView);
+      setFoundationView("seasonV2", setActiveView, { push: false });
     }
   }, [activeView]);
 
@@ -9057,6 +9059,7 @@ export function useFoundationShellRouterBodyScope({
     setSelectedMatchdaySummaryId,
     setActiveView,
     openTeamProfileById,
+    triggerGlobalNext,
   };
 
   const foundationSeasonPreviewHostProps: FoundationSeasonPreviewShellHostProps = {

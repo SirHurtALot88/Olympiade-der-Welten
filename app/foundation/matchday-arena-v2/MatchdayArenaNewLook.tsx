@@ -784,13 +784,28 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             ) : null}
             {props.onOpenSeason ? (
               <button
-                className="nl-arena-button is-primary"
+                className="nl-arena-button"
                 type="button"
                 disabled={!resultsUnlocked}
                 title={resultsUnlocked ? "Saisonstand öffnen" : "Wird nach der Ergebnis-Phase freigeschaltet"}
                 onClick={props.onOpenSeason}
               >
                 Saisonstand
+              </button>
+            ) : null}
+            {props.onAdvanceMatchday ? (
+              <button
+                className="nl-arena-button is-primary"
+                type="button"
+                disabled={!resultsUnlocked}
+                title={
+                  resultsUnlocked
+                    ? "Spieltag abschließen und den nächsten starten"
+                    : "Wird nach der Ergebnis-Phase freigeschaltet"
+                }
+                onClick={props.onAdvanceMatchday}
+              >
+                Zum nächsten Spieltag →
               </button>
             ) : null}
           </div>
