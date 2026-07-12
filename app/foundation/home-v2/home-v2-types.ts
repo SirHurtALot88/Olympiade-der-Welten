@@ -1,4 +1,5 @@
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 
 export type HomeV2TopPlayerCard = {
   playerId: string;
@@ -82,6 +83,17 @@ export type HomeV2ClientProps = {
   salaryTotal: number | null;
   guv: number | null;
   rosterCount: number;
+  /**
+   * Wave D · Feld-Rennen (fog-sicher, additiv, optional):
+   * - `fieldRaceForm`: letzte bis zu 5 Spieltage des eigenen Teams (D1).
+   * - `fieldRacePlayedMatchdays`: bereits gespielte Spieltage (Frühphasen-Zustand).
+   * - `fieldRaceTotalTeams`: Feldgröße für die feld-relative Rang-KPI (D2).
+   * - `fieldRaceRankMovement`: Δ Gesamtrang vs. letztem Spieltag (D4).
+   */
+  fieldRaceForm?: FieldRaceLedgerEntry[];
+  fieldRacePlayedMatchdays?: number;
+  fieldRaceTotalTeams?: number;
+  fieldRaceRankMovement?: number | null;
   gmStoryLabel: string | null;
   gmStoryDetail: string | null;
   gmStoryTone: string | null;

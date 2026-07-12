@@ -82,6 +82,9 @@ export type FoundationTeamsDetailPanelProps = {
   teamsHydrationPhase?: "shell" | "full";
   gameState: unknown;
   selectedTeam: unknown;
+  /** Wave D · D1 Feld-Form-Strip (nur im Neuen Look verwendet, additiv/optional). */
+  fieldRaceRecentForm?: unknown;
+  fieldRacePlayedMatchdayCount?: unknown;
   sortedTeamsViewRows: unknown;
   visibleTeamsViewColumns: unknown;
   SortableHeader: unknown;

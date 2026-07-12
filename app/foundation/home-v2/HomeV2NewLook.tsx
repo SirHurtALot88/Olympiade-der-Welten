@@ -9,6 +9,7 @@ import FoundationPlayerPortraitCard from "@/components/foundation/player-portrai
 import {
   NlCard,
   NlDeltaChip,
+  NlFieldRaceFormStrip,
   NlProgressBar,
   NlRadar,
   StatChip,
@@ -261,6 +262,10 @@ export default function HomeV2NewLook({
   salaryTotal,
   guv,
   rosterCount,
+  fieldRaceForm,
+  fieldRacePlayedMatchdays,
+  fieldRaceTotalTeams,
+  fieldRaceRankMovement,
   boardPressure,
   boardRating,
   boardObjectives,
@@ -286,6 +291,21 @@ export default function HomeV2NewLook({
 }: HomeV2ClientProps) {
   const visibleTodayCards = todayCards.slice(0, 3);
   const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
+
+  // D2 Feld-relative Rang-KPI: "#{rank} von {total} · Top {pct}%". Perzentil aus
+  // Rang/Feldgröße (Beispiel: #31 von 32 → Top 97%). Fog-sicher — nur die
+  // öffentliche Feldgröße und der eigene Rang, keine fremden Werte.
+  const fieldRankPercentile =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? Math.max(1, Math.min(100, Math.round((rank / fieldRaceTotalTeams) * 100)))
+      : null;
+  const rankFieldSub =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? `von ${formatNlNumber(fieldRaceTotalTeams, 0)}${fieldRankPercentile != null ? ` · Top ${fieldRankPercentile}%` : ""}`
+      : undefined;
+  // D4 Rang-Movement (Δ vs. letzter Spieltag): >0 ▲ Plätze gut, <0 ▼. Am ersten
+  // Spieltag (kein Vorwert) bewusst "neu" statt eines erfundenen Deltas.
+  const isFirstFieldRaceMatchday = (fieldRacePlayedMatchdays ?? 0) <= 1;
 
   // Hero-/KPI-Zähler (#Wave2): nur die Headline-Zahlen zählen hoch — Tabellen
   // und Listen bleiben unverändert. Fixe Anzahl Top-Level-Hooks (kein Loop),
@@ -379,13 +399,35 @@ export default function HomeV2NewLook({
           </div>
 
           <StatChipRow className="nl-home-hero-kpis" aria-label="Team KPIs">
-            <StatChip
-              label="Rang"
-              value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
-              tone="accent"
-              onClick={onOpenSeason}
-              title="Zum Saisonstand"
-            />
+            <span className="nl-home-rank-portal">
+              <StatChip
+                label="Rang"
+                value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
+                tone="accent"
+                sub={rankFieldSub}
+                onClick={onOpenSeason}
+                title={
+                  rankFieldSub
+                    ? `Rang ${rank} von ${fieldRaceTotalTeams} im Feld — zum Saisonstand`
+                    : "Zum Saisonstand"
+                }
+              />
+              {fieldRaceRankMovement != null ? (
+                <NlDeltaChip
+                  value={fieldRaceRankMovement}
+                  format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
+                  title="Rang-Bewegung gegenüber dem letzten Spieltag"
+                  className="nl-home-rank-move"
+                />
+              ) : rank != null && isFirstFieldRaceMatchday ? (
+                <span
+                  className="nl-home-rank-move is-new nl-tnum"
+                  title="Erster Spieltag — noch keine Rang-Bewegung"
+                >
+                  neu
+                </span>
+              ) : null}
+            </span>
             <StatChip
               label="Cash"
               value={formatNlMoney(animatedCash ?? cash)}
@@ -393,6 +435,15 @@ export default function HomeV2NewLook({
               title="Zum Front Office"
             />
           </StatChipRow>
+
+          {fieldRaceForm != null ? (
+            <NlFieldRaceFormStrip
+              entries={fieldRaceForm}
+              playedMatchdayCount={fieldRacePlayedMatchdays}
+              compact
+              className="nl-home-hero-form"
+            />
+          ) : null}
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
             <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />

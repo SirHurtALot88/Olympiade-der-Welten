@@ -8,6 +8,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlFieldRaceFormStrip,
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
@@ -29,6 +30,7 @@ import type { Discipline, DisciplineCategory, GameState, Team } from "@/lib/data
 import { formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import type { TeamsViewRow } from "@/lib/foundation/tabs/teams-view-derivations";
@@ -125,6 +127,13 @@ export type FoundationTeamsNewLookProps = {
    * `null`, solange die Ableitung (Hydration) noch nicht gebaut wurde.
    */
   selectedTeamsHistoryData: TeamDetailDrawerData | null;
+  /**
+   * Wave D · D1 Feld-Form-Strip: letzte bis zu 5 Spieltage des gezeigten Teams
+   * aus dem Feld-Rennen-Ledger (fog-sicher, optional). `fieldRacePlayedMatchdayCount`
+   * speist den Frühphasen-Zustand (S1/MD1).
+   */
+  fieldRaceRecentForm?: FieldRaceLedgerEntry[];
+  fieldRacePlayedMatchdayCount?: number;
   filteredSelectedRosterTableRows: NlTeamsRosterRow[];
   teamRosterRoleFilter: TeamRosterRoleFilter;
   setTeamRosterRoleFilter: (value: TeamRosterRoleFilter) => void;
@@ -563,6 +572,8 @@ export default function FoundationTeamsNewLook({
   selectedTeamDetailTab,
   sortedTeamsViewRows,
   selectedTeamsHistoryData,
+  fieldRaceRecentForm,
+  fieldRacePlayedMatchdayCount,
   filteredSelectedRosterTableRows,
   teamRosterRoleFilter,
   setTeamRosterRoleFilter,
@@ -1450,6 +1461,13 @@ export default function FoundationTeamsNewLook({
                     </span>
                   ) : null}
                 </div>
+              ) : null}
+              {fieldRaceRecentForm != null ? (
+                <NlFieldRaceFormStrip
+                  entries={fieldRaceRecentForm}
+                  playedMatchdayCount={fieldRacePlayedMatchdayCount}
+                  className="nl-teams-hero-form"
+                />
               ) : null}
             </div>
           </div>

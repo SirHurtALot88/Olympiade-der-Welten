@@ -288,6 +288,12 @@ export default function FoundationTeamsViewHost({
         onOpenSeason={onOpenSeason}
         sortedTeamsViewRows={sortedTeamsViewRows}
         selectedTeamsHistoryData={selectedTeamsHistoryData}
+        fieldRaceRecentForm={
+          panelProps.fieldRaceRecentForm as FoundationTeamsNewLookProps["fieldRaceRecentForm"]
+        }
+        fieldRacePlayedMatchdayCount={
+          panelProps.fieldRacePlayedMatchdayCount as FoundationTeamsNewLookProps["fieldRacePlayedMatchdayCount"]
+        }
         filteredSelectedRosterTableRows={
           rosterDerivations.filteredSelectedRosterTableRows as unknown as FoundationTeamsNewLookProps["filteredSelectedRosterTableRows"]
         }

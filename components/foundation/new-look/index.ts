@@ -30,6 +30,10 @@ export { NlDeltaChip, type NlDeltaChipProps } from "@/components/foundation/new-
 export { NlProgressBar, type NlProgressBarProps } from "@/components/foundation/new-look/NlProgressBar";
 export { NlGauge, type NlGaugeProps } from "@/components/foundation/new-look/NlGauge";
 export { NlSparkline, type NlSparklineProps } from "@/components/foundation/new-look/NlSparkline";
+export {
+  NlFieldRaceFormStrip,
+  type NlFieldRaceFormStripProps,
+} from "@/components/foundation/new-look/NlFieldRaceFormStrip";
 export { NlBarChart, type NlBarChartProps, type NlBarChartBar } from "@/components/foundation/new-look/NlBarChart";
 export { NlRadar, type NlRadarProps, type NlRadarAxis } from "@/components/foundation/new-look/NlRadar";
 export { NlMedalBadge, type NlMedalBadgeProps, type NlMedalKind } from "@/components/foundation/new-look/NlMedalBadge";

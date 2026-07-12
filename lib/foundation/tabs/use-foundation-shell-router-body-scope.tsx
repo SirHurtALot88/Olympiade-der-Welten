@@ -129,6 +129,11 @@ import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import {
+  buildFieldRaceLedger,
+  getFieldRaceRecentForm,
+  type FieldRaceLedgerEntry,
+} from "@/lib/foundation/build-field-race-ledger";
+import {
   deriveTeamIdentityAxisBias,
   buildResolvedTeamIdentities,
   buildTeamIdentityOverrideMap,
@@ -6460,6 +6465,45 @@ export function useFoundationShellRouterBodyScope({
     contentSignature: seasonContentSignature,
   });
   const seasonPointsLedger = shouldLoadSeasonLedger ? seasonDerivations.ledger : null;
+
+  // Feld-Rennen-Ledger (Wave D · D1/D2/D4): geteilte, fog-sichere Datenquelle
+  // für Feld-Form-Strip (letzte 5 Spieltage), feld-relative Home-KPIs und
+  // Rang-Movement. `useSeasonDerivations` ist aus Performance-Gründen nur im
+  // Fallback aktiv (`shouldLoadSeasonDerivations`), daher wird der bereits
+  // memoisierte `fieldRaceLedger` bevorzugt und nur bei leerem Cache über den
+  // sanktionierten Helper `buildFieldRaceLedger` (dieselbe Quelle) nachgezogen
+  // — ohne die teure Voll-Derivation zu erzwingen.
+  const fieldRaceLedger = useMemo(() => {
+    const shared = seasonDerivations.fieldRaceLedger;
+    if (shared.rowsByTeamId.size > 0) {
+      return shared;
+    }
+    return buildFieldRaceLedger(gameState, gameState.season.id);
+  }, [seasonDerivations.fieldRaceLedger, gameState]);
+
+  /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
+  const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
+    () => (selectedTeam ? getFieldRaceRecentForm(fieldRaceLedger, selectedTeam.teamId, 5) : []),
+    [fieldRaceLedger, selectedTeam?.teamId],
+  );
+
+  /** Anzahl bereits gespielter Spieltage der Season (für Frühphasen-Zustände). */
+  const fieldRacePlayedMatchdayCount = fieldRaceLedger.matchdays.length;
+  const fieldRaceTotalTeams = gameState.teams.length;
+
+  /** Rang-Movement (Δ vs. letzter Spieltag) je Team — letzter Ledger-Eintrag (D4). */
+  const fieldRaceRankDeltaByTeamId = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const [teamId, rows] of fieldRaceLedger.rowsByTeamId) {
+      map.set(teamId, rows.length > 0 ? rows[rows.length - 1].rankDeltaVsPrev : null);
+    }
+    return map;
+  }, [fieldRaceLedger]);
+
+  const homeFieldRaceRankMovement = selectedTeam
+    ? fieldRaceRankDeltaByTeamId.get(selectedTeam.teamId) ?? null
+    : null;
+
   const fullPlayerRatingsById = useMemo(() => {
     if (shouldBuildPlayerDirectory && playerDirectorySlice.ratingsById.size > 0 && !playerDirectorySlice.error) {
       return playerDirectorySlice.ratingsById;
@@ -8509,9 +8553,17 @@ export function useFoundationShellRouterBodyScope({
           rosterCount: row.rosterCount ?? 0,
           avgContractLength: row.avgContractLength ?? null,
           isSelected: selectedTeam?.teamId === row.teamId,
+          // D4 Rang-Movement: Δ Gesamtrang vs. letztem Spieltag (nicht saison-
+          // übergreifend wie `rankDiff`, sondern feldrennen-spezifisch pro
+          // Spieltag) — letzter Ledger-Eintrag; null am ersten Spieltag. Der
+          // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
+          // kein Live-Delta (sonst irreführend) → null.
+          fieldRaceRankDelta: isViewingArchivedSeason
+            ? null
+            : fieldRaceRankDeltaByTeamId.get(row.teamId) ?? null,
         };
       }),
-    [gameState, selectedTeam?.teamId, sortedSeasonStandRows],
+    [fieldRaceRankDeltaByTeamId, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
   const seasonV2PpRows = useMemo(
     () =>
@@ -9327,6 +9379,9 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
+    // D1 Feld-Form-Strip auf dem Team-Profil (Neuer Look).
+    fieldRaceRecentForm: selectedTeamFieldRaceForm,
+    fieldRacePlayedMatchdayCount,
   };
 
   const foundationCockpitHostProps: FoundationCockpitHostProps = {
@@ -9574,6 +9629,7 @@ export function useFoundationShellRouterBodyScope({
     categories: leagueLeaderBoards,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
+    gameState,
     returnContext: leagueLeadersReturnContext,
     onReturnToPlayer: leagueLeadersReturnContext
       ? () => {
@@ -10031,6 +10087,11 @@ export function useFoundationShellRouterBodyScope({
     selectedRosterTableRows,
     selectedSeasonOverviewLabel,
     selectedStandingRow,
+    // Wave D · Feld-Rennen-Ableitungen für die Home-Übersicht (D1/D2/D4).
+    selectedTeamFieldRaceForm,
+    fieldRacePlayedMatchdayCount,
+    fieldRaceTotalTeams,
+    homeFieldRaceRankMovement,
     selectedTeam,
     selectedTeamAverageAxisStats,
     selectedTeamCanManage,
