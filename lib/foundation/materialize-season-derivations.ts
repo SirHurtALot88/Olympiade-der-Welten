@@ -1,5 +1,4 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildFieldRaceLedger } from "@/lib/foundation/build-field-race-ledger";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import type {
@@ -108,11 +107,10 @@ export function readPersistedSeasonDerivations(
   if (persisted.seasonId !== gameState.season.id) {
     return null;
   }
-  const hydrated = hydrateSeasonDerivations(persisted);
-  return {
-    ...hydrated,
-    fieldRaceLedger: buildFieldRaceLedger(gameState, gameState.season.id, hydrated.ledger),
-  };
+  // fieldRaceLedger bleibt der leere Platzhalter aus hydrateSeasonDerivations —
+  // der Shell-Scope-Hook baut ihn on-demand (reine UI-Ableitung, siehe
+  // computeSeasonDerivationsFresh).
+  return hydrateSeasonDerivations(persisted);
 }
 
 export function buildPersistedSeasonDerivationsRecord(gameState: GameState): PersistedSeasonDerivationsRecord {

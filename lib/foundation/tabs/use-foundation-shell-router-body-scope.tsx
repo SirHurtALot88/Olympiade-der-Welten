@@ -6475,11 +6475,12 @@ export function useFoundationShellRouterBodyScope({
   // — ohne die teure Voll-Derivation zu erzwingen.
   const fieldRaceLedger = useMemo(() => {
     const shared = seasonDerivations.fieldRaceLedger;
-    if (shared.rowsByTeamId.size > 0) {
+    if (shared.matchdays.length > 0) {
       return shared;
     }
-    return buildFieldRaceLedger(gameState, gameState.season.id);
-  }, [seasonDerivations.fieldRaceLedger, gameState]);
+    // On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build).
+    return buildFieldRaceLedger(gameState, gameState.season.id, seasonDerivations.ledger);
+  }, [seasonDerivations.fieldRaceLedger, seasonDerivations.ledger, gameState]);
 
   /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
   const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
