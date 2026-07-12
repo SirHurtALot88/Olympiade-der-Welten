@@ -60,6 +60,15 @@ const PRICE_SLOT_SCALE = 18;
 const ROTATION_VALUE = 92;
 
 /**
+ * Flat depth pull applied to EVERY buy while the roster is strictly below optTarget (drops to 0 at
+ * opt). On top of the fading rotation term, this guarantees the last slots up to opt stay worth
+ * filling with a cheap body even when its marginal strength is small — encoding "reach OPT is the
+ * default, weaker individual players are acceptable". Big enough to clear a cheap filler's price/wage
+ * and the (low, cash-comfortable) STOP value, but it vanishes exactly at opt so nobody overfills.
+ */
+const BELOW_OPT_FILL_FLOOR = 45;
+
+/**
  * A player's real cost is the transfer price PLUS the recurring wage bill over its expected tenure.
  * Capitalizing ~this many seasons of salary into the effective cost is what makes the model weigh
  * "kann ich mir das Gehalt leisten" — an expensive-wage superstar costs far more than its fee, so a
@@ -83,7 +92,7 @@ const THEME_FIT_VALUE = 12;
  * budget to fill toward OPT. Flat (applies to every club) so the effective ceiling emerges league-wide;
  * a genuinely exceptional player can still clear it, so it never hard-blocks.
  */
-const PREMIUM_PRICE_KNEE = 65;
+const PREMIUM_PRICE_KNEE = 60;
 const PREMIUM_PRICE_SLOPE = 2.5;
 
 function clamp(value: number, min: number, max: number): number {
@@ -155,9 +164,16 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const effectiveCost = Math.max(0, player.marketValue) + SALARY_CAPITALIZATION * Math.max(0, player.salary);
   const priceInSlots = effectiveCost / budgetPerOptSlot;
   const potential = Math.max(0, player.potential ?? 0);
-  // Rotation/depth baseline: fades from full (empty squad) to 0 at optTarget.
+  // Rotation/depth baseline: a fading part (full at an empty squad, 0 at optTarget) PLUS a flat
+  // BELOW_OPT_FILL_FLOOR that holds as long as the roster is strictly under opt, then vanishes at opt.
+  // The flat floor is what makes "reach OPT even with weaker individual players" the DEFAULT: near opt
+  // the fading part is tiny, so without the floor a cheap depth body's small strength was cancelled by
+  // its price and the club stopped 1–2 short; the floor keeps that last fill worthwhile. Going UNDER
+  // opt for a stronger average is then an exception driven by the GM (elite/star bias lowers optTarget
+  // itself), not the default.
   const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));
-  const rotationValue = ROTATION_VALUE * belowOptFraction;
+  const belowOpt = state.rosterSize < w.optTarget ? 1 : 0;
+  const rotationValue = ROTATION_VALUE * belowOptFraction + BELOW_OPT_FILL_FLOOR * belowOpt;
   const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
   // Soft premium-price aversion: makes 65+ MW superstars rare (only the few clubs that value them
   // enough clear it) and >70 MW essentially not worth it in S1 — a wish, not a hard cap.
