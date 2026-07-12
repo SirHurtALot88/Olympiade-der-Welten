@@ -4831,6 +4831,19 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         phaseAMinimumGuard &&
         (params.mode === "preseason_roster_repair" || params.mode === "season1_initial_topup");
       const getCandidateCashCost = (candidate: Candidate) => candidate.marketValue;
+      // The non-repair affordability BUDGET is candidate-invariant (depends only on team cash / reserve
+      // / roster state), so resolve it ONCE per pick instead of inside the per-candidate filter — it
+      // reads gameState and the liquidity buffer, and was previously recomputed for all ~2500 candidates.
+      const nonRepairAffordableBudget = repairMode
+        ? 0
+        : resolveTransferAffordableBudget({
+            teamCash: latestTeam.cash,
+            cashReservePct: phasePlan.cashReservePct,
+            spendableBudget: targetPlan?.spendableBudget,
+            gameState: runContext.save.gameState,
+            teamId: team.teamId,
+            rosterBelowOpt: rosterCount < phasePlan.targetRoster,
+          });
       const cashAffordableCandidates = candidatePool
         .filter((candidate) => !pickedPlayerIds.has(candidate.player.id))
         .filter((candidate) => {
@@ -4851,15 +4864,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             // has no "later pick" to save for — every remaining slot is equally urgent.
             return isPreseasonRepairCandidateEligible({ marketValue: cashCost, teamCash: latestTeam.cash });
           }
-          const affordableBudget = resolveTransferAffordableBudget({
-            teamCash: latestTeam.cash,
-            cashReservePct: phasePlan.cashReservePct,
-            spendableBudget: targetPlan?.spendableBudget,
-            gameState: runContext.save.gameState,
-            teamId: team.teamId,
-            rosterBelowOpt: rosterCount < phasePlan.targetRoster,
-          });
-          return affordableBudget >= cashCost;
+          return nonRepairAffordableBudget >= cashCost;
         });
       counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
       const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
