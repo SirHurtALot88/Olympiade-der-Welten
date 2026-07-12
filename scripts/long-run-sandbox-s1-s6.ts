@@ -805,6 +805,7 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
       .map(({ team, rosterCount, optTarget, strategy }) => `${team.shortCode}:${rosterCount}/${optTarget}:${strategy}`)
       .join(",")}`,
   );
+  const preseasonConvergenceStartedAt = Date.now();
   const convergence = await runTransferWindowSession({
     saveId,
     seasonId,
@@ -820,6 +821,9 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
     skipIfExistingMarketTransfers: false,
     progressLog: true,
   });
+  console.error(
+    `[long-run] preseason-convergence ${seasonId} elapsed=${Date.now() - preseasonConvergenceStartedAt}ms`,
+  );
   const engineSummary = convergence.perTeam.reduce(
     (counts, entry) => {
       counts[entry.pickEngine] = (counts[entry.pickEngine] ?? 0) + 1;
@@ -2211,6 +2215,9 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
       status: standings.ok && standings.applied ? "ok" : "blocked",
       note: standings.ok ? standings.warnings.join("|") : standings.blockingReasons.join("|"),
     });
+    console.error(
+      `[long-run] resolve ${seasonId} ${matchdayId} done elapsed=${Date.now() - matchdayStartedAt}ms`,
+    );
     matchdayRows.push({
       seasonId,
       matchdayId,
@@ -2673,6 +2680,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   // across ALL seasons) is now handled by the netNegativeStrikes exhaustion mechanism in
   // ai-transfer-window-session-service.ts, so this pass runs unchanged in every season including S1.
   if (existingMarketTransfers.length === 0) {
+    const seasonEndConvergenceStartedAt = Date.now();
     const marketConvergence = await runTransferWindowSession({
       saveId,
       seasonId,
@@ -2688,6 +2696,9 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       skipIfExistingMarketTransfers: false,
       progressLog: true,
     });
+    console.error(
+      `[long-run] season-end-convergence ${seasonId} elapsed=${Date.now() - seasonEndConvergenceStartedAt}ms`,
+    );
     marketStatus = marketConvergence.blockingReasons.length > 0 ? "blocked" : "applied";
     marketAppliedBuys = marketConvergence.appliedBuys;
     marketAppliedSells = marketConvergence.appliedSells;
@@ -3431,7 +3442,11 @@ async function main() {
       console.error(`[long-run] STOP_AFTER=preseason — ${seasonId} Preseason abgeschlossen, Save \`${save.saveId}\`.`);
       break;
     }
+    const matchSimStartedAt = Date.now();
     const matchdayRun = await runSeasonMatchdays(save.saveId, persistence);
+    console.error(
+      `[long-run] match-sim ${seasonId} matchdays=${matchdayRun.matchdayRows.length} elapsed=${Date.now() - matchSimStartedAt}ms`,
+    );
     matchdayRows.push(...matchdayRun.matchdayRows);
     performanceRows.push(...matchdayRun.performanceRows);
     if (matchdayRun.blockers.length > 0) {
