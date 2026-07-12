@@ -23,6 +23,7 @@ import {
   type NlAxisKey,
 } from "@/components/foundation/new-look";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 /**
  * "Neuer Look" Transfer-Historie — flag-gated, additiv.
@@ -49,6 +50,18 @@ export type TransferHistoryV2NewLookProps = TransferHistoryV2ClientProps & {
   selectedTransferId: string | null;
   onSelectTransfer: (transferId: string | null) => void;
 };
+
+// Scope-Labels kommen als "<saveId> / <seasonId|Alle Seasons>". Für die UI
+// nur den menschenlesbaren Season-Teil zeigen ("season-1" → "Season 1") und die
+// interne Save-ID bewusst weglassen — kein Roh-Dev-String im Kopfbereich.
+function formatNlScopeSeason(scopeLabel: string) {
+  const separatorIndex = scopeLabel.indexOf(" / ");
+  const seasonPart = (separatorIndex >= 0 ? scopeLabel.slice(separatorIndex + 3) : scopeLabel).trim();
+  if (/season-\d+/i.test(seasonPart)) {
+    return getCanonicalSeasonLabel({ seasonId: seasonPart });
+  }
+  return seasonPart || "—";
+}
 
 function formatNlSignedMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -143,7 +156,17 @@ export default function TransferHistoryV2NewLook({
 }: TransferHistoryV2NewLookProps) {
   const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
   // #73: Teambewegungs-Liste sortierbar über Sub-Tabs.
-  const [teamSort, setTeamSort] = useState<"volume" | "income" | "net">("income");
+  // #2: Ohne Verkäufe im Scope ist "Erlös" durchgehend 0 (nur Käufe) — dann
+  // standardmässig auf "Volumen" starten, damit kein Null-Bildschirm erscheint.
+  // "Erlös" bleibt weiterhin frei wählbar.
+  const [teamSort, setTeamSort] = useState<"volume" | "income" | "net">(() =>
+    activityCards.some((team) => team.sells > 0) ? "income" : "volume",
+  );
+
+  // #1: Scope-Kopf ohne interne Save-ID; Season menschenlesbar. "Angefragt" nur
+  // zeigen, wenn der aufgelöste Scope davon abweicht (Fallback).
+  const resolvedScopeSeasonLabel = formatNlScopeSeason(resolvedScopeLabel);
+  const requestedScopeSeasonLabel = formatNlScopeSeason(requestedScopeLabel);
 
   // MW-Verlauf des gewählten Spielers über alle seine Deals im aktuellen Scope
   // (chronologisch nach happenedAt) — echte Werte aus filteredRows.
@@ -262,7 +285,8 @@ export default function TransferHistoryV2NewLook({
         actions={<span className="nl-thist-source-pill">{sourceBadgeLabel}</span>}
       >
         <p className="nl-thist-header-meta">
-          {saveName} · Angefragt {requestedScopeLabel} · Aktiv {resolvedScopeLabel}
+          {saveName} · {resolvedScopeSeasonLabel}
+          {requestedScopeSeasonLabel !== resolvedScopeSeasonLabel ? ` · angefragt ${requestedScopeSeasonLabel}` : ""}
         </p>
       </NlCard>
 
@@ -656,17 +680,28 @@ export default function TransferHistoryV2NewLook({
                   <span className={`nl-thist-type-pill ${getNlTransferToneClass(selectedRow.type)}`}>
                     {formatNlTransferType(selectedRow.type)}
                   </span>
-                  <div className="nl-thist-spotlight-icons">
-                    <ClassIcon
-                      classNameValue={selectedRow.className}
-                      className="table-identity-icon-chip"
-                      iconClassName="table-identity-icon-image"
-                    />
-                    <RaceIcon
-                      race={selectedRow.race}
-                      className="table-identity-icon-chip"
-                      iconClassName="table-identity-icon-image"
-                    />
+                  {/* #3: Klasse/Rasse als beschriftete Identitäts-Chips —
+                      damit die Icons nicht mit Team-Wappen verwechselt werden. */}
+                  <div className="nl-thist-spotlight-identity">
+                    <span className="nl-thist-eyebrow">Klasse &amp; Rasse</span>
+                    <div className="nl-thist-spotlight-icons">
+                      <span className="nl-thist-identity-chip" title={`Klasse: ${selectedRow.className ?? "unbekannt"}`}>
+                        <ClassIcon
+                          classNameValue={selectedRow.className}
+                          className="table-identity-icon-chip"
+                          iconClassName="table-identity-icon-image"
+                        />
+                        <span className="nl-thist-identity-label">{selectedRow.className ?? "—"}</span>
+                      </span>
+                      <span className="nl-thist-identity-chip" title={`Rasse: ${selectedRow.race ?? "unbekannt"}`}>
+                        <RaceIcon
+                          race={selectedRow.race}
+                          className="table-identity-icon-chip"
+                          iconClassName="table-identity-icon-image"
+                        />
+                        <span className="nl-thist-identity-label">{selectedRow.race ?? "—"}</span>
+                      </span>
+                    </div>
                   </div>
                   <div className="nl-thist-team-route">
                     {selectedRow.fromTeamId && selectedRow.fromTeamName ? (
@@ -784,7 +819,10 @@ export default function TransferHistoryV2NewLook({
               >
                 <span className="nl-thist-team-code">{team.shortCode}</span>
                 <span className="nl-thist-team-copy">
-                  <strong>{team.teamName}</strong>
+                  {/* #4: Teamname darf auf zwei Zeilen umbrechen (CSS) und trägt
+                      einen eigenen Tooltip, damit kein harter Mitten-im-Wort-
+                      Abschnitt ohne Auflösung entsteht. */}
+                  <strong title={team.teamName}>{team.teamName}</strong>
                   <small>
                     {team.volume} Deals · {team.buys}K/{team.sells}V
                   </small>

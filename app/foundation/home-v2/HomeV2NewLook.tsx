@@ -396,7 +396,7 @@ export default function HomeV2NewLook({
 
           <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
             <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
-            <StatChip label="Punkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
+            <StatChip label="Saisonpunkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Saison-Punktestand — identisch zum Saisonstand" />
             <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} />
             <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} />
           </StatChipRow>
@@ -467,6 +467,9 @@ export default function HomeV2NewLook({
         <div className="nl-home-section-head">
           <span className="nl-home-section-icon"><IconUsers /></span>
           <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
+          <span className="nl-home-section-hint" title="Reihenfolge: Rolle (Stammspieler zuerst), dann Saisonleistung (PPS), MVS und OVR">
+            sortiert nach Rolle &amp; Saisonleistung
+          </span>
         </div>
         {topPlayers.length > 0 ? (
           <div className="nl-home-portrait-grid">

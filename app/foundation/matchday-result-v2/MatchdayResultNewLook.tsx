@@ -221,6 +221,9 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         style={{ ...getSeasonV2TeamTagStyle(row.teamShortCode), "--nl-reveal-i": revealIndex } as CSSProperties}
       >
         <NlMedalBadge kind={medalKind} title={`Tagesrang ${rank}`} className="nl-result-podium-medal" />
+        {/* Explizites Rang-Label: die 2·1·3-Anordnung darf nicht als "wir haben
+            gewonnen" fehlgelesen werden — die Platzierung bleibt eindeutig (#6). */}
+        <span className="nl-result-podium-rank-label">Tagesrang {rank}</span>
         <BudgetedMediaImage
           src={logoSrc}
           alt={`${row.teamName} Logo`}

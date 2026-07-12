@@ -106,6 +106,9 @@ export default function FoundationDiszisPanel(props: FoundationDiszisPanelProps)
           </button>
         ))}
         <span>{visibleDisciplineConfigRows.length} Diszis</span>
+        <a className="secondary-button inline-button diszis-schedule-jump" href="#foundation-diszis-schedule">
+          ↓ Saison-Matchday-Plan
+        </a>
       </div>
       <div className="table-shell">
         <table className="team-table discipline-config-table">
@@ -147,15 +150,27 @@ export default function FoundationDiszisPanel(props: FoundationDiszisPanelProps)
                     );
                   }
                   if (column.id === "playerCount") return <td key={column.id}>{discipline.playerCount as React.ReactNode}</td>;
-                  if (column.id === "mutator1") return <td key={column.id}>{(discipline.mutator1 as string) || "-"}</td>;
-                  return <td key={column.id}>{(discipline.mutator2 as string) || "-"}</td>;
+                  // Mutatoren sind pro Disziplin (noch) nicht im Spielplan hinterlegt
+                  // (`Discipline.mutator1/2` sind ligaweit leer). Statt einer toten
+                  // "-"-Spalte den Zustand explizit benennen (#4).
+                  if (column.id === "mutator1") {
+                    const value = (discipline.mutator1 as string) || "";
+                    return <td key={column.id}>{value || <span className="muted">kein Mutator</span>}</td>;
+                  }
+                  const mutator2 = (discipline.mutator2 as string) || "";
+                  return <td key={column.id}>{mutator2 || <span className="muted">kein Mutator</span>}</td>;
                 })}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="panel inset-panel" style={{ marginTop: 16 }}>
+      <p className="muted" style={{ marginTop: 8 }}>
+        Mutatoren sind pro Disziplin (noch) nicht im Saison-Spielplan hinterlegt — die Spalten zeigen daher
+        „kein Mutator&#8220;. Der vollständige Spieltag-Ablauf steht im{" "}
+        <a href="#foundation-diszis-schedule">Saison-Matchday-Plan</a> weiter unten.
+      </p>
+      <div className="panel inset-panel" id="foundation-diszis-schedule" style={{ marginTop: 16, scrollMarginTop: 16 }}>
         <div className="panel-header">
           <div className="stack">
             <TooltipHeading

@@ -1303,15 +1303,26 @@ function PlayerComparePanel({
 
   return (
     <div className="is-new-look nl-player-compare" data-testid="player-compare-panel">
-      <button
-        type="button"
-        className="nl-player-compare-toggle"
-        aria-expanded={open}
-        aria-controls="player-compare-panel-body"
-        onClick={onToggleOpen}
-      >
-        {open ? "Vergleich schliessen" : "Vergleichen"}
-      </button>
+      {/* #6: Deutlich sichtbarer Einstieg für den 2-Spieler-Vergleich —
+          Icon + ausformulierte Beschriftung + Kurzhinweis, damit die Funktion
+          nicht übersehen wird. */}
+      <div className="nl-player-compare-entry">
+        <button
+          type="button"
+          className="nl-player-compare-toggle"
+          aria-expanded={open}
+          aria-controls="player-compare-panel-body"
+          onClick={onToggleOpen}
+        >
+          <span className="nl-player-compare-toggle-icon" aria-hidden="true">
+            ⇆
+          </span>
+          {open ? "Vergleich schliessen" : "Spieler vergleichen"}
+        </button>
+        {!open ? (
+          <span className="nl-player-compare-hint muted">Stelle diesen Spieler einem zweiten direkt gegenüber.</span>
+        ) : null}
+      </div>
       <div className="nl-compare-panel" id="player-compare-panel-body" hidden={!open}>
         {!open ? null : selectedPlayerId == null ? (
           <div className="nl-compare-picker">
@@ -2301,12 +2312,6 @@ export default function PlayerDetailDrawer({
                 <strong>{formatValue(seasonPerformance?.averageContribution, 1)}</strong>
               </article>
             </div>
-            {variant === "page" && data.historyRows.length >= 2 ? (
-              <div className="player-drawer-stats-chart">
-                <h3>Stat-Entwicklung</h3>
-                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} />
-              </div>
-            ) : null}
           </section>
 
           {variant !== "page" ? (
@@ -3002,6 +3007,15 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-history">
             <h3>Historie</h3>
+            {/* Entwicklung über Seasons gehört zur Karriere-Sektion (nicht zu
+                "Stats"): die Stat-Entwicklungskurve führt hier den saison-
+                weisen Verlauf an. */}
+            {variant === "page" && data.historyRows.length >= 2 ? (
+              <div className="player-drawer-stats-chart">
+                <h3>Stat-Entwicklung über Seasons</h3>
+                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} />
+              </div>
+            ) : null}
             {data.injurySummary.totalInjuries > 0 ? (
               <p className="player-drawer-injury-summary muted" data-testid="player-drawer-injury-summary">
                 {data.injurySummary.totalInjuries} Verletzung{data.injurySummary.totalInjuries === 1 ? "" : "en"} ·{" "}

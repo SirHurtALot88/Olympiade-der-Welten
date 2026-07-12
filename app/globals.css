@@ -58943,3 +58943,287 @@ button.is-new-look .nl-thist-season-pill,
   margin-bottom: 12px;
 }
 
+
+/* ============================================================
+   WAVE C — P2 per-tab polish (merged from scratch)
+   ============================================================ */
+/* Wave C — Home+Inbox */
+
+/* ================================================================
+   HOME #2 — Board-Ziele: Ziel-Text vollständig lesbar machen.
+   Vorher clippte die 3. Zielkarte ("…mit einem Spi…") und der
+   Sponsor-Vertrag-Wert brach hart um. Ursache: der generische
+   Progress-Label-Stil (Uppercase + Letter-Spacing, für kurze
+   Achsen-Kürzel gedacht) und ein hartes `white-space: nowrap` auf
+   dem Status-Wert. Hier im Board-Ziel-Kontext deshalb sauberes
+   Umbrechen statt Clip — Selektoren mit +1 Klasse, damit sie die
+   Basisregeln unabhängig von der Quellreihenfolge überschreiben.
+   ================================================================ */
+
+/* Numerischer Ziel-Pfad (NlProgressBar): der Ziel-Satz steht als
+   Progress-Label neben dem Fortschrittswert. */
+.is-new-look .nl-home-objective-row .nl-progress-head {
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nl-s2);
+  row-gap: 2px;
+}
+
+.is-new-look .nl-home-objective-row .nl-progress-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.is-new-look .nl-home-objective-row .nl-progress-value {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Nicht-numerischer Ziel-Pfad (z. B. Sponsor-Vertrag): Label und
+   Status-Wert dürfen umbrechen statt aus der Karte zu laufen; der
+   Wert rutscht bei Bedarf sauber in die nächste Zeile. */
+.is-new-look .nl-home-objective-row .nl-home-objective-fallback {
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--nl-s3);
+  row-gap: 2px;
+}
+
+.is-new-look .nl-home-objective-row .nl-home-objective-label {
+  flex: 1 1 60%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.is-new-look .nl-home-objective-row .nl-home-objective-status {
+  flex: 1 1 auto;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ================================================================
+   HOME #3 — Top-Kader "Deine besten 6": Sortier-Kriterium sichtbar
+   machen. Die Reihenfolge folgt Rolle → Saisonleistung (PPS) → MVS
+   → OVR (nicht dem OVR allein), daher der erklärende Hinweis rechts
+   in der Section-Kopfzeile.
+   ================================================================ */
+.is-new-look .nl-home-section-head {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-home-section-hint {
+  margin-left: auto;
+  align-self: center;
+  font-family: var(--nl-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .is-new-look .nl-home-section-hint {
+    margin-left: 0;
+    flex-basis: 100%;
+    white-space: normal;
+  }
+}
+
+/* Wave C — Historie+Profil */
+
+/* ── Historie: Spotlight-Identität (Klasse/Rasse) ───────────────────────────
+   #3: Klasse- und Rasse-Icons als klar beschriftete Identitäts-Chips, damit sie
+   nicht als Team-Wappen missverstanden werden. */
+.is-new-look .nl-thist-spotlight-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-thist-spotlight-identity .nl-thist-spotlight-icons {
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-thist-identity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill, 999px);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-thist-identity-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-ink);
+  white-space: nowrap;
+}
+
+/* ── Historie: Teambewegung — sanftere Namens-Kürzung ───────────────────────
+   #4: Teamname darf auf zwei Zeilen umbrechen (statt harter Ellipse mitten im
+   Wort); zusätzlicher Tooltip auf dem Namen liefert den vollen Text. */
+.is-new-look .nl-thist-team-copy strong {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+/* ── Spielerprofil: Vergleichs-Einstieg deutlicher machen ───────────────────
+   #6: Klarer, auffindbarer Einstiegspunkt für den 2-Spieler-Vergleich. */
+.is-new-look .nl-player-compare-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-player-compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.is-new-look .nl-player-compare-toggle-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-new-look .nl-player-compare-hint {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* Wave C — Ranks+Diszis+Result */
+
+/* ============================================================
+   RANKS — Neuer-Look-Board Politur (nl-ranks-*)
+   Nur aktiv unter `.is-new-look` (Flag an). Additiv zu den in
+   app/globals.css bestehenden Regeln; nichts wird überschrieben.
+   ============================================================ */
+
+/* #3 — Horizontaler Scroll-Container mit Scroll-Schatten, damit auf schmalen
+   Breiten nichts am rechten Rand abgeschnitten wird und die Seite selbst nie
+   horizontal scrollt. Auf normalen Breiten erscheint keine Scrollleiste. */
+.is-new-look .nl-ranks-board-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* Scroll-Schatten links/rechts (Chris Coyier / Lea Verou Muster). */
+  background:
+    linear-gradient(to right, var(--nl-panel) 30%, transparent) left center,
+    linear-gradient(to left, var(--nl-panel) 30%, transparent) right center,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.14), transparent) left center,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.14), transparent) right center;
+  background-repeat: no-repeat;
+  background-size: 28px 100%, 28px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Erste Spalte (Rang + Team) beim horizontalen Scrollen sichtbar halten. */
+.is-new-look .nl-ranks-board-scroll .nl-ranks-rank {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+/* #1 — Rang-Bewegungs-Platzhalter unter der Rangzahl. Bewusst zurückhaltend:
+   kein erfundener Trend, nur ein sauberes "—" mit Tooltip. */
+.is-new-look .nl-ranks-rank {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-ranks-trend {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ranks-trend.is-empty {
+  opacity: 0.55;
+  cursor: help;
+}
+
+/* #2 — Liga-Ø/Median-Zusammenfassungszeile am Fuß des Boards. */
+.is-new-look .nl-ranks-summaryrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s2);
+  padding: 8px 12px;
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 5%, var(--nl-panel-2));
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-ranks-summaryrow-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-ranks-summaryrow-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.is-new-look .nl-ranks-summaryrow-stat small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ranks-summaryrow-stat strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ============================================================
+   DISZIS — Sprungmarke zum Saison-Matchday-Plan (#5)
+   Gilt mit und ohne Flag (klassisches Panel-Layout).
+   ============================================================ */
+.diszis-schedule-jump {
+  margin-left: auto;
+  text-decoration: none;
+}
+
+/* ============================================================
+   MATCHDAY-RESULT — Podium-Rang-Label (#6)
+   Nur aktiv unter `.is-new-look`.
+   ============================================================ */
+.is-new-look .nl-result-podium-rank-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-podium-step.is-rank-1 .nl-result-podium-rank-label {
+  color: color-mix(in srgb, #d4a72c 70%, var(--nl-ink));
+}
+

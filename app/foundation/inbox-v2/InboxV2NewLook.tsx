@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
+import { useMemo, type CSSProperties, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
@@ -14,25 +14,6 @@ import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundatio
  * Liste/Detail-Ansicht zurück. Konsumiert exakt dieselben Props und
  * Handler (onSelectItem/onRunChoice/onMarkDone/onDismiss).
  */
-
-const NL_INBOX_DECISION_CATEGORY_FILTERS = [
-  { value: "ALL", label: "Alle" },
-  { value: "task", label: "Aufgaben" },
-  { value: "warning", label: "Warnungen" },
-  { value: "transfer", label: "Transfers" },
-  { value: "finance", label: "Finanzen" },
-  { value: "training", label: "Training" },
-  { value: "contract", label: "Verträge" },
-  { value: "facility", label: "Facilities" },
-  { value: "sponsor", label: "Sponsoren" },
-] as const;
-
-const NL_INBOX_CHRONICLE_CATEGORY_FILTERS = [
-  { value: "ALL", label: "Alle" },
-  { value: "news", label: "News" },
-  { value: "result", label: "Results" },
-  { value: "transfer", label: "Transfers" },
-] as const;
 
 /* --- Kategorie-Vokabular: deutsches Label + Inline-SVG Icon ------- */
 
@@ -227,8 +208,6 @@ export default function InboxV2NewLook({
   openCount = 0,
   criticalCount = 0,
   mode = "decisions",
-  categoryFilter = "ALL",
-  onCategoryFilterChange,
   includeDone = false,
   onIncludeDoneChange,
   includeDismissed = false,
@@ -239,54 +218,14 @@ export default function InboxV2NewLook({
   onModeChange,
 }: InboxV2ClientProps) {
   const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
-  const categoryFilters = mode === "chronicle" ? NL_INBOX_CHRONICLE_CATEGORY_FILTERS : NL_INBOX_DECISION_CATEGORY_FILTERS;
 
-  // Kategorie-Filter als klickbare Portale (#3). Der Mount reicht aktuell
-  // keinen `onCategoryFilterChange`-Handler durch (Host setzt
-  // `hideCategoryFilters`), daher filtert der Neue Look die Liste lokal —
-  // nur echte `item.category`-Werte, keine erfundenen Daten.
-  const [localCategoryFilter, setLocalCategoryFilter] = useState<string>(categoryFilter);
-  const isExternallyFiltered = Boolean(onCategoryFilterChange);
-  const activeCategoryFilter = isExternallyFiltered ? categoryFilter : localCategoryFilter;
-
-  const handleCategoryFilter = (value: string) => {
-    if (onCategoryFilterChange) {
-      onCategoryFilterChange(value);
-    } else {
-      setLocalCategoryFilter(value);
-    }
-  };
-
-  // Modus-Wechsel (Entscheidungen ↔ Chronik) setzt den lokalen Kategorie-Filter
-  // auf "ALL" zurück: die Kategorie-Vokabulare der beiden Modi überschneiden
-  // sich nur teilweise, ein überlebender Filter würde die Chronik sonst auf eine
-  // dort nicht existierende Kategorie einschränken (leere Liste + irreführende
-  // "alles erledigt"-Karte). Nur im lokal gefilterten Pfad — vorfiltert der Host
-  // extern, gehört das Filter-State ihm.
-  useEffect(() => {
-    if (!isExternallyFiltered) {
-      setLocalCategoryFilter("ALL");
-    }
-  }, [mode, isExternallyFiltered]);
-
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of items) {
-      const key = item.category.toLowerCase();
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return counts;
-  }, [items]);
-
-  // Wenn der Host bereits vorfiltert (externer Handler), nichts doppelt
-  // filtern; sonst lokal nach der gewählten Kategorie einschränken.
-  const displayedItems = useMemo(() => {
-    if (isExternallyFiltered || activeCategoryFilter === "ALL") {
-      return items;
-    }
-    const wanted = activeCategoryFilter.toLowerCase();
-    return items.filter((item) => item.category.toLowerCase() === wanted);
-  }, [items, isExternallyFiltered, activeCategoryFilter]);
+  // Kategorie-Filter (#4): Die Kategorie-Auswahl liegt allein in der
+  // Shell-Subnav (`foundation-shell-subnav`), die `inboxCategoryFilter` samt
+  // URL steuert und die Items über `useInboxV2Derivations` bereits vorfiltert
+  // (siehe FoundationInboxV2Host). Der frühere zweite, nur lokal filternde
+  // Chip-Streifen im Panel war redundant und konnte der Subnav widersprechen —
+  // er ist entfernt; `items` kommen bereits kategorie-gefiltert an.
+  const displayedItems = items;
 
   const firstCriticalItem = useMemo(
     () => displayedItems.find((item) => item.severity === "critical") ?? null,
@@ -482,30 +421,6 @@ export default function InboxV2NewLook({
         onSelect={(id) => onModeChange?.(id as InboxV2Mode)}
         aria-label="Inbox Modus"
       />
-
-      <div className="nl-inbox-filter-row" role="group" aria-label="Inbox Kategorien">
-        {categoryFilters.map((filter) => {
-          const isActive = activeCategoryFilter === filter.value;
-          const count = filter.value === "ALL" ? items.length : categoryCounts.get(filter.value) ?? 0;
-          // Kategorien ohne Einträge werden ausgeblendet (kein toter Chip),
-          // "ALL" und der aktive Chip bleiben immer sichtbar.
-          if (filter.value !== "ALL" && !isActive && count === 0) {
-            return null;
-          }
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              className={`nl-inbox-filter-chip${isActive ? " is-active" : ""}`}
-              onClick={() => handleCategoryFilter(filter.value)}
-              aria-pressed={isActive}
-            >
-              <span>{filter.label}</span>
-              <span className="nl-inbox-filter-count nl-tnum">{count}</span>
-            </button>
-          );
-        })}
-      </div>
 
       {onIncludeDoneChange || onIncludeDismissedChange ? (
         <div className="nl-inbox-toggle-row">

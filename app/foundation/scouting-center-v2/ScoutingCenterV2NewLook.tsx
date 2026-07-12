@@ -188,7 +188,13 @@ export default function ScoutingCenterV2NewLook({
     }
   };
 
-  const rosterGap = rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
+  // #Kader-Tile-Ton: "Minimum erreicht" (grün) nur behaupten, wenn das Minimum
+  // bekannt UND erfüllt ist. Bei unbekanntem Minimum (rosterMinimum == null, z. B.
+  // Büro L0) galt zuvor rosterGap === 0 => grün "Minimum erreicht", auch bei 0
+  // Spielern. Leerer Kader ist nie das erreichte Minimum.
+  const rosterKnown = rosterMinimum != null;
+  const rosterGap = rosterKnown && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
+  const rosterMinimumMet = rosterKnown ? rosterCount >= rosterMinimum : rosterCount > 0;
   const readyToBuyEntries = queueEntries.filter((entry) => entry.isFullyScouted);
   const focusEntry = queueEntries.find((entry) => entry.isFocusTarget && !entry.isFullyScouted) ?? null;
 
@@ -222,7 +228,14 @@ export default function ScoutingCenterV2NewLook({
         title={teamName}
         actions={
           <div className="nl-scout-header-actions">
-            <VeloStarRating value={scoutingFacilityLevel} label={scoutingFacilityLabel} compact />
+            {/* #Scout-Office-Sterne: Bei L0/ungebaut zeigt VeloStarRating sonst
+                5 (leere, aber gold glühende) Sterne — liest sich wie ein volles
+                5-Sterne-Rating. Ungebaut => expliziter "nicht gebaut"-Status. */}
+            {scoutingFacilityLevel > 0 ? (
+              <VeloStarRating value={scoutingFacilityLevel} label={scoutingFacilityLabel} compact />
+            ) : (
+              <span className="nl-scout-status-pill is-focus">{scoutingFacilityLabel} · nicht gebaut</span>
+            )}
           </div>
         }
       >
@@ -258,9 +271,9 @@ export default function ScoutingCenterV2NewLook({
           />
           <StatChip
             label="Kader"
-            value={rosterMinimum != null ? `${rosterCount}/${rosterMinimum}` : rosterCount}
-            tone={rosterGap > 0 ? "warn" : "good"}
-            sub={rosterGap > 0 ? `−${rosterGap} bis Minimum` : "Minimum erreicht"}
+            value={rosterKnown ? `${rosterCount}/${rosterMinimum}` : rosterCount}
+            tone={rosterMinimumMet ? "good" : "warn"}
+            sub={rosterGap > 0 ? `−${rosterGap} bis Minimum` : rosterMinimumMet ? "Minimum erreicht" : "Minimum nicht erreicht"}
             title={draftContextNote}
           />
           <StatChip

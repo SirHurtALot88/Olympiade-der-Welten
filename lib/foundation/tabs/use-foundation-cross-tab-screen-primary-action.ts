@@ -214,22 +214,13 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     }
 
     if (input.activeView === "inboxV2" || input.activeView === "inbox") {
-      return {
-        kicker: "Hauptaktion",
-        title: input.inboxPrimaryTeamItem ? input.inboxPrimaryTeamItem.title : "Zur Manager-Zentrale",
-        detail:
-          input.inboxPrimaryTeamItem?.description ??
-          "Wenn hier nichts Kritisches liegt, geht es zurück in HQ für Markt, Kaderdruck und die nächsten Saison-Schritte.",
-        status: input.inboxPrimaryTeamItem ? "offen" : "optional",
-        buttonLabel: input.inboxPrimaryTeamItem ? "Hinweis öffnen" : "Office öffnen",
-        onClick: () => {
-          if (input.inboxPrimaryTeamItem) {
-            input.navigateToInboxItem(input.inboxPrimaryTeamItem);
-            return;
-          }
-          input.navigateHomeTab("office");
-        },
-      };
+      // #5: Kein separates "Hauptaktion"-Band für die Inbox. Der frühere
+      // "Hinweis öffnen"/"Office öffnen"-Button schwebte in einem leeren Band
+      // ohne klares Ziel und dupliziert die Panel-Interaktion (Klick auf einen
+      // Listeneintrag öffnet ihn direkt, der "kritisch"-Chip springt zum ersten
+      // kritischen Eintrag). Wie Home (oben) liefert die Inbox daher keine
+      // Screen-Hauptaktion.
+      return null;
     }
 
     if (input.activeView === "teamSettings") {
@@ -268,7 +259,6 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
   }, [
     input.activeManagerArenaBlockerReason,
     input.activeView,
-    input.inboxPrimaryTeamItem,
     input.isSelectedTeamManagementLocked,
     input.marketBuyBusy,
     input.marketPreviewPlayer,
@@ -276,7 +266,6 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     input.marketTeamId,
     marketTransferWindowOpen,
     input.navigateHomeTab,
-    input.navigateToInboxItem,
     input.openMarketOfferPanel,
     input.selectedTeam,
     input.selectedTeamCanManage,
