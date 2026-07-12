@@ -9,8 +9,20 @@ const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
-/** Abzug vom Referenz-Gehalt für den Rang-32-Basis-Anker (4. niedrigstes Gehalt − Buffer). */
-export const SPONSOR_BASE_SALARY_BUFFER_C = 5;
+/**
+ * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
+ * der Sockel liegt ÜBER dem 4.-niedrigsten Gehalt, sodass die ~4 gehaltsschwächsten Teams strukturell
+ * abgesichert sind und ein kleines Plus machen (Design-Regel). Vorher +5, was mit der Gehalts-Inflation
+ * (salaryFactor > 1) den Sockel unter die realen Gehälter zog und die Schwächsten ins Minus rutschen ließ.
+ */
+export const SPONSOR_BASE_SALARY_BUFFER_C = -2;
+
+/**
+ * Globale Stauchung der kumulativen Rang-Meilenstein-Leiter im Sponsor-Payout. <1 ⇒ die Spitze (die alle
+ * Meilensteine stapelt) zahlt nicht mehr komplett über: sie kappt den Top-Bonus, ohne den Sockel (der die
+ * Kleinen absichert) anzutasten. So sinkt die Rang-Spreizung Richtung der funktionierenden Preisgeld-Kurve.
+ */
+export const SPONSOR_MILESTONE_LADDER_SCALE = 0.6;
 
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
@@ -238,7 +250,10 @@ export function getSponsorPayoutForFinalRankAndTier(
       ? round1(effectiveBaseFloor)
       : round1(effectiveBaseFloor * getStarTierBaseMultiplier(starTier));
   const rawMilestone = round1(
-    getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale * getStarTierMilestoneMultiplier(starTier),
+    getRankMilestoneBonus(finalRank, salaryFactor) *
+      milestoneScale *
+      SPONSOR_MILESTONE_LADDER_SCALE *
+      getStarTierMilestoneMultiplier(starTier),
   );
   const { base, milestoneBonus } = applyQualityRebalanceToPayout({
     base: rawBase,

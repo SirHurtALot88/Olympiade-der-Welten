@@ -301,7 +301,9 @@ describe("sponsor economy balance", () => {
     const twoStar = getSponsorPayoutForFinalRankAndTier(1, factor, 2, leagueMin);
     const oneStar = getSponsorPayoutForFinalRankAndTier(1, factor, 1, leagueMin);
 
-    expect(fiveStar).toBeGreaterThan(95);
+    // Milestone ladder compressed (SPONSOR_MILESTONE_LADDER_SCALE) so the 5★ champion no longer
+    // over-pays: still a strong ~2× base-floor premium, but capped well below the old steep curve.
+    expect(fiveStar).toBeGreaterThan(80);
     expect(twoStar).toBeLessThan(fiveStar * 0.92);
     expect(oneStar).toBeLessThan(twoStar);
     expect(fiveStar / oneStar).toBeGreaterThan(1.12);
@@ -476,7 +478,9 @@ describe("sponsor economy balance", () => {
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, mmTeam.teamId);
     const baseFloor = leagueMin * salaryFactor;
 
-    expect(payout).toBeGreaterThan(baseFloor * 1.5);
+    // Compressed milestone ladder: top teams keep a meaningful upside over the base floor (~1.3–1.5×),
+    // just not the old steep multiple.
+    expect(payout).toBeGreaterThan(baseFloor * 1.3);
     expect(payout).toBeLessThan(115);
   }, 60000);
 
