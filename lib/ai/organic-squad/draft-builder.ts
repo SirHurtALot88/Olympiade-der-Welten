@@ -132,11 +132,17 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     // min this reserve is 0, so composition past min is fully emergent.
     const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
     const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
-    // Affordability keeps cash ≥ buffer AFTER the buy AND after the reserved min-fill (hard blockers).
+    // Reaching the hard ROSTER_MIN outranks the solvency buffer: a club MUST field a legal (≥ min)
+    // squad even if that spends it down toward ~0 — otherwise a cash-poor club (e.g. after paying
+    // renewal salaries) stalls below min and breaks downstream (autoprep "teams_under_7"). So below
+    // min the affordability floor is 0 (never negative cash); the buffer only guards spend ABOVE min.
+    const belowMin = squad.length < rosterMin;
+    const affordFloor = belowMin ? 0 : cashBuffer;
+    // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const candidate of pool) {
-      if (cash - price(candidate) - reserveForMin < cashBuffer) continue;
+      if (cash - price(candidate) - reserveForMin < affordFloor) continue;
       const utility = buyUtility(candidate, state);
       if (utility > bestUtility) {
         bestUtility = utility;
@@ -144,8 +150,22 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       }
     }
 
+    // Broke-and-below-min fallback: if the min-reserve made the FULL min-fill unaffordable, a club that
+    // can't reach min in one go must still make PARTIAL progress (6→7 beats staying at 6 and breaking
+    // autoprep). Drop the reserve and buy the single best candidate it can actually pay for (cash ≥ 0).
+    if (!best && belowMin) {
+      for (const candidate of pool) {
+        if (cash - price(candidate) < 0) continue;
+        const utility = buyUtility(candidate, state);
+        if (utility > bestUtility) {
+          bestUtility = utility;
+          best = candidate;
+        }
+      }
+    }
+
     if (!best) {
-      // Nothing affordable while keeping the buffer.
+      // Nothing affordable at all (truly out of cash for even the cheapest player).
       if (squad.length < rosterMin) stoppedBelowMin = true;
       break;
     }
