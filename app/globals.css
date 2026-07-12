@@ -59279,3 +59279,10 @@ button.is-new-look .nl-thist-season-pill,
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* Aktuelle Trainingsklasse außerhalb der Top-2: optisch als Vergleichszeile absetzen */
+.is-new-look .nl-training-class-ranking-row.is-current-outside {
+  margin-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--nl-line, #2a3344) 80%, transparent);
+  padding-top: 6px;
+}

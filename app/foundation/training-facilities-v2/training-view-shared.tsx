@@ -199,6 +199,8 @@ export type TrainingClassGainEstimate = {
   /** Geschätzter Trainings-SP-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. */
   estimatedGain: number;
   isCurrent: boolean;
+  /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
+  rank: number;
 };
 
 /**
@@ -217,7 +219,10 @@ export type TrainingClassGainEstimate = {
 export function buildTrainingClassGainRanking(
   row: TrainingPlayerRowView,
   trainingClassOptions: TrainingClassOption[],
+  options?: { limit?: number; includeCurrent?: boolean },
 ): TrainingClassGainEstimate[] {
+  const limit = options?.limit ?? 3;
+  const includeCurrent = options?.includeCurrent ?? false;
   const budget = row.organicForecast.trainingSetpoints;
   if (!(budget > 0)) return [];
   const currentClass = normalizeProgressionClassName(row.trainingClass);
@@ -246,7 +251,16 @@ export function buildTrainingClassGainRanking(
     };
   });
 
-  return estimates.sort((left, right) => right.estimatedGain - left.estimatedGain).slice(0, 3);
+  const sorted = estimates
+    .sort((left, right) => right.estimatedGain - left.estimatedGain)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const top = sorted.slice(0, Math.max(0, limit));
+  // Aktuelle Klasse immer zum Vergleich sichtbar halten, auch wenn außerhalb der Top-N.
+  if (includeCurrent && !top.some((entry) => entry.isCurrent)) {
+    const current = sorted.find((entry) => entry.isCurrent);
+    if (current) top.push(current);
+  }
+  return top;
 }
 
 export type TrainingBudgetBreakdownStep = {

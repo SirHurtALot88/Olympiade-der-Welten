@@ -433,35 +433,42 @@ function NlTrainingClassRanking({
   readOnly: boolean;
   onSelectClass: (className: string) => void;
 }) {
-  const ranking = useMemo(() => buildTrainingClassGainRanking(row, trainingClassOptions), [row, trainingClassOptions]);
+  const ranking = useMemo(
+    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 2, includeCurrent: true }),
+    [row, trainingClassOptions],
+  );
   if (ranking.length === 0) return null;
   const best = ranking.reduce((max, entry) => Math.max(max, entry.estimatedGain), 0.01);
+  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 2);
 
   return (
     <div
       className="nl-training-class-ranking is-selectable"
       data-testid="nl-training-class-ranking"
       role="radiogroup"
-      aria-label="Trainingsklasse aus Top-3 wählen"
+      aria-label="Trainingsklasse wählen — Top-2 plus deine aktuelle"
     >
       <span className="nl-training-class-ranking-title">
-        Top-3 Klassen · SP-Zugewinn {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
+        Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
+        {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
       </span>
       <div className="nl-training-class-ranking-rows">
-        {ranking.map((entry, index) => (
+        {ranking.map((entry) => (
           <button
             type="button"
             key={`class-rank-${row.player.id}-${entry.className}`}
-            className={`nl-training-class-ranking-row${entry.isCurrent ? " is-current" : ""}`}
+            className={`nl-training-class-ranking-row${entry.isCurrent ? " is-current" : ""}${
+              entry.isCurrent && currentOutsideTop ? " is-current-outside" : ""
+            }`}
             role="radio"
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectClass(entry.className)}
-            title={`${entry.label} als Trainingsklasse wählen: ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
+            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
             } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
           >
-            <span className="nl-training-class-ranking-rank nl-tnum">{index + 1}</span>
+            <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
             <span className="nl-training-class-ranking-label">
               {entry.label}
               {entry.isCurrent ? <span className="nl-training-class-ranking-current">aktiv</span> : null}
