@@ -3093,9 +3093,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </div>
           </section>
           <FoundationRanksHost {...foundationRanksHostProps} />
-          <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} />
           </>
           ) : null}
+
+          {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
 

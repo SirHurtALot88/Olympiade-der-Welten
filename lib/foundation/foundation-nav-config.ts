@@ -50,6 +50,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
       { id: "diszis", label: "Diszis", tooltip: "Disziplinen und Mutatoren.", icon: "◫" },
+      { id: "leagueLeaders", label: "Leaders", tooltip: "Liga-Leaders je Kategorie plus Rekorde & Hall of Fame.", icon: "★" },
       { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "€" },
       { id: "encyclopedia", label: "Lexikon", tooltip: "Spielbegriffe und Regeln.", icon: "?" },
     ],

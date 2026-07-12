@@ -24,6 +24,7 @@ export const FOUNDATION_VIEW_IDS = [
   "teamProfile",
   "ranks",
   "diszis",
+  "leagueLeaders",
   "prize",
   "market",
   "marketV2",
@@ -71,6 +72,15 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "lexikon" || view === "glossar" || view === "encyclopedia" || view === "buch") {
     return "encyclopedia";
+  }
+  if (
+    view === "league-leaders" ||
+    view === "league-leaders-v2" ||
+    view === "leagueLeaders" ||
+    view === "bestenliste" ||
+    view === "leaders"
+  ) {
+    return "leagueLeaders";
   }
   if (view === "home-v2" || view === "homev2" || view === "home") {
     return "homeV2";

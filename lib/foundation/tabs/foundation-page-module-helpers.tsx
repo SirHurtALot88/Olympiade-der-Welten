@@ -265,6 +265,8 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
       return "discipline-ranks";
     case "diszis":
       return "foundation-diszis";
+    case "leagueLeaders":
+      return "league-leaders";
     default:
       return null;
   }

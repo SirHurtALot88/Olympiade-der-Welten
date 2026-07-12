@@ -1065,7 +1065,11 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildGameFlow = shouldBuildFoundationGameFlow(activeView, homeV2Tab);
   const shouldBuildGameInbox = shouldBuildGameFlow;
   const shouldLoadSeasonOverviewFeed =
-    activeView === "seasonV2" || activeView === "prize" || activeView === "ranks" || activeView === "diszis";
+    activeView === "seasonV2" ||
+    activeView === "prize" ||
+    activeView === "ranks" ||
+    activeView === "diszis" ||
+    activeView === "leagueLeaders";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
   const shouldLoadSeasonArchive =
@@ -1073,6 +1077,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "seasonV2" ||
     activeView === "prize" ||
     activeView === "ranks" ||
+    activeView === "leagueLeaders" ||
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
@@ -1272,13 +1277,15 @@ export function useFoundationShellRouterBodyScope({
     activeView === "seasonV2" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
+    activeView === "leagueLeaders" ||
     activeView === "prize";
   const shouldBuildSeasonTopPlayerRows =
     activeView === "seasonV2" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
+    activeView === "leagueLeaders" ||
     activeView === "prize";
-  const shouldBuildLeagueLeaderBoards = activeView === "ranks";
+  const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -2540,7 +2547,7 @@ export function useFoundationShellRouterBodyScope({
     // Rangliste wird i. d. R. aus einem Spieler-Profil heraus geöffnet (returnContext
     // gesetzt) — ein History-Eintrag wird gepusht, damit Zurück (Browser-Back oder der
     // "Zurück zu {Spieler}"-Link) verlässlich zum Herkunfts-Profil zurückführt.
-    setFoundationView("ranks", setActiveView, { push: true });
+    setFoundationView("leagueLeaders", setActiveView, { push: true });
     scrollToFoundationTarget(`league-leaders-${categoryId}`);
   }
 
