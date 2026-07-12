@@ -7,6 +7,7 @@ import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
+import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
 import PlayerTrainingControls from "@/app/foundation/player-profile/PlayerTrainingControls";
 import {
   PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP,
@@ -3007,6 +3008,12 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-history">
             <h3>Historie</h3>
+            {/* D5 "Karriere-Story-Header" ("Neuer Look", flag-gated, additiv):
+                kompakter Story-Streifen (Peak-OVR, größter Sprung, Longevity,
+                letzter Trend) aus den bereits archivierten Saison-Metriken —
+                führt die Karriere-/Entwicklungs-Sektion an. Mit Flag OFF
+                unverändert. */}
+            {newLookEnabled ? <PlayerCareerStoryHeader historyRows={data.historyRows} /> : null}
             {/* Entwicklung über Seasons gehört zur Karriere-Sektion (nicht zu
                 "Stats"): die Stat-Entwicklungskurve führt hier den saison-
                 weisen Verlauf an. */}

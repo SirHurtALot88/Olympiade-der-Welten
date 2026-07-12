@@ -75,6 +75,38 @@ function formatNlTransferType(type: TransferHistoryV2Row["type"]) {
   return "Abgang";
 }
 
+// #D10: CSV-Feld robust escapen — immer quoten und interne Quotes verdoppeln
+// (RFC-4180-Stil). So bleiben Semikolons, Kommas, Zeilenumbrüche und deutsche
+// Zahlenformate im Feld unversehrt.
+function escapeCsvField(value: string | number | null | undefined) {
+  const raw = value == null ? "" : String(value);
+  return `"${raw.replace(/"/g, '""')}"`;
+}
+
+// #D10: Deal-Liste als CSV (Separator ";", UTF-8 BOM für Excel/DE). Reihen
+// stammen 1:1 aus den bereits sichtbaren `filteredRows` — keine neuen Daten.
+function buildTransferHistoryCsv(rows: TransferHistoryV2Row[]) {
+  const header = ["Datum", "Saison", "Richtung", "Spieler", "Von", "Nach", "Ablöse (EUR)"];
+  const lines = [header.map(escapeCsvField).join(";")];
+  for (const row of rows) {
+    lines.push(
+      [
+        new Date(row.happenedAt).toLocaleDateString("de-DE"),
+        row.seasonLabel,
+        formatNlTransferType(row.type),
+        row.playerName,
+        row.fromTeamName ?? row.fromTeamId ?? "",
+        row.toTeamName ?? row.toTeamId ?? "",
+        Number.isFinite(row.fee) ? Math.round(row.fee) : "",
+      ]
+        .map(escapeCsvField)
+        .join(";"),
+    );
+  }
+  // ﻿ = BOM, \r\n = Excel-freundliche Zeilenenden.
+  return `﻿${lines.join("\r\n")}`;
+}
+
 function getNlTransferToneClass(type: TransferHistoryV2Row["type"]) {
   if (type === "buy") return "is-buy";
   if (type === "sell") return "is-sell";
@@ -106,6 +138,7 @@ function NlThistPortraitChip({ row, size = 40 }: { row: TransferHistoryV2Row; si
 export default function TransferHistoryV2NewLook({
   sourceBadgeLabel,
   saveName,
+  ownTeamId,
   requestedScopeLabel,
   resolvedScopeLabel,
   totalLoaded,
@@ -276,6 +309,58 @@ export default function TransferHistoryV2NewLook({
     return selectedRow.fee - selectedRow.marketValue;
   }, [selectedRow]);
 
+  // #D10: Kumulative Netto-Ausgaben (Käufe − Verkäufe) des EIGENEN Teams über
+  // die Saison. Fog-safe — nur die ohnehin sichtbaren, öffentlichen Deals des
+  // eigenen Teams; keine fremden Werte. Gleiche Buy/Sell-Aufteilung wie
+  // `summary.netTransferBalance` (contract_exit zählt bewusst nicht mit).
+  const ownTeamName = useMemo(
+    () => (ownTeamId ? teamOptions.find((team) => team.teamId === ownTeamId)?.name ?? null : null),
+    [ownTeamId, teamOptions],
+  );
+
+  const ownNetSpendSeries = useMemo(() => {
+    if (!ownTeamId) return [];
+    const ownDeals = filteredRows
+      .filter(
+        (row) =>
+          (row.type === "buy" && row.toTeamId === ownTeamId) ||
+          (row.type === "sell" && row.fromTeamId === ownTeamId),
+      )
+      .sort((left, right) => Date.parse(left.happenedAt) - Date.parse(right.happenedAt));
+    let cumulative = 0;
+    return ownDeals.map((row) => {
+      // Netto-Ausgaben: Kauf erhöht, Verkauf senkt (Käufe − Verkäufe).
+      cumulative += row.type === "buy" ? row.fee : -row.fee;
+      return { row, cumulative };
+    });
+  }, [filteredRows, ownTeamId]);
+
+  const ownNetSpendPoints = useMemo(() => ownNetSpendSeries.map((entry) => entry.cumulative), [ownNetSpendSeries]);
+  const ownNetSpendFinal = ownNetSpendPoints.length ? ownNetSpendPoints[ownNetSpendPoints.length - 1] : 0;
+
+  // #D10: CSV-Export der aktuell sichtbaren Deal-Liste (fog-safe: exakt
+  // `filteredRows`). Client-seitiger Blob + Download-Link, keine Persistenz.
+  const csvRows = useMemo(
+    () => [...filteredRows].sort((left, right) => Date.parse(left.happenedAt) - Date.parse(right.happenedAt)),
+    [filteredRows],
+  );
+  const canExportCsv = csvRows.length > 0;
+
+  function handleExportCsv() {
+    if (!canExportCsv || typeof document === "undefined") return;
+    const csv = buildTransferHistoryCsv(csvRows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const scopeSlug = resolvedScopeSeasonLabel.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/(^-|-$)/g, "") || "scope";
+    anchor.href = url;
+    anchor.download = `transferhistorie-${scopeSlug}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="nl-thist" data-new-look="true">
       <NlCard
@@ -409,6 +494,62 @@ export default function TransferHistoryV2NewLook({
           sub="bei Verkäufen"
         />
       </StatChipRow>
+
+      {/* #D10: Eigene kumulative Netto-Ausgaben (Sparkline) + CSV-Export der
+          sichtbaren Deal-Liste. Fog-safe: nur eigene, ohnehin sichtbare Deals. */}
+      <NlCard
+        className="nl-thist-own-card"
+        eyebrow="Eigenes Team"
+        title="Netto-Ausgaben-Verlauf"
+        actions={
+          <button
+            type="button"
+            className="nl-thist-inline-action"
+            onClick={handleExportCsv}
+            disabled={!canExportCsv}
+            title={
+              canExportCsv
+                ? "Sichtbare Deal-Liste als CSV herunterladen"
+                : "Noch keine Deals zum Exportieren"
+            }
+          >
+            CSV exportieren
+          </button>
+        }
+      >
+        {ownTeamId ? (
+          ownNetSpendSeries.length ? (
+            <div className="nl-thist-own-spend">
+              <div className="nl-thist-own-spend-head">
+                <span className="nl-thist-eyebrow">
+                  Kumulative Netto-Ausgaben{ownTeamName ? ` · ${ownTeamName}` : ""} (Käufe − Verkäufe)
+                </span>
+                <strong
+                  className={`nl-tnum${ownNetSpendFinal > 0 ? " is-negative" : ownNetSpendFinal < 0 ? " is-positive" : ""}`}
+                >
+                  {formatNlSignedMoney(ownNetSpendFinal)}
+                </strong>
+              </div>
+              <NlSparkline
+                points={ownNetSpendPoints}
+                tone={ownNetSpendFinal > 0 ? "risk" : "good"}
+                aria-label="Kumulative Netto-Ausgaben des eigenen Teams über die Saison"
+                className="nl-thist-own-sparkline"
+              />
+              <small className="nl-thist-spotlight-meta nl-tnum">
+                {ownNetSpendSeries.length} eigene Deals · Δ {formatNlSignedMoney(ownNetSpendFinal)}
+              </small>
+            </div>
+          ) : (
+            <p className="nl-thist-muted">
+              Noch keine eigenen Deals im aktuellen Scope — der Verlauf bleibt flach.
+            </p>
+          )
+        ) : (
+          <p className="nl-thist-muted">Kein eigenes Team im Kontext — Netto-Ausgaben-Verlauf nicht verfügbar.</p>
+        )}
+        {!canExportCsv ? <p className="nl-thist-muted">Noch keine Deals — CSV-Export deaktiviert.</p> : null}
+      </NlCard>
 
       {/* #2: Story-Kacheln als Portale — Klick wählt den jeweiligen Deal
           (Spotlight) bzw. öffnet das aktivste Team; nur klickbar, wenn ein

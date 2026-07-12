@@ -135,6 +135,8 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   const [mode, setMode] = useState<NlResultMode>("board");
   const [sortKey, setSortKey] = useState<NlResultSortKey | null>(null);
   const [sortDir, setSortDir] = useState<NlResultSortDir>("asc");
+  // Tagessieger-Reveal (D3): kurzer, überspringbarer Moment über dem Detail.
+  const [tagessiegerDismissed, setTagessiegerDismissed] = useState(false);
 
   const boardRows = useMemo(
     () =>
@@ -522,6 +524,77 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </StatChipRow>
         </div>
       </NlCard>
+
+      {championRow && !tagessiegerDismissed ? (
+        <section
+          className="nl-result-reveal"
+          data-testid="nl-result-tagessieger-reveal"
+          aria-label="Tagessieger-Reveal"
+        >
+          <div className="nl-result-reveal-inner">
+            <span
+              className="nl-result-reveal-eyebrow nl-reveal"
+              style={{ "--nl-reveal-i": 0 } as CSSProperties}
+            >
+              Spieltag {matchdaySummary.matchdayNumber ?? "—"} · Tagessieger
+            </span>
+            <div
+              className="nl-result-reveal-champion nl-reveal"
+              style={{ "--nl-reveal-i": 1 } as CSSProperties}
+            >
+              <NlMedalBadge kind="gold" title="Tagessieger" className="nl-result-reveal-medal" />
+              <BudgetedMediaImage
+                src={getTeamLogoBrowserUrl(championRow.teamId, null, { variant: "thumb" })}
+                alt={`${championRow.teamName} Logo`}
+                className="nl-result-reveal-crest"
+                width={64}
+                height={64}
+                fallback={
+                  <span className="nl-result-reveal-crest nl-result-reveal-crest-fallback">
+                    {championRow.teamShortCode}
+                  </span>
+                }
+              />
+              <div className="nl-result-reveal-copy">
+                <button
+                  type="button"
+                  className="nl-result-reveal-team"
+                  onClick={() => openTeamProfileById(championRow.teamId)}
+                  title={`${championRow.teamName} öffnen`}
+                >
+                  {championRow.teamName}
+                </button>
+                <span className="nl-result-reveal-points nl-tnum">
+                  <strong>
+                    <NlCountUpValue
+                      value={championRow.matchdayPoints}
+                      format={(value) => formatNlNumber(value, 1)}
+                    />
+                  </strong>
+                  <small>Tagespunkte</small>
+                </span>
+              </div>
+            </div>
+            {heroRow ? (
+              <p
+                className="nl-result-reveal-you nl-reveal nl-tnum"
+                style={{ "--nl-reveal-i": 2 } as CSSProperties}
+              >
+                Du: <strong>{heroRow.matchdayRank != null ? `#${heroRow.matchdayRank}` : "—"}</strong>{" "}
+                von {boardRows.length}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nl-result-reveal-skip"
+            onClick={() => setTagessiegerDismissed(true)}
+            aria-label="Tagessieger-Reveal überspringen"
+          >
+            Überspringen
+          </button>
+        </section>
+      ) : null}
 
       {podiumRows.length > 0 ? (
         <NlCard

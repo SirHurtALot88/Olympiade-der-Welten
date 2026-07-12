@@ -9141,6 +9141,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     saveName: activeSaveName,
     gameState,
+    ownTeamId: selectedTeamId ?? null,
     historyFeed,
     playerRatingsById,
     transferHistorySort: tableSorts.transferHistory,

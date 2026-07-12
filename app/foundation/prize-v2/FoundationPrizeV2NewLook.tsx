@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
@@ -159,6 +160,11 @@ export default function FoundationPrizeV2NewLook({
 
   const championLogo = seasonEndChampionRow ? getTeamLogoModel(seasonEndChampionRow.team) : null;
 
+  // Champion-/Saisonende-Reveal (D3): überspringbarer Feier-Banner.
+  const [championDismissed, setChampionDismissed] = useState(false);
+  // Endplatz des eigenen Teams (nur öffentliche Rangdaten) für "Du: #.. von ..".
+  const ownFinalRank = (prizeV2SelectedTeamSummary?.rank as number | null | undefined) ?? null;
+
   // Story-/Champion-Karten sind Portale: nur wenn die Zeile ein Team mit
   // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
   const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
@@ -169,6 +175,85 @@ export default function FoundationPrizeV2NewLook({
 
   return (
     <div className="nl-prize" data-testid="foundation-prize-v2" data-new-look="true">
+      {seasonEndChampionRow && !championDismissed ? (
+        <section
+          className="nl-prize-champion-banner"
+          data-testid="nl-prize-champion-banner"
+          aria-label="Champion · Saisonende"
+        >
+          <div className="nl-prize-champion-banner-inner">
+            <span
+              className="nl-prize-champion-banner-eyebrow nl-reveal"
+              style={{ "--nl-reveal-i": 0 } as CSSProperties}
+            >
+              <NlMedalBadge kind="gold" title="Champion" />
+              Saisonende · Champion
+            </span>
+            <div
+              className="nl-prize-champion-banner-main nl-reveal"
+              style={{ "--nl-reveal-i": 1 } as CSSProperties}
+            >
+              <BudgetedMediaImage
+                src={championLogo?.src ?? null}
+                alt={`${seasonEndChampionRow.team.name} Logo`}
+                className="nl-prize-champion-banner-crest"
+                width={88}
+                height={88}
+                loading="lazy"
+                fallback={
+                  <span className="nl-prize-champion-banner-crest nl-prize-crest-fallback">
+                    {championLogo?.initials ?? "?"}
+                  </span>
+                }
+              />
+              <div className="nl-prize-champion-banner-copy">
+                <button
+                  type="button"
+                  className="nl-prize-champion-banner-team"
+                  onClick={championTeamId ? () => openTeamProfileById(championTeamId) : undefined}
+                  disabled={!championTeamId}
+                  title={championTeamId ? `${seasonEndChampionRow.team.name} öffnen` : undefined}
+                >
+                  {seasonEndChampionRow.team.name}
+                </button>
+                <span className="nl-prize-champion-banner-sub nl-tnum">
+                  <span className="nl-prize-champion-banner-rank">
+                    {seasonEndChampionRow.rank != null ? `#${seasonEndChampionRow.rank}` : "#1"}
+                  </span>
+                  {seasonEndChampionRow.points != null ? (
+                    <span className="nl-prize-champion-banner-points">
+                      <strong>
+                        <NlCountUpValue
+                          value={seasonEndChampionRow.points}
+                          format={(value) => formatLocalePoints(value, 1)}
+                        />
+                      </strong>{" "}
+                      Punkte
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            {ownFinalRank != null ? (
+              <p
+                className="nl-prize-champion-banner-you nl-reveal nl-tnum"
+                style={{ "--nl-reveal-i": 2 } as CSSProperties}
+              >
+                Du: <strong>#{ownFinalRank}</strong> von {prizeV2Summary.totalTeams}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nl-prize-champion-banner-skip"
+            onClick={() => setChampionDismissed(true)}
+            aria-label="Champion-Banner schließen"
+          >
+            Schließen
+          </button>
+        </section>
+      ) : null}
+
       <NlCard
         className="nl-prize-header-card"
         eyebrow={`${getViewSourceBadgeLabel("prize", activeContextMeta)} · ${gameState.season.name}`}
@@ -289,37 +374,8 @@ export default function FoundationPrizeV2NewLook({
               : "kein Drucksignal"}
           </p>
         </NlCard>
-        {seasonEndChampionRow ? (
-          <NlCard
-            className="nl-prize-story-card nl-prize-champion-card"
-            onClick={championTeamId ? () => openTeamProfileById(championTeamId) : undefined}
-            eyebrow="Champion · Saisonende"
-            title={
-              <span className="nl-prize-champion-title">
-                <NlMedalBadge kind="gold" title="Champion" />
-                {seasonEndChampionRow.team.name}
-              </span>
-            }
-          >
-            <div className="nl-prize-champion-body">
-              <BudgetedMediaImage
-                src={championLogo?.src ?? null}
-                alt={`${seasonEndChampionRow.team.name} Logo`}
-                className="nl-prize-champion-crest"
-                width={44}
-                height={44}
-                loading="lazy"
-                fallback={
-                  <span className="nl-prize-champion-crest nl-prize-crest-fallback">{championLogo?.initials ?? "?"}</span>
-                }
-              />
-              <p className="nl-prize-story-line nl-tnum">
-                {seasonEndChampionRow.rank != null ? `#${seasonEndChampionRow.rank}` : "#1"}
-                {seasonEndChampionRow.points != null ? ` · ${formatLocalePoints(seasonEndChampionRow.points, 1)} Punkte` : ""}
-              </p>
-            </div>
-          </NlCard>
-        ) : null}
+        {/* Champion wird oben als voller Feier-Banner gezeigt (D3) — hier bewusst
+            nicht dupliziert. */}
       </div>
 
       <div className="nl-prize-chart-grid">

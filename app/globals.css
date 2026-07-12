@@ -59286,3 +59286,506 @@ button.is-new-look .nl-thist-season-pill,
   border-top: 1px dashed color-mix(in srgb, var(--nl-line, #2a3344) 80%, transparent);
   padding-top: 6px;
 }
+
+/* ============================================================
+   WAVE D — Feature CSS (batch 1: cinematic, career, historie+sponsor)
+   ============================================================ */
+/* Wave D — Cinematic Saisonende */
+
+/* --------------------------------------------------------------------------
+   D3 — Champion / Saisonende-Reveal (Preisgeld, flag-gated)
+   Voller Feier-Banner am Kopf der Preisgeld-Ansicht. Erscheint nur, wenn
+   `seasonEndChampionRow` vorliegt (Saisonende-Zustand). Nutzt das bestehende
+   `.nl-reveal`-Primitiv (Stagger via --nl-reveal-i, respektiert
+   prefers-reduced-motion) plus useCountUp für die Punktzahl.
+   -------------------------------------------------------------------------- */
+.is-new-look .nl-prize-champion-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  padding: var(--nl-s5) var(--nl-s5);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-lg);
+  background:
+    radial-gradient(120% 160% at 8% 0%, color-mix(in srgb, var(--nl-medal-gold, #d4a72c) 22%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+  box-shadow: var(--nl-e2);
+  overflow: hidden;
+}
+
+.is-new-look .nl-prize-champion-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--nl-medal-gold, #d4a72c), transparent);
+}
+
+.is-new-look .nl-prize-champion-banner-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3) var(--nl-s5);
+  min-width: 0;
+}
+
+.is-new-look .nl-prize-champion-banner-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-basis: 100%;
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-prize-champion-banner-main {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  min-width: 0;
+}
+
+.is-new-look .nl-prize-champion-banner-crest {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--nl-r-md);
+  object-fit: cover;
+  flex: 0 0 auto;
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-prize-champion-banner-crest.nl-prize-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-xl);
+  font-weight: 700;
+}
+
+.is-new-look .nl-prize-champion-banner-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  min-width: 0;
+}
+
+.is-new-look .nl-prize-champion-banner-team {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-xl);
+  font-weight: 700;
+  color: var(--nl-ink);
+  cursor: pointer;
+}
+
+.is-new-look .nl-prize-champion-banner-team:disabled {
+  cursor: default;
+}
+
+.is-new-look .nl-prize-champion-banner-team:not(:disabled):hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-prize-champion-banner-sub {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s3);
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-md);
+}
+
+.is-new-look .nl-prize-champion-banner-rank {
+  color: var(--nl-medal-gold, #d4a72c);
+  font-weight: 700;
+}
+
+.is-new-look .nl-prize-champion-banner-points strong {
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .nl-prize-champion-banner-you {
+  margin: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-md);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-prize-champion-banner-you strong {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-prize-champion-banner-skip {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm);
+  padding: var(--nl-s1) var(--nl-s3);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-prize-champion-banner-skip:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+/* --------------------------------------------------------------------------
+   D3 — Tagessieger-Reveal (Spieltagsergebnis, flag-gated)
+   Kurzer, überspringbarer Moment über dem Detail-Ergebnis. Erscheint nur,
+   wenn eine Tagessieger-Zeile (`championRow`) vorliegt. Gleiches `.nl-reveal`-
+   Primitiv (respektiert prefers-reduced-motion) + useCountUp.
+   -------------------------------------------------------------------------- */
+.is-new-look .nl-result-reveal {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  padding: var(--nl-s4) var(--nl-s5);
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-lg);
+  background:
+    radial-gradient(120% 160% at 8% 0%, color-mix(in srgb, var(--nl-medal-gold, #d4a72c) 18%, transparent) 0%, transparent 58%),
+    linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+  box-shadow: var(--nl-e1);
+  overflow: hidden;
+}
+
+.is-new-look .nl-result-reveal-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3) var(--nl-s5);
+  min-width: 0;
+}
+
+.is-new-look .nl-result-reveal-eyebrow {
+  flex-basis: 100%;
+  font-size: var(--nl-fs-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-result-reveal-champion {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  min-width: 0;
+}
+
+.is-new-look .nl-result-reveal-crest {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--nl-r-md);
+  object-fit: cover;
+  flex: 0 0 auto;
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-result-reveal-crest.nl-result-reveal-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-lg);
+  font-weight: 700;
+}
+
+.is-new-look .nl-result-reveal-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  min-width: 0;
+}
+
+.is-new-look .nl-result-reveal-team {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-family: var(--nl-display);
+  font-size: var(--nl-fs-lg);
+  font-weight: 700;
+  color: var(--nl-ink);
+  cursor: pointer;
+}
+
+.is-new-look .nl-result-reveal-team:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-reveal-points {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm);
+}
+
+.is-new-look .nl-result-reveal-points strong {
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-lg);
+}
+
+.is-new-look .nl-result-reveal-you {
+  margin: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-md);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-result-reveal-you strong {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-result-reveal-skip {
+  align-self: flex-start;
+  appearance: none;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm);
+  padding: var(--nl-s1) var(--nl-s3);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-result-reveal-skip:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-prize-champion-banner,
+  .is-new-look .nl-result-reveal {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .is-new-look .nl-prize-champion-banner-skip,
+  .is-new-look .nl-result-reveal-skip {
+    align-self: flex-end;
+  }
+}
+
+/* Wave D — Karriere-Story */
+
+/* ── D5: Karriere-Story-Header (Spielerprofil) ──────────────────────────────
+   Kompakter, flag-gated Story-Streifen, der die Karriere-/Entwicklungs-Sektion
+   anführt. Fasst den Bogen aus den ARCHIVIERTEN Saison-Metriken zusammen:
+   Schlagzeile + Peak-OVR / größter Sprung / Longevity / letzter Trend.
+   Markup: app/foundation/player-profile/PlayerCareerStoryHeader.tsx. */
+.is-new-look .nl-career-story {
+  display: grid;
+  gap: var(--nl-s4, 16px);
+  padding: var(--nl-s4, 16px);
+  margin-bottom: var(--nl-s4, 16px);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg, 16px);
+  background:
+    linear-gradient(180deg, var(--nl-accent-soft) 0%, transparent 60%),
+    var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-career-story.is-empty {
+  gap: 6px;
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-career-story-eyebrow {
+  font-size: var(--nl-fs-xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-career-story-head {
+  display: grid;
+  gap: 3px;
+}
+
+.is-new-look .nl-career-story-headline {
+  font-family: var(--nl-display, Georgia, serif);
+  font-size: var(--nl-fs-xl, 17px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-career-story-sub {
+  font-size: var(--nl-fs-md, 12px);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-career-story-empty-copy {
+  font-size: var(--nl-fs-md, 12px);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-career-story-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nl-s3, 12px);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-career-story-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.is-new-look .nl-career-story-tile {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: var(--nl-s3, 12px);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md, 12px);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-career-story-tile-label {
+  font-size: var(--nl-fs-xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-career-story-tile-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nl-fs-xl, 17px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-career-story-tile-meta {
+  font-size: var(--nl-fs-sm, 11px);
+  color: var(--nl-mut);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Wave D — Historie+Sponsor */
+
+/* ── D10: Eigene Netto-Ausgaben-Sparkline + CSV-Export ──────────────────────
+   Additiv, flag-gated (nur unter .is-new-look), fog-safe: nur die ohnehin
+   sichtbaren, öffentlichen Deals des eigenen Teams. Ordnet sich als schmale
+   Karte zwischen Bilanz-Chips und Story-Kacheln ein. */
+.is-new-look .nl-thist-own-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2, 8px);
+}
+
+.is-new-look .nl-thist-own-spend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2, 8px);
+}
+
+.is-new-look .nl-thist-own-spend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s3, 12px);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-thist-own-spend-head strong {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--nl-fs-md, 15px);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-thist-own-spend-head strong.is-positive {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-thist-own-spend-head strong.is-negative {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-thist-own-sparkline {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+}
+
+/* ── D12: Sponsor „schwächster Treiber"-Nudge ───────────────────────────────
+   Kleiner Hinweis unter den Rating-Treibern; eigenes Team, read-time. */
+.is-new-look .nl-sponsor-nudge {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2, 8px);
+  margin-top: var(--nl-s2, 8px);
+  padding: var(--nl-s2, 8px) var(--nl-s3, 12px);
+  border-radius: var(--nl-r-md, 10px);
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 40%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
+}
+
+.is-new-look .nl-sponsor-nudge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--nl-r-pill, 999px);
+  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
+  color: var(--nl-accent);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.is-new-look .nl-sponsor-nudge-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-sponsor-nudge-copy strong {
+  font-size: var(--nl-fs-sm, 13px);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sponsor-nudge-copy small {
+  font-size: var(--nl-fs-xs, 12px);
+  color: var(--nl-mut);
+}
+
