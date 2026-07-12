@@ -108,6 +108,13 @@ export type TransfermarktV2ClientProps = {
   onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
   roomContext?: FoundationRoomContext | null;
+  /**
+   * Transferfenster-Status (additiv). Fehlt der Prop, bleibt der Markt voll
+   * bedienbar (Default „offen"). Ist das Fenster geschlossen, degradiert die
+   * Ansicht zu Read-only: Markt/Scouting bleiben sichtbar, nur Kauf/Verkauf
+   * werden gesperrt.
+   */
+  transferWindow?: { open: boolean; canBuy: boolean; canSell: boolean; phaseLabel: string };
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -1175,7 +1182,18 @@ export default function TransfermarktV2Client({
   onCloseOfferPanel,
   onSell,
   roomContext: roomContextProp = null,
+  transferWindow,
 }: TransfermarktV2ClientProps) {
+  // Transferfenster: fehlt der Prop -> als offen behandeln (kein Regress ohne Wiring).
+  const transferWindowOpen = transferWindow?.open ?? true;
+  const transferCanBuy = transferWindow?.canBuy ?? true;
+  const transferCanSell = transferWindow?.canSell ?? true;
+  const marketReadOnlyReason = "Transferfenster geschlossen — nur Ansicht.";
+  const marketWindowNotice = transferWindowOpen
+    ? null
+    : transferWindow?.phaseLabel
+      ? `Transferfenster geschlossen (${transferWindow.phaseLabel}) — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
+      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`;
   // "Neuer Look" Flag (additiv): der Hook läuft immer, das eigentliche Gate
   // sitzt unten direkt vor dem Haupt-Return — nach ALLEN Hooks, damit die
   // Hook-Reihenfolge beim Umschalten des Flags stabil bleibt.
@@ -2793,13 +2811,15 @@ export default function TransfermarktV2Client({
       ? `${formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(buyPreview.expectedSalary)}`
       : formatTransfermarktCurrency(previewAnnualSalary);
   const dealOpenDisabledReason =
-    !selectedTeamId
-      ? "Bitte erst ein Team wählen."
-      : !selectedPlayer
-        ? "Bitte erst links einen Kandidaten wählen."
-        : !selectedTeamCanManage
-          ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
-          : null;
+    !transferCanBuy
+      ? marketReadOnlyReason
+      : !selectedTeamId
+        ? "Bitte erst ein Team wählen."
+        : !selectedPlayer
+          ? "Bitte erst links einen Kandidaten wählen."
+          : !selectedTeamCanManage
+            ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
+            : null;
   const needBreakdownSummary = useMemo(() => {
     const breakdown = selectedPlayer?.needMatchBreakdown;
     if (!breakdown) {
@@ -2827,12 +2847,13 @@ export default function TransfermarktV2Client({
   // "Neuer Look" Gate (additiv): alle Hooks oben sind gelaufen, ab hier nur
   // noch Darstellung. Flag aus => bestehendes Markup unverändert.
   if (newLook) {
-    const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId));
+    const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId) && transferCanSell);
     return (
       <TransfermarktV2NewLook
         teamName={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
         teamShortCode={selectedTeam?.shortCode ?? null}
         availabilityLabel={availabilityLabel}
+        marketWindowNotice={marketWindowNotice}
         marketBusy={marketBusy}
         marketError={marketError}
         onRetryMarket={() => setReloadToken((current) => current + 1)}
@@ -4328,7 +4349,7 @@ export default function TransfermarktV2Client({
                         </th>
                       ))
                     : null}
-                  {onSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
+                  {onSell && transferCanSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -4411,7 +4432,7 @@ export default function TransfermarktV2Client({
                           </td>
                         ))
                       : null}
-                    {onSell && manageableTeamIdSet.has(selectedTeamId) ? (
+                    {onSell && transferCanSell && manageableTeamIdSet.has(selectedTeamId) ? (
                       <td>
                         <button
                           className="secondary-button inline-button"

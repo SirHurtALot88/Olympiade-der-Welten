@@ -58792,3 +58792,154 @@ button.is-new-look .nl-thist-season-pill,
   background-color: #2f2f2f;   /* opaque — matches .foundation-shell .input */
 }
 
+
+/* ============================================================
+   WAVE B — P1 show-stopper fixes (merged from scratch)
+   ============================================================ */
+/* Wave B — Arena */
+
+/*
+ * Pre-Race / Slots-Phase-Poster für die "Neuer Look"-Matchday-Arena.
+ *
+ * Zustand: Die Wertung ist geladen, aber der Spieltag ist noch nicht aufgelöst
+ * (keine gescorten Team-Zeilen). Statt toter Skeletons/leerem Board zeigt die
+ * Arena einen statischen, befüllten Poster mit den beiden echten Disziplinen und
+ * der Aufstellungs-Bereitschaft. Klassen folgen der nl-arena-* / .is-new-look-
+ * Konvention aus app/globals.css und nutzen dieselben Design-Tokens (--nl-*).
+ */
+
+.is-new-look .nl-arena-prerace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-arena-prerace-lede {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--nl-mut);
+  max-width: 68ch;
+}
+
+.is-new-look .nl-arena-prerace-disciplines {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-arena-prerace-discipline {
+  --nl-tone: var(--nl-accent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-left: 3px solid var(--nl-tone);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-arena-prerace-discipline.is-pow {
+  --nl-tone: var(--nl-pow);
+}
+.is-new-look .nl-arena-prerace-discipline.is-men {
+  --nl-tone: var(--nl-men);
+}
+.is-new-look .nl-arena-prerace-discipline.is-soc {
+  --nl-tone: var(--nl-soc);
+}
+
+.is-new-look .nl-arena-prerace-disc-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-tone);
+}
+
+.is-new-look .nl-arena-prerace-disc-name {
+  font-size: 18px;
+  line-height: 1.2;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-arena-prerace-disc-slots {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-arena-prerace-chips {
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-prerace-actions {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
+/*
+ * Der Board-Rahmen des Pre-Race-Zustands soll ruhig wirken (keine Reveal-/
+ * Bühnen-Optik). Kein height-getriebenes Board, daher weiche Fläche.
+ */
+.is-new-look .nl-arena-prerace-card {
+  background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
+}
+
+/* Wave B — Saisonstand */
+
+/* ============================================================
+   B7 — "Top-Spieler"-Strip: horizontal scrollbar statt Clipping.
+   Der Strip (`.nl-standings-players`) hat bereits `overflow-x: auto`,
+   aber die umgebende Karte (`.nl-standings-players-card`, eine
+   `.nl-card`) besitzt kein `min-width: 0`. In der Spalten-Flexbox
+   `.nl-standings` wächst die Karte dadurch auf die Inhaltsbreite der
+   nowrap-Kacheln und wird vom Shell-Container abgeschnitten, statt zu
+   scrollen. `min-width: 0` gibt die Breite frei, sodass der eigene
+   `overflow-x`-Container greift und die Seite selbst nie horizontal
+   scrollt.
+   ============================================================ */
+
+.is-new-look .nl-standings-players-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.is-new-look .nl-standings-players {
+  max-width: 100%;
+  /* Platz für die Scrollleiste, damit die letzte Kachel nicht anstößt. */
+  padding-bottom: var(--nl-s1, 4px);
+  scrollbar-gutter: stable;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  /* Scroll-Shadow-Affordanz (reine CSS, kein JS): an den Enden deuten
+     dezente Schatten an, dass links/rechts weitere Karten folgen. Die
+     Deck-Verläufe in Panel-Farbe blenden den Schatten am jeweiligen
+     Rand aus, sobald dort nichts mehr zu scrollen ist. */
+  background:
+    linear-gradient(to right, var(--nl-panel), transparent) left center / 28px 100% no-repeat,
+    linear-gradient(to left, var(--nl-panel), transparent) right center / 28px 100% no-repeat,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.16), transparent) left center / 14px 100% no-repeat,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.16), transparent) right center / 14px 100% no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Kacheln behalten ihre Breite (kein Zusammenstauchen) und rasten sanft
+   an der linken Kante ein — so wird nie eine Karte halb abgeschnitten. */
+.is-new-look .nl-standings-players > li {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+/* Wave B — Transfermarkt */
+
+/*
+ * B2 (P1): Transfermarkt degradiert bei geschlossenem Transferfenster zu einer
+ * Read-only-Ansicht statt zu einem Dauer-Spinner. Der Hinweisbanner nutzt die
+ * bestehenden `.transfer-callout.is-blocked`-Styles; hier nur der Abstand zum
+ * darunterliegenden Markt-Layout im „Neuer Look".
+ */
+.nl-market .nl-market-window-notice {
+  margin-bottom: 12px;
+}
+

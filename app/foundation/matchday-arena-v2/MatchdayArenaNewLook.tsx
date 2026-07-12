@@ -76,8 +76,65 @@ type ArenaNewLookBasePayload = {
   scoreSummary?: MatchdayMvpScoringResult | null;
   scoreWarnings?: string[];
   scoreBlockingReasons?: string[];
+  /**
+   * Disziplin-/Bereitschafts-Metadaten aus dem echten Disziplin-Schedule
+   * (`options.matchdays`) — unabhängig von der Wertung befüllt und damit auch
+   * im Pre-Race-Zustand (MD1, Spieltag noch nicht aufgelöst) vorhanden, wenn
+   * `scoreSummary.targetMatchday` noch keine Disziplin-Namen kennt.
+   */
+  options?: {
+    matchdays?: Array<{
+      id: string;
+      label?: string | null;
+      status?: string | null;
+      resultApplied?: boolean;
+      discipline1Label?: string | null;
+      discipline1RequiredPlayers?: number | null;
+      discipline2Label?: string | null;
+      discipline2RequiredPlayers?: number | null;
+      readyTeams?: number | null;
+      totalTeams?: number | null;
+    }>;
+  };
   error?: string;
 };
+
+/**
+ * Aus dem Arena-Base-Payload extrahierte Spieltag-Metadaten. Quelle ist der
+ * Disziplin-Schedule (dieselbe Quelle wie das Ergebnis-Panel darunter), damit
+ * die D1/D2-Header-Chips und der Pre-Race-Poster echte Disziplin-Namen zeigen —
+ * auch bevor die Wertung existiert.
+ */
+type ArenaNewLookMatchdayMeta = {
+  label: string | null;
+  resultApplied: boolean;
+  d1DisciplineName: string | null;
+  d1RequiredPlayers: number | null;
+  d2DisciplineName: string | null;
+  d2RequiredPlayers: number | null;
+  readyTeams: number | null;
+  totalTeams: number | null;
+};
+
+function extractArenaMatchdayMeta(
+  payload: ArenaNewLookBasePayload,
+  matchdayId: string,
+): ArenaNewLookMatchdayMeta | null {
+  const entry = payload.options?.matchdays?.find((matchday) => matchday.id === matchdayId);
+  if (!entry) {
+    return null;
+  }
+  return {
+    label: entry.label ?? null,
+    resultApplied: Boolean(entry.resultApplied),
+    d1DisciplineName: entry.discipline1Label ?? null,
+    d1RequiredPlayers: entry.discipline1RequiredPlayers ?? null,
+    d2DisciplineName: entry.discipline2Label ?? null,
+    d2RequiredPlayers: entry.discipline2RequiredPlayers ?? null,
+    readyTeams: entry.readyTeams ?? null,
+    totalTeams: entry.totalTeams ?? null,
+  };
+}
 
 type ArenaNewLookTotalRow = {
   teamId: string;
@@ -134,6 +191,14 @@ function buildBaseScoreMap(rows: MatchdayArenaScoreboardRowView[]) {
 }
 
 export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) {
+  // Bewusst auf stabile Primitives (Länge + erstes Team) statt der
+  // `props.teams`-Array-Referenz memoisieren — analog zu `externalParams` im
+  // Legacy-`MatchdayArenaV2Client`. Der Parent liefert bei Re-Renders teils eine
+  // neue `teams`-Array-Referenz; hinge `params` daran, würde der Lade-Effekt
+  // (`[params, source]`) bei jedem Re-Render neu laufen, den laufenden
+  // arena-base-Fetch (~2 s) abbrechen und neu starten — eine Abort-Schleife, die
+  // `scoreFeed` nie befüllt (Dauer-Skeleton + Platzhalter-Chips "Disziplin 1/2").
+  const firstTeamId = props.teams[0]?.teamId ?? "";
   const params = useMemo(
     () => ({
       saveId: props.defaultSaveId,
@@ -141,13 +206,22 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       matchdayId: props.defaultMatchdayId,
       teamId: resolveArenaNewLookTeamId(props.teams, props.defaultTeamId),
     }),
-    [props.defaultSaveId, props.defaultSeasonId, props.defaultMatchdayId, props.defaultTeamId, props.teams],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      props.defaultSaveId,
+      props.defaultSeasonId,
+      props.defaultMatchdayId,
+      props.defaultTeamId,
+      firstTeamId,
+      props.teams.length,
+    ],
   );
   const source = props.initialSource ?? "sqlite";
 
   const [loadState, setLoadState] = useState<ArenaNewLookLoadState>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [scoreFeed, setScoreFeed] = useState<MatchdayMvpScoringResult | null>(null);
+  const [matchdayMeta, setMatchdayMeta] = useState<ArenaNewLookMatchdayMeta | null>(null);
   const [feedWarnings, setFeedWarnings] = useState<string[]>([]);
   const [boardSide, setBoardSide] = useState<ArenaNewLookBoardSide>("d1");
   const [phaseIndex, setPhaseIndex] = useState(0);
@@ -166,11 +240,16 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     const controller = new AbortController();
     let cancelled = false;
 
-    function applyScoreSummary(summary: MatchdayMvpScoringResult, warnings: string[]) {
+    function applyScoreSummary(
+      summary: MatchdayMvpScoringResult,
+      warnings: string[],
+      meta: ArenaNewLookMatchdayMeta | null,
+    ) {
       if (cancelled) {
         return;
       }
       setScoreFeed(summary);
+      setMatchdayMeta(meta);
       setFeedWarnings(Array.from(new Set(warnings.filter(Boolean))));
       setLoadError(null);
       setLoadState("ready");
@@ -189,13 +268,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           const sessionKey = buildMatchdayArenaBaseSessionKey({ ...params, source });
           const cached = getMatchdayArenaBaseBundle<ArenaNewLookBasePayload>(sessionKey);
           if (cached?.scoreSummary) {
-            applyScoreSummary(cached.scoreSummary, [
-              ...(cached.contextWarnings ?? []),
-              ...(cached.scoreWarnings ?? []),
-              ...(cached.scoreBlockingReasons ?? []),
-              ...cached.scoreSummary.warnings,
-              ...cached.scoreSummary.blockingReasons,
-            ]);
+            applyScoreSummary(
+              cached.scoreSummary,
+              [
+                ...(cached.contextWarnings ?? []),
+                ...(cached.scoreWarnings ?? []),
+                ...(cached.scoreBlockingReasons ?? []),
+                ...cached.scoreSummary.warnings,
+                ...cached.scoreSummary.blockingReasons,
+              ],
+              extractArenaMatchdayMeta(cached, params.matchdayId),
+            );
             return;
           }
 
@@ -216,6 +299,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             return;
           }
           if (!response.ok || payload.error || !payload.scoreSummary) {
+            // Auch im Fehlerfall die echten Disziplin-Namen mitnehmen, damit die
+            // Fehlerkarte/Header-Chips nicht auf "Disziplin 1/2" zurückfallen.
+            setMatchdayMeta(extractArenaMatchdayMeta(payload, params.matchdayId));
             setLoadState("error");
             setLoadError(payload.error ?? "Die Arena konnte die Spieltagswertung nicht laden.");
             return;
@@ -223,14 +309,18 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           if (payload.context) {
             setMatchdayArenaBaseBundle(sessionKey, payload);
           }
-          applyScoreSummary(payload.scoreSummary, [
-            ...(payload.contextWarnings ?? []),
-            ...(payload.contextErrors ?? []),
-            ...(payload.scoreWarnings ?? []),
-            ...(payload.scoreBlockingReasons ?? []),
-            ...payload.scoreSummary.warnings,
-            ...payload.scoreSummary.blockingReasons,
-          ]);
+          applyScoreSummary(
+            payload.scoreSummary,
+            [
+              ...(payload.contextWarnings ?? []),
+              ...(payload.contextErrors ?? []),
+              ...(payload.scoreWarnings ?? []),
+              ...(payload.scoreBlockingReasons ?? []),
+              ...payload.scoreSummary.warnings,
+              ...payload.scoreSummary.blockingReasons,
+            ],
+            extractArenaMatchdayMeta(payload, params.matchdayId),
+          );
           return;
         }
 
@@ -256,7 +346,11 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           setLoadError(payload.error ?? "Die Arena konnte die 32er-Wertung nicht laden.");
           return;
         }
-        applyScoreSummary(payload.summary, [...payload.summary.warnings, ...payload.summary.blockingReasons]);
+        applyScoreSummary(
+          payload.summary,
+          [...payload.summary.warnings, ...payload.summary.blockingReasons],
+          null,
+        );
       } catch (error) {
         if (cancelled || controller.signal.aborted) {
           return;
@@ -284,8 +378,13 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     [scoreFeed?.d2Scoreboard],
   );
 
-  const d1Label = scoreFeed?.targetMatchday.d1DisciplineName ?? "Disziplin 1";
-  const d2Label = scoreFeed?.targetMatchday.d2DisciplineName ?? "Disziplin 2";
+  // Disziplin-Namen bevorzugt aus dem echten Schedule (matchdayMeta) — dieselbe
+  // Quelle wie das Ergebnis-Panel darunter —, damit die Header-Chips auch im
+  // Pre-Race-Zustand nicht auf "Disziplin 1/2" zurückfallen.
+  const d1Label =
+    matchdayMeta?.d1DisciplineName ?? scoreFeed?.targetMatchday.d1DisciplineName ?? "Disziplin 1";
+  const d2Label =
+    matchdayMeta?.d2DisciplineName ?? scoreFeed?.targetMatchday.d2DisciplineName ?? "Disziplin 2";
 
   const activePhase: MatchdayArenaPhaseId =
     MATCHDAY_ARENA_PHASES[Math.max(0, Math.min(phaseIndex, MATCHDAY_ARENA_PHASES.length - 1))]?.id ?? "slots";
@@ -497,6 +596,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const autoLineups = scoreFeed?.lineupSummary.autoGeneratedLineups ?? 0;
   const blockedTeams = scoreFeed?.lineupSummary.blockedTeams ?? 0;
 
+  // Pre-Race-Zustand: Die Wertung ist geladen (`ready`), aber es liegen noch
+  // keine gescorten Team-Zeilen vor — der Spieltag ist noch nicht aufgelöst
+  // (MD1-Slots-Phase). Statt toter Skeletons/leerer Board zeigen wir dann einen
+  // statischen, befüllten "Slots-Phase"-Poster.
+  const hasScoredRows = d1View.length > 0 || d2View.length > 0;
+  const ownLineupTeam = scoreFeed?.lineupTeams.find((team) => team.teamId === params.teamId) ?? null;
+  const readyTeamsCount =
+    matchdayMeta?.readyTeams ?? scoreFeed?.lineupSummary.existingLineups ?? null;
+  const totalTeamsCount =
+    matchdayMeta?.totalTeams ?? scoreFeed?.lineupSummary.totalTeams ?? props.teams.length;
+
   const ownTeamName = teamById.get(params.teamId)?.name ?? null;
   const ownTeamRank =
     boardSide === "total"
@@ -697,6 +807,80 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     );
   }
 
+  function renderPreRaceBoard() {
+    const disciplines = [
+      { tag: "D1", tone: "pow" as const, name: d1Label, slots: matchdayMeta?.d1RequiredPlayers ?? null },
+      { tag: "D2", tone: "men" as const, name: d2Label, slots: matchdayMeta?.d2RequiredPlayers ?? null },
+    ];
+    const ownReadyTone =
+      ownLineupTeam == null
+        ? "warn"
+        : ownLineupTeam.blockingReasons.length > 0
+          ? "risk"
+          : ownLineupTeam.status === "existing_lineup"
+            ? "good"
+            : "warn";
+    const ownReadyValue =
+      ownLineupTeam == null
+        ? "—"
+        : ownLineupTeam.blockingReasons.length > 0
+          ? "Blockiert"
+          : ownLineupTeam.status === "existing_lineup"
+            ? "Aufgestellt"
+            : "Auto-Lineup";
+    const readinessTone =
+      readyTeamsCount != null && totalTeamsCount > 0 && readyTeamsCount >= totalTeamsCount
+        ? "good"
+        : "warn";
+
+    return (
+      <div className="nl-arena-prerace" role="group" aria-label="Slots-Phase — Spieltag noch nicht gelaufen">
+        <p className="nl-arena-prerace-lede">
+          Der Spieltag ist noch nicht gelaufen. Alle {totalTeamsCount} Teams treten gleich parallel in
+          zwei Disziplinen an — sobald aufgelöst wird, füllt sich das Board hier live. Bis dahin zählt
+          deine Aufstellung.
+        </p>
+        <div className="nl-arena-prerace-disciplines">
+          {disciplines.map((discipline) => (
+            <div key={discipline.tag} className={`nl-arena-prerace-discipline ${nlToneClass(discipline.tone)}`}>
+              <span className="nl-arena-prerace-disc-tag">{discipline.tag}</span>
+              <strong className="nl-arena-prerace-disc-name">{discipline.name}</strong>
+              <span className="nl-arena-prerace-disc-slots nl-tnum">
+                {discipline.slots != null ? `${discipline.slots} Slots` : "Slots offen"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <StatChipRow className="nl-arena-prerace-chips" aria-label="Aufstellungs-Bereitschaft">
+          <StatChip
+            label="Aufstellungen"
+            value={readyTeamsCount != null ? `${readyTeamsCount}/${totalTeamsCount}` : `${totalTeamsCount}`}
+            tone={readinessTone}
+            sub="Teams aufgestellt"
+            title="Teams mit vollständiger Einsatzliste für diesen Spieltag"
+          />
+          {ownTeamName ? (
+            <StatChip
+              label="Dein Team"
+              value={ownReadyValue}
+              tone={ownReadyTone}
+              sub={ownTeamName}
+              title="Bereitschaft deiner Einsatzliste für diesen Spieltag"
+            />
+          ) : null}
+          <StatChip label="Disziplinen" value={2} tone="accent" title="Zwei parallele Disziplinen pro Spieltag" />
+        </StatChipRow>
+        {props.onBackToLineup ? (
+          <div className="nl-arena-prerace-actions">
+            <button className="nl-arena-button is-primary" type="button" onClick={props.onBackToLineup}>
+              Aufstellung prüfen
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderMvpColumn(title: string, tone: "pow" | "men" | "soc", players: MatchdayMvpTopPlayerRow[]) {
     return (
       <div className={`nl-arena-mvp-column ${nlToneClass(tone)}`}>
@@ -814,6 +998,62 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             <div key={`nl-arena-skeleton-${index}`} className="nl-arena-skeleton-row" />
           ))}
         </div>
+      ) : !hasScoredRows ? (
+        <>
+          <NlCard
+            className="nl-arena-board-card nl-arena-prerace-card"
+            title={`Slots-Phase — ${matchdayMeta?.label ?? scoreFeed?.targetMatchday.label ?? "Spieltag"}`}
+            eyebrow="Der Spieltag ist noch nicht gelaufen — Aufstellung zählt"
+            actions={
+              props.onOpenMatchdayResult ? (
+                <button
+                  className="nl-arena-button"
+                  type="button"
+                  disabled
+                  title="Wird nach dem Spieltag freigeschaltet"
+                >
+                  Ergebnis
+                </button>
+              ) : null
+            }
+          >
+            {renderPreRaceBoard()}
+          </NlCard>
+
+          <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
+            <summary>
+              Details &amp; Diagnose
+              {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
+            </summary>
+            <div className="nl-arena-diagnose-body">
+              <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
+                <StatChip
+                  label="Readiness"
+                  value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? totalTeamsCount}`}
+                  tone={blockedTeams > 0 ? "warn" : "good"}
+                  title="Teams mit vorhandener Einsatzliste"
+                />
+                <StatChip
+                  label="Status"
+                  value={scoreFeed?.status ?? "wartet"}
+                  tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
+                />
+              </StatChipRow>
+              <p className="nl-arena-diagnose-line">
+                Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
+              </p>
+              {feedWarnings.length > 0 ? (
+                <ul className="nl-arena-diagnose-list">
+                  {feedWarnings.slice(0, 20).map((warning, index) => (
+                    <li key={`nl-arena-prerace-warning-${index}`}>{warning}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
+              )}
+            </div>
+          </details>
+        </>
       ) : (
         <>
           <NlCard

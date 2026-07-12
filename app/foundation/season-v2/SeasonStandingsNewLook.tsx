@@ -187,8 +187,28 @@ export default function SeasonStandingsNewLook({
     });
   }, [boardRows, tableSort]);
 
+  // B3: Das Podium folgt exakt den ANGEZEIGTEN Punkten (nicht dem gespeicherten
+  // `rank`, falls beide in den Rohdaten auseinanderlaufen). Reihenfolge, Medaille,
+  // "Spitze" und Rückstands-Label stützen sich damit auf dieselbe Kennzahl — der
+  // Platz 1 ist garantiert das Team mit den meisten Punkten. Gleichstände lösen
+  // wir über den Standings-Rang und dann den Teamnamen auf.
   const podiumRows = useMemo(
-    () => boardRows.filter((row) => row.rank != null && row.rank >= 1 && row.rank <= 3).slice(0, 3),
+    () =>
+      [...boardRows]
+        .filter((row) => row.points != null && Number.isFinite(row.points))
+        .sort((left, right) => {
+          const pointsDelta = (right.points as number) - (left.points as number);
+          if (pointsDelta !== 0) {
+            return pointsDelta;
+          }
+          const leftRank = left.rank != null && Number.isFinite(left.rank) ? left.rank : Number.POSITIVE_INFINITY;
+          const rightRank = right.rank != null && Number.isFinite(right.rank) ? right.rank : Number.POSITIVE_INFINITY;
+          if (leftRank !== rightRank) {
+            return leftRank - rightRank;
+          }
+          return left.teamName.localeCompare(right.teamName, "de-DE");
+        })
+        .slice(0, 3),
     [boardRows],
   );
 
@@ -802,11 +822,18 @@ export default function SeasonStandingsNewLook({
     if (podiumRows.length === 0) {
       return null;
     }
+    // Spitzenreiter = Team mit den meisten Punkten (erste Zeile, s.o.). Alle
+    // Rückstände beziehen sich auf genau diesen Wert, damit Platz 1 immer "Spitze"
+    // (Abstand 0) zeigt und kein tiefer platziertes Team fälschlich führt.
+    const podiumLeaderPoints = podiumRows[0].points;
     return (
-      <ol className="nl-standings-podium" aria-label="Podium — Top 3">
-        {podiumRows.map((row) => {
-          const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : "bronze";
-          const gap = row.points != null && Number.isFinite(row.points) ? row.points - leaderPoints : null;
+      <ol className="nl-standings-podium" aria-label="Podium — Top 3 nach Punkten">
+        {podiumRows.map((row, index) => {
+          const medalKind = index === 0 ? "gold" : index === 1 ? "silver" : "bronze";
+          const gap =
+            row.points != null && Number.isFinite(row.points) && podiumLeaderPoints != null
+              ? row.points - podiumLeaderPoints
+              : null;
           return (
             <li key={row.teamId} className={`nl-standings-podium-card is-${medalKind}`} style={getSeasonV2TeamTagStyle(row.teamCode)}>
               <button
@@ -816,7 +843,7 @@ export default function SeasonStandingsNewLook({
                 title={`${row.teamName} öffnen`}
               >
                 <span className="nl-standings-podium-medal">
-                  <NlMedalBadge kind={medalKind} title={`Rang ${row.rank}`} />
+                  <NlMedalBadge kind={medalKind} title={`Platz ${index + 1} nach Punkten`} />
                 </span>
                 <span className="nl-standings-podium-copy">
                   <span className="nl-standings-podium-name">{row.teamName}</span>
