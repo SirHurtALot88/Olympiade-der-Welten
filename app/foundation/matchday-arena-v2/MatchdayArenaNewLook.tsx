@@ -76,6 +76,17 @@ type ArenaNewLookBasePayload = {
   scoreSummary?: MatchdayMvpScoringResult | null;
   scoreWarnings?: string[];
   scoreBlockingReasons?: string[];
+  briefingStandings?: ArenaNewLookStandingsPreview | null;
+  error?: string;
+};
+
+/**
+ * Spoilerfreie Ausgangslage vor dem Spieltag: nur der aktuelle Liga-Rang
+ * (`currentRank`, vor diesem Spieltag). `projectedRank` bleibt bewusst
+ * ungenutzt, damit das Briefing das Reveal-Ergebnis nicht vorwegnimmt.
+ */
+type ArenaNewLookStandingsPreview = {
+  items: Array<{ teamId: string; currentRank: number | null; projectedRank: number | null }>;
   error?: string;
 };
 
@@ -154,6 +165,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [speedIndex, setSpeedIndex] = useState(1);
+  const [standingsPreview, setStandingsPreview] = useState<ArenaNewLookStandingsPreview | null>(null);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
 
   useEffect(() => {
@@ -189,6 +201,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           const sessionKey = buildMatchdayArenaBaseSessionKey({ ...params, source });
           const cached = getMatchdayArenaBaseBundle<ArenaNewLookBasePayload>(sessionKey);
           if (cached?.scoreSummary) {
+            if (!cancelled) {
+              setStandingsPreview(cached.briefingStandings ?? null);
+            }
             applyScoreSummary(cached.scoreSummary, [
               ...(cached.contextWarnings ?? []),
               ...(cached.scoreWarnings ?? []),
@@ -223,6 +238,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           if (payload.context) {
             setMatchdayArenaBaseBundle(sessionKey, payload);
           }
+          setStandingsPreview(payload.briefingStandings ?? null);
           applyScoreSummary(payload.scoreSummary, [
             ...(payload.contextWarnings ?? []),
             ...(payload.contextErrors ?? []),
@@ -256,6 +272,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           setLoadError(payload.error ?? "Die Arena konnte die 32er-Wertung nicht laden.");
           return;
         }
+        setStandingsPreview(null);
         applyScoreSummary(payload.summary, [...payload.summary.warnings, ...payload.summary.blockingReasons]);
       } catch (error) {
         if (cancelled || controller.signal.aborted) {
@@ -274,6 +291,35 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   }, [params, source]);
 
   const teamById = useMemo(() => new Map(props.teams.map((team) => [team.teamId, team] as const)), [props.teams]);
+
+  // Spoilerfreies Briefing: aktuelle Liga-Ausgangslage vor dem Spieltag.
+  // Nur `currentRank` — projizierte Werte bleiben aussen vor, damit das
+  // Reveal-Ergebnis nicht vorweggenommen wird. Zeigt Top 3 + die eigene
+  // Nachbarschaft (Rang -1/0/+1) als kompaktes Fenster.
+  const arenaBriefing = useMemo(() => {
+    const rows = (standingsPreview?.items ?? [])
+      .filter((item): item is { teamId: string; currentRank: number; projectedRank: number | null } => item.currentRank != null)
+      .map((item) => ({
+        teamId: item.teamId,
+        rank: item.currentRank,
+        teamName: teamById.get(item.teamId)?.name ?? item.teamId,
+        teamCode: teamById.get(item.teamId)?.shortCode ?? item.teamId,
+        isOwn: item.teamId === params.teamId,
+      }))
+      .sort((a, b) => a.rank - b.rank);
+    if (rows.length === 0) {
+      return null;
+    }
+    const ownRow = rows.find((row) => row.isOwn) ?? null;
+    const total = rows.length;
+    const keepRanks = new Set<number>();
+    rows.slice(0, 3).forEach((row) => keepRanks.add(row.rank));
+    if (ownRow) {
+      [ownRow.rank - 1, ownRow.rank, ownRow.rank + 1].forEach((rank) => keepRanks.add(rank));
+    }
+    const window = rows.filter((row) => keepRanks.has(row.rank));
+    return { ownRank: ownRow?.rank ?? null, total, window };
+  }, [standingsPreview, teamById, params.teamId]);
 
   const d1View = useMemo(
     () => buildMatchdayArenaScoreboardView(scoreFeed?.d1Scoreboard ?? []),
@@ -822,6 +868,38 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           />
         </StatChipRow>
       </NlCard>
+
+      {arenaBriefing ? (
+        <NlCard
+          className="nl-arena-briefing-card"
+          eyebrow="Vor dem Spieltag · Ausgangslage"
+          title="Briefing"
+        >
+          <div className="nl-arena-briefing-body">
+            <div className="nl-arena-briefing-rank">
+              <span className="nl-arena-briefing-rank-value nl-tnum">
+                {arenaBriefing.ownRank != null ? `#${arenaBriefing.ownRank}` : "—"}
+              </span>
+              <span className="nl-arena-briefing-rank-label">
+                {arenaBriefing.ownRank != null ? `von ${arenaBriefing.total} · dein Rang vor dem Spieltag` : "kein Ligarang"}
+              </span>
+            </div>
+            <ol className="nl-arena-briefing-table" aria-label="Aktuelle Liga-Ausgangslage">
+              {arenaBriefing.window.map((row) => (
+                <li
+                  key={row.teamId}
+                  className={`nl-arena-briefing-row${row.isOwn ? " is-own" : ""}`}
+                  aria-current={row.isOwn ? "true" : undefined}
+                >
+                  <span className="nl-arena-briefing-row-rank nl-tnum">{row.rank}</span>
+                  <span className="nl-arena-briefing-row-name">{row.teamName}</span>
+                  <span className="nl-arena-briefing-row-code">{row.teamCode}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </NlCard>
+      ) : null}
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {loadState === "ready"

@@ -47702,6 +47702,78 @@ button.foundation-team-portrait-card {
   flex-wrap: wrap;
 }
 
+/* --- Arena-Briefing (spoilerfreie Ausgangslage vor dem Spieltag) ---- */
+.is-new-look .nl-arena-briefing-card {
+  margin-top: var(--nl-s3);
+}
+.is-new-look .nl-arena-briefing-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3) var(--nl-s5);
+}
+.is-new-look .nl-arena-briefing-rank {
+  display: flex;
+  flex-direction: column;
+  min-width: 116px;
+}
+.is-new-look .nl-arena-briefing-rank-value {
+  font-family: var(--nl-display);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--nl-ink);
+}
+.is-new-look .nl-arena-briefing-rank-label {
+  margin-top: var(--nl-s1);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut-2);
+}
+.is-new-look .nl-arena-briefing-table {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.is-new-look .nl-arena-briefing-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r1);
+  font-size: 13px;
+  color: var(--nl-ink-2);
+}
+.is-new-look .nl-arena-briefing-row.is-own {
+  background: var(--nl-accent-soft, rgba(91, 155, 255, 0.16));
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+.is-new-look .nl-arena-briefing-row-rank {
+  color: var(--nl-mut-2);
+  font-weight: 700;
+  text-align: right;
+}
+.is-new-look .nl-arena-briefing-row.is-own .nl-arena-briefing-row-rank {
+  color: var(--nl-accent);
+}
+.is-new-look .nl-arena-briefing-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-new-look .nl-arena-briefing-row-code {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut-2);
+}
+
 .is-new-look .nl-arena-phase-controls {
   display: flex;
   align-items: center;
