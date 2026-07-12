@@ -58574,3 +58574,85 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .nl-ptable-td-ability.nl-ptable-td-ability-stacked {
   min-width: 60px;
 }
+
+/* ============================================================
+   Scratch CSS — merge target: app/globals.css
+   (near the existing "Wave 3 — Spieler-Verzeichnis" block, e.g. next to
+   `.is-new-look .nl-ptable-percentile` / the `.is-active-sort` Fix #4
+   block). ADDITIVE ONLY — introduces new classes, does not redefine any
+   existing selector.
+
+   Scope of the TSX change this CSS supports:
+     - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
+       (OVR column body cell + `renderMetricRankChip`)
+
+   ------------------------------------------------------------
+   FIX 2 — OVR-Spalte: eigener Gold/Amber-Akzent statt Value-Heat-
+   Regenbogen ("Einheitsbrei").
+
+   Vorher trug die OVR-Zelle DREI überlappende Farbsysteme gleichzeitig:
+     (a) die liga-relative Value-Heat-Hintergrundfarbe (`getPoolHeatClass`,
+         dieselbe Blau→Grün→Gelb→Orange→Rot-Rampe wie PPs/MVS),
+     (b) den hellblauen "aktive Sortierspalte"-Zustand (`.is-active-sort`,
+         app/globals.css Fix #4), und
+     (c) einen wertabhängigen ton-gefärbten Rang-Chip (`getPoolHeatTone`:
+         blau/grün/gelb/rot).
+   Drei Systeme auf einer Zelle → nicht mehr von PPs/MVS unterscheidbar,
+   und der Sortier-Blau-Zustand kollidierte mit dem Chip-Ton.
+
+   PPs/MVS behalten ihre Value-Heat-Hintergrundfarbe UNVERÄNDERT (dieselben
+   `.heat-band-*`-Klassen über `getPoolHeatClass`, hier nicht angefasst).
+
+   OVR ist die Kopf-/Primär-Fähigkeitskennzahl und bekommt stattdessen EINEN
+   festen Akzent (App-Token `--nl-warn` = Amber/Gold, bereits Teil des
+   "Neuer Look"-Vokabulars, hier aber FEST statt wertabhängig zugewiesen —
+   ein klar anderer Farbton als das PPs/MVS-Blau):
+     - dezente Amber-Tönung als Zellenhintergrund (Spalten-Identität)
+     - 3px linker Akzent-Rand in Amber statt der bisherigen dünnen
+       neutralen `is-highlight-secondary`-Umrandung
+     - der Rang-Chip (`#N`, `.nl-ptable-ovr-rank` — siehe
+       `renderMetricRankChip` in der TSX) trägt jetzt dieselbe feste
+       Amber-Farbe statt der wertabhängigen `nl-tone-*`-Klasse.
+   → EIN konsolidiertes Farbsystem statt drei.
+
+   Ist OVR die aktive Sortierspalte, gewinnt der Amber-Akzent (kräftigere
+   Amber-Wäsche statt des generischen Hellblaus aus Fix #4) — Selektoren
+   sind absichtlich spezifischer (Element + 2 Klassen bzw. + 4 Klassen)
+   als die bestehenden `.is-active-sort`-Regeln in app/globals.css, damit
+   sie ohne `!important` gewinnen. Der bestehende dunkle Kontrast-Text aus
+   dem `.is-active-sort`-Block (`#0b1220`) bleibt unverändert und ist auf
+   der helleren Amber-Wäsche weiterhin lesbar.
+   ------------------------------------------------------------ */
+
+.is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell {
+  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 12%, transparent);
+  box-shadow:
+    inset 3px 0 0 var(--nl-warn, #e0a53a),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+.is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell.is-active-sort {
+  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 45%, var(--nl-panel, #131a26) 55%);
+  box-shadow:
+    inset 3px 0 0 var(--nl-warn, #e0a53a),
+    inset -1px 0 0 var(--nl-line-2);
+}
+
+/* Rang-Chip (#N) in der OVR-Spalte: feste Amber-Farbe, eigene Klasse statt
+   der generischen `--nl-tone`-Var, damit sie nicht versehentlich von einer
+   geerbten `nl-tone-*`-Klasse überschrieben wird. */
+.is-new-look .nl-ptable-percentile.nl-ptable-ovr-rank {
+  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 22%, transparent);
+  color: var(--nl-warn, #e0a53a);
+}
+
+/* Im aktiv sortierten Zustand erzwingt die bestehende
+   `.is-active-sort .nl-ptable-percentile`-Regel bereits dunklen Text
+   (#0b1220) für Kontrast auf der helleren Wäsche (app/globals.css Fix #4)
+   — hier nur der Chip-Hintergrund kräftiger, damit der dunkle Text nicht
+   auf der dezenten 22%-Amber-Wäsche "schwimmt". Vier Klassen + Element:
+   gewinnt gegenüber der 3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basis-
+   regel oben, ohne `!important`. */
+.is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-ovr-rank {
+  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 55%, transparent);
+}

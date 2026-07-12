@@ -106,13 +106,19 @@ export default function PlayerHeroNewLook({
   // GEHALT-Chip (neben MW): reales Saison-Gehalt — Kader-Eintrag bevorzugt
   // (`getRosterEntryDisplaySalary`, gleiche Auflösung wie Kader-/Marktliste),
   // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
-  // Roster-Auflösung spiegelt `resolveRosterEntry` im Drawer-Builder:
-  // `activePlayerId` (Kader-Eintrags-ID) hat Vorrang vor der reinen
-  // Spieler-ID, damit z. B. Leihen/Duplikate im selben Kader-Scope bleiben.
+  // Auflösung sucht bewusst DIREKT über `playerId` in ALLEN Rostern (nicht
+  // über `data.activePlayerId`) — exakt derselbe Ansatz wie in der
+  // Spieler-Tabelle (`rosterByPlayerId` in
+  // `use-foundation-cross-tab-player-directory.ts`), wo derselbe Spieler
+  // korrekt sein Gehalt zeigt. `data.activePlayerId` referenziert je nach
+  // Aufrufkontext einen spezifischen Kader-Eintrag (`resolveRosterEntry` im
+  // Drawer-Builder) und kann bei diesem `foundationState`-Snapshot ins Leere
+  // laufen, obwohl der Spieler real auf EINEM Kader steht — dann würde ein
+  // rostierter Spieler fälschlich "—" zeigen. Der direkte
+  // `playerId`-Treffer über alle Roster ist robust: jeder Spieler steht in
+  // höchstens einem aktiven Kader-Eintrag.
   const rosterEntry = foundationState
-    ? (data.activePlayerId
-        ? (foundationState.gameState.rosters.find((entry) => entry.id === data.activePlayerId) ?? null)
-        : (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null))
+    ? (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
     : null;
   const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
   const heroSalary = rosterEntry

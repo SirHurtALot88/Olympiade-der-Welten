@@ -293,18 +293,23 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
 /**
  * Absoluter Liga-Rang-Chip ("#N") — ersetzt den Perzentil-Chip in der
  * OVR-Spalte (Produkt-Feedback: absoluter Rang ist griffiger als "Top X%").
- * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung). Ton bleibt
- * die bestehende 3-stufige Heat-Einordnung (`getPoolHeatTone`) — an dieser
- * Spalte wurde keine Farb-Änderung angefragt, nur der angezeigte Wert.
+ * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung).
+ *
+ * Ton ist bewusst FEST (`.nl-ptable-ovr-rank`, Amber/Gold), NICHT mehr die
+ * wertabhängige `getPoolHeatTone`-Ton-Klasse: OVR ist die Kopf-Kennzahl der
+ * Tabelle und bekommt EINEN eigenen, von PPs/MVS abgesetzten Akzent statt
+ * einer dritten überlagerten Farb-Ebene (Value-Heat-Zellenhintergrund +
+ * Sortier-Highlight + ton-gefärbter Chip sahen zusammen wie zufälliger
+ * Regenbogen aus). Siehe die OVR-`<td>`-Zelle unten und die Scratch-CSS
+ * `.nl-ptable-ovr-cell` / `.nl-ptable-ovr-rank`.
  */
 function renderMetricRankChip(value: number | null | undefined, pool: number[]) {
   const rank = getLeagueRank(value, pool);
   if (rank == null) {
     return null;
   }
-  const tone = getPoolHeatTone(value, pool);
   return (
-    <span className={`nl-ptable-percentile ${nlToneClass(tone)}`} title={`Liga-Rang #${rank} von ${pool.length}`}>
+    <span className="nl-ptable-percentile nl-ptable-ovr-rank" title={`Liga-Rang #${rank} von ${pool.length}`}>
       #{formatNlNumber(rank, 0)}
     </span>
   );
@@ -776,11 +781,7 @@ export default function FoundationPlayersTableNewLook({
             {renderMetricPercentileChip(row.playerPps, leaguePlayerHeatPools.pps)}
           </span>
         </td>
-        <td
-          className={`nl-players-td-metric is-highlight-secondary${sortCellClass("ovr")} ${
-            row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""
-          }`}
-        >
+        <td className={`nl-players-td-metric nl-ptable-ovr-cell${sortCellClass("ovr")}`}>
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
             {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
