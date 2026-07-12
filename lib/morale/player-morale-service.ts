@@ -28,11 +28,57 @@ export type PlayerMoraleAssessment = PlayerMoraleState & {
   source: "stored" | "computed_preview";
 };
 
+/**
+ * Vorberechnete O(1)-Lookups fuer `assessPlayerMorale`. Ohne Index fallen die
+ * Aufrufe auf lineare `.find`-Scans zurueck (unveraendertes Verhalten) — mit
+ * Index (z. B. bei ligaweiter Neuberechnung ueber ~320 Kader-Eintraege) wird
+ * aus O(N)-Scans pro Spieler ein Map-Lookup. Die Maps halten jeweils das
+ * ERSTE Vorkommen bzw. die Einfuege-Reihenfolge, damit sie exakt dieselbe
+ * Auswahl wie `Array.find` liefern.
+ */
+export type MoraleLookupIndex = {
+  playersById: Map<string, Player>;
+  rostersByPlayerId: Map<string, RosterEntry[]>;
+  teamsById: Map<string, Team>;
+  teamIdentitiesByTeamId: Map<string, TeamIdentity>;
+  storedMoraleByPlayerId: Map<string, PlayerMoraleState[]>;
+};
+
+export function buildMoraleLookupIndex(gameState: GameState): MoraleLookupIndex {
+  const playersById = new Map<string, Player>();
+  for (const player of gameState.players) {
+    if (!playersById.has(player.id)) playersById.set(player.id, player);
+  }
+  const rostersByPlayerId = new Map<string, RosterEntry[]>();
+  for (const roster of gameState.rosters) {
+    const list = rostersByPlayerId.get(roster.playerId);
+    if (list) list.push(roster);
+    else rostersByPlayerId.set(roster.playerId, [roster]);
+  }
+  const teamsById = new Map<string, Team>();
+  for (const team of gameState.teams) {
+    if (!teamsById.has(team.teamId)) teamsById.set(team.teamId, team);
+  }
+  const teamIdentitiesByTeamId = new Map<string, TeamIdentity>();
+  for (const identity of gameState.teamIdentities ?? []) {
+    if (!teamIdentitiesByTeamId.has(identity.teamId)) teamIdentitiesByTeamId.set(identity.teamId, identity);
+  }
+  const storedMoraleByPlayerId = new Map<string, PlayerMoraleState[]>();
+  for (const entry of gameState.playerMoraleState ?? []) {
+    const list = storedMoraleByPlayerId.get(entry.playerId);
+    if (list) list.push(entry);
+    else storedMoraleByPlayerId.set(entry.playerId, [entry]);
+  }
+  return { playersById, rostersByPlayerId, teamsById, teamIdentitiesByTeamId, storedMoraleByPlayerId };
+}
+
 export type PlayerMoraleInput = {
   gameState: GameState;
   playerId: string;
   teamId?: string | null;
   renewalSalaryPreview?: number | null;
+  /** Optionaler O(1)-Lookup-Index; ohne ihn wird linear gescannt (Verhalten identisch). */
+  index?: MoraleLookupIndex;
 };
 
 const POSITIVE_TRAINING_TRAITS = new Set(["diligent", "disciplined", "motivated", "ambitious", "flexible", "healthy", "resourceful"]);
@@ -500,8 +546,15 @@ function buildRelativePlayerContext(input: {
   };
 }
 
-function getStoredMorale(gameState: GameState, playerId: string, teamId: string | null): PlayerMoraleState | null {
-  const storedRows = gameState.playerMoraleState ?? [];
+function getStoredMorale(
+  gameState: GameState,
+  playerId: string,
+  teamId: string | null,
+  candidateRows?: PlayerMoraleState[],
+): PlayerMoraleState | null {
+  // Mit Index: bereits auf die playerId vorgefilterte Zeilen (Einfuege-
+  // Reihenfolge). Ohne Index: die volle Liste — identisches Ergebnis.
+  const storedRows = candidateRows ?? gameState.playerMoraleState ?? [];
   const exactMatch =
     storedRows.find((entry) => entry.playerId === playerId && (teamId == null || entry.teamId === teamId)) ?? null;
   if (exactMatch) {
@@ -537,15 +590,25 @@ function normalizeCarryOverMorale(stored: PlayerMoraleState, seasonId: string, c
 }
 
 export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssessment | null {
-  const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
+  const index = input.index;
+  const player =
+    (index ? index.playersById.get(input.playerId) : input.gameState.players.find((entry) => entry.id === input.playerId)) ?? null;
   if (!player) return null;
+  const rosterCandidates = index ? index.rostersByPlayerId.get(player.id) : null;
   const rosterEntry =
-    input.gameState.rosters.find((entry) => entry.playerId === player.id && (input.teamId == null || entry.teamId === input.teamId)) ?? null;
+    (rosterCandidates
+      ? rosterCandidates.find((entry) => input.teamId == null || entry.teamId === input.teamId)
+      : input.gameState.rosters.find((entry) => entry.playerId === player.id && (input.teamId == null || entry.teamId === input.teamId))) ??
+    null;
   if (!rosterEntry) return null;
-  const team = input.gameState.teams.find((entry) => entry.teamId === rosterEntry.teamId) ?? null;
+  const team =
+    (index ? index.teamsById.get(rosterEntry.teamId) : input.gameState.teams.find((entry) => entry.teamId === rosterEntry.teamId)) ?? null;
   if (!team) return null;
-  const stored = getStoredMorale(input.gameState, player.id, rosterEntry.teamId);
-  const teamIdentity = input.gameState.teamIdentities.find((entry) => entry.teamId === rosterEntry.teamId) ?? null;
+  const stored = getStoredMorale(input.gameState, player.id, rosterEntry.teamId, index?.storedMoraleByPlayerId.get(player.id));
+  const teamIdentity =
+    (index
+      ? index.teamIdentitiesByTeamId.get(rosterEntry.teamId)
+      : input.gameState.teamIdentities.find((entry) => entry.teamId === rosterEntry.teamId)) ?? null;
   const assessment = computePlayerMorale({
     gameState: input.gameState,
     player,
