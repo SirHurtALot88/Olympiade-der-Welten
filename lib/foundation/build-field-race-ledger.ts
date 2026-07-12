@@ -67,10 +67,25 @@ function rankByPoints(
   );
 }
 
-export function buildFieldRaceLedger(gameState: GameState, seasonId = gameState.season.id): FieldRaceLedger {
+export function buildFieldRaceLedger(gameState: GameState, seasonId = gameState.season?.id ?? ""): FieldRaceLedger {
+  const teams = (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name }));
+
+  // Defensiv: dieser Ledger läuft im Hot-Path von computeSeasonDerivationsFresh,
+  // also auch mit minimalen/teilweise befüllten GameStates aus Tests/Frühphasen.
+  // Ohne Spieltag-Reihenfolge oder Ergebnisse gibt es nichts abzuleiten — dann ein
+  // leeres Ledger zurückgeben statt zu werfen (ein Throw würde die gesamte
+  // Season-Derivation kippen).
+  const emptyLedger: FieldRaceLedger = {
+    seasonId,
+    matchdays: [],
+    rowsByTeamId: new Map(teams.map((team) => [team.teamId, [] as FieldRaceLedgerEntry[]])),
+  };
+  if (!Array.isArray(gameState.season?.matchdayIds) || (gameState.seasonState?.matchdayResults ?? []).length === 0) {
+    return emptyLedger;
+  }
+
   const orderedMatchdays = getMatchdaySummaryOptions(gameState, seasonId);
   const ledger = buildSeasonPointsLedger(gameState, seasonId);
-  const teams = gameState.teams.map((team) => ({ teamId: team.teamId, teamName: team.name }));
 
   // Tagespunkte je Spieltag je Team (aus den Punkt-Einträgen des Ledgers).
   const pointsByMatchday = new Map<string, Map<string, number>>();
