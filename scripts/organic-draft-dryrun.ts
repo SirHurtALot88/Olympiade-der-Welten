@@ -151,16 +151,18 @@ allDrafted.slice(0, 10).forEach((e, i) => {
 // --- Example team roster ---
 const example = draftedByCode.get(exampleTeamCode);
 if (example) {
-  console.log(`\n## Beispielteam ${exampleTeamCode} — Kader (${example.length})`);
-  console.log("Spieler|MW|Gehalt|Tier|Top-Disziplinen(>60)");
+  const female = example.filter((p) => String((p as Player).gender ?? "").toLowerCase().startsWith("f")).length;
+  console.log(`\n## Beispielteam ${exampleTeamCode} — Kader (${example.length}) · weiblich ${female}/${example.length}`);
+  console.log("Spieler|Geschlecht|Rasse|Klasse|MW|Gehalt|Tier|Top-Disziplinen(>60)");
   for (const p of [...example].sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))) {
+    const pl = p as Player & { gender?: string; race?: string; className?: string };
     const topDiscs = Object.entries(p.disciplineRatings ?? {})
       .filter(([, v]) => v > 60)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([id, v]) => `${id}:${Math.round(v)}`)
       .join(" ");
-    console.log(`${p.name}|${round(p.marketValue ?? 0)}|${round(p.salaryDemand ?? 0)}|${classifyMarketBracket(p.marketValue ?? 0, brackets)}|${topDiscs}`);
+    console.log(`${p.name}|${pl.gender ?? "?"}|${pl.race ?? "?"}|${pl.className ?? "?"}|${round(p.marketValue ?? 0)}|${round(p.salaryDemand ?? 0)}|${classifyMarketBracket(p.marketValue ?? 0, brackets)}|${topDiscs}`);
   }
 }
 
