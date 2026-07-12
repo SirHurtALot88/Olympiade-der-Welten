@@ -26,10 +26,15 @@ import {
   listLocalTransfermarktFreeAgents,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
-import { planOrganicDraftForTeam, planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import {
+  planOrganicDraftForTeam,
+  planOrganicSellsForTeam,
+  resolveOrganicRenewalContractLength,
+} from "@/lib/ai/organic-squad/draft-adapter";
+import { applyContractRenewalAction, previewContractRenewalAction } from "@/lib/contracts/contract-renewal-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -253,13 +258,29 @@ async function runTeamCycle(input: {
   // input.allowBuys (preseason) ⇒ organic BUYS only. The outer loop never sets both in one cycle.
   function organicRosterEntries(gameState: GameState, teamId: string) {
     // Trivial replica of ai-picks-run-service.getTeamRosterPlayers (not exported): each roster entry
-    // paired with its domain Player, so the sell call has the roster entry `id` (activePlayerId).
+    // paired with its domain Player, so the sell call has the roster entry `id` (activePlayerId). Also
+    // carries the entry's cost basis (purchasePrice → profit-flip term) and contract state (whether the
+    // player is expiring, i.e. renewal-eligible) for the season-end renew→sell decision.
     const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
-    const entries: Array<{ activePlayerId: string; player: Player }> = [];
+    const entries: Array<{
+      activePlayerId: string;
+      player: Player;
+      purchasePrice: number | null;
+      contractLength: number;
+      contractStatus?: ContractStatus;
+    }> = [];
     for (const entry of gameState.rosters) {
       if (entry.teamId !== teamId) continue;
       const player = playersById.get(entry.playerId);
-      if (player) entries.push({ activePlayerId: entry.id, player });
+      if (player) {
+        entries.push({
+          activePlayerId: entry.id,
+          player,
+          purchasePrice: entry.purchasePrice ?? null,
+          contractLength: entry.contractLength,
+          contractStatus: entry.contractStatus,
+        });
+      }
     }
     return entries;
   }
@@ -275,8 +296,76 @@ async function runTeamCycle(input: {
     );
     if (entries.length === 0) return;
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
-    const plan = planOrganicSellsForTeam({ gameState, team, identity, roster: entries.map((entry) => entry.player) });
+
+    // Organic season-end economic flow: score every held player with the organic sell model (profit +
+    // coverage + patience). High-sellUtility bodies are the SELLABLE surplus/profit-flips; everyone
+    // else is a KEEPER. purchasePrice (cost basis) feeds the profit-flip term so a trader sheds gains.
+    const purchasePriceByPlayerId: Record<string, number> = {};
+    for (const entry of entries) {
+      if (typeof entry.purchasePrice === "number" && Number.isFinite(entry.purchasePrice)) {
+        purchasePriceByPlayerId[entry.player.id] = entry.purchasePrice;
+      }
+    }
+    const plan = planOrganicSellsForTeam({
+      gameState,
+      team,
+      identity,
+      roster: entries.map((entry) => entry.player),
+      purchasePriceByPlayerId,
+    });
     warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
+    const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
+
+    // (1) RENEW keepers BEFORE selling (product intent "renew before sell"): for each non-sold player
+    // whose contract is already expiring (length 0 / renewal-eligible — the per-season −1 decrement and
+    // exit are existing engine behaviour we do NOT re-apply here), extend it via the existing
+    // contract-renewal service at the identity/GM-derived length. Non-eligible players (still under
+    // contract) need no action; keepers the renewal gate rejects (not affordable/valid) fall through to
+    // the existing contract-exit machinery. Reuses previewContractRenewalAction for the confirm token
+    // and affordability/validity gate, then applyContractRenewalAction to write.
+    const renewLength = resolveOrganicRenewalContractLength({ gameState, team, identity });
+    let renewed = 0;
+    for (const entry of entries) {
+      if (sellPlayerIds.has(entry.player.id)) continue; // surplus/profit-flip → sold below, not renewed
+      const renewalEligible =
+        entry.contractLength <= 0 ||
+        entry.contractStatus === "renewal_pending" ||
+        entry.contractStatus === "out_of_contract";
+      if (!renewalEligible) continue; // still under contract → stays without action
+      const renewSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+      if (!renewSave) break;
+      const preview = previewContractRenewalAction({
+        save: renewSave,
+        teamId: input.teamId,
+        playerId: entry.player.id,
+        action: "renew",
+        contractLength: renewLength,
+      });
+      if (!preview.ok) continue; // not affordable/eligible/blocked → let contract-exit handle it
+      const applied = applyContractRenewalAction({
+        save: renewSave,
+        teamId: input.teamId,
+        playerId: entry.player.id,
+        action: "renew",
+        confirmToken: preview.confirmToken,
+        persistence: input.persistence,
+        contractLength: renewLength,
+        source: "ai_contract_renewal",
+      });
+      if (!applied.applied) continue;
+      renewed += 1;
+      // applyContractRenewalAction persists the full derived gameState directly (bypassing the deferred
+      // run-context buffer). Re-sync the run context to that persisted state so subsequent sells build
+      // on the renewed roster and the session's final flush does not clobber the renewal.
+      if (input.sessionRunContext) {
+        const reloaded = input.persistence.getSaveById(input.saveId);
+        if (reloaded) input.sessionRunContext.save = reloaded;
+      }
+    }
+    if (renewed > 0) warnings.push(`organic_squad_builder_renew:renewed=${renewed}:length=${renewLength}`);
+
+    // (2) SELL the sellable surplus/profit-flips (unchanged execute path; ROSTER_MIN respected upstream
+    // by planOrganicSellsForTeam). The remaining non-renewed, non-sold players are left to contract-exit.
     const activePlayerIdByPlayerId = new Map(entries.map((entry) => [entry.player.id, entry.activePlayerId]));
     for (const decision of plan.decisions) {
       const activePlayerId = activePlayerIdByPlayerId.get(decision.playerId);

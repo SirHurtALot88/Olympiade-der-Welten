@@ -55,6 +55,13 @@ export type OrganicPlayerView = {
   marketValue: number;
   /** Per-season salary. */
   salary: number;
+  /**
+   * What the club PAID for this player (roster entry purchasePrice). Basis for the profit-flip term in
+   * sellUtility: profit = max(0, marketValue − purchasePrice). Undefined ⇒ unknown cost basis ⇒ NO
+   * profit signal (the sell term contributes 0), so buy/draft views that never carry a cost basis are
+   * unaffected. PRICE dimension only — never a quality signal.
+   */
+  purchasePrice?: number;
   /** Build-for-future signal (potential; there is NO age dimension in this game). Null if unknown. */
   potential?: number | null;
   /**
@@ -101,6 +108,12 @@ export type OrganicUtilityWeights = {
   wAsset: number;
   /** Value of holding cash (patience/saving). */
   wPatience: number;
+  /**
+   * Appetite for realizing a profit flip on a sell: multiplies max(0, marketValue − purchasePrice) in
+   * sellUtility. Derived from GM `sellForProfitAggression` — a trader club (high) actively sells players
+   * it can flip at a gain, a loyal/stable club (low ⇒ ~0) barely reacts to unrealized profit.
+   */
+  wProfit: number;
   /** Soft roster target (STOP grows attractive as roster approaches it), clamped to [8,14]. */
   optTarget: number;
 };
@@ -125,6 +138,8 @@ export type OrganicGmBiasInput = Partial<{
   loyaltyBias: number;
   wageSensitivity: number;
   sellForProfitAggression: number;
+  shortContractPreference: number;
+  longContractPreference: number;
 }>;
 
 /** Rolling cash-flow forecast for sustainability + cash option value. */

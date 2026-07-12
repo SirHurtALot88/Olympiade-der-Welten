@@ -155,7 +155,17 @@ export function sellUtility(player: OrganicPlayerView, state: OrganicTeamState):
       rosterSize: Math.max(0, state.rosterSize - 1),
       optTarget: w.optTarget,
     }) - stopCashOptionValue(state);
-  return w.wThrift * saleValue - w.wWin * strengthLoss + w.wPatience * Math.max(0, cashOptionGain);
+  // Profit-flip term: unrealized gain over the club's own cost basis. A trader club (high wProfit)
+  // actively sheds players it can flip at a gain — this can flip an otherwise-negative sell (a
+  // needed but cheaply-bought, now-valuable body) into a sale; a loyal club (wProfit ~0) ignores it.
+  // Undefined purchasePrice ⇒ unknown cost basis ⇒ no profit signal (draft/buy views are unaffected).
+  const profit = player.purchasePrice != null ? Math.max(0, saleValue - player.purchasePrice) : 0;
+  return (
+    w.wThrift * saleValue -
+    w.wWin * strengthLoss +
+    w.wPatience * Math.max(0, cashOptionGain) +
+    w.wProfit * profit
+  );
 }
 
 /** Shared cash-option-value evaluation at the current state (used by stop + sell delta). */

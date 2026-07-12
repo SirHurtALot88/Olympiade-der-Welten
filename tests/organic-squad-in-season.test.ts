@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
 import { ROSTER_MIN } from "@/lib/ai/organic-squad/types";
+import type {
+  CoreAxis,
+  OrganicDiscipline,
+  OrganicIdentityInput,
+  OrganicPlayerView,
+  OrganicTeamState,
+  OrganicUtilityWeights,
+} from "@/lib/ai/organic-squad/types";
+import { sellUtility } from "@/lib/ai/organic-squad/utility";
+import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 
 // A pow-heavy identity with a low OPT (8) so a roster of 9+ is already "over OPT". Finances low so the
@@ -116,5 +127,119 @@ describe("planOrganicSellsForTeam — organic in-season sells", () => {
     expect(result.decisions.length).toBeGreaterThan(0);
     expect(result.decisions.map((d) => d.playerId)).not.toContain("key");
     expect(result.finalRosterSize).toBeGreaterThanOrEqual(ROSTER_MIN);
+  });
+});
+
+describe("sellUtility profit-flip term (GM sellForProfitAggression → wProfit)", () => {
+  // Identity fixed; the ONLY thing separating the two clubs is GM sellForProfitAggression → wProfit
+  // (wWin/wThrift/wPatience are identical for both). wAsset differs slightly but is not read by sells.
+  const IDENTITY: OrganicIdentityInput = {
+    ambition: 55,
+    finances: 45,
+    boardConfidence: 55,
+    harmony: 50,
+    playerOpt: ROSTER_MIN, // 8 → optTarget 8
+  };
+
+  // A needed key player (sole cover of a needed speed discipline → high on-pitch strength loss if sold)
+  // bought cheap and now worth far more: marketValue (40) >> purchasePrice (4).
+  const FLIP: OrganicPlayerView = {
+    playerId: "flip",
+    pow: 50,
+    spe: 45,
+    men: 50,
+    soc: 50,
+    disciplineRatings: { staffel: 70 },
+    marketValue: 40,
+    salary: 6,
+    purchasePrice: 4,
+  };
+
+  // Build a deterministic single-discipline sell state. rosterSize (10) and rosterSize-1 (9) are both
+  // >= optTarget (8) and cash sits far above the buffer, so the wPatience cash-option term nets to 0 —
+  // isolating wThrift·saleValue − wWin·strengthLoss (+ wProfit·profit) as the decision.
+  function buildSellState(weights: OrganicUtilityWeights): OrganicTeamState {
+    const disciplines: OrganicDiscipline[] = [{ id: "staffel", category: "speed" }];
+    const identityAxisWeights: Record<CoreAxis, number> = { pow: 0, spe: 1, men: 0, soc: 0 };
+    const disciplineNeeds = computeDisciplineNeeds([FLIP], identityAxisWeights, disciplines);
+    const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);
+    return {
+      cash: 200,
+      cashBuffer: 5,
+      salaryTotal: FLIP.salary,
+      rosterSize: 10,
+      boardRisk: 0.45,
+      forecast: { projectedSeasonEndCash: 300, sustainabilityMargin: 100 },
+      weights,
+      disciplineNeeds,
+      needAxisWeights,
+    };
+  }
+
+  it("a trader (high sellForProfitAggression) flips the profitable player; a loyal club keeps it", () => {
+    const traderWeights = deriveUtilityWeights(IDENTITY, { sellForProfitAggression: 10 });
+    const loyalWeights = deriveUtilityWeights(IDENTITY, { sellForProfitAggression: 1, loyaltyBias: 9 });
+
+    // A loyal/stable club barely values the unrealized profit; a trader values it strongly.
+    expect(loyalWeights.wProfit).toBeCloseTo(0);
+    expect(traderWeights.wProfit).toBeGreaterThan(0.5);
+
+    const loyalUtility = sellUtility(FLIP, buildSellState(loyalWeights));
+    const traderUtility = sellUtility(FLIP, buildSellState(traderWeights));
+
+    // planOrganicSellsForTeam sells only while sellUtility > SELL_THRESHOLD (0): loyal keeps, trader sells.
+    expect(loyalUtility).toBeLessThanOrEqual(0);
+    expect(traderUtility).toBeGreaterThan(0);
+    expect(traderUtility).toBeGreaterThan(loyalUtility);
+  });
+
+  it("an unknown cost basis (undefined purchasePrice) contributes no profit term", () => {
+    const traderWeights = deriveUtilityWeights(IDENTITY, { sellForProfitAggression: 10 });
+    const withProfit = sellUtility(FLIP, buildSellState(traderWeights));
+    const noBasis = sellUtility({ ...FLIP, purchasePrice: undefined }, buildSellState(traderWeights));
+    // Removing the cost basis removes exactly the wProfit·max(0, mv−pp) contribution.
+    expect(withProfit).toBeGreaterThan(noBasis);
+  });
+});
+
+describe("resolveRenewalContractLength", () => {
+  const NEUTRAL: OrganicIdentityInput = {
+    ambition: 50,
+    finances: 50,
+    boardConfidence: 50,
+    harmony: 50,
+    playerOpt: 10,
+  };
+
+  it("returns a SHORT contract for a flexible trader (high short/profit bias)", () => {
+    const length = resolveRenewalContractLength(NEUTRAL, {
+      shortContractPreference: 9,
+      sellForProfitAggression: 9,
+    });
+    expect(length).toBeGreaterThanOrEqual(1);
+    expect(length).toBeLessThanOrEqual(2);
+  });
+
+  it("returns a LONG contract for a stable high-harmony/high-boardConfidence club", () => {
+    const stableIdentity: OrganicIdentityInput = { ...NEUTRAL, harmony: 90, boardConfidence: 90 };
+    const length = resolveRenewalContractLength(stableIdentity, { longContractPreference: 9 });
+    expect(length).toBeGreaterThanOrEqual(4);
+    expect(length).toBeLessThanOrEqual(5);
+  });
+
+  it("a trader renews shorter than a stable club, and both stay in the [1,5] contract range", () => {
+    const trader = resolveRenewalContractLength(NEUTRAL, {
+      shortContractPreference: 9,
+      sellForProfitAggression: 9,
+    });
+    const stable = resolveRenewalContractLength(
+      { ...NEUTRAL, harmony: 90, boardConfidence: 90 },
+      { longContractPreference: 9 },
+    );
+    expect(trader).toBeLessThan(stable);
+    for (const length of [trader, stable]) {
+      expect(length).toBeGreaterThanOrEqual(1);
+      expect(length).toBeLessThanOrEqual(5);
+    }
   });
 });

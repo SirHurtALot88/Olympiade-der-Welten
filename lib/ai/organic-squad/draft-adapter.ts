@@ -26,7 +26,7 @@ import {
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { sellUtility } from "@/lib/ai/organic-squad/utility";
-import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
+import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
@@ -45,8 +45,16 @@ function normId(value: number | null | undefined): number {
   return Math.min(1, Math.max(0, scaled));
 }
 
-/** Build the utility player view from a domain Player (quality from stats; marketValue = price only). */
-export function toOrganicPlayerView(player: Player, themeFit?: number): OrganicPlayerView {
+/**
+ * Build the utility player view from a domain Player (quality from stats; marketValue = price only).
+ * `purchasePrice` (the roster entry's cost basis) is threaded only for SELL views — it feeds the
+ * profit-flip term in sellUtility. Buy/draft views omit it (undefined ⇒ no profit signal).
+ */
+export function toOrganicPlayerView(
+  player: Player,
+  themeFit?: number,
+  purchasePrice?: number | null,
+): OrganicPlayerView {
   return {
     playerId: player.id,
     pow: player.coreStats?.pow ?? 0,
@@ -56,6 +64,8 @@ export function toOrganicPlayerView(player: Player, themeFit?: number): OrganicP
     disciplineRatings: player.disciplineRatings ?? {},
     marketValue: Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0),
     salary: Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0),
+    purchasePrice:
+      typeof purchasePrice === "number" && Number.isFinite(purchasePrice) ? Math.max(0, purchasePrice) : undefined,
     potential: player.potential ?? null,
     themeFit,
   };
@@ -154,6 +164,19 @@ function resolveGmBias(gameState: GameState, teamId: string): OrganicGmBiasInput
     loyaltyBias: bias.loyaltyBias,
     wageSensitivity: bias.wageSensitivity,
     sellForProfitAggression: bias.sellForProfitAggression,
+    shortContractPreference: bias.shortContractPreference,
+    longContractPreference: bias.longContractPreference,
+  };
+}
+
+/** Identity → the minimal management-scale inputs the weight/contract-length derivations read. */
+function buildOrganicIdentityInput(identity: TeamIdentity | null | undefined): OrganicIdentityInput {
+  return {
+    ambition: identity?.ambition ?? 50,
+    finances: identity?.finances ?? 55,
+    boardConfidence: identity?.boardConfidence ?? 50,
+    harmony: identity?.harmony ?? 50,
+    playerOpt: identity?.playerOpt ?? 10,
   };
 }
 
@@ -208,13 +231,7 @@ function buildOrganicPlanContext(input: {
   team: Team;
   identity: TeamIdentity | null | undefined;
 }): OrganicPlanContext {
-  const identityInput: OrganicIdentityInput = {
-    ambition: input.identity?.ambition ?? 50,
-    finances: input.identity?.finances ?? 55,
-    boardConfidence: input.identity?.boardConfidence ?? 50,
-    harmony: input.identity?.harmony ?? 50,
-    playerOpt: input.identity?.playerOpt ?? 10,
-  };
+  const identityInput = buildOrganicIdentityInput(input.identity);
   const weights = deriveUtilityWeights(identityInput, resolveGmBias(input.gameState, input.team.teamId));
   return {
     weights,
@@ -294,6 +311,11 @@ export type OrganicSellPlanInput = {
   identity: TeamIdentity | null | undefined;
   /** Players currently on the roster (domain Players; their disciplines drive coverage). */
   roster: Player[];
+  /**
+   * Optional cost basis per playerId (the roster entry's `purchasePrice`). Feeds the profit-flip term
+   * in sellUtility so a trader club sheds players it can flip at a gain. Absent ⇒ no profit signal.
+   */
+  purchasePriceByPlayerId?: Record<string, number>;
   /** Conservative forecast planning inputs (mirrors the draft planner; optional). */
   forecast?: {
     expectedPrize?: number;
@@ -323,7 +345,9 @@ export type OrganicSellPlanResult = {
  */
 export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSellPlanResult {
   const ctx = buildOrganicPlanContext({ gameState: input.gameState, team: input.team, identity: input.identity });
-  const held = input.roster.map((player) => toOrganicPlayerView(player));
+  const held = input.roster.map((player) =>
+    toOrganicPlayerView(player, undefined, input.purchasePriceByPlayerId?.[player.id]),
+  );
   const rosterMin = ROSTER_MIN;
 
   let cash = ctx.cash;
@@ -382,4 +406,21 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     finalRosterSize: held.length,
     optTarget: ctx.weights.optTarget,
   };
+}
+
+/**
+ * Season-end RENEWAL contract length (seasons, ∈ [1,5]) for one team, from its identity + GM bias —
+ * the gameState-facing wrapper around the pure `resolveRenewalContractLength`. Used by the organic
+ * season-end renew→sell cycle to decide how long a kept player's renewed contract runs (short for a
+ * flexible trader, long for a stable/high-harmony club).
+ */
+export function resolveOrganicRenewalContractLength(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null | undefined;
+}): number {
+  return resolveRenewalContractLength(
+    buildOrganicIdentityInput(input.identity),
+    resolveGmBias(input.gameState, input.team.teamId),
+  );
 }

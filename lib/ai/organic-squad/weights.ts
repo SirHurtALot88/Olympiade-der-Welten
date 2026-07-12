@@ -111,6 +111,13 @@ export function deriveUtilityWeights(
   const sellForProfitAggression = normBias(gmBias?.sellForProfitAggression);
   const rosterDepthPreference = normBias(gmBias?.rosterDepthPreference);
 
+  // Profit-flip appetite: near 0 for a neutral/loyal club (base is deliberately tiny) and rises
+  // strongly with sellForProfitAggression, so a trader GM actively realizes unrealized gains while a
+  // stable/loyal GM barely reacts to them. Downstream, sellUtility multiplies this by
+  // max(0, marketValue − purchasePrice); the coefficient is large because that gap is a raw MW figure
+  // (comparable to saleValue) and the tilt must be able to flip an otherwise-negative sell for a trader.
+  const wProfit = clamp(0.1 + sellForProfitAggression * 1.6, 0, 2);
+
   const wWin = clamp(
     wWinBase + starPriority * 0.6 + riskTolerance * 0.4 + eliteSmallRosterPreference * 0.3,
     0,
@@ -137,5 +144,39 @@ export function deriveUtilityWeights(
     K * eliteSmallRosterPreference;
   const optTarget = Math.round(clamp(optTargetRaw, ROSTER_MIN, ROSTER_MAX));
 
-  return { wWin, wThrift, wSustain, wAsset, wPatience, optTarget };
+  return { wWin, wThrift, wSustain, wAsset, wPatience, wProfit, optTarget };
+}
+
+/**
+ * Target contract length (in seasons) to offer when RENEWING a keeper at season end, clamped to the
+ * [1, 5] range `previewContractRenewalAction`/`applyContractRenewalAction` expect (they both clamp via
+ * `Math.max(1, Math.min(5, …))`).
+ *
+ * Two opposing pulls, both centered on the neutral midpoint 3:
+ *  - SHORT (flexible flipping): high `shortContractPreference` and/or high `sellForProfitAggression` —
+ *    a trader wants to keep players tradeable and its wage book flexible, so it renews on 1–2 seasons.
+ *  - LONG (stability, wage-saving): high `longContractPreference`, OR a stable club with high
+ *    `harmony` / high `boardConfidence` — it locks keepers in for 4–5 seasons to save future wage
+ *    negotiation and signal continuity.
+ *
+ * PURE, no game state. Missing GM fields fall back to neutral (normBias fallback 5 ⇒ 0 tilt), so an
+ * unbiased club renews at the neutral midpoint.
+ */
+export function resolveRenewalContractLength(
+  identity: OrganicIdentityInput,
+  gmBias: OrganicGmBiasInput,
+): number {
+  const shortPref = normBias(gmBias?.shortContractPreference);
+  const longPref = normBias(gmBias?.longContractPreference);
+  const profitAggression = normBias(gmBias?.sellForProfitAggression);
+  // Identity stability signals, re-centered on 0 (so a neutral 0.5 club adds nothing).
+  const harmonyTilt = normId(identity?.harmony) - 0.5;
+  const boardConfidenceTilt = normId(identity?.boardConfidence) - 0.5;
+
+  const stabilityPull = longPref + harmonyTilt + boardConfidenceTilt; // ∈ [-1.5, 1.5]
+  const flexibilityPull = shortPref + profitAggression; // ∈ [-1.0, 1.0]
+
+  const MID = 3;
+  const raw = MID + 2.5 * stabilityPull - 2.5 * flexibilityPull;
+  return Math.round(clamp(raw, 1, 5));
 }
