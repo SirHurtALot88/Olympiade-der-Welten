@@ -49,6 +49,7 @@ import {
   collectTeamFatigueInjuryMetrics,
   countSeasonInjuryEvents,
 } from "@/lib/season/long-run-fatigue-collect";
+import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getDatabase } from "@/lib/persistence/sqlite";
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
@@ -2056,10 +2057,18 @@ function syncStaleMatchdayPointerIfNeeded(
   return true;
 }
 
-async function runSeasonMatchdays(saveId: string, persistence: PersistenceService) {
+async function runSeasonMatchdays(saveId: string, delegatePersistence: PersistenceService) {
   const matchdayRows: Array<Record<string, unknown>> = [];
   const performanceRows: PhaseMetric[] = [];
   const blockers: string[] = [];
+  // Matchday-Save-Batching: die 4-Schritt-Kette (Lineups → Result → Standings →
+  // Advance) schrieb den vollen State ~5× pro Matchday. Der Capture-Wrapper
+  // haelt die Writes im Speicher und flusht genau EINMAL pro Matchday — die
+  // Kette liest zwischen den Schritten konsistent den In-Memory-Stand, das
+  // Endergebnis pro Matchday ist identisch, nur die Voll-Writes fallen von
+  // ~5 auf 1. Per-Matchday-Flush erhaelt die Resume-Granularitaet.
+  const capture = createCaptureBatchPersistence({ delegate: delegatePersistence, saveId });
+  const persistence = capture.persistence;
   const resultApplyService = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
   const initialSave = persistence.getSaveById(saveId);
   if (
@@ -2076,6 +2085,9 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
     initialSave?.gameState.season.matchdayIds.findIndex((entry) => entry === loopStartMatchdayId) ?? 0,
   );
   for (const matchdayId of initialSave?.gameState.season.matchdayIds.slice(startIndex) ?? []) {
+    // Vorherigen Matchday genau einmal auf Platte schreiben (Resume-Granularitaet
+    // bleibt pro Matchday erhalten); der finale Flush steht nach der Schleife.
+    capture.flush();
     const currentSave = persistence.getSaveById(saveId);
     if (!currentSave) throw new Error("Long-run save disappeared during matchday loop.");
     const seasonId = currentSave.gameState.season.id;
@@ -2271,6 +2283,11 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
       }
     }
   }
+  // Letzten Matchday (bzw. den abgebrochenen Teilstand) einmal persistieren.
+  capture.flush();
+  console.error(
+    `[long-run] match-sim-batch ${saveId}: disk-writes=${capture.diskWrites()} (statt ~5/Matchday)`,
+  );
   return { matchdayRows, performanceRows, blockers };
 }
 
