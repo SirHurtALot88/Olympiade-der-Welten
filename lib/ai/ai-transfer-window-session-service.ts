@@ -20,12 +20,16 @@ import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-ser
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import {
   createLocalTransfermarktRunContext,
+  executeLocalTransfermarktBuy,
+  executeLocalTransfermarktSell,
   flushLocalTransfermarktRunContext,
+  listLocalTransfermarktFreeAgents,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
+import { planOrganicDraftForTeam, planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -242,16 +246,130 @@ async function runTeamCycle(input: {
     }
   }
 
+  // Organic-squad-builder cycle (flag: OLY_ORGANIC_SQUAD_BUILDER, default OFF). Same per-team unit as
+  // runSellPass/runBuyPass — it returns via the same closure accumulators (appliedSells/appliedBuys/
+  // applyResult/warnings) and mutates the same exclusion sets, so the outer-loop bookkeeping is
+  // unchanged. Respects the hard phase separation: input.allowSells (season_end) ⇒ organic SELLS only,
+  // input.allowBuys (preseason) ⇒ organic BUYS only. The outer loop never sets both in one cycle.
+  function organicRosterEntries(gameState: GameState, teamId: string) {
+    // Trivial replica of ai-picks-run-service.getTeamRosterPlayers (not exported): each roster entry
+    // paired with its domain Player, so the sell call has the roster entry `id` (activePlayerId).
+    const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
+    const entries: Array<{ activePlayerId: string; player: Player }> = [];
+    for (const entry of gameState.rosters) {
+      if (entry.teamId !== teamId) continue;
+      const player = playersById.get(entry.playerId);
+      if (player) entries.push({ activePlayerId: entry.id, player });
+    }
+    return entries;
+  }
+
+  async function runOrganicSellCycle() {
+    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!save) return;
+    const gameState = save.gameState;
+    const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
+    if (!team) return;
+    const entries = organicRosterEntries(gameState, input.teamId).filter(
+      (entry) => !input.excludeSellPlayerIds.has(entry.player.id),
+    );
+    if (entries.length === 0) return;
+    const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+    const plan = planOrganicSellsForTeam({ gameState, team, identity, roster: entries.map((entry) => entry.player) });
+    warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
+    const activePlayerIdByPlayerId = new Map(entries.map((entry) => [entry.player.id, entry.activePlayerId]));
+    for (const decision of plan.decisions) {
+      const activePlayerId = activePlayerIdByPlayerId.get(decision.playerId);
+      if (!activePlayerId) continue;
+      const sellResult = executeLocalTransfermarktSell({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        activePlayerId,
+        transferSource: "ai_organic_squad_sell",
+        localRunContext: input.sessionRunContext,
+        deferPersist: true,
+      });
+      if (!sellResult.transferCreated) {
+        warnings.push(...sellResult.blockingReasons.slice(0, 2));
+        continue;
+      }
+      appliedSells += 1;
+      input.excludeSellPlayerIds.add(decision.playerId);
+    }
+  }
+
+  function runOrganicBuyCycle() {
+    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!save) return;
+    const gameState = save.gameState;
+    const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
+    if (!team) return;
+    const rosterPlayerIds = new Set(organicRosterEntries(gameState, input.teamId).map((entry) => entry.player.id));
+    const startingSquad = organicRosterEntries(gameState, input.teamId).map((entry) => entry.player);
+    const freeAgentItems = listLocalTransfermarktFreeAgents({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      mode: "ai_preview",
+      localRunContext: input.sessionRunContext,
+      fullPool: true,
+    }).items;
+    const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
+    const candidates: Player[] = [];
+    for (const item of freeAgentItems) {
+      if (input.excludeBuyPlayerIds.has(item.playerId) || rosterPlayerIds.has(item.playerId)) continue;
+      const player = playersById.get(item.playerId);
+      if (player) candidates.push(player);
+    }
+    const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+    // Preseason buys reuse the draft planner with the CURRENT roster as the startingSquad.
+    const plan = planOrganicDraftForTeam({ gameState, team, identity, startingSquad, candidates });
+    warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
+    if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+    for (const decision of plan.decisions) {
+      if (input.excludeBuyPlayerIds.has(decision.playerId)) continue;
+      const buyResult = executeLocalTransfermarktBuy({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        playerId: decision.playerId,
+        transferSource: "ai_organic_squad_buy",
+        localRunContext: input.sessionRunContext,
+        deferPersist: true,
+      });
+      if (!buyResult.transferCreated || !buyResult.transferId) {
+        warnings.push(...buyResult.blockingReasons.slice(0, 2));
+        applyResult = "hold";
+        break;
+      }
+      appliedBuys += 1;
+      applyResult = "applied";
+      input.excludeBuyPlayerIds.add(decision.playerId);
+    }
+  }
+
+  async function runOrganicTeamCycle() {
+    if (input.allowSells) await runOrganicSellCycle();
+    if (input.allowBuys) runOrganicBuyCycle();
+  }
+
+  const useOrganic = process.env.OLY_ORGANIC_SQUAD_BUILDER === "1";
+
   // Strict phase separation: season_end cycles sell-only, preseason cycles buy-only.
   // Replace-mode floor sells belong in the S1 season_end pass, not paired inside S2 buy cycles.
-  if (input.allowSells) {
-    await runSellPass(mandate);
-  }
-  const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
-  const postSellMandate =
-    afterSellSave != null ? resolvePostOptUpgradeMandate(afterSellSave.gameState, input.teamId) : null;
-  if (input.allowBuys) {
-    await runBuyPass(postSellMandate);
+  if (useOrganic) {
+    await runOrganicTeamCycle();
+  } else {
+    if (input.allowSells) {
+      await runSellPass(mandate);
+    }
+    const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    const postSellMandate =
+      afterSellSave != null ? resolvePostOptUpgradeMandate(afterSellSave.gameState, input.teamId) : null;
+    if (input.allowBuys) {
+      await runBuyPass(postSellMandate);
+    }
   }
 
   if (input.progressLog && (appliedSells > 0 || appliedBuys > 0)) {

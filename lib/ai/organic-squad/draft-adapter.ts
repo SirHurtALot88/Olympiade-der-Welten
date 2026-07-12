@@ -10,6 +10,8 @@
  * time and are refined in P3 — the P2 goal is the emergent buy/stop/coverage behaviour, not exact cash.
  */
 
+import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
+import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import {
   CATEGORY_TO_AXIS,
@@ -20,7 +22,10 @@ import {
   type OrganicGmBiasInput,
   type OrganicIdentityInput,
   type OrganicPlayerView,
+  type OrganicTeamState,
+  type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
+import { sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights } from "@/lib/ai/organic-squad/weights";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -178,8 +183,31 @@ export type OrganicDraftPlanResult = {
   optTarget: number;
 };
 
-/** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
-export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDraftPlanResult {
+/**
+ * Team-level scalar context shared by the draft (buy) planner and the in-season sell planner: the
+ * derived utility weights, identity axis weights, discipline catalog, theme runtime context, and the
+ * team economy scalars (cash / cash buffer / board risk / roster max). Squad-specific inputs
+ * (starting squad views, salary total, candidate views) are built per planner from their own player
+ * lists; only this identity/economy assembly is common, so it is factored out here rather than
+ * duplicated between the two planners.
+ */
+type OrganicPlanContext = {
+  weights: OrganicUtilityWeights;
+  identityAxisWeights: Record<CoreAxis, number>;
+  disciplines: OrganicDiscipline[];
+  themeRuntimeContext: TeamThemeCompositionRuntimeContext;
+  cash: number;
+  /** Small flat solvency buffer (the only cash hard blocker). */
+  cashBuffer: number;
+  boardRisk: number;
+  rosterMax: number;
+};
+
+function buildOrganicPlanContext(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null | undefined;
+}): OrganicPlanContext {
   const identityInput: OrganicIdentityInput = {
     ambition: input.identity?.ambition ?? 50,
     finances: input.identity?.finances ?? 55,
@@ -188,41 +216,47 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     playerOpt: input.identity?.playerOpt ?? 10,
   };
   const weights = deriveUtilityWeights(identityInput, resolveGmBias(input.gameState, input.team.teamId));
-  const identityAxisWeights = buildIdentityAxisWeights(input.identity);
-  const disciplines = resolveOrganicDisciplines(input.gameState);
+  return {
+    weights,
+    identityAxisWeights: buildIdentityAxisWeights(input.identity),
+    disciplines: resolveOrganicDisciplines(input.gameState),
+    // Build the team's theme runtime context ONCE (cached rosterShare/themedPoolCount), then reuse it
+    // for every candidate's themeFit lookup — never recomputed per player.
+    themeRuntimeContext: buildTeamThemeCompositionRuntimeContext(input.gameState, input.team),
+    cash: input.team.cash ?? 0,
+    // Small flat solvency buffer (the only cash hard blocker). How much a club keeps ABOVE this is
+    // emergent: aggressive clubs spend down toward it (~0-10 left), savers keep more via wPatience.
+    cashBuffer: ORGANIC_CASH_BUFFER,
+    boardRisk: 1 - normId(input.identity?.boardConfidence),
+    rosterMax: Math.min(ROSTER_MAX, input.team.rosterLimit ?? ROSTER_MAX),
+  };
+}
 
-  // Build the team's theme runtime context ONCE (cached rosterShare/themedPoolCount), then reuse it
-  // for every candidate's themeFit lookup below — never recomputed per player.
-  const themeRuntimeContext = buildTeamThemeCompositionRuntimeContext(input.gameState, input.team);
+/** Assemble utility inputs from gameState and run the greedy organic plan for one team. */
+export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDraftPlanResult {
+  const ctx = buildOrganicPlanContext({ gameState: input.gameState, team: input.team, identity: input.identity });
   const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player));
   const candidates = input.candidates
-    .map((player) => toOrganicPlayerView(player, computeThemeFit(input.gameState, input.team, player, themeRuntimeContext)))
+    .map((player) => toOrganicPlayerView(player, computeThemeFit(input.gameState, input.team, player, ctx.themeRuntimeContext)))
     .filter((view) => view.marketValue > 0);
-
-  const cash = input.team.cash ?? 0;
-  // Small flat solvency buffer (the only cash hard blocker). How much a club keeps ABOVE this is
-  // emergent: aggressive clubs spend down toward it (~0-10 left), savers keep more via wPatience.
-  const cashBuffer = ORGANIC_CASH_BUFFER;
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
-  const boardRisk = 1 - normId(input.identity?.boardConfidence);
-  const rosterMax = Math.min(ROSTER_MAX, input.team.rosterLimit ?? ROSTER_MAX);
 
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
-    identityAxisWeights,
-    disciplines,
+    identityAxisWeights: ctx.identityAxisWeights,
+    disciplines: ctx.disciplines,
     economy: {
-      cash,
-      cashBuffer,
+      cash: ctx.cash,
+      cashBuffer: ctx.cashBuffer,
       salaryTotal,
-      boardRisk,
+      boardRisk: ctx.boardRisk,
       expectedPrize: input.forecast?.expectedPrize ?? 0,
       sponsorIncome: input.forecast?.sponsorIncome ?? 0,
       facilityNet: input.forecast?.facilityNet ?? 0,
       netTransfer: input.forecast?.netTransfer ?? 0,
-      weights,
-      rosterMax,
+      weights: ctx.weights,
+      rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
     },
   });
@@ -233,6 +267,119 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
-    optTarget: weights.optTarget,
+    optTarget: ctx.weights.optTarget,
+  };
+}
+
+/**
+ * Small positive sell-utility floor: a player is only sold when its sellUtility STRICTLY exceeds this.
+ * sellUtility already goes negative for a key starter (high wWin·ΔStrength loss beats its wThrift·sale
+ * value), so this floor mainly stops churning out ~break-even bodies; the real "keep vs. sell" line is
+ * the utility sign, not this constant.
+ */
+const SELL_THRESHOLD = 0;
+
+export type OrganicSellDecision = {
+  /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
+  playerId: string;
+  /** 0-based order in which this sell was chosen. */
+  step: number;
+  /** The sell utility at the moment it was chosen (for the decision log / diagnostics). */
+  utility: number;
+};
+
+export type OrganicSellPlanInput = {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null | undefined;
+  /** Players currently on the roster (domain Players; their disciplines drive coverage). */
+  roster: Player[];
+  /** Conservative forecast planning inputs (mirrors the draft planner; optional). */
+  forecast?: {
+    expectedPrize?: number;
+    sponsorIncome?: number;
+    facilityNet?: number;
+    netTransfer?: number;
+  };
+};
+
+export type OrganicSellPlanResult = {
+  /** Ordered list of players to sell (highest sell-utility first). */
+  decisions: OrganicSellDecision[];
+  finalCash: number;
+  finalRosterSize: number;
+  optTarget: number;
+};
+
+/**
+ * Greedy organic SELL plan for one team (in-season / season-end sell-only path). Mirror of
+ * planOrganicDraftForTeam but for shedding: repeatedly scores sellUtility for every still-held roster
+ * player, sells the highest-utility one while it clears SELL_THRESHOLD and the roster stays >=
+ * ROSTER_MIN, RE-COMPUTING coverage + cash after each sell (so shedding a covered-discipline body
+ * raises the need of the remaining ones and eventually stops the loop). A player in an already-covered
+ * discipline / with an attractive sale value scores high; a key starter (high ΔStrength loss) scores
+ * negative and is kept. PURE: reads nothing from the live save beyond the passed inputs and mutates
+ * nothing — the caller applies the returned decisions via the market sell primitive.
+ */
+export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSellPlanResult {
+  const ctx = buildOrganicPlanContext({ gameState: input.gameState, team: input.team, identity: input.identity });
+  const held = input.roster.map((player) => toOrganicPlayerView(player));
+  const rosterMin = ROSTER_MIN;
+
+  let cash = ctx.cash;
+  let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
+  const decisions: OrganicSellDecision[] = [];
+
+  const buildState = (): OrganicTeamState => {
+    const disciplineNeeds = computeDisciplineNeeds(held, ctx.identityAxisWeights, ctx.disciplines);
+    const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);
+    const forecast = projectCashFlow({
+      cash,
+      salaryTotal,
+      expectedPrize: input.forecast?.expectedPrize ?? 0,
+      sponsorIncome: input.forecast?.sponsorIncome ?? 0,
+      facilityNet: input.forecast?.facilityNet ?? 0,
+      netTransfer: input.forecast?.netTransfer ?? 0,
+      cashBuffer: ctx.cashBuffer,
+    });
+    return {
+      cash,
+      cashBuffer: ctx.cashBuffer,
+      salaryTotal,
+      rosterSize: held.length,
+      boardRisk: ctx.boardRisk,
+      forecast,
+      weights: ctx.weights,
+      disciplineNeeds,
+      needAxisWeights,
+    };
+  };
+
+  // Hard floor: never sell below ROSTER_MIN. Composition above the floor is fully emergent (the
+  // highest-sellUtility body goes first; the loop stops once nothing left clears SELL_THRESHOLD).
+  while (held.length > rosterMin) {
+    const state = buildState();
+    let best: OrganicPlayerView | null = null;
+    let bestUtility = -Infinity;
+    for (const view of held) {
+      const utility = sellUtility(view, state);
+      if (utility > bestUtility) {
+        bestUtility = utility;
+        best = view;
+      }
+    }
+    if (!best || bestUtility <= SELL_THRESHOLD) break;
+
+    held.splice(held.indexOf(best), 1);
+    cash += Math.max(0, best.marketValue);
+    salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
+    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
+  }
+
+  return {
+    decisions,
+    finalCash: cash,
+    finalRosterSize: held.length,
+    optTarget: ctx.weights.optTarget,
   };
 }
