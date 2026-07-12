@@ -398,6 +398,35 @@ export function resolveContractExitRenewBias(input: {
   };
 }
 
+/**
+ * Quality proxy on the OVR ~0–100 scale for players WITHOUT a computed OVR. The organic squad builder
+ * deliberately leaves mvs/ovr null and scores from stats, so `rawOvrScore`/`player.rating` are 0/null
+ * for its players — which made EVERY renewal signal below fail and `badValueContract` fire for the
+ * whole league (ratingValue < 65 is always true at 0), so no keeper was ever renewed and rosters
+ * collapsed season over season. Fall back to a core-stat average plus a small "solide discipline"
+ * breadth bonus so the OVR-based signals + badValueContract behave sensibly for stats-only players.
+ */
+function resolveStatsQualityScore(player: Player | null): number {
+  const cs = player?.coreStats;
+  if (!cs) return 0;
+  const core = ((cs.pow ?? 0) + (cs.spe ?? 0) + (cs.men ?? 0) + (cs.soc ?? 0)) / 4;
+  let solide = 0;
+  for (const value of Object.values(player?.disciplineRatings ?? {})) {
+    if (typeof value === "number" && value > 60) solide += 1;
+  }
+  return core + Math.min(solide, 6) * 2;
+}
+
+/** OVR when present, otherwise the stats-based quality proxy (organic players carry no OVR). */
+function resolveContractRatingValue(
+  rating: { rawOvrScore?: number | null } | null,
+  player: Player | null,
+): number {
+  const ovr = rating?.rawOvrScore ?? player?.rating ?? null;
+  if (typeof ovr === "number" && ovr > 0) return ovr;
+  return resolveStatsQualityScore(player);
+}
+
 function shouldAiRenewContract(input: {
   entry: RosterEntry;
   player: Player | null;
@@ -441,7 +470,7 @@ function shouldAiRenewContract(input: {
     entry.currentValue ??
     entry.purchasePrice ??
     0;
-  const ratingValue = rating?.rawOvrScore ?? player?.rating ?? 0;
+  const ratingValue = resolveContractRatingValue(rating, player);
   const salaryAfterRenewal = renewalSalaryPreview ?? entry.salary ?? 0;
   const salaryToMarketRatio = marketValue > 0 ? salaryAfterRenewal / marketValue : 1;
   const badValueContract = marketValue > 0 && salaryToMarketRatio > 0.42 && ratingValue < 65;
@@ -833,7 +862,7 @@ function buildPreviewRow(input: {
     player?.marketValue ??
     entry.currentValue ??
     0;
-  const ratingValueForBad = rating?.rawOvrScore ?? player?.rating ?? 0;
+  const ratingValueForBad = resolveContractRatingValue(rating, player);
   const salaryAfterRenewalForBad = moraleAdjustedRenewalSalary ?? entry.salary ?? 0;
   const salaryToMarketRatioForBad = marketValueForBad > 0 ? salaryAfterRenewalForBad / marketValueForBad : 1;
   const badValueContract =
