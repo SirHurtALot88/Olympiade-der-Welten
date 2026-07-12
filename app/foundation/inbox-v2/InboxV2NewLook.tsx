@@ -7,11 +7,11 @@ import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/founda
 import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
 
 /**
- * "Neuer Look" Entscheidungs-Triage fuer Inbox V2 (flag-gated, additive).
+ * "Neuer Look" Entscheidungs-Triage für Inbox V2 (flag-gated, additive).
  *
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
- * `InboxV2Client` faellt ohne Flag unveraendert auf die bestehende
- * Liste/Detail-Ansicht zurueck. Konsumiert exakt dieselben Props und
+ * `InboxV2Client` fällt ohne Flag unverändert auf die bestehende
+ * Liste/Detail-Ansicht zurück. Konsumiert exakt dieselben Props und
  * Handler (onSelectItem/onRunChoice/onMarkDone/onDismiss).
  */
 

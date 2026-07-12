@@ -704,7 +704,7 @@ export function buildPlayerProgressionForecast(input: {
     }),
     buildEvent({
       type: "appearance",
-      label: `${appearances} Einsaetze`,
+      label: `${appearances} Einsätze`,
       xpBeforeTraits: appearanceXP,
       traitModifierPct,
       traitMultiplier,

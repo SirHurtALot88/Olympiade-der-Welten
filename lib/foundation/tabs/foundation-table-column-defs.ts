@@ -22,7 +22,7 @@ export function buildFoundationPlayersTableColumns(): FoundationTableColumn[] {
     { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 120, minWidth: 100 },
     { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 120, minWidth: 100 },
     { id: "contract", label: "Vertrag", dataKey: "contract", defaultWidth: 96, minWidth: 80 },
-    { id: "appearances", label: "Einsaetze", dataKey: "appearances", defaultWidth: 94, minWidth: 78 },
+    { id: "appearances", label: "Einsätze", dataKey: "appearances", defaultWidth: 94, minWidth: 78 },
     { id: "bestDiscipline", label: "Beste Diszi", dataKey: "bestDiscipline", defaultWidth: 120, minWidth: 98 },
     {
       id: "careerLeague",
@@ -44,7 +44,7 @@ export function buildFoundationTransferHistoryTableColumns(): FoundationTableCol
     { id: "type", label: "Typ", dataKey: "type", defaultWidth: 90, minWidth: 72 },
     { id: "from", label: "Von", dataKey: "from", defaultWidth: 180, minWidth: 140 },
     { id: "to", label: "Zu", dataKey: "to", defaultWidth: 180, minWidth: 140 },
-    { id: "fee", label: "Abloese", dataKey: "fee", defaultWidth: 110, minWidth: 90 },
+    { id: "fee", label: "Ablöse", dataKey: "fee", defaultWidth: 110, minWidth: 90 },
     { id: "guv", label: "GuV", dataKey: "guv", defaultWidth: 110, minWidth: 90 },
     { id: "marketValue", label: "Marktwert", dataKey: "marketValue", defaultWidth: 110, minWidth: 90 },
     { id: "pow", label: "Power", dataKey: "pow", defaultWidth: 90, minWidth: 72 },
@@ -115,7 +115,7 @@ export function buildFoundationSeasonCompactPresets(
     {
       id: "compact",
       label: "Compact",
-      description: "Kernwerte fuer schnellen Spieltagsblick.",
+      description: "Kernwerte für schnellen Spieltagsblick.",
       order: defaultOrder,
       visibleColumnIds: ["platz", "mannschaft", "punkte", "tdm", "gewichtheben", "hockey", "schach", "takeshi", "vertragslange", "actions"],
       pinnedLeft: ["platz", "mannschaft", "punkte"],

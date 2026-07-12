@@ -28,7 +28,7 @@ export const TEAMS_VIEW_COLUMNS: FoundationTableColumn[] = [
 ];
 
 export function getTeamAxisRankTooltip(axisLabel: "POW" | "SPE" | "MEN" | "SOC") {
-  return `${axisLabel} Rang: Die Engine nimmt pro Disziplin die Top 6 scorefaehigen Spieler eines Teams, summiert diese Teamstaerke je Bereich und rankt alle Teams ligaweit.`;
+  return `${axisLabel} Rang: Die Engine nimmt pro Disziplin die Top 6 scorefaehigen Spieler eines Teams, summiert diese Teamstärke je Bereich und rankt alle Teams ligaweit.`;
 }
 
 export function getTeamsViewColumnTitle(columnId: string) {

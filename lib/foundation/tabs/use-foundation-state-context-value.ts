@@ -49,13 +49,13 @@ export function useFoundationStateContextValue(input: {
 }
 
 export function getFoundationReadOnlyActionReason(action: string) {
-  return `Im Nur-Ansicht-Modus kannst du ${action} nicht aendern.`;
+  return `Im Nur-Ansicht-Modus kannst du ${action} nicht ändern.`;
 }
 
 export function getFoundationBusyActionReason(task: string) {
-  return `${task} laeuft gerade. Bitte kurz warten.`;
+  return `${task} läuft gerade. Bitte kurz warten.`;
 }
 
 export function getFoundationCockpitBusyReason() {
-  return "Gerade laeuft schon ein anderer Saisonabschluss-Schritt. Bitte erst diesen Schritt fertig werden lassen.";
+  return "Gerade läuft schon ein anderer Saisonabschluss-Schritt. Bitte erst diesen Schritt fertig werden lassen.";
 }

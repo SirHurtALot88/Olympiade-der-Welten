@@ -189,13 +189,13 @@ function getStoredStatusMap(gameState: GameState) {
 // --- #43 Auto-Resolve: Bedingungs-Items ------------------------------
 // Ein Teil der Inbox-"Aufgaben" ist in Wahrheit eine reine Bedingung, die
 // der Spielstand selbst beantworten kann ("ist ein Lineup gesetzt?", "hat
-// das Team einen Kapitaen?", ...). Fuer diese Items wird `status`
+// das Team einen Kapitän?", ...). Für diese Items wird `status`
 // AUSSCHLIESSLICH live aus dem Spielstand abgeleitet (siehe die jeweiligen
 // `createItem(...)`-Aufrufe unten, die `status: bedingungErfuellt ? "done"
 // : "open"` setzen) — persistierter Status aus `gameState.gameInboxItems`
-// wird fuer diese Item-Praefixe bewusst ignoriert. Ohne diese Sperre koennte
+// wird für diese Item-Praefixe bewusst ignoriert. Ohne diese Sperre könnte
 // ein alter "done"/"dismissed"-Eintrag (z.B. durch einen frueheren Klick auf
-// "Erledigt", der die Bedingung NICHT tatsaechlich erfuellt) einen weiterhin
+// "Erledigt", der die Bedingung NICHT tatsaechlich erfüllt) einen weiterhin
 // unerfuellten Zustand verstecken — genau der Bug, den #43 behebt. Die Liste
 // ist bewusst auf Items beschraenkt, deren Erfuellung 1:1 aus vorhandenen
 // Spielstand-Feldern lesbar ist; Items, die eine echte Nutzer-ENTSCHEIDUNG
@@ -221,13 +221,13 @@ function getInboxItemIdPrefix(itemId: string): string {
   return separatorIndex === -1 ? itemId : itemId.slice(0, separatorIndex);
 }
 
-/** True fuer Items, deren `status` live aus dem Spielstand abgeleitet wird (siehe oben). */
+/** True für Items, deren `status` live aus dem Spielstand abgeleitet wird (siehe oben). */
 export function isAutoResolvingInboxItemId(itemId: string): boolean {
   return AUTO_RESOLVING_INBOX_ITEM_PREFIXES.has(getInboxItemIdPrefix(itemId));
 }
 
 // --- #44 Wiederkehrend vs. einmalig -----------------------------------
-// Rein informatives Tagging fuer die UI (kein Save-Feld, nur aus dem
+// Rein informatives Tagging für die UI (kein Save-Feld, nur aus dem
 // itemId-Praefix abgeleitet): wiederkehrende Reminder (tauchen jeden
 // Spieltag/immer wieder auf) vs. einmalige Setup-Aufgaben pro Saison.
 const RECURRING_INBOX_ITEM_PREFIXES = new Set<string>([
@@ -261,7 +261,7 @@ const ONE_TIME_INBOX_ITEM_PREFIXES = new Set<string>([
 
 export type InboxItemCadence = "recurring" | "once" | null;
 
-/** "recurring" (taucht regelmaessig wieder auf), "once" (Setup-Aufgabe pro Saison) oder null (kein Tag). */
+/** "recurring" (taucht regelmäßig wieder auf), "once" (Setup-Aufgabe pro Saison) oder null (kein Tag). */
 export function getInboxItemCadence(itemId: string): InboxItemCadence {
   const prefix = getInboxItemIdPrefix(itemId);
   if (RECURRING_INBOX_ITEM_PREFIXES.has(prefix)) return "recurring";
@@ -608,8 +608,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           status: formCardsReady ? "done" : "open",
           title: formCardsReady ? "Formkarten-Pool erstellt" : "Formkarten-Pool fehlt",
           description: formCardsReady
-            ? `${team.shortCode}: Formkarten fuer diese Saison sind erzeugt.`
-            : `${team.shortCode}: Formkarten fuer diese Saison muessen noch in der Einsatzliste erzeugt werden.`,
+            ? `${team.shortCode}: Formkarten für diese Saison sind erzeugt.`
+            : `${team.shortCode}: Formkarten für diese Saison müssen noch in der Einsatzliste erzeugt werden.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
           ctaLabel: "Formkarten erzeugen",
@@ -660,7 +660,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${formCardUsageAudit!.unusedNegativeCards} negative Karte(n) ungenutzt — am Saisonende drohen ${formCardUsageAudit!.negativePenaltyPoints} Strafpunkte.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
-          ctaLabel: "Formkarten pruefen",
+          ctaLabel: "Formkarten prüfen",
           source: "season_formcards",
           createdAt,
         }),

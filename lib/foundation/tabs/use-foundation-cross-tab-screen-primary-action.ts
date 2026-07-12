@@ -106,11 +106,11 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
       const selectedCandidate = input.marketPreviewPlayer;
       const disabledReason =
         !input.marketTeamId
-          ? "Waehle erst ein Team, damit Budget, Kaderdruck und Verhandlung fuer dieses Team berechnet werden."
+          ? "Wähle erst ein Team, damit Budget, Kaderdruck und Verhandlung für dieses Team berechnet werden."
           : marketTeamLocked
             ? `${input.marketSelectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Deals gehen nur mit steuerbaren Teams.`
             : !selectedCandidate
-              ? "Waehle links erst einen Kandidaten aus der Liste aus."
+              ? "Wähle links erst einen Kandidaten aus der Liste aus."
               : input.marketBuyBusy
                 ? "Deal wird gerade vorbereitet."
                 : null;
@@ -272,7 +272,7 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
       return "Nur Ansicht: Dieser Spielstand ist gerade nicht schreibbar. Anschauen ja, steuern nein.";
     }
     if (input.isSelectedTeamManagementLocked && input.selectedTeam) {
-      return `Nur Ansicht: ${input.selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Anschauen ja, steuern nein.`;
+      return `Nur Ansicht: ${input.selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Anschauen ja, steuern nein.`;
     }
     return null;
   }, [input.isSelectedTeamManagementLocked, input.readMeta.readOnly, input.selectedTeam]);

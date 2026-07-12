@@ -174,7 +174,7 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
   "training-facilities": {
     tableId: "training-facilities",
     storageKey: "trainingFacilitiesTable",
-    label: "Training & Gebaeude",
+    label: "Training & Gebäude",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "legacy",
     requiresResizableColumns: true,

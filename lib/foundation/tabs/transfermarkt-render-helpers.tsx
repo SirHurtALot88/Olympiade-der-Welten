@@ -126,7 +126,7 @@ export function getMarketTierStyle(value: string | null | undefined) {
 
 export function formatFitDisplay(item: TransfermarktFreeAgentItem) {
   if (!item.teamContextAvailable) {
-    return "Team waehlen";
+    return "Team wählen";
   }
 
   if (item.mercenary) {

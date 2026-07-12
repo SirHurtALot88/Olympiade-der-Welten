@@ -1173,7 +1173,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
                     <h4>{gmTitle}</h4>
                     <p>{row.description ?? row.lineupDoctrine ?? "Kein GM-Profil aktiv."}</p>
                   </div>
-                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und moeglichen Wechselgruenden.">
+                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und möglichen Wechselgruenden.">
                     <strong>
                       {getGmStoryLabel({
                         source: row.source,

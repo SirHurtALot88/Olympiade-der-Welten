@@ -44,7 +44,7 @@ export function deriveGlobalNextUi(input: FoundationGlobalNextUiInput): Foundati
             : input.gameFlowActionStep.blockers,
         ) || "Leertaste: zum blockierten Schritt springen"
       : globalNextDisabled
-        ? "Aktion laeuft gerade."
+        ? "Aktion läuft gerade."
         : input.gameFlowActionStep.status === "optional" &&
             (input.gameFlowActionStep.stepId === "matchday_facilities" || input.gameFlowActionStep.stepId === "facilities")
           ? "Leertaste: optional prüfen oder überspringen"

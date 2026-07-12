@@ -367,11 +367,11 @@ export function getAttributeTrainingPointCost(input: {
     affinity,
     reason:
       blockReason === "potential_ceiling_reached"
-        ? "Route-/Attribut-Decke erreicht — kaum noch Entwicklung moeglich."
+        ? "Route-/Attribut-Decke erreicht — kaum noch Entwicklung möglich."
         : affinity === "signature"
-          ? "Signature: Dieses Attribut entwickelt sich bei diesem Spieler guenstiger."
+          ? "Signature: Dieses Attribut entwickelt sich bei diesem Spieler günstiger."
           : affinity === "weak"
-            ? "Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern."
+            ? "Weak Development: Dieses Attribut ist für diesen Spieler schwerer zu steigern."
             : "Neutral: normale Attributkosten.",
     blocked,
     blockReason,

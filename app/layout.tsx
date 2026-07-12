@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Oly Room v0.1",
-  description: "Turn-based Raumprototyp fuer Oly Umbau App v2",
+  description: "Turn-based Raumprototyp für Oly Umbau App v2",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -181,7 +181,7 @@ export default function FoundationHomeV2Host({
             ? formatCockpitReason(gameFlowActionStep.blockers[0])
             : gameFlowActionStep.warnings[0]
               ? formatCockpitReason(gameFlowActionStep.warnings[0])
-              : "Flow bereit — weiter zum naechsten Schritt.",
+              : "Flow bereit — weiter zum nächsten Schritt.",
         warnings: overviewDerivations.homeWarnings.map(formatHomeWarningLabel),
         topPlayers: overviewDerivations.homeV2TopPlayers,
         leagueHeatPools: leaguePlayerHeatPools,

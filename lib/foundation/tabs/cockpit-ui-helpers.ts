@@ -28,7 +28,7 @@ export function getGameFlowStatusLabel(status: GameFlowStepStatus) {
   if (status === "blocked") return "blockiert";
   if (status === "optional") return "optional";
   if (status === "completed") return "erledigt";
-  if (status === "applying") return "laeuft";
+  if (status === "applying") return "läuft";
   return "achtung";
 }
 
@@ -78,7 +78,7 @@ export function getAiTransferBudgetLabel(status: "healthy" | "tight" | "critical
 export function getAiTransferRosterLabel(status: "under_min" | "under_opt" | "at_or_above_opt" | "unknown") {
   if (status === "under_min") return "unter Min";
   if (status === "under_opt") return "unter Opt";
-  if (status === "at_or_above_opt") return "bei/ueber Opt";
+  if (status === "at_or_above_opt") return "bei/über Opt";
   return "offen";
 }
 
@@ -88,19 +88,19 @@ export function formatCockpitReason(reason: string) {
     return shared;
   }
 
-  if (reason === "insufficient_cash") return "Nicht genug Cash fuer dieses Upgrade.";
-  if (reason === "facility_max_level") return "Dieses Gebaeude ist bereits auf Max-Level.";
-  if (reason === "facility_disabled") return "Dieses Gebaeude ist aktuell deaktiviert und muss erst stabilisiert werden.";
-  if (reason === "specialist_wing_variant_required") return "Bitte zuerst eine Spezialisten-Variante waehlen.";
+  if (reason === "insufficient_cash") return "Nicht genug Cash für dieses Upgrade.";
+  if (reason === "facility_max_level") return "Dieses Gebäude ist bereits auf Max-Level.";
+  if (reason === "facility_disabled") return "Dieses Gebäude ist aktuell deaktiviert und muss erst stabilisiert werden.";
+  if (reason === "specialist_wing_variant_required") return "Bitte zuerst eine Spezialisten-Variante wählen.";
   if (reason === "specialist_wing_variant_switch_not_supported") return "Diese Spezialisten-Variante kann nach dem Bau nicht mehr gewechselt werden.";
-  if (reason === "team_not_found") return "Team konnte fuer diese Gebaeude-Aktion nicht gefunden werden.";
+  if (reason === "team_not_found") return "Team konnte für diese Gebäude-Aktion nicht gefunden werden.";
   if (reason === "save_not_active") return "Dieser Spielstand ist nicht aktiv.";
   if (reason === "save_not_found") return "Spielstand konnte nicht gefunden werden.";
-  if (reason === "local_team_not_owned_or_ai_controlled") return "Nur eigene manuelle Teams duerfen Gebaeude bauen oder warten.";
-  if (reason === "confirm_token_required") return "Bitte Upgrade zuerst pruefen und danach bestaetigen.";
-  if (reason === "facility_upgrade_preview_stale") return "Die Upgrade-Vorschau ist veraltet. Bitte noch einmal pruefen.";
-  if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal pruefen.";
-  if (reason === "early_season_setup_allowed_before_first_result") return "Frueher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
+  if (reason === "local_team_not_owned_or_ai_controlled") return "Nur eigene manuelle Teams dürfen Gebäude bauen oder warten.";
+  if (reason === "confirm_token_required") return "Bitte Upgrade zuerst prüfen und danach bestätigen.";
+  if (reason === "facility_upgrade_preview_stale") return "Die Upgrade-Vorschau ist veraltet. Bitte noch einmal prüfen.";
+  if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal prüfen.";
+  if (reason === "early_season_setup_allowed_before_first_result") return "Früher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
 
   return shared;
 }
@@ -110,7 +110,7 @@ export function formatObjectiveStatusLabel(status: string | null | undefined) {
     open: "offen",
     at_risk: "unter Druck",
     failed: "verfehlt",
-    completed: "erfuellt",
+    completed: "erfüllt",
     blocked: "blockiert",
     optional: "optional",
     ready: "bereit",
@@ -124,7 +124,7 @@ export function formatSeasonCompletionStepStatus(status: string | null | undefin
     applied: "angewendet",
     already_done: "schon erledigt",
     blocked: "blockiert",
-    skipped: "uebersprungen",
+    skipped: "übersprungen",
     ready: "bereit",
   };
   return mapped[String(status ?? "").toLowerCase()] ?? String(status ?? "offen").replaceAll("_", " ");
@@ -141,7 +141,7 @@ export function getSeasonCompletionStepTone(status: string | null | undefined) {
 export function formatAiLineupAuditWarning(warning: string) {
   const mapped: Record<string, string> = {
     ai_lineup_audit_no_source: "AI-Audit hat keine lesbare Lineup-Quelle.",
-    ai_lineup_audit_no_lineup_drafts: "Keine gespeicherten Einsatzlisten fuer diese Saison gefunden.",
+    ai_lineup_audit_no_lineup_drafts: "Keine gespeicherten Einsatzlisten für diese Saison gefunden.",
     ai_lineup_audit_no_ai_drafts: "AI-Teams haben keine gespeicherten Einsatzlisten.",
     ai_lineups_missing: "AI-Lineups fehlen.",
     ai_captain_unused: "Captain wurde nicht genutzt.",
@@ -158,7 +158,7 @@ export function formatHomeWarningLabel(warning: string) {
     season_started_no_results: "Saison ohne Ergebnis",
     no_final_standings: "Tabelle noch offen",
     missing_lineups: "Einsatzliste offen",
-    lineup_not_submitted: "Einsatzliste voll — bitte in der Einsatzliste bestaetigen.",
+    lineup_not_submitted: "Einsatzliste voll — bitte in der Einsatzliste bestätigen.",
     formcard_pool_missing: "Formkarten-Pool fehlt",
     unused_negative_formcards: "Negative Formkarten offen",
     formcards_open: "Formkarten-Pool fehlt",

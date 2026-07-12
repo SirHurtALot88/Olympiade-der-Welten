@@ -287,11 +287,11 @@ const GAME_PHASE_VISIBLE_NEEDLES = [
   "GamePhase",
   "season_active",
   "Phase",
-  "Saison laeuft",
-  "Saisonrueckblick",
+  "Saison läuft",
+  "Saisonrückblick",
   "Saison abgeschlossen",
   "Preseason-Management",
-  "Naechste Saison bereit",
+  "Nächste Saison bereit",
   "Vorbereitung",
   "Lineup Setup",
   "Preseason",
@@ -707,7 +707,7 @@ async function main() {
         assertStep(step, activeSaveText.toLowerCase().includes(shortSaveId(alternativeSave.saveId).toLowerCase()), "Banner/Admin-Kontext zeigt den gewechselten Save.");
         assertStep(step, managerText.includes("Quelle"), "Teamquelle bleibt im Banner sichtbar.");
         assertStep(step, switchedSelectedTeam.length > 0, "activeManagerTeamId wurde gegen den neuen Save validiert.");
-        assertStep(step, switchedSelectedTeam !== selectedBeforeSwitch || managerText.includes("zurueckgesetzt") || managerText.includes("Quelle"), "Alter Team-Kontext wird nicht blind als Autoritaet uebernommen.");
+        assertStep(step, switchedSelectedTeam !== selectedBeforeSwitch || managerText.includes("zurückgesetzt") || managerText.includes("Quelle"), "Alter Team-Kontext wird nicht blind als Autoritaet uebernommen.");
 
         await gotoFoundation(page, args.baseUrl, "market", switchedSelectedTeam, alternativeSave.saveId);
         const marketTextAfterSwitch = await page.getByTestId("transfer-market").innerText({ timeout: args.timeoutMs }).catch(() => "");
@@ -788,7 +788,7 @@ async function main() {
         const text = await trainingPanel.innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, hasAny(text, ["Training", "Trainings-Setpoints", "Regeneration"]), "Training-Reiter lädt.");
         assertStep(step, hasAny(text, ["Entwicklung", "Setpoints", "Performance"]), "Entwicklungs-/Forecast-UI ist sichtbar.");
-        assertStep(step, hasAny(text, ["Top Steigerer", "Groesstes Risiko", "Kein aktiver Kader"]), "Spieler-Forecast ist sichtbar.");
+        assertStep(step, hasAny(text, ["Top Steigerer", "Größtes Risiko", "Kein aktiver Kader"]), "Spieler-Forecast ist sichtbar.");
         assertStep(step, hasAny(text, ["Gebäude", "Facility", "Leicht", "Hart"]), "Training-Kontext inkl. Facility/Modus ist sichtbar.");
       },
     }));

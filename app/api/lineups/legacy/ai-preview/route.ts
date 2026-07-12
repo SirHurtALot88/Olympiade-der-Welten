@@ -43,9 +43,9 @@ function formatCardLabel(context: LegacyLineupLoadedContext, cardId: string | nu
 
 function buildIntensityReason(side: AiLegacyLineupSuggestionSide, modifier: LineupDraftModifierSide) {
   if (modifier.intensity === "push") {
-    if (side.captainName) return `Push, weil ${side.captainName} als Captain ein klares Score-Fenster oeffnet.`;
+    if (side.captainName) return `Push, weil ${side.captainName} als Captain ein klares Score-Fenster öffnet.`;
     if ((side.teamDisciplineRank ?? 99) <= 8) return "Push, weil die AI einen Toprang verteidigt.";
-    return "Push, weil der beste eingesetzte Score stark genug fuer einen Angriff ist.";
+    return "Push, weil der beste eingesetzte Score stark genug für einen Angriff ist.";
   }
   if (modifier.intensity === "conserve") {
     return "Schonen, weil die AI den Spieltag frueh in der Saison eher als Low-Value-Fenster bewertet.";
@@ -63,7 +63,7 @@ function buildFormReason(context: LegacyLineupLoadedContext, modifier: LineupDra
 
 function buildMutatorReason(side: AiLegacyLineupSuggestionSide, modifier: LineupDraftModifierSide) {
   const traits = [modifier.mutatorTrait1, modifier.mutatorTrait2].filter((entry): entry is string => Boolean(entry));
-  if (traits.length === 0) return "Keine Mutatoren gewaehlt.";
+  if (traits.length === 0) return "Keine Mutatoren gewählt.";
   return `${traits.join(" / ")} nach Trefferchance im eingesetzten Lineup. Jeder Treffer zaehlt +6.`;
 }
 
@@ -111,7 +111,7 @@ function buildAiAuditSummary(preview: AiLegacyLineupPreview): AiLegacyLineupAudi
     items.push({
       label: `${side.disciplineSide.toUpperCase()} Captain`,
       status: side.captainSelectionStatus === "blocked_policy" ? "blocked" : "ok",
-      detail: side.captainName ? `${side.captainName} gewaehlt` : "kein Captain auf dieser Diszi",
+      detail: side.captainName ? `${side.captainName} gewählt` : "kein Captain auf dieser Diszi",
     });
   }
   items.push({

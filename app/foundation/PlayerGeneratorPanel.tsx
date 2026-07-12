@@ -215,7 +215,7 @@ function formatFormulaSourceStatus(status: PlayerGeneratorDraft["generated"]["fo
     return "ready";
   }
   if (status === "incomplete_source") {
-    return "unvollstaendig";
+    return "unvollständig";
   }
   return "missing";
 }
@@ -269,7 +269,7 @@ function formatGeneratorEngineStatusLabel(
       return "MW-Engine bereit";
     }
     if (status === "incomplete_source") {
-      return "MW-Engine blockiert: Rank→MW-Tabelle ist noch unvollstaendig.";
+      return "MW-Engine blockiert: Rank→MW-Tabelle ist noch unvollständig.";
     }
     return "MW-Engine blockiert: Quelle fehlt noch.";
   }
@@ -287,7 +287,7 @@ function formatGeneratorEngineStatusLabel(
       return "Class Engine nutzt echte Faktoren.";
     }
     if (status === "heuristic") {
-      return "Class Engine laeuft heuristisch.";
+      return "Class Engine läuft heuristisch.";
     }
     return "Class Engine blockiert.";
   }
@@ -301,11 +301,11 @@ function formatQualityWarningLabel(warning: PlayerGeneratorDraft["generated"]["d
     case "role_profile_weak":
       return "Rollenprofil ist noch zu schwach oder zu weich ausgepraegt.";
     case "too_flat_profile":
-      return "Profil ist zu flach und braucht klarere Spitzen und Schwaechen.";
+      return "Profil ist zu flach und braucht klarere Spitzen und Schwächen.";
     case "axis_auto_resolved":
       return "Mindestens eine Achse wurde automatisch aus Rolle oder Archetyp abgeleitet.";
     case "archetype_pool_missing":
-      return "Fuer den Archetyp fehlt im aktuellen Pool eine saubere Race-/Subclass-Basis.";
+      return "Für den Archetyp fehlt im aktuellen Pool eine saubere Race-/Subclass-Basis.";
     case "unknown_trait":
       return "Trait-Hinweis ist im aktuellen Pool nicht bekannt.";
     case "unknown_class":
@@ -322,7 +322,7 @@ function formatSaveCommitReason(reason: PlayerGeneratorDraft["generated"]["diagn
     case "market_value_engine_blocked":
       return "Marktwert ist noch nicht final freigegeben.";
     case "salary_engine_blocked":
-      return "Gehaltsengine ist noch nicht vollstaendig freigegeben.";
+      return "Gehaltsengine ist noch nicht vollständig freigegeben.";
     case "salary_engine_waits_for_market_value":
       return "Gehalt wartet noch auf einen echten Marktwert.";
     case "commit_path_not_ready":
@@ -492,7 +492,7 @@ export default function PlayerGeneratorPanel({
       return;
     }
     if (readOnly) {
-      setMessage("Prisma / Referenzmodus bleibt read-only. Drafts koennen nur lokal gespeichert werden.");
+      setMessage("Prisma / Referenzmodus bleibt read-only. Drafts können nur lokal gespeichert werden.");
       return;
     }
 
@@ -515,7 +515,7 @@ export default function PlayerGeneratorPanel({
 
   function deleteDraft(draftId: string) {
     if (readOnly) {
-      setMessage("Prisma / Referenzmodus bleibt read-only. Drafts koennen hier nicht geloescht werden.");
+      setMessage("Prisma / Referenzmodus bleibt read-only. Drafts können hier nicht gelöscht werden.");
       return;
     }
 
@@ -556,7 +556,7 @@ export default function PlayerGeneratorPanel({
 
   function readPortraitFile(file: File) {
     if (!file.type.startsWith("image/")) {
-      setMessage("Bitte nur Bilddateien fuer das Portrait verwenden.");
+      setMessage("Bitte nur Bilddateien für das Portrait verwenden.");
       return;
     }
     const reader = new FileReader();
@@ -647,7 +647,7 @@ export default function PlayerGeneratorPanel({
         <div className="stack">
           <h2>Player Generator</h2>
           <p className="muted">
-            Lokale Drafts fuer neue Spieler mit Teamfit, Slot-Ausblick, Economy-Schaetzung und sicherem Review vor jedem echten Commit.
+            Lokale Drafts für neue Spieler mit Teamfit, Slot-Ausblick, Economy-Schätzung und sicherem Review vor jedem echten Commit.
           </p>
         </div>
         <div className="room-meta foundation-admin-meta">
@@ -720,7 +720,7 @@ export default function PlayerGeneratorPanel({
             </label>
 
             <label className="filter-field">
-              <span>Staerke-Level</span>
+              <span>Stärke-Level</span>
               <select
                 className="input"
                 value={form.strengthTier}
@@ -877,7 +877,7 @@ export default function PlayerGeneratorPanel({
               disabled
               title="Noch deaktiviert: Erst sicheren Free-Agent-Insert-Pfad bauen."
             >
-              Als Free Agent uebernehmen
+              Als Free Agent übernehmen
             </button>
           </div>
           <p className="muted" style={{ marginTop: 8 }}>
@@ -929,7 +929,7 @@ export default function PlayerGeneratorPanel({
                         className="input"
                         type="text"
                         value={portraitDraftUrl}
-                        placeholder="Portrait-URL oder /media/pfad einfuegen"
+                        placeholder="Portrait-URL oder /media/pfad einfügen"
                         onChange={(event) => setPortraitDraftUrl(event.target.value)}
                       />
                       <button className="secondary-button inline-button" type="button" onClick={applyPortraitUrl}>
@@ -1054,7 +1054,7 @@ export default function PlayerGeneratorPanel({
                   <ul className="foundation-inline-list">
                     <li>OVR ist eine Draft-Vorschau, kein finaler Pool-Wert.</li>
                     <li>PPs sind Draft-Vorschauwerte und keine Season-PPs.</li>
-                    <li>MW und Gehalt sind Generator-Projections fuer Review und Balancing.</li>
+                    <li>MW und Gehalt sind Generator-Projections für Review und Balancing.</li>
                     <li>Draft speichern legt nur einen lokalen Entwurf ab.</li>
                     <li>Free-Agent-Commit bleibt deaktiviert, bis der sichere Insert-Pfad gebaut ist.</li>
                   </ul>
@@ -1065,7 +1065,7 @@ export default function PlayerGeneratorPanel({
                   <div className="foundation-player-generator-status-cards">
                     <article className={`foundation-player-generator-status-card ${readOnly ? "is-warning" : "is-success"}`}>
                       <span>Draft speichern</span>
-                      <strong>{readOnly ? "Read-only in Prisma" : "Aktiv fuer lokalen Entwurf"}</strong>
+                      <strong>{readOnly ? "Read-only in Prisma" : "Aktiv für lokalen Entwurf"}</strong>
                     </article>
                     <article className="foundation-player-generator-status-card is-warning">
                       <span>Free-Agent-Commit</span>
@@ -1099,7 +1099,7 @@ export default function PlayerGeneratorPanel({
                 <div className="panel-header">
                   <div className="stack">
                     <h3>Finaler Spieler-Entwurf</h3>
-                    <p className="muted">Das wuerde am Ende entstehen, wenn der Draft spaeter ueber einen separaten sicheren Insert-Pfad uebernommen wird.</p>
+                    <p className="muted">Das würde am Ende entstehen, wenn der Draft später über einen separaten sicheren Insert-Pfad uebernommen wird.</p>
                   </div>
                 </div>
                 <div className="foundation-player-generator-final-grid">
@@ -1525,7 +1525,7 @@ export default function PlayerGeneratorPanel({
                     Laden
                   </button>
                   <button className="secondary-button" type="button" disabled={readOnly} onClick={() => deleteDraft(draft.draftId)}>
-                    Loeschen
+                    Löschen
                   </button>
                 </div>
               </article>

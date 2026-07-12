@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Prisma-Referenz ist read-only. Fuer Kaeufe bitte lokalen Testspielstand starten.",
+          error: "Prisma-Referenz ist read-only. Für Käufe bitte lokalen Testspielstand starten.",
           summary: null,
           warnings: [],
           scope: { saveId, seasonId, teamId, playerId, dryRun, source },

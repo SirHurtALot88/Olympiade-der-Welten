@@ -326,7 +326,7 @@ export function createCockpitMatchdayApplyHandlers(
         setFoundationActionFeedback({
           tone: "success",
           title: "Spieltag weitergeschaltet",
-          detail: "Matchday wurde geschrieben. Tabelle, Preisgeld-Preview und naechster Spieltag sind aktualisiert.",
+          detail: "Matchday wurde geschrieben. Tabelle, Preisgeld-Preview und nächster Spieltag sind aktualisiert.",
         });
         await Promise.all([loadSave(activeSaveId), reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
         bumpMarketReloadToken();

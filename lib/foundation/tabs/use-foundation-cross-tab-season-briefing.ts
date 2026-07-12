@@ -303,7 +303,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         kicker: "Dossier",
         detail:
           rosterCount > 0
-            ? `Staerke ${strongestAxis?.label ?? "—"} ${formatWholeNumber(strongestAxis?.value)} · Luecke ${weakestAxis?.label ?? "—"} ${formatWholeNumber(weakestAxis?.value)}.`
+            ? `Stärke ${strongestAxis?.label ?? "—"} ${formatWholeNumber(strongestAxis?.value)} · Lücke ${weakestAxis?.label ?? "—"} ${formatWholeNumber(weakestAxis?.value)}.`
             : "Noch kein aktiver Kader vorhanden.",
         targetLabel: "Kader öffnen",
         targetView: "teams",
@@ -331,7 +331,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         stepId: "first_transfers",
         title: "Erste Transfers",
         kicker: "Markt",
-        detail: "Oeffnet den Markt mit Team-Fit, Value-Ratio und Kaderluecken im Fokus.",
+        detail: "Oeffnet den Markt mit Team-Fit, Value-Ratio und Kaderlücken im Fokus.",
         targetLabel: "Deals suchen",
         targetView: "market",
         status: getResolvedStatus("first_transfers", activeTransfers),
@@ -376,7 +376,7 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         stepId: "set_lineup",
         title: "Einsatzliste setzen",
         kicker: "Matchday",
-        detail: `${input.currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / ${input.currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}: Slots fuellen, Powers/Captains bewusst setzen.`,
+        detail: `${input.currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / ${input.currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}: Slots füllen, Powers/Captains bewusst setzen.`,
         targetLabel: "Einsatzliste öffnen",
         targetView: "lineup",
         status: getResolvedStatus(

@@ -622,7 +622,7 @@ function getDemandCardTone(status: PlayerDetailDrawerData["demands"][number]["st
 
 function formatAvailabilityStatus(data: PlayerDetailDrawerData["availability"]) {
   if (data.isUnavailable) {
-    return `Verletzt bis ${data.injuryUntilMatchday ?? "naechster Matchday"}`;
+    return `Verletzt bis ${data.injuryUntilMatchday ?? "nächster Matchday"}`;
   }
   if (data.injuryStatus === "recovering") {
     return "Genesen";
@@ -711,7 +711,7 @@ function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
       <div className="player-drawer-injury-banner is-negative" data-testid="player-drawer-injury-banner">
         <strong>Verletzt</strong>
         <span>
-          Ausfall bis {data.availability.injuryUntilMatchday ?? "naechster Spieltag"}
+          Ausfall bis {data.availability.injuryUntilMatchday ?? "nächster Spieltag"}
           {data.availability.injuryRecovery != null
             ? ` · Regeneration ${formatValue(data.availability.injuryRecovery, 1)} (50%)`
             : " · Regeneration 50%"}
@@ -751,7 +751,7 @@ function formatGrowthOutlook(value: NonNullable<PlayerDetailDrawerData["developm
     case "stagnation":
       return "Stagnation";
     case "regression_risk":
-      return "Rueckschritt-Risiko";
+      return "Rückschritt-Risiko";
     default:
       return "—";
   }
@@ -872,7 +872,7 @@ function PotentialRangeStarRating({
     <span
       className={`player-drawer-star-rating is-range${compact ? " is-compact" : ""}`}
       aria-label={`${label ? `${label}: ` : ""}Potential ${formatValue(minStars, 1)} bis ${formatValue(maxStars, 1)} von 5 Sternen`}
-      title={`${label ? `${label}: ` : ""}Potential ${formatValue(minScore, 0)}-${formatValue(maxScore, 0)} (${formatValue(minStars, 1)}-${formatValue(maxStars, 1)} Sterne). Schwarze Sterne = moegliches, aber unsicheres Maximum.`}
+      title={`${label ? `${label}: ` : ""}Potential ${formatValue(minScore, 0)}-${formatValue(maxScore, 0)} (${formatValue(minStars, 1)}-${formatValue(maxStars, 1)} Sterne). Schwarze Sterne = mögliches, aber unsicheres Maximum.`}
     >
       {label ? <span className="player-drawer-star-label">{label}</span> : null}
       <span className="player-drawer-stars" aria-hidden="true">
@@ -2731,7 +2731,7 @@ export default function PlayerDetailDrawer({
                     ))}
                   </div>
                   <div className="player-drawer-progression-reason-grid" aria-label="Progressionsgruende">
-                    <span title="Positive Traits erhoehen das Trainingsbudget, negative Traits bremsen es.">
+                    <span title="Positive Traits erhöhen das Trainingsbudget, negative Traits bremsen es.">
                       <strong>
                         Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
                         {formatValue(data.organicProgression.traitModifierPct, 1)}%
@@ -2768,11 +2768,11 @@ export default function PlayerDetailDrawer({
 
           {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast || showOwnPotentialSnapshot) ? (
             <section className="player-drawer-section player-drawer-panel" id="player-drawer-potential">
-              <h3 title="Kurzfassung: Potential und Entwicklungsroute. Details koennen aufgeklappt werden.">Potential & Entwicklung</h3>
+              <h3 title="Kurzfassung: Potential und Entwicklungsroute. Details können aufgeklappt werden.">Potential & Entwicklung</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                 {showOwnPotentialSnapshot ? (
-                  <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status fuer den eigenen Kader.">
-                    <HelpLabel title="PO = geschaetzte Achsen-Decke. Delta zeigt die Veraenderung seit der letzten Saison.">Achsen-Potential</HelpLabel>
+                  <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status für den eigenen Kader.">
+                    <HelpLabel title="PO = geschätzte Achsen-Decke. Delta zeigt die Veränderung seit der letzten Saison.">Achsen-Potential</HelpLabel>
                     <strong className="player-drawer-star-stack">
                       PO {formatAxisStarValue(data.potentialOverallStars)}
                       {data.potentialOverallDelta != null ? (
@@ -2812,8 +2812,8 @@ export default function PlayerDetailDrawer({
                   </article>
                 ) : null}
                 {data.scoutPotential ? (
-                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschaetzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
-                    <HelpLabel title="Potential-Spanne = geschaetzter Zielbereich. Current = aktueller Stand. Gap = moegliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
+                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschätzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
+                    <HelpLabel title="Potential-Spanne = geschätzter Zielbereich. Current = aktueller Stand. Gap = mögliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
                     <strong>
                       {formatDevelopmentRange(data.developmentInsight)}{" "}
                       {showScoutedPotentialStars ? (
@@ -2850,7 +2850,7 @@ export default function PlayerDetailDrawer({
                     className="metric-card player-drawer-xp-balance-card"
                     title="Organische Saison-Prognose: Setpoints aus Training, Performance und Erhaltungsdruck — das ist die verbindliche Entwicklungslogik."
                   >
-                    <HelpLabel title="Netto-Setpoints = angewandtes Training + Performance + Regression (Basis + Marktwert). Das ist die Hauptzahl fuer organische Entwicklung.">
+                    <HelpLabel title="Netto-Setpoints = angewandtes Training + Performance + Regression (Basis + Marktwert). Das ist die Hauptzahl für organische Entwicklung.">
                       Saison-Prognose (Setpoints)
                     </HelpLabel>
                     <div className="player-drawer-xp-balance-grid">
@@ -2890,7 +2890,7 @@ export default function PlayerDetailDrawer({
                     {data.progressionForecast ? (
                       <>
                         <article className="metric-card">
-                          <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
+                          <HelpLabel title="CA = aktueller Stand. PO = geschätztes Potential. Je größer der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
                           <strong className="player-drawer-star-stack">
                             <ScoutStarDisplay
                               axisDisplay={data.axisStarsDisplay}
@@ -3060,7 +3060,7 @@ export default function PlayerDetailDrawer({
                       return (
                         <span
                           className={getMoneyDeltaToneClass(row.marketValueBaselineDelta, "higher")}
-                          title="Marktwert mit Veraenderung gegenueber Kaufpreis (Fallback: Season-0-Baseline)."
+                          title="Marktwert mit Veränderung gegenüber Kaufpreis (Fallback: Season-0-Baseline)."
                         >
                           {formatMoneyWithBaselineDelta(row.marketValue, row.marketValueBaselineDelta)}
                         </span>
@@ -3085,7 +3085,7 @@ export default function PlayerDetailDrawer({
                 />
                 <p className="muted" style={{ marginTop: 10 }}>
                   Alte Seasons kommen aus gespeicherten Season-Snapshots. Fehlende Felder bedeuten: der damalige Snapshot
-                  wurde noch vor der vollstaendigen Spieler-Metric-Archivierung erstellt.
+                  wurde noch vor der vollständigen Spieler-Metric-Archivierung erstellt.
                 </p>
                 {marketValueHistoryRows.length > 0 ? (
                   <div className="player-drawer-injury-history" data-testid="player-drawer-market-value-history">

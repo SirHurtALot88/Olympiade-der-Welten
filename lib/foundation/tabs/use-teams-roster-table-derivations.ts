@@ -147,7 +147,7 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
       { id: "default" as const, label: "Standard", count: input.selectedRosterTableRows.length },
       { id: "salary" as const, label: "Gehaltsdruck", count: salaryCount },
       { id: "value" as const, label: "Value", count: valueCount },
-      { id: "contracts" as const, label: "Vertraege", count: expiringCount },
+      { id: "contracts" as const, label: "Verträge", count: expiringCount },
       { id: "training" as const, label: "Training", count: trainingCount },
     ].filter((entry) => entry.id === "default" || entry.count > 0);
   }, [input.gameState, input.getRosterEntryDisplaySalary, input.getRosterEntrySalaryDelta, input.selectedRosterTableRows]);

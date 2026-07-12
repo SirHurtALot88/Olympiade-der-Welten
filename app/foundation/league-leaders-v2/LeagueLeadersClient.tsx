@@ -40,7 +40,7 @@ export default function LeagueLeadersClient(props: LeagueLeadersClientProps) {
         <div className="stack">
           <TooltipHeading
             as="h2"
-            tooltip="Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick oeffnet das Spielerprofil."
+            tooltip="Top 5 ligaweit je Kategorie. Eigene Kader-Spieler sind hervorgehoben. Klick öffnet das Spielerprofil."
           >
             Liga-Leaders
           </TooltipHeading>

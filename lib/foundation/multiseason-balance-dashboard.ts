@@ -448,7 +448,7 @@ function buildWarnings(input: {
       type: "season_source_missing",
       severity: "warning",
       title: `${seasonId} fehlt`,
-      message: "Diese Season ist im aktiven Save nicht als Snapshot vorhanden. Dashboard zeigt dafuer keine Fakewerte.",
+      message: "Diese Season ist im aktiven Save nicht als Snapshot vorhanden. Dashboard zeigt dafür keine Fakewerte.",
       source: "seasonSnapshots",
     });
   }

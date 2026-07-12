@@ -304,11 +304,11 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                 <span className="foundation-kicker">Control Room</span>
                 <strong>Spielmodus, Team-Zuordnung und AI-Automation.</strong>
                 <p className="muted">
-                  Der Spielmodus ist die einzige Wahrheit fuer Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
+                  Der Spielmodus ist die einzige Wahrheit für Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
                 </p>
                 <div className="room-meta foundation-admin-meta">
                   <span className={`pill${selectedTeamHasUnsavedChanges ? " warning-pill" : " success-pill"}`}>
-                    {selectedTeamHasUnsavedChanges ? "Aenderungen offen" : "Alles synchron"}
+                    {selectedTeamHasUnsavedChanges ? "Änderungen offen" : "Alles synchron"}
                   </span>
                   <span className="pill">Aktiv {selectedTeam?.shortCode ?? "—"}</span>
                   <span className="pill">GM {selectedTeamGeneralManager?.profile.name ?? "—"}</span>
@@ -371,7 +371,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
             <div className="foundation-main-grid">
               <section className="panel" id="foundation-team-settings-saves">
                 <div className="panel-header">
-                  <h2>Spielstaende</h2>
+                  <h2>Spielstände</h2>
                 </div>
                 <div className="stack">
                   <article className="metric-card">
@@ -411,7 +411,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           ? getReadOnlyActionReason("den Save-Bereich")
                           : isSaveBusy
                             ? getBusyActionReason("Der Save-Wechsel")
-                            : "Waehlt, in welchem Bereich lokale Spielstaende angezeigt und gesteuert werden."
+                            : "Wählt, in welchem Bereich lokale Spielstände angezeigt und gesteuert werden."
                       }
                       onChange={(event) => changeFoundationSaveMode(normalizeFoundationSaveMode(event.target.value))}
                     >
@@ -432,12 +432,12 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       disabled={isSaveBusy || readMeta.readOnly || saveSummaries.length === 0}
                       title={
                         saveSummaries.length === 0
-                          ? "In diesem Save-Bereich gibt es gerade keine Spielstaende."
+                          ? "In diesem Save-Bereich gibt es gerade keine Spielstände."
                           : readMeta.readOnly
                             ? getReadOnlyActionReason("den aktiven Spielstand")
                             : isSaveBusy
                               ? getBusyActionReason("Der Save-Wechsel")
-                              : "Waehlt den lokalen Spielstand, mit dem du weiterarbeitest."
+                              : "Wählt den lokalen Spielstand, mit dem du weiterarbeitest."
                       }
                       onChange={(event) => {
                         const nextSaveId = event.target.value;
@@ -466,7 +466,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       <span className="pill">Baseline · Startbudget · Ownership</span>
                     </div>
                     <p className="muted">
-                      Erst pruefen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save aktiv.
+                      Erst prüfen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save aktiv.
                     </p>
                     <div className="filter-grid">
                       <label className="filter-field">
@@ -480,7 +480,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               ? getReadOnlyActionReason("den Spielmodus")
                               : newGameBusy
                                 ? getBusyActionReason("Das New-Game-Setup")
-                                : "Waehlt das Basissetup fuer das neue Spiel."
+                                : "Wählt das Basissetup für das neue Spiel."
                           }
                           onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
                         >
@@ -502,7 +502,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               ? getReadOnlyActionReason("den Save-Namen")
                               : newGameBusy
                                 ? getBusyActionReason("Das New-Game-Setup")
-                                : "Optionaler Name fuer den neuen lokalen Spielstand."
+                                : "Optionaler Name für den neuen lokalen Spielstand."
                           }
                           placeholder="Optional, sonst automatisch"
                           onChange={(event) => {
@@ -544,7 +544,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               ? getReadOnlyActionReason("die Team-Zuordnung")
                               : newGameBusy
                                 ? getBusyActionReason("Das New-Game-Setup")
-                                : "Waehle genau 1 Team fuer den Solo-Spielstand."
+                                : "Wähle genau 1 Team für den Solo-Spielstand."
                           }
                           onChange={(event) => {
                             if (event.target.value) {
@@ -553,7 +553,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           }}
                         >
                           <option value="" disabled>
-                            Team waehlen
+                            Team wählen
                           </option>
                           {[...gameState.teams]
                             .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
@@ -612,7 +612,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                             ? getReadOnlyActionReason("die Team-Zuordnung")
                                             : newGameBusy
                                               ? getBusyActionReason("Das New-Game-Setup")
-                                              : "Ordnet dieses Team Chris/User fuer den neuen Spielstand zu."
+                                              : "Ordnet dieses Team Chris/User für den neuen Spielstand zu."
                                       }
                                       onClick={() => toggleNewGameTeam("chris", team.teamId)}
                                     >
@@ -629,7 +629,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                             ? getReadOnlyActionReason("die Team-Zuordnung")
                                             : newGameBusy
                                               ? getBusyActionReason("Das New-Game-Setup")
-                                              : "Ordnet dieses Team Franky fuer den neuen Spielstand zu."
+                                              : "Ordnet dieses Team Franky für den neuen Spielstand zu."
                                       }
                                       onClick={() => toggleNewGameTeam("franky", team.teamId)}
                                     >
@@ -653,11 +653,11 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             ? getReadOnlyActionReason("das New-Game-Setup")
                             : newGameBusy
                               ? getBusyActionReason("Das New-Game-Setup")
-                              : "Prueft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
+                              : "Prüft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
                         }
                         onClick={() => void runNewGameSetup(true)}
                       >
-                        {newGameBusy ? "Prueft..." : "Setup pruefen"}
+                        {newGameBusy ? "Prüft..." : "Setup prüfen"}
                       </button>
                       <button
                         className="primary-button"
@@ -674,10 +674,10 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             : newGameBusy
                               ? getBusyActionReason("Das New-Game-Setup")
                               : !newGamePreview
-                                ? "Bitte zuerst das Setup pruefen."
+                                ? "Bitte zuerst das Setup prüfen."
                                 : newGamePreview.blockers.length > 0
                                   ? `Noch offen: ${newGamePreview.blockers.map((reason: string) => formatCockpitReason(reason)).join(" · ")}`
-                                  : "Erstellt den neuen lokalen Spielstand mit dem geprueften Setup."
+                                  : "Erstellt den neuen lokalen Spielstand mit dem geprüften Setup."
                         }
                         onClick={() => void runNewGameSetup(false)}
                       >
@@ -787,11 +787,11 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           ? getReadOnlyActionReason("ein neues Spiel")
                           : isSaveBusy
                             ? getBusyActionReason("Die Save-Aktion")
-                            : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu loeschen."
+                            : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu löschen."
                       }
                       onClick={() => {
                         const confirmed = window.confirm(
-                          "Erstellt einen neuen lokalen Testspielstand fuer Season 1. Bestehende Saves bleiben erhalten.",
+                          "Erstellt einen neuen lokalen Testspielstand für Season 1. Bestehende Saves bleiben erhalten.",
                         );
                         if (!confirmed) {
                           return;
@@ -837,13 +837,13 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           ? getReadOnlyActionReason("den Season-Start-Reset")
                           : seasonStartResetBusy
                             ? getBusyActionReason("Der Season-Start-Reset")
-                            : "Prueft, wie der aktuelle Save auf den Season-Start zurueckgesetzt wuerde."
+                            : "Prüft, wie der aktuelle Save auf den Season-Start zurückgesetzt würde."
                       }
                       onClick={() => {
                         void runSeasonStartReset(false);
                       }}
                     >
-                      {seasonStartResetBusy ? "Laedt..." : "Season-Start-Reset pruefen"}
+                      {seasonStartResetBusy ? "Lädt..." : "Season-Start-Reset prüfen"}
                     </button>
                     <button
                       className="danger-button"
@@ -855,15 +855,15 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           : seasonStartResetBusy
                             ? getBusyActionReason("Der Season-Start-Reset")
                             : !seasonStartResetFeed || !seasonStartResetFeed.dryRun
-                              ? "Bitte zuerst den Reset trocken pruefen."
-                              : "Setzt den aktuellen lokalen Save hart auf den Season-Start zurueck."
+                              ? "Bitte zuerst den Reset trocken prüfen."
+                              : "Setzt den aktuellen lokalen Save hart auf den Season-Start zurück."
                       }
                       onClick={() => {
                         if (!seasonStartResetFeed) {
                           return;
                         }
                         const confirmed = window.confirm(
-                          `Aktuellen Save jetzt hart auf Season-Start zuruecksetzen? ${seasonStartResetFeed.summary.currentTransfers} Transfers, ${seasonStartResetFeed.summary.currentRosterEntries} Roster-Eintraege und gespeicherte Spieltagsdaten werden entfernt.`,
+                          `Aktuellen Save jetzt hart auf Season-Start zurücksetzen? ${seasonStartResetFeed.summary.currentTransfers} Transfers, ${seasonStartResetFeed.summary.currentRosterEntries} Roster-Einträge und gespeicherte Spieltagsdaten werden entfernt.`,
                         );
                         if (!confirmed) {
                           return;
@@ -871,7 +871,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         void runSeasonStartReset(true);
                       }}
                     >
-                      Season-Start-Reset ausfuehren
+                      Season-Start-Reset ausführen
                     </button>
                   </div>
 
@@ -955,7 +955,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                   <div className="save-summary-list">
                     {saveSummaries.length === 0 ? (
                       <div className="transfer-callout">
-                        <strong>Keine Spielstaende in diesem Bereich</strong>
+                        <strong>Keine Spielstände in diesem Bereich</strong>
                         <span>Wechsle den Save-Bereich oder starte ein neues Spiel in diesem Modus.</span>
                       </div>
                     ) : null}
@@ -1079,7 +1079,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                 <div className="panel-header">
                   <div className="stack">
                     <h2>Aktives Team</h2>
-                    <p className="muted">Das aktuell ausgewaehlte Team steht hier im Zentrum. Von hier springst du direkt in Kader, Markt oder Team-Drawer.</p>
+                    <p className="muted">Das aktuell ausgewählte Team steht hier im Zentrum. Von hier springst du direkt in Kader, Markt oder Team-Drawer.</p>
                   </div>
                   <div className="room-meta foundation-admin-meta">
                     <span className="pill">{selectedTeam?.name ?? "Kein Team"}</span>
@@ -1094,7 +1094,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     <small>
                       {selectedTeam
                         ? `${formatTeamControlModeLabel(selectedTeamControl?.controlMode)} · ${selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "noch ohne Rang"}`
-                        : "Waehle oben ein Team fuer Identity, Strategy und Control."}
+                        : "Wähle oben ein Team für Identity, Strategy und Control."}
                     </small>
                   </article>
                   <article className="metric-card">
@@ -1135,7 +1135,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       ) : null}
                       <p>
                         {selectedTeamGeneralManager.profile.title} wirkt aktuell zu{" "}
-                        <strong>{selectedTeamGeneralManager.assignment.influencePct}%</strong> auf Teamidentitaet, Pick-Fokus,
+                        <strong>{selectedTeamGeneralManager.assignment.influencePct}%</strong> auf Teamidentität, Pick-Fokus,
                         Cash-Risiko und Vertragsstil.
                       </p>
                       {selectedTeamGmAxisShares ? (
@@ -1182,7 +1182,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     className="secondary-button"
                     type="button"
                     disabled={!selectedTeam}
-                    title={selectedTeam ? "Teamprofil öffnen" : "Waehle zuerst ein Team aus."}
+                    title={selectedTeam ? "Teamprofil öffnen" : "Wähle zuerst ein Team aus."}
                     onClick={() => selectedTeam && openTeamProfileById(selectedTeam.teamId)}
                   >
                     Teamprofil
@@ -1194,7 +1194,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                 <div className="panel-header">
                   <div className="stack">
                     <h2>Team-Auswahl</h2>
-                    <p className="muted">Waehlt das Team fuer Identity, Strategy Profile und Control Settings. Der Wechsel bleibt ueber die URL teilbar.</p>
+                    <p className="muted">Wählt das Team für Identity, Strategy Profile und Control Settings. Der Wechsel bleibt über die URL teilbar.</p>
                   </div>
                 </div>
                 <div
@@ -1206,7 +1206,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                   }}
                 >
                   <label className="stack">
-                    <span>Team waehlen</span>
+                    <span>Team wählen</span>
                     <select
                       className="input"
                       value={selectedTeamId}
@@ -1254,7 +1254,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     title={
                       selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1
                         ? "Du bist bereits beim letzten Team der Liste."
-                        : "Springt zum naechsten Team in der aktuellen Liste."
+                        : "Springt zum nächsten Team in der aktuellen Liste."
                     }
                     onClick={() => {
                       const nextTeam = gameState.teams[selectedTeamSettingsIndex + 1];
@@ -1263,7 +1263,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       }
                     }}
                   >
-                    Naechstes
+                    Nächstes
                   </button>
                 </div>
                 <div className="room-meta foundation-admin-meta" style={{ marginTop: 12 }}>
@@ -1304,8 +1304,8 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                   <div className="stack">
                     <h2>Spielmodus &amp; Team-Zuordnung</h2>
                     <p className="muted">
-                      Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere laeuft als AI.
-                      Aenderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
+                      Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere läuft als AI.
+                      Änderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
                     </p>
                   </div>
                   <div className="foundation-save-actions">
@@ -1322,7 +1322,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       className="secondary-button"
                       type="button"
                       disabled={readMeta.readOnly}
-                      title={readMeta.readOnly ? getReadOnlyActionReason("den Team-Control-Draft") : "Setzt alle lokalen Entwurfs-Aenderungen auf den gespeicherten Stand zurueck."}
+                      title={readMeta.readOnly ? getReadOnlyActionReason("den Team-Control-Draft") : "Setzt alle lokalen Entwurfs-Änderungen auf den gespeicherten Stand zurück."}
                       onClick={() => {
                         const savedSettings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
                         const savedOwnership = deriveChrisFrankyTeamIdsFromSettings(gameState.teams, savedSettings);
@@ -1367,9 +1367,9 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       <h3>Team-Zuordnung</h3>
                       <p className="muted">
                         {activeSaveGameMode === "online_4v4"
-                          ? "Waehle genau 4 Teams fuer Chris und 4 fuer Franky. Alle anderen Teams bleiben AI."
+                          ? "Wähle genau 4 Teams für Chris und 4 für Franky. Alle anderen Teams bleiben AI."
                           : activeSaveGameMode === "solo_1"
-                            ? "Waehle genau 1 Team fuer dich. Alle anderen Teams bleiben AI."
+                            ? "Wähle genau 1 Team für dich. Alle anderen Teams bleiben AI."
                             : `Maximal ${gameModeOwnershipLimits.chrisMax} Chris-Team(s)${gameModeOwnershipLimits.frankyMax ? ` und ${gameModeOwnershipLimits.frankyMax} Franky-Team(s)` : ""}.`}
                       </p>
                     </div>
@@ -1390,7 +1390,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         }}
                       >
                         <option value="" disabled>
-                          Team waehlen
+                          Team wählen
                         </option>
                         {gameState.teams.map((team: Team) => (
                           <option key={`solo-team-${team.teamId}`} value={team.teamId}>
@@ -1468,7 +1468,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                   <div className="panel-header">
                     <div className="stack">
                       <h3>AI-Automation (nur AI-Teams)</h3>
-                      <p className="muted">Preview- und Apply-Flags fuer automatisierte AI-Teams. Ownership bleibt unveraendert.</p>
+                      <p className="muted">Preview- und Apply-Flags für automatisierte AI-Teams. Ownership bleibt unverändert.</p>
                     </div>
                   </div>
                   <div className="table-shell" style={{ marginTop: 12 }}>
@@ -1560,9 +1560,9 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     disabled={!selectedTeam || !selectedIdentityDraft || !selectedTeamStrategyDraft}
                     title={
                       !selectedTeam
-                        ? "Waehle zuerst ein Team aus."
+                        ? "Wähle zuerst ein Team aus."
                         : !selectedIdentityDraft || !selectedTeamStrategyDraft
-                          ? "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
+                          ? "Für dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
                           : "Exportiert die aktuellen lokalen Team-Settings als JSON."
                     }
                     onClick={exportSelectedTeamSettingsJson}
@@ -1572,7 +1572,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                 </div>
                 {!selectedTeam || !selectedIdentityDraft || !selectedTeamStrategyDraft ? (
                   <p className="foundation-screen-action-reason">
-                    Warum nicht: {!selectedTeam ? "Waehle zuerst ein Team aus." : "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."}
+                    Warum nicht: {!selectedTeam ? "Wähle zuerst ein Team aus." : "Für dieses Team fehlen noch lokale Identity- oder Strategy-Daten."}
                   </p>
                 ) : null}
                 {teamIdentityMessage ? <p className="text-positive">{teamIdentityMessage}</p> : null}
@@ -1585,7 +1585,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                       <div className="stack">
                         <h3>Team Strategy Profile</h3>
                         <p className="muted">
-                          Ausfuehrlicher lokaler Lore- und Bias-Kontext fuer AI-Erklaerungen. Keine Automatik, keine Auto-Apply-Aktion.
+                          Ausführlicher lokaler Lore- und Bias-Kontext für AI-Erklärungen. Keine Automatik, keine Auto-Apply-Aktion.
                         </p>
                       </div>
                       <div className="room-meta foundation-admin-meta">
@@ -1654,7 +1654,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         <div className="panel-header">
                           <div className="stack">
                             <h3>Identity Rohwerte</h3>
-                            <p className="muted">Exakte Team-Identitaet aus den lokalen Quellen. Diese Rohwerte werden nicht auf generische 50er- oder 60er-Biaswerte geglaettet.</p>
+                            <p className="muted">Exakte Team-Identität aus den lokalen Quellen. Diese Rohwerte werden nicht auf generische 50er- oder 60er-Biaswerte geglaettet.</p>
                           </div>
                           <div className="room-meta foundation-admin-meta">
                             <span className="pill">Default: {selectedIdentityDraft.sourceNote ?? "—"}</span>
@@ -1753,7 +1753,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             className="secondary-button"
                             type="button"
                             disabled={readMeta.readOnly}
-                            title={readMeta.readOnly ? getReadOnlyActionReason("die Team-Identity") : "Setzt die Team-Identity fuer dieses Team auf den Default zurueck."}
+                            title={readMeta.readOnly ? getReadOnlyActionReason("die Team-Identity") : "Setzt die Team-Identity für dieses Team auf den Default zurück."}
                             onClick={() => {
                               const resetIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, {});
                               const resetIdentity = resetIdentities.find((identity: TeamIdentity) => identity.teamId === selectedTeam.teamId);
@@ -1764,7 +1764,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                                 ...current,
                                 [selectedTeam.teamId]: resetIdentity,
                               }));
-                              setTeamIdentityMessage(`Default-Identity fuer ${selectedTeam.name} wiederhergestellt.`);
+                              setTeamIdentityMessage(`Default-Identity für ${selectedTeam.name} wiederhergestellt.`);
                             }}
                           >
                             Identity auf Default
@@ -2092,9 +2092,9 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     </div>
 
                     <details className="panel inset-panel" style={{ marginTop: 16 }}>
-                      <summary>Legacy-Kompatibilitaet / Debug</summary>
+                      <summary>Legacy-Kompatibilität / Debug</summary>
                       <p className="muted" style={{ marginTop: 12 }}>
-                        Diese Werte dienen nur der Rueckwaertskompatibilitaet und sind nicht die primaere Team Identity oder die fuehrende AI-Bias-Quelle.
+                        Diese Werte dienen nur der Rückwärtskompatibilität und sind nicht die primäre Team Identity oder die führende AI-Bias-Quelle.
                       </p>
                       <div
                         style={{
@@ -2175,7 +2175,7 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                         className="secondary-button"
                         type="button"
                         disabled={readMeta.readOnly}
-                        title={readMeta.readOnly ? getReadOnlyActionReason("das Strategy-Profil") : "Verwirft ungespeicherte Strategy-Aenderungen und springt auf den aktuellen Save-Stand zurueck."}
+                        title={readMeta.readOnly ? getReadOnlyActionReason("das Strategy-Profil") : "Verwirft ungespeicherte Strategy-Änderungen und springt auf den aktuellen Save-Stand zurück."}
                         onClick={() => {
                           setTeamStrategyDraft(
                             buildTeamStrategyProfileMap(
@@ -2184,16 +2184,16 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                               gameState.seasonState.teamStrategyProfiles,
                             ),
                           );
-                          setTeamStrategyMessage("Strategy-Profile-Draft wurde auf den lokalen Save-Stand zurueckgesetzt.");
+                          setTeamStrategyMessage("Strategy-Profile-Draft wurde auf den lokalen Save-Stand zurückgesetzt.");
                         }}
                       >
-                        Strategy Draft zuruecksetzen
+                        Strategy Draft zurücksetzen
                       </button>
                       <button
                         className="secondary-button"
                         type="button"
                         disabled={readMeta.readOnly}
-                        title={readMeta.readOnly ? getReadOnlyActionReason("das Strategy-Profil") : "Setzt das Strategy-Profil dieses Teams auf die Default-Werte zurueck."}
+                        title={readMeta.readOnly ? getReadOnlyActionReason("das Strategy-Profil") : "Setzt das Strategy-Profil dieses Teams auf die Default-Werte zurück."}
                         onClick={() => {
                           const defaults = buildTeamStrategyProfileMap(gameState.teams, gameState.teamIdentities);
                           const resetProfile = defaults[selectedTeam.teamId];
@@ -2204,13 +2204,13 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             ...current,
                             [selectedTeam.teamId]: resetProfile,
                           }));
-                          setTeamStrategyMessage(`Default-Profil fuer ${selectedTeam.name} wiederhergestellt.`);
+                          setTeamStrategyMessage(`Default-Profil für ${selectedTeam.name} wiederhergestellt.`);
                         }}
                       >
                         Reset auf Default
                       </button>
                     </div>
-                    {readMeta.readOnly ? <p className="muted">Prisma/Supabase bleibt read-only. Profile koennen dort nicht gespeichert werden.</p> : null}
+                    {readMeta.readOnly ? <p className="muted">Prisma/Supabase bleibt read-only. Profile können dort nicht gespeichert werden.</p> : null}
                     {selectedTeamStrategyProfile ? (
                       <p className="muted" style={{ marginTop: 8 }}>
                         AI read-only Kontext: {selectedTeamStrategyProfile.strategySummary}
