@@ -80,7 +80,7 @@ export function toOrganicPlayerView(
  * dark team) is pushed out — while a strongly-themed off-primary player (e.g. a male incubus) can
  * still rank above a plain primary match, so the roster leans ~primary but carries real theme flavour.
  */
-const THEME_PRIMARY_WEIGHT = 0.5;
+const THEME_PRIMARY_WEIGHT = 0.7;
 const THEME_SECONDARY_WEIGHT = 0.3;
 const THEME_SECONDARY_CAP = 2;
 const THEME_SOFT_WEIGHT = 0.1;
@@ -95,7 +95,7 @@ const THEME_AVOID_PENALTY = 0.6;
  * negative via avoid tags), so hard clubs get a strong positive pull for themed players and a strong
  * negative push against avoid-tag players, while soft clubs get a gentle nudge.
  */
-const THEME_STRICTNESS_MULT: Record<string, number> = { hard: 2.5, strong: 1.8, medium: 1.2, soft: 0.7 };
+const THEME_STRICTNESS_MULT: Record<string, number> = { hard: 8.0, strong: 2.4, medium: 1.2, soft: 0.7 };
 
 /**
  * Graded per-(team, player) theme-fit signal (0..1) from actual tag overlap between the player's
@@ -122,15 +122,27 @@ export function computeThemeFit(
   // not preferred over themed primary players.
   const outsiderMatch = !primaryMatch && countMatches(target.allowedOutsiderTags) > 0 ? 1 : 0;
 
+  // For a HARD-strictness QUOTA club, secondary/soft tags are FLAVOUR ON TOP OF the primary tag, not
+  // standalone credit: an off-primary player must not earn theme pull just for sharing a secondary tag
+  // (e.g. a non-Viking Berserker on a ~75%-Viking club). Otherwise, when the primary tag is RARE
+  // (few cheap Vikings), strong off-primary secondary-sharers out-compete and drain the budget before
+  // the quota is met. So off-primary players on a hard club get only the (small) allowed-outsider
+  // credit minus avoid — reserving preference + budget for genuine primary-tag players. Softer clubs
+  // keep the graded "leans toward flavour" behaviour where secondary tags count on their own.
+  const hardQuota = target.strictness === "hard";
+  const flavourCounts = hardQuota && !primaryMatch ? 0 : 1;
   const rawFit =
     THEME_PRIMARY_WEIGHT * primaryMatch +
-    THEME_SECONDARY_WEIGHT * secondaryMatches +
-    THEME_SOFT_WEIGHT * softMatches +
+    THEME_SECONDARY_WEIGHT * secondaryMatches * flavourCounts +
+    THEME_SOFT_WEIGHT * softMatches * flavourCounts +
     THEME_OUTSIDER_WEIGHT * outsiderMatch -
     THEME_AVOID_PENALTY * avoidMatches;
   const strictnessMult = THEME_STRICTNESS_MULT[target.strictness] ?? 1;
-  // May be negative (avoid) for hard clubs, so buyUtility actively pushes those players out.
-  return Math.min(3, Math.max(-2, strictnessMult * rawFit));
+  // May be negative (avoid) for hard clubs, so buyUtility actively pushes those players out. Ceiling
+  // is generous (×THEME_FIT_VALUE downstream) so a HARD-strictness quota club (V-V ~75% Viking, V-D
+  // ~95% female) pulls themed players strongly enough to act quota-like — a themed candidate then out-
+  // scores a moderately-stronger off-theme one — while medium/soft clubs (low mult) stay a gentle tilt.
+  return Math.min(6, Math.max(-2, strictnessMult * rawFit));
 }
 
 /** Team playstyle axis emphasis from identity.pow/spe/men/soc, normalized to sum 1 (fallback equal). */

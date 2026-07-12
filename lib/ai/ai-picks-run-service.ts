@@ -3021,7 +3021,12 @@ function runOrganicTeamDraftExecute(input: {
     teamWarnings.push("organic_squad_builder_stopped_below_min");
   }
 
-  // 4. Execute each decision in order via the shared buy primitive; stop on the first failed buy.
+  // 4. Execute each decision in order via the shared buy primitive. The plan is a RANKED wishlist,
+  //    so a single unbuyable pick (raced/taken between plan and apply, or a transient price/validation
+  //    edge) must NOT abort the whole team — skip it and try the next decision. Each buy is validated
+  //    against live cash independently, so continuing can only ever fill MORE of the roster, never
+  //    overspend. This is the clean "don't hang the draft" behaviour (no emergency repair): a team
+  //    whose top pick fell through still drafts the rest of its ranked plan instead of ending empty.
   let appliedCount = 0;
   for (const decision of plan.decisions) {
     if (liveTakenPlayerIds.has(decision.playerId)) continue;
@@ -3036,8 +3041,8 @@ function runOrganicTeamDraftExecute(input: {
       deferPersist: true,
     });
     if (!buyResult.transferCreated || !buyResult.transferId) {
-      teamBlockingReasons.push(...buyResult.blockingReasons, "organic_squad_builder_buy_failed");
-      break;
+      teamBlockingReasons.push(...buyResult.blockingReasons, "organic_squad_builder_buy_skipped");
+      continue;
     }
     const item = freeAgentItemsById.get(decision.playerId) ?? null;
     const player = playersById.get(decision.playerId) ?? null;
@@ -3736,7 +3741,12 @@ export async function runAiPicksExecutePreview(
 
   for (const previewTeam of previewTeams) {
     const teamExecuteStartedAt = Date.now();
-    if (partialExecutionPlan?.blockedTeamIds.has(previewTeam.teamId)) {
+    // The partial-execution plan is derived from the NON-organic preview planner. When the organic
+    // squad builder owns the execute (flag on), it recomputes its OWN min-feasible plan from the live
+    // free-agent pool and never touches the preview's picks — so a preview-side team veto (e.g. the
+    // unified planner failing to reach hard-min for this team) must NOT exclude it here, or the team
+    // ends up with an empty roster despite the organic builder being able to draft it cleanly.
+    if (!useOrganicSquadBuilder && partialExecutionPlan?.blockedTeamIds.has(previewTeam.teamId)) {
       // Season-1 partial execution: this team's own narrow blocker keeps it excluded, but must
       // not prevent every other clean team from being applied (see resolveSeason1PartialExecutionPlan).
       executedTeams.push({

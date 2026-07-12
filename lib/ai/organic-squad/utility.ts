@@ -16,7 +16,7 @@
  */
 
 import { cashOptionValue } from "@/lib/ai/organic-squad/cash-option-value";
-import { marginalCoverageValue } from "@/lib/ai/organic-squad/coverage-curve";
+import { disciplineSupportFactor, marginalCoverageValue } from "@/lib/ai/organic-squad/coverage-curve";
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import {
   SOLIDE_THRESHOLD,
@@ -30,6 +30,17 @@ import {
 const COVERAGE_FLOOR = 0.25;
 
 /**
+ * Quality of a solid, rotation-grade CORE body — the line above which quality is a genuine "star
+ * premium". Quality up to this is the BASE (every core/depth body provides it, valued by the breadth
+ * coverage curve, UNGATED); only quality ABOVE this — the star/superstar premium — is gated by how
+ * SUPPORTED its discipline is (disciplineSupportFactor). Set a notch above SOLIDE_THRESHOLD so the
+ * mid-tier bulk (core/depth) is unaffected and the gate bites ONLY on stars/superstars: that is how
+ * "a star needs 3–4 in its discipline or its effect fizzles" enters the model without suppressing the
+ * whole draft — a lone star keeps full base body value but loses most of its premium.
+ */
+const SUPPORT_QUALITY_BASELINE = 68;
+
+/**
  * Converts the budget-relative "price in slots" into a penalty comparable to ΔStrength (~0..90).
  * A player costing one whole remaining-OPT-slot of budget costs PRICE_SLOT_SCALE utility before wThrift.
  * This is the "Preis / Budget-Skala": a star is cheap to a rich/elite club (few slots, high budget/slot)
@@ -40,11 +51,13 @@ const PRICE_SLOT_SCALE = 18;
 /**
  * Baseline value of a body for rotation/fatigue depth (≤12 deploy per matchday, fatigue), independent
  * of discipline coverage. Fades from full at an empty squad to 0 at optTarget, so teams fill toward
- * their (GM-modulated) OPT even once their needed disciplines are covered — this, with optTarget, is
- * what makes a depth club big and an elite club small. Weighted flat (every club needs a squad), not
- * by wWin, so low-ambition depth clubs still fill out.
+ * their (GM-modulated) OPT even once their needed disciplines are covered. Reaching OPT is a goal for
+ * EVERY club (rotation) — the roster-SIZE variety comes from the differing optTarget itself (a flipper
+ * like C-C wants ~14 bodies, an elite-small club ~9), NOT from some clubs under-filling. So this is set
+ * strong enough to dominate the per-slot price of a cheap depth body, and weighted flat (not by wWin),
+ * so even a low-ambition club reliably fills its bench toward its own OPT instead of hoarding cash.
  */
-const ROTATION_VALUE = 70;
+const ROTATION_VALUE = 92;
 
 /**
  * A player's real cost is the transfer price PLUS the recurring wage bill over its expected tenure.
@@ -89,16 +102,25 @@ export function marginalStrength(
   needAxisWeights: Record<CoreAxis, number>,
 ): number {
   const quality = computePlayerQuality(player, needAxisWeights);
+  // Split quality into a plain-body BASE (valued by breadth) and a star PREMIUM (excess, gated by
+  // how supported its discipline is — a lone star's premium fizzles). See SUPPORT_QUALITY_BASELINE.
+  const base = Math.min(quality, SUPPORT_QUALITY_BASELINE);
+  const excess = Math.max(0, quality - SUPPORT_QUALITY_BASELINE);
   let acc = 0;
   let weightSum = 0;
   for (const need of disciplineNeeds) {
     if ((player.disciplineRatings[need.disciplineId] ?? 0) > SOLIDE_THRESHOLD) {
-      acc += need.needWeight * marginalCoverageValue(need.coveredCount);
+      const coverage = marginalCoverageValue(need.coveredCount);
+      const support = disciplineSupportFactor(need.coveredCount);
+      // base·coverage: breadth value of another body. excess·coverage·support: the star premium,
+      // only realized when the discipline already carries support — peaks as the ~3rd body (sweet spot).
+      acc += need.needWeight * coverage * (base + excess * support);
       weightSum += need.needWeight;
     }
   }
-  const coverageMultiplier = weightSum > 0 ? acc / weightSum : COVERAGE_FLOOR;
-  return quality * coverageMultiplier;
+  // No needed discipline covered: only the base body value survives (the premium is fully wasted
+  // off-need — a star in a discipline you don't need is pointless), heavily damped by the floor.
+  return weightSum > 0 ? acc / weightSum : base * COVERAGE_FLOOR;
 }
 
 /**
