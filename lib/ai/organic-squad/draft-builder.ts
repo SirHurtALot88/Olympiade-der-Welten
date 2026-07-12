@@ -30,10 +30,15 @@ import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
  * near-ties between similarly-attractive candidates so different save/team seeds can land on different
  * (but comparably good) picks — composition variance across saves, not randomness overriding the
  * model. It must never be large enough to flip a clear preference: a genuinely better candidate always
- * wins regardless of jitter amplitude choice by the caller. Default 0 (env unset) ⇒ bit-identical to the
- * pre-jitter deterministic behaviour (golden tests unaffected). Amplitude is ENV-tunable for tuning/QA.
+ * wins regardless of jitter amplitude choice by the caller. Default 15 (calibrated): a draft-run sweep
+ * showed ~80% roster-slot variance across seeds at amplitude 20 while every team's IDENTITY held (same
+ * roster sizes, MW tiers, GM character) and the draft audit stayed PASS — 15 keeps that strong
+ * different-players-same-team-character variety with a touch more headroom for genuinely-better picks.
+ * The jitter only ever engages when a `draftSeed` is passed (real runs, keyed `saveId:teamId`); pure
+ * unit tests pass no seed, so they stay deterministic regardless of this amplitude. ENV-tunable (set 0
+ * to disable, higher for more spread).
  */
-const ORGANIC_DRAFT_JITTER = Number(process.env.OLY_ORGANIC_DRAFT_JITTER ?? 0) || 0;
+const ORGANIC_DRAFT_JITTER = Number(process.env.OLY_ORGANIC_DRAFT_JITTER ?? 15) || 0;
 
 export type OrganicBuyDecision = {
   playerId: string;
