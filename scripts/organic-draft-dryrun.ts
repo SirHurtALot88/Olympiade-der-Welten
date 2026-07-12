@@ -55,13 +55,20 @@ const teams = [...gameState.teams].sort((a, b) => {
   return bb - aa || String(a.shortCode).localeCompare(String(b.shortCode));
 });
 
+const exampleTeamCode = arg("--team") ?? "D-P";
+type TierLabel = "Superstar" | "Star" | "Core" | "Depth" | "Backup" | "Reserve";
+const TIERS: TierLabel[] = ["Superstar", "Star", "Core", "Depth", "Backup", "Reserve"];
+
 const available = new Map(pool.map((p) => [p.id, p]));
 type Row = {
   code: string;
   roster: number;
   spend: number;
   cash: number;
+  mw: number;
   opt: number;
+  tiers: Record<TierLabel, number>;
+  kern: number;
   stars: number;
   belowMin: boolean;
   ambition: number;
@@ -71,6 +78,7 @@ type Row = {
   eliteSmall: number;
 };
 const rows: Row[] = [];
+const draftedByCode = new Map<string, Player[]>();
 
 for (const team of teams) {
   const identity = identityById.get(team.identityId) ?? null;
@@ -82,23 +90,36 @@ for (const team of teams) {
     startingSquad: [],
     candidates,
   });
-  let stars = 0;
+  const code = team.shortCode ?? team.teamId;
+  const tiers: Record<TierLabel, number> = {
+    Superstar: 0, Star: 0, Core: 0, Depth: 0, Backup: 0, Reserve: 0,
+  };
+  const drafted: Player[] = [];
+  let mw = 0;
   for (const decision of result.decisions) {
     const player = byId.get(decision.playerId);
     if (player) {
-      const tier = classifyMarketBracket(player.marketValue ?? 0, brackets);
-      if (tier === "Superstar" || tier === "Star") stars += 1;
+      drafted.push(player);
+      mw += player.marketValue ?? 0;
+      tiers[classifyMarketBracket(player.marketValue ?? 0, brackets)] += 1;
     }
     available.delete(decision.playerId);
   }
+  draftedByCode.set(code, drafted);
+  const kern = drafted.length
+    ? Math.round(((tiers.Superstar + tiers.Star + tiers.Core + tiers.Depth) / drafted.length) * 100)
+    : 0;
   const bias = getTeamGeneralManager(gameState, team.teamId)?.profile?.bias;
   rows.push({
-    code: team.shortCode ?? team.teamId,
+    code,
     roster: result.finalRosterSize,
     spend: round((team.cash ?? 0) - result.finalCash),
     cash: round(result.finalCash),
+    mw: round(mw),
     opt: result.optTarget,
-    stars,
+    tiers,
+    kern,
+    stars: tiers.Superstar + tiers.Star,
     belowMin: result.stoppedBelowMin,
     ambition: identity?.ambition ?? 50,
     starPriority: bias?.starPriority ?? 5,
@@ -106,6 +127,41 @@ for (const team of teams) {
     depthPref: bias?.rosterDepthPreference ?? 5,
     eliteSmall: bias?.eliteSmallRosterPreference ?? 5,
   });
+}
+
+// --- Per-team MW/Cash/roles table ---
+const byMw = [...rows].sort((a, b) => b.mw - a.mw);
+console.log("\n## Teams (MW · Cash · Rollen)");
+console.log("Team|Kader|MW|Cash|SStar|Star|Core|Depth|Backup|Reserve|Kern%");
+for (const r of byMw) {
+  const t = r.tiers;
+  console.log(`${r.code}|${r.roster}|${r.mw}|${r.cash}|${t.Superstar}|${t.Star}|${t.Core}|${t.Depth}|${t.Backup}|${t.Reserve}|${r.kern}%`);
+}
+
+// --- Top-10 most expensive drafted players ---
+const allDrafted: Array<{ p: Player; team: string }> = [];
+for (const [code, players] of draftedByCode) for (const p of players) allDrafted.push({ p, team: code });
+allDrafted.sort((a, b) => (b.p.marketValue ?? 0) - (a.p.marketValue ?? 0));
+console.log("\n## Top-10 teuerste Spieler (Liga)");
+console.log("#|Spieler|Team|MW|Gehalt|Tier");
+allDrafted.slice(0, 10).forEach((e, i) => {
+  console.log(`${i + 1}|${e.p.name}|${e.team}|${round(e.p.marketValue ?? 0)}|${round(e.p.salaryDemand ?? 0)}|${classifyMarketBracket(e.p.marketValue ?? 0, brackets)}`);
+});
+
+// --- Example team roster ---
+const example = draftedByCode.get(exampleTeamCode);
+if (example) {
+  console.log(`\n## Beispielteam ${exampleTeamCode} — Kader (${example.length})`);
+  console.log("Spieler|MW|Gehalt|Tier|Top-Disziplinen(>60)");
+  for (const p of [...example].sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))) {
+    const topDiscs = Object.entries(p.disciplineRatings ?? {})
+      .filter(([, v]) => v > 60)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id, v]) => `${id}:${Math.round(v)}`)
+      .join(" ");
+    console.log(`${p.name}|${round(p.marketValue ?? 0)}|${round(p.salaryDemand ?? 0)}|${classifyMarketBracket(p.marketValue ?? 0, brackets)}|${topDiscs}`);
+  }
 }
 
 rows.sort((a, b) => b.spend - a.spend);
