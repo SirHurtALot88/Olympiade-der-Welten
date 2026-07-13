@@ -144,21 +144,60 @@ describe("resolveAiLoanDecision", () => {
     expect(decision.reason).toBe("cash_sufficient");
   });
 
-  it("borrows min(shortfall, capacity) when there is need, a cash gap, and free capacity", () => {
-    const gameState = buildTeamGameState({ cash: 60, rosterCount: 8, playerOpt: 12, annualRevenue: 50 });
+  it("borrows only for a genuinely distressed team (below the competitive floor, meaningful cash gap), on a SHORT term", () => {
+    // Competitive floor = playerMin(8) + ceil((14-8)*0.5) = 11; roster 6 is well below it with almost no cash.
+    const gameState = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14, annualRevenue: 50 });
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(true);
     expect(decision.loanAmount).toBeGreaterThan(0);
     // capacity = min(0.15*cash + 0.30*marketValueTotal, 1.5*annualRevenue) - outstandingDebt
-    //          = min(0.15*60 + 0.30*120, 1.5*50) - 0 = min(9+36=45, 75) = 45
-    expect(decision.loanAmount).toBeLessThanOrEqual(45);
-    expect(decision.termSeasons).toBeGreaterThanOrEqual(1);
-    expect(decision.termSeasons).toBeLessThanOrEqual(10);
+    //          = min(0.15*3 + 0.30*90, 1.5*50) - 0 = min(27.45, 75) = 27.45
+    expect(decision.loanAmount).toBeLessThanOrEqual(27.45);
+    // Short terms only (anti-spiral: no 10-season loans).
+    expect(decision.termSeasons).toBeGreaterThanOrEqual(2);
+    expect(decision.termSeasons).toBeLessThanOrEqual(4);
+  });
+
+  it("does not borrow to top up a team that already reaches the competitive floor with its own cash", () => {
+    // Roster 11 == competitive floor for opt 14; even though it is below OPT, no loan (own cash fills the rest).
+    const gameState = buildTeamGameState({ cash: 60, rosterCount: 11, playerOpt: 14, annualRevenue: 50 });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("no_need");
+  });
+
+  it("refuses a further loan when the team is already highly leveraged (anti-spiral)", () => {
+    // Outstanding 40 vs revenue 50 -> debt/revenue 0.8 >= MAX_DEBT_TO_REVENUE(0.6) -> already_leveraged.
+    const gameState = buildTeamGameState({
+      cash: 3,
+      rosterCount: 6,
+      playerOpt: 14,
+      annualRevenue: 50,
+      loans: [
+        {
+          loanId: "existing",
+          borrowerTeamId: "T-1",
+          lenderType: "bank",
+          principalOriginal: 40,
+          principalOutstanding: 40,
+          interestRatePerSeason: 0.14,
+          termSeasons: 4,
+          seasonsRemaining: 3,
+          installmentPerSeason: 12,
+          originatedSeasonId: "season-1",
+          status: "active",
+          missedPayments: 0,
+        },
+      ],
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("already_leveraged");
   });
 
   it("scales borrowing down for a high-cashPriority (hoarder-leaning) team vs an aggressive team, same gap", () => {
-    const hoarder = buildTeamGameState({ cash: 60, rosterCount: 8, playerOpt: 12, annualRevenue: 50, cashPriority: 10 });
-    const aggressive = buildTeamGameState({ cash: 60, rosterCount: 8, playerOpt: 12, annualRevenue: 50, cashPriority: 1 });
+    const hoarder = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14, annualRevenue: 50, cashPriority: 10 });
+    const aggressive = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14, annualRevenue: 50, cashPriority: 1 });
 
     const hoarderDecision = resolveAiLoanDecision(hoarder, "T-1");
     const aggressiveDecision = resolveAiLoanDecision(aggressive, "T-1");
@@ -170,7 +209,7 @@ describe("resolveAiLoanDecision", () => {
 
   it("does not borrow when there is need and a cash gap but no borrowing capacity", () => {
     // No sponsor revenue at all -> annualRevenue 0 -> revenue cap 0 -> capacity 0.
-    const gameState = buildTeamGameState({ cash: 60, rosterCount: 8, playerOpt: 12 });
+    const gameState = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14 });
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("no_capacity");
@@ -225,10 +264,11 @@ describe("resolveAiEarlyPayoffDecision", () => {
   });
 
   it("does not pay off when there is no surplus (cash needed for next season's roster gap)", () => {
+    // Roster 6 vs competitive floor 11 (opt 14) -> a real need that exceeds the modest cash -> no surplus.
     const gameState = buildTeamGameState({
-      cash: 60,
-      rosterCount: 8,
-      playerOpt: 12,
+      cash: 30,
+      rosterCount: 6,
+      playerOpt: 14,
       annualRevenue: 50,
       loans: [loanRecord()],
     });
