@@ -13,7 +13,8 @@ import {
 } from "@/lib/progression/season-end-progression-batch";
 import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
-import { buildCoreStatsFromDisciplineRatings, buildPreviewDisciplineRatingsFromAttributes } from "@/lib/training/season-end-progression-preview";
+import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildSeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
@@ -212,10 +213,39 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
   );
   const nextMarketValueByPlayerId = new Map<string, number | null>();
 
-  const players = gameState.players.map((player) => {
+  // Discipline ratings are league-relative (computed by ranking every player against the whole
+  // league per discipline, see buildLeagueDisciplineRatingsWithAttributeOverrides). The previous
+  // implementation called buildPreviewDisciplineRatingsFromAttributes — which re-ranks the ENTIRE
+  // league from scratch for every discipline — once per player inside this .map(), making the
+  // whole function O(players^2 * disciplines). With ~3000 players and 20 disciplines that is on
+  // the order of hundreds of millions of allocations (each ranking pass allocates fresh arrays/
+  // Maps and calls Object.entries per player) and manifests as a many-minutes-long hang — easily
+  // mistaken for an infinite loop — during the S1->S2 season transition (full pipeline only; the
+  // lightweight/fast transfer-pipeline path skips this function entirely).
+  //
+  // Fix: compute every changed player's post-drift attributes first (pass 1, O(players)), batch
+  // the league-wide discipline ranking into a SINGLE call across all changed players at once
+  // (O(players * disciplines * log players)), then apply the looked-up ratings per player
+  // (pass 2, O(players)).
+  type PendingPlayerUpdate = {
+    baseline: ReturnType<typeof normalizePlayerBaselineRecord>;
+    isRostered: boolean;
+    nextAttributePatch: PlayerGeneratorAttributes;
+    /** null mirrors the old short-circuit in buildPreviewDisciplineRatingsFromAttributes: skip
+     * the league ranking lookup entirely and keep the player's existing disciplineRatings. */
+    attributesAfter: PlayerGeneratorAttributes | null;
+    nextMarketValue: number;
+    nextDisplayMarketValue: number;
+    nextSalaryDemand: number;
+    nextDisplaySalary: number;
+  };
+  const attributesAfterByPlayerId = new Map<string, PlayerGeneratorAttributes>();
+  const pendingByPlayerId = new Map<string, PendingPlayerUpdate>();
+
+  for (const player of gameState.players) {
     const baseline = baselineByPlayerId.get(player.id);
     if (!baseline) {
-      return player;
+      continue;
     }
 
     const isRostered = rosterPlayerIds.has(player.id);
@@ -248,11 +278,9 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       ...(player.attributeSheetStats ?? {}),
       ...nextAttributePatch,
     });
-    const nextDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter,
-      leaguePlayers: gameState.players,
-    });
+    if (attributesAfter) {
+      attributesAfterByPlayerId.set(player.id, attributesAfter);
+    }
     const currentEconomy = resolvePlayerEconomyContract({ player });
     const baselineMarketValue = getStableEconomyTarget({
       currentVisible: player.displayMarketValue,
@@ -304,6 +332,44 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
           minStep: 0.08,
           digits: 2,
         }) ?? nextSalaryDemand;
+
+    pendingByPlayerId.set(player.id, {
+      baseline,
+      isRostered,
+      nextAttributePatch,
+      attributesAfter,
+      nextMarketValue,
+      nextDisplayMarketValue,
+      nextSalaryDemand,
+      nextDisplaySalary,
+    });
+  }
+
+  // Single league-wide discipline ranking pass covering every changed player's post-drift
+  // attributes at once (see comment above pendingByPlayerId for why this must not run per-player).
+  const leagueRatingsByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+    gameState.players,
+    attributesAfterByPlayerId,
+  );
+
+  const players = gameState.players.map((player) => {
+    const pending = pendingByPlayerId.get(player.id);
+    if (!pending) {
+      return player;
+    }
+    const {
+      baseline,
+      isRostered,
+      nextAttributePatch,
+      attributesAfter,
+      nextMarketValue,
+      nextDisplayMarketValue,
+      nextSalaryDemand,
+      nextDisplaySalary,
+    } = pending;
+    const nextDisciplineRatings = attributesAfter
+      ? (leagueRatingsByPlayerId.get(player.id) ?? player.disciplineRatings ?? {})
+      : (player.disciplineRatings ?? {});
 
     nextMarketValueByPlayerId.set(player.id, nextDisplayMarketValue ?? nextMarketValue ?? null);
 
