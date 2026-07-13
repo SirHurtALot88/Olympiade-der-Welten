@@ -13,6 +13,7 @@ type LoanEarlyPayoffBody = {
   seasonId?: string;
   teamId?: string;
   loanId?: string;
+  adminOverride?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -42,6 +43,9 @@ export async function POST(request: Request) {
     const seasonId = body.seasonId?.trim() ?? "";
     const teamId = body.teamId?.trim() ?? "";
     const loanId = body.loanId?.trim() ?? "";
+    // Admin-Override nur in Singleplayer-Spielständen (kein Raum) — ein
+    // Room-Save behält die echten Regeln, siehe docs/design/kredit-system.md.
+    const adminOverride = body.adminOverride === true && !body.roomCode;
 
     if (source === "prisma") {
       return NextResponse.json({ ok: false, reason: "prisma_read_only", payoff: 0 }, { status: 409 });
@@ -75,7 +79,7 @@ export async function POST(request: Request) {
     // `transfer_sell_phase` mit einschließt — siehe
     // game-phase-action-policy.ts für die Begründung dieser Wahl).
     const phaseGate = evaluateGamePhaseAction(save.gameState, "credit_early_payoff");
-    if (!phaseGate.allowed) {
+    if (!adminOverride && !phaseGate.allowed) {
       return NextResponse.json({ ok: false, reason: "not_preseason", payoff: 0 }, { status: 409 });
     }
 

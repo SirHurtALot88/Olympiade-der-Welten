@@ -54080,6 +54080,38 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+.is-new-look .nl-credits-admin-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3) var(--nl-s4);
+  border: 1px dashed var(--nl-line);
+  border-radius: var(--nl-radius-md, 10px);
+  background: color-mix(in srgb, var(--nl-warn, #d9a441) 8%, transparent);
+}
+
+.is-new-look .nl-credits-admin-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.is-new-look .nl-credits-admin-toggle-label input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--nl-warn, #d9a441);
+  cursor: pointer;
+}
+
+.is-new-look .nl-credits-admin-toggle-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
 /* --- Kredit-Aufnahme: Slider + exakter Betrag + Laufzeit + Live-Quote --- */
 .is-new-look .nl-credits-borrow-card {
   display: flex;

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import FoundationCreditsNewLook from "@/app/foundation/credits/FoundationCreditsNewLook";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { useCreditsViewModel } from "@/lib/foundation/credits/use-credits-view-model";
@@ -19,20 +21,29 @@ export type FoundationCreditsHostProps = {
    * for the bank offer, a team id for a team offer (Phase 3 — see
    * `lib/finance/loan-service.ts`'s `buildLoanOffers`/`originateLoan`).
    */
-  onBorrow?: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
+  onBorrow?: (
+    principal: number,
+    termSeasons: number,
+    lenderTeamId?: string | null,
+    adminOverride?: boolean,
+  ) => Promise<LoanOriginateOutcome>;
   /**
    * POST /api/finance/loan/early-payoff + game-state refresh, wired by
    * `FoundationShellRouterBody` (`repayLoanEarlyForActiveTeam`, mirrors
    * `onBorrow`'s fetch-then-`loadSave` pattern). Falls back to a no-op
    * "not available" result if the shell hasn't wired a handler.
    */
-  onEarlyPayoff?: (loanId: string) => Promise<LoanEarlyPayoffOutcome>;
+  onEarlyPayoff?: (loanId: string, adminOverride?: boolean) => Promise<LoanEarlyPayoffOutcome>;
 };
 
 export default function FoundationCreditsHost({ gameState, teamId, onBorrow, onEarlyPayoff }: FoundationCreditsHostProps) {
-  const model = useCreditsViewModel(gameState, teamId);
+  const [adminOverride, setAdminOverride] = useState(false);
+  const model = useCreditsViewModel(gameState, teamId, adminOverride);
   const team = gameState.teams.find((candidate) => candidate.teamId === teamId) ?? null;
   const teamName = team?.name ?? "Dein Team";
+
+  const baseOnBorrow = onBorrow ?? (async () => ({ ok: false, reason: "not_available" }));
+  const baseOnEarlyPayoff = onEarlyPayoff ?? (async () => ({ ok: false, reason: "not_available", payoff: null }));
 
   return (
     <FoundationCreditsNewLook
@@ -40,8 +51,10 @@ export default function FoundationCreditsHost({ gameState, teamId, onBorrow, onE
       model={model}
       gameState={gameState}
       teamId={teamId}
-      onBorrow={onBorrow ?? (async () => ({ ok: false, reason: "not_available" }))}
-      onEarlyPayoff={onEarlyPayoff ?? (async () => ({ ok: false, reason: "not_available", payoff: null }))}
+      adminOverride={adminOverride}
+      onToggleAdminOverride={setAdminOverride}
+      onBorrow={(principal, termSeasons, lenderTeamId) => baseOnBorrow(principal, termSeasons, lenderTeamId, adminOverride)}
+      onEarlyPayoff={(loanId) => baseOnEarlyPayoff(loanId, adminOverride)}
     />
   );
 }

@@ -4540,6 +4540,7 @@ export function useFoundationShellRouterBodyScope({
     principal: number,
     termSeasons: number,
     lenderTeamId?: string | null,
+    adminOverride?: boolean,
   ): Promise<{ ok: boolean; reason: string | null }> {
     if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -4562,6 +4563,7 @@ export function useFoundationShellRouterBodyScope({
           // `null`/omitted selects the bank; a team id selects a team offer
           // (Phase 3 — see docs/design/kredit-system.md).
           lenderTeamId: lenderTeamId ?? null,
+          adminOverride: adminOverride === true,
           source: readMeta.source,
         })),
       });
@@ -4582,7 +4584,10 @@ export function useFoundationShellRouterBodyScope({
    * save so `gameState` reflects the freed-up cash/cleared loan immediately.
    * Always the active manager's own team (fog of war), never a `teamId` param.
    */
-  async function repayLoanEarlyForActiveTeam(loanId: string): Promise<{ ok: boolean; reason: string | null; payoff: number | null }> {
+  async function repayLoanEarlyForActiveTeam(
+    loanId: string,
+    adminOverride?: boolean,
+  ): Promise<{ ok: boolean; reason: string | null; payoff: number | null }> {
     if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
       return { ok: false, reason: "not_available", payoff: null };
@@ -4600,6 +4605,7 @@ export function useFoundationShellRouterBodyScope({
           seasonId: gameState.season.id,
           teamId: activeManagerTeamId,
           loanId,
+          adminOverride: adminOverride === true,
           source: readMeta.source,
         })),
       });

@@ -21,7 +21,7 @@ const MAX_TERM_SEASONS = 10;
  * views like Sponsoren). Never pass another team's id in here — the credit
  * system is not league-visible data.
  */
-export function buildCreditsViewModel(gameState: GameState, teamId: string | null): CreditsViewModel {
+export function buildCreditsViewModel(gameState: GameState, teamId: string | null, adminOverride = false): CreditsViewModel {
   if (!teamId) {
     return { status: "not_ready" };
   }
@@ -41,7 +41,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   // here are throwaway probe values, capacity does not depend on either).
   // Season 1 → `buildLoanOffers` returns `[]` (hard rule), so `bankOffer` is
   // `null` and `creditLimit` naturally falls to 0 without a separate probe.
-  const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS);
+  const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS, { allowSeason1: adminOverride });
   const bankOffer = probeOffers.find((offer) => offer.lenderType === "bank") ?? null;
   const creditLimit = bankOffer?.maxAmount ?? 0;
 
@@ -71,16 +71,21 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
 
   const isPreseason = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
   const seasonOne = isSeasonOne(gameState.season.id);
-  const canBorrow = isPreseason && !seasonOne && creditLimit > 0;
+  // Admin-Override (nur Vorschau/Test, siehe FoundationCreditsHost): ignoriert
+  // die Season-1- und Phasen-Sperre, der Kreditrahmen selbst muss aber real
+  // > 0 sein.
+  const canBorrow = adminOverride ? creditLimit > 0 : isPreseason && !seasonOne && creditLimit > 0;
   const borrowBlockedReason = canBorrow
     ? null
-    : seasonOne
-      ? "season_one"
-      : !isPreseason
-        ? "not_preseason"
-        : "no_capacity";
+    : adminOverride
+      ? "no_capacity"
+      : seasonOne
+        ? "season_one"
+        : !isPreseason
+          ? "not_preseason"
+          : "no_capacity";
 
-  const canEarlyPayoff = evaluateGamePhaseAction(gameState, "credit_early_payoff").allowed;
+  const canEarlyPayoff = adminOverride || evaluateGamePhaseAction(gameState, "credit_early_payoff").allowed;
 
   const teamCreditState: TeamCreditState = {
     teamId,
@@ -104,6 +109,6 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
  * this over calling the builder directly so the model is memoized per
  * render the same way other Foundation view models are.
  */
-export function useCreditsViewModel(gameState: GameState, teamId: string | null): CreditsViewModel {
-  return useMemo(() => buildCreditsViewModel(gameState, teamId), [gameState, teamId]);
+export function useCreditsViewModel(gameState: GameState, teamId: string | null, adminOverride = false): CreditsViewModel {
+  return useMemo(() => buildCreditsViewModel(gameState, teamId, adminOverride), [gameState, teamId, adminOverride]);
 }
