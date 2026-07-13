@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getTeamOutstandingDebt, originateLoan } from "@/lib/finance/loan-service";
+import { buildLoanOffers, computeEarlyPayoff, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
 
 const MIN_TERM_SEASONS = 1;
@@ -35,34 +36,51 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
 
   const outstandingDebt = getTeamOutstandingDebt(gameState, teamId);
 
-  // Single source of truth for capacity: the exact same preview path
-  // `originateLoan` uses internally when it validates a real borrow request
-  // (principal/termSeasons here are throwaway probe values — capacity does
-  // not depend on either). This guarantees the KPI/slider max can never
-  // drift from what the mutation route will actually accept.
-  const capacityProbe = originateLoan(
-    gameState,
-    { borrowerTeamId: teamId, principal: 1, termSeasons: MIN_TERM_SEASONS },
-    { execute: false },
-  );
-  const creditLimit = capacityProbe.capacity;
+  // Single source of truth for capacity: the exact same offer path the
+  // marketplace renders — the bank card's `maxAmount` (principal/termSeasons
+  // here are throwaway probe values, capacity does not depend on either).
+  // Season 1 → `buildLoanOffers` returns `[]` (hard rule), so `bankOffer` is
+  // `null` and `creditLimit` naturally falls to 0 without a separate probe.
+  const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS);
+  const bankOffer = probeOffers.find((offer) => offer.lenderType === "bank") ?? null;
+  const creditLimit = bankOffer?.maxAmount ?? 0;
 
   const activeLoans = (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
-    .map((loan) => ({
-      id: loan.loanId,
-      principal: loan.principalOriginal,
-      outstanding: loan.principalOutstanding,
-      interestRate: loan.interestRatePerSeason,
-      termSeasons: loan.termSeasons,
-      remainingSeasons: loan.seasonsRemaining,
-      nextInstalment: loan.installmentPerSeason,
-      status: loan.status,
-    }));
+    .map((loan) => {
+      const lenderTeamId = loan.lenderType === "team" ? (loan.lenderTeamId ?? null) : null;
+      const lenderName =
+        loan.lenderType === "team"
+          ? (gameState.teams.find((candidate) => candidate.teamId === lenderTeamId)?.name ?? "Team")
+          : "Bank";
+      return {
+        id: loan.loanId,
+        principal: loan.principalOriginal,
+        outstanding: loan.principalOutstanding,
+        interestRate: loan.interestRatePerSeason,
+        termSeasons: loan.termSeasons,
+        remainingSeasons: loan.seasonsRemaining,
+        nextInstalment: loan.installmentPerSeason,
+        status: loan.status,
+        lenderType: loan.lenderType,
+        lenderTeamId,
+        lenderName,
+        earlyPayoffQuote: computeEarlyPayoff(loan),
+      };
+    });
 
   const isPreseason = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
-  const canBorrow = isPreseason && creditLimit > 0;
-  const borrowBlockedReason = canBorrow ? null : !isPreseason ? "not_preseason" : "no_capacity";
+  const seasonOne = isSeasonOne(gameState.season.id);
+  const canBorrow = isPreseason && !seasonOne && creditLimit > 0;
+  const borrowBlockedReason = canBorrow
+    ? null
+    : seasonOne
+      ? "season_one"
+      : !isPreseason
+        ? "not_preseason"
+        : "no_capacity";
+
+  const canEarlyPayoff = evaluateGamePhaseAction(gameState, "credit_early_payoff").allowed;
 
   const teamCreditState: TeamCreditState = {
     teamId,
@@ -72,6 +90,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
     finances,
     canBorrow,
     borrowBlockedReason,
+    canEarlyPayoff,
     minTermSeasons: MIN_TERM_SEASONS,
     maxTermSeasons: MAX_TERM_SEASONS,
     activeLoans,

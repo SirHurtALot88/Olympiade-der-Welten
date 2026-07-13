@@ -14,6 +14,7 @@ export type GamePhaseAction =
   | "facility_apply"
   | "sponsor_choice"
   | "credit_borrow"
+  | "credit_early_payoff"
   | "set_lineup"
   | "resolve_matchday"
   | "complete_season"
@@ -89,7 +90,14 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     action === "set_training" ||
     action === "facility_apply" ||
     action === "sponsor_choice" ||
-    action === "credit_borrow"
+    action === "credit_borrow" ||
+    // `credit_early_payoff` (Vorab-Ablösung) is documented as a "Verkaufsphase"
+    // action (docs/design/kredit-system.md, funded from sell proceeds), but
+    // `isPreseasonManagementOpen` already covers `transfer_sell_phase` as one
+    // of its member phases — reusing the identical `credit_borrow` gate here
+    // (rather than inventing a sell-phase-only variant) keeps borrow/payoff
+    // symmetric and avoids a second bespoke phase predicate for one action.
+    action === "credit_early_payoff"
   ) {
     allowed = isPreseasonManagementOpen(gameState) || isEarlySeasonSetup(gameState);
     reason = allowed ? null : `phase_blocked:${action}:${phase}`;
@@ -109,9 +117,16 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
 
   if (
     isEarlySeasonSetup(gameState) &&
-    ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply", "sponsor_choice", "credit_borrow"].includes(
-      action,
-    )
+    [
+      "buy_players",
+      "sell_players",
+      "renew_contract",
+      "set_training",
+      "facility_apply",
+      "sponsor_choice",
+      "credit_borrow",
+      "credit_early_payoff",
+    ].includes(action)
   ) {
     warnings.push("early_season_setup_allowed_before_first_result");
   }

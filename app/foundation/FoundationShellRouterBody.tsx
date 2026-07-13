@@ -485,6 +485,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   onOpenLeagueLeaders,
   orderedDisciplines,
   originateLoanForActiveTeam,
+  repayLoanEarlyForActiveTeam,
   ownerQuickSwitchTeams,
   passiveTeams,
   persistenceError,
@@ -3653,6 +3654,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               gameState={gameState}
               teamId={activeManagerTeamId}
               onBorrow={originateLoanForActiveTeam}
+              onEarlyPayoff={repayLoanEarlyForActiveTeam}
             />
           ) : null}
 

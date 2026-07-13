@@ -135,7 +135,8 @@ export type TeamWriteAction =
   | "cash_prize_apply"
   | "standings_apply"
   | "sponsor_choice"
-  | "credit_borrow";
+  | "credit_borrow"
+  | "credit_early_payoff";
 
 export type TeamWriteAuthorizationReason =
   | "ok"

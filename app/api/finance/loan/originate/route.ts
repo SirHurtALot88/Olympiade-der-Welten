@@ -15,11 +15,9 @@ type LoanOriginateBody = {
   principal?: number;
   termSeasons?: number;
   /**
-   * Non-null selects a team offer (Phase 3, not yet supported — rejected
-   * below with `team_lending_not_available`). `null`/omitted means the bank.
-   * Threaded through now so the client + this route are ready for Phase 3
-   * without another wiring pass — see docs/design/kredit-system.md
-   * "Seam-Vertrag für die UI (Phase 3)".
+   * Non-null selects a team offer (Phase 3 — see
+   * docs/design/kredit-system.md "Phase 3 — Team-zu-Team-Kredite").
+   * `null`/omitted means the bank.
    */
   lenderTeamId?: string | null;
   source?: "sqlite" | "prisma";
@@ -50,19 +48,6 @@ export async function POST(request: Request) {
     const principal = typeof body.principal === "number" ? body.principal : NaN;
     const termSeasons = typeof body.termSeasons === "number" ? body.termSeasons : NaN;
     const lenderTeamId = typeof body.lenderTeamId === "string" ? body.lenderTeamId.trim() : "";
-
-    // Phase 3 (team-to-team lending) is not implemented yet — `originateLoan`
-    // only knows how to originate bank loans. Reject team offers explicitly
-    // here rather than silently falling back to the bank, so the client can
-    // show an honest message instead of originating the wrong loan. Remove
-    // this guard once `originateLoan` supports `lenderType: "team"` (see
-    // docs/design/kredit-system.md "Seam-Vertrag für die UI (Phase 3)").
-    if (lenderTeamId) {
-      return NextResponse.json(
-        { ok: false, reason: "team_lending_not_available", loan: null, capacity: 0, terms: null },
-        { status: 400 },
-      );
-    }
 
     if (source === "prisma") {
       return NextResponse.json(
@@ -132,10 +117,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Kern-Validierung (Betrag, Laufzeit, Kapazität) lebt im Service — hier
-    // nie den Client-Betrag/Laufzeit blind vertrauen, `originateLoan`
-    // clamped/prüft erneut serverseitig und liefert den maßgeblichen `reason`.
-    const result = originateLoan(save.gameState, { borrowerTeamId: teamId, principal, termSeasons }, { execute: true });
+    // Kern-Validierung (Betrag, Laufzeit, Kapazität, Verleiher-Eligibilität)
+    // lebt im Service — hier nie den Client-Betrag/Laufzeit/Verleiher blind
+    // vertrauen, `originateLoan` clamped/prüft erneut serverseitig und
+    // liefert den maßgeblichen `reason`. `lenderTeamId` non-empty selects a
+    // team offer (Phase 3); leer/omitted bleibt die Bank (unverändertes
+    // Verhalten).
+    const result = originateLoan(
+      save.gameState,
+      {
+        borrowerTeamId: teamId,
+        principal,
+        termSeasons,
+        ...(lenderTeamId ? { lenderType: "team" as const, lenderTeamId } : {}),
+      },
+      { execute: true },
+    );
 
     if (!result.ok) {
       return NextResponse.json(

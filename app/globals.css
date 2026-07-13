@@ -54212,6 +54212,33 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+/* --- Aktive Kredite: "Vorzeitig ablösen" Inline-Aktion ------------- */
+.is-new-look .nl-credits-payoff-button {
+  white-space: nowrap;
+}
+
+.is-new-look .nl-credits-payoff-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 200px;
+}
+
+.is-new-look .nl-credits-payoff-quote {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--nl-s2);
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-md, 8px);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-credits-payoff-actions {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-thist-season-pill,
