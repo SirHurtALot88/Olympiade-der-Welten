@@ -250,8 +250,9 @@ export function buildLoanOffers(
   borrowerTeamId: string,
   principal: number,
   termSeasons: number,
+  options?: { allowSeason1?: boolean },
 ): LoanOffer[] {
-  if (isSeasonOne(gameState.season.id)) return [];
+  if (!options?.allowSeason1 && isSeasonOne(gameState.season.id)) return [];
 
   const borrower = gameState.teams.find((team) => team.teamId === borrowerTeamId) ?? null;
   if (!borrower) return [];
@@ -341,7 +342,7 @@ export type OriginateLoanResult = {
 export function originateLoan(
   gameState: GameState,
   input: OriginateLoanInput,
-  options?: { execute?: boolean },
+  options?: { execute?: boolean; allowSeason1?: boolean },
 ): OriginateLoanResult {
   const borrower = gameState.teams.find((team) => team.teamId === input.borrowerTeamId) ?? null;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.borrowerTeamId) ?? null;
@@ -352,7 +353,7 @@ export function originateLoan(
 
   // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md. Unabhängig von
   // Kapazität — man kommt mit dem aus, was man hat.
-  if (isSeasonOne(gameState.season.id)) {
+  if (!options?.allowSeason1 && isSeasonOne(gameState.season.id)) {
     return { ok: false, loan: null, reason: SEASON_ONE_NO_LOANS_REASON, capacity: 0, terms: null, gameState };
   }
 

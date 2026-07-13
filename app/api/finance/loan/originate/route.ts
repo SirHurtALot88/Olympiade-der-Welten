@@ -20,6 +20,7 @@ type LoanOriginateBody = {
    * `null`/omitted means the bank.
    */
   lenderTeamId?: string | null;
+  adminOverride?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -48,6 +49,9 @@ export async function POST(request: Request) {
     const principal = typeof body.principal === "number" ? body.principal : NaN;
     const termSeasons = typeof body.termSeasons === "number" ? body.termSeasons : NaN;
     const lenderTeamId = typeof body.lenderTeamId === "string" ? body.lenderTeamId.trim() : "";
+    // Admin-Override nur in Singleplayer-Spielständen (kein Raum) — ein
+    // Room-Save behält die echten Regeln, siehe docs/design/kredit-system.md.
+    const adminOverride = body.adminOverride === true && !body.roomCode;
 
     if (source === "prisma") {
       return NextResponse.json(
@@ -89,7 +93,7 @@ export async function POST(request: Request) {
     // fest verlangten Reason-String, damit der Client eine stabile,
     // sprachneutrale Fehlerkonstante bekommt.
     const phaseGate = evaluateGamePhaseAction(save.gameState, "credit_borrow");
-    if (!phaseGate.allowed) {
+    if (!adminOverride && !phaseGate.allowed) {
       return NextResponse.json(
         { ok: false, reason: "not_preseason", loan: null, capacity: 0, terms: null },
         { status: 409 },
@@ -131,7 +135,7 @@ export async function POST(request: Request) {
         termSeasons,
         ...(lenderTeamId ? { lenderType: "team" as const, lenderTeamId } : {}),
       },
-      { execute: true },
+      { execute: true, allowSeason1: adminOverride },
     );
 
     if (!result.ok) {

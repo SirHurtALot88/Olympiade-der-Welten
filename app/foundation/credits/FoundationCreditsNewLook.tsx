@@ -18,6 +18,8 @@ export type FoundationCreditsNewLookProps = {
   teamId: string | null;
   onBorrow: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
   onEarlyPayoff: (loanId: string) => Promise<LoanEarlyPayoffOutcome>;
+  adminOverride: boolean;
+  onToggleAdminOverride: (next: boolean) => void;
 };
 
 function formatRate(rate: number | null | undefined): string {
@@ -422,6 +424,8 @@ export default function FoundationCreditsNewLook({
   teamId,
   onBorrow,
   onEarlyPayoff,
+  adminOverride,
+  onToggleAdminOverride,
 }: FoundationCreditsNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
   const capacity = Math.max(0, team?.creditLimit ?? 0);
@@ -467,8 +471,8 @@ export default function FoundationCreditsNewLook({
   // see `isSeasonOneBlocked` below) — `buildLoanOffers` itself returns `[]`.
   const offers = useMemo(() => {
     if (!team || !teamId || amount <= 0) return [];
-    return buildLoanOffers(gameState, teamId, amount, termSeasons);
-  }, [gameState, team, teamId, amount, termSeasons]);
+    return buildLoanOffers(gameState, teamId, amount, termSeasons, { allowSeason1: adminOverride });
+  }, [gameState, team, teamId, amount, termSeasons, adminOverride]);
 
   const isSeasonOneBlocked = team?.borrowBlockedReason === "season_one";
 
@@ -501,6 +505,24 @@ export default function FoundationCreditsNewLook({
         <StatChip label="Cash" value={team ? formatNlMoney(team.cash) : "—"} tone="neutral" />
         <StatChip label="Zins-Range" value={rateRange} tone="neutral" />
       </StatChipRow>
+
+      <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
+        <label className="nl-credits-admin-toggle-label">
+          <input
+            type="checkbox"
+            checked={adminOverride}
+            onChange={(event) => onToggleAdminOverride(event.target.checked)}
+            data-testid="nl-credits-admin-toggle-input"
+          />
+          <span>Admin-Vorschau: Kredite trotz Season-1- &amp; Phasen-Sperre freischalten</span>
+        </label>
+        {adminOverride ? (
+          <p className="nl-credits-admin-toggle-note">
+            Admin-Modus aktiv — nur zum Testen/Ansehen. In Singleplayer-Spielständen kannst du hier
+            Angebote und Abläufe unabhängig von Saison und Spielphase durchspielen.
+          </p>
+        ) : null}
+      </div>
 
       {team && team.canBorrow ? (
         <>
