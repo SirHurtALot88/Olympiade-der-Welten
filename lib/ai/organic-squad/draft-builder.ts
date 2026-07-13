@@ -73,6 +73,15 @@ export type OrganicSquadPlanInput = {
     rosterMax?: number;
     /** Hard lower roster bound, defaults to ROSTER_MIN (8). */
     rosterMin?: number;
+    /**
+     * Small flat solvency floor kept while filling the squad from min UP TO opt. Below this the reserve
+     * (cashBuffer) is treated as SPENDABLE toward the opt target rather than a hard hold — the club
+     * spends its salary-scaled reserve to build the squad it wants and refills it from income over later
+     * seasons (user model: "die Reserve muss auch mal ausgegeben werden, kann später aufgefüllt werden").
+     * Only ABOVE opt does the full cashBuffer hold again. Defaults to cashBuffer (i.e. the old behaviour:
+     * reserve held from min onward) when not provided, so callers that don't opt in are unchanged.
+     */
+    solvencyFloor?: number;
   };
   /**
    * Optional per-(save, team) seed for the reproducible buy-utility jitter (see ORGANIC_DRAFT_JITTER).
@@ -112,6 +121,9 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   const rosterMax = input.economy.rosterMax ?? ROSTER_MAX;
   const rosterMin = input.economy.rosterMin ?? ROSTER_MIN;
   const cashBuffer = input.economy.cashBuffer;
+  const optTarget = input.economy.weights.optTarget;
+  // Floor kept while building from min→opt (see solvencyFloor doc). Defaults to cashBuffer = old behaviour.
+  const optFillFloor = Math.min(cashBuffer, input.economy.solvencyFloor ?? cashBuffer);
 
   const squad = [...input.startingSquad];
   const pool = [...input.candidates];
@@ -154,12 +166,17 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     // min this reserve is 0, so composition past min is fully emergent.
     const remainingToMinAfterBuy = Math.max(0, rosterMin - (squad.length + 1));
     const reserveForMin = cheapestPriceSum(pool, remainingToMinAfterBuy);
-    // Reaching the hard ROSTER_MIN outranks the solvency buffer: a club MUST field a legal (≥ min)
-    // squad even if that spends it down toward ~0 — otherwise a cash-poor club (e.g. after paying
-    // renewal salaries) stalls below min and breaks downstream (autoprep "teams_under_7"). So below
-    // min the affordability floor is 0 (never negative cash); the buffer only guards spend ABOVE min.
+    // Three-tier solvency floor. (1) Below the hard ROSTER_MIN: floor 0 — fielding a legal (≥ min) squad
+    // outranks any buffer, so a cash-poor club spends down toward ~0 to reach min (else it stalls below
+    // min and breaks autoprep "teams_under_7"). (2) From min UP TO opt: floor = optFillFloor (a small flat
+    // solvency floor). Here the salary-scaled reserve is SPENDABLE — a club spends it to build its target
+    // squad and refills it from income over later seasons, instead of hoarding it and stalling under opt
+    // (user model: "die Reserve muss auch mal ausgegeben werden, kann später aufgefüllt werden"). (3) At or
+    // above opt: floor = cashBuffer — the full reserve holds again, so cash beyond the target squad is kept
+    // rather than blown on luxury depth. Affordability keeps cash ≥ floor AFTER the buy AND the min-fill.
     const belowMin = squad.length < rosterMin;
-    const affordFloor = belowMin ? 0 : cashBuffer;
+    const belowOpt = squad.length < optTarget;
+    const affordFloor = belowMin ? 0 : belowOpt ? optFillFloor : cashBuffer;
     // Affordability keeps cash ≥ affordFloor AFTER the buy AND after the reserved min-fill.
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;

@@ -329,6 +329,9 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       weights: ctx.weights,
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
+      // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
+      // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
+      solvencyFloor: ORGANIC_CASH_BUFFER,
     },
     draftSeed: input.draftSeed ?? null,
   });
