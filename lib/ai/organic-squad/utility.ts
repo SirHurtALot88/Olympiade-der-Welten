@@ -99,7 +99,11 @@ const THEME_FIT_VALUE = 12;
  * scale that behaviour and are gated by a distress factor that is ~0 when cash is healthy, so they never
  * make a solvent club fire-sale.
  */
-const SELL_DISTRESS_STRENGTH_DISCOUNT = 0.75; // max fraction of the strength-keeping waived at full distress
+// Bei voller Not fast die ganze Stärke-Bindung aufheben, damit ein cash-knappes/über-salariertes Team
+// auch seinen TEURSTEN Star liquidiert (60 MW → 2–3 neue Spieler + Cash), statt ihn zu halten und unter
+// dem Gehalt zu ersticken. Es gibt keine "Verkauf-unter-Min"-Policy — ein Verkauf drückt nur kurzfristig
+// unter Min und wird sofort wieder aufgefüllt. Bei GESUNDEM Cash bleibt distress ~0 → kein Fire-Sale.
+const SELL_DISTRESS_STRENGTH_DISCOUNT = 0.9; // max fraction of the strength-keeping waived at full distress
 const SELL_DISTRESS_SALARY_RELIEF = 1.0; // weight on the capitalized wage relief a sale frees, under distress
 /**
  * ANTICIPATION amplifier ("wenn Teams eh schon unter OPT sind und wenig Cash haben müssen sie eigentlich
