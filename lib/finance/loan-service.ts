@@ -3,20 +3,38 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { resolveTeamLiquidityBufferTarget } from "@/lib/ai/planner-cash-buffer-policy";
 
-/** Bank-Kredit-Kern (Phase 1). KI-Anbindung (Phase 2) und Team-zu-Team-Kredite (Phase 3) folgen später. */
+/** Bank-Kredit-Kern (Phase 1), KI-Anbindung (Phase 2) und Team-zu-Team-Kredite (Phase 3), siehe
+ * docs/design/kredit-system.md. */
 
 const MIN_INTEREST_RATE = 0.07;
 const MAX_INTEREST_RATE = 0.2;
 const BASE_INTEREST_RATE = 0.1;
 const RISK_PER_MISSING_FINANCE_POINT = 0.012;
 const TERM_DISCOUNT_PER_SEASON = 0.004;
-const CAPACITY_MARKET_VALUE_SHARE = 0.35;
-const CAPACITY_REVENUE_SHARE = 1.25;
+const CAPACITY_CASH_SHARE = 0.15;
+const CAPACITY_MARKET_VALUE_SHARE = 0.3;
+const CAPACITY_REVENUE_SHARE = 1.5;
 const DEFAULT_PENALTY_RATE = 0.05;
+/** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
+const PREPAYMENT_FEE_RATE = 0.2;
+export const SEASON_ONE_NO_LOANS_REASON = "season_one_no_loans";
 const DEFAULT_MISSED_PAYMENTS_THRESHOLD = 2;
 const MIN_TERM_SEASONS = 1;
 const MAX_TERM_SEASONS = 10;
+
+/** Phase 3 — Team-zu-Team-Kredite, siehe docs/design/kredit-system.md ("Phase 3"). */
+export const TEAM_INTERACTION_DISCOUNT = 0.01;
+export const TEAM_RELATIONSHIP_DISCOUNT_MAX = 0.03;
+export const TEAM_LOAN_FLOOR = 0.05;
+export const LENDER_OFFER_SHARE_BASE = 0.5;
+export const LENDER_OFFER_SHARE_MAX = 0.66;
+/** Rivalen mit Relationship <= RIVAL_CUTOFF bieten keine Team-Kredite an. */
+export const RIVAL_CUTOFF = -4;
 
 function roundCash(value: number) {
   return Number(value.toFixed(1));
@@ -36,6 +54,21 @@ export type LoanTerms = {
 };
 
 /**
+ * Annuität A = P * r / (1 - (1 + r)^(-n)) für eine beliebige (z. B. Team-)Rate, siehe
+ * docs/design/kredit-system.md ("Zins- & Tilgungsmodell"). Bei r === 0 wird linear getilgt.
+ * Geteilt zwischen `computeLoanTerms` (Bank-Satz) und Team-Angeboten (Phase 3), die einen
+ * eigenen, unterbotenen Satz mitbringen statt ihn selbst herzuleiten.
+ */
+export function annuityInstallment(principal: number, ratePerSeason: number, termSeasons: number): number {
+  const term = clamp(Math.round(termSeasons), MIN_TERM_SEASONS, MAX_TERM_SEASONS);
+  const safePrincipal = Math.max(0, principal);
+  if (safePrincipal === 0) return 0;
+  const installment =
+    ratePerSeason === 0 ? safePrincipal / term : (safePrincipal * ratePerSeason) / (1 - Math.pow(1 + ratePerSeason, -term));
+  return roundCash(installment);
+}
+
+/**
  * Zins- & Annuitätenberechnung, siehe docs/design/kredit-system.md.
  * rate = clamp(0.10 + (10 - finances) * 0.012 - (termSeasons - 1) * 0.004, 0.07, 0.20)
  * A = P * r / (1 - (1 + r)^(-n))
@@ -48,31 +81,26 @@ export function computeLoanTerms(input: { principal: number; termSeasons: number
   const rate = roundRate(clamp(BASE_INTEREST_RATE + risk - termDiscount, MIN_INTEREST_RATE, MAX_INTEREST_RATE));
   const principal = Math.max(0, input.principal);
 
-  if (principal === 0) {
-    return { interestRatePerSeason: rate, installmentPerSeason: 0 };
-  }
-
-  // Annuität: bei r === 0 (theoretisch außerhalb Floor/Cap) linear tilgen, sonst Standardformel.
-  const installment =
-    rate === 0 ? principal / termSeasons : (principal * rate) / (1 - Math.pow(1 + rate, -termSeasons));
-
   return {
     interestRatePerSeason: rate,
-    installmentPerSeason: roundCash(installment),
+    installmentPerSeason: annuityInstallment(principal, rate, termSeasons),
   };
 }
 
 /**
- * Kreditlimit: min(0.35 * marketValueTotal, 1.25 * jährlicheEinnahmen) - aktuelleRestschuld, floor 0.
+ * Kreditlimit: min(0.15 * cash + 0.30 * marketValueTotal, 1.5 * jährlicheEinnahmen) -
+ * aktuelleRestschuld, floor 0. Siehe docs/design/kredit-system.md ("Kreditlimit").
  */
 export function computeBorrowingCapacity(input: {
+  cash: number;
   marketValueTotal: number;
   annualRevenue: number;
   currentOutstandingDebt: number;
 }): number {
-  const marketValueCap = CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
-  const revenueCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
-  const cap = Math.min(marketValueCap, revenueCap);
+  const teamwertCap =
+    CAPACITY_CASH_SHARE * Math.max(0, input.cash) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
+  const tragbarkeitsCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
+  const cap = Math.min(teamwertCap, tragbarkeitsCap);
   return roundCash(Math.max(0, cap - Math.max(0, input.currentOutstandingDebt)));
 }
 
@@ -136,10 +164,162 @@ function getTeamMarketValueTotal(gameState: GameState, teamId: string): number {
   return row?.marketValueTotal ?? 0;
 }
 
+/** Numerischer Beziehungswert (0 wenn kein Eintrag vorliegt), siehe `getTeamRelationship`. */
+function getTeamRelationshipValue(fromTeamId: string, toTeamId: string): number {
+  return getTeamRelationship(fromTeamId, toTeamId)?.value ?? 0;
+}
+
+/**
+ * Zinssatz eines Team-Angebots, siehe docs/design/kredit-system.md ("Konditionen"). Teams
+ * unterbieten die Bank IMMER um `TEAM_INTERACTION_DISCOUNT`, gute Beziehungen und
+ * renditehungrige Verleiher (hohe finances) rabattieren zusätzlich, nie unter `TEAM_LOAN_FLOOR`.
+ */
+export function computeTeamLoanRate(input: {
+  bankRate: number;
+  relationshipValue: number;
+  lenderFinances: number;
+  lenderCashPriority?: number;
+}): number {
+  const interactionDiscount = TEAM_INTERACTION_DISCOUNT;
+  const relationshipDiscount = (Math.max(0, input.relationshipValue) / 5) * TEAM_RELATIONSHIP_DISCOUNT_MAX;
+  const yieldAppetite = Math.max(0, (input.lenderFinances - 5) / 5) * 0.01;
+  const maxRate = input.bankRate - interactionDiscount;
+  const rate = input.bankRate - interactionDiscount - relationshipDiscount - yieldAppetite;
+  return roundRate(clamp(rate, TEAM_LOAN_FLOOR, maxRate));
+}
+
+/**
+ * Wie viel freies Cash ein Team L überhaupt entbehren kann (Puffer bleibt unangetastet), siehe
+ * docs/design/kredit-system.md ("Verleiher-Eligibilität & Angebotsbetrag").
+ */
+export function getLendableCash(gameState: GameState, lenderTeamId: string): number {
+  const lender = gameState.teams.find((team) => team.teamId === lenderTeamId) ?? null;
+  if (!lender) return 0;
+  const buffer = resolveTeamLiquidityBufferTarget(gameState, lenderTeamId);
+  return roundCash(Math.max(0, lender.cash - buffer));
+}
+
+/**
+ * Angebotsbetrag eines Verleihers: nur ein Teil (LENDER_OFFER_SHARE_BASE..MAX) des lendableCash,
+ * damit der Verleiher eine Reserve behält. Finanzstarke/renditehungrige Teams (hohe
+ * finances/cashPriority) oder gute Beziehungen bieten einen höheren Anteil.
+ */
+export function computeLenderOfferAmount(
+  gameState: GameState,
+  lenderTeamId: string,
+  input: { relationshipValue: number },
+): number {
+  const lendable = getLendableCash(gameState, lenderTeamId);
+  if (lendable <= 0) return 0;
+
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === lenderTeamId) ?? null;
+  const finances = clamp(identity?.finances ?? 5, 0, 10);
+  const profile = getTeamStrategyProfile(gameState, lenderTeamId);
+  const cashPriority = clamp(profile?.bias.cashPriority ?? 5, 0, 10);
+
+  const financeBonus = (Math.max(0, finances - 5) / 5) * 0.1 + (Math.max(0, cashPriority - 5) / 5) * 0.06;
+  const relationshipBonus = (Math.max(0, input.relationshipValue) / 5) * 0.1;
+
+  const share = clamp(
+    LENDER_OFFER_SHARE_BASE + financeBonus + relationshipBonus,
+    LENDER_OFFER_SHARE_BASE,
+    LENDER_OFFER_SHARE_MAX,
+  );
+
+  return roundCash(lendable * share);
+}
+
+export type LoanOffer = {
+  lenderType: "bank" | "team";
+  lenderTeamId: string | null;
+  lenderName: string;
+  maxAmount: number;
+  interestRatePerSeason: number;
+  installmentPerSeason: number;
+  relationshipValue: number | null;
+};
+
+/**
+ * Baut die Angebotsliste für eine Kreditsumme/Laufzeit — Bank + jedes eligible Team, siehe
+ * docs/design/kredit-system.md ("Phase 3 — Angebots-UI"). Power sowohl das menschliche
+ * Angebots-UI als auch die KI-Kreditwahl (Phase 3 KI-Anbindung). Season 1 = keine Kredite (harte
+ * Regel) -> leere Liste, dasselbe Verhalten wie `originateLoan`.
+ */
+export function buildLoanOffers(
+  gameState: GameState,
+  borrowerTeamId: string,
+  principal: number,
+  termSeasons: number,
+): LoanOffer[] {
+  if (isSeasonOne(gameState.season.id)) return [];
+
+  const borrower = gameState.teams.find((team) => team.teamId === borrowerTeamId) ?? null;
+  if (!borrower) return [];
+  if (!Number.isFinite(principal) || principal <= 0) return [];
+
+  const borrowerIdentity = gameState.teamIdentities.find((entry) => entry.teamId === borrowerTeamId) ?? null;
+  const borrowerFinances = borrowerIdentity?.finances ?? 5;
+  const marketValueTotal = getTeamMarketValueTotal(gameState, borrowerTeamId);
+  const annualRevenue = estimateTeamAnnualRevenue(gameState, borrowerTeamId);
+  const currentOutstandingDebt = getTeamOutstandingDebt(gameState, borrowerTeamId);
+  const capacity = computeBorrowingCapacity({
+    cash: borrower.cash,
+    marketValueTotal,
+    annualRevenue,
+    currentOutstandingDebt,
+  });
+
+  const bankTerms = computeLoanTerms({ principal, termSeasons, finances: borrowerFinances });
+  const offers: LoanOffer[] = [
+    {
+      lenderType: "bank",
+      lenderTeamId: null,
+      lenderName: "Bank",
+      maxAmount: capacity,
+      interestRatePerSeason: bankTerms.interestRatePerSeason,
+      installmentPerSeason: bankTerms.installmentPerSeason,
+      relationshipValue: null,
+    },
+  ];
+
+  for (const lender of gameState.teams) {
+    if (lender.teamId === borrowerTeamId) continue;
+    const relationshipValue = getTeamRelationshipValue(lender.teamId, borrowerTeamId);
+    if (relationshipValue <= RIVAL_CUTOFF) continue;
+
+    const lenderOfferAmount = computeLenderOfferAmount(gameState, lender.teamId, { relationshipValue });
+    if (lenderOfferAmount < principal) continue;
+
+    const lenderIdentity = gameState.teamIdentities.find((entry) => entry.teamId === lender.teamId) ?? null;
+    const profile = getTeamStrategyProfile(gameState, lender.teamId);
+    const rate = computeTeamLoanRate({
+      bankRate: bankTerms.interestRatePerSeason,
+      relationshipValue,
+      lenderFinances: lenderIdentity?.finances ?? 5,
+      lenderCashPriority: profile?.bias.cashPriority ?? 5,
+    });
+
+    offers.push({
+      lenderType: "team",
+      lenderTeamId: lender.teamId,
+      lenderName: lender.name,
+      maxAmount: Math.min(lenderOfferAmount, capacity),
+      interestRatePerSeason: rate,
+      installmentPerSeason: annuityInstallment(principal, rate, termSeasons),
+      relationshipValue,
+    });
+  }
+
+  return offers.sort((left, right) => left.interestRatePerSeason - right.interestRatePerSeason);
+}
+
 export type OriginateLoanInput = {
   borrowerTeamId: string;
   principal: number;
   termSeasons: number;
+  /** Phase 3: optionaler Team-Verleiher statt der Bank. Default: Bank (unverändertes Verhalten). */
+  lenderType?: "bank" | "team";
+  lenderTeamId?: string;
 };
 
 export type OriginateLoanResult = {
@@ -153,7 +333,10 @@ export type OriginateLoanResult = {
 
 /**
  * Kreditaufnahme (nur Preseason — wird vom Aufrufer erzwungen, dieser Service ist phasenlos).
- * Ohne execute: reine Vorschau/Validierung (keine Mutation).
+ * Ohne execute: reine Vorschau/Validierung (keine Mutation). Phase 3: bei `lenderType: "team"`
+ * leiht das Team statt der Bank — Cash-Transfer erfolgt zwischen Verleiher und Kreditnehmer, der
+ * Satz kommt aus `computeTeamLoanRate` statt dem Bank-Satz, siehe
+ * docs/design/kredit-system.md ("Phase 3 — Abwicklung").
  */
 export function originateLoan(
   gameState: GameState,
@@ -167,6 +350,12 @@ export function originateLoan(
     return { ok: false, loan: null, reason: "borrower_not_found", capacity: 0, terms: null, gameState };
   }
 
+  // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md. Unabhängig von
+  // Kapazität — man kommt mit dem aus, was man hat.
+  if (isSeasonOne(gameState.season.id)) {
+    return { ok: false, loan: null, reason: SEASON_ONE_NO_LOANS_REASON, capacity: 0, terms: null, gameState };
+  }
+
   const termSeasons = Math.round(input.termSeasons);
   if (!Number.isFinite(input.principal) || input.principal <= 0) {
     return { ok: false, loan: null, reason: "invalid_principal", capacity: 0, terms: null, gameState };
@@ -175,22 +364,65 @@ export function originateLoan(
     return { ok: false, loan: null, reason: "invalid_term_seasons", capacity: 0, terms: null, gameState };
   }
 
+  const lenderType = input.lenderType ?? "bank";
+  let lender: (typeof gameState.teams)[number] | null = null;
+  let relationshipValue = 0;
+
+  if (lenderType === "team") {
+    if (!input.lenderTeamId || input.lenderTeamId === input.borrowerTeamId) {
+      return { ok: false, loan: null, reason: "invalid_lender", capacity: 0, terms: null, gameState };
+    }
+    lender = gameState.teams.find((team) => team.teamId === input.lenderTeamId) ?? null;
+    if (!lender) {
+      return { ok: false, loan: null, reason: "lender_not_found", capacity: 0, terms: null, gameState };
+    }
+    relationshipValue = getTeamRelationshipValue(input.lenderTeamId, input.borrowerTeamId);
+    if (relationshipValue <= RIVAL_CUTOFF) {
+      return { ok: false, loan: null, reason: "lender_hostile_relationship", capacity: 0, terms: null, gameState };
+    }
+    const lenderOfferAmount = computeLenderOfferAmount(gameState, input.lenderTeamId, { relationshipValue });
+    if (lenderOfferAmount < input.principal) {
+      return { ok: false, loan: null, reason: "lender_insufficient_cash", capacity: 0, terms: null, gameState };
+    }
+  }
+
   const finances = identity?.finances ?? 5;
   const marketValueTotal = getTeamMarketValueTotal(gameState, input.borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, input.borrowerTeamId);
   const currentOutstandingDebt = getTeamOutstandingDebt(gameState, input.borrowerTeamId);
-  const capacity = computeBorrowingCapacity({ marketValueTotal, annualRevenue, currentOutstandingDebt });
+  const capacity = computeBorrowingCapacity({
+    cash: borrower.cash,
+    marketValueTotal,
+    annualRevenue,
+    currentOutstandingDebt,
+  });
 
   if (input.principal > capacity) {
     return { ok: false, loan: null, reason: "over_capacity", capacity, terms: null, gameState };
   }
 
-  const terms = computeLoanTerms({ principal: input.principal, termSeasons, finances });
+  const bankTerms = computeLoanTerms({ principal: input.principal, termSeasons, finances });
+  let terms = bankTerms;
+  if (lenderType === "team" && lender) {
+    const lenderIdentity = gameState.teamIdentities.find((entry) => entry.teamId === lender!.teamId) ?? null;
+    const lenderProfile = getTeamStrategyProfile(gameState, lender.teamId);
+    const teamRate = computeTeamLoanRate({
+      bankRate: bankTerms.interestRatePerSeason,
+      relationshipValue,
+      lenderFinances: lenderIdentity?.finances ?? 5,
+      lenderCashPriority: lenderProfile?.bias.cashPriority ?? 5,
+    });
+    terms = {
+      interestRatePerSeason: teamRate,
+      installmentPerSeason: annuityInstallment(input.principal, teamRate, termSeasons),
+    };
+  }
 
   const loan: LoanRecord = {
     loanId: `loan:${gameState.season.id}:${input.borrowerTeamId}:${randomUUID()}`,
     borrowerTeamId: input.borrowerTeamId,
-    lenderType: "bank",
+    lenderType,
+    ...(lenderType === "team" && input.lenderTeamId ? { lenderTeamId: input.lenderTeamId } : {}),
     principalOriginal: roundCash(input.principal),
     principalOutstanding: roundCash(input.principal),
     interestRatePerSeason: terms.interestRatePerSeason,
@@ -208,9 +440,15 @@ export function originateLoan(
 
   const nextGameState: GameState = {
     ...gameState,
-    teams: gameState.teams.map((team) =>
-      team.teamId === input.borrowerTeamId ? { ...team, cash: roundCash(team.cash + input.principal) } : team,
-    ),
+    teams: gameState.teams.map((team) => {
+      if (team.teamId === input.borrowerTeamId) {
+        return { ...team, cash: roundCash(team.cash + input.principal) };
+      }
+      if (lenderType === "team" && team.teamId === input.lenderTeamId) {
+        return { ...team, cash: roundCash(team.cash - input.principal) };
+      }
+      return team;
+    }),
     seasonState: {
       ...gameState.seasonState,
       loans: [...(gameState.seasonState.loans ?? []), loan],
@@ -385,10 +623,22 @@ export function applyLoanSettlement(
   }
 
   const rowsByLoanId = new Map(preview.rows.map((row) => [row.loanId, row] as const));
+  const loansByLoanId = new Map((gameState.seasonState.loans ?? []).map((loan) => [loan.loanId, loan] as const));
   const cashDeltaByTeamId = new Map<string, number>();
   for (const row of preview.rows) {
     if (row.cashDelta === 0) continue;
     cashDeltaByTeamId.set(row.borrowerTeamId, roundCash((cashDeltaByTeamId.get(row.borrowerTeamId) ?? 0) + row.cashDelta));
+
+    // Phase 3: Team-Kredite lassen die Rate nicht "verschwinden" — der Verleiher kassiert genau
+    // den tatsächlich eingezogenen Betrag (installmentCharged), auch bei Teilzahlung/Default. Der
+    // Verleiher trägt so das Ausfallrisiko, keine Phantom-Gutschrift.
+    const loan = loansByLoanId.get(row.loanId);
+    if (loan?.lenderType === "team" && loan.lenderTeamId && row.installmentCharged > 0) {
+      cashDeltaByTeamId.set(
+        loan.lenderTeamId,
+        roundCash((cashDeltaByTeamId.get(loan.lenderTeamId) ?? 0) + row.installmentCharged),
+      );
+    }
   }
 
   const nextLoans = (gameState.seasonState.loans ?? []).map((loan) => {
@@ -458,4 +708,93 @@ export function applyLoanSettlement(
   };
 
   return { ok: true, applied: true, duplicateDetected: false, preview, gameState: nextGameState };
+}
+
+export type EarlyPayoffQuote = {
+  payoff: number;
+  principalPortion: number;
+  foregoneInterest: number;
+  feePortion: number;
+};
+
+/**
+ * Vorab-Rückzahlung (vorzeitige Ablösung), siehe docs/design/kredit-system.md
+ * ("Vorab-Rückzahlung"):
+ *   remainingScheduled = installmentPerSeason * seasonsRemaining
+ *   foregoneInterest   = max(0, remainingScheduled - principalOutstanding)
+ *   payoff             = principalOutstanding + PREPAYMENT_FEE_RATE * foregoneInterest
+ * Nur sinnvoll für `status === "active"` — für andere Status liefert es trotzdem eine
+ * (rechnerisch bedeutungslose) Zahl zurück; Aufrufer prüfen den Status separat.
+ */
+export function computeEarlyPayoff(loan: LoanRecord): EarlyPayoffQuote {
+  const remainingScheduled = roundCash(loan.installmentPerSeason * loan.seasonsRemaining);
+  const foregoneInterest = roundCash(Math.max(0, remainingScheduled - loan.principalOutstanding));
+  const feePortion = roundCash(PREPAYMENT_FEE_RATE * foregoneInterest);
+  const principalPortion = roundCash(Math.max(0, loan.principalOutstanding));
+  const payoff = roundCash(principalPortion + feePortion);
+  return { payoff, principalPortion, foregoneInterest, feePortion };
+}
+
+export type ApplyEarlyPayoffResult = {
+  ok: boolean;
+  reason: string | null;
+  payoff: number;
+  gameState: GameState;
+};
+
+/**
+ * Vorab-Rückzahlung ausführen (Verkaufsphase). Ohne execute: reine Vorschau/Validierung (keine
+ * Mutation). Belastet Cash des Kreditnehmers, setzt den Kredit auf `status: "paid"`.
+ * Team-zu-Team-Kredite (Phase 3): die Ablösesumme fließt an den Verleiher, siehe
+ * docs/design/kredit-system.md ("Vorab-Rückzahlung").
+ */
+export function applyEarlyPayoff(
+  gameState: GameState,
+  loanId: string,
+  options?: { execute?: boolean },
+): ApplyEarlyPayoffResult {
+  const loan = (gameState.seasonState.loans ?? []).find((entry) => entry.loanId === loanId) ?? null;
+  if (!loan) {
+    return { ok: false, reason: "loan_not_found", payoff: 0, gameState };
+  }
+  if (loan.status !== "active") {
+    return { ok: false, reason: "loan_not_active", payoff: 0, gameState };
+  }
+
+  const borrower = gameState.teams.find((team) => team.teamId === loan.borrowerTeamId) ?? null;
+  if (!borrower) {
+    return { ok: false, reason: "borrower_not_found", payoff: 0, gameState };
+  }
+
+  const { payoff } = computeEarlyPayoff(loan);
+  if (borrower.cash < payoff) {
+    return { ok: false, reason: "insufficient_cash", payoff, gameState };
+  }
+
+  if (!options?.execute) {
+    return { ok: true, reason: null, payoff, gameState };
+  }
+
+  const nextGameState: GameState = {
+    ...gameState,
+    teams: gameState.teams.map((team) => {
+      if (team.teamId === loan.borrowerTeamId) {
+        return { ...team, cash: roundCash(team.cash - payoff) };
+      }
+      if (loan.lenderType === "team" && loan.lenderTeamId && team.teamId === loan.lenderTeamId) {
+        return { ...team, cash: roundCash(team.cash + payoff) };
+      }
+      return team;
+    }),
+    seasonState: {
+      ...gameState.seasonState,
+      loans: (gameState.seasonState.loans ?? []).map((entry) =>
+        entry.loanId === loanId
+          ? { ...entry, status: "paid" as const, principalOutstanding: 0, seasonsRemaining: 0 }
+          : entry,
+      ),
+    },
+  };
+
+  return { ok: true, reason: null, payoff, gameState: nextGameState };
 }

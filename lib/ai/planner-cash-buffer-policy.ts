@@ -3,12 +3,18 @@ import { getTeamCashSalarySoftTarget, getTeamSalarySum } from "@/lib/ai/ai-cash-
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 
 /** League-median salary anchor for S2+ buffer (teams with thin salary history). */
 export const PLANNER_LEAGUE_SALARY_BUFFER_RATIO = 0.35;
 
 export const PLANNER_LIQUIDITY_BUFFER_MW_RATIO = 0.1;
 export const PLANNER_LIQUIDITY_BUFFER_MIN = 3;
+
+/** Anteil der offenen Restschuld, der zusätzlich als Vorsichts-Puffer aufgeschlagen wird. */
+export const PLANNER_DEBT_CAUTION_RATIO = 0.15;
+/** Deckelt den Restschuld-Aufschlag relativ zum Kader-Marktwert, damit er nicht ausufert. */
+export const PLANNER_DEBT_CAUTION_CAP_MW_RATIO = 0.5;
 
 function round(value: number) {
   return Math.round(value * 100) / 100;
@@ -44,12 +50,26 @@ export function getLeagueMedianTeamSalary(gameState: GameState): number {
 }
 
 /**
+ * Vorsichts-Aufschlag aus offener Restschuld (siehe docs/design/kredit-system.md, KI-Anbindung):
+ * ein verschuldetes Team hält einen größeren Cash-Puffer, gedeckelt relativ zum Kader-Marktwert,
+ * damit ein extrem hoch verschuldetes kleines Team nicht den Puffer sprengt.
+ */
+function resolveDebtCautionBuffer(gameState: GameState, teamId: string, rosterMw: number): number {
+  const outstandingDebt = getTeamOutstandingDebt(gameState, teamId);
+  if (outstandingDebt <= 0) return 0;
+  const raw = outstandingDebt * PLANNER_DEBT_CAUTION_RATIO;
+  const cap = Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_DEBT_CAUTION_CAP_MW_RATIO);
+  return round(Math.min(raw, cap));
+}
+
+/**
  * S2+ liquidity buffer: finance-scaled cash/salary target (0.25–0.75× own salary),
  * floored by league-median salary anchor. Excess cash above this buffer is spendable.
  */
 export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: string): number {
   const rosterMw = resolveTeamRosterMarketValue(gameState, teamId);
-  const mwBuffer = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_LIQUIDITY_BUFFER_MW_RATIO));
+  const debtCautionBuffer = resolveDebtCautionBuffer(gameState, teamId, rosterMw);
+  const mwBuffer = round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, rosterMw * PLANNER_LIQUIDITY_BUFFER_MW_RATIO) + debtCautionBuffer);
   if (!usesSingleCashPlanningPolicy(gameState)) {
     return mwBuffer;
   }
@@ -57,7 +77,7 @@ export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: s
   if (salary <= 0) {
     const leagueMedian = getLeagueMedianTeamSalary(gameState);
     if (leagueMedian <= 0) return mwBuffer;
-    return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO));
+    return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO) + debtCautionBuffer);
   }
   const teamCash = gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? 0;
   const baseSoftRatio = getTeamCashSalarySoftTarget(gameState, teamId);
@@ -84,7 +104,7 @@ export function resolveTeamLiquidityBufferTarget(gameState: GameState, teamId: s
   const ownBuffer = salary * (cashRatio + 0.01 >= highRatio ? lowRatio : highRatio);
   const leagueMedian = getLeagueMedianTeamSalary(gameState);
   const leagueAnchor = leagueMedian > 0 ? leagueMedian * PLANNER_LEAGUE_SALARY_BUFFER_RATIO : 0;
-  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor));
+  return round(Math.max(PLANNER_LIQUIDITY_BUFFER_MIN, ownBuffer, leagueAnchor) + debtCautionBuffer);
 }
 
 export function resolveTeamSpendableCashForPlanning(
