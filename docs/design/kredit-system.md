@@ -168,9 +168,78 @@ vorsichtiger aus.
 - **Phase 2 — KI-Anbindung:** `resolveAiLoanDecision` vor der Kaufphase, Restschuld-Signal im
   Puffer-Gate + Doctrine-Layer, Tests, dass eine bedarfslose KI **nicht** borgt und eine
   bedarfsstarke knappe KI **schon**.
-- **Phase 3 — Team-zu-Team (später):** Verleiher zahlt aus eigenem Cash, Satz = Bank-Satz −
-  Beziehungs-Rabatt (`getTeamRelationship` / `buildTeamRelationshipCards`), Verleiher-Bereitschaft
-  gegated durch eigenen Liquiditäts-Puffer + `cashPriority`. Rivalen verweigern/verteuern.
+- **Phase 3 — Team-zu-Team (später):** Verleih aus fremdem Cash mit beziehungsbasierten
+  Konditionen und einem interaktiven Angebots-UI. Detailkonzept siehe unten.
+
+## Phase 3 — Team-zu-Team-Kredite (Detailkonzept)
+
+Vorbedingung (offen): erst prüfen, wie viel Cash die Teams über die Saisons realistisch
+ansammeln — Angebote sind nur sinnvoll, wenn Teams überhaupt nennenswertes freies Cash haben.
+Keine zusätzliche dynamische Dauer-Mechanik; alle Werte werden im Moment der Kreditanfrage
+einmal berechnet.
+
+### Idee
+
+Statt nur der Bank kann der Kreditnehmer auch von anderen Teams leihen, die freies Cash haben.
+Das fördert Interaktion und gibt Finanz-Teams (z. B. Cash Creators, hohe `finances`) einen
+Zweck: sie verdienen an den Zinsen, die der Kreditnehmer über die Laufzeit zurückzahlt (der
+Verleiher kassiert die Raten als Einnahme).
+
+### Angebots-UI (Kreditaufnahme)
+
+- **Summen-Slider**: der Spieler stellt die gewünschte Kreditsumme ein.
+- Live darunter eine **Angebotsliste**: die Bank plus jedes Team, das die Summe stemmen kann,
+  jeweils mit seinem angebotenen Zinssatz (aufsteigend sortiert, bestes Angebot oben).
+- Schiebt der Spieler den Slider hoch, **fallen Teams raus**, deren freies Cash nicht mehr reicht
+  — nur die Bank ist immer verfügbar (bis Kreditlimit).
+
+### Verleiher-Eligibilität
+
+Ein Team `L` erscheint als Angebot für Betrag `X`, wenn:
+- `lendableCash(L) >= X`, mit `lendableCash = max(0, cash − resolveTeamLiquidityBufferTarget(L))`
+  — ein Team verleiht nur Cash, das es selbst nicht als Puffer braucht (nicht das nackte
+  Kontoguthaben, sonst ruiniert es sich selbst), **und**
+- die Beziehung nicht feindlich ist: `getTeamRelationship(L, borrower) > rivalCutoff` (Rivalen mit
+  Relationship ≤ −4 bieten **nicht** an).
+
+### Konditionen (Zinssatz eines Team-Angebots)
+
+Ausgangspunkt ist der Bank-Satz, den der Kreditnehmer für dieselbe Summe/Laufzeit bekäme.
+Teams unterbieten die Bank **immer leicht**, damit sich Team-Kredite lohnen:
+
+```
+teamRate = clamp(
+  bankRate − interactionDiscount − relationshipDiscount − lenderYieldAppetite,
+  teamFloor,                    // z. B. 0.05, leicht unter dem Bank-Floor
+  bankRate − interactionDiscount
+)
+  interactionDiscount   = 0.01                      // Teams sind IMMER ~1 % günstiger als die Bank
+  relationshipDiscount  = max(0, relValue) / 5 · 0.03   // rel +5 → bis −3 % extra bei sehr guter Beziehung
+  lenderYieldAppetite   = finanzstarke/renditehungrige Verleiher (hohe finances / cashPriority)
+                          geben einen kleinen Extra-Rabatt, weil sie den Deal WOLLEN
+```
+
+- Beispiel Mavericks leihen 20 Mio., sehr gute Beziehung (+5) zu den Cash Creators (hohe
+  `finances`, wollen Finanzdeals): Bank z. B. 14,4 % → Cash-Creators-Angebot ~14,4 % − 1 %
+  (Interaktion) − 3 % (Beziehung) − X (Rendite-Appetit) ⇒ deutlich unter Bank, aber ≥ 5 % Floor.
+- Rivalen: kein Angebot.
+
+### Abwicklung
+
+- Bei Abschluss: `LoanRecord` mit `lenderType: "team"`, `lenderTeamId: L`. Cash-Transfer
+  `borrower.cash += X`, `L.cash −= X` (dasselbe map-Muster).
+- `loan_settlement` pro Saison: Rate wird dem Kreditnehmer belastet **und dem Verleiher
+  gutgeschrieben** (statt an die Bank zu „verschwinden"). Der Zinsanteil ist der Gewinn des
+  Verleihers. Bei Ausfall trägt der Verleiher das Risiko (Rate bleibt aus / Kapitalisierung).
+- KI-Verleiher: ein finanzstarkes AI-Team mit viel freiem Cash und guter/neutraler Beziehung
+  bietet automatisch an; `cashPriority`/`finances` steuern Bereitschaft und Rendite-Appetit.
+
+### Offene Punkte Phase 3
+
+- Wie werden mehrere gleichzeitige Angebote/aktive Verleih-Positionen eines Teams gedeckelt
+  (damit ein Team sich nicht komplett verausgabt)?
+- KI-zu-KI-Kredite: vorerst evtl. nur Mensch↔KI, KI↔KI später.
+- Balancing des Cash-Aufkommens (Vorbedingung oben) — braucht Daten aus echten Season-Läufen.
 
 ## Tests
 
