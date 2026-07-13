@@ -241,6 +241,27 @@ function getRecommendedLength(
   return Math.max(min, Math.min(max, organicBaseline));
 }
 
+/**
+ * Phase B — Sicherheits-Rabatt fürs Gehalt bei LÄNGEREN Verträgen. Ein zufriedener (hohe Morale),
+ * loyaler Spieler gibt für die Sicherheit einer längeren Bindung Gehalt ab; je länger der Vertrag und je
+ * zufriedener/loyaler, desto größer der Rabatt (gedeckelt). Greift erst ab 3 Jahren — kurze Verträge
+ * bekommen keinen Rabatt (da ist keine „Sicherheit" zu vergüten).
+ */
+function resolveLengthSecurityDiscount(
+  morale: PlayerMoraleAssessment | null | undefined,
+  recommendedLength: number,
+  profile: TeamStrategyProfile | null,
+): number {
+  if (recommendedLength <= 2) return 0;
+  const moraleScore = morale?.morale ?? 50; // 0..100
+  const contentment = clamp01((moraleScore - 50) / 50); // 0 bei neutral, 1 bei Top-Morale
+  if (contentment <= 0) return 0;
+  const extraYears = recommendedLength - 2; // 1 bei 3y … 3 bei 5y
+  const loyalty = clamp01((profile?.bias.loyaltyBias ?? 5) / 10);
+  // Max ~12 % bei Top-Morale + 5-Jahres-Vertrag + loyaler Kultur.
+  return Math.min(0.15, contentment * extraYears * 0.04 * (0.6 + 0.4 * loyalty));
+}
+
 function getTeamRosterCount(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
 }
@@ -842,7 +863,17 @@ function buildPreviewRow(input: {
         renewalSalaryPreview: negotiationPreview.expectedSalary,
       })
     : null;
-  const moraleAdjustedRenewalSalary = applyMoraleToSalary(negotiationPreview.expectedSalary, morale);
+  // Phase B: a motivated (high-morale) / loyal player accepts a further discount for the SECURITY of a
+  // longer commitment — the longer the offered contract, the more salary they'll give up, scaled by how
+  // content they are and the club's loyalty culture. Gives teams a real lever: bind willing players LONG
+  // AND cheaper (deine „motivierte Spieler akzeptieren weniger Gehalt für Sicherheit"-Idee). Only kicks in
+  // above 2 years and is capped, so it never turns into a fire-sale of wages.
+  const moraleSalaryBase = applyMoraleToSalary(negotiationPreview.expectedSalary, morale);
+  const lengthSecurityDiscount = resolveLengthSecurityDiscount(morale, recommendedLength, teamStrategyProfile);
+  const moraleAdjustedRenewalSalary =
+    moraleSalaryBase != null && lengthSecurityDiscount > 0
+      ? roundMoney(moraleSalaryBase * (1 - lengthSecurityDiscount)) ?? moraleSalaryBase
+      : moraleSalaryBase;
   const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
   const exit = buildContractExitValue(save.gameState, player, entry);
   const renewalCashGate = buildAiRenewalCashGate({
