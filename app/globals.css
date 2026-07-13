@@ -39284,28 +39284,6 @@ button.foundation-team-portrait-card {
   gap: 8px;
 }
 
-.legacy-lineup-v2-candidate-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.legacy-lineup-v2-candidate-tabs button {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.legacy-lineup-v2-candidate-tabs button.is-active {
-  border-color: rgba(120, 170, 255, 0.45);
-  background: rgba(120, 170, 255, 0.12);
-  color: rgba(255, 255, 255, 0.92);
-}
-
 .legacy-lineup-v2-candidate-search {
   width: 100%;
 }
@@ -39829,28 +39807,83 @@ button.foundation-team-portrait-card {
   color: rgba(120, 210, 145, 0.95);
 }
 
+/* Always-visible tactics bar (Formkarten + Team-Power) — previously a collapsed <details>
+   that hid these controls by default; now a first-class panel so the user always sees them. */
 .legacy-lineup-v2-tactics {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  background: rgba(10, 15, 24, 0.45);
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(20, 27, 40, 0.7), rgba(10, 15, 24, 0.5));
 }
 
-.legacy-lineup-v2-tactics summary {
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.72);
+.legacy-lineup-v2-tactics-heading {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .legacy-lineup-v2-tactics-body {
   display: grid;
-  gap: 10px;
-  padding: 0 12px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
 }
 
-.legacy-lineup-v2-tactics-body section {
+.legacy-lineup-v2-tactics-side {
   display: grid;
   gap: 8px;
+  align-content: start;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid rgba(160, 160, 160, 0.75);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.legacy-lineup-v2-tactics-side.is-d1 {
+  border-left-color: rgba(94, 151, 220, 0.9);
+}
+
+.legacy-lineup-v2-tactics-side.is-d2 {
+  border-left-color: rgba(244, 114, 182, 0.75);
+}
+
+.legacy-lineup-v2-tactics-side.is-discipline-red { border-left-color: rgba(220, 94, 94, 0.95); }
+.legacy-lineup-v2-tactics-side.is-discipline-green { border-left-color: rgba(102, 173, 104, 0.95); }
+.legacy-lineup-v2-tactics-side.is-discipline-blue { border-left-color: rgba(94, 151, 220, 0.95); }
+.legacy-lineup-v2-tactics-side.is-discipline-yellow { border-left-color: rgba(220, 180, 70, 0.95); }
+.legacy-lineup-v2-tactics-side.is-discipline-purple { border-left-color: rgba(160, 110, 220, 0.95); }
+.legacy-lineup-v2-tactics-side.is-discipline-neutral { border-left-color: rgba(160, 160, 160, 0.75); }
+
+.legacy-lineup-v2-tactics-side-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.legacy-lineup-v2-tactics-side-head span {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.legacy-lineup-v2-tactics-side-head strong {
+  font-size: 0.86rem;
+}
+
+.legacy-lineup-v2-tactics-side .legacy-lineup-draft-tactics-form,
+.legacy-lineup-v2-tactics-side .legacy-lineup-form-select-field {
+  width: 100%;
+}
+
+.legacy-lineup-v2-tactics-side .legacy-lineup-form-select-field > .input {
+  width: 100%;
+  min-width: 0;
 }
 
 .legacy-lineup-v2-focus-empty {
@@ -39884,14 +39917,6 @@ button.foundation-team-portrait-card {
   display: block;
   font-size: 0.74rem;
   color: rgba(255, 255, 255, 0.5);
-}
-
-.legacy-lineup-v2-focus-open {
-  display: grid;
-  gap: 4px;
-  padding: 16px 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
 }
 
 .legacy-lineup-v2-impact {
@@ -40054,7 +40079,9 @@ button.foundation-team-portrait-card {
 .legacy-lineup-v2-candidate-list {
   display: grid;
   gap: 6px;
-  max-height: min(44vh, 440px);
+  /* Raised from the previous 44vh/440px cap now that the low-value "Freier Slot" filler and
+     candidate tabs are gone — the reclaimed space goes straight to showing more candidates. */
+  max-height: min(58vh, 580px);
   overflow-y: auto;
   min-height: 0;
 }
@@ -40613,8 +40640,6 @@ button.foundation-team-portrait-card {
 .legacy-lineup-v2-tactic-preview-chip.is-active { border: 1px solid rgba(96,165,250,0.45); }
 .legacy-lineup-v2-tactic-preview-chip em.is-positive { color: #86efac; }
 .legacy-lineup-v2-tactic-preview-chip em.is-negative { color: #fca5a5; }
-.legacy-lineup-v2-candidate-tabs.is-d1 { border-left: 3px solid rgba(96,165,250,0.55); padding-left: 8px; }
-.legacy-lineup-v2-candidate-tabs.is-d2 { border-left: 3px solid rgba(244,114,182,0.55); padding-left: 8px; }
 .legacy-lineup-v2-arena-cta.is-ready { border-color: rgba(134,239,172,0.45); }
 .arena-v2-shell.is-broadcast-mode .arena-v2-insight-panel,
 .arena-v2-shell.is-broadcast-mode .arena-v2-player-panel { display: none; }

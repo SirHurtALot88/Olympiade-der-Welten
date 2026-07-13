@@ -628,9 +628,13 @@ export default function LegacyLineupFocusV2Board({
     }
   }, [assignPulse, triggerSlotFlash, activeSlotKey, rosterCardByActivePlayerId, selections, slots]);
 
+  // The candidate rail always shows the full sorted candidate set (search-filtered only). The
+  // former Alle/Sofort/Alternative/Blockiert tabs added a filtering step that hid selectable
+  // players without adding real value, so the effective tab is now always "all" — blocked
+  // candidates still render, just visually marked via `is-blocked` styling further down.
   const filteredCandidateGroups = useMemo(
-    () => filterLegacyLineupCandidateEntries(candidateGroups, candidateTab, playerFilter),
-    [candidateGroups, candidateTab, playerFilter],
+    () => filterLegacyLineupCandidateEntries(candidateGroups, "all", playerFilter),
+    [candidateGroups, playerFilter],
   );
 
   const activeSlotScoreScale = useMemo(() => {
@@ -662,18 +666,6 @@ export default function LegacyLineupFocusV2Board({
         .filter((entry) => !entry.activeSlotCandidate?.blockReason && entry.player.activePlayerId)
         .slice(0, 3),
     [filteredCandidateGroups],
-  );
-
-  const candidateTabCounts = useMemo(
-    () => ({
-      all: candidateGroups.reduce((sum, group) => sum + group.entries.length, 0),
-      instant: candidateGroups.filter((g) => g.key === "instant").reduce((sum, g) => sum + g.entries.length, 0),
-      alternative: candidateGroups
-        .filter((g) => g.key !== "instant" && g.key !== "blocked")
-        .reduce((sum, g) => sum + g.entries.length, 0),
-      blocked: candidateGroups.filter((g) => g.key === "blocked").reduce((sum, g) => sum + g.entries.length, 0),
-    }),
-    [candidateGroups],
   );
 
   const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
@@ -1386,25 +1378,6 @@ export default function LegacyLineupFocusV2Board({
 
               <section className="legacy-lineup-v2-candidates" aria-label="Kandidaten für aktiven Slot">
                 <div className="legacy-lineup-v2-candidates-head">
-                  <div className={`legacy-lineup-v2-candidate-tabs is-${activeSlot.disciplineSide}`} role="tablist" data-testid="lineup-v2-candidate-tabs">
-                    {([
-                      { key: "all" as const, label: "Alle" },
-                      { key: "instant" as const, label: "Sofort" },
-                      { key: "alternative" as const, label: "Alternative" },
-                      { key: "blocked" as const, label: "Blockiert" },
-                    ]).map((tab) => (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={candidateTab === tab.key}
-                        className={candidateTab === tab.key ? "is-active" : ""}
-                        onClick={() => onCandidateTabChange(tab.key)}
-                      >
-                        {tab.label} ({candidateTabCounts[tab.key]})
-                      </button>
-                    ))}
-                  </div>
                   <input
                     className="input legacy-lineup-v2-candidate-search"
                     type="search"
@@ -1644,13 +1617,7 @@ export default function LegacyLineupFocusV2Board({
                     Profil
                   </button>
                 </div>
-              ) : (
-                <div className="legacy-lineup-v2-focus-open">
-                  <span>Freier Slot</span>
-                  <strong>{topPickForActiveSlot?.player.name ?? "Keine Kandidaten"}</strong>
-                  <small>{topPickForActiveSlot?.detail ?? "Kandidat oben wählen oder Top-Pick übernehmen."}</small>
-                </div>
-              )}
+              ) : null}
 
               {activeSlotPreview ? (
                 <VeloImpactStrip
@@ -1754,10 +1721,10 @@ export default function LegacyLineupFocusV2Board({
       </div>
 
       {tacticsSlot ? (
-        <details className="legacy-lineup-v2-tactics">
-          <summary>Taktik · Form & Team-Power</summary>
+        <section className="legacy-lineup-v2-tactics" aria-label="Taktik: Formkarten & Team-Power">
+          <h3 className="legacy-lineup-v2-tactics-heading">Taktik · Form &amp; Team-Power</h3>
           <div className="legacy-lineup-v2-tactics-body">{tacticsSlot}</div>
-        </details>
+        </section>
       ) : null}
     </div>
   );
