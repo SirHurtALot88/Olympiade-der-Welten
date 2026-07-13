@@ -3,6 +3,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 
 /** Bank-Kredit-Kern (Phase 1). KI-Anbindung (Phase 2) und Team-zu-Team-Kredite (Phase 3) folgen später. */
 
@@ -11,9 +12,13 @@ const MAX_INTEREST_RATE = 0.2;
 const BASE_INTEREST_RATE = 0.1;
 const RISK_PER_MISSING_FINANCE_POINT = 0.012;
 const TERM_DISCOUNT_PER_SEASON = 0.004;
-const CAPACITY_MARKET_VALUE_SHARE = 0.35;
-const CAPACITY_REVENUE_SHARE = 1.25;
+const CAPACITY_CASH_SHARE = 0.15;
+const CAPACITY_MARKET_VALUE_SHARE = 0.3;
+const CAPACITY_REVENUE_SHARE = 1.5;
 const DEFAULT_PENALTY_RATE = 0.05;
+/** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
+const PREPAYMENT_FEE_RATE = 0.2;
+export const SEASON_ONE_NO_LOANS_REASON = "season_one_no_loans";
 const DEFAULT_MISSED_PAYMENTS_THRESHOLD = 2;
 const MIN_TERM_SEASONS = 1;
 const MAX_TERM_SEASONS = 10;
@@ -63,16 +68,19 @@ export function computeLoanTerms(input: { principal: number; termSeasons: number
 }
 
 /**
- * Kreditlimit: min(0.35 * marketValueTotal, 1.25 * jährlicheEinnahmen) - aktuelleRestschuld, floor 0.
+ * Kreditlimit: min(0.15 * cash + 0.30 * marketValueTotal, 1.5 * jährlicheEinnahmen) -
+ * aktuelleRestschuld, floor 0. Siehe docs/design/kredit-system.md ("Kreditlimit").
  */
 export function computeBorrowingCapacity(input: {
+  cash: number;
   marketValueTotal: number;
   annualRevenue: number;
   currentOutstandingDebt: number;
 }): number {
-  const marketValueCap = CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
-  const revenueCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
-  const cap = Math.min(marketValueCap, revenueCap);
+  const teamwertCap =
+    CAPACITY_CASH_SHARE * Math.max(0, input.cash) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
+  const tragbarkeitsCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
+  const cap = Math.min(teamwertCap, tragbarkeitsCap);
   return roundCash(Math.max(0, cap - Math.max(0, input.currentOutstandingDebt)));
 }
 
@@ -152,6 +160,12 @@ export function originateLoan(
     return { ok: false, loan: null, reason: "borrower_not_found", capacity: 0, terms: null, gameState };
   }
 
+  // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md. Unabhängig von
+  // Kapazität — man kommt mit dem aus, was man hat.
+  if (isSeasonOne(gameState.season.id)) {
+    return { ok: false, loan: null, reason: SEASON_ONE_NO_LOANS_REASON, capacity: 0, terms: null, gameState };
+  }
+
   const termSeasons = Math.round(input.termSeasons);
   if (!Number.isFinite(input.principal) || input.principal <= 0) {
     return { ok: false, loan: null, reason: "invalid_principal", capacity: 0, terms: null, gameState };
@@ -164,7 +178,12 @@ export function originateLoan(
   const marketValueTotal = getTeamMarketValueTotal(gameState, input.borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, input.borrowerTeamId);
   const currentOutstandingDebt = getTeamOutstandingDebt(gameState, input.borrowerTeamId);
-  const capacity = computeBorrowingCapacity({ marketValueTotal, annualRevenue, currentOutstandingDebt });
+  const capacity = computeBorrowingCapacity({
+    cash: borrower.cash,
+    marketValueTotal,
+    annualRevenue,
+    currentOutstandingDebt,
+  });
 
   if (input.principal > capacity) {
     return { ok: false, loan: null, reason: "over_capacity", capacity, terms: null, gameState };
@@ -443,4 +462,91 @@ export function applyLoanSettlement(
   };
 
   return { ok: true, applied: true, duplicateDetected: false, preview, gameState: nextGameState };
+}
+
+export type EarlyPayoffQuote = {
+  payoff: number;
+  principalPortion: number;
+  foregoneInterest: number;
+  feePortion: number;
+};
+
+/**
+ * Vorab-Rückzahlung (vorzeitige Ablösung), siehe docs/design/kredit-system.md
+ * ("Vorab-Rückzahlung"):
+ *   remainingScheduled = installmentPerSeason * seasonsRemaining
+ *   foregoneInterest   = max(0, remainingScheduled - principalOutstanding)
+ *   payoff             = principalOutstanding + PREPAYMENT_FEE_RATE * foregoneInterest
+ * Nur sinnvoll für `status === "active"` — für andere Status liefert es trotzdem eine
+ * (rechnerisch bedeutungslose) Zahl zurück; Aufrufer prüfen den Status separat.
+ */
+export function computeEarlyPayoff(loan: LoanRecord): EarlyPayoffQuote {
+  const remainingScheduled = roundCash(loan.installmentPerSeason * loan.seasonsRemaining);
+  const foregoneInterest = roundCash(Math.max(0, remainingScheduled - loan.principalOutstanding));
+  const feePortion = roundCash(PREPAYMENT_FEE_RATE * foregoneInterest);
+  const principalPortion = roundCash(Math.max(0, loan.principalOutstanding));
+  const payoff = roundCash(principalPortion + feePortion);
+  return { payoff, principalPortion, foregoneInterest, feePortion };
+}
+
+export type ApplyEarlyPayoffResult = {
+  ok: boolean;
+  reason: string | null;
+  payoff: number;
+  gameState: GameState;
+};
+
+/**
+ * Vorab-Rückzahlung ausführen (Verkaufsphase). Ohne execute: reine Vorschau/Validierung (keine
+ * Mutation). Belastet Cash des Kreditnehmers, setzt den Kredit auf `status: "paid"`.
+ * Team-zu-Team-Kredite (Phase 3): Ablösung fließt noch nicht an den Verleiher (TODO Phase 3) —
+ * der Kredit wird hier bereits auf "paid" gesetzt, das Verleiher-Cash-Gutschreiben folgt später.
+ */
+export function applyEarlyPayoff(
+  gameState: GameState,
+  loanId: string,
+  options?: { execute?: boolean },
+): ApplyEarlyPayoffResult {
+  const loan = (gameState.seasonState.loans ?? []).find((entry) => entry.loanId === loanId) ?? null;
+  if (!loan) {
+    return { ok: false, reason: "loan_not_found", payoff: 0, gameState };
+  }
+  if (loan.status !== "active") {
+    return { ok: false, reason: "loan_not_active", payoff: 0, gameState };
+  }
+
+  const borrower = gameState.teams.find((team) => team.teamId === loan.borrowerTeamId) ?? null;
+  if (!borrower) {
+    return { ok: false, reason: "borrower_not_found", payoff: 0, gameState };
+  }
+
+  const { payoff } = computeEarlyPayoff(loan);
+  if (borrower.cash < payoff) {
+    return { ok: false, reason: "insufficient_cash", payoff, gameState };
+  }
+
+  if (!options?.execute) {
+    return { ok: true, reason: null, payoff, gameState };
+  }
+
+  // TODO (Phase 3): bei lenderType === "team" muss die Ablösung dem Verleiher gutgeschrieben
+  // werden (analog der Raten-Gutschrift in loan_settlement). Bis dahin wird nur der Kreditnehmer
+  // belastet und der Kredit auf "paid" gesetzt.
+
+  const nextGameState: GameState = {
+    ...gameState,
+    teams: gameState.teams.map((team) =>
+      team.teamId === loan.borrowerTeamId ? { ...team, cash: roundCash(team.cash - payoff) } : team,
+    ),
+    seasonState: {
+      ...gameState.seasonState,
+      loans: (gameState.seasonState.loans ?? []).map((entry) =>
+        entry.loanId === loanId
+          ? { ...entry, status: "paid" as const, principalOutstanding: 0, seasonsRemaining: 0 }
+          : entry,
+      ),
+    },
+  };
+
+  return { ok: true, reason: null, payoff, gameState: nextGameState };
 }

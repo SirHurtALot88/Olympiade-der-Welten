@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, LoanRecord, StandingRecord, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import {
+  applyEarlyPayoff,
   applyLoanSettlement,
   computeBorrowingCapacity,
+  computeEarlyPayoff,
   computeLoanTerms,
   estimateTeamAnnualRevenue,
   getTeamOutstandingDebt,
@@ -146,23 +148,23 @@ describe("computeLoanTerms", () => {
 });
 
 describe("computeBorrowingCapacity", () => {
-  it("caps at the lower of market-value share and revenue share", () => {
-    expect(computeBorrowingCapacity({ marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 0 })).toBeCloseTo(
-      70,
-      1,
-    ); // min(0.35*200=70, 1.25*80=100) - 0
-    expect(computeBorrowingCapacity({ marketValueTotal: 40, annualRevenue: 200, currentOutstandingDebt: 0 })).toBeCloseTo(
-      14,
-      1,
-    ); // min(0.35*40=14, 1.25*200=250) - 0
+  it("caps at the lower of teamwert (cash+marketvalue) share and revenue share", () => {
+    // teamwertCap = 0.15*cash + 0.30*marketValueTotal; tragbarkeitsCap = 1.5*annualRevenue.
+    expect(
+      computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 0 }),
+    ).toBeCloseTo(75, 1); // min(0.15*100=15 + 0.30*200=60 -> 75, 1.5*80=120) - 0 = 75
+    expect(
+      computeBorrowingCapacity({ cash: 20, marketValueTotal: 40, annualRevenue: 200, currentOutstandingDebt: 0 }),
+    ).toBeCloseTo(15, 1); // min(0.15*20=3 + 0.30*40=12 -> 15, 1.5*200=300) - 0 = 15
   });
 
   it("subtracts existing debt and floors at 0", () => {
-    expect(computeBorrowingCapacity({ marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 65 })).toBeCloseTo(
-      5,
-      1,
-    );
-    expect(computeBorrowingCapacity({ marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 999 })).toBe(0);
+    expect(
+      computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 65 }),
+    ).toBeCloseTo(10, 1); // teamwertCap 75, min(75,120)=75 - 65 = 10
+    expect(
+      computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 999 }),
+    ).toBe(0);
   });
 });
 
@@ -234,7 +236,7 @@ describe("originateLoan", () => {
         },
       ],
     });
-    // capacity = min(0.35*200=70, 1.25*80=100) - 0 = 70
+    // capacity = min(0.15*50 + 0.30*200=67.5, 1.5*80=120) - 0 = 67.5
   }
 
   it("previews without mutating when execute is not set", () => {
@@ -262,7 +264,7 @@ describe("originateLoan", () => {
     const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 100, termSeasons: 3 }, { execute: true });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("over_capacity");
-    expect(result.capacity).toBeCloseTo(70, 1);
+    expect(result.capacity).toBeCloseTo(67.5, 1);
     expect(result.gameState).toBe(gameState);
     expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
   });
@@ -275,6 +277,17 @@ describe("originateLoan", () => {
     expect(originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 11 }).reason).toBe(
       "invalid_term_seasons",
     );
+  });
+
+  it("Season 1 = keine Kredite: refuses regardless of capacity, no mutation", () => {
+    const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
+    const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("season_one_no_loans");
+    expect(result.loan).toBeNull();
+    expect(result.gameState).toBe(gameState);
+    expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
   });
 });
 
@@ -398,5 +411,83 @@ describe("applyLoanSettlement", () => {
     const result = applyLoanSettlement(gameState, { execute: true });
     expect(result.applied).toBe(false);
     expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+  });
+});
+
+describe("computeEarlyPayoff", () => {
+  it("matches the doc example: 18 remaining scheduled, 15 outstanding -> 15.6 payoff", () => {
+    // installmentPerSeason * seasonsRemaining = 18 ("noch offen"), principalOutstanding = 15.
+    const loan: LoanRecord = { ...baseLoan(), installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 };
+    const quote = computeEarlyPayoff(loan);
+    expect(quote.foregoneInterest).toBeCloseTo(3, 1); // 18 - 15
+    expect(quote.feePortion).toBeCloseTo(0.6, 1); // 0.20 * 3
+    expect(quote.principalPortion).toBeCloseTo(15, 1);
+    expect(quote.payoff).toBeCloseTo(15.6, 1);
+  });
+
+  it("has zero foregone interest and fee when remaining scheduled payments no longer exceed principal", () => {
+    const loan: LoanRecord = { ...baseLoan(), installmentPerSeason: 5, seasonsRemaining: 1, principalOutstanding: 20 };
+    const quote = computeEarlyPayoff(loan);
+    expect(quote.foregoneInterest).toBe(0);
+    expect(quote.feePortion).toBe(0);
+    expect(quote.payoff).toBeCloseTo(20, 1);
+  });
+});
+
+describe("applyEarlyPayoff", () => {
+  it("debits cash and marks the loan paid on execute", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 50 })],
+      loans: [{ ...baseLoan(), installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 }],
+    });
+    const result = applyEarlyPayoff(gameState, "loan-base", { execute: true });
+    expect(result.ok).toBe(true);
+    expect(result.payoff).toBeCloseTo(15.6, 1);
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBeCloseTo(50 - 15.6, 1);
+    const loan = result.gameState.seasonState.loans?.[0];
+    expect(loan?.status).toBe("paid");
+    expect(loan?.principalOutstanding).toBe(0);
+    expect(loan?.seasonsRemaining).toBe(0);
+  });
+
+  it("previews without mutating when execute is not set", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 50 })],
+      loans: [{ ...baseLoan(), installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 }],
+    });
+    const result = applyEarlyPayoff(gameState, "loan-base");
+    expect(result.ok).toBe(true);
+    expect(result.gameState).toBe(gameState);
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+    expect(result.gameState.seasonState.loans?.[0]?.status).toBe("active");
+  });
+
+  it("rejects when borrower cash is insufficient, no mutation", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 5 })],
+      loans: [{ ...baseLoan(), installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 }],
+    });
+    const result = applyEarlyPayoff(gameState, "loan-base", { execute: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("insufficient_cash");
+    expect(result.gameState).toBe(gameState);
+    expect(result.gameState.seasonState.loans?.[0]?.status).toBe("active");
+  });
+
+  it("rejects a loan that is not active", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 50 })],
+      loans: [{ ...baseLoan(), status: "paid", principalOutstanding: 0, seasonsRemaining: 0 }],
+    });
+    const result = applyEarlyPayoff(gameState, "loan-base", { execute: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("loan_not_active");
+  });
+
+  it("rejects an unknown loan id", () => {
+    const gameState = createGameState({ teams: [createTeam({ teamId: "A-A", cash: 50 })], loans: [baseLoan()] });
+    const result = applyEarlyPayoff(gameState, "does-not-exist", { execute: true });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("loan_not_found");
   });
 });

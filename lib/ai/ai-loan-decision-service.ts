@@ -1,11 +1,12 @@
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 
 import { estimateUpgradeBuyFloorMw, isCashHoardingTeam, teamNeedsTransferBudgetDeploy } from "@/lib/ai/ai-budget-deploy-service";
 import { resolveTeamSpendableCashForPlanning } from "@/lib/ai/planner-cash-buffer-policy";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { computeLoanTerms, estimateTeamAnnualRevenue, originateLoan } from "@/lib/finance/loan-service";
+import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, originateLoan } from "@/lib/finance/loan-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 
 /**
  * Phase 2 KI-Anbindung, siehe docs/design/kredit-system.md ("KI-Anbindung"). Bedarfsgetrieben und
@@ -42,6 +43,23 @@ export type AiLoanDecision = {
 
 function noLoan(reason: string): AiLoanDecision {
   return { shouldBorrow: false, loanAmount: 0, termSeasons: 0, reason };
+}
+
+/**
+ * Roster-Bedarf in € (Lücke bis playerOpt * Preisfloor pro Upgrade-Kauf), siehe
+ * docs/design/kredit-system.md ("KI-Anbindung" Schritt 1). Geteilt zwischen `resolveAiLoanDecision`
+ * (Bedarf für Kreditaufnahme) und `resolveAiEarlyPayoffDecision` (erwarteter Bedarf der nächsten
+ * Saison, gegen den ein Überschuss geprüft wird).
+ */
+function estimateRosterNeedEur(gameState: GameState, teamId: string): number {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team) return 0;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+  const { playerOpt } = deriveRosterTargets(team, identity);
+  const rosterGap = Math.max(0, playerOpt - rosterCount);
+  if (rosterGap <= 0) return 0;
+  return round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId), 1);
 }
 
 /** Skaliert die Kreditbereitschaft nach Persönlichkeit runter (Hoarder/Cash-Creator borgen konservativ). */
@@ -100,6 +118,10 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   if (!team) return noLoan("team_not_found");
 
   const seasonId = gameState.season.id;
+
+  // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md.
+  if (isSeasonOne(seasonId)) return noLoan("season_one_no_loans");
+
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
   const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
   const { playerOpt } = deriveRosterTargets(team, identity);
@@ -108,7 +130,7 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   if (rosterGap <= 0) return noLoan("no_need");
   if (!teamNeedsTransferBudgetDeploy(gameState, teamId, seasonId)) return noLoan("no_need");
 
-  const needsEur = round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId), 1);
+  const needsEur = estimateRosterNeedEur(gameState, teamId);
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
   const shortfall = round(needsEur - spendableCash, 1);
   if (shortfall <= 0) return noLoan("cash_sufficient");
@@ -132,4 +154,68 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const termSeasons = resolveServiceableTermSeasons({ gameState, teamId, principal: loanAmount, finances });
 
   return { shouldBorrow: true, loanAmount, termSeasons, reason: "need_driven_borrow" };
+}
+
+export type AiEarlyPayoffDecision = {
+  loanIdsToPayoff: string[];
+  reason: string;
+};
+
+/**
+ * Ordnet Ablöse-Kandidaten so, dass mit begrenztem Überschuss möglichst viele Kredite abgelöst
+ * werden können: kleinste Ablösesumme zuerst, bei Gleichstand die höher verzinsten Kredite zuerst
+ * (die teuerste laufende Last wird zuerst los).
+ */
+function sortEarlyPayoffCandidates(loans: LoanRecord[]): Array<{ loan: LoanRecord; payoff: number }> {
+  return loans
+    .map((loan) => ({ loan, payoff: computeEarlyPayoff(loan).payoff }))
+    .sort((left, right) => {
+      if (left.payoff !== right.payoff) return left.payoff - right.payoff;
+      return right.loan.interestRatePerSeason - left.loan.interestRatePerSeason;
+    });
+}
+
+/**
+ * Anti-Churn-KI-Entscheidung für Vorab-Rückzahlung (Verkaufsphase), siehe
+ * docs/design/kredit-system.md ("Vorab-Rückzahlung" / "Anti-Churn-Balancing"). Löst nur aus
+ * echtem Überschuss ab (spendableCash über dem erwarteten Kaufbedarf der nächsten Saison), nie
+ * einen gerade erst (dieselbe Saison) aufgenommenen Kredit (Hysterese) und nie, wenn das Team in
+ * derselben Saison bereits geliehen hat (kein Leihen+Ablösen in einer Saison). Deterministisch,
+ * kein Zufall.
+ */
+export function resolveAiEarlyPayoffDecision(gameState: GameState, teamId: string): AiEarlyPayoffDecision {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team) return { loanIdsToPayoff: [], reason: "team_not_found" };
+
+  const seasonId = gameState.season.id;
+  const activeLoans = (gameState.seasonState.loans ?? []).filter(
+    (loan) => loan.borrowerTeamId === teamId && loan.status === "active",
+  );
+  if (activeLoans.length === 0) return { loanIdsToPayoff: [], reason: "no_active_loans" };
+
+  // Ein Team, das in dieser Saison bereits geliehen hat, löst nicht gleichzeitig ab.
+  if (activeLoans.some((loan) => loan.originatedSeasonId === seasonId)) {
+    return { loanIdsToPayoff: [], reason: "borrowed_this_season" };
+  }
+
+  const needsEur = estimateRosterNeedEur(gameState, teamId);
+  const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
+  let surplus = round(spendableCash - needsEur, 1);
+  if (surplus <= 0) return { loanIdsToPayoff: [], reason: "no_surplus" };
+
+  // Hysterese: ein gerade erst (dieselbe Saison) aufgenommener Kredit wird nicht abgelöst.
+  const candidates = activeLoans.filter((loan) => loan.originatedSeasonId !== seasonId);
+  if (candidates.length === 0) return { loanIdsToPayoff: [], reason: "no_eligible_loans" };
+
+  const loanIdsToPayoff: string[] = [];
+  for (const { loan, payoff } of sortEarlyPayoffCandidates(candidates)) {
+    if (surplus < payoff) continue;
+    loanIdsToPayoff.push(loan.loanId);
+    surplus = round(surplus - payoff, 1);
+  }
+
+  if (loanIdsToPayoff.length === 0) {
+    return { loanIdsToPayoff: [], reason: "insufficient_surplus_for_any_loan" };
+  }
+  return { loanIdsToPayoff, reason: "surplus_payoff" };
 }

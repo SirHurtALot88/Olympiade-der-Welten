@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
-import { getTeamOutstandingDebt } from "@/lib/finance/loan-service";
+import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { computeEarlyPayoff, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { resolveTeamLiquidityBufferTarget } from "@/lib/ai/planner-cash-buffer-policy";
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 
@@ -149,9 +149,9 @@ describe("resolveAiLoanDecision", () => {
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(true);
     expect(decision.loanAmount).toBeGreaterThan(0);
-    // capacity = min(0.35 * marketValueTotal, 1.25 * annualRevenue) - outstandingDebt
-    //          = min(0.35 * 120, 1.25 * 50) - 0 = min(42, 62.5) = 42
-    expect(decision.loanAmount).toBeLessThanOrEqual(42);
+    // capacity = min(0.15*cash + 0.30*marketValueTotal, 1.5*annualRevenue) - outstandingDebt
+    //          = min(0.15*60 + 0.30*120, 1.5*50) - 0 = min(9+36=45, 75) = 45
+    expect(decision.loanAmount).toBeLessThanOrEqual(45);
     expect(decision.termSeasons).toBeGreaterThanOrEqual(1);
     expect(decision.termSeasons).toBeLessThanOrEqual(10);
   });
@@ -175,6 +175,132 @@ describe("resolveAiLoanDecision", () => {
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("no_capacity");
     expect(decision.loanAmount).toBe(0);
+  });
+
+  it("Season 1 = keine Kredite: refuses regardless of need/capacity", () => {
+    const gameState = buildTeamGameState({
+      cash: 60,
+      rosterCount: 8,
+      playerOpt: 12,
+      annualRevenue: 50,
+      seasonId: "season-1",
+    });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(decision.reason).toBe("season_one_no_loans");
+    expect(decision.loanAmount).toBe(0);
+  });
+});
+
+describe("resolveAiEarlyPayoffDecision", () => {
+  function loanRecord(partial?: Partial<LoanRecord>): LoanRecord {
+    return {
+      loanId: "loan-1",
+      borrowerTeamId: "T-1",
+      lenderType: "bank",
+      principalOriginal: 10,
+      principalOutstanding: 10,
+      interestRatePerSeason: 0.14,
+      termSeasons: 5,
+      seasonsRemaining: 3,
+      installmentPerSeason: 3,
+      originatedSeasonId: "season-1",
+      status: "active",
+      missedPayments: 0,
+      ...partial,
+    };
+  }
+
+  it("pays off from genuine surplus (no roster need, cash well above the payoff)", () => {
+    const gameState = buildTeamGameState({
+      cash: 200,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 100,
+      loans: [loanRecord()],
+    });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("surplus_payoff");
+    expect(decision.loanIdsToPayoff).toEqual(["loan-1"]);
+  });
+
+  it("does not pay off when there is no surplus (cash needed for next season's roster gap)", () => {
+    const gameState = buildTeamGameState({
+      cash: 60,
+      rosterCount: 8,
+      playerOpt: 12,
+      annualRevenue: 50,
+      loans: [loanRecord()],
+    });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("no_surplus");
+    expect(decision.loanIdsToPayoff).toEqual([]);
+  });
+
+  it("does not pay off when surplus is positive but below every candidate loan's payoff", () => {
+    const gameState = buildTeamGameState({
+      cash: 65,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 50,
+      loans: [
+        loanRecord({ loanId: "big", principalOutstanding: 50, installmentPerSeason: 15, seasonsRemaining: 4 }),
+      ],
+    });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("insufficient_surplus_for_any_loan");
+    expect(decision.loanIdsToPayoff).toEqual([]);
+  });
+
+  it("hysteresis: skips a loan originated this season, even with a large surplus", () => {
+    const gameState = buildTeamGameState({
+      cash: 200,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 100,
+      loans: [loanRecord({ originatedSeasonId: "season-2" })], // buildTeamGameState default seasonId
+    });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("borrowed_this_season");
+    expect(decision.loanIdsToPayoff).toEqual([]);
+  });
+
+  it("does not recommend payoff at all when the team also borrowed this season (no borrow+payoff same season)", () => {
+    const gameState = buildTeamGameState({
+      cash: 200,
+      rosterCount: 12,
+      playerOpt: 12,
+      annualRevenue: 100,
+      loans: [
+        loanRecord({ loanId: "old-loan", originatedSeasonId: "season-1" }),
+        loanRecord({ loanId: "new-loan", originatedSeasonId: "season-2" }),
+      ],
+    });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("borrowed_this_season");
+    expect(decision.loanIdsToPayoff).toEqual([]);
+  });
+
+  it("pays off the smallest-payoff loan first, largest last, when surplus covers both", () => {
+    const loans: LoanRecord[] = [
+      loanRecord({ loanId: "big", principalOutstanding: 50, installmentPerSeason: 15, seasonsRemaining: 4 }),
+      loanRecord({ loanId: "small", principalOutstanding: 5, installmentPerSeason: 2, seasonsRemaining: 3 }),
+    ];
+    const gameState = buildTeamGameState({ cash: 100, rosterCount: 12, playerOpt: 12, annualRevenue: 50, loans });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("surplus_payoff");
+    // "small" has a lower computeEarlyPayoff().payoff (5.2) than "big" (52) -> paid first.
+    const smallPayoff = computeEarlyPayoff(loans[1]!).payoff;
+    const bigPayoff = computeEarlyPayoff(loans[0]!).payoff;
+    expect(smallPayoff).toBeLessThan(bigPayoff);
+    expect(decision.loanIdsToPayoff).toEqual(["small", "big"]);
+  });
+
+  it("does not pay off when the team has no active loans", () => {
+    const gameState = buildTeamGameState({ cash: 200, rosterCount: 12, playerOpt: 12, annualRevenue: 100, loans: [] });
+    const decision = resolveAiEarlyPayoffDecision(gameState, "T-1");
+    expect(decision.reason).toBe("no_active_loans");
+    expect(decision.loanIdsToPayoff).toEqual([]);
   });
 });
 
