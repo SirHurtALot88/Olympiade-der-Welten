@@ -1,6 +1,7 @@
 # Kredit- & Schuldensystem
 
-Status: **In Umsetzung** (Phase 1 + 2). Phase 3 (Team-zu-Team) ist geplant, aber später.
+Status: **Service-/Mechanik-Ebene fertig** (Phase 1 + 2 + 3). Offen: menschliche UI (Aufnahme,
+Ablösung, Angebots-Karten, Finanz-Integration) und Balancing nach Playtest.
 
 ## Ziel
 
