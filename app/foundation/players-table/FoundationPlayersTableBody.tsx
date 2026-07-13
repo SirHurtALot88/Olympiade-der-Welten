@@ -48,6 +48,21 @@ type SortableHeaderProps = {
   onToggle: (tableId: string, columnKey: string) => void;
 };
 
+/**
+ * Kurze deutsche Hover-Erklärung für die kryptischen Spalten-Abkürzungen
+ * (`dataKey` entspricht 1:1 den Sort-Keys) — Tooltip statt Inline-Prose
+ * ("ein GAME, keine Excel-Tabelle mit Beschreibungen"). Spalten ohne
+ * Eintrag sind selbsterklärend (Name, Team, Klasse, Rasse, Gehalt, …).
+ */
+const PLAYERS_TABLE_HEADER_TOOLTIPS: Record<string, string> = {
+  pps: "Performance-Punkte der Saison — wichtigste Leistungskennzahl.",
+  ovr: "Gesamtstärke (Overall).",
+  mvs: "Marktwert-Score.",
+  mw: "Marktwert.",
+  bestDiscipline: "Beste Disziplin.",
+  careerLeague: "Karriere-Bilanz (Saisons · Einsätze · PPs) — gesamte Liga-Einsätze und PPs über alle Saisons.",
+};
+
 export type FoundationPlayersTableBodyProps = {
   columns: PlayersTableColumn[];
   rows: PlayersTableRow[];
@@ -158,6 +173,7 @@ export default function FoundationPlayersTableBody({
                 key={column.id}
                 {...getTableHeaderDragProps("playersTable", column, columns)}
                 style={{ width: `${getTableColumnWidth("playersTable", column)}px`, minWidth: `${column.minWidth}px` }}
+                title={PLAYERS_TABLE_HEADER_TOOLTIPS[column.dataKey]}
               >
                 <div className="resizable-header-cell">
                   {column.id === "image" ? (
@@ -263,7 +279,13 @@ export default function FoundationPlayersTableBody({
                           >
                             {row.player.name}
                           </button>
-                          <span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span>
+                          {(() => {
+                            // Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
+                            // "Active Player" auf jeder Zeile ist reine Excel-Redundanz, solange
+                            // der Scope-Filter ohnehin schon auf aktive Spieler eingrenzt.
+                            const statusLabel = row.seasonPerformance?.sourceLabel ?? row.transferStatus;
+                            return statusLabel !== "Active Player" ? <span>{statusLabel}</span> : null;
+                          })()}
                         </div>
                       </td>
                     );

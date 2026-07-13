@@ -135,7 +135,7 @@ export async function POST(request: Request) {
         termSeasons,
         ...(lenderTeamId ? { lenderType: "team" as const, lenderTeamId } : {}),
       },
-      { execute: true, allowSeason1: adminOverride },
+      { execute: true, allowSeason1: adminOverride, ignoreRevenueCap: adminOverride },
     );
 
     if (!result.ok) {

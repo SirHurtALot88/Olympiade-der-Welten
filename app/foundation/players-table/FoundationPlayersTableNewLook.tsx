@@ -226,28 +226,54 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     align: "left",
     tooltip: "Fähigkeit (CA) und Potenzial (PO) als Sterne — Bereich, solange nicht vollständig bekannt.",
   },
-  { id: "axes", label: "Achsen", align: "left", tooltip: "POW / SPE / MEN / SOC Kernwerte (0–100)" },
+  {
+    id: "axes",
+    label: "Achsen",
+    align: "left",
+    tooltip:
+      "POW/SPE/MEN/SOC — liga-relative Achsenwerte (0–100). Farben sind liga-relativ: jede Stufe ist ein Achtel des aktuellen Liga-Pools.",
+  },
   {
     id: "pps",
     label: "PPs",
     sortKey: "pps",
     align: "right",
-    tooltip: "Performance-Punkte der Saison — wichtigste Leistungskennzahl. Zeile aufklappbar für die Aufschlüsselung.",
+    tooltip:
+      "Performance-Punkte der Saison — wichtigste Leistungskennzahl (Zeile aufklappbar für die Aufschlüsselung). Farben sind liga-relativ (Achtel des Liga-Pools).",
     highlight: "primary",
   },
-  { id: "ovr", label: "OVR", sortKey: "ovr", align: "right", highlight: "secondary" },
-  { id: "mvs", label: "MVS", sortKey: "mvs", align: "right" },
-  { id: "mw", label: "MW", sortKey: "mw", align: "right" },
+  {
+    id: "ovr",
+    label: "OVR",
+    sortKey: "ovr",
+    align: "right",
+    tooltip: "Gesamtstärke (Overall) — Farben sind liga-relativ (Achtel des Liga-Pools).",
+    highlight: "secondary",
+  },
+  {
+    id: "mvs",
+    label: "MVS",
+    sortKey: "mvs",
+    align: "right",
+    tooltip: "Marktwert-Score — Farben sind liga-relativ (Achtel des Liga-Pools).",
+  },
+  { id: "mw", label: "MW", sortKey: "mw", align: "right", tooltip: "Marktwert" },
   { id: "salary", label: "Gehalt", sortKey: "salary", align: "right" },
   { id: "contract", label: "Vertrag", sortKey: "contract", align: "right" },
   { id: "appearances", label: "Einsätze", sortKey: "appearances", align: "right" },
-  { id: "bestDiscipline", label: "Beste Diszi", sortKey: "bestDiscipline", align: "left" },
+  {
+    id: "bestDiscipline",
+    label: "Beste Diszi",
+    sortKey: "bestDiscipline",
+    align: "left",
+    tooltip: "Beste Disziplin",
+  },
   {
     id: "careerLeague",
     label: "Alltime",
     sortKey: "careerLeague",
     align: "right",
-    tooltip: "Gesamte Liga-Einsätze und PPs über alle Saisons (Archiv + Live).",
+    tooltip: "Karriere-Bilanz (Saisons · Einsätze · PPs) — gesamte Liga-Einsätze und PPs über alle Saisons (Archiv + Live).",
   },
   { id: "traits", label: "Traits", sortKey: "traits", align: "left" },
 ];
@@ -339,36 +365,6 @@ function renderMetricRankChip(value: number | null | undefined, pool: number[]) 
       #{formatNlNumber(rank, 0)}
     </span>
   );
-}
-
-/**
- * 4-stufiger Ampel-Ton (blau → grün → gelb → rot) für den Achsen-Rang
- * (POW/SPE/MEN/SOC) — dieselbe Konvention wie das bestehende App-weite
- * `heat-band-1..8`-Farbschema (blau = Spitzenwerte, grün = stark, gelb =
- * Mitte, rot = schwach; siehe `.heat-band-*` in `app/globals.css`), nur auf
- * die 4 `NlTone`-Äquivalente `accent`/`good`/`warn`/`risk` verdichtet, die
- * bereits app-weit exakt diese Farben tragen (`nl-tones.ts`:
- * `--nl-accent`=blau, `--nl-good`=grün, `--nl-warn`=gelb, `--nl-risk`=rot).
- * Erfindet keine neue Skala — bucketet nur `getPoolHeatClass`s bestehende
- * 8 Bänder (liga-perzentil-basiert) auf die 4 Ampel-Farben.
- */
-function getAxisRankTone(value: number | null | undefined, pool: number[]): NlTone {
-  const heatClass = getPoolHeatClass(value, pool);
-  const match = heatClass.match(/heat-band-(\d)/);
-  const band = match ? Number(match[1]) : null;
-  if (band == null) {
-    return "neutral";
-  }
-  if (band >= 7) {
-    return "accent"; // Top-Band (7-8): blau, "alternativlos das Beste".
-  }
-  if (band >= 5) {
-    return "good"; // Bänder 5-6: grün.
-  }
-  if (band >= 3) {
-    return "warn"; // Bänder 3-4: gelb.
-  }
-  return "risk"; // Bänder 1-2: rot.
 }
 
 export default function FoundationPlayersTableNewLook({
@@ -540,10 +536,11 @@ export default function FoundationPlayersTableNewLook({
    * nebeneinander benachbarter Achsen und laufen nicht zusammen
    * ("91SPE" statt "91 · SPE"). Jede Achse ist einzeln lesbar.
    *
-   * Rechts zeigt jede Achse den absoluten Liga-Rang ("#N") statt eines
-   * Perzentil-Chips, eingefärbt nach der 4-stufigen Ampel-Konvention
-   * (`getAxisRankTone` — blau = Spitze, grün, gelb, rot = schwach). Ohne
-   * validen Rang/Pool wird nichts erfunden — "—".
+   * Bewusst NUR Balken + Wert (kein inline "#Rang" mehr) — PPS/OVR/MVS
+   * tragen bereits eigene Top-%/Rang-Chips, ein zusätzlicher #Rang je
+   * Achse war reine Excel-Redundanz ("ein GAME, keine Excel-Tabelle").
+   * Der ligaweite Rang bleibt trotzdem einen Hover entfernt: er steckt im
+   * `title`-Tooltip der Achse statt fest sichtbar in der Zelle zu stehen.
    */
   function renderAxisBars(row: FoundationPlayerScopeRow) {
     return (
@@ -554,7 +551,6 @@ export default function FoundationPlayersTableNewLook({
             value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
           const pool = leaguePlayerHeatPools[key];
           const rank = getLeagueRank(value, pool);
-          const rankTone = getAxisRankTone(value, pool);
           return (
             <span
               key={key}
@@ -568,13 +564,6 @@ export default function FoundationPlayersTableNewLook({
                 <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
               </span>
               <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-              {rank != null ? (
-                <span className={`nl-ptable-axis-percentile ${nlToneClass(rankTone)}`} aria-hidden="true">
-                  #{formatNlNumber(rank, 0)}
-                </span>
-              ) : (
-                <span className="nl-ptable-axis-percentile is-empty" aria-hidden="true" />
-              )}
             </span>
           );
         })}
@@ -741,7 +730,12 @@ export default function FoundationPlayersTableNewLook({
             title={`${row.player.name} öffnen`}
           >
             <span className="nl-players-name">{row.player.name}</span>
-            <span className="nl-players-status">{row.transferStatus}</span>
+            {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
+                bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
+                Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
+            {row.transferStatus !== "Active Player" ? (
+              <span className="nl-players-status">{row.transferStatus}</span>
+            ) : null}
           </button>
         </td>
         <td className={`nl-players-td-team${sortCellClass("team")}`}>
@@ -1136,10 +1130,6 @@ export default function FoundationPlayersTableNewLook({
               </button>
             </div>
           ) : null}
-          <p className="nl-players-footnote">
-            Farben sind liga-relativ: jede Stufe steht für ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW
-            61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
-          </p>
         </NlCard>
       )}
     </div>

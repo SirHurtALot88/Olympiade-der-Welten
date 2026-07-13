@@ -55,6 +55,8 @@ export type TeamCreditState = {
   teamId: string;
   /** Zusätzlicher Kreditrahmen (siehe `computeBorrowingCapacity`), bereits abzüglich bestehender Restschuld. */
   creditLimit: number;
+  /** Größter Betrag, den irgendein Anbieter (Bank ODER Team) vergibt — Slider-Max & Marktplatz-Gate. Die Bank kann 0 sein, während Teams leihen. */
+  maxOfferAmount: number;
   /** Summe aller aktiven Restschulden (`getTeamOutstandingDebt`). */
   outstandingDebt: number;
   /** Aktuelles Cash des Teams. */
