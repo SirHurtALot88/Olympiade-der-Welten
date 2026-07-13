@@ -12,11 +12,7 @@
 
 import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
 import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
-import {
-  buildOrganicSquadPlan,
-  type OrganicBuyDecision,
-  type OrganicTradeDownDecision,
-} from "@/lib/ai/organic-squad/draft-builder";
+import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import {
   CATEGORY_TO_AXIS,
   ROSTER_MAX,
@@ -238,8 +234,6 @@ export type OrganicDraftPlanInput = {
 
 export type OrganicDraftPlanResult = {
   decisions: OrganicBuyDecision[];
-  /** Trade-down sells the executor must apply BEFORE the buys (they fund the fills). */
-  sellDecisions: OrganicTradeDownDecision[];
   finalCash: number;
   finalSalaryTotal: number;
   finalRosterSize: number;
@@ -341,7 +335,6 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
 
   return {
     decisions: result.decisions,
-    sellDecisions: result.sellDecisions,
     finalCash: result.finalCash,
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,

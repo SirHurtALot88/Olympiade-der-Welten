@@ -428,34 +428,15 @@ async function runTeamCycle(input: {
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
 
-    // TRADE-DOWN sells FIRST: a cash-poor club may have planned to shed an expendable expensive body to
-    // fund the fills below (selling even at a loss to refill toward opt). Apply before the buys — they
-    // raise the cash the buys spend. Map planned sell playerIds to their live roster-entry activePlayerId.
-    if (plan.sellDecisions.length > 0) {
-      const activePlayerIdByPlayerId = new Map(
-        organicRosterEntries(gameState, input.teamId).map((entry) => [entry.player.id, entry.activePlayerId]),
-      );
-      for (const sell of plan.sellDecisions) {
-        const activePlayerId = activePlayerIdByPlayerId.get(sell.playerId);
-        if (!activePlayerId) continue;
-        const sellResult = executeLocalTransfermarktSell({
-          saveId: input.saveId,
-          seasonId: input.seasonId,
-          teamId: input.teamId,
-          activePlayerId,
-          transferSource: "ai_organic_squad_sell",
-          localRunContext: input.sessionRunContext,
-          deferPersist: true,
-        });
-        if (!sellResult.transferCreated) {
-          warnings.push(...sellResult.blockingReasons.slice(0, 2), "organic_squad_builder_trade_down_skipped");
-          continue;
-        }
-        appliedSells += 1;
-        input.excludeSellPlayerIds.add(sell.playerId);
-      }
-    }
-
+    // PURE BUY (clean two-phase model — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc):
+    // the preseason cycle only ever BUYS. It spends the team's CURRENT cash to fill toward min/opt with the
+    // organic buy planner; it never sells. All selling happens exclusively at season end
+    // (runOrganicSellCycle) — a team enters the preseason with whatever roster + cash it has and buys up
+    // from there. Because this cycle only buys, the roster can only GROW here, so a preseason buy pass can
+    // never shrink a team below the count it needs to field a lineup (that guarantee is what makes
+    // autoprep's teams_under_7 preflight safe). The buy list is a RANKED wishlist; a single unbuyable pick
+    // (raced away or priced out at apply) stops this cycle, and the outer convergence loop re-plans the
+    // team next cycle/round with a fresh, cheaper wishlist until it reaches min/opt or runs out of cash.
     for (const decision of plan.decisions) {
       if (input.excludeBuyPlayerIds.has(decision.playerId)) continue;
       const buyResult = executeLocalTransfermarktBuy({
@@ -502,8 +483,13 @@ async function runTeamCycle(input: {
   }
 
   if (input.progressLog && (appliedSells > 0 || appliedBuys > 0)) {
+    // Engine label reflects the ACTUAL executor: under OLY_ORGANIC_SQUAD_BUILDER the per-team buy/sell
+    // ran through the organic squad builder (runOrganicBuyCycle/runOrganicSellCycle), NOT the unified/
+    // legacy convergence path — resolveActiveConvergencePickEngine only knows the unified-market flag, so
+    // labelling organic runs "unified" was misleading in the log.
+    const engineLabel = useOrganic ? "organic" : resolveActiveConvergencePickEngine();
     console.error(
-      `[transfer-window] ${input.seasonId} ${input.teamId} round=${input.leagueRound} cycle=${input.cycleIndex} engine=${resolveActiveConvergencePickEngine()} sells=${appliedSells} buys=${appliedBuys}`,
+      `[transfer-window] ${input.seasonId} ${input.teamId} round=${input.leagueRound} cycle=${input.cycleIndex} engine=${engineLabel} sells=${appliedSells} buys=${appliedBuys}`,
     );
   }
 

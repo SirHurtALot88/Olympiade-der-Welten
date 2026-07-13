@@ -53,13 +53,13 @@ kaputtgeht:
   **0 Spielern (aber dem Cash) in die neue Season**. Das ist **kein** Fehler.
 - **Es gibt KEINE Bindung an hardMin VOR den Preseason-Käufen.** Man muss NICHT
   mit ≥ min Spielern in die Season starten. Die Teams **kaufen sich IN der
-  Preseason mit dem Cash, das sie haben, bis Richtung min/Opt hoch** — inkl.
-  Trade-Down (teuren Spieler verkaufen → mehrere billige kaufen), wenn das Cash
-  knapp ist.
+  Preseason mit dem Cash, das sie haben, bis Richtung min/Opt hoch** — reines
+  Kaufen, kein Verkaufen während der Preseason (siehe „Preseason-Buy ist PURE
+  BUY" unten — Trade-Down wurde entfernt).
 - Folglich ist **`roster_post_buy` als HARTER, run-pausierender RED falsch**:
-  ein Team, das mit seinem verfügbaren Cash (auch nach Trade-Down) min nicht
-  erreicht, ist ein **akzeptables Ergebnis**, kein Abbruchgrund. Der Check gehört
-  in `isSoftPhaseAuditRed` (soft red / Warnung), nicht als Hard-Stop. Baue hier
+  ein Team, das mit seinem verfügbaren Cash min nicht erreicht, ist ein
+  **akzeptables Ergebnis**, kein Abbruchgrund. Der Check gehört in
+  `isSoftPhaseAuditRed` (soft red / Warnung), nicht als Hard-Stop. Baue hier
   keine „fülle notfalls per Alt-Engine auf min auf"-Krücke wieder ein.
 
 ## Buy-Engine unter OLY_ORGANIC_SQUAD_BUILDER = Organic (MP-P5 Cutover)
@@ -69,7 +69,25 @@ kaputtgeht:
   `runOrganicSellCycle` in `ai-transfer-window-session-service.ts`), NICHT über
   den Legacy-Unified-Batch (`runPreseasonBatchPickRebuild`). Der Batch-Pfad
   (`usePreseasonS1DraftBatch`) ist unter dem Organic-Flag deaktiviert.
-- Grund: das gesamte Balancing (Trade-Down, Salary-Reserve, Support-Gating,
+- Grund: das gesamte Balancing (Salary-Reserve, Support-Gating,
   Seed-/Strategie-Varianz) lebt in der Organic-Engine. Kaufen mit der Alt-Engine
   macht das Balancing für den Haupt-Kaufmoment wirkungslos. Route Preseason-Buys
   daher nie zurück auf den Batch-Pfad, solange das Organic-Flag gesetzt ist.
+
+### Preseason-Buy ist PURE BUY — es wird NIE verkauft (Trade-Down entfernt)
+
+- Die **Preseason-BUY-Phase** (`runOrganicBuyCycle`, `buildOrganicSquadPlan`)
+  ist **PURE BUY**: sie gibt NIEMALS einen Spieler ab. Verkäufe passieren
+  **ausschließlich** am Season-Ende, über `runOrganicSellCycle` /
+  `planOrganicSellsForTeam`. Sauberes Zwei-Phasen-Modell: erst am Season-Ende
+  sauber verkaufen (bis auf 0 möglich, siehe oben), dann in der Preseason mit
+  dem vorhandenen Cash rein **KAUFEN** Richtung min(8)/opt.
+- Das frühere **„Trade-Down"** (Verkauf eines teuren Spielers WÄHREND des
+  Kaufens, um billige Fills zu finanzieren) wurde **ENTFERNT**. Es verletzte
+  die Phasen-Trennung zwischen Buy und Sell und konnte den Kader WÄHREND der
+  Preseason-Buy-Phase unter die Fielding-Min drücken → Crash im Autoprep-
+  Preflight (`teams_under_7`), beobachtet z. B. bei V-V (8→6 Spieler).
+- Baue Trade-Down bzw. „Sell während Buy" **NICHT wieder** in den
+  Preseason-Buy-Pfad ein. `buildOrganicSquadPlan` liefert kein
+  `sellDecisions` mehr — es gibt in der Preseason-Buy-Phase keinen Sell-Pfad,
+  den man dort reaktivieren könnte.

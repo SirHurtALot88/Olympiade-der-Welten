@@ -131,10 +131,11 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
     expect(result.stoppedBelowMin).toBe(true);
   });
 
-  it("trades down: a cash-poor club below min sheds an expendable expensive body to refill toward opt", () => {
-    // Reproduce the S-C stall: 7 players, cash too low to buy the cheapest free agent, but the roster
-    // holds a pricey surplus (a 4th body in an already-covered discipline → low marginalStrength, high
-    // price). The club must SELL that body (even at a loss) to fund the cheap fills and reach min/opt.
+  it("pure buy: a cash-poor club below min never sheds its pricey surplus body, it only buys what it can afford", () => {
+    // Two-phase model (see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc): the preseason BUY
+    // cycle NEVER sells — trade-down was removed. A cash-poor club (e.g. after paying renewal salaries)
+    // holding a pricey surplus body (a 4th body in an already-covered discipline) must keep that body no
+    // matter how expendable it looks; selling only ever happens at season end (runOrganicSellCycle).
     const surplusRoster: OrganicPlayerView[] = [];
     // Three tdm bodies already cover that discipline well; the 4th (expensive) is pure surplus.
     for (let i = 0; i < 4; i += 1) {
@@ -145,7 +146,7 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
         men: 60,
         soc: 60,
         disciplineRatings: { tdm: 80 },
-        marketValue: i === 3 ? 60 : 8, // the 4th body is the pricey, expendable one
+        marketValue: i === 3 ? 60 : 8, // the 4th body is the pricey, expendable-looking one
         salary: i === 3 ? 12 : 4,
       });
     }
@@ -162,36 +163,56 @@ describe("buildOrganicSquadPlan — emergent composition", () => {
         salary: 4,
       });
     }
+    const originalIds = surplusRoster.map((player) => player.playerId);
 
-    const input = baseInput({ cash: 6, cashBuffer: 5, salaryTotal: 32 });
-    input.startingSquad = surplusRoster;
-    // Cheapest free agent (marketValue 20) is unaffordable from cash 6 — only a trade-down unblocks it.
+    // Case A: cash (6) is below even the cheapest free agent (marketValue 20) — pure buy can afford
+    // nothing at all. The correct behaviour is to simply stop under-filled, NOT to shed a body to unblock
+    // a buy: the plan must be a strict no-op on the roster.
+    const brokeInput = baseInput({ cash: 6, cashBuffer: 5, salaryTotal: 32 });
+    brokeInput.startingSquad = surplusRoster;
+    const broke = buildOrganicSquadPlan(brokeInput);
 
-    const result = buildOrganicSquadPlan(input);
+    expect(broke.decisions).toHaveLength(0);
+    expect(broke.finalSquad.map((player) => player.playerId).sort()).toEqual([...originalIds].sort());
+    // Nothing was ever removed — the pricey surplus body is still there.
+    expect(broke.finalSquad.some((player) => player.playerId === "tdm-held-3")).toBe(true);
+    expect(broke.stoppedBelowMin).toBe(true);
+    expect("sellDecisions" in broke).toBe(false);
 
-    expect(result.sellDecisions.length).toBeGreaterThanOrEqual(1);
-    // The pricey 4th tdm body is the one shed (highest price − marginalStrength).
-    expect(result.sellDecisions.some((sell) => sell.playerId === "tdm-held-3")).toBe(true);
-    // Having freed the cash, the club fills back up to at least the hard minimum.
-    expect(result.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
-    expect(result.stoppedBelowMin).toBe(false);
-    expect(result.finalCash).toBeGreaterThanOrEqual(0);
-    // The sold body is gone from the final squad.
-    expect(result.finalSquad.some((player) => player.playerId === "tdm-held-3")).toBe(false);
+    // Case B: cash (25) covers exactly one cheap fill. Pure buy spends toward min, keeps every original
+    // roster player (including the pricey surplus body — it is never shed to fund the buy), and reaches
+    // the hard minimum via growth only.
+    const affordableInput = baseInput({ cash: 25, cashBuffer: 5, salaryTotal: 32 });
+    affordableInput.startingSquad = surplusRoster.map((player) => ({ ...player }));
+    const affordable = buildOrganicSquadPlan(affordableInput);
+
+    expect(affordable.decisions.length).toBeGreaterThanOrEqual(1);
+    // Every original starting-squad id survives untouched — pure buy only grows the squad.
+    for (const id of originalIds) {
+      expect(affordable.finalSquad.some((player) => player.playerId === id)).toBe(true);
+    }
+    expect(affordable.finalSquad.some((player) => player.playerId === "tdm-held-3")).toBe(true);
+    expect(affordable.finalSquad.length).toBeGreaterThanOrEqual(ROSTER_MIN);
+    expect(affordable.stoppedBelowMin).toBe(false);
+    expect(affordable.finalCash).toBeGreaterThanOrEqual(0);
+    expect("sellDecisions" in affordable).toBe(false);
   });
 
-  it("never trades down a freshly-bought player on an empty-start draft (no phantom sells)", () => {
-    // Regression: on an empty starting squad the builder must NOT 'sell' a player it just planned to
-    // buy — those aren't on the live roster, so the executor can't realize the proceeds and the later
-    // buys they were meant to fund fail with insufficient_cash. Give it a tight budget so it gets stuck
-    // below opt mid-draft; the correct behaviour is to simply stop, not to shed a planned buy.
+  it("empty-start draft only ever buys — finalSquad is exactly the bought decisions, never a sell", () => {
+    // Regression guard for the removed trade-down: on an empty starting squad the builder must never
+    // produce anything but buys. Give it a tight budget so it gets stuck below opt mid-draft; the correct
+    // behaviour is to simply stop, not to shed a planned buy (there is no sellDecisions concept anymore).
     const tight = baseInput({ cash: 120, cashBuffer: 20 });
     const result = buildOrganicSquadPlan(tight);
-    // No trade-downs at all from an empty start.
-    expect(result.sellDecisions).toHaveLength(0);
-    // And no player is ever both bought and sold in the same plan.
-    const soldIds = new Set(result.sellDecisions.map((sell) => sell.playerId));
-    expect(result.decisions.every((buy) => !soldIds.has(buy.playerId))).toBe(true);
+
+    // The result type no longer carries sellDecisions at all.
+    expect("sellDecisions" in result).toBe(false);
+    // Every decision is a buy, and the final squad is exactly (and only) what was bought — nothing to
+    // sell because there was nothing on the roster to begin with.
+    expect(result.decisions.length).toBeGreaterThan(0);
+    expect(result.finalSquad.map((player) => player.playerId).sort()).toEqual(
+      result.decisions.map((decision) => decision.playerId).sort(),
+    );
   });
 
   it("SEED-based draft jitter: reproducible per seed, varies composition across seeds on near-tied candidates", async () => {
