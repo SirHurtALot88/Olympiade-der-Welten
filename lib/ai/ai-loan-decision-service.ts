@@ -47,7 +47,7 @@ const COMPETITIVE_FLOOR_OPT_FRACTION = 0.5;
  * Cash einen Kredit, weil Lücke × Upgrade-Preis jeden Cash-Bestand übersteigt (Combined-Run-Befund:
  * H-R/R-L/T-C leihen mit 110–138 Cash). ENV-tunebar zum schnellen Kalibrieren.
  */
-const LOAN_NEED_FILL_FRACTION = Number(process.env.OLY_LOAN_NEED_FILL_FRACTION ?? 0.4) || 0.4;
+const LOAN_NEED_FILL_FRACTION = Number(process.env.OLY_LOAN_NEED_FILL_FRACTION ?? 0.3) || 0.3;
 /**
  * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt. Das Gehalt
  * wird nur ANTEILIG gegengerechnet (Teams haben auch Transfer-/sonstige Einnahmen), der Gebäude-Unterhalt
