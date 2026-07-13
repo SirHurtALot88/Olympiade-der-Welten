@@ -29,7 +29,25 @@
  * kein Pro-Saison-Sparkline je Spieler (OVR-/MW-Historie pro Saison existiert
  * nur im Spieler-Drawer über `historyRows`, nicht in den Tabellen-Rows).
  *
- * Styles: `app/globals.css` unter `.is-new-look .nl-players-*`.
+ * Weitere Zusätze:
+ * - Schnäppchen-Radar (Analyse-Hub, `FoundationPlayersScatterCard.tsx`): ein
+ *   Streudiagramm-Kärtchen aus OVR/PPs × MW/Gehalt über dieselben Hub-`rows`,
+ *   eigenes Team hervorgehoben, Klick öffnet den Spieler-Drawer.
+ * - MW-Bracket-Histogramm ist jetzt klickbar (`selectedMwBracket`, rein
+ *   client-seitiges Prädikat auf `rows`, kein neuer Shell-State) — filtert die
+ *   Spielerliste im Verzeichnis auf den angeklickten Bracket, erneuter Klick
+ *   hebt den Filter wieder auf.
+ * - Wishlist-Stern je Zeile: reiner Lesezugriff auf die im `gameState`-Prop
+ *   bereits vorhandene Transfermarkt-Wishlist des eigenen Teams
+ *   (`gameState.seasonState.transferWishlist`, via `getTeamTransferWishlistEntries`).
+ *   BEWUSST read-only — ein Schreibpfad (Stern zum Hinzufügen/Entfernen) würde
+ *   einen neuen Callback-Prop aus `FoundationShellRouterBody.tsx`
+ *   (Shell-Datei) erfordern, siehe `toggleTransferWishlist` in
+ *   `use-foundation-shell-router-body-scope.tsx`; das ist außerhalb dieser
+ *   additiven Komponente nicht herstellbar, ohne Shell-Dateien anzufassen.
+ *
+ * Styles: `app/globals.css` unter `.is-new-look .nl-players-*` /
+ * `.is-new-look .nl-phub-scatter-*`.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -55,6 +73,7 @@ import {
   getRosterEntryDisplaySalary,
   getRosterEntrySalaryDelta,
   getTeamLogoModel,
+  getTeamTransferWishlistEntries,
   type PlayerTableScope,
 } from "@/app/foundation/foundation-page-client-exports";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
@@ -84,6 +103,9 @@ import {
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
+import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+
+import FoundationPlayersScatterCard from "@/app/foundation/players-table/FoundationPlayersScatterCard";
 
 export type FoundationPlayersTableNewLookProps = {
   /** Bereits nach `tableSorts.playersTable` sortierte, gefilterte Zeilen. */
@@ -390,12 +412,58 @@ export default function FoundationPlayersTableNewLook({
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   /** Verzeichnis (bestehende Tabelle) vs. ligaweiter Analyse-Hub (#47). */
   const [playersView, setPlayersView] = useState<NlPlayersView>("directory");
+  /**
+   * Aktiver MW-Bracket-Filter der Spielerliste (Klick auf einen Histogramm-Balken,
+   * erneuter Klick auf denselben Balken hebt ihn wieder auf). Rein client-seitiges
+   * Prädikat auf `rows` — kein neuer Shell-State/Prop nötig, da die Bracket-Logik
+   * (`getTransfermarktBracket`) bereits dieselbe ist wie in `playerBracketCounts`.
+   */
+  const [selectedMwBracket, setSelectedMwBracket] = useState<number | null>(null);
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
     setVisibleCount(NL_PLAYERS_PAGE_SIZE);
     setExpandedPlayerId(null);
-  }, [playerScope, playerTeamFilter, playerClassFilter]);
+  }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket]);
+
+  /** Spielerliste, zusätzlich auf den angeklickten MW-Bracket eingeschränkt (falls aktiv). */
+  const bracketFilteredRows = useMemo(() => {
+    if (selectedMwBracket == null) {
+      return rows;
+    }
+    return rows.filter((row) => getTransfermarktBracket(getPlayerDisplayMarketValue(row.player)) === selectedMwBracket);
+  }, [rows, selectedMwBracket]);
+
+  const maxBracketCount = useMemo(
+    () => Math.max(1, ...NL_PLAYERS_BRACKETS.map(({ bracket }) => playerBracketCounts[bracket] ?? 0)),
+    [playerBracketCounts],
+  );
+
+  /**
+   * Eigenes (vom Menschen geführtes) Team — einzige Quelle, um zu wissen, wessen
+   * Transfermarkt-Wishlist (`gameState.seasonState.transferWishlist`) gemeint ist.
+   * `null`, wenn kein Team als `humanControlled` markiert ist (keine Erfindung).
+   */
+  const ownTeamId = useMemo(() => teams.find((team) => team.humanControlled)?.teamId ?? null, [teams]);
+
+  /**
+   * Wishlist-Stern je Zeile (#3, additiv): reiner Lesezugriff auf die bereits im
+   * `gameState`-Prop vorhandene Transfermarkt-Wishlist des eigenen Teams — kein
+   * neuer Schreibpfad, siehe Modul-Kommentar unten bei `renderRow`/dem Sterne-Chip.
+   */
+  const wishlistPlayerIds = useMemo(() => {
+    if (!ownTeamId) {
+      return new Set<string>();
+    }
+    return new Set(getTeamTransferWishlistEntries(gameState, ownTeamId).map((entry) => entry.playerId));
+  }, [gameState, ownTeamId]);
+
+  const wishlistSelectionCount = useMemo(() => {
+    if (wishlistPlayerIds.size === 0) {
+      return 0;
+    }
+    return rows.filter((row) => wishlistPlayerIds.has(row.player.id)).length;
+  }, [rows, wishlistPlayerIds]);
 
   /**
    * Kader-/Liga-Summary aus den aktuell gefilterten Zeilen: Durchschnitte
@@ -459,8 +527,11 @@ export default function FoundationPlayersTableNewLook({
     };
   }, [rows]);
 
-  const visibleRows = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
-  const hasMoreRows = rows.length > visibleRows.length;
+  const visibleRows = useMemo(
+    () => bracketFilteredRows.slice(0, visibleCount),
+    [bracketFilteredRows, visibleCount],
+  );
+  const hasMoreRows = bracketFilteredRows.length > visibleRows.length;
 
   /**
    * Klasse für die aktuell sortierte Spalte (Header + jede Körperzelle
@@ -729,7 +800,14 @@ export default function FoundationPlayersTableNewLook({
             }}
             title={`${row.player.name} öffnen`}
           >
-            <span className="nl-players-name">{row.player.name}</span>
+            <span className="nl-players-name-line">
+              {wishlistPlayerIds.has(row.player.id) ? (
+                <span className="nl-players-wishlist-star" aria-label="Auf deiner Transfermarkt-Wishlist" title="Auf deiner Transfermarkt-Wishlist">
+                  ★
+                </span>
+              ) : null}
+              <span className="nl-players-name">{row.player.name}</span>
+            </span>
             {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
                 bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
                 Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
@@ -1000,6 +1078,14 @@ export default function FoundationPlayersTableNewLook({
               tone="warn"
               title="Summe der Jahresgehälter der Auswahl"
             />
+            {ownTeamId != null ? (
+              <StatChip
+                label="Wishlist"
+                value={formatNlNumber(wishlistSelectionCount, 0)}
+                tone="warn"
+                title="Spieler der aktuellen Auswahl auf deiner Transfermarkt-Wishlist"
+              />
+            ) : null}
           </StatChipRow>
         </div>
         {playersView === "directory" ? (
@@ -1043,20 +1129,52 @@ export default function FoundationPlayersTableNewLook({
                 true,
               )}
             </StatChipRow>
-            <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl">
-              <NlBarChart
-                bars={NL_PLAYERS_BRACKETS.map(({ bracket }) => ({
-                  label: `B${bracket}`,
-                  value: playerBracketCounts[bracket] ?? 0,
-                  tone: "accent",
-                }))}
-                format={(value) => formatNlNumber(value, 0)}
-                aria-label="Marktwert-Brackets der Auswahl (Spieleranzahl je Bracket)"
-                className="nl-ptable-bracket-barchart"
-              />
+            <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl — Balken anklicken filtert die Spielerliste">
+              <div className="nl-players-bracket-bars">
+                {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => {
+                  const count = playerBracketCounts[bracket] ?? 0;
+                  const isActive = selectedMwBracket === bracket;
+                  const heightPercent = count > 0 ? Math.max(4, Math.round((count / maxBracketCount) * 100)) : 0;
+                  return (
+                    <button
+                      key={bracket}
+                      type="button"
+                      className={`nl-players-bracket-bar${isActive ? " is-active" : ""}`}
+                      onClick={() => setSelectedMwBracket((current) => (current === bracket ? null : bracket))}
+                      aria-pressed={isActive}
+                      title={`B${bracket} · ${range} · ${formatNlNumber(count, 0)} Spieler${
+                        isActive ? " — Filter aktiv, erneut klicken zum Entfernen" : " — anklicken zum Filtern der Spielerliste"
+                      }`}
+                    >
+                      <span className="nl-players-bracket-bar-value nl-tnum">{formatNlNumber(count, 0)}</span>
+                      <span className="nl-players-bracket-bar-track" aria-hidden="true">
+                        <span className="nl-players-bracket-bar-fill" style={{ height: `${heightPercent}%` }} />
+                      </span>
+                      <span className="nl-players-bracket-bar-label">B{bracket}</span>
+                    </button>
+                  );
+                })}
+              </div>
               <p className="nl-ptable-bracket-legend">
                 {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => `B${bracket} ${range}`).join(" · ")}
               </p>
+              {selectedMwBracket != null ? (
+                <div className="nl-players-bracket-filter-chip">
+                  <span>
+                    MW-Filter: B{selectedMwBracket} ·{" "}
+                    {NL_PLAYERS_BRACKETS.find((entry) => entry.bracket === selectedMwBracket)?.range}
+                  </span>
+                  <button
+                    type="button"
+                    className="nl-players-bracket-filter-clear"
+                    onClick={() => setSelectedMwBracket(null)}
+                    aria-label="Marktwert-Filter zurücksetzen"
+                    title="Marktwert-Filter zurücksetzen"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}
@@ -1070,11 +1188,18 @@ export default function FoundationPlayersTableNewLook({
           openPlayerDrawerById={openPlayerDrawerById}
           openTeamProfileById={openTeamProfileById}
         />
-      ) : rows.length === 0 ? (
+      ) : bracketFilteredRows.length === 0 ? (
         <NlCard className="nl-players-empty-card">
           <p className="nl-players-empty-text">
-            Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen.
+            {selectedMwBracket != null
+              ? "Keine Spieler in diesem Marktwert-Bracket — MW-Filter zurücksetzen oder Umfang/Team/Klasse anpassen."
+              : "Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen."}
           </p>
+          {selectedMwBracket != null ? (
+            <button type="button" className="nl-players-more-button" onClick={() => setSelectedMwBracket(null)}>
+              MW-Filter zurücksetzen
+            </button>
+          ) : null}
         </NlCard>
       ) : (
         <NlCard
@@ -1083,7 +1208,7 @@ export default function FoundationPlayersTableNewLook({
           title="Spielerliste"
           actions={
             <span className="nl-players-shown nl-tnum" aria-live="polite">
-              {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(rows.length, 0)} Spielern
+              {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(bracketFilteredRows.length, 0)} Spielern
             </span>
           }
         >
@@ -1124,9 +1249,9 @@ export default function FoundationPlayersTableNewLook({
               <button
                 type="button"
                 className="nl-players-more-button"
-                onClick={() => setVisibleCount(rows.length)}
+                onClick={() => setVisibleCount(bracketFilteredRows.length)}
               >
-                Alle {formatNlNumber(rows.length, 0)} anzeigen
+                Alle {formatNlNumber(bracketFilteredRows.length, 0)} anzeigen
               </button>
             </div>
           ) : null}
@@ -1423,6 +1548,8 @@ function FoundationPlayersHub({
           </>
         )}
       </NlCard>
+
+      <FoundationPlayersScatterCard rows={rows} openPlayerDrawerById={openPlayerDrawerById} />
 
       <div className="nl-phub-grid">
         <NlCard className="nl-phub-value-card" eyebrow="Kader-Ökonomie" title="Bestes Preis-Leistungs-Verhältnis">
