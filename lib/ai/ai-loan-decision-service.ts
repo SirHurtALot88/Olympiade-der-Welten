@@ -66,6 +66,13 @@ const SALARY_SERVICE_WEIGHT = 0.6;
 const MIN_DEBT_SERVICE_FLOOR = 0.15;
 /** Ist nach den bestehenden Raten weniger als das übrig, gibt es keinen Spielraum für einen weiteren Kredit. */
 const MIN_DEBT_SERVICE_ROOM = 1;
+/**
+ * Vorsichts-Anteil: die Rate soll nur diesen Bruchteil des freien Kreditdienst-Budgets belegen. Das
+ * verhindert, dass ein GROSSER Kredit in eine kurze Laufzeit gequetscht wird (21 in 2 Jahren = ~11/Season
+ * Rate), obwohl man noch nicht weiß, ob das Cash reinkommt — so wandert ein großer Betrag automatisch auf
+ * eine längere Laufzeit mit kleinerer Rate, ein kleiner Betrag bleibt kurz.
+ */
+const TERM_PRUDENCE_FRACTION = Number(process.env.OLY_LOAN_TERM_PRUDENCE ?? 0.5) || 0.5;
 
 /** Summe der offenen Restschuld (principalOutstanding) über alle aktiven Kredite eines Teams. */
 function sumActiveOutstanding(gameState: GameState, teamId: string): number {
@@ -180,9 +187,18 @@ function resolveServiceableTermSeasons(input: {
   // Bestehende Raten fressen bereits das ganze Budget → keine weitere Rate tragbar.
   if (room <= MIN_DEBT_SERVICE_ROOM) return null;
 
+  // Die kürzeste Laufzeit, deren Rate NUR den Vorsichts-Anteil des Rahmens belegt — so wandert ein großer
+  // Betrag auf eine längere (günstigere) Laufzeit, ein kleiner bleibt kurz (variable, prudente Laufzeiten).
+  const comfortRoom = room * TERM_PRUDENCE_FRACTION;
   for (const termSeasons of TERM_CANDIDATES) {
     const terms = computeLoanTerms({ principal: input.principal, termSeasons, finances: input.finances });
-    if (terms.installmentPerSeason <= room) return termSeasons;
+    if (terms.installmentPerSeason <= comfortRoom) return termSeasons;
+  }
+  // Passt nicht in den Vorsichts-Anteil, aber noch in den vollen Rahmen → nimm die längste Laufzeit,
+  // deren Rate wenigstens den vollen Rahmen nicht sprengt (kleinste mögliche Rate).
+  for (let i = TERM_CANDIDATES.length - 1; i >= 0; i -= 1) {
+    const terms = computeLoanTerms({ principal: input.principal, termSeasons: TERM_CANDIDATES[i]!, finances: input.finances });
+    if (terms.installmentPerSeason <= room) return TERM_CANDIDATES[i]!;
   }
   // Selbst die längste Laufzeit liegt knapp über dem Rahmen — als begründete Ausnahme trotzdem die
   // längste (kleinste Rate) nehmen statt abzulehnen; Kapazität + Bereitschaft haben den Betrag bereits

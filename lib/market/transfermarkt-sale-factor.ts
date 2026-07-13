@@ -14,6 +14,15 @@ function roundValue(value: number, digits = 2) {
 /** Rank bonus/malus and bracket spread apply only when the league bracket pool is at least this size. */
 export const SALE_FACTOR_MIN_RANK_POOL = 15;
 
+/**
+ * Untere Schranke für den Verkaufsfaktor (Verkaufspreis / MW). Die hochwertigen Brackets haben von Natur
+ * aus die NIEDRIGSTEN minFactors (0.35–0.55) — d. h. ausgerechnet teure Spieler/Stars könnten für ~35 %
+ * ihres MW verkauft werden und das Team verlöre viel Cash. Diese Schranke deckelt den maximalen Abschlag,
+ * damit Stars nicht DEUTLICH unter MW verkauft werden (User-Vorgabe). Reduziert zugleich die
+ * Buy-high/Sell-low-Reibung, die die Mehrsaison-Ökonomie deflationär macht. ENV-tunebar.
+ */
+const MIN_SALE_FACTOR_FLOOR = Number(process.env.OLY_MIN_SALE_FACTOR ?? 0.65) || 0.65;
+
 const SALE_FACTOR_BRACKET_RANGES = {
   1: { minFactor: 0.35, maxFactor: 1.5 },
   2: { minFactor: 0.4, maxFactor: 1.46 },
@@ -374,7 +383,8 @@ export function buildTransfermarktSaleFactorBreakdown(
   const step = (bracketRange.maxFactor - bracketRange.minFactor) / Math.max(1, rankedGroup.length - 1);
   const baseFactor = bracketRange.maxFactor - rankedIndex * step;
   const rankBonus = getRankBonus(rankInBracket, rankedGroup.length);
-  const saleFactor = baseFactor + rankBonus;
+  // Abschlag deckeln, damit (teure) Spieler nicht deutlich unter MW verkauft werden.
+  const saleFactor = Math.max(baseFactor + rankBonus, MIN_SALE_FACTOR_FLOOR);
   const factorSource = rankedGroup[rankedIndex]?.source === "snapshot" ? "bracket_snapshot_pps" : "bracket_mvs_live";
 
   return {
