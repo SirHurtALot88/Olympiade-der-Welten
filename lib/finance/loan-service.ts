@@ -86,6 +86,21 @@ export function getTeamOutstandingDebt(gameState: GameState, teamId: string): nu
 }
 
 /**
+ * Summe der jährlichen Kreditraten (`installmentPerSeason`) über alle aktiven Kredite eines
+ * Teams — die Cash-Belastung, die `applyLoanSettlement` am Saisonende abbucht. Für UI-Zwecke
+ * gedacht (Kreditrate neben Gehälter/Gebäudekosten als Ausgabenzeile), nicht Teil der
+ * Settlement-Logik selbst.
+ */
+export function getTeamAnnualLoanInstallment(gameState: GameState, teamId: string): number {
+  const loans = gameState.seasonState.loans ?? [];
+  return roundCash(
+    loans
+      .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+      .reduce((sum, loan) => sum + loan.installmentPerSeason, 0),
+  );
+}
+
+/**
  * Proxy für jährliche Einnahmen: letzte abgerechnete Saison-Summe der Sponsoren-Payouts für das
  * Team; ohne historische Payout-Logs fällt der Proxy auf die Basis-Komponente des laufenden
  * Sponsorenvertrags zurück. Kein Preisgeld-Benchmark eingerechnet (TODO: sauberen

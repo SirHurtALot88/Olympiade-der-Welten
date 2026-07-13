@@ -82,6 +82,8 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
     cash,
     salaryTotal,
     guv,
+    loanInstallment,
+    outstandingDebt,
     rosterCount,
     gmStoryLabel,
     gmStoryTone,
@@ -180,6 +182,15 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
             <span>Gehalt</span>
             <strong>{formatMoney(salaryTotal)}</strong>
           </div>
+          {loanInstallment != null && loanInstallment > 0 ? (
+            <div className="home-v2-hero-stat is-muted">
+              <span>Kreditrate</span>
+              <strong>{formatMoney(loanInstallment)}</strong>
+              {outstandingDebt != null && outstandingDebt > 0 ? (
+                <small>Restschuld {formatMoney(outstandingDebt)}</small>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         {/* CC7: advance action lives once in the global top-bar
             (foundation-global-next-button → triggerGlobalNext). The Home hero no

@@ -106,6 +106,13 @@ export type ManagerOfficeClientProps = {
     points: number | null;
     guv: number | null;
   } | null;
+  /**
+   * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate und
+   * Restschuld des aktiven Manager-Teams (Fog of War — nie ein fremdes Team,
+   * siehe `use-credits-view-model.ts`). `null`/`0` blendet die Anzeige aus.
+   */
+  loanInstallment?: number | null;
+  outstandingDebt?: number | null;
   activeTeamOpenInboxItems: Array<{ title: string }>;
   activeTeamCriticalInboxItems: unknown[];
   selectedOpenObjectives: Array<{ label: string; detail?: string | null; actionHint?: string | null }>;
@@ -173,6 +180,8 @@ export function ManagerOfficeClient({
   selectedTeamPlayerDemands,
   selectedHqFinanceWarnings,
   selectedStandingRow,
+  loanInstallment,
+  outstandingDebt,
   activeTeamOpenInboxItems,
   activeTeamCriticalInboxItems,
   selectedOpenObjectives,
@@ -720,6 +729,17 @@ export function ManagerOfficeClient({
 	                    <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
 	                    <small>laufender Druck</small>
 	                  </article>
+	                  {loanInstallment != null && loanInstallment > 0 ? (
+	                    <article className="foundation-hq-state-card">
+	                      <span>Kreditrate</span>
+	                      <strong>{formatMoney(loanInstallment)}</strong>
+	                      <small>
+	                        {outstandingDebt != null && outstandingDebt > 0
+	                          ? `Restschuld ${formatMoney(outstandingDebt)}`
+	                          : "jährliche Tilgung"}
+	                      </small>
+	                    </article>
+	                  ) : null}
 	                  <article className="foundation-hq-state-card">
 	                    <span>Kadergröße</span>
 	                    <strong>{selectedStandingRow?.rosterCount ?? rosterPlayers.length}</strong>

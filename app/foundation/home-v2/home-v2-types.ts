@@ -84,6 +84,14 @@ export type HomeV2ClientProps = {
   guv: number | null;
   rosterCount: number;
   /**
+   * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate (Summe
+   * `installmentPerSeason` über aktive Kredite) und Restschuld. Eigenes Team
+   * only (Fog of War, siehe `use-credits-view-model.ts`) — `null`/`0` bei
+   * fehlenden Krediten, dann bleibt der Chip ausgeblendet.
+   */
+  loanInstallment: number | null;
+  outstandingDebt: number | null;
+  /**
    * Wave D · Feld-Rennen (fog-sicher, additiv, optional):
    * - `fieldRaceForm`: letzte bis zu 5 Spieltage des eigenen Teams (D1).
    * - `fieldRacePlayedMatchdays`: bereits gespielte Spieltage (Frühphasen-Zustand).
