@@ -1114,6 +1114,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         <small>
                           {entry.className} · {formatTransfermarktCurrency(entry.marketValue)} MW
                         </small>
+                        {entry.projectedSalarySchedule?.length ? (
+                          <span className="nl-market-wishlist-schedule nl-tnum" aria-label="Projizierte Gehaltsstaffel bei Vertrag">
+                            {entry.projectedSalarySchedule.map((year) => (
+                              <span className="nl-market-wishlist-year-chip" key={`${entry.id}-y${year.yearIndex}`}>
+                                <b>S{year.yearIndex}</b> {formatTransfermarktCurrency(year.salary)}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
                         <span
                           className={`nl-market-signal-chip ${
                             scoutingPipelineCapacity?.draftSuspended
