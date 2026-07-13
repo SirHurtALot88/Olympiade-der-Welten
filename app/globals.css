@@ -54074,10 +54074,6 @@ button.is-new-look .nl-thist-season-pill,
   font-family: var(--nl-sans);
 }
 
-.is-new-look .nl-credits-kpi-row {
-  flex-wrap: wrap;
-}
-
 .is-new-look .nl-credits-table-shell {
   overflow-x: auto;
 }
@@ -54447,10 +54443,282 @@ button.is-new-look .nl-thist-season-pill,
   gap: var(--nl-s2);
 }
 
+/* --- Grafik-Welle 2: Kreditrahmen-Gauge ---------------------------- */
+.is-new-look .nl-credits-gauge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s5, 24px);
+}
+
+.is-new-look .nl-credits-gauge {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 220px;
+  max-width: 100%;
+  flex: 0 0 auto;
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-credits-gauge svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.is-new-look .nl-credits-gauge-zone {
+  opacity: 0.9;
+}
+
+.is-new-look .nl-credits-gauge-fill {
+  transition: stroke var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-credits-gauge-needle {
+  stroke: var(--nl-panel);
+  stroke-width: 2;
+}
+
+.is-new-look .nl-credits-gauge-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  pointer-events: none;
+}
+
+.is-new-look .nl-credits-gauge-value {
+  font-family: var(--nl-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-credits-gauge-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2, var(--nl-mut));
+}
+
+.is-new-look .nl-credits-gauge-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-gauge-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+}
+
+/* --- Grafik-Welle 2: Tilgung-vs-Cashflow --------------------------- */
+.is-new-look .nl-credits-burden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-credits-burden-chart {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.is-new-look .nl-credits-burden-track {
+  fill: var(--nl-bg-2);
+  stroke: var(--nl-line);
+}
+
+.is-new-look .nl-credits-burden-seg {
+  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-credits-burden-seg.is-loan {
+  stroke: var(--nl-risk);
+  stroke-width: 1.5;
+}
+
+.is-new-look .nl-credits-burden-marker line {
+  stroke: var(--nl-ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+
+.is-new-look .nl-credits-burden-marker text {
+  fill: var(--nl-mut);
+  font-family: var(--nl-sans);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.is-new-look .nl-credits-burden.is-danger .nl-credits-burden-track {
+  stroke: var(--nl-risk);
+}
+
+.is-new-look .nl-credits-burden-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-credits-burden-legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-credits-burden-legend-item.is-total {
+  font-weight: 700;
+}
+
+.is-new-look .nl-credits-burden-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+.is-new-look .nl-credits-burden-legend-label {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-burden-legend-value {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-credits-burden-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-credits-burden-badge.is-good {
+  background: var(--heat-good-bg);
+  color: var(--heat-good-text);
+}
+
+.is-new-look .nl-credits-burden-badge.is-risk {
+  background: var(--heat-danger-bg);
+  color: var(--heat-danger-text);
+}
+
+.is-new-look .nl-credits-burden-empty {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* --- Grafik-Welle 2: Slider-Farbfeedback ---------------------------- */
+.is-new-look .nl-credits-slider {
+  border-radius: var(--nl-r-pill, 999px);
+  height: 6px;
+}
+
+.is-new-look .nl-credits-amount-field {
+  transition: border-color var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-credits-amount-input {
+  transition: color var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-credits-amount-tier {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* --- Grafik-Welle 2: Season-1 Vault-Empty-State --------------------- */
+.is-new-look .nl-credits-vault-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nl-s3);
+  padding: var(--nl-s3) 0;
+}
+
+.is-new-look .nl-credits-vault {
+  display: block;
+  width: 120px;
+  max-width: 100%;
+  height: auto;
+}
+
+.is-new-look .nl-credits-vault-rim {
+  fill: var(--nl-panel-2, var(--nl-panel));
+  stroke: var(--nl-line-2);
+  stroke-width: 6;
+}
+
+.is-new-look .nl-credits-vault-spoke {
+  stroke: var(--nl-line);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.is-new-look .nl-credits-vault-hub {
+  fill: var(--nl-panel);
+  stroke: var(--nl-accent);
+  stroke-width: 3;
+}
+
+.is-new-look .nl-credits-vault-lock-body {
+  fill: var(--nl-warn);
+}
+
+.is-new-look .nl-credits-vault-lock-shackle {
+  stroke: var(--nl-warn);
+  stroke-width: 4;
+}
+
+.is-new-look .nl-credits-vault-chip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--nl-warn);
+  color: #1a1200;
+}
+
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-thist-season-pill,
   .is-new-look .nl-sponsor-rating-toggle {
+    transition: none;
+  }
+  .is-new-look .nl-credits-gauge-fill,
+  .is-new-look .nl-credits-burden-seg,
+  .is-new-look .nl-credits-amount-field,
+  .is-new-look .nl-credits-amount-input {
     transition: none;
   }
 }

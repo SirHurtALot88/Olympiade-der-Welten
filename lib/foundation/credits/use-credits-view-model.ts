@@ -3,13 +3,25 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildLoanOffers, computeEarlyPayoff, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
+import {
+  buildLoanOffers,
+  computeEarlyPayoff,
+  estimateTeamAnnualRevenue,
+  getTeamAnnualLoanInstallment,
+  getTeamOutstandingDebt,
+} from "@/lib/finance/loan-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { getTeamDisplaySalaryTotal, getTeamFacilityUpkeepTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
 
 const MIN_TERM_SEASONS = 1;
 const MAX_TERM_SEASONS = 10;
+
+/** Gleiche Rundung wie die Cash-Werte im Kredit-Service (1 Nachkommastelle). */
+function roundGaugeCash(value: number): number {
+  return Number(value.toFixed(1));
+}
 
 /**
  * Builds the Credits view model for one human team, wired to the real bank
@@ -95,6 +107,20 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
 
   const canEarlyPayoff = adminOverride || evaluateGamePhaseAction(gameState, "credit_early_payoff").allowed;
 
+  // Kreditrahmen-Gauge (Grafik-Welle 2): rohe Bank-Gesamtkapazität VOR Abzug
+  // der Restschuld, damit die Gauge "Schulden von Gesamtrahmen" statt nur
+  // des bereits um die Restschuld reduzierten `creditLimit` zeigt.
+  const creditCapacityTotal = roundGaugeCash(creditLimit + outstandingDebt);
+  const creditUtilizationRatio =
+    creditCapacityTotal > 0 ? Math.max(0, Math.min(1, outstandingDebt / creditCapacityTotal)) : 0;
+
+  // Tilgung-vs-Cashflow (Grafik-Welle 2): dieselben Helper, die auch die
+  // Sponsoren-/KI-Kalkulation nutzt — keine eigene Wirtschaftslogik hier.
+  const annualLoanInstallment = getTeamAnnualLoanInstallment(gameState, teamId);
+  const annualSalaryTotal = getTeamDisplaySalaryTotal(gameState, teamId);
+  const annualFacilityUpkeep = getTeamFacilityUpkeepTotal(gameState, teamId);
+  const estimatedAnnualRevenue = estimateTeamAnnualRevenue(gameState, teamId);
+
   const teamCreditState: TeamCreditState = {
     teamId,
     creditLimit,
@@ -108,6 +134,12 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
     minTermSeasons: MIN_TERM_SEASONS,
     maxTermSeasons: MAX_TERM_SEASONS,
     activeLoans,
+    creditCapacityTotal,
+    creditUtilizationRatio,
+    annualLoanInstallment,
+    annualSalaryTotal,
+    annualFacilityUpkeep,
+    estimatedAnnualRevenue,
   };
 
   return { status: "ready", team: teamCreditState };
