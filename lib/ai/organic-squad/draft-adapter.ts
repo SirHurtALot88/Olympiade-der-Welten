@@ -355,6 +355,21 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
 const SELL_THRESHOLD = 0;
 
 /**
+ * RELAXED sell floor used ONLY while the roster still sits ABOVE the team's own optTarget (see the sell
+ * loop below). "Über-opt = Überschuss abschälen, Slot freimachen": a team above its opt is carrying
+ * surplus it doesn't need for its own (GM/identity-derived) target size, so it should shed weak/redundant
+ * bodies toward opt even when they don't clear the normal profit/coverage SELL_THRESHOLD — the freed slot
+ * and cash are the point, not a break-even sale. optTarget already encodes the archetype (elite_curator
+ * ~8, depth_spammer ~14), so shedding toward it is automatically identity-aware: a small-elite club sheds
+ * hard down to its lean core, a broad club barely sheds at all once it's within its own (larger) opt.
+ * Deliberately still a real floor, not -Infinity: a sole-coverage player or a key starter scores strongly
+ * negative sellUtility (large wWin·ΔStrength loss), well below this line, so the core and discipline
+ * coverage stay protected even under opt-surplus pressure — only genuinely weak/duplicated surplus clears
+ * it. Tuned empirically against the lean-transition harness (see draft-adapter tests / balancing notes).
+ */
+const OPT_SURPLUS_SELL_THRESHOLD = -18;
+
+/**
  * Small additive jitter (in sellUtility units) applied ONLY inside the greedy sell comparison, keyed by
  * `${draftSeed}:${playerId}` (hash-based, reproducible — no Math.random). Mirrors ORGANIC_DRAFT_JITTER
  * in draft-builder.ts but for the sell path, with its OWN env knob so buy/sell variance can be tuned
@@ -479,7 +494,14 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         best = view;
       }
     }
-    if (!best || bestUtility <= SELL_THRESHOLD) break;
+    // OPT-AWARE surplus shedding: while still ABOVE the team's own optTarget, use the relaxed
+    // OPT_SURPLUS_SELL_THRESHOLD so weak/redundant surplus goes even if it wouldn't clear a normal
+    // profit sell — this is what stops e.g. an elite_curator sitting at 11 with opt 8 from hoarding
+    // cash instead of shedding down to its lean core. Once at/below opt this reverts to the normal
+    // (stricter) SELL_THRESHOLD, so profit/coverage sells still work as before but nothing sheds BELOW
+    // opt on this pressure — refilling below opt is the buy side's job, not this loop's.
+    const threshold = held.length > ctx.weights.optTarget ? OPT_SURPLUS_SELL_THRESHOLD : SELL_THRESHOLD;
+    if (!best || bestUtility <= threshold) break;
 
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, best.marketValue);
