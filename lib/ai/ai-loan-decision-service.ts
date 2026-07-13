@@ -1,6 +1,6 @@
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 
-import { estimateUpgradeBuyFloorMw, isCashHoardingTeam, teamNeedsTransferBudgetDeploy } from "@/lib/ai/ai-budget-deploy-service";
+import { estimateUpgradeBuyFloorMw, isCashHoardingTeam, isStrategicHoardTeam } from "@/lib/ai/ai-budget-deploy-service";
 import { resolveTeamSpendableCashForPlanning } from "@/lib/ai/planner-cash-buffer-policy";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -128,7 +128,15 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const rosterGap = Math.max(0, playerOpt - rosterCount);
 
   if (rosterGap <= 0) return noLoan("no_need");
-  if (!teamNeedsTransferBudgetDeploy(gameState, teamId, seasonId)) return noLoan("no_need");
+  // Bedarf-Gate laut docs/design/kredit-system.md (Schritt 1 "Bedarf" + Schritt 2 "Finanzierungslücke"):
+  // Bedarf = Roster-Lücke bis Opt (rosterGap > 0) UND eine echte Finanzierungslücke (shortfall > 0, unten).
+  // NICHT teamNeedsTransferBudgetDeploy verwenden — das ist ein Überschuss-Deploy-Gate ("hat das Team
+  // genug freies Cash zum Ausgeben?") und schließt über `spendable < MIN` / `cash < 45` genau die
+  // cash-armen Unter-Opt-Teams aus, die einen Kredit am DRINGENDSTEN brauchen (empirisch: die tief unter
+  // Opt gefallenen ~0-Cash-Teams bekamen mit dem alten Gate `no_need` und blieben unter Min hängen).
+  // Reine Hort-Teams (Cash-Creator-Identität) borgen aus Charakter trotzdem nicht — die eine Ausnahme,
+  // die aus dem alten Gate erhalten bleibt.
+  if (isStrategicHoardTeam(gameState, teamId)) return noLoan("strategic_hoard");
 
   const needsEur = estimateRosterNeedEur(gameState, teamId);
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);

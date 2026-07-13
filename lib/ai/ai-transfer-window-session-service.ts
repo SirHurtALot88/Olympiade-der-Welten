@@ -18,8 +18,8 @@ import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-
 import { runPreseasonBatchPickRebuild } from "@/lib/ai/preseason-batch-pick-rebuild-service";
 import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
-import { resolveAiEarlyPayoffDecision } from "@/lib/ai/ai-loan-decision-service";
-import { applyEarlyPayoff } from "@/lib/finance/loan-service";
+import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { applyEarlyPayoff, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -617,6 +617,53 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     isUnifiedPickEnabledForMarket() &&
     preseasonBuyMode === "s1_draft_batch" &&
     !useOrganicEngine;
+
+  // Phase 2 KI-Anbindung — Kreditaufnahme im ORGANIC-Preseason (docs/design/kredit-system.md,
+  // "KI-Anbindung"): der Bank-/Team-Kredit-Hook lebt in runAiPicksExecutePreview (S1-Draft +
+  // Legacy-Batch-Rebuild), aber unter OLY_ORGANIC_SQUAD_BUILDER laufen die S2+ Preseason-Käufe durch
+  // runOrganicBuyCycle und umgehen diesen Pfad komplett — die KI würde also nie einen Kredit aufnehmen,
+  // egal wie knapp die Kasse ist. Dieser Pass schließt die Lücke: EINMALIG pro Team, VOR den Kaufzyklen,
+  // bedarfsgetrieben (resolveAiLoanDecision: Roster < Opt + Cash-Lücke + Kapazität frei, Season 1 hart
+  // ausgenommen). Das geliehene Cash wird in die Session (persist + sessionRunContext.save) geschrieben,
+  // damit die anschließende Kaufschleife das erhöhte Budget sieht. Nur im Organic-Pfad, damit es sich
+  // nicht mit dem Batch-Hook (der bereits über runAiPicksExecutePreview leiht) doppelt.
+  if (useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun) {
+    const borrowSave = readLiveSave();
+    if (borrowSave) {
+      const borrowTeamIds = scopeTeam(borrowSave.gameState.teams.map((team) => team.teamId)).filter(
+        (teamId) => (getTeamControlSettings(borrowSave!.gameState, teamId)?.controlMode ?? "ai") === "ai",
+      );
+      for (const teamId of borrowTeamIds) {
+        const current = readLiveSave();
+        if (!current) break;
+        const loanDecision = resolveAiLoanDecision(current.gameState, teamId);
+        if (!loanDecision.shouldBorrow) continue;
+        // Günstigstes Angebot (Bank oder Team); buildLoanOffers ist aufsteigend nach Zinssatz sortiert
+        // und enthält immer die Bank, es gibt also mindestens ein Angebot.
+        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+        const bestOffer = offers[0] ?? null;
+        const loanResult = originateLoan(
+          current.gameState,
+          {
+            borrowerTeamId: teamId,
+            principal: loanDecision.loanAmount,
+            termSeasons: loanDecision.termSeasons,
+            lenderType: bestOffer?.lenderType ?? "bank",
+            lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
+          },
+          { execute: true },
+        );
+        if (!loanResult.ok) continue;
+        const persisted = persistence.saveSingleplayerState(input.saveId, loanResult.gameState);
+        if (sessionRunContext) {
+          // Nur Cash + seasonState.loans ändern sich — die Free-Agent-/Player-Caches des RunContext
+          // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
+          sessionRunContext.save = persisted;
+        }
+        warnings.push(`ai_loan_borrow:${teamId}:${loanDecision.loanAmount}:${loanDecision.termSeasons}s`);
+      }
+    }
+  }
 
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();
