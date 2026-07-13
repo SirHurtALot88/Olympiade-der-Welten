@@ -13264,58 +13264,74 @@ a {
     0 0 16px color-mix(in srgb, var(--discipline-area-accent) 42%, transparent);
 }
 
-.player-drawer-axis-detail-panel {
+/* Achsen-KPI-Karte konsolidiert (Space-Saving statt separater "Top-
+   Disziplinen"-Tabelle + Achsen-"Detail"-Tabelle): Top-5-Diszis dieser Achse
+   als kompakte Mini-Bar-Zeilen direkt in der Karte, PPs-All-Time steckt in
+   `.player-drawer-category-meta` (siehe oben). */
+.player-drawer-axis-discipline-list {
   display: grid;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    rgba(10, 13, 19, 0.72);
+  gap: 5px;
+  margin-top: 4px;
 }
 
-.player-drawer-axis-detail-panel.is-power {
-  border-color: rgba(214, 87, 77, 0.36);
+.player-drawer-axis-discipline-row {
+  display: grid;
+  gap: 2px;
 }
 
-.player-drawer-axis-detail-panel.is-speed {
-  border-color: rgba(105, 184, 100, 0.36);
-}
-
-.player-drawer-axis-detail-panel.is-mental {
-  border-color: rgba(109, 157, 240, 0.36);
-}
-
-.player-drawer-axis-detail-panel.is-social {
-  border-color: rgba(226, 186, 87, 0.38);
-}
-
-.player-drawer-axis-detail-header {
+.player-drawer-axis-discipline-row-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
+  font-size: 0.72rem;
 }
 
-.player-drawer-axis-detail-header h4 {
-  margin: 0;
-  font-size: 1.05rem;
+.player-drawer-axis-discipline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(230, 237, 249, 0.88);
 }
 
-.player-drawer-axis-detail-header p {
-  margin: 3px 0 0;
-  color: var(--muted);
-}
-
-.player-drawer-axis-detail-table-shell {
-  max-height: 260px;
-}
-
-.player-drawer-axis-detail-table th,
-.player-drawer-axis-detail-table td {
+.player-drawer-axis-discipline-label .discipline-icon-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.player-drawer-axis-discipline-count {
+  flex: 0 0 auto;
+  color: rgba(214, 223, 241, 0.62);
+  font-weight: 700;
+}
+
+.player-drawer-axis-discipline-value {
+  flex: 0 0 auto;
+  color: #f7fbff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-drawer-axis-discipline-meter {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-drawer-axis-discipline-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.74));
+}
+
+.player-drawer-axis-discipline-empty {
+  font-size: 0.72rem;
 }
 
 .player-drawer-two-column-grid {
