@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
-import { NlCard, StatChip, StatChipRow, formatNlMoney } from "@/components/foundation/new-look";
+import { NL_TONE_VAR, NlCard, StatChip, formatNlMoney, type NlTone } from "@/components/foundation/new-look";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildLoanOffers, computeLoanTerms, type LoanOffer } from "@/lib/finance/loan-service";
@@ -40,6 +40,252 @@ function formatRateRange(minRate: number, maxRate: number): string {
   const low = Math.min(minRate, maxRate);
   const high = Math.max(minRate, maxRate);
   return `${formatRate(low)} – ${formatRate(high)}`;
+}
+
+/** Grün/Amber/Rot-Ton nach Anteil (0..1) — geteilte Schwelle für Gauge, Slider und Belastungs-Badge. */
+function riskTone(ratio: number): NlTone {
+  const safeRatio = Number.isFinite(ratio) ? ratio : 0;
+  if (safeRatio >= 0.85) return "risk";
+  if (safeRatio >= 0.6) return "warn";
+  return "good";
+}
+
+// --- Kreditrahmen-Gauge (Grafik-Welle 2) ------------------------------
+// Handgerolltes, halbkreisförmiges SVG-Gauge, gleiche Bogen-Geometrie-Schule
+// wie `NlGauge` (siehe components/foundation/new-look/NlGauge.tsx), aber ein
+// echter 180°-Halbkreis (flache Grundlinie) statt des 240°-Bogens dort, plus
+// bandierte Zonen (grün/amber/rot) statt eines einfarbigen Tracks — die Kredite-
+// Ansicht bekommt hier bewusst ihre eigene, "cockpit"-artige Variante.
+const GAUGE_W = 220;
+const GAUGE_H = 132;
+const GAUGE_CENTER_X = 110;
+const GAUGE_CENTER_Y = 112;
+const GAUGE_RADIUS = 92;
+const GAUGE_STROKE = 16;
+const GAUGE_START_DEG = -90;
+const GAUGE_SWEEP_DEG = 180;
+const GAUGE_WARN_RATIO = 0.6;
+const GAUGE_DANGER_RATIO = 0.85;
+const GAUGE_ZONE_COLORS = ["var(--heat-good-bg)", "var(--heat-neutral-bg)", "var(--heat-danger-light-bg)"];
+
+function gaugePolarPoint(angleDeg: number) {
+  const rad = ((angleDeg - 90) * Math.PI) / 180;
+  return {
+    x: GAUGE_CENTER_X + GAUGE_RADIUS * Math.cos(rad),
+    y: GAUGE_CENTER_Y + GAUGE_RADIUS * Math.sin(rad),
+  };
+}
+
+function gaugeArcPath(startDeg: number, endDeg: number): string {
+  const start = gaugePolarPoint(startDeg);
+  const end = gaugePolarPoint(endDeg);
+  const largeArc = endDeg - startDeg > 180 ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${GAUGE_RADIUS} ${GAUGE_RADIUS} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+/**
+ * Hero-Gauge: Schulden vs. Bank-Kreditrahmen (`creditCapacityTotal`,
+ * `creditUtilizationRatio` aus dem View-Model). Bogenfarbe folgt der
+ * Auslastung (grün → amber → rot), der Bogen selbst bleibt in einem
+ * grün/amber/rot-bandierten Track sichtbar, damit die Zonen auch ohne
+ * Bewegung erkennbar sind ("Cockpit"-Charakter statt Excel-Zeile).
+ */
+function CreditUtilizationGauge({ outstanding, capacity, ratio }: { outstanding: number; capacity: number; ratio: number }) {
+  const safeRatio = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+  const tone = riskTone(safeRatio);
+  const endDeg = GAUGE_START_DEG + Math.max(safeRatio * GAUGE_SWEEP_DEG, 0.001);
+  const needle = gaugePolarPoint(endDeg);
+  const pct = Math.round(safeRatio * 1000) / 10;
+  const zoneBounds = [0, GAUGE_WARN_RATIO, GAUGE_DANGER_RATIO, 1];
+  const ariaLabel = `Kreditrahmen-Auslastung: ${formatNlMoney(outstanding)} Schulden von ${formatNlMoney(capacity)} Bank-Rahmen, ${pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+
+  return (
+    <div className="nl-credits-gauge" role="img" aria-label={ariaLabel} title={ariaLabel}>
+      <svg viewBox={`0 0 ${GAUGE_W} ${GAUGE_H}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        {zoneBounds.slice(0, -1).map((from, index) => (
+          <path
+            key={`zone-${index}`}
+            d={gaugeArcPath(GAUGE_START_DEG + from * GAUGE_SWEEP_DEG, GAUGE_START_DEG + zoneBounds[index + 1] * GAUGE_SWEEP_DEG)}
+            className="nl-credits-gauge-zone"
+            fill="none"
+            stroke={GAUGE_ZONE_COLORS[index]}
+            strokeWidth={GAUGE_STROKE}
+          />
+        ))}
+        <path
+          d={gaugeArcPath(GAUGE_START_DEG, endDeg)}
+          className="nl-credits-gauge-fill"
+          fill="none"
+          stroke={NL_TONE_VAR[tone]}
+          strokeWidth={GAUGE_STROKE}
+          strokeLinecap="round"
+        />
+        <circle cx={needle.x} cy={needle.y} r={GAUGE_STROKE * 0.55} className="nl-credits-gauge-needle" fill={NL_TONE_VAR[tone]} />
+      </svg>
+      <div className="nl-credits-gauge-copy">
+        <span className="nl-credits-gauge-value nl-tnum">{pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%</span>
+        <span className="nl-credits-gauge-label">Auslastung</span>
+        <span className="nl-credits-gauge-sub nl-tnum">
+          {formatNlMoney(outstanding)} / {formatNlMoney(capacity)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// --- Tilgung-vs-Cashflow (Grafik-Welle 2) -----------------------------
+// Gestapelter Belastungs-Balken: Kreditrate (hervorgehoben) + Gehälter +
+// Gebäude-Unterhalt, optional mit Einnahmen-Marker. Degradiert bewusst
+// graceful, siehe Kommentare unten (nie ein All-Null/NaN-Chart rendern).
+const BURDEN_W = 320;
+const BURDEN_H = 60;
+const BURDEN_PAD_X = 10;
+const BURDEN_BAR_Y = 16;
+const BURDEN_BAR_H = 22;
+/** Anteil der Kreditrate am Cash, ab dem ohne Einnahmen-Referenz die "Belastung"-Warnung greift. */
+const BURDEN_CASH_SHARE_DANGER = 0.25;
+
+type BurdenSegment = { key: string; label: string; value: number; color: string };
+
+function LoanBurdenChart({
+  installment,
+  salary,
+  upkeep,
+  revenue,
+  cash,
+}: {
+  installment: number;
+  salary: number;
+  upkeep: number;
+  revenue: number;
+  cash: number;
+}) {
+  const safe = (value: number) => (Number.isFinite(value) ? Math.max(0, value) : 0);
+  const segments: BurdenSegment[] = [
+    { key: "loan", label: "Kreditraten", value: safe(installment), color: NL_TONE_VAR.risk },
+    { key: "salary", label: "Gehälter", value: safe(salary), color: NL_TONE_VAR.men },
+    { key: "upkeep", label: "Gebäude-Unterhalt", value: safe(upkeep), color: NL_TONE_VAR.soc },
+  ];
+  const total = segments.reduce((sum, seg) => sum + seg.value, 0);
+  const safeRevenue = safe(revenue);
+  const safeCash = safe(cash);
+
+  // Nie ein All-Null/NaN-Chart rendern (z. B. Team ohne Kredit, Gehälter UND
+  // Gebäude) — stattdessen ein knapper Fallback statt eines leeren SVGs.
+  if (total <= 0) {
+    return <p className="nl-credits-burden-empty muted">Keine laufenden Ausgaben bekannt.</p>;
+  }
+
+  const hasIncome = safeRevenue > 0;
+  const scale = Math.max(total, safeRevenue, 0.0001);
+  const barWidth = BURDEN_W - BURDEN_PAD_X * 2;
+  let cursor = BURDEN_PAD_X;
+  const rects = segments
+    .filter((seg) => seg.value > 0)
+    .map((seg) => {
+      const width = (seg.value / scale) * barWidth;
+      const rect = { ...seg, x: cursor, width };
+      cursor += width;
+      return rect;
+    });
+  const incomeX = hasIncome ? BURDEN_PAD_X + Math.min(1, safeRevenue / scale) * barWidth : null;
+  const covered = hasIncome && safeRevenue >= total;
+
+  // Ohne verlässliche Einnahmen (oft 0 vor Sponsorvertrag/Season 1, siehe
+  // `estimateTeamAnnualRevenue`) statt eines kaputten/leeren Einnahmen-
+  // Overlays lieber die Cash-Belastung der Kreditrate selbst bewerten.
+  const cashShare = safeCash > 0 ? installment / safeCash : installment > 0 ? 1 : 0;
+  const isDanger = !hasIncome && cashShare >= BURDEN_CASH_SHARE_DANGER;
+
+  const ariaLabel =
+    `Jährliche Belastung: ${formatNlMoney(installment)} Kreditrate, ${formatNlMoney(salary)} Gehälter, ` +
+    `${formatNlMoney(upkeep)} Gebäude-Unterhalt, Summe ${formatNlMoney(total)}` +
+    (hasIncome ? `, Einnahmen ${formatNlMoney(safeRevenue)}` : "");
+
+  return (
+    <div className={`nl-credits-burden${isDanger ? " is-danger" : ""}`} data-testid="nl-credits-burden-chart">
+      <svg
+        className="nl-credits-burden-chart"
+        viewBox={`0 0 ${BURDEN_W} ${BURDEN_H}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <rect x={BURDEN_PAD_X} y={BURDEN_BAR_Y} width={barWidth} height={BURDEN_BAR_H} rx={6} className="nl-credits-burden-track" />
+        {rects.map((rect) => (
+          <rect
+            key={rect.key}
+            x={rect.x}
+            y={BURDEN_BAR_Y}
+            width={Math.max(0, rect.width)}
+            height={BURDEN_BAR_H}
+            fill={rect.color}
+            className={`nl-credits-burden-seg${rect.key === "loan" ? " is-loan" : ""}`}
+          >
+            <title>
+              {rect.label}: {formatNlMoney(rect.value)}
+            </title>
+          </rect>
+        ))}
+        {hasIncome && incomeX != null ? (
+          <g className="nl-credits-burden-marker">
+            <line x1={incomeX} y1={BURDEN_BAR_Y - 6} x2={incomeX} y2={BURDEN_BAR_Y + BURDEN_BAR_H + 6} />
+            <text x={incomeX} y={BURDEN_BAR_Y - 9} textAnchor="middle">
+              Einnahmen
+            </text>
+          </g>
+        ) : null}
+      </svg>
+      <div className="nl-credits-burden-legend">
+        {segments.map((seg) => (
+          <span key={seg.key} className="nl-credits-burden-legend-item">
+            <span className="nl-credits-burden-legend-dot" style={{ background: seg.color }} aria-hidden="true" />
+            <span className="nl-credits-burden-legend-label">{seg.label}</span>
+            <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(seg.value)}</span>
+          </span>
+        ))}
+        <span className="nl-credits-burden-legend-item is-total">
+          <span className="nl-credits-burden-legend-label">Summe</span>
+          <span className="nl-credits-burden-legend-value nl-tnum">{formatNlMoney(total)}</span>
+        </span>
+        {hasIncome ? (
+          <span className={`nl-credits-burden-badge ${covered ? "is-good" : "is-risk"}`}>{covered ? "Gedeckt" : "Deckungslücke"}</span>
+        ) : isDanger ? (
+          <span className="nl-credits-burden-badge is-risk">Belastung</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// --- Season-1 Vault-Empty-State (Grafik-Welle 2) -----------------------
+// Reines inline-SVG, kein externes Asset: Tresor-Rad + Vorhängeschloss-
+// Badge statt der früheren zwei grauen Textboxen.
+const VAULT_SPOKE_ANGLES = [0, 60, 120, 180, 240, 300];
+
+function LockedVaultIllustration() {
+  const cx = 60;
+  const cy = 58;
+  const spokeInner = 15;
+  const spokeOuter = 42;
+  return (
+    <svg className="nl-credits-vault" viewBox="0 0 120 116" aria-hidden="true">
+      <circle cx={cx} cy={cy} r={48} className="nl-credits-vault-rim" />
+      {VAULT_SPOKE_ANGLES.map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        const x1 = cx + spokeInner * Math.cos(rad);
+        const y1 = cy + spokeInner * Math.sin(rad);
+        const x2 = cx + spokeOuter * Math.cos(rad);
+        const y2 = cy + spokeOuter * Math.sin(rad);
+        return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} className="nl-credits-vault-spoke" />;
+      })}
+      <circle cx={cx} cy={cy} r={15} className="nl-credits-vault-hub" />
+      <g className="nl-credits-vault-lock" transform="translate(84, 84)">
+        <path d="M -8 1 A 8 8 0 0 1 8 1" className="nl-credits-vault-lock-shackle" fill="none" />
+        <rect x={-10} y={0} width={20} height={15} rx={4} className="nl-credits-vault-lock-body" />
+      </g>
+    </svg>
+  );
 }
 
 /** Deutschsprachige Erklärung für die vom Server/Service gemeldeten `reason`-Codes. */
@@ -123,6 +369,7 @@ function LoanOfferCard({
   amount,
   termSeasons,
   isBest,
+  amountTone,
   onBorrow,
 }: {
   offer: LoanOffer;
@@ -132,6 +379,8 @@ function LoanOfferCard({
   termSeasons: number;
   /** Erstes (günstigstes) Angebot, nur wenn mehr als eines existiert. */
   isBest: boolean;
+  /** Slider-Farbfeedback (siehe `riskTone`) — färbt den Zinssatz nach Anteil der Kreditsumme am Rahmen ein. */
+  amountTone: NlTone;
   onBorrow: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -188,7 +437,9 @@ function LoanOfferCard({
         ) : null}
       </div>
 
-      <div className="nl-credits-offer-rate nl-tnum">{formatRate(offer.interestRatePerSeason)}</div>
+      <div className="nl-credits-offer-rate nl-tnum" style={{ color: NL_TONE_VAR[amountTone] }}>
+        {formatRate(offer.interestRatePerSeason)}
+      </div>
 
       <div className="nl-credits-offer-stats">
         <div className="nl-credits-offer-stat">
@@ -260,6 +511,13 @@ function LoanOfferFilterPanel({
 }) {
   const maxAmount = Math.max(0, team.maxOfferAmount);
   const sliderStep = maxAmount > 0 ? Math.max(0.1, Math.round((maxAmount / 200) * 10) / 10) : 0.1;
+  // Slider-Farbfeedback (Grafik-Welle 2): reiner Anteils-Wert, keine eigene
+  // Wirtschaftslogik — färbt Slider-Füllung, Betragsfeld und Prozent-Chip
+  // grün→amber→rot je näher der Betrag an `maxOfferAmount` heranrückt.
+  const amountFraction = maxAmount > 0 ? Math.max(0, Math.min(1, amount / maxAmount)) : 0;
+  const amountTone = riskTone(amountFraction);
+  const amountToneColor = NL_TONE_VAR[amountTone];
+  const amountPct = Math.round(amountFraction * 100);
 
   return (
     <NlCard className="nl-credits-borrow-card" eyebrow="Kredit-Filter" title="Kreditsumme & Laufzeit wählen">
@@ -276,8 +534,12 @@ function LoanOfferFilterPanel({
             onChange={(event) => onAmountChange(Number(event.target.value))}
             aria-label="Kreditsumme (Slider)"
             data-testid="nl-credits-principal-slider"
+            style={{
+              accentColor: amountToneColor,
+              background: `linear-gradient(90deg, ${amountToneColor} ${amountPct}%, var(--nl-line) ${amountPct}%)`,
+            }}
           />
-          <div className="nl-credits-amount-field">
+          <div className="nl-credits-amount-field" style={{ borderColor: maxAmount > 0 ? amountToneColor : undefined }}>
             <input
               type="number"
               className="nl-credits-amount-input nl-tnum"
@@ -290,9 +552,20 @@ function LoanOfferFilterPanel({
               onBlur={onAmountBlur}
               aria-label="Kreditsumme (genauer Betrag, Mio.)"
               data-testid="nl-credits-principal-input"
+              style={{ color: maxAmount > 0 ? amountToneColor : undefined }}
             />
             <span className="nl-credits-amount-unit">Mio.</span>
           </div>
+          {maxAmount > 0 ? (
+            <span
+              className="nl-credits-amount-tier nl-tnum"
+              style={{ color: amountToneColor, borderColor: amountToneColor }}
+              title="Anteil der Kreditsumme am größten verfügbaren Angebot"
+              data-testid="nl-credits-amount-tier"
+            >
+              {amountPct}% des Rahmens
+            </span>
+          ) : null}
         </div>
         <div className="nl-credits-amount-range">
           <span>0</span>
@@ -510,6 +783,11 @@ export default function FoundationCreditsNewLook({
   }, [gameState, team, teamId, amount, termSeasons, adminOverride]);
 
   const isSeasonOneBlocked = team?.borrowBlockedReason === "season_one";
+  // Kredite ohne aktive Kredite in Season 1 → ein einzelner Tresor-Empty-State
+  // statt zweier grauer Boxen (Angebots-Sperre + leere Aktive-Kredite-Tabelle),
+  // siehe `LockedVaultIllustration`. Admin-Override kann in Season 1 trotzdem
+  // Kredite anlegen — bleiben die dann sichtbar, zeigt die normale Tabelle.
+  const showVaultEmptyState = isSeasonOneBlocked && (team?.activeLoans.length ?? 0) === 0;
 
   const rateRange = team
     ? formatRateRange(
@@ -517,6 +795,11 @@ export default function FoundationCreditsNewLook({
         computeLoanTerms({ principal: 1, termSeasons: team.maxTermSeasons, finances: team.finances }).interestRatePerSeason,
       )
     : "—";
+
+  // Slider-Farbfeedback (Grafik-Welle 2), gespiegelt auf den Zinssatz jeder
+  // Angebotskarte — reiner Anteils-Wert, keine eigene Wirtschaftslogik.
+  const amountFraction = maxAmount > 0 ? Math.max(0, Math.min(1, amount / maxAmount)) : 0;
+  const amountTone = riskTone(amountFraction);
 
   return (
     <div className="nl-credits" data-testid="foundation-credits" data-new-look="true">
@@ -530,12 +813,43 @@ export default function FoundationCreditsNewLook({
         />
       ) : null}
 
-      <StatChipRow className="nl-credits-kpi-row" aria-label="Kredit-Kennzahlen">
-        <StatChip label="Kreditrahmen" value={team ? formatNlMoney(team.creditLimit) : "—"} tone="neutral" />
-        <StatChip label="Schulden" value={team ? formatNlMoney(team.outstandingDebt) : "—"} tone="neutral" />
-        <StatChip label="Cash" value={team ? formatNlMoney(team.cash) : "—"} tone="neutral" />
-        <StatChip label="Zins-Range" value={rateRange} tone="neutral" />
-      </StatChipRow>
+      {team ? (
+        <NlCard
+          className="nl-credits-gauge-card"
+          eyebrow="Kreditrahmen"
+          title="Auslastung"
+          data-testid="nl-credits-gauge-card"
+        >
+          <div className="nl-credits-gauge-row">
+            <CreditUtilizationGauge
+              outstanding={team.outstandingDebt}
+              capacity={team.creditCapacityTotal}
+              ratio={team.creditUtilizationRatio}
+            />
+            <div className="nl-credits-gauge-stats">
+              <StatChip label="Cash" value={formatNlMoney(team.cash)} tone="neutral" />
+              <StatChip label="Zins-Range" value={rateRange} tone="neutral" />
+            </div>
+          </div>
+        </NlCard>
+      ) : null}
+
+      {team ? (
+        <NlCard
+          className="nl-credits-burden-card"
+          eyebrow="Tilgung vs. Cashflow"
+          title="Jährliche Belastung"
+          data-testid="nl-credits-burden-card"
+        >
+          <LoanBurdenChart
+            installment={team.annualLoanInstallment}
+            salary={team.annualSalaryTotal}
+            upkeep={team.annualFacilityUpkeep}
+            revenue={team.estimatedAnnualRevenue}
+            cash={team.cash}
+          />
+        </NlCard>
+      ) : null}
 
       <div className="nl-credits-admin-toggle" data-testid="nl-credits-admin-toggle">
         <label className="nl-credits-admin-toggle-label">
@@ -589,6 +903,7 @@ export default function FoundationCreditsNewLook({
                     amount={amount}
                     termSeasons={termSeasons}
                     isBest={index === 0 && offers.length > 1}
+                    amountTone={amountTone}
                     onBorrow={onBorrow}
                   />
                 ))}
@@ -598,6 +913,18 @@ export default function FoundationCreditsNewLook({
             )}
           </NlCard>
         </>
+      ) : team && showVaultEmptyState ? (
+        <NlCard
+          className="nl-credits-vault-card"
+          eyebrow="Neuer Kredit"
+          title="Kredit-Tresor gesperrt"
+          data-testid="nl-credits-vault-card"
+        >
+          <div className="nl-credits-vault-wrap">
+            <LockedVaultIllustration />
+            <span className="nl-credits-vault-chip">Ab Season 2</span>
+          </div>
+        </NlCard>
       ) : team ? (
         <NlCard
           className="nl-credits-blocked-card"
@@ -614,55 +941,57 @@ export default function FoundationCreditsNewLook({
         </NlCard>
       ) : null}
 
-      <NlCard className="nl-credits-active-card" eyebrow="Kredite" title="Aktive Kredite">
-        {team && team.activeLoans.length > 0 ? (
-          <>
-            <div className="nl-credits-table-shell">
-              <table className="nl-credits-table" data-testid="nl-credits-active-loans-table">
-                <thead>
-                  <tr>
-                    <th>Kredit</th>
-                    <th>Verleiher</th>
-                    <th>Aufgenommen</th>
-                    <th>Restschuld</th>
-                    <th>Zinssatz</th>
-                    <th>Restlaufzeit</th>
-                    <th>Jahresrate</th>
-                    <th>Aktion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {team.activeLoans.map((loan, index) => (
-                    <tr key={loan.id}>
-                      <td>Kredit {index + 1}</td>
-                      <td>{loan.lenderName}</td>
-                      <td className="nl-tnum">{formatNlMoney(loan.principal)}</td>
-                      <td className="nl-tnum">{formatNlMoney(loan.outstanding)}</td>
-                      <td className="nl-tnum">{formatRate(loan.interestRate)}</td>
-                      <td className="nl-tnum">
-                        {loan.remainingSeasons} / {loan.termSeasons} Saisons
-                      </td>
-                      <td className="nl-tnum">{formatNlMoney(loan.nextInstalment)}</td>
-                      <td>
-                        <LoanEarlyPayoffAction
-                          loan={loan}
-                          canEarlyPayoff={team.canEarlyPayoff}
-                          onEarlyPayoff={onEarlyPayoff}
-                        />
-                      </td>
+      {showVaultEmptyState ? null : (
+        <NlCard className="nl-credits-active-card" eyebrow="Kredite" title="Aktive Kredite">
+          {team && team.activeLoans.length > 0 ? (
+            <>
+              <div className="nl-credits-table-shell">
+                <table className="nl-credits-table" data-testid="nl-credits-active-loans-table">
+                  <thead>
+                    <tr>
+                      <th>Kredit</th>
+                      <th>Verleiher</th>
+                      <th>Aufgenommen</th>
+                      <th>Restschuld</th>
+                      <th>Zinssatz</th>
+                      <th>Restlaufzeit</th>
+                      <th>Jahresrate</th>
+                      <th>Aktion</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="nl-credits-empty-text muted">
-              Die Jahresrate wird am Saisonabschluss automatisch von eurem Cash abgebucht — keine manuelle Tilgung nötig.
-            </p>
-          </>
-        ) : (
-          <p className="nl-credits-empty-text muted">Keine aktiven Kredite.</p>
-        )}
-      </NlCard>
+                  </thead>
+                  <tbody>
+                    {team.activeLoans.map((loan, index) => (
+                      <tr key={loan.id}>
+                        <td>Kredit {index + 1}</td>
+                        <td>{loan.lenderName}</td>
+                        <td className="nl-tnum">{formatNlMoney(loan.principal)}</td>
+                        <td className="nl-tnum">{formatNlMoney(loan.outstanding)}</td>
+                        <td className="nl-tnum">{formatRate(loan.interestRate)}</td>
+                        <td className="nl-tnum">
+                          {loan.remainingSeasons} / {loan.termSeasons} Saisons
+                        </td>
+                        <td className="nl-tnum">{formatNlMoney(loan.nextInstalment)}</td>
+                        <td>
+                          <LoanEarlyPayoffAction
+                            loan={loan}
+                            canEarlyPayoff={team.canEarlyPayoff}
+                            onEarlyPayoff={onEarlyPayoff}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="nl-credits-empty-text muted">
+                Die Jahresrate wird am Saisonabschluss automatisch von eurem Cash abgebucht — keine manuelle Tilgung nötig.
+              </p>
+            </>
+          ) : (
+            <p className="nl-credits-empty-text muted">Keine aktiven Kredite.</p>
+          )}
+        </NlCard>
+      )}
     </div>
   );
 }

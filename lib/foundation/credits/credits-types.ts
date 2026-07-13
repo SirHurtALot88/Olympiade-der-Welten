@@ -72,6 +72,27 @@ export type TeamCreditState = {
   minTermSeasons: number;
   maxTermSeasons: number;
   activeLoans: ActiveLoan[];
+
+  /**
+   * Rohe Bank-Gesamtkapazität (`creditLimit + outstandingDebt`, vor Abzug der
+   * Restschuld) — Hero-Gauge-Skala ("Kreditrahmen-Gauge"). 0 wenn beides 0
+   * ist (keine Division-durch-0 in der Gauge nötig, siehe dort).
+   */
+  creditCapacityTotal: number;
+  /**
+   * Auslastung des Bank-Rahmens (`outstandingDebt / creditCapacityTotal`),
+   * 0..1, 0 wenn `creditCapacityTotal` 0 ist. Treibt die Gauge-Farbe
+   * (grün→amber→rot) in `FoundationCreditsNewLook`.
+   */
+  creditUtilizationRatio: number;
+  /** Summe der jährlichen Kreditraten aller aktiven Kredite (`getTeamAnnualLoanInstallment`) — Belastungs-Chart. */
+  annualLoanInstallment: number;
+  /** Gehaltssumme des Kaders (`getTeamDisplaySalaryTotal`) — Belastungs-Chart. */
+  annualSalaryTotal: number;
+  /** Gebäude-Unterhalt aller gebauten Anlagen (`getTeamFacilityUpkeepTotal`) — Belastungs-Chart. */
+  annualFacilityUpkeep: number;
+  /** Einnahmen-Proxy (`estimateTeamAnnualRevenue`) — oft 0 vor Sponsorvertrag/Season 1, siehe dort. */
+  estimatedAnnualRevenue: number;
 };
 
 /** Discriminated view model consumed by the Credits UI. */
