@@ -506,7 +506,6 @@ export default function FoundationCreditsNewLook({
     if (!team || !teamId || amount <= 0) return [];
     return buildLoanOffers(gameState, teamId, amount, termSeasons, {
       allowSeason1: adminOverride,
-      ignoreRevenueCap: adminOverride,
     });
   }, [gameState, team, teamId, amount, termSeasons, adminOverride]);
 

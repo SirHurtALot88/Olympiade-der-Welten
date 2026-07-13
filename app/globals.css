@@ -44960,6 +44960,30 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+.is-new-look .nl-market-wishlist-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.is-new-look .nl-market-wishlist-year-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-wishlist-year-chip b {
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+
 .is-new-look .nl-market-wishlist-actions {
   display: flex;
   flex-direction: column;

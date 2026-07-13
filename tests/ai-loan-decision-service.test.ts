@@ -149,8 +149,8 @@ describe("resolveAiLoanDecision", () => {
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(true);
     expect(decision.loanAmount).toBeGreaterThan(0);
-    // capacity = min(0.15*cash + 0.30*marketValueTotal, 1.5*annualRevenue) - outstandingDebt
-    //          = min(0.15*60 + 0.30*120, 1.5*50) - 0 = min(9+36=45, 75) = 45
+    // capacity = 0.15*cash + 0.30*marketValueTotal - outstandingDebt
+    //          = 0.15*60 + 0.30*120 - 0 = 9+36 = 45
     expect(decision.loanAmount).toBeLessThanOrEqual(45);
     expect(decision.termSeasons).toBeGreaterThanOrEqual(1);
     expect(decision.termSeasons).toBeLessThanOrEqual(10);
@@ -169,8 +169,31 @@ describe("resolveAiLoanDecision", () => {
   });
 
   it("does not borrow when there is need and a cash gap but no borrowing capacity", () => {
-    // No sponsor revenue at all -> annualRevenue 0 -> revenue cap 0 -> capacity 0.
-    const gameState = buildTeamGameState({ cash: 60, rosterCount: 8, playerOpt: 12 });
+    // Capacity is now purely teamwert-based (cash + marketValueTotal), so zero revenue alone no
+    // longer zeroes it out — instead, exhaust the teamwertCap with existing debt: teamwertCap =
+    // 0.15*60 + 0.30*(8*15=120) = 45, and an outstanding loan of 100 already exceeds that, so
+    // capacity floors at 0.
+    const gameState = buildTeamGameState({
+      cash: 60,
+      rosterCount: 8,
+      playerOpt: 12,
+      loans: [
+        {
+          loanId: "loan-existing",
+          borrowerTeamId: "T-1",
+          lenderType: "bank",
+          principalOriginal: 100,
+          principalOutstanding: 100,
+          interestRatePerSeason: 0.1,
+          termSeasons: 5,
+          seasonsRemaining: 5,
+          installmentPerSeason: 10,
+          originatedSeasonId: "season-1",
+          status: "active",
+          missedPayments: 0,
+        },
+      ],
+    });
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("no_capacity");
