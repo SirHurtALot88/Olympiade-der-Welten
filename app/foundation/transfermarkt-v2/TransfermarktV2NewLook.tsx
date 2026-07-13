@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
@@ -38,7 +38,12 @@ import {
   type TransfermarktDisciplineTopSixImpactRow,
   type TransfermarktTopSixAxisImpactRow,
 } from "@/lib/market/transfermarkt-roster-impact";
-import { formatScoutedImpactDelta, isScoutedImpactExact } from "@/lib/market/transfermarkt-scouting";
+import {
+  buildTransfermarktScoutedAttributeRows,
+  formatScoutedImpactDelta,
+  isScoutedImpactExact,
+  type TransfermarktAttributeRatings,
+} from "@/lib/market/transfermarkt-scouting";
 
 /**
  * "Neuer Look" Transfermarkt — flag-gated, additiv.
@@ -103,6 +108,89 @@ const NL_AXIS_DISCIPLINE_CATEGORY: Record<NlAxisKey, DisciplineCategory> = {
   men: "mental",
   soc: "social",
 };
+
+/** Diszi-Kurzcodes für Balken-Labels (Spiegel von TransfermarktV2Client.DISCIPLINE_ABBREVIATIONS). */
+const NL_DISCIPLINE_ABBREVIATIONS: Record<string, string> = {
+  tdm: "TDM",
+  "mini-dm": "MDM",
+  gewichtheben: "GEW",
+  hockey: "HOC",
+  breaking: "BRE",
+  staffel: "STA",
+  staffellauf: "STA",
+  spurt: "SPU",
+  climbing: "CLM",
+  fechten: "FEC",
+  schach: "SCH",
+  "speed-schach": "SCH",
+  takeshi: "TAK",
+  "takeshis-castle": "TAK",
+  tennis: "TEN",
+  "time-trial": "TT",
+  timetrial: "TT",
+  "i-spy": "SPY",
+  wettessen: "WET",
+  basketball: "BAS",
+  football: "FOO",
+  battlefield: "BAT",
+  eiskunst: "EIS",
+  eiskunstlauf: "EIS",
+  showcase: "SHW",
+};
+
+function normalizeNlDisciplineLookup(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** Kurzcode statt abgeschnittenem Namen (Spiegel von TransfermarktV2Client.getDisciplineAbbreviation). */
+function getNlDisciplineAbbreviation(disciplineId: string | null | undefined, disciplineName: string | null | undefined) {
+  const byId = NL_DISCIPLINE_ABBREVIATIONS[normalizeNlDisciplineLookup(disciplineId)];
+  if (byId) {
+    return byId;
+  }
+  const byName = NL_DISCIPLINE_ABBREVIATIONS[normalizeNlDisciplineLookup(disciplineName)];
+  if (byName) {
+    return byName;
+  }
+  const raw = (disciplineName ?? disciplineId ?? "DIS").trim();
+  const compact = raw
+    .split(/[\s/-]+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 3).toUpperCase())
+    .join("");
+  return compact.slice(0, 4) || "DIS";
+}
+
+/** Feinattribut-Tiers je Kandidat (Spiegel von TransfermarktV2Client.getItemAttributeRatings). */
+function getNlAttributeRatings(item: TransfermarktFreeAgentItem): TransfermarktAttributeRatings {
+  return {
+    power: item.powerRating,
+    health: item.healthRating,
+    stamina: item.staminaRating,
+    intelligence: item.intelligenceRating,
+    awareness: item.awarenessRating,
+    determination: item.determinationRating,
+    speed: item.speedRating,
+    dexterity: item.dexterityRating,
+    charisma: item.charismaRating,
+    will: item.willRating,
+    spirit: item.spiritRating,
+    torment: item.tormentRating,
+  };
+}
+
+/** Enter/Space aktiviert die Kandidaten-Karte wie ein Klick (role="button"-Div, kein verschachteltes <button>). */
+function handleNlSelectKeyDown(event: KeyboardEvent<HTMLDivElement>, onActivate: () => void) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    onActivate();
+  }
+}
 
 /** Ø über echte Werte — null statt erfundener 0, wenn nichts vorliegt. */
 function nlAverage(values: number[]): number | null {
@@ -670,13 +758,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               const ratioTone = getNlRatioTone(item.marketValueSalaryRatio);
               const needTone = getNlNeedTone(item.needMatchScore);
               return (
-                <button
+                <div
                   key={item.playerId}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   data-testid="transfer-candidate-card"
                   className={`nl-market-candidate${isSelected ? " is-selected" : ""}`}
                   aria-selected={isSelected}
                   onClick={() => onSelectCandidate(item.playerId)}
+                  onKeyDown={(event) => handleNlSelectKeyDown(event, () => onSelectCandidate(item.playerId))}
                 >
                   <span className="nl-market-candidate-portrait" aria-hidden="true">
                     {portraitSrc ? (
@@ -686,7 +776,21 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     )}
                   </span>
                   <span className="nl-market-candidate-copy">
-                    <strong>{item.name}</strong>
+                    {onOpenPlayerDetails ? (
+                      <button
+                        type="button"
+                        className="nl-market-candidate-name"
+                        title={`${item.name} — Profil öffnen`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenPlayerDetails({ playerId: item.playerId });
+                        }}
+                      >
+                        {item.name}
+                      </button>
+                    ) : (
+                      <strong>{item.name}</strong>
+                    )}
                     <small>
                       {item.className} · {item.race}
                     </small>
@@ -717,7 +821,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
                     <small>OVR {formatNlNumber(item.ovr, 0)}</small>
                   </span>
-                </button>
+                </div>
               );
             })}
             {marketBusy && candidates.length === 0 ? (
@@ -738,7 +842,24 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           <NlCard
             className="nl-market-focus-card"
             eyebrow="Scouting-Profil"
-            title={selectedPlayer ? selectedPlayer.name : "Kandidat wählen"}
+            title={
+              selectedPlayer ? (
+                onOpenPlayerDetails ? (
+                  <button
+                    type="button"
+                    className="nl-market-focus-title-action"
+                    title={`${selectedPlayer.name} — Profil öffnen`}
+                    onClick={() => onOpenPlayerDetails({ playerId: selectedPlayer.playerId })}
+                  >
+                    {selectedPlayer.name}
+                  </button>
+                ) : (
+                  selectedPlayer.name
+                )
+              ) : (
+                "Kandidat wählen"
+              )
+            }
             actions={
               selectedPlayer && onOpenPlayerDetails ? (
                 <button
@@ -759,7 +880,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       const portrait = getTransfermarktPortraitModel(selectedPlayer);
                       const src = appendMediaImageVariant(portrait.src, "preview") ?? portrait.src;
                       return src ? (
-                        <OptimizedMediaImage src={src} alt="" width={132} height={132} className="nl-market-portrait-img" />
+                        <OptimizedMediaImage src={src} alt="" width={196} height={196} className="nl-market-portrait-img" />
                       ) : (
                         <span className="nl-market-portrait-initials">{portrait.initials}</span>
                       );
@@ -823,6 +944,39 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   })}
                 </div>
 
+                {/* Feinattribute (12) — nur wirklich freigeschaltete Werte (buildTransfermarktScoutedAttributeRows
+                    filtert nach Scouting-Level exakt wie im alten Look); kein Fog-Placeholder für Unbekanntes. */}
+                {(() => {
+                  const attributeRows = buildTransfermarktScoutedAttributeRows({
+                    ratings: getNlAttributeRatings(selectedPlayer),
+                    values: selectedPlayer.attributeStatValues ?? null,
+                    scoutingLevel: selectedPlayer.scoutingLevel,
+                    playerId: selectedPlayer.playerId,
+                  }).filter((row) => row.revealed);
+                  if (attributeRows.length === 0) {
+                    return null;
+                  }
+                  return (
+                    <div className="nl-market-fine-attrs" aria-label="Feinattribute">
+                      <span className="nl-market-eyebrow">Attribute</span>
+                      <div className="nl-market-fine-attr-grid">
+                        {attributeRows.map((row) => (
+                          <span
+                            key={`nl-fine-attr-${selectedPlayer.playerId}-${row.key}`}
+                            className={`nl-market-fine-attr-chip${row.ratingLabel ? ` ${getAttributeTierClass(row.ratingLabel)}` : ""}`}
+                            title={row.value != null ? `${row.label}: ${formatNlNumber(row.value, 0)}` : row.label}
+                          >
+                            <b>{row.label}</b>
+                            <span className="nl-tnum">
+                              {row.value != null ? formatNlNumber(row.value, 0) : row.ratingLabel ?? row.rangeLabel ?? "—"}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels). */}
                 {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay || selectedPlayer.developmentTrend ? (
                   <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
@@ -862,28 +1016,45 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </div>
                 ) : null}
 
-                {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore). */}
+                {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore).
+                    Kurzcode statt abgeschnittenem Namen + Teilnehmerzahl (entry.playerCount, gleiche Quelle
+                    wie im Spielerprofil über buildSeasonDisciplinePlayerCountMap). */}
                 {(() => {
-                  const disciplineBars = selectedPlayer.topDisciplineScores
+                  const scoutedTopDisciplines = selectedPlayer.topDisciplineScores
                     .filter(
                       (entry) => typeof entry.displayedScore === "number" && Number.isFinite(entry.displayedScore),
                     )
                     .slice(0, 5)
                     .map((entry) => ({
-                      label: entry.disciplineName.length > 7 ? `${entry.disciplineName.slice(0, 6)}…` : entry.disciplineName,
-                      value: entry.displayedScore as number,
-                      tone: "accent" as NlTone,
+                      abbr: getNlDisciplineAbbreviation(entry.disciplineId, entry.disciplineName),
+                      name: entry.disciplineName,
+                      playerCount: entry.playerCount,
+                      displayedScore: entry.displayedScore as number,
                     }));
-                  if (disciplineBars.length > 0) {
+                  if (scoutedTopDisciplines.length > 0) {
                     return (
                       <div className="nl-market-diszi-chart" aria-label="Top-Disziplinen des Kandidaten">
                         <span className="nl-market-eyebrow">Top-Disziplinen (gescoutet)</span>
                         <NlBarChart
-                          bars={disciplineBars}
+                          bars={scoutedTopDisciplines.map((entry) => ({
+                            label:
+                              typeof entry.playerCount === "number" && Number.isFinite(entry.playerCount)
+                                ? `${entry.abbr} (${entry.playerCount})`
+                                : entry.abbr,
+                            value: entry.displayedScore,
+                            tone: "accent" as NlTone,
+                          }))}
                           format={(value) => formatNlNumber(value, 0)}
                           aria-label={`${selectedPlayer.name} Top-Disziplinen`}
                           className="nl-market-diszi-barchart"
                         />
+                        <span className="nl-market-diszi-legend">
+                          {scoutedTopDisciplines.map((entry) => (
+                            <span key={`nl-diszi-legend-${entry.abbr}-${entry.name}`}>
+                              <b>{entry.abbr}</b> {entry.name}
+                            </span>
+                          ))}
+                        </span>
                       </div>
                     );
                   }

@@ -44836,6 +44836,11 @@ button.foundation-team-portrait-card {
   transform: translateY(-1px);
 }
 
+.is-new-look .nl-market-candidate:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
 .is-new-look .nl-market-candidate.is-selected {
   border-color: var(--nl-accent);
   background: linear-gradient(180deg, var(--nl-accent-soft), var(--nl-panel-2));
@@ -44855,8 +44860,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-focus-portrait {
-  width: 132px;
-  height: 132px;
+  width: 196px;
+  height: 196px;
 }
 
 .is-new-look .nl-market-portrait-img {
@@ -44879,11 +44884,37 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 
-.is-new-look .nl-market-candidate-copy strong {
+.is-new-look .nl-market-candidate-copy strong,
+.is-new-look .nl-market-candidate-name {
   font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.is-new-look .nl-market-candidate-name {
+  display: block;
+  max-width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--nl-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-candidate-name:hover,
+.is-new-look .nl-market-candidate-name:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.is-new-look .nl-market-candidate-name:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
 }
 
 .is-new-look .nl-market-candidate-copy small {
@@ -44927,10 +44958,36 @@ button.foundation-team-portrait-card {
 }
 
 /* Fokus-Panel */
+.is-new-look .nl-market-focus-card .nl-card-body {
+  gap: var(--nl-s4);
+}
+
 .is-new-look .nl-market-focus-head {
   display: flex;
-  gap: var(--nl-s3);
-  align-items: flex-start;
+  gap: var(--nl-s4);
+  align-items: center;
+}
+
+.is-new-look .nl-market-focus-title-action {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-focus-title-action:hover,
+.is-new-look .nl-market-focus-title-action:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.is-new-look .nl-market-focus-title-action:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
 }
 
 .is-new-look .nl-market-focus-copy {
@@ -53780,10 +53837,10 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-market-focus-radar {
   display: flex;
   justify-content: center;
-  margin: var(--nl-s2) 0;
+  margin: var(--nl-s3) 0;
 }
 .is-new-look .nl-market-focus-radar .nl-market-axis-radar {
-  width: 210px;
+  width: 280px;
   max-width: 100%;
 }
 
@@ -53816,26 +53873,26 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-market-attr-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   margin: var(--nl-s2) 0;
 }
 
 .is-new-look .nl-market-attr-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: var(--nl-r-pill);
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
   color: var(--nl-ink);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .is-new-look .nl-market-attr-chip b {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   color: inherit;
   opacity: 0.8;
@@ -53846,49 +53903,94 @@ span.nl-facility-ampel-chip {
   font-weight: 700;
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-splus {
+/* --- Feinattribute (12) — nur freigeschaltete Werte, gleiche Tier-Farben wie die Achsen-Chips --- */
+.is-new-look .nl-market-fine-attrs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  margin: var(--nl-s2) 0;
+}
+
+.is-new-look .nl-market-fine-attr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.is-new-look .nl-market-fine-attr-chip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-fine-attr-chip b {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-splus,
+.is-new-look .nl-market-fine-attr-chip.is-tier-splus {
   color: var(--heat-best-text);
   background: var(--heat-best-bg);
   border-color: rgba(230, 240, 255, 0.34);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-s {
+.is-new-look .nl-market-attr-chip.is-tier-s,
+.is-new-look .nl-market-fine-attr-chip.is-tier-s {
   color: var(--heat-elite-text);
   background: var(--heat-elite-bg);
   border-color: rgba(12, 21, 39, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-a {
+.is-new-look .nl-market-attr-chip.is-tier-a,
+.is-new-look .nl-market-fine-attr-chip.is-tier-a {
   color: var(--heat-strong-text);
   background: var(--heat-strong-bg);
   border-color: rgba(240, 255, 235, 0.22);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-b {
+.is-new-look .nl-market-attr-chip.is-tier-b,
+.is-new-look .nl-market-fine-attr-chip.is-tier-b {
   color: var(--heat-good-text);
   background: var(--heat-good-bg);
   border-color: rgba(20, 28, 20, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-c {
+.is-new-look .nl-market-attr-chip.is-tier-c,
+.is-new-look .nl-market-fine-attr-chip.is-tier-c {
   color: var(--heat-neutral-text);
   background: var(--heat-neutral-bg);
   border-color: rgba(42, 31, 8, 0.18);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-d {
+.is-new-look .nl-market-attr-chip.is-tier-d,
+.is-new-look .nl-market-fine-attr-chip.is-tier-d {
   color: var(--heat-risk-text);
   background: var(--heat-risk-bg);
   border-color: rgba(42, 31, 8, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-e {
+.is-new-look .nl-market-attr-chip.is-tier-e,
+.is-new-look .nl-market-fine-attr-chip.is-tier-e {
   color: var(--heat-danger-light-text);
   background: var(--heat-danger-light-bg);
   border-color: rgba(42, 18, 14, 0.2);
 }
 
-.is-new-look .nl-market-attr-chip.is-tier-f {
+.is-new-look .nl-market-attr-chip.is-tier-f,
+.is-new-look .nl-market-fine-attr-chip.is-tier-f {
   color: var(--heat-danger-text);
   background: var(--heat-danger-bg);
   border-color: rgba(255, 220, 220, 0.18);
@@ -53898,12 +54000,24 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-market-diszi-chart {
   display: flex;
   flex-direction: column;
-  gap: var(--nl-s1);
+  gap: var(--nl-s2);
   margin-top: var(--nl-s2);
 }
 .is-new-look .nl-market-diszi-chart .nl-market-diszi-barchart {
   width: 100%;
-  max-width: 340px;
+  max-width: 460px;
+}
+.is-new-look .nl-market-diszi-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-market-diszi-legend b {
+  color: var(--nl-ink);
+  font-weight: 700;
+  margin-right: 3px;
 }
 .is-new-look .nl-market-diszi-hint {
   margin-top: var(--nl-s2);
