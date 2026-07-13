@@ -16,7 +16,7 @@ import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-va
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
-import { originateLoan } from "@/lib/finance/loan-service";
+import { buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 
 import { isAiPickResettableSource } from "@/lib/ai/ai-pick-audit-reset-contract";
 import {
@@ -3489,9 +3489,21 @@ export async function runAiPicksExecutePreview(
     let preseasonLoanSave = latestSave;
     const loanDecision = resolveAiLoanDecision(latestSave.gameState, latestTeam.teamId);
     if (loanDecision.shouldBorrow) {
+      // Phase 3 (docs/design/kredit-system.md, "Team-zu-Team-Kredite"): die KI leiht sich gegen
+      // das guenstigste verfuegbare Angebot (Bank oder Team) statt immer nur bei der Bank -
+      // buildLoanOffers ist bereits aufsteigend nach Zinssatz sortiert, die Bank ist immer
+      // enthalten, daher gibt es hier immer mindestens ein Angebot.
+      const offers = buildLoanOffers(latestSave.gameState, latestTeam.teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+      const bestOffer = offers[0] ?? null;
       const loanResult = originateLoan(
         latestSave.gameState,
-        { borrowerTeamId: latestTeam.teamId, principal: loanDecision.loanAmount, termSeasons: loanDecision.termSeasons },
+        {
+          borrowerTeamId: latestTeam.teamId,
+          principal: loanDecision.loanAmount,
+          termSeasons: loanDecision.termSeasons,
+          lenderType: bestOffer?.lenderType ?? "bank",
+          lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
+        },
         { execute: true },
       );
       if (loanResult.ok) {
