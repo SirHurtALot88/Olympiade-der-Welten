@@ -877,6 +877,19 @@ export default function SeasonStandingsNewLook({
                 title={`${player.name} öffnen`}
               >
                 <span className="nl-standings-player-rank nl-tnum">#{player.rank}</span>
+                <BudgetedMediaImage
+                  src={player.portraitUrl}
+                  alt={`${player.name} Portrait`}
+                  className="nl-standings-player-portrait"
+                  width={30}
+                  height={30}
+                  loading="lazy"
+                  fallback={
+                    <span className="nl-standings-player-portrait nl-standings-player-portrait-fallback" aria-hidden="true">
+                      {player.portraitInitials}
+                    </span>
+                  }
+                />
                 <span className="nl-standings-player-copy">
                   <span className="nl-standings-player-name">{player.name}</span>
                   <span className="nl-standings-player-team">{player.teamCode ?? player.teamName ?? "—"}</span>
