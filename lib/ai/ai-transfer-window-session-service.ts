@@ -435,8 +435,13 @@ async function runTeamCycle(input: {
     // from there. Because this cycle only buys, the roster can only GROW here, so a preseason buy pass can
     // never shrink a team below the count it needs to field a lineup (that guarantee is what makes
     // autoprep's teams_under_7 preflight safe). The buy list is a RANKED wishlist; a single unbuyable pick
-    // (raced away or priced out at apply) stops this cycle, and the outer convergence loop re-plans the
-    // team next cycle/round with a fresh, cheaper wishlist until it reaches min/opt or runs out of cash.
+    // (raced away or priced out at apply) is SKIPPED, not fatal — the team keeps buying the rest of its
+    // ranked plan, and the outer convergence loop re-plans it next cycle/round until it reaches min/opt or
+    // runs out of cash. A failed pick is added to the exclude set so it is never re-proposed: earlier the
+    // loop `break`d on the first failure and left the pick in play, so one plan/execute affordability
+    // disagreement re-proposed the same unbuyable pick every cycle and stranded the team permanently below
+    // min (the 2026-07-13 S2 buy-convergence stall). Continuing past it can only ever buy MORE of the
+    // roster (each buy is validated against live cash independently), never overspend.
     for (const decision of plan.decisions) {
       if (input.excludeBuyPlayerIds.has(decision.playerId)) continue;
       const buyResult = executeLocalTransfermarktBuy({
@@ -450,8 +455,9 @@ async function runTeamCycle(input: {
       });
       if (!buyResult.transferCreated || !buyResult.transferId) {
         warnings.push(...buyResult.blockingReasons.slice(0, 2));
-        applyResult = "hold";
-        break;
+        if (applyResult !== "applied") applyResult = "hold";
+        input.excludeBuyPlayerIds.add(decision.playerId); // don't re-propose an unbuyable pick next cycle
+        continue;
       }
       appliedBuys += 1;
       applyResult = "applied";

@@ -867,10 +867,21 @@ export function resolveMarketSpendableCashForPlanner(input: {
   const rebuildMode = belowOpt || Boolean(input.forceRosterFill) || input.rosterBelowMin;
 
   // Hard-min fill must not be capped by stale draft-era GM buckets after season-end sells
-  // inflated team cash — spend almost all current cash to reach playerMin first.
+  // inflated team cash — and must not be capped by ANY solvency/liquidity pad either. The organic
+  // squad builder's own greedy plan (draft-builder.ts) explicitly uses affordFloor=0 below the hard
+  // roster minimum ("reaching hard ROSTER_MIN outranks the solvency buffer... spends it down toward
+  // ~0 if needed") — it plans a buy as affordable whenever raw cash covers the price. This function
+  // is the execute-time affordability ceiling shared by every buy engine (organic/legacy/unified), so
+  // if it still subtracted a pad here (previously a flat MW 3-15 "almost all cash" reserve) a
+  // plan-time-affordable pick could fail at execute time purely because of that pad. Since the
+  // organic buy loop aborts on the first execute failure and never excludes the failed candidate
+  // (see ai-transfer-window-session-service.ts runOrganicBuyCycle), that single plan/execute
+  // disagreement stranded teams permanently below hardMin every cycle even with ample cash for
+  // cheaper alternatives in their own candidate pool (2026-07-13 S2 buy-convergence bug: 7/32 teams
+  // stuck at roster 7 with double-digit cash while cheap free agents sat unbought). Below hard min,
+  // the ceiling must equal raw cash — no pad — exactly mirroring the planner's own rule.
   if (input.rosterBelowMin) {
-    const minPad = round(Math.max(3, Math.min(15, teamCash * 0.05)), 2);
-    return round(Math.max(0, teamCash - minPad), 2);
+    return round(Math.max(0, teamCash), 2);
   }
 
   // S2+: single cash pool — soft liquidity pad only while rebuilding toward Opt/Min.
