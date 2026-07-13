@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { GameState } from "@/lib/data/olyDataTypes";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
@@ -729,6 +730,96 @@ function formatGrowthOutlook(value: NonNullable<PlayerDetailDrawerData["developm
   }
 }
 
+// Entwicklungstrend als Pfeil-Chip (steigend/stabil/fallend), abgeleitet vom
+// bestehenden `growthOutlook`-Feld — keine neue Datenquelle, nur eine visuelle
+// Gruppierung der vorhandenen 5 Ausprägungen.
+function getGrowthOutlookArrow(value: NonNullable<PlayerDetailDrawerData["developmentInsight"]>["growthOutlook"] | null | undefined) {
+  switch (value) {
+    case "breakout":
+      return "⇈";
+    case "growth":
+      return "↑";
+    case "stable":
+      return "→";
+    case "stagnation":
+      return "↘";
+    case "regression_risk":
+      return "↓";
+    default:
+      return "—";
+  }
+}
+
+function getGrowthOutlookToneClass(value: NonNullable<PlayerDetailDrawerData["developmentInsight"]>["growthOutlook"] | null | undefined) {
+  switch (value) {
+    case "breakout":
+    case "growth":
+      return " is-positive";
+    case "stagnation":
+      return " is-warning";
+    case "regression_risk":
+      return " is-negative";
+    case "stable":
+      return " is-neutral";
+    default:
+      return "";
+  }
+}
+
+// Confidence-Ton folgt derselben Certainty-Klassifizierung wie der Rest des
+// Scouting-Systems (`PlayerPotentialCertainty`) — keine neue Schwelle erfunden.
+function getConfidenceToneClass(certainty: NonNullable<PlayerDetailDrawerData["scoutPotential"]>["certainty"] | null | undefined) {
+  switch (certainty) {
+    case "high":
+      return " is-positive";
+    case "medium":
+      return " is-neutral";
+    case "low":
+      return " is-warning";
+    case "missing_source":
+      return " is-negative";
+    default:
+      return "";
+  }
+}
+
+const POTENTIAL_TRACK_DOMAIN_PADDING_LOW = 6;
+const POTENTIAL_TRACK_DOMAIN_PADDING_HIGH = 4;
+const POTENTIAL_CONFIDENCE_SEGMENT_COUNT = 5;
+
+// Geometrie für die Potential-vs-Current-Visualisierung: Current als gefüllter
+// Balken, die gescoutete Potential-Spanne als hellere Range daneben. Domain
+// wird relativ um die tatsächlichen Werte gelegt (wie `VeloRangeBar`), damit
+// auch enge Spannen sichtbar bleiben. Gibt `null` zurück, wenn Fog-of-war
+// (noch) keine belastbaren Zahlen liefert — dann degradiert die UI auf Text.
+function buildPotentialTrackGeometry(
+  current: number | null | undefined,
+  potentialMin: number | null | undefined,
+  potentialMax: number | null | undefined,
+) {
+  if (
+    current == null || !Number.isFinite(current) ||
+    potentialMin == null || !Number.isFinite(potentialMin) ||
+    potentialMax == null || !Number.isFinite(potentialMax)
+  ) {
+    return null;
+  }
+  const lowValue = Math.min(current, potentialMin);
+  const highValue = Math.max(current, potentialMax);
+  const domainMin = Math.max(0, lowValue - POTENTIAL_TRACK_DOMAIN_PADDING_LOW);
+  const domainMax = Math.min(100, highValue + POTENTIAL_TRACK_DOMAIN_PADDING_HIGH);
+  const domainWidth = Math.max(domainMax - domainMin, 0.01);
+  const toPercent = (value: number) => Math.min(100, Math.max(0, ((value - domainMin) / domainWidth) * 100));
+  const currentPct = toPercent(current);
+  const bandLeftPct = toPercent(Math.min(potentialMin, potentialMax));
+  const bandRightPct = toPercent(Math.max(potentialMin, potentialMax));
+  return {
+    currentPct,
+    bandLeftPct,
+    bandWidthPct: Math.max(bandRightPct - bandLeftPct, 1.5),
+  };
+}
+
 function parseStarValue(value: string | number | null | undefined) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
@@ -1206,6 +1297,7 @@ function PlayerComparePanel({
   query,
   onQueryChange,
   candidates,
+  candidatesLoading,
   selectedPlayerId,
   onSelectPlayer,
   onClearSelection,
@@ -1218,6 +1310,7 @@ function PlayerComparePanel({
   query: string;
   onQueryChange: (value: string) => void;
   candidates: ComparePlayerCandidate[];
+  candidatesLoading: boolean;
   selectedPlayerId: string | null;
   onSelectPlayer: (playerId: string) => void;
   onClearSelection: () => void;
@@ -1312,7 +1405,13 @@ function PlayerComparePanel({
                   </button>
                 </li>
               ))}
-              {candidates.length === 0 ? <li className="nl-compare-picker-empty muted">Keine Treffer.</li> : null}
+              {candidatesLoading ? (
+                <li className="nl-compare-picker-empty muted" role="status" aria-live="polite">
+                  Lade Spielerliste…
+                </li>
+              ) : candidates.length === 0 ? (
+                <li className="nl-compare-picker-empty muted">Keine Treffer.</li>
+              ) : null}
             </ul>
           </div>
         ) : loadingB ? (
@@ -1538,8 +1637,73 @@ export default function PlayerDetailDrawer({
     setComparePlayerBData(null);
   }, [data?.playerId]);
 
+  // Bugfix: `useFoundationStateOptional()` liefert hier dauerhaft `null` — der
+  // App-weite Foundation-State-Context wird nirgends mit einem echten Value
+  // gemountet (kein `<FoundationStateProvider>` in der Komponenten-Baum). Der
+  // Picker konnte dadurch nie Kandidaten anzeigen, weder mit noch ohne
+  // Sucheingabe: `compareCandidates` brach immer auf `!werdegangGameState` ab.
+  // Fix: eigene, schlanke Kopie des Savegames direkt über den bestehenden
+  // `/api/singleplayer-state`-Read-Endpoint laden (denselben, den auch der
+  // reguläre Spielstand-Loader nutzt) statt auf den toten Context zu warten.
+  const [compareRosterGameState, setCompareRosterGameState] = useState<GameState | null>(null);
+  const [compareRosterSaveId, setCompareRosterSaveId] = useState<string | null>(null);
+  const [compareRosterLoading, setCompareRosterLoading] = useState(false);
+  const [compareRosterError, setCompareRosterError] = useState(false);
+  // Fetch-Guard als Ref statt State: `compareRosterLoading` selbst darf NICHT im
+  // Dependency-Array stehen — das würde beim synchronen `setCompareRosterLoading(true)`
+  // sofort einen Re-Run triggern, dessen Cleanup den gerade gestarteten Fetch sofort
+  // wieder als `cancelled` markiert, bevor die Antwort ankommt (Race, kein Ergebnis
+  // landet je im State).
+  const compareRosterFetchStartedRef = useRef(false);
+
   useEffect(() => {
-    if (!comparePlayerId || !werdegangGameState) {
+    if (!compareOpen || compareRosterFetchStartedRef.current) {
+      return undefined;
+    }
+    compareRosterFetchStartedRef.current = true;
+    let cancelled = false;
+    setCompareRosterLoading(true);
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (data?.source === "prisma") {
+          params.set("source", "prisma");
+        }
+        if (typeof window !== "undefined") {
+          const urlSaveId = new URLSearchParams(window.location.search).get("saveId");
+          if (urlSaveId) {
+            params.set("saveId", urlSaveId);
+          }
+        }
+        const queryString = params.toString();
+        const response = await fetch(`/api/singleplayer-state${queryString ? `?${queryString}` : ""}`);
+        const payload = (await response.json()) as { save?: { saveId?: string; gameState?: GameState } | null };
+        if (cancelled) {
+          return;
+        }
+        if (payload.save?.gameState) {
+          setCompareRosterGameState(payload.save.gameState);
+          setCompareRosterSaveId(payload.save.saveId ?? null);
+        } else {
+          setCompareRosterError(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setCompareRosterError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setCompareRosterLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [compareOpen, data?.source]);
+
+  useEffect(() => {
+    if (!comparePlayerId || !compareRosterGameState) {
       setComparePlayerBData(null);
       setComparePlayerBLoading(false);
       return undefined;
@@ -1550,11 +1714,11 @@ export default function PlayerDetailDrawer({
       try {
         const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
         const nextData = buildPlayerDrawerDataFromGameState({
-          gameState: werdegangGameState,
+          gameState: compareRosterGameState,
           playerId: comparePlayerId,
           source: data?.source ?? "sqlite",
           manageableTeamIds: foundationState?.foundationManageableTeamIds ?? null,
-          saveId: foundationState?.activeSaveId ?? null,
+          saveId: compareRosterSaveId ?? foundationState?.activeSaveId ?? null,
         });
         if (!cancelled) {
           setComparePlayerBData(nextData);
@@ -1572,34 +1736,34 @@ export default function PlayerDetailDrawer({
     return () => {
       cancelled = true;
     };
-  }, [comparePlayerId, werdegangGameState, data?.source, foundationState?.foundationManageableTeamIds, foundationState?.activeSaveId]);
+  }, [comparePlayerId, compareRosterGameState, compareRosterSaveId, data?.source, foundationState?.foundationManageableTeamIds, foundationState?.activeSaveId]);
 
   const compareTeamCodeByPlayerId = useMemo(() => {
     const map = new Map<string, string>();
-    if (!compareOpen || !werdegangGameState) {
+    if (!compareOpen || !compareRosterGameState) {
       return map;
     }
-    const teamById = new Map(werdegangGameState.teams.map((team) => [team.teamId, team] as const));
-    for (const roster of werdegangGameState.rosters) {
+    const teamById = new Map(compareRosterGameState.teams.map((team) => [team.teamId, team] as const));
+    for (const roster of compareRosterGameState.rosters) {
       const team = teamById.get(roster.teamId);
       if (team) {
         map.set(roster.playerId, team.shortCode || team.name);
       }
     }
     return map;
-  }, [compareOpen, werdegangGameState]);
+  }, [compareOpen, compareRosterGameState]);
 
   const compareCandidates = useMemo(() => {
-    if (!compareOpen || !werdegangGameState || !data) {
+    if (!compareOpen || !compareRosterGameState || !data) {
       return [];
     }
     const query = compareQuery.trim().toLowerCase();
     const currentPlayerId = data.playerId;
-    return werdegangGameState.players
+    return compareRosterGameState.players
       .filter((player) => player.id !== currentPlayerId && (query.length === 0 || player.name.toLowerCase().includes(query)))
       .sort((left, right) => left.name.localeCompare(right.name, "de"))
       .slice(0, 20);
-  }, [compareOpen, werdegangGameState, data, compareQuery]);
+  }, [compareOpen, compareRosterGameState, data, compareQuery]);
 
   const compareCandidateOptions = useMemo(
     () =>
@@ -1821,6 +1985,7 @@ export default function PlayerDetailDrawer({
                 query={compareQuery}
                 onQueryChange={setCompareQuery}
                 candidates={compareCandidateOptions}
+                candidatesLoading={compareRosterLoading}
                 selectedPlayerId={comparePlayerId}
                 onSelectPlayer={setComparePlayerId}
                 onClearSelection={() => {
@@ -2741,40 +2906,119 @@ export default function PlayerDetailDrawer({
                     ) : null}
                   </article>
                 ) : null}
-                {data.scoutPotential ? (
-                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschätzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
-                    <HelpLabel title="Potential-Spanne = geschätzter Zielbereich. Current = aktueller Stand. Gap = mögliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
-                    <strong>
-                      {formatDevelopmentRange(data.developmentInsight)}{" "}
-                      {showScoutedPotentialStars ? (
-                        <ScoutStarDisplay
-                          axisDisplay={data.potentialStarsDisplay}
-                          starRating={data.scoutPotential?.starRating}
-                          starRangeMin={
-                            data.developmentInsight?.potentialRangeDisplay?.min ??
-                            data.scoutPotential?.potentialRange?.min ??
-                            null
-                          }
-                          starRangeMax={
-                            data.developmentInsight?.potentialRangeDisplay?.max ??
-                            data.scoutPotential?.potentialRange?.max ??
-                            null
-                          }
-                          compact
-                        />
-                      ) : null}
-                    </strong>
-                    <small>
-                      Current {formatValue(data.developmentInsight?.currentRating, 1)} · Gap{" "}
-                      {data.developmentInsight?.developmentGap != null && data.developmentInsight.developmentGap > 0 ? "+" : ""}
-                      {formatValue(data.developmentInsight?.developmentGap, 1)}
-                    </small>
-                    <small>
-                      {formatGrowthOutlook(data.developmentInsight?.growthOutlook)} · Confidence {data.scoutPotential.confidence}% · Scouting L
-                      {data.scoutPotential.scoutingLevel}
-                    </small>
-                  </article>
-                ) : null}
+                {data.scoutPotential
+                  ? (() => {
+                      const scoutPotential = data.scoutPotential!;
+                      const potentialMin =
+                        data.developmentInsight?.potentialRangeDisplay?.min ?? scoutPotential.potentialRange?.min ?? null;
+                      const potentialMax =
+                        data.developmentInsight?.potentialRangeDisplay?.max ?? scoutPotential.potentialRange?.max ?? null;
+                      const currentRating = data.developmentInsight?.currentRating ?? null;
+                      const gapValue = data.developmentInsight?.developmentGap ?? null;
+                      const gapLabel =
+                        gapValue != null && Number.isFinite(gapValue)
+                          ? `${gapValue > 0 ? "+" : ""}${formatValue(gapValue, 1)}`
+                          : null;
+                      const track = buildPotentialTrackGeometry(currentRating, potentialMin, potentialMax);
+                      const confidence = scoutPotential.confidence;
+                      const filledConfidenceSegments = Math.max(
+                        0,
+                        Math.min(
+                          POTENTIAL_CONFIDENCE_SEGMENT_COUNT,
+                          Math.round((confidence / 100) * POTENTIAL_CONFIDENCE_SEGMENT_COUNT),
+                        ),
+                      );
+                      const trendTone = getGrowthOutlookToneClass(data.developmentInsight?.growthOutlook);
+                      const confidenceTone = getConfidenceToneClass(scoutPotential.certainty);
+                      const trackAriaLabel = track
+                        ? `Aktueller Stand ${formatValue(currentRating, 1)}, Potential-Spanne ${formatDevelopmentRange(
+                            data.developmentInsight,
+                          )}${gapLabel ? `, Gap ${gapLabel}` : ""}`
+                        : "Potential-Grafik noch nicht verfügbar";
+                      return (
+                        <article
+                          className="metric-card player-drawer-scout-potential-card player-drawer-potential-visual-card"
+                          title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschätzten Potential. Je niedriger Confidence, desto unsicherer die Spanne."
+                        >
+                          <div className="player-drawer-potential-visual-head">
+                            <HelpLabel title="Potential-Spanne = geschätzter Zielbereich. Current = aktueller Stand. Gap = mögliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">
+                              Potential
+                            </HelpLabel>
+                            <span
+                              className={`player-drawer-potential-trend-chip${trendTone}`}
+                              title={`Entwicklungstrend: ${formatGrowthOutlook(data.developmentInsight?.growthOutlook)}`}
+                            >
+                              <span aria-hidden="true">{getGrowthOutlookArrow(data.developmentInsight?.growthOutlook)}</span>
+                              {formatGrowthOutlook(data.developmentInsight?.growthOutlook)}
+                            </span>
+                          </div>
+                          <div className="is-new-look player-drawer-potential-visual">
+                            <div className="player-drawer-potential-range-row">
+                              <strong className="player-drawer-potential-range-value nl-tnum">
+                                {formatDevelopmentRange(data.developmentInsight)}
+                              </strong>
+                              {showScoutedPotentialStars ? (
+                                <ScoutStarDisplay
+                                  axisDisplay={data.potentialStarsDisplay}
+                                  starRating={scoutPotential.starRating}
+                                  starRangeMin={potentialMin}
+                                  starRangeMax={potentialMax}
+                                  compact
+                                />
+                              ) : null}
+                            </div>
+                            {track ? (
+                              <div className="player-drawer-potential-track-wrap" role="img" aria-label={trackAriaLabel}>
+                                <div className="player-drawer-potential-track">
+                                  <span
+                                    className="player-drawer-potential-current-fill"
+                                    style={{ width: `${track.currentPct}%` }}
+                                  />
+                                  <span
+                                    className="player-drawer-potential-band"
+                                    style={{ left: `${track.bandLeftPct}%`, width: `${track.bandWidthPct}%` }}
+                                  />
+                                  <span
+                                    className="player-drawer-potential-current-marker"
+                                    style={{ left: `${track.currentPct}%` }}
+                                  />
+                                </div>
+                                <div className="player-drawer-potential-track-labels">
+                                  <span className="nl-tnum">Current {formatValue(currentRating, 1)}</span>
+                                  {gapLabel ? (
+                                    <span className="player-drawer-potential-gap-label nl-tnum">Gap {gapLabel}</span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="muted player-drawer-potential-visual-empty">
+                                Grafik folgt, sobald mehr gescoutet ist.
+                              </p>
+                            )}
+                            <div className="player-drawer-potential-confidence-row">
+                              <span className="player-drawer-potential-confidence-label">Confidence</span>
+                              <span
+                                className={`player-drawer-potential-confidence-meter${confidenceTone}`}
+                                role="img"
+                                aria-label={`Scouting-Confidence ${confidence}%`}
+                              >
+                                {Array.from({ length: POTENTIAL_CONFIDENCE_SEGMENT_COUNT }).map((_, index) => (
+                                  <span
+                                    key={`confidence-seg-${index}`}
+                                    className={`player-drawer-potential-confidence-segment${
+                                      index < filledConfidenceSegments ? " is-filled" : ""
+                                    }`}
+                                  />
+                                ))}
+                              </span>
+                              <span className="player-drawer-potential-confidence-value nl-tnum">{confidence}%</span>
+                              <span className="player-drawer-potential-scouting-level">Scouting L{scoutPotential.scoutingLevel}</span>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })()
+                  : null}
                 {data.seasonOrganicForecast && !data.organicProgression ? (
                   <article
                     className="metric-card player-drawer-xp-balance-card"

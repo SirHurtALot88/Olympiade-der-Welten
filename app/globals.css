@@ -13586,6 +13586,196 @@ a {
   gap: 5px;
 }
 
+/* Potential & Entwicklung — grafische Potential-vs-Current-Visualisierung,
+   Confidence-Gauge und Entwicklungstrend-Chip. Ton-Klassen nutzen die
+   globalen `--heat-*`-Tokens (immer verfügbar); `.is-new-look` wird lokal
+   auf den Visual-Wrapper gesetzt, damit `--nl-*`/`.nl-tnum` unabhängig vom
+   globalen "Neuer Look"-Flag greifen (gleiches Muster wie `.nl-attr-spark`). */
+.player-drawer-potential-visual-card {
+  display: grid;
+  gap: 10px;
+}
+
+.player-drawer-potential-visual-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 8px;
+}
+
+.player-drawer-potential-visual-head .player-drawer-help-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.player-drawer-potential-trend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+}
+
+.player-drawer-potential-trend-chip span[aria-hidden="true"] {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.player-drawer-potential-trend-chip.is-positive {
+  color: var(--heat-strong-text);
+  background: var(--heat-strong-bg);
+}
+
+.player-drawer-potential-trend-chip.is-warning {
+  color: var(--heat-risk-text);
+  background: var(--heat-risk-bg);
+}
+
+.player-drawer-potential-trend-chip.is-negative {
+  color: var(--heat-danger-text);
+  background: var(--heat-danger-bg);
+}
+
+.player-drawer-potential-visual {
+  display: grid;
+  gap: 8px;
+}
+
+.player-drawer-potential-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.player-drawer-potential-range-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgba(247, 250, 255, 0.95);
+}
+
+.player-drawer-potential-track-wrap {
+  display: grid;
+  gap: 4px;
+}
+
+.player-drawer-potential-track {
+  position: relative;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-drawer-potential-current-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.34), var(--heat-blue-light));
+}
+
+.player-drawer-potential-band {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border-radius: 999px;
+  background: rgba(255, 209, 112, 0.3);
+  border: 1px solid rgba(255, 209, 112, 0.68);
+}
+
+.player-drawer-potential-current-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: #f7fbff;
+  box-shadow: 0 0 6px rgba(247, 251, 255, 0.7);
+}
+
+.player-drawer-potential-track-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+  color: rgba(220, 229, 244, 0.72);
+}
+
+.player-drawer-potential-gap-label {
+  font-weight: 700;
+  color: rgba(235, 239, 247, 0.92);
+}
+
+.player-drawer-potential-visual-empty {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.player-drawer-potential-confidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.player-drawer-potential-confidence-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(220, 229, 244, 0.6);
+}
+
+.player-drawer-potential-confidence-meter {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.player-drawer-potential-confidence-segment {
+  width: 14px;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.player-drawer-potential-confidence-meter.is-positive .player-drawer-potential-confidence-segment.is-filled {
+  background: var(--heat-strong-bg);
+}
+
+.player-drawer-potential-confidence-meter.is-neutral .player-drawer-potential-confidence-segment.is-filled,
+.player-drawer-potential-confidence-meter .player-drawer-potential-confidence-segment.is-filled {
+  background: var(--heat-neutral-bg);
+}
+
+.player-drawer-potential-confidence-meter.is-warning .player-drawer-potential-confidence-segment.is-filled {
+  background: var(--heat-risk-bg);
+}
+
+.player-drawer-potential-confidence-meter.is-negative .player-drawer-potential-confidence-segment.is-filled {
+  background: var(--heat-danger-bg);
+}
+
+.player-drawer-potential-confidence-value {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgba(235, 239, 247, 0.9);
+}
+
+.player-drawer-potential-scouting-level {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: rgba(220, 229, 244, 0.6);
+}
+
 .player-drawer-help-label {
   display: inline-flex;
   align-items: center;
