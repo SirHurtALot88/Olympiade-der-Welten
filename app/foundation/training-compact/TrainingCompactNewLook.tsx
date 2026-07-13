@@ -379,7 +379,7 @@ function NlTrainingIntensityProjection({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)} · Regeneration ${formatSignedPercent(entry.recoveryDeltaPct)}`}
+            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue-Last ${formatVeloNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -399,9 +399,9 @@ function NlTrainingIntensityProjection({
             </span>
             <span
               className={`nl-training-intensity-recovery nl-tnum${entry.recoveryDeltaPct < 0 ? " is-negative" : entry.recoveryDeltaPct > 0 ? " is-positive" : ""}`}
-              title="Regenerations-Delta dieser Intensität (Erholung ↔ Verletzungsrisiko-Trade-off)"
+              title="Erholungs-Tempo dieser Intensität (Erholungs-Rate, nicht Fatigue-Last) — Erholung ↔ Verletzungsrisiko-Trade-off"
             >
-              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Reg</small>
+              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Erholung</small>
             </span>
             <NlDeltaChip
               value={entry.net}
