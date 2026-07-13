@@ -27,11 +27,6 @@ const TEAM_ROSTER_PORTRAIT_LOADING = {
 const TEAMS_INITIAL_VISIBLE_LOGO_ROWS = 10;
 const TEAMS_DEFERRED_LOGO_IDLE_MS = 200;
 
-const FoundationTeamsPortraitsTab = dynamic(() => import("./FoundationTeamsPortraitsTab"), {
-  ssr: false,
-  loading: () => <p className="muted team-portraits-loading">Portraits werden geladen…</p>,
-});
-
 const FoundationPlayerPortraitCard = dynamic(
   () => import("@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard"),
   { ssr: false },
@@ -75,6 +70,112 @@ function PlayerPortrait({
       onError={() => setFailed(true)}
     />
   );
+}
+
+/**
+ * Vertrags-Restlaufzeit → Heat-Band-Klasse (`heat-band-1`..`heat-band-8`,
+ * dieselbe Ton-Skala wie `getPoolHeatClass`). 1 Jahr = am dringendsten
+ * (rot), 5+ Jahre = am sichersten (blau) — reine Anzeige-Einordnung, keine
+ * neue Spielmechanik.
+ */
+function getContractLengthHeatBandClass(length) {
+  if (length == null || !Number.isFinite(length)) {
+    return "";
+  }
+  if (length <= 1) return "heat-band-1";
+  if (length === 2) return "heat-band-3";
+  if (length === 3) return "heat-band-5";
+  if (length === 4) return "heat-band-6";
+  return "heat-band-8";
+}
+
+/** Balkengeometrie für den Gehaltsforecast-Chart (Verträge-Tab): pro Saison
+ * ein Balken (gebundene Summe), plus ein zweiter Balken NUR wenn die
+ * Preview-Summe (inkl. Kaufdialog-Drafts) tatsächlich abweicht — sonst
+ * bleibt der Chart auf den Normalfall (keine Drafts) reduziert. */
+function buildContractForecastChartGeometry(totalsCommitted, totalsWithPreview) {
+  if (!Array.isArray(totalsCommitted) || totalsCommitted.length === 0) {
+    return null;
+  }
+  const width = 600;
+  const height = 168;
+  const paddingLeft = 6;
+  const paddingRight = 6;
+  const paddingTop = 22;
+  const paddingBottom = 26;
+  const innerWidth = width - paddingLeft - paddingRight;
+  const innerHeight = height - paddingTop - paddingBottom;
+  const slotWidth = innerWidth / totalsCommitted.length;
+  const barWidth = Math.max(10, slotWidth * 0.32);
+  const barGap = slotWidth * 0.06;
+
+  const committedValues = totalsCommitted.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0));
+  const previewValues = totalsCommitted.map((_, index) => {
+    const preview = totalsWithPreview?.[index];
+    return preview && Number.isFinite(preview.salary) ? preview.salary : null;
+  });
+  const maxValue = Math.max(1, ...committedValues, ...previewValues.filter((value) => value != null));
+
+  const bars = totalsCommitted.map((entry, index) => {
+    const committedValue = committedValues[index];
+    const previewValue = previewValues[index];
+    const hasPreviewDelta = previewValue != null && Math.abs(previewValue - committedValue) >= 0.01;
+    const committedHeight = (committedValue / maxValue) * innerHeight;
+    const previewHeight = hasPreviewDelta ? (previewValue / maxValue) * innerHeight : null;
+    const slotStart = paddingLeft + index * slotWidth;
+    const centerX = slotStart + slotWidth / 2;
+    const committedX = hasPreviewDelta ? centerX - barWidth - barGap / 2 : centerX - barWidth / 2;
+    const previewX = committedX + barWidth + barGap;
+    return {
+      label: entry.label,
+      committedValue,
+      previewValue: hasPreviewDelta ? previewValue : null,
+      hasPreviewDelta,
+      x: committedX,
+      y: paddingTop + innerHeight - committedHeight,
+      width: barWidth,
+      height: committedHeight,
+      previewX,
+      previewY: previewHeight != null ? paddingTop + innerHeight - previewHeight : null,
+      previewWidth: barWidth,
+      previewHeight,
+      centerX,
+    };
+  });
+
+  return { width, height, paddingTop, paddingBottom, innerHeight, maxValue, bars };
+}
+
+/** Gruppiert die aktiven Vertragszeilen nach Restlaufzeit (1 Jahr … Cap) für
+ * die Restlaufzeiten-Zeitleiste — Cap = Anzahl der Forecast-Saisons
+ * (`seasonLabels.length`, i. d. R. 5), längere Laufzeiten fallen in den
+ * letzten Bucket ("Cap+"). Preview-Drafts zählen nicht mit (noch kein
+ * aktiver Vertrag). */
+function buildContractExpiryBuckets(rows, seasonLabelCount) {
+  const maxBucket = Math.max(1, seasonLabelCount || 5);
+  const buckets = new Map();
+  for (let year = 1; year <= maxBucket; year += 1) {
+    buckets.set(year, []);
+  }
+  (rows ?? [])
+    .filter((row) => row.status === "active")
+    .forEach((row) => {
+      const length = Number.isFinite(row.contractLength) ? row.contractLength : null;
+      if (length == null) {
+        return;
+      }
+      const bucketYear = Math.min(Math.max(1, Math.round(length)), maxBucket);
+      const bucket = buckets.get(bucketYear) ?? [];
+      bucket.push(row);
+      buckets.set(bucketYear, bucket);
+    });
+  return Array.from(buckets.entries())
+    .sort((left, right) => left[0] - right[0])
+    .map(([year, bucketRows]) => ({
+      year,
+      isOverflowBucket: year === maxBucket,
+      rows: [...bucketRows].sort((left, right) => left.playerName.localeCompare(right.playerName, "de-DE")),
+    }));
 }
 
 export type FoundationTeamsDetailPanelProps = {
@@ -378,29 +479,6 @@ function FoundationTeamsDetailPanel({
     (showDeferredTeamLogos ||
       rowIndex < TEAMS_INITIAL_VISIBLE_LOGO_ROWS ||
       teamId === selectedTeam?.teamId);
-  const selectedTeamViewRow = sortedTeamsViewRows.find((row) => row.team?.teamId === selectedTeam?.teamId) ?? null;
-  const portraitExpiringCount =
-    selectedTeamDetailTab === "portraits"
-      ? filteredSelectedRosterTableRows.filter(({ entry }) => entry.contractLength <= 1).length
-      : 0;
-  const portraitAvgOvr =
-    selectedTeamDetailTab === "portraits"
-      ? (() => {
-          const values = filteredSelectedRosterTableRows
-            .map(({ playerOvr }) => playerOvr)
-            .filter((value) => value != null && Number.isFinite(value));
-          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-        })()
-      : null;
-  const portraitAvgSalary =
-    selectedTeamDetailTab === "portraits"
-      ? (() => {
-          const values = filteredSelectedRosterTableRows
-            .map(({ entry, player }) => getRosterEntryCurrentSeasonSalary(entry, player))
-            .filter((value) => value != null && Number.isFinite(value));
-          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-        })()
-      : null;
   const contractExpiringCount = selectedRoster.filter((entry) => entry.contractLength <= 1).length;
 
   return (
@@ -433,10 +511,10 @@ function FoundationTeamsDetailPanel({
                       );
                     })()}
                     <div>
-                    <p className="eyebrow">{selectedTeamDetailTab === "portraits" ? "Kaderprofil" : "Team Fokus"}</p>
+                    <p className="eyebrow">Team Fokus</p>
                     <h2>
                       {selectedTeam.name}
-                      {selectedTeamDetailTab === "portraits" ? "" : selectedTeamDetailTab === "contracts" ? " · Verträge" : selectedTeamDetailTab === "transfer" ? " · Transfers" : " · Kader"}
+                      {selectedTeamDetailTab === "contracts" ? " · Verträge" : selectedTeamDetailTab === "transfer" ? " · Transfers" : " · Kader"}
                     </h2>
                     </div>
                   </div>
@@ -790,10 +868,6 @@ function FoundationTeamsDetailPanel({
                                 : "—"}
                             </strong>
                           </article>
-                          <article>
-                            <span>Spielerwerte</span>
-                            <strong>OVR und PPs nur pro Spieler, nicht als Teamwert</strong>
-                          </article>
                         </div>
                         <div className="team-focus-footer-actions">
                           <span className="muted">
@@ -823,37 +897,6 @@ function FoundationTeamsDetailPanel({
                       </div>
                     </div>
                   </>
-                ) : selectedTeamDetailTab === "portraits" ? (
-                  <FoundationTeamsPortraitsTab
-                    selectedTeam={selectedTeam}
-                    selectedTeamViewRow={selectedTeamViewRow}
-                    filteredSelectedRosterTableRows={filteredSelectedRosterTableRows}
-                    selectedStandingRow={selectedStandingRow}
-                    selectedRoster={selectedRoster}
-                    teamRosterRoleFilterOptions={teamRosterRoleFilterOptions}
-                    teamRosterRoleFilter={teamRosterRoleFilter}
-                    setTeamRosterRoleFilter={setTeamRosterRoleFilter}
-                    teamRosterFocusOptions={teamRosterFocusOptions}
-                    teamRosterFocusMode={teamRosterFocusMode}
-                    setTeamRosterFocusMode={setTeamRosterFocusMode}
-                    gameState={gameState}
-                    leaguePlayerHeatPools={leaguePlayerHeatPools}
-                    getPlayerPortraitModel={getPlayerPortraitModel}
-                    getClassColorClassName={getClassColorClassName}
-                    openPlayerDrawerById={openPlayerDrawerById}
-                    formatLocalePoints={formatLocalePoints}
-                    formatDisplayMoney={formatDisplayMoney}
-                    formatMoney={formatMoney}
-                    getRosterEntryDisplayMarketValue={getRosterEntryDisplayMarketValue}
-                    getRosterEntryDisplaySalary={getRosterEntryDisplaySalary}
-                    getRosterEntryCurrentSeasonSalary={getRosterEntryCurrentSeasonSalary}
-                    getPlayerDisplayMarketValueDelta={getPlayerDisplayMarketValueDelta}
-                    getRosterEntrySalaryDelta={getRosterEntrySalaryDelta}
-                    formatWholeNumber={formatWholeNumber}
-                    portraitAvgOvr={portraitAvgOvr}
-                    portraitAvgSalary={portraitAvgSalary}
-                    contractExpiringCount={portraitExpiringCount}
-                  />
                 ) : selectedTeamDetailTab === "transfer" ? (
                   <div className="teams-v2-transfer-tab" data-testid="teams-v2-transfer-tab">
                     <div className="teams-v2-finance-role-cards">
@@ -996,44 +1039,179 @@ function FoundationTeamsDetailPanel({
                           <strong>Gehaltsforecast</strong>
                           <span className="muted">Gebundene Summen je Saison</span>
                         </div>
-                        <div className="contract-forecast-grid">
-                          {selectedTeamContractTable.totalsCommitted.map((entry, index) => {
-                            const preview = selectedTeamContractTable.totalsWithPreview[index];
-                            return (
-                              <article className="contract-forecast-card" key={entry.label}>
-                                <span>{entry.label}</span>
-                                <strong>{formatDisplayMoney(entry.salary)}</strong>
-                                <small className="muted">Preview {preview ? formatDisplayMoney(preview.salary) : "—"}</small>
-                              </article>
-                            );
-                          })}
+                        {(() => {
+                          const chart = buildContractForecastChartGeometry(
+                            selectedTeamContractTable.totalsCommitted,
+                            selectedTeamContractTable.totalsWithPreview,
+                          );
+                          if (!chart) {
+                            return null;
+                          }
+                          return (
+                            <svg
+                              className="contract-forecast-chart-svg nl-tnum"
+                              viewBox={`0 0 ${chart.width} ${chart.height}`}
+                              preserveAspectRatio="xMidYMid meet"
+                              role="img"
+                              aria-label={`Gehaltsforecast: ${chart.bars.map((bar) => `${bar.label} ${formatDisplayMoney(bar.committedValue)}`).join(", ")}`}
+                            >
+                              <line
+                                x1={0}
+                                y1={chart.paddingTop + chart.innerHeight}
+                                x2={chart.width}
+                                y2={chart.paddingTop + chart.innerHeight}
+                                className="contract-forecast-chart-axis"
+                              />
+                              {chart.bars.map((bar) => (
+                                <g key={bar.label}>
+                                  <rect
+                                    x={bar.x}
+                                    y={bar.y}
+                                    width={bar.width}
+                                    height={Math.max(bar.height, 1)}
+                                    rx={3}
+                                    className="contract-forecast-chart-bar is-committed"
+                                  >
+                                    <title>
+                                      {bar.label} · {formatDisplayMoney(bar.committedValue)}
+                                    </title>
+                                  </rect>
+                                  {bar.hasPreviewDelta ? (
+                                    <rect
+                                      x={bar.previewX}
+                                      y={bar.previewY}
+                                      width={bar.previewWidth}
+                                      height={Math.max(bar.previewHeight, 1)}
+                                      rx={3}
+                                      className="contract-forecast-chart-bar is-preview"
+                                    >
+                                      <title>
+                                        {bar.label} · Preview {formatDisplayMoney(bar.previewValue)}
+                                      </title>
+                                    </rect>
+                                  ) : null}
+                                  <text
+                                    x={bar.centerX}
+                                    y={Math.min(bar.y, bar.previewY ?? bar.y) - 6}
+                                    textAnchor="middle"
+                                    className="contract-forecast-chart-value"
+                                  >
+                                    {formatDisplayMoney(bar.committedValue)}
+                                  </text>
+                                  <text
+                                    x={bar.centerX}
+                                    y={chart.paddingTop + chart.innerHeight + 16}
+                                    textAnchor="middle"
+                                    className="contract-forecast-chart-label"
+                                  >
+                                    {bar.label}
+                                  </text>
+                                </g>
+                              ))}
+                            </svg>
+                          );
+                        })()}
+                      </div>
+                    ) : null}
+                    {selectedTeamContractTable ? (
+                      <div className="team-contracts-expiry-panel" data-testid="team-contracts-expiry-timeline">
+                        <div className="team-contracts-section-head">
+                          <strong>Restlaufzeiten</strong>
+                          <span className="muted">Wer läuft wann aus</span>
+                        </div>
+                        <div className="team-contracts-expiry-track nl-tnum">
+                          {buildContractExpiryBuckets(
+                            selectedTeamContractTable.rows,
+                            selectedTeamContractTable.seasonLabels?.length,
+                          ).map((bucket) => (
+                            <div
+                              key={`expiry-${bucket.year}`}
+                              className={`team-contracts-expiry-bucket ${getContractLengthHeatBandClass(bucket.year)}`}
+                            >
+                              <div className="team-contracts-expiry-bucket-head">
+                                <span>
+                                  {bucket.year === 1 ? "Läuft aus" : `${bucket.year} J.${bucket.isOverflowBucket ? "+" : ""}`}
+                                </span>
+                                <strong>{bucket.rows.length}</strong>
+                              </div>
+                              <div className="team-contracts-expiry-bucket-players">
+                                {bucket.rows.length > 0 ? (
+                                  bucket.rows.map((row) => (
+                                    <button
+                                      key={row.rowId}
+                                      type="button"
+                                      className="team-contracts-expiry-chip"
+                                      title={`${row.playerName} öffnen`}
+                                      onClick={() => void openPlayerDrawerById(row.playerId)}
+                                    >
+                                      {row.playerName}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <span className="team-contracts-expiry-empty">—</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ) : null}
                     {selectedTeamContractShapeMix ? (
-                      <details className="team-contracts-mix-details">
-                        <summary>
-                          Vertragsmix · {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount} strukturiert
-                        </summary>
-                        <div className="team-contract-mix-grid">
+                      <div className="team-contract-mix-panel">
+                        <div className="team-contracts-section-head">
+                          <strong>Vertragsmix</strong>
+                          <span className="muted nl-tnum">
+                            {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount} strukturiert
+                          </span>
+                        </div>
+                        <div
+                          className="team-contract-mix-segbar"
+                          role="img"
+                          aria-label={`Vertragsmix: ${selectedTeamContractShapeMix.entries.map((entry) => `${entry.label} ${formatLocalePoints(entry.share, 0)}%`).join(", ")}`}
+                        >
+                          {selectedTeamContractShapeMix.entries.map((entry) =>
+                            entry.share > 0 ? (
+                              <span
+                                key={entry.shape}
+                                className={`team-contract-mix-segbar-seg is-${entry.shape.replace("_", "-")}`}
+                                style={{ width: `${entry.share}%` }}
+                                title={`${entry.label} · ${entry.count} · ${formatLocalePoints(entry.share, 0)}%`}
+                              />
+                            ) : null,
+                          )}
+                        </div>
+                        <div className="team-contract-mix-segbar-legend">
                           {selectedTeamContractShapeMix.entries.map((entry) => (
-                            <article className={`team-contract-mix-card is-${entry.shape.replace("_", "-")}`} key={entry.shape}>
-                              <div className="team-contract-mix-card-head">
-                                <span>{entry.label}</span>
-                                <strong>{formatLocalePoints(entry.share, 0)}%</strong>
-                              </div>
-                              <div className="team-contract-mix-metrics">
-                                <span>
-                                  <strong>{entry.count}</strong> Verträge
-                                </span>
-                                <span>
-                                  <strong>{formatDisplayMoney(entry.totalSalary)}</strong> gebunden
-                                </span>
-                              </div>
-                            </article>
+                            <span
+                              key={`legend-${entry.shape}`}
+                              className={`team-contract-mix-segbar-legend-item is-${entry.shape.replace("_", "-")}`}
+                            >
+                              <i aria-hidden="true" /> {entry.label} <strong>{entry.count}</strong>
+                            </span>
                           ))}
                         </div>
-                      </details>
+                        <details className="team-contracts-mix-details">
+                          <summary>Struktur-Details</summary>
+                          <div className="team-contract-mix-grid">
+                            {selectedTeamContractShapeMix.entries.map((entry) => (
+                              <article className={`team-contract-mix-card is-${entry.shape.replace("_", "-")}`} key={entry.shape}>
+                                <div className="team-contract-mix-card-head">
+                                  <span>{entry.label}</span>
+                                  <strong>{formatLocalePoints(entry.share, 0)}%</strong>
+                                </div>
+                                <div className="team-contract-mix-metrics">
+                                  <span>
+                                    <strong>{entry.count}</strong> Verträge
+                                  </span>
+                                  <span>
+                                    <strong>{formatDisplayMoney(entry.totalSalary)}</strong> gebunden
+                                  </span>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
                     ) : null}
                     <div className="team-contracts-toolbar">
                       {selectedTeamContractPreviewRowCount > 0 ? (
@@ -1096,7 +1274,11 @@ function FoundationTeamsDetailPanel({
                                       {formatContractShapeLabel(row.contractShape)}
                                     </span>
                                   </td>
-                                  <td>{formatWholeNumber(row.contractLength)}</td>
+                                  <td>
+                                    <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
+                                      {formatWholeNumber(row.contractLength)}
+                                    </span>
+                                  </td>
                                   <td>
                                     {row.morale != null ? (
                                       <span title={row.moraleMood ?? "Moral"}>
@@ -1240,10 +1422,6 @@ function FoundationTeamsDetailPanel({
                         ) : null}
                       </table>
                     </div>
-                    <p className="muted team-contracts-footnote">
-                      Preview-Drafts stammen aus dem Kaufdialog. Buyout zahlt das komplette Restgehalt; bei Abgang erhält das Team den VK-Wert.
-                    </p>
-
                   </div>
                 )}
               </section>

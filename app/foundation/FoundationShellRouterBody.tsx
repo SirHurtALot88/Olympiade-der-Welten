@@ -1043,7 +1043,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               className="foundation-shell-subnav"
               items={[
                 { id: "roster", label: "Kader", count: teamsRosterBadgeCount },
-                { id: "portraits", label: "Portraits" },
                 { id: "contracts", label: "Verträge" },
                 { id: "transfer", label: "Transfers" },
               ]}

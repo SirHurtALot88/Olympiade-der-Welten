@@ -9379,11 +9379,6 @@ a {
   background: rgba(30, 41, 59, 0.82);
 }
 
-.team-contracts-footnote {
-  margin: 0;
-  font-size: 0.82rem;
-}
-
 .teams-portraits-dashboard {
   margin-bottom: 4px;
 }
@@ -9518,7 +9513,7 @@ a {
 
 .team-focus-footer-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -24993,30 +24988,205 @@ a {
     rgba(17, 19, 24, 0.55);
 }
 
-.contract-forecast-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 0.65rem;
+.contract-forecast-chart-svg {
+  display: block;
+  width: 100%;
+  height: 152px;
 }
 
-.contract-forecast-card {
-  display: grid;
-  gap: 0.18rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.045);
+.contract-forecast-chart-axis {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
 }
 
-.contract-forecast-card span {
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+.contract-forecast-chart-bar.is-committed {
+  fill: rgba(237, 190, 88, 0.88);
+  stroke: rgba(237, 190, 88, 1);
+  stroke-width: 1;
+}
+
+.contract-forecast-chart-bar.is-preview {
+  fill: rgba(96, 165, 250, 0.32);
+  stroke: rgba(96, 165, 250, 0.85);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.contract-forecast-chart-value {
+  fill: rgba(255, 255, 255, 0.92);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.contract-forecast-chart-label {
+  fill: rgba(255, 255, 255, 0.56);
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
-.contract-forecast-card strong {
-  font-size: 1.15rem;
+/* --- Restlaufzeiten-Zeitleiste (Verträge-Tab) ---------------------- */
+.team-contracts-expiry-panel {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.team-contracts-expiry-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 0.5rem;
+}
+
+.team-contracts-expiry-bucket {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.team-contracts-expiry-bucket.heat-band-1 {
+  border-color: var(--heat-danger-bg);
+  background: linear-gradient(180deg, rgba(124, 52, 52, 0.22), rgba(255, 255, 255, 0.03));
+}
+
+.team-contracts-expiry-bucket.heat-band-3 {
+  border-color: var(--heat-risk-bg);
+  background: linear-gradient(180deg, rgba(184, 115, 66, 0.18), rgba(255, 255, 255, 0.03));
+}
+
+.team-contracts-expiry-bucket.heat-band-5 {
+  border-color: var(--heat-good-bg);
+  background: linear-gradient(180deg, rgba(171, 201, 148, 0.14), rgba(255, 255, 255, 0.03));
+}
+
+.team-contracts-expiry-bucket.heat-band-6 {
+  border-color: var(--heat-strong-bg);
+  background: linear-gradient(180deg, rgba(95, 143, 89, 0.16), rgba(255, 255, 255, 0.03));
+}
+
+.team-contracts-expiry-bucket.heat-band-8 {
+  border-color: var(--heat-best-bg);
+  background: linear-gradient(180deg, rgba(53, 95, 157, 0.18), rgba(255, 255, 255, 0.03));
+}
+
+.team-contracts-expiry-bucket-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.74rem;
+}
+
+.team-contracts-expiry-bucket-head span {
+  color: rgba(255, 255, 255, 0.68);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.team-contracts-expiry-bucket-head strong {
+  font-size: 0.92rem;
+}
+
+.team-contracts-expiry-bucket-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.team-contracts-expiry-chip {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  cursor: pointer;
+}
+
+.team-contracts-expiry-chip:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.team-contracts-expiry-empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.74rem;
+}
+
+/* --- Vertragsmix-Segmentbar (Verträge-Tab) ------------------------- */
+.team-contract-mix-segbar {
+  display: flex;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.team-contract-mix-segbar-seg {
+  display: block;
+  height: 100%;
+}
+
+.team-contract-mix-segbar-seg.is-balanced {
+  background: rgba(148, 163, 184, 0.75);
+}
+
+.team-contract-mix-segbar-seg.is-front-loaded {
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.7), rgba(96, 165, 250, 0.95));
+}
+
+.team-contract-mix-segbar-seg.is-back-loaded {
+  background: linear-gradient(90deg, rgba(237, 190, 88, 0.7), rgba(237, 190, 88, 0.95));
+}
+
+.team-contract-mix-segbar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.team-contract-mix-segbar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.team-contract-mix-segbar-legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.team-contract-mix-segbar-legend-item.is-balanced i {
+  background: rgba(148, 163, 184, 0.85);
+}
+
+.team-contract-mix-segbar-legend-item.is-front-loaded i {
+  background: rgba(96, 165, 250, 0.9);
+}
+
+.team-contract-mix-segbar-legend-item.is-back-loaded i {
+  background: rgba(237, 190, 88, 0.9);
+}
+
+/* --- LZ-Heat-Chip (Verträge-Tabelle) -------------------------------- */
+.team-contract-lz-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.78rem;
 }
 
 @media (max-width: 1320px) {
