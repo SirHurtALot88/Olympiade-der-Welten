@@ -1,5 +1,12 @@
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
+// Kredite tab visibility gate. The credit game-system (interest math,
+// eligibility, cash mutations) is being built in parallel; the scaffold
+// here (view, nav wiring, data seam) is ready but stays hidden from
+// players until that system is connected.
+// Flip to true once the parallel credit system is connected.
+export const CREDITS_TAB_ENABLED = false;
+
 export type FoundationNavItem = {
   id: FoundationViewId;
   label: string;
@@ -42,6 +49,9 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "marketV2", label: "Transfermarkt", tooltip: "Kaufen, verkaufen und verhandeln.", icon: "⇄" },
       { id: "scoutingCenterV2", label: "Scouting", tooltip: "Reports, Watchlist und Empfehlungen.", icon: "◐" },
       { id: "historyV2", label: "Historie", tooltip: "Vergangene Transfers.", icon: "↺" },
+      ...(CREDITS_TAB_ENABLED
+        ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
+        : []),
     ],
   },
   {

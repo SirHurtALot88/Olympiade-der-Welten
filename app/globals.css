@@ -53924,6 +53924,88 @@ button.is-new-look .nl-thist-season-pill,
   font-size: 10px;
 }
 
+/* ============================================================
+   Kredite (Neuer Look) — UI scaffold for the parallel-built credit
+   system. Data-agnostic: identical styling whether the seam is
+   still `"not_ready"` (stub) or `"ready"` (real credit data).
+   ============================================================ */
+.is-new-look .nl-credits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-credits-header-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-kpi-row {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-credits-table-shell {
+  overflow-x: auto;
+}
+
+.is-new-look .nl-credits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.is-new-look .nl-credits-table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  border-bottom: 1px solid var(--nl-line-2);
+}
+
+.is-new-look .nl-credits-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--nl-line);
+  vertical-align: middle;
+}
+
+.is-new-look .nl-credits-offer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-credits-offer-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+  border-radius: var(--nl-r-lg);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-credits-offer-range {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-credits-offer-terms {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-empty-text {
+  margin: 0;
+  font-size: 13px;
+}
+
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-thist-season-pill,

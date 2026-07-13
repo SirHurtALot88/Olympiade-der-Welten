@@ -249,6 +249,10 @@ const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/Fou
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
 });
+const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -3627,6 +3631,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             active={activeView === "history" || activeView === "historyV2"}
             hostProps={foundationHistoryV2HostProps}
           />
+
+          {activeView === "credits" ? (
+            <FoundationCreditsHost gameState={gameState} teamId={activeManagerTeamId} />
+          ) : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />
