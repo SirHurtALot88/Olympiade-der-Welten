@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { NlCard, StatChip, StatChipRow, formatNlMoney } from "@/components/foundation/new-look";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, Team } from "@/lib/data/olyDataTypes";
+import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildLoanOffers, computeLoanTerms, type LoanOffer } from "@/lib/finance/loan-service";
 import type { LoanEarlyPayoffOutcome, LoanOriginateOutcome } from "@/app/foundation/credits/FoundationCreditsHost";
 import type { ActiveLoan, CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
@@ -117,13 +119,19 @@ function describeEarlyPayoffReason(reason: string | null): string {
 /** One card per lender offer — cheapest interest first (see `buildLoanOffers`). */
 function LoanOfferCard({
   offer,
+  lenderTeam,
   amount,
   termSeasons,
+  isBest,
   onBorrow,
 }: {
   offer: LoanOffer;
+  /** Nur bei `offer.lenderType === "team"` gesetzt — für Logo/Initialen, siehe `getTeamLogoModel`. */
+  lenderTeam: Team | null;
   amount: number;
   termSeasons: number;
+  /** Erstes (günstigstes) Angebot, nur wenn mehr als eines existiert. */
+  isBest: boolean;
   onBorrow: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -140,14 +148,39 @@ function LoanOfferCard({
   const eligible = amount <= offer.maxAmount;
   const canSubmit = eligible && amount > 0 && !busy;
 
+  const teamLogo = offer.lenderType === "team" && lenderTeam ? getTeamLogoModel(lenderTeam, { variant: "thumb" }) : null;
+
   return (
     <div
-      className={`nl-credits-offer-card${eligible ? "" : " is-disabled"}`}
+      className={`nl-credits-offer-card${eligible ? "" : " is-disabled"}${isBest ? " is-best" : ""}`}
       data-testid="nl-credits-offer-card"
       data-lender-type={offer.lenderType}
     >
       <div className="nl-credits-offer-header">
+        {offer.lenderType === "bank" ? (
+          <span className="nl-credits-offer-crest is-bank" aria-hidden="true">
+            ₤
+          </span>
+        ) : (
+          <span className="nl-credits-offer-crest is-team">
+            {teamLogo?.src ? (
+              <BudgetedMediaImage
+                className="nl-credits-offer-crest-img"
+                src={teamLogo.src}
+                alt=""
+                width={28}
+                height={28}
+                loading="lazy"
+                fetchPriority="low"
+                fallback={<span aria-hidden="true">{teamLogo.initials}</span>}
+              />
+            ) : (
+              <span aria-hidden="true">{teamLogo?.initials ?? "?"}</span>
+            )}
+          </span>
+        )}
         <span className="nl-credits-offer-name">{offer.lenderName}</span>
+        {isBest ? <span className="nl-credits-offer-best-badge">Bestes Angebot</span> : null}
         {offer.lenderType === "team" && offer.relationshipValue != null ? (
           <span className="nl-credits-offer-badge" title="Beziehung zum Verleiher-Team">
             Beziehung {offer.relationshipValue > 0 ? `+${offer.relationshipValue}` : offer.relationshipValue}
@@ -225,8 +258,8 @@ function LoanOfferFilterPanel({
   onAmountBlur: () => void;
   onTermSeasonsChange: (next: number) => void;
 }) {
-  const capacity = Math.max(0, team.creditLimit);
-  const sliderStep = capacity > 0 ? Math.max(0.1, Math.round((capacity / 200) * 10) / 10) : 0.1;
+  const maxAmount = Math.max(0, team.maxOfferAmount);
+  const sliderStep = maxAmount > 0 ? Math.max(0.1, Math.round((maxAmount / 200) * 10) / 10) : 0.1;
 
   return (
     <NlCard className="nl-credits-borrow-card" eyebrow="Kredit-Filter" title="Kreditsumme & Laufzeit wählen">
@@ -236,10 +269,10 @@ function LoanOfferFilterPanel({
             type="range"
             className="nl-credits-slider"
             min={0}
-            max={capacity}
+            max={maxAmount}
             step={sliderStep}
             value={amount}
-            disabled={capacity <= 0}
+            disabled={maxAmount <= 0}
             onChange={(event) => onAmountChange(Number(event.target.value))}
             aria-label="Kreditsumme (Slider)"
             data-testid="nl-credits-principal-slider"
@@ -249,10 +282,10 @@ function LoanOfferFilterPanel({
               type="number"
               className="nl-credits-amount-input nl-tnum"
               min={0}
-              max={capacity}
+              max={maxAmount}
               step={0.1}
               value={amountInput}
-              disabled={capacity <= 0}
+              disabled={maxAmount <= 0}
               onChange={(event) => onAmountInputChange(event.target.value)}
               onBlur={onAmountBlur}
               aria-label="Kreditsumme (genauer Betrag, Mio.)"
@@ -263,7 +296,7 @@ function LoanOfferFilterPanel({
         </div>
         <div className="nl-credits-amount-range">
           <span>0</span>
-          <span>Bank-Kreditrahmen: {formatNlMoney(capacity)}</span>
+          <span>Max. Angebot: {formatNlMoney(maxAmount)}</span>
         </div>
       </div>
 
@@ -428,10 +461,10 @@ export default function FoundationCreditsNewLook({
   onToggleAdminOverride,
 }: FoundationCreditsNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
-  const capacity = Math.max(0, team?.creditLimit ?? 0);
+  const maxAmount = Math.max(0, team?.maxOfferAmount ?? 0);
 
-  const [amount, setAmount] = useState<number>(() => Math.round((capacity / 2) * 10) / 10);
-  const [amountInput, setAmountInput] = useState<string>(() => String(Math.round((capacity / 2) * 10) / 10));
+  const [amount, setAmount] = useState<number>(() => Math.round((maxAmount / 2) * 10) / 10);
+  const [amountInput, setAmountInput] = useState<string>(() => String(Math.round((maxAmount / 2) * 10) / 10));
   const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
 
   // Anders als früher (die Slider-Form mountete erst, sobald `team.canBorrow`
@@ -442,23 +475,23 @@ export default function FoundationCreditsNewLook({
   // bleiben; danach nur noch in den (ggf. neuen) Rahmen klemmen.
   const didInitializeAmountRef = useRef(false);
   useEffect(() => {
-    if (!didInitializeAmountRef.current && capacity > 0) {
+    if (!didInitializeAmountRef.current && maxAmount > 0) {
       didInitializeAmountRef.current = true;
-      const initial = Math.round((capacity / 2) * 10) / 10;
+      const initial = Math.round((maxAmount / 2) * 10) / 10;
       setAmount(initial);
       setAmountInput(String(initial));
       return;
     }
     setAmount((current) => {
-      const clamped = Math.min(Math.max(0, current), capacity);
+      const clamped = Math.min(Math.max(0, current), maxAmount);
       setAmountInput(String(clamped));
       return clamped;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capacity]);
+  }, [maxAmount]);
 
   function applyAmount(next: number) {
-    const clamped = Math.min(Math.max(0, next), capacity);
+    const clamped = Math.min(Math.max(0, next), maxAmount);
     setAmount(clamped);
     setAmountInput(String(clamped));
   }
@@ -471,7 +504,10 @@ export default function FoundationCreditsNewLook({
   // see `isSeasonOneBlocked` below) — `buildLoanOffers` itself returns `[]`.
   const offers = useMemo(() => {
     if (!team || !teamId || amount <= 0) return [];
-    return buildLoanOffers(gameState, teamId, amount, termSeasons, { allowSeason1: adminOverride });
+    return buildLoanOffers(gameState, teamId, amount, termSeasons, {
+      allowSeason1: adminOverride,
+      ignoreRevenueCap: adminOverride,
+    });
   }, [gameState, team, teamId, amount, termSeasons, adminOverride]);
 
   const isSeasonOneBlocked = team?.borrowBlockedReason === "season_one";
@@ -485,11 +521,7 @@ export default function FoundationCreditsNewLook({
 
   return (
     <div className="nl-credits" data-testid="foundation-credits" data-new-look="true">
-      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName}>
-        <p className="nl-credits-header-hint">
-          Kreditrahmen, laufende Kredite und Kreditangebote für {teamName}.
-        </p>
-      </NlCard>
+      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName} />
 
       {model.status === "not_ready" ? (
         <EmptyState
@@ -536,7 +568,7 @@ export default function FoundationCreditsNewLook({
               setAmountInput(raw);
               const parsed = Number(raw);
               if (Number.isFinite(parsed)) {
-                setAmount(Math.min(Math.max(0, parsed), capacity));
+                setAmount(Math.min(Math.max(0, parsed), maxAmount));
               }
             }}
             onAmountBlur={() => applyAmount(amount)}
@@ -546,12 +578,18 @@ export default function FoundationCreditsNewLook({
           <NlCard className="nl-credits-offers-card" eyebrow="Angebote" title="Verfügbare Angebote">
             {offers.length > 0 ? (
               <div className="nl-credits-offer-grid" data-testid="nl-credits-offer-grid">
-                {offers.map((offer) => (
+                {offers.map((offer, index) => (
                   <LoanOfferCard
                     key={`${offer.lenderType}:${offer.lenderTeamId ?? "bank"}`}
                     offer={offer}
+                    lenderTeam={
+                      offer.lenderType === "team"
+                        ? (gameState.teams.find((candidate) => candidate.teamId === offer.lenderTeamId) ?? null)
+                        : null
+                    }
                     amount={amount}
                     termSeasons={termSeasons}
+                    isBest={index === 0 && offers.length > 1}
                     onBorrow={onBorrow}
                   />
                 ))}
@@ -569,7 +607,7 @@ export default function FoundationCreditsNewLook({
         >
           <p className="nl-credits-empty-text muted">
             {isSeasonOneBlocked
-              ? "In Season 1 sind noch keine Kredite möglich."
+              ? "Ab Season 2 verfügbar."
               : team.borrowBlockedReason === "not_preseason"
                 ? "Neue Kredite könnt ihr nur in der Vorbereitung (Preseason) aufnehmen."
                 : "Euer Kreditrahmen ist aktuell ausgeschöpft."}

@@ -53937,12 +53937,6 @@ button.is-new-look .nl-thist-season-pill,
   font-family: var(--nl-sans);
 }
 
-.is-new-look .nl-credits-header-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--nl-mut);
-}
-
 .is-new-look .nl-credits-kpi-row {
   flex-wrap: wrap;
 }
@@ -54006,6 +54000,11 @@ button.is-new-look .nl-thist-season-pill,
   opacity: 0.55;
 }
 
+.is-new-look .nl-credits-offer-card.is-best {
+  border-color: var(--nl-warn);
+  box-shadow: 0 0 0 1px var(--nl-warn), var(--nl-e1);
+}
+
 .is-new-look .nl-credits-offer-header {
   display: flex;
   align-items: center;
@@ -54013,9 +54012,49 @@ button.is-new-look .nl-thist-season-pill,
   gap: var(--nl-s2);
 }
 
+.is-new-look .nl-credits-offer-crest {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--nl-line);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-offer-crest img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-credits-offer-crest.is-bank {
+  background: color-mix(in srgb, var(--nl-warn) 20%, transparent);
+  color: var(--nl-warn);
+  font-size: 14px;
+}
+
 .is-new-look .nl-credits-offer-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 14px;
   font-weight: 700;
+}
+
+.is-new-look .nl-credits-offer-best-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nl-warn);
+  color: #1a1200;
+  white-space: nowrap;
 }
 
 .is-new-look .nl-credits-offer-badge {
@@ -54713,6 +54752,27 @@ button.is-new-look .nl-thist-season-pill,
   gap: var(--nl-s3);
   font-family: var(--nl-sans);
   color: var(--nl-ink);
+  /* Ohne dies wächst der Flex-Container (samt der ~1480px breiten
+     Tabelle weiter unten) auf seine Inhaltsbreite und reißt so die
+     `.foundation-shell-content`/`.foundation-shell-main`-Grid-Spalte
+     mit sich — die Seite bekommt dann einen horizontalen Scrollbalken,
+     statt dass nur die Tabelle selbst scrollt. `min-width: 0` erlaubt
+     dem Container, auf die verfügbare Breite zu schrumpfen; die
+     eigentliche Breite bleibt bei der Tabelle in `.nl-players-table-shell`
+     (siehe dort, `overflow-x: auto`). */
+  min-width: 0;
+}
+
+/* Scoped Blowout-Fix für die umgebende Shell (siehe Kommentar oben):
+   `.foundation-shell-content` ist ein geteilter Wrapper aller
+   Foundation-Ansichten, daher NUR hier via `:has(> .nl-players)`
+   gezielt für die Spieler-Ansicht behandelt — keine Auswirkung auf
+   andere Tabs. Ohne `min-width: 0` zieht die implizite Grid-Spalte von
+   `.foundation-shell-main` die Breite der ~1480px breiten Spielertabelle
+   nach außen durch, statt sie innerhalb von `.nl-players-table-shell`
+   scrollen zu lassen. */
+.foundation-shell-content:has(> .nl-players) {
+  min-width: 0;
 }
 
 /* --- Header: Filter, Scope-Tabs, Summary & Leader ------------------ */
@@ -54810,6 +54870,11 @@ button.is-new-look .nl-thist-season-pill,
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-md);
   background: var(--nl-panel);
+  /* Deckelt den Shell auf die verfügbare Kartenbreite — die Tabelle
+     darin (`min-width: 1480px`) scrollt dann INNERHALB dieses Shells
+     statt die Karte/Seite zu verbreitern. */
+  width: 100%;
+  max-width: 100%;
 }
 
 .is-new-look .nl-players-table {
@@ -55273,12 +55338,6 @@ button.is-new-look .nl-thist-season-pill,
 
 .is-new-look .nl-players-more-button:hover {
   background: var(--nl-accent-soft);
-}
-
-.is-new-look .nl-players-footnote {
-  margin: var(--nl-s3) 0 0;
-  font-size: 11px;
-  color: var(--nl-mut-2);
 }
 
 .is-new-look .nl-players-empty-text {
@@ -57570,8 +57629,7 @@ button.is-new-look .nl-thist-season-pill,
  * nur als Layout-Container weiterverwendet, nie neu definiert).
  *
  * Tasks:
- * 1) Liga-Perzentil-Chips (OVR/PPs/MVS + Achsen) — `.nl-ptable-percentile`,
- *    `.nl-ptable-axis-percentile`.
+ * 1) Liga-Perzentil-Chips (OVR/PPs/MVS) — `.nl-ptable-percentile`.
  * 2) Nächster-Spieltag Disziplin-Eignungs-Strip — `.nl-ptable-discipline-*`.
  * 3) CA/PO-Sterne-Spalte (NlAbilityStars) — `.nl-ptable-td-ability`.
  * 4) MW-Bracket-Histogramm (NlBarChart) — `.nl-ptable-bracket-*`.
@@ -57598,21 +57656,11 @@ button.is-new-look .nl-thist-season-pill,
   white-space: nowrap;
 }
 
-/* --- 1) Achsen-Perzentil-Badge (kompakt, "T8%") ---------------------- */
+/* --- 1) Achsen-Zeile: Label + Balken + Wert (kein #Rang mehr in der
+   Zelle — Excel-Redundanz zu den PPS/OVR/MVS-Rang-Chips entfernt, siehe
+   `renderAxisBars`; der Rang steckt weiterhin im `title`-Tooltip). --- */
 .is-new-look .nl-players-axis.nl-ptable-axis-enhanced {
-  grid-template-columns: 28px minmax(40px, 1fr) 26px 30px;
-}
-
-.is-new-look .nl-ptable-axis-percentile {
-  font-size: 9px;
-  font-weight: 700;
-  text-align: right;
-  color: var(--nl-tone, var(--nl-mut));
-  white-space: nowrap;
-}
-
-.is-new-look .nl-ptable-axis-percentile.is-empty {
-  visibility: hidden;
+  grid-template-columns: 28px minmax(40px, 1fr) 26px;
 }
 
 /* --- 2) Disziplin-Eignungs-Strip (nächster Spieltag) ----------------- */
@@ -59007,12 +59055,11 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 /* Erzwingt dunklen Text für jede Zahl/jeden Chip-Typ, der in der Tabelle
-   vorkommt — Perzentil-/Rang-Chips (PPs/OVR/MVS), Achsen-Rang-Badges,
-   Name/Status, Team-Name, Geld-/Vertrags-/Karriere-Zellen, Traits. Deckt
-   alle Spalten ab, die `sortCellClass(...)` in der TSX tragen können. */
+   vorkommt — Perzentil-/Rang-Chips (PPs/OVR/MVS), Name/Status, Team-Name,
+   Geld-/Vertrags-/Karriere-Zellen, Traits. Deckt alle Spalten ab, die
+   `sortCellClass(...)` in der TSX tragen können. */
 .is-new-look td.is-active-sort .nl-tnum,
 .is-new-look td.is-active-sort .nl-ptable-percentile,
-.is-new-look td.is-active-sort .nl-ptable-axis-percentile,
 .is-new-look td.is-active-sort .nl-players-name,
 .is-new-look td.is-active-sort .nl-players-status,
 .is-new-look td.is-active-sort .nl-players-team-name,

@@ -37,13 +37,22 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   const outstandingDebt = getTeamOutstandingDebt(gameState, teamId);
 
   // Single source of truth for capacity: the exact same offer path the
-  // marketplace renders — the bank card's `maxAmount` (principal/termSeasons
-  // here are throwaway probe values, capacity does not depend on either).
-  // Season 1 → `buildLoanOffers` returns `[]` (hard rule), so `bankOffer` is
-  // `null` and `creditLimit` naturally falls to 0 without a separate probe.
-  const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS, { allowSeason1: adminOverride });
+  // marketplace renders (principal/termSeasons here are throwaway probe
+  // values, capacity does not depend on either). `creditLimit` is the BANK's
+  // `maxAmount` only — used for the "Kreditrahmen" KPI chip, not for gating
+  // (see `maxOfferAmount` below). Season 1 → `buildLoanOffers` returns `[]`
+  // (hard rule), so both naturally fall to 0 without a separate probe.
+  const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS, {
+    allowSeason1: adminOverride,
+    ignoreRevenueCap: adminOverride,
+  });
   const bankOffer = probeOffers.find((offer) => offer.lenderType === "bank") ?? null;
   const creditLimit = bankOffer?.maxAmount ?? 0;
+  // Größter Betrag, den irgendein Anbieter (Bank ODER Team) vergibt — Team-
+  // Verleiher hängen nicht am Bank-Kreditrahmen, daher darf das Gate nicht an
+  // `creditLimit` (Bank) allein hängen, sonst verschwindet der ganze
+  // Marktplatz sobald die Bank 0 Kapazität hat, obwohl Teams noch leihen.
+  const maxOfferAmount = probeOffers.reduce((max, offer) => Math.max(max, offer.maxAmount), 0);
 
   const activeLoans = (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
@@ -74,7 +83,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   // Admin-Override (nur Vorschau/Test, siehe FoundationCreditsHost): ignoriert
   // die Season-1- und Phasen-Sperre, der Kreditrahmen selbst muss aber real
   // > 0 sein.
-  const canBorrow = adminOverride ? creditLimit > 0 : isPreseason && !seasonOne && creditLimit > 0;
+  const canBorrow = adminOverride ? maxOfferAmount > 0 : isPreseason && !seasonOne && maxOfferAmount > 0;
   const borrowBlockedReason = canBorrow
     ? null
     : adminOverride
@@ -90,6 +99,7 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   const teamCreditState: TeamCreditState = {
     teamId,
     creditLimit,
+    maxOfferAmount,
     outstandingDebt,
     cash: team.cash,
     finances,
