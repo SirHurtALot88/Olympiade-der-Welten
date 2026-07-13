@@ -5,8 +5,9 @@ import { resolveTeamSpendableCashForPlanning } from "@/lib/ai/planner-cash-buffe
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment, originateLoan } from "@/lib/finance/loan-service";
-import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
+import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 /**
  * Phase 2 KI-Anbindung, siehe docs/design/kredit-system.md ("KI-Anbindung"). Bedarfsgetrieben und
@@ -14,28 +15,20 @@ import { isSeasonOne } from "@/lib/season/transfer-season-policy";
  * sie echten Kaderbedarf hat und ihn sich sonst nicht leisten kann.
  */
 
-const DEFAULT_TERM_SEASONS = 3;
+/** Default-Laufzeit (Kapazitäts-Vorschau + neutraler Startwert); der reale Term ergibt sich tragbarkeits-basiert. */
+const DEFAULT_TERM_SEASONS = 4;
 /**
- * Kandidaten-Laufzeiten, aufsteigend probiert — NUR KURZE Laufzeiten (User: "möglichst kurz, keine
- * 10-Jahres-Dinger"). Passt keine davon in die kumulative Tragfähigkeit, wird der Kredit ABGELEHNT
- * (resolveServiceableTermSeasons → null) statt auf eine lange Laufzeit gestreckt.
+ * Kandidaten-Laufzeiten, AUFSTEIGEND — die kürzeste tragbare gewinnt (kleiner Bedarf → kurze Laufzeit,
+ * nicht ewig gestreckt). Lange Laufzeiten sind ERLAUBT (bis 10), aber nur wenn der Betrag es nötig macht
+ * ("wenn begründet"), nicht als Standard. Kein harter Term-Block.
  */
-const TERM_CANDIDATES = [2, 3, 4];
-/** Jahresrate (GESAMT: bestehende + neue) darf höchstens diesen Anteil der Jahreseinnahmen ausmachen. */
-const SERVICEABILITY_INCOME_RATIO = 0.5;
+const TERM_CANDIDATES = [2, 3, 4, 5, 6, 8, 10];
 const MIN_WILLINGNESS = 0.3;
 const MAX_WILLINGNESS = 1.0;
 /** Bereitschaft sinkt um diesen Faktor je cashPriority-Punkt über dem neutralen Wert (5). */
 const WILLINGNESS_CASH_PRIORITY_STEP = 0.1;
 /** Zusätzlicher Dämpfungsfaktor für explizit als Cash-Hoarder markierte Teams. */
 const HOARDER_WILLINGNESS_MULTIPLIER = 0.6;
-/**
- * Anti-Spiral-Parameter (siehe Combined-Run-Befund: ohne diese leiht die ganze Liga jede Preseason auf
- * Opt und rutscht in eine Schuldenspirale, bis ein Team unter Min fällt und die Season bricht). Kredit
- * ist die AUSNAHME, kein Standard-Finanzierungsinstrument.
- */
-/** Ab dieser Schulden/Jahreseinnahmen-Quote nimmt ein Team gar keinen weiteren Kredit mehr auf. */
-const MAX_DEBT_TO_REVENUE = 0.6;
 /** Bereitschaft sinkt zusätzlich mit vorhandener Verschuldung (Teams werden bewusst vorsichtiger). */
 const LEVERAGE_WILLINGNESS_STEP = 0.7;
 /** Nur bei spürbarer Finanzierungslücke leihen — kleine Routine-Top-ups lösen keinen Kredit aus. */
@@ -46,6 +39,17 @@ const MIN_MEANINGFUL_SHORTFALL = 8;
  * nicht die ganze Liga jede Preseason auf Opt fremdfinanziert.
  */
 const COMPETITIVE_FLOOR_OPT_FRACTION = 0.5;
+/**
+ * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt. Das Gehalt
+ * wird nur ANTEILIG gegengerechnet (Teams haben auch Transfer-/sonstige Einnahmen), der Gebäude-Unterhalt
+ * voll. So behalten Teams Gehalt + Gebäudekosten vs. Sponsor im Blick und nehmen keine zu kurzen (zu
+ * teuren) Kredite auf, die sie zusammen mit den Fixkosten nicht stemmen können.
+ */
+const SALARY_SERVICE_WEIGHT = 0.6;
+/** Auch bei hohen Fixkosten bleibt mindestens dieser Anteil des Sponsor-FC als Kreditdienst-Budget nutzbar. */
+const MIN_DEBT_SERVICE_FLOOR = 0.15;
+/** Ist nach den bestehenden Raten weniger als das übrig, gibt es keinen Spielraum für einen weiteren Kredit. */
+const MIN_DEBT_SERVICE_ROOM = 1;
 
 /** Summe der offenen Restschuld (principalOutstanding) über alle aktiven Kredite eines Teams. */
 function sumActiveOutstanding(gameState: GameState, teamId: string): number {
@@ -57,6 +61,21 @@ function sumActiveOutstanding(gameState: GameState, teamId: string): number {
 /** Wettbewerbsfähige Roster-Zwischenstufe zwischen Min und Opt (Kredit-Zielgröße, nicht das volle Opt). */
 function resolveCompetitiveFloor(playerMin: number, playerOpt: number): number {
   return playerMin + Math.ceil(Math.max(0, playerOpt - playerMin) * COMPETITIVE_FLOOR_OPT_FRACTION);
+}
+
+/**
+ * Jährliches Budget für Kreditraten: Sponsor-FC minus Fixkosten (anteiliges Gehalt + voller Gebäude-
+ * Unterhalt), mit einem Floor, damit auch bei hohen Fixkosten ein kleiner Rahmen bleibt. Gegen dieses
+ * Budget (nach Abzug der bereits laufenden Raten) wird die Tragfähigkeit geprüft — nicht mehr die Rate
+ * blind gegen den vollen Sponsor-FC.
+ */
+function disposableDebtServiceBudget(gameState: GameState, teamId: string): number {
+  const sponsorIncome = estimateTeamAnnualRevenue(gameState, teamId);
+  if (sponsorIncome <= 0) return 0;
+  const salary = getTeamSalarySum(gameState, teamId);
+  const buildingUpkeep = calculateFacilityUpkeep(getTeamFacilityState(gameState, teamId));
+  const afterFixedCosts = sponsorIncome - salary * SALARY_SERVICE_WEIGHT - buildingUpkeep;
+  return Math.max(sponsorIncome * MIN_DEBT_SERVICE_FLOOR, afterFixedCosts);
 }
 
 function round(value: number, digits = 2) {
@@ -116,25 +135,12 @@ function resolveWillingness(gameState: GameState, teamId: string, seasonId: stri
   return willingness;
 }
 
-/** Projiziert die Jahreseinnahmen über das Saison-Ökonomie-Fenster, um die Tragfähigkeit zu prüfen. */
-function resolveProjectedAnnualIncome(gameState: GameState, teamId: string): number {
-  const baseRevenue = estimateTeamAnnualRevenue(gameState, teamId);
-  if (baseRevenue <= 0) return 0;
-  const factorWindow = getSeasonEconomyFactorWindow({
-    saveId: gameState.season.id,
-    seasonId: gameState.season.id,
-    seasonState: gameState.seasonState,
-  }).map((entry) => entry.factor);
-  const nearTermFactor = factorWindow[0] ?? 1;
-  return round(baseRevenue * Math.max(0.1, nearTermFactor));
-}
-
 /**
- * Wählt die KÜRZESTE Kandidaten-Laufzeit, deren GESAMT-Jahresrate (bestehende Kredite + neuer Kredit)
- * gegen die projizierten Einnahmen tragbar ist. Die bestehende Schuldenlast wird bewusst mitgerechnet —
- * ohne das sah ein 2./3. Kredit einzeln „tragbar" aus, obwohl die Summe erdrückend war (die
- * Schuldenspirale). Passt KEINE der kurzen Laufzeiten, wird `null` zurückgegeben → der Kredit wird
- * abgelehnt, statt auf eine lange, belastende Laufzeit gestreckt zu werden.
+ * Wählt die KÜRZESTE Laufzeit, deren Rate in das noch freie Kreditdienst-Budget passt (Budget minus
+ * bereits laufende Raten) — kleiner Bedarf ⇒ kurze Laufzeit, nicht ewig gestreckt. Passt die Rate erst
+ * bei einer langen Laufzeit, wird diese genommen (lange Kredite sind erlaubt, "wenn begründet"): der
+ * Fallback ist die LÄNGSTE Laufzeit (kleinste Rate), kein harter Block. `null` nur, wenn nach den
+ * bestehenden Raten gar kein Spielraum mehr da ist (echte Überschuldung, kein weiterer Kredit).
  */
 function resolveServiceableTermSeasons(input: {
   gameState: GameState;
@@ -142,19 +148,22 @@ function resolveServiceableTermSeasons(input: {
   principal: number;
   finances: number;
 }): number | null {
-  const projectedAnnualIncome = resolveProjectedAnnualIncome(input.gameState, input.teamId);
+  const budget = disposableDebtServiceBudget(input.gameState, input.teamId);
   const existingInstallment = getTeamAnnualLoanInstallment(input.gameState, input.teamId);
+  const room = budget - existingInstallment;
+  // Kein Einkommensdatum (budget 0, z. B. brandneues Team ohne Payout-Log): kurze Default-Laufzeit zulassen.
+  if (budget <= 0) return DEFAULT_TERM_SEASONS;
+  // Bestehende Raten fressen bereits das ganze Budget → keine weitere Rate tragbar.
+  if (room <= MIN_DEBT_SERVICE_ROOM) return null;
 
   for (const termSeasons of TERM_CANDIDATES) {
     const terms = computeLoanTerms({ principal: input.principal, termSeasons, finances: input.finances });
-    const totalInstallment = terms.installmentPerSeason + existingInstallment;
-    if (projectedAnnualIncome <= 0 || totalInstallment <= projectedAnnualIncome * SERVICEABILITY_INCOME_RATIO) {
-      return termSeasons;
-    }
+    if (terms.installmentPerSeason <= room) return termSeasons;
   }
-
-  // Selbst die längste kurze Laufzeit ist zusammen mit der bestehenden Last nicht tragbar → ablehnen.
-  return null;
+  // Selbst die längste Laufzeit liegt knapp über dem Rahmen — als begründete Ausnahme trotzdem die
+  // längste (kleinste Rate) nehmen statt abzulehnen; Kapazität + Bereitschaft haben den Betrag bereits
+  // gedeckelt.
+  return TERM_CANDIDATES[TERM_CANDIDATES.length - 1];
 }
 
 /**
@@ -184,13 +193,10 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // Reine Hort-Teams (Cash-Creator-Identität) borgen aus Charakter nicht.
   if (isStrategicHoardTeam(gameState, teamId)) return noLoan("strategic_hoard");
 
-  // Leverage-Vorsicht (Anti-Spiral): ein Team, dessen offene Schuld bereits einen zu großen Teil seiner
-  // Jahreseinnahmen ausmacht, nimmt keinen weiteren Kredit auf — es lässt sich erst stabilisieren/abbauen.
-  const annualRevenue = estimateTeamAnnualRevenue(gameState, teamId);
-  const outstandingDebt = sumActiveOutstanding(gameState, teamId);
-  if (annualRevenue > 0 && outstandingDebt >= annualRevenue * MAX_DEBT_TO_REVENUE) {
-    return noLoan("already_leveraged");
-  }
+  // Kein harter Leverage-Block mehr (User: Kredite sollen möglich bleiben, "wenn begründet"): die
+  // Vorsicht gegen eine Schuldenspirale läuft jetzt weich über (a) das Kreditdienst-Budget in
+  // resolveServiceableTermSeasons, das die bereits laufenden Raten UND Gehalt/Gebäudekosten
+  // gegenrechnet, und (b) die leverage-abhängig sinkende Bereitschaft in resolveWillingness.
 
   const needsEur = estimateRosterNeedEur(gameState, teamId);
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);

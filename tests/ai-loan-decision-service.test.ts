@@ -166,33 +166,53 @@ describe("resolveAiLoanDecision", () => {
     expect(decision.reason).toBe("no_need");
   });
 
-  it("refuses a further loan when the team is already highly leveraged (anti-spiral)", () => {
-    // Outstanding 40 vs revenue 50 -> debt/revenue 0.8 >= MAX_DEBT_TO_REVENUE(0.6) -> already_leveraged.
+  function existingLoan(installmentPerSeason: number, outstanding: number): LoanRecord {
+    return {
+      loanId: "existing",
+      borrowerTeamId: "T-1",
+      lenderType: "bank",
+      principalOriginal: outstanding,
+      principalOutstanding: outstanding,
+      interestRatePerSeason: 0.14,
+      termSeasons: 4,
+      seasonsRemaining: 3,
+      installmentPerSeason,
+      originatedSeasonId: "season-1",
+      status: "active",
+      missedPayments: 0,
+    };
+  }
+
+  it("borrows LESS when already carrying debt than the same team debt-free (soft leverage caution, no hard block)", () => {
+    const debtFree = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14, annualRevenue: 50 });
+    const indebted = buildTeamGameState({
+      cash: 3,
+      rosterCount: 6,
+      playerOpt: 14,
+      annualRevenue: 50,
+      loans: [existingLoan(8, 25)],
+    });
+    const debtFreeDecision = resolveAiLoanDecision(debtFree, "T-1");
+    const indebtedDecision = resolveAiLoanDecision(indebted, "T-1");
+    // A moderately indebted team can still borrow (loans stay possible "wenn begründet")...
+    expect(indebtedDecision.shouldBorrow).toBe(true);
+    // ...but is more cautious: it borrows a strictly smaller amount than the debt-free version.
+    expect(indebtedDecision.loanAmount).toBeLessThan(debtFreeDecision.loanAmount);
+  });
+
+  it("refuses a further loan only when existing installments have consumed the debt-service budget", () => {
+    // Existing installment 45 > disposable debt-service budget (~ max(7.5, 50 - 18*0.6) = 39.2) -> no room.
+    // Outstanding kept modest (20) so borrowing capacity stays positive and we reach the serviceability gate.
     const gameState = buildTeamGameState({
       cash: 3,
       rosterCount: 6,
       playerOpt: 14,
       annualRevenue: 50,
-      loans: [
-        {
-          loanId: "existing",
-          borrowerTeamId: "T-1",
-          lenderType: "bank",
-          principalOriginal: 40,
-          principalOutstanding: 40,
-          interestRatePerSeason: 0.14,
-          termSeasons: 4,
-          seasonsRemaining: 3,
-          installmentPerSeason: 12,
-          originatedSeasonId: "season-1",
-          status: "active",
-          missedPayments: 0,
-        },
-      ],
+      loans: [existingLoan(45, 20)],
     });
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
-    expect(decision.reason).toBe("already_leveraged");
+    expect(decision.reason).toBe("debt_service_ceiling");
   });
 
   it("scales borrowing down for a high-cashPriority (hoarder-leaning) team vs an aggressive team, same gap", () => {
