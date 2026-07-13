@@ -11,6 +11,7 @@ import {
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentForObjective } from "@/lib/sponsor/sponsor-objective-evaluator";
+import { FAN_INFRASTRUCTURE_LEVEL_CAP, fanInfrastructureLevelSum } from "@/lib/sponsor/sponsor-special-objectives";
 
 export type SponsorSettlementPhase = "season_end";
 
@@ -157,15 +158,26 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
 
     if (component.kind === "special") {
       const completed = evaluateSpecialComponentForObjective(gameState, contract.teamId, component) === "completed";
+      // Fan-Infrastruktur-Klausel: die Auszahlung skaliert mit der Income-Gebäude-Gesamtstufe (mehr
+      // fan_shop/arena-Level → höherer Bonus, gedeckelt), statt binär den vollen rewardCash zu zahlen.
+      // Alle anderen Sonderziele bleiben binär (voller rewardCash oder 0).
+      let cashDelta = completed ? component.rewardCash : 0;
+      let reason = completed ? "Sonderziel erfüllt" : "Sonderziel offen";
+      if (completed && component.specialKey === "fan_infrastructure") {
+        const levelSum = fanInfrastructureLevelSum(gameState, contract.teamId);
+        const scale = Math.min(1, levelSum / FAN_INFRASTRUCTURE_LEVEL_CAP);
+        cashDelta = roundCash(component.rewardCash * scale);
+        reason = `Fan-Infrastruktur Stufe ${levelSum}/${FAN_INFRASTRUCTURE_LEVEL_CAP}`;
+      }
       rows.push({
         teamId: contract.teamId,
         teamName: team?.name ?? contract.teamId,
         componentId: component.componentId,
         kind: component.kind,
         label: component.label,
-        status: completed ? "paid" : "skipped",
-        cashDelta: completed ? component.rewardCash : 0,
-        reason: completed ? "Sonderziel erfüllt" : "Sonderziel offen",
+        status: cashDelta > 0 ? "paid" : "skipped",
+        cashDelta,
+        reason,
       });
     }
   }

@@ -9,6 +9,7 @@ import type {
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-variants";
+import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 export type SponsorAxisKey = "pow" | "spe" | "men" | "soc";
 
@@ -329,5 +330,66 @@ export function buildStandardSpecialComponent(input: {
     targetValue: `${colors} Farben`,
     rewardCash: input.rewardCash,
     specialKey: "form_color_cover",
+  };
+}
+
+/**
+ * Fan-Infrastruktur-Klausel (Sponsor-Enhancement 2, optional). Immer-an-Zusatzkomponente auf JEDEM
+ * Angebot: belohnt den Bau der Einkommens-Gebäude (fan_shop / arena_upgrade). `targetValue` = minimale
+ * Gesamtstufe der beiden Income-Gebäude, ab der die Klausel greift (Schwelle 1 = mindestens ein
+ * Income-Gebäude auf L1). Die AUSZAHLUNG skaliert dann in der Settlement mit der tatsächlichen
+ * Gesamtstufe (fan_shop-Level + arena_upgrade-Level, gedeckelt) — je mehr Income-Infrastruktur ein
+ * Team baut, desto höher der Sponsor-Bonus. Das zieht in die gleiche Richtung wie der
+ * Income-Building-Fix (Teams sollen die Einkommens-Gebäude wirklich bauen, auch die arena).
+ */
+/**
+ * Deckel für die Fan-Infrastruktur-Skalierung: ab dieser Income-Gebäude-Gesamtstufe (fan_shop-Level +
+ * arena_upgrade-Level) zahlt die Klausel den vollen rewardCash; darunter anteilig. 6 = fan_shop L3 +
+ * arena L3 (oder eine L5+L1-Kombi) — solide, aber nicht maximaler Ausbau, damit der Bonus schon bei
+ * moderatem Ausbau greift und nicht erst bei voll gemaxten Gebäuden.
+ */
+export const FAN_INFRASTRUCTURE_LEVEL_CAP = 6;
+
+/** Gesamtstufe der beiden Einkommens-Gebäude eines Teams (fan_shop-Level + arena_upgrade-Level). */
+export function fanInfrastructureLevelSum(gameState: GameState, teamId: string): number {
+  const facilities = getTeamFacilityState(gameState, teamId);
+  return getFacilityLevel(facilities, "fan_shop") + getFacilityLevel(facilities, "arena_upgrade");
+}
+
+export function buildFanInfrastructureSpecialComponent(input: { rewardCash: number }): SponsorOfferComponent {
+  return {
+    componentId: "special-fan-infrastructure",
+    kind: "special",
+    label: "Fan-Infrastruktur (Fan-Shop / Arena)",
+    targetValue: 1,
+    rewardCash: input.rewardCash,
+    specialKey: "fan_infrastructure",
+  };
+}
+
+/**
+ * Überperformance-Bonus (Sponsor-Enhancement 3, Feinschliff). Immer-an-Zusatzkomponente: zahlt, wenn
+ * das Team die Saison DEUTLICH über seiner erwarteten Qualitäts-Platzierung beendet. Die erwartete
+ * Platzierung (teamQualityRank, beim Signing eingefroren) MINUS `margin` wird als absolute Ziel-
+ * Platzierung in `targetValue` einbetoniert — die Settlement/Evaluator braucht so nur `row.rank <=
+ * targetValue` zu prüfen (kein Zugriff auf den Vertrag nötig). Nicht über den Basisbetrag, sondern echte
+ * Überperformance über ein Saisonziel.
+ */
+export function buildBeatExpectedRankSpecialComponent(input: {
+  expectedRank: number | null | undefined;
+  margin: number;
+  rewardCash: number;
+}): SponsorOfferComponent | null {
+  if (input.expectedRank == null || !Number.isFinite(input.expectedRank)) return null;
+  // Nur Teams, die überhaupt Luft nach oben haben (nicht schon Platz 1 erwartet), bekommen die Klausel.
+  const targetRank = Math.round(input.expectedRank) - input.margin;
+  if (targetRank < 1) return null;
+  return {
+    componentId: "special-beat-expected-rank",
+    kind: "special",
+    label: `Saison auf Platz ≤ ${targetRank} beenden (Überperformance)`,
+    targetValue: targetRank,
+    rewardCash: input.rewardCash,
+    specialKey: "beat_expected_rank",
   };
 }

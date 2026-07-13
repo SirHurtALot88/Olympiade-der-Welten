@@ -45,7 +45,12 @@ import {
   getDemandProfile,
   rollSponsorStarTiers,
 } from "@/lib/sponsor/sponsor-tier-pool";
-import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
+import {
+  buildBeatExpectedRankSpecialComponent,
+  buildFanInfrastructureSpecialComponent,
+  resolveChallengeSlotIndex,
+} from "@/lib/sponsor/sponsor-special-objectives";
+import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 function roundCash(value: number) {
   return Number(value.toFixed(1));
@@ -102,10 +107,29 @@ function buildOffer(input: {
   });
   const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank });
   const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
-  const specialCash =
+  const baseSpecialCash =
     specialMode === "challenge"
       ? roundCash(Math.max(cashAmounts.specialCash, cashAmounts.totalAtMaxRank * 0.05))
       : roundCash(Math.max(special.rewardCash > 0 ? cashAmounts.specialCash * 0.65 : 0, cashAmounts.specialCash * 0.35));
+  // Enhancement 1 (Kern): das (bereits erreichbare) Saison-Sonderziel soll den Unterhaltskosten-Teil
+  // plus etwas extra abdecken — aber über ein Ziel, nicht über den Basisbetrag. Der Reward bekommt einen
+  // an den tatsächlichen Gebäude-Unterhalt des Teams gekoppelten Floor (halber Unterhalt, gedeckelt,
+  // salaryFactor-skaliert), sodass Teams mit mehr Gebäuden auch einen größeren erreichbaren Bonus haben.
+  const teamUpkeep = calculateFacilityUpkeep(getTeamFacilityState(gameState, team.teamId));
+  const upkeepSpecialFloor = roundCash(Math.min(teamUpkeep * 0.5, 6) * salaryFactor);
+  const specialCash = roundCash(Math.max(baseSpecialCash, upkeepSpecialFloor));
+
+  // Enhancement 2 (optional) + 3 (Feinschliff): Fan-Infrastruktur-Klausel (skaliert mit Income-Gebäude-
+  // Stufe) und Überperformance-Bonus (Saison deutlich über der erwarteten Qualitäts-Platzierung). Beide
+  // konservativ, salaryFactor-skaliert, binär bzw. gedeckelt — nur ausgezahlt, wenn das jeweilige Ziel
+  // erreicht wird (siehe Settlement/Evaluator).
+  const fanInfraReward = roundCash(2.5 * salaryFactor);
+  const overachieveReward = roundCash(3 * salaryFactor);
+  const beatExpectedComponent = buildBeatExpectedRankSpecialComponent({
+    expectedRank: teamQualityRank,
+    margin: 3,
+    rewardCash: overachieveReward,
+  });
 
   const components: SponsorOfferComponent[] = [
     {
@@ -135,6 +159,8 @@ function buildOffer(input: {
       rewardCash: specialCash,
       penaltyCash: special.penaltyCash != null ? roundCash(specialCash * 0.25 / demandMult) : undefined,
     },
+    buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward }),
+    ...(beatExpectedComponent ? [beatExpectedComponent] : []),
   ];
 
   return {
