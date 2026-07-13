@@ -54001,6 +54001,76 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
+/* --- Angebotsliste: eine Karte je Verleiher, günstigster Zins oben --- */
+.is-new-look .nl-credits-offer-card.is-disabled {
+  opacity: 0.55;
+}
+
+.is-new-look .nl-credits-offer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-credits-offer-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-credits-offer-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-accent-soft);
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-credits-offer-rate {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-credits-offer-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-credits-offer-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-credits-offer-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-offer-stat-value {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-credits-offer-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-offer-button {
+  align-self: flex-start;
+}
+
 .is-new-look .nl-credits-empty-text {
   margin: 0;
   font-size: 13px;

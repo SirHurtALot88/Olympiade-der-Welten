@@ -241,6 +241,97 @@ teamRate = clamp(
 - KI-zu-KI-Kredite: vorerst evtl. nur Mensch↔KI, KI↔KI später.
 - Balancing des Cash-Aufkommens (Vorbedingung oben) — braucht Daten aus echten Season-Läufen.
 
+## Seam-Vertrag für die UI (Phase 3)
+
+Die Kredite-UI (`app/foundation/credits/FoundationCreditsNewLook.tsx`) ist bereits ein
+Angebots-Marktplatz: Betrag-Slider + Laufzeit-Dropdown sind ein **Filter**, darunter rendert eine
+generische Angebotsliste (`lib/foundation/credits/loan-offers.ts`, `buildLoanOffers`) eine Karte
+pro Verleiher, günstigster Zins zuerst. Aktuell liefert `buildLoanOffers` nur das Bank-Angebot —
+diese Sektion ist der copy-paste-fertige Vertrag, um Team-Angebote reinzuhängen.
+
+### 1. `LoanOffer`-Typ (bereits vorhanden, nicht ändern)
+
+```ts
+// lib/foundation/credits/loan-offers.ts
+export type LoanOffer = {
+  lenderType: "bank" | "team";
+  lenderTeamId: string | null;      // null für die Bank
+  lenderName: string;               // "Bank" oder Team-Name
+  maxAmount: number;                // aktuell maximal verfügbarer Betrag dieses Verleihers
+  interestRatePerSeason: number;    // Satz für den angefragten Betrag+Laufzeit
+  installmentPerSeason: number;
+  relationship?: number | null;     // nur Team-Verleiher, für das Beziehungs-Badge
+  eligible: boolean;                // maxAmount >= angefragter Betrag
+};
+```
+
+Die UI rendert `LoanOffer[]` bereits generisch (sortiert nach `interestRatePerSeason` aufsteigend,
+`eligible: false` → Karte greyed-out mit "Reicht für diese Summe nicht."-Hinweis, Button
+deaktiviert). Es ist **keine weitere UI-Arbeit** nötig, sobald `buildLoanOffers` Team-Angebote
+zurückgibt.
+
+### 2. Team-Zweig in `buildLoanOffers` implementieren
+
+In `lib/foundation/credits/loan-offers.ts` steht der Block `// === SEAM: Phase 3 team-to-team
+offers connect HERE ===` mit auskommentiertem Pseudocode. Kurzfassung der Regeln (siehe oben
+§"Verleiher-Eligibilität" / §"Konditionen"):
+
+- Für jedes Team `L !== borrowerTeamId`:
+  - `freeLendableCash = max(0, L.cash - resolveTeamLiquidityBufferTarget(gameState, L.teamId))`
+    (`lib/ai/planner-cash-buffer-policy.ts`) — **nicht** das nackte `L.cash`.
+  - Kein Angebot (auch nicht disabled), wenn `freeLendableCash <= 0`.
+  - Kein Angebot, wenn die Beziehung feindlich ist:
+    `(getTeamRelationship(L.teamId, borrowerTeamId)?.value ?? 0) <= RIVAL_CUTOFF` (z. B. `-4`).
+    Achtung: `getTeamRelationship` gibt einen `TeamRelationshipRecord | null` zurück
+    (`lib/rivalries/team-rivalries.ts`), nicht direkt eine Zahl — `.value` lesen.
+  - Sonst: `teamRate = clamp(bankRate - 0.01 - relationshipDiscount - lenderYieldAppetite,
+    teamFloor, bankRate - 0.01)` mit `relationshipDiscount = max(0, relationshipValue) / 5 * 0.03`
+    und `bankRate` = derselbe Satz, den das Bank-Angebot für Betrag+Laufzeit gerade zeigt.
+  - `installmentPerSeason` **muss** aus `teamRate` per Annuität berechnet werden
+    (`A = P · r / (1 − (1+r)^(−n))`), NICHT über `computeLoanTerms` — die Funktion leitet ihren
+    Satz intern aus `finances` her und akzeptiert keinen extern vorgegebenen Zins. Am saubersten:
+    die Annuitätsformel aus `computeLoanTerms` in eine eigene, von beiden Zweigen (Bank + Team)
+    genutzte Hilfsfunktion auslagern.
+  - `maxAmount = freeLendableCash`, `eligible = freeLendableCash >= angefragter Betrag`,
+    `relationship = relationshipValue`.
+
+### 3. `originateLoan` für `lenderType: "team"` erweitern
+
+`lib/finance/loan-service.ts`, `originateLoan`: aktuell hart auf `lenderType: "bank"` codiert
+(Zeile `lenderType: "bank"` im gebauten `LoanRecord`) und mutiert bei `execute: true` nur den
+Cash des Kreditnehmers (`teams.map(...)`). Für Team-Kredite zusätzlich:
+
+- `OriginateLoanInput` um `lenderTeamId?: string` erweitern.
+- Beim Bauen des `LoanRecord`: `lenderType: input.lenderTeamId ? "team" : "bank"`,
+  `lenderTeamId: input.lenderTeamId`.
+- Bei der Cash-Mutation (`execute: true`): zusätzlich zum `+principal` beim Kreditnehmer den
+  Verleiher belasten: `−principal` auf `Team.cash` des Verleihers, im selben `teams.map`-Aufruf
+  (dasselbe Muster wie die Kreditnehmer-Mutation, nur gegenläufig). Kein zusätzlicher
+  Validierungsschritt nötig, wenn `buildLoanOffers`/die UI bereits `eligible` korrekt filtert —
+  aber serverseitig trotzdem `freeLendableCash >= principal` erneut prüfen (nie dem Client
+  vertrauen), sonst `reason: "over_capacity"` (oder ein neuer, spezifischerer Reason-Code).
+
+### 4. Settlement (`loan_settlement`) für Team-Verleiher erweitern
+
+`buildSettlementRows`/`applyLoanSettlement` (`lib/finance/loan-service.ts`) belasten aktuell nur
+den Kreditnehmer und schreiben dem Verleiher nichts gut ("verschwindet" bei der Bank). Für
+`loan.lenderType === "team"`: der `installmentCharged`-Betrag (abzüglich eines eventuellen
+Ausfall-Anteils) muss zusätzlich `loan.lenderTeamId` gutgeschrieben werden — analog zu
+`cashDeltaByTeamId` für den Kreditnehmer, nur mit positivem Delta beim Verleiher. Bei Ausfall
+trägt der Verleiher das Risiko (Rate bleibt aus / Kapitalisierung erhöht nur die Restschuld beim
+Kreditnehmer, keine Zahlung an den Verleiher für den ausgefallenen Teil).
+
+### 5. API-Route-Guard entfernen
+
+`app/api/finance/loan/originate/route.ts` lehnt aktuell jede Anfrage mit gesetztem
+`lenderTeamId` im Body sofort mit `{ ok: false, reason: "team_lending_not_available" }` ab (Guard
+direkt nach dem Body-Parsing, vor allen anderen Checks). Der Client (`onBorrow` in
+`app/foundation/credits/FoundationCreditsNewLook.tsx` → `originateLoanForActiveTeam` in
+`lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx`) übergibt bereits
+`offer.lenderTeamId` (aus der `LoanOffer`) an `onBorrow` — sobald `originateLoan` Team-Kredite
+unterstützt (Schritt 3), diesen Guard entfernen und `lenderTeamId` bis zum
+`originateLoan(...)`-Aufruf durchreichen.
+
 ## Tests
 
 - Zins/Rate-Berechnung gegen die Beispieltabelle (Annuität, Floor/Cap, Laufzeitrabatt,

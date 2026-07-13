@@ -14,6 +14,14 @@ type LoanOriginateBody = {
   teamId?: string;
   principal?: number;
   termSeasons?: number;
+  /**
+   * Non-null selects a team offer (Phase 3, not yet supported — rejected
+   * below with `team_lending_not_available`). `null`/omitted means the bank.
+   * Threaded through now so the client + this route are ready for Phase 3
+   * without another wiring pass — see docs/design/kredit-system.md
+   * "Seam-Vertrag für die UI (Phase 3)".
+   */
+  lenderTeamId?: string | null;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
   participantId?: string | null;
@@ -41,6 +49,20 @@ export async function POST(request: Request) {
     const teamId = body.teamId?.trim() ?? "";
     const principal = typeof body.principal === "number" ? body.principal : NaN;
     const termSeasons = typeof body.termSeasons === "number" ? body.termSeasons : NaN;
+    const lenderTeamId = typeof body.lenderTeamId === "string" ? body.lenderTeamId.trim() : "";
+
+    // Phase 3 (team-to-team lending) is not implemented yet — `originateLoan`
+    // only knows how to originate bank loans. Reject team offers explicitly
+    // here rather than silently falling back to the bank, so the client can
+    // show an honest message instead of originating the wrong loan. Remove
+    // this guard once `originateLoan` supports `lenderType: "team"` (see
+    // docs/design/kredit-system.md "Seam-Vertrag für die UI (Phase 3)").
+    if (lenderTeamId) {
+      return NextResponse.json(
+        { ok: false, reason: "team_lending_not_available", loan: null, capacity: 0, terms: null },
+        { status: 400 },
+      );
+    }
 
     if (source === "prisma") {
       return NextResponse.json(

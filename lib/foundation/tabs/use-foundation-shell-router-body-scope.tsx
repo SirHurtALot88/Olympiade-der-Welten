@@ -4539,6 +4539,7 @@ export function useFoundationShellRouterBodyScope({
   async function originateLoanForActiveTeam(
     principal: number,
     termSeasons: number,
+    lenderTeamId?: string | null,
   ): Promise<{ ok: boolean; reason: string | null }> {
     if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -4558,6 +4559,10 @@ export function useFoundationShellRouterBodyScope({
           teamId: activeManagerTeamId,
           principal,
           termSeasons,
+          // `null`/omitted selects the bank; a team id selects a team offer
+          // (Phase 3 — the route currently rejects this with
+          // `team_lending_not_available`, see kredit-system.md).
+          lenderTeamId: lenderTeamId ?? null,
           source: readMeta.source,
         })),
       });

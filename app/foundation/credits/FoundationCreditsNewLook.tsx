@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/foundation/EmptyState";
 import { NlCard, StatChip, StatChipRow, formatNlMoney } from "@/components/foundation/new-look";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import { computeLoanTerms } from "@/lib/finance/loan-service";
 import type { LoanOriginateOutcome } from "@/app/foundation/credits/FoundationCreditsHost";
-import type { CreditsViewModel, LoanQuote, TeamCreditState } from "@/lib/foundation/credits/credits-types";
+import { buildLoanOffers, type LoanOffer } from "@/lib/foundation/credits/loan-offers";
+import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
 
 export type FoundationCreditsNewLookProps = {
   teamName: string;
   model: CreditsViewModel;
-  onBorrow: (principal: number, termSeasons: number) => Promise<LoanOriginateOutcome>;
+  /** Needed to recompute `buildLoanOffers` live as the amount/Laufzeit filter changes. */
+  gameState: GameState;
+  /** Active manager's own team id — fog of war: never another team's id. */
+  teamId: string | null;
+  onBorrow: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
 };
 
 function formatRate(rate: number | null | undefined): string {
@@ -38,7 +44,7 @@ function describeBorrowReason(reason: string | null): string {
     case "not_preseason":
       return "Kreditaufnahme ist nur in der Vorbereitung (Preseason) möglich.";
     case "over_capacity":
-      return "Die gewünschte Summe übersteigt euren aktuellen Kreditrahmen.";
+      return "Die gewünschte Summe übersteigt den Rahmen dieses Anbieters.";
     case "invalid_principal":
       return "Bitte eine gültige Kreditsumme größer als 0 eingeben.";
     case "invalid_term_seasons":
@@ -53,6 +59,8 @@ function describeBorrowReason(reason: string | null): string {
       return "Unvollständige Anfrage — bitte erneut versuchen.";
     case "prisma_read_only":
       return "Im Referenzmodus (Prisma/Supabase) ist die Kreditaufnahme schreibgeschützt.";
+    case "team_lending_not_available":
+      return "Team-zu-Team-Kredite sind noch nicht verfügbar.";
     case "not_available":
       return "Kreditaufnahme ist gerade nicht verfügbar.";
     case null:
@@ -63,55 +71,115 @@ function describeBorrowReason(reason: string | null): string {
   }
 }
 
-function BorrowCard({
-  team,
+/** One card per lender offer — cheapest interest first (see `buildLoanOffers`). */
+function LoanOfferCard({
+  offer,
+  amount,
+  termSeasons,
   onBorrow,
 }: {
-  team: TeamCreditState;
-  onBorrow: (principal: number, termSeasons: number) => Promise<LoanOriginateOutcome>;
+  offer: LoanOffer;
+  amount: number;
+  termSeasons: number;
+  onBorrow: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
 }) {
-  const capacity = Math.max(0, team.creditLimit);
-  const [principal, setPrincipal] = useState<number>(() => Math.round((capacity / 2) * 10) / 10);
-  const [principalInput, setPrincipalInput] = useState<string>(() => String(Math.round((capacity / 2) * 10) / 10));
-  const [termSeasons, setTermSeasons] = useState<number>(team.minTermSeasons);
-  const [borrowBusy, setBorrowBusy] = useState(false);
-  const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  // Kapazität kann sich nach einer erfolgreichen Aufnahme (oder Team-Wechsel)
-  // ändern — den gewählten Betrag dann in den neuen Rahmen klemmen statt
-  // einen jetzt ungültigen Wert stehen zu lassen.
-  useEffect(() => {
-    setPrincipal((current) => {
-      const clamped = Math.min(Math.max(0, current), capacity);
-      setPrincipalInput(String(clamped));
-      return clamped;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capacity]);
-
-  const quote: LoanQuote = useMemo(() => {
-    const terms = computeLoanTerms({ principal, termSeasons, finances: team.finances });
-    const totalRepayment = terms.installmentPerSeason * termSeasons;
-    return {
-      interestRatePerSeason: terms.interestRatePerSeason,
-      installmentPerSeason: terms.installmentPerSeason,
-      totalRepayment,
-      totalInterest: Math.max(0, totalRepayment - principal),
-    };
-  }, [principal, termSeasons, team.finances]);
-
-  const sliderStep = capacity > 0 ? Math.max(0.1, Math.round((capacity / 200) * 10) / 10) : 0.1;
-
-  function applyPrincipal(next: number) {
-    const clamped = Math.min(Math.max(0, next), capacity);
-    setPrincipal(clamped);
-    setPrincipalInput(String(clamped));
-  }
-
-  const canSubmit = !borrowBusy && principal > 0 && principal <= capacity;
+  const totalRepayment = offer.installmentPerSeason * termSeasons;
+  const totalInterest = Math.max(0, totalRepayment - amount);
+  const canSubmit = offer.eligible && amount > 0 && !busy;
 
   return (
-    <NlCard className="nl-credits-borrow-card" eyebrow="Neuer Kredit" title="Kreditsumme & Laufzeit wählen">
+    <div
+      className={`nl-credits-offer-card${offer.eligible ? "" : " is-disabled"}`}
+      data-testid="nl-credits-offer-card"
+      data-lender-type={offer.lenderType}
+    >
+      <div className="nl-credits-offer-header">
+        <span className="nl-credits-offer-name">{offer.lenderName}</span>
+        {offer.lenderType === "team" && offer.relationship != null ? (
+          <span className="nl-credits-offer-badge" title="Beziehung zum Verleiher-Team">
+            Beziehung {offer.relationship > 0 ? `+${offer.relationship}` : offer.relationship}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="nl-credits-offer-rate nl-tnum">{formatRate(offer.interestRatePerSeason)}</div>
+
+      <div className="nl-credits-offer-stats">
+        <div className="nl-credits-offer-stat">
+          <span className="nl-credits-offer-stat-label">Jahresrate</span>
+          <span className="nl-credits-offer-stat-value nl-tnum">{formatNlMoney(offer.installmentPerSeason)}</span>
+        </div>
+        <div className="nl-credits-offer-stat">
+          <span className="nl-credits-offer-stat-label">Gesamtrückzahlung</span>
+          <span className="nl-credits-offer-stat-value nl-tnum">{formatNlMoney(totalRepayment)}</span>
+        </div>
+        <div className="nl-credits-offer-stat">
+          <span className="nl-credits-offer-stat-label">Gesamtzinsen</span>
+          <span className="nl-credits-offer-stat-value nl-tnum">{formatNlMoney(totalInterest)}</span>
+        </div>
+        <div className="nl-credits-offer-stat">
+          <span className="nl-credits-offer-stat-label">Max. verfügbar</span>
+          <span className="nl-credits-offer-stat-value nl-tnum">{formatNlMoney(offer.maxAmount)}</span>
+        </div>
+      </div>
+
+      {!offer.eligible ? <p className="nl-credits-offer-note">Reicht für diese Summe nicht.</p> : null}
+
+      <button
+        type="button"
+        className="primary-button nl-credits-offer-button"
+        disabled={!canSubmit}
+        onClick={() => {
+          setMessage(null);
+          setBusy(true);
+          void onBorrow(amount, termSeasons, offer.lenderTeamId)
+            .then((outcome) => {
+              setMessage(describeBorrowReason(outcome.reason));
+            })
+            .finally(() => setBusy(false));
+        }}
+        data-testid="nl-credits-offer-submit"
+      >
+        {busy ? "Wird aufgenommen…" : "Aufnehmen"}
+      </button>
+
+      {message ? (
+        <p className="nl-credits-borrow-message" role="status">
+          {message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Amount slider + exact input + Laufzeit dropdown — a FILTER, not a direct borrow action. */
+function LoanOfferFilterPanel({
+  team,
+  amount,
+  amountInput,
+  termSeasons,
+  onAmountChange,
+  onAmountInputChange,
+  onAmountBlur,
+  onTermSeasonsChange,
+}: {
+  team: TeamCreditState;
+  amount: number;
+  amountInput: string;
+  termSeasons: number;
+  onAmountChange: (next: number) => void;
+  onAmountInputChange: (raw: string) => void;
+  onAmountBlur: () => void;
+  onTermSeasonsChange: (next: number) => void;
+}) {
+  const capacity = Math.max(0, team.creditLimit);
+  const sliderStep = capacity > 0 ? Math.max(0.1, Math.round((capacity / 200) * 10) / 10) : 0.1;
+
+  return (
+    <NlCard className="nl-credits-borrow-card" eyebrow="Kredit-Filter" title="Kreditsumme & Laufzeit wählen">
       <div className="nl-credits-borrow-amount">
         <div className="nl-credits-borrow-amount-row">
           <input
@@ -120,9 +188,9 @@ function BorrowCard({
             min={0}
             max={capacity}
             step={sliderStep}
-            value={principal}
-            disabled={capacity <= 0 || borrowBusy}
-            onChange={(event) => applyPrincipal(Number(event.target.value))}
+            value={amount}
+            disabled={capacity <= 0}
+            onChange={(event) => onAmountChange(Number(event.target.value))}
             aria-label="Kreditsumme (Slider)"
             data-testid="nl-credits-principal-slider"
           />
@@ -133,17 +201,10 @@ function BorrowCard({
               min={0}
               max={capacity}
               step={0.1}
-              value={principalInput}
-              disabled={capacity <= 0 || borrowBusy}
-              onChange={(event) => {
-                const raw = event.target.value;
-                setPrincipalInput(raw);
-                const parsed = Number(raw);
-                if (Number.isFinite(parsed)) {
-                  setPrincipal(Math.min(Math.max(0, parsed), capacity));
-                }
-              }}
-              onBlur={() => applyPrincipal(principal)}
+              value={amountInput}
+              disabled={capacity <= 0}
+              onChange={(event) => onAmountInputChange(event.target.value)}
+              onBlur={onAmountBlur}
               aria-label="Kreditsumme (genauer Betrag, Mio.)"
               data-testid="nl-credits-principal-input"
             />
@@ -152,7 +213,7 @@ function BorrowCard({
         </div>
         <div className="nl-credits-amount-range">
           <span>0</span>
-          <span>Kreditrahmen: {formatNlMoney(capacity)}</span>
+          <span>Bank-Kreditrahmen: {formatNlMoney(capacity)}</span>
         </div>
       </div>
 
@@ -161,8 +222,7 @@ function BorrowCard({
         <select
           className="nl-credits-term-select"
           value={termSeasons}
-          disabled={borrowBusy}
-          onChange={(event) => setTermSeasons(Number(event.target.value))}
+          onChange={(event) => onTermSeasonsChange(Number(event.target.value))}
           data-testid="nl-credits-term-select"
         >
           {Array.from(
@@ -176,63 +236,75 @@ function BorrowCard({
         </select>
       </label>
 
-      <div className="nl-credits-quote-panel" data-testid="nl-credits-quote">
-        <div className="nl-credits-quote-row">
-          <span className="nl-credits-quote-label">Zinssatz p. a.</span>
-          <span className="nl-credits-quote-value nl-tnum">{formatRate(quote.interestRatePerSeason)}</span>
-        </div>
-        <div className="nl-credits-quote-row">
-          <span className="nl-credits-quote-label">Jahresrate</span>
-          <span className="nl-credits-quote-value nl-tnum">{formatNlMoney(quote.installmentPerSeason)}</span>
-        </div>
-        <div className="nl-credits-quote-row">
-          <span className="nl-credits-quote-label">Gesamtrückzahlung</span>
-          <span className="nl-credits-quote-value nl-tnum">{formatNlMoney(quote.totalRepayment)}</span>
-        </div>
-        <div className="nl-credits-quote-row">
-          <span className="nl-credits-quote-label">Gesamtzinsen</span>
-          <span className="nl-credits-quote-value nl-tnum">{formatNlMoney(quote.totalInterest)}</span>
-        </div>
-      </div>
-
-      <button
-        type="button"
-        className="primary-button nl-credits-borrow-button"
-        disabled={!canSubmit}
-        onClick={() => {
-          setLocalMessage(null);
-          setBorrowBusy(true);
-          void onBorrow(principal, termSeasons)
-            .then((outcome) => {
-              setLocalMessage(describeBorrowReason(outcome.reason));
-            })
-            .finally(() => setBorrowBusy(false));
-        }}
-        data-testid="nl-credits-borrow-submit"
-      >
-        {borrowBusy ? "Wird aufgenommen…" : "Kredit aufnehmen"}
-      </button>
-
-      {localMessage ? (
-        <p className="nl-credits-borrow-message" role="status">
-          {localMessage}
-        </p>
-      ) : null}
+      <p className="nl-credits-empty-text muted">
+        Betrag und Laufzeit filtern die Angebote unten — sie nehmen noch keinen Kredit auf.
+      </p>
     </NlCard>
   );
 }
 
 /**
- * "Neuer Look" Kredite — wired to the real bank credit system
- * (`lib/finance/loan-service.ts`, see `docs/design/kredit-system.md`).
+ * "Neuer Look" Kredite — Angebots-Marktplatz, wired to the real bank credit
+ * system (`lib/finance/loan-service.ts`) plus the loan-offer seam
+ * (`lib/foundation/credits/loan-offers.ts`), see
+ * `docs/design/kredit-system.md` §"Phase 3 — Team-zu-Team-Kredite
+ * (Detailkonzept)" / §"Angebots-UI".
  *
- * Borrowing (slider + exact amount + Laufzeit + live quote) only renders
- * when `team.canBorrow` (preseason + free capacity). No manual repayment —
- * settlement is automatic at season end (`applyLoanSettlement`), so active
- * loans are display-only with a note that the annual rate is auto-deducted.
+ * The amount slider + Laufzeit dropdown are a FILTER that parametrizes a
+ * live offer list (one card per lender, cheapest interest first); borrowing
+ * happens per-card via "Aufnehmen", not via the filter itself. Only the
+ * bank renders today — team offers are a clean empty seam (`buildLoanOffers`
+ * returns none yet) that will populate the same grid with zero further UI
+ * work once Phase 3 lands.
+ *
+ * No manual repayment — settlement is automatic at season end
+ * (`applyLoanSettlement`), so active loans are display-only with a note
+ * that the annual rate is auto-deducted.
  */
-export default function FoundationCreditsNewLook({ teamName, model, onBorrow }: FoundationCreditsNewLookProps) {
+export default function FoundationCreditsNewLook({ teamName, model, gameState, teamId, onBorrow }: FoundationCreditsNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
+  const capacity = Math.max(0, team?.creditLimit ?? 0);
+
+  const [amount, setAmount] = useState<number>(() => Math.round((capacity / 2) * 10) / 10);
+  const [amountInput, setAmountInput] = useState<string>(() => String(Math.round((capacity / 2) * 10) / 10));
+  const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
+
+  // Anders als früher (die Slider-Form mountete erst, sobald `team.canBorrow`
+  // feststand) mountet der Filter jetzt immer — `model` kann also nach dem
+  // ersten Render noch von "not_ready" auf "ready" wechseln. Den
+  // Default-Betrag (Kapazitätsmitte) daher einmalig setzen, sobald zum
+  // ersten Mal eine echte Kapazität > 0 bekannt ist, statt bei 0 hängen zu
+  // bleiben; danach nur noch in den (ggf. neuen) Rahmen klemmen.
+  const didInitializeAmountRef = useRef(false);
+  useEffect(() => {
+    if (!didInitializeAmountRef.current && capacity > 0) {
+      didInitializeAmountRef.current = true;
+      const initial = Math.round((capacity / 2) * 10) / 10;
+      setAmount(initial);
+      setAmountInput(String(initial));
+      return;
+    }
+    setAmount((current) => {
+      const clamped = Math.min(Math.max(0, current), capacity);
+      setAmountInput(String(clamped));
+      return clamped;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capacity]);
+
+  function applyAmount(next: number) {
+    const clamped = Math.min(Math.max(0, next), capacity);
+    setAmount(clamped);
+    setAmountInput(String(clamped));
+  }
+
+  // Live offer recompute on every filter change — pure/derived, no mutation.
+  // Empty until a real team is known (not_ready / fog-of-war-safe: teamId is
+  // always the active manager's own id here, see FoundationCreditsHost).
+  const offers = useMemo(() => {
+    if (!team || !teamId) return [];
+    return buildLoanOffers(gameState, teamId, { amount, termSeasons });
+  }, [gameState, team, teamId, amount, termSeasons]);
 
   const rateRange = team
     ? formatRateRange(
@@ -245,7 +317,7 @@ export default function FoundationCreditsNewLook({ teamName, model, onBorrow }: 
     <div className="nl-credits" data-testid="foundation-credits" data-new-look="true">
       <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName}>
         <p className="nl-credits-header-hint">
-          Kreditrahmen, laufende Kredite und Kreditaufnahme für {teamName}.
+          Kreditrahmen, laufende Kredite und Kreditangebote für {teamName}.
         </p>
       </NlCard>
 
@@ -265,7 +337,42 @@ export default function FoundationCreditsNewLook({ teamName, model, onBorrow }: 
       </StatChipRow>
 
       {team && team.canBorrow ? (
-        <BorrowCard team={team} onBorrow={onBorrow} />
+        <>
+          <LoanOfferFilterPanel
+            team={team}
+            amount={amount}
+            amountInput={amountInput}
+            termSeasons={termSeasons}
+            onAmountChange={applyAmount}
+            onAmountInputChange={(raw) => {
+              setAmountInput(raw);
+              const parsed = Number(raw);
+              if (Number.isFinite(parsed)) {
+                setAmount(Math.min(Math.max(0, parsed), capacity));
+              }
+            }}
+            onAmountBlur={() => applyAmount(amount)}
+            onTermSeasonsChange={setTermSeasons}
+          />
+
+          <NlCard className="nl-credits-offers-card" eyebrow="Angebote" title="Verfügbare Angebote">
+            {offers.length > 0 ? (
+              <div className="nl-credits-offer-grid" data-testid="nl-credits-offer-grid">
+                {offers.map((offer) => (
+                  <LoanOfferCard
+                    key={`${offer.lenderType}:${offer.lenderTeamId ?? "bank"}`}
+                    offer={offer}
+                    amount={amount}
+                    termSeasons={termSeasons}
+                    onBorrow={onBorrow}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="nl-credits-empty-text muted">Keine Angebote verfügbar.</p>
+            )}
+          </NlCard>
+        </>
       ) : team ? (
         <NlCard className="nl-credits-blocked-card" eyebrow="Neuer Kredit" title="Kreditaufnahme aktuell nicht möglich">
           <p className="nl-credits-empty-text muted">

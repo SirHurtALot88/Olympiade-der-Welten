@@ -14,9 +14,11 @@ export type FoundationCreditsHostProps = {
    * POST /api/finance/loan/originate + game-state refresh, wired by
    * `FoundationShellRouterBody` (mirrors `chooseTeamSponsor`'s
    * fetch-then-`loadSave` pattern). Falls back to a no-op "not available"
-   * result if the shell hasn't wired a handler.
+   * result if the shell hasn't wired a handler. `lenderTeamId` is `null`
+   * for the bank offer, a team id for a team offer (Phase 3 — see
+   * `lib/foundation/credits/loan-offers.ts`).
    */
-  onBorrow?: (principal: number, termSeasons: number) => Promise<LoanOriginateOutcome>;
+  onBorrow?: (principal: number, termSeasons: number, lenderTeamId?: string | null) => Promise<LoanOriginateOutcome>;
 };
 
 export default function FoundationCreditsHost({ gameState, teamId, onBorrow }: FoundationCreditsHostProps) {
@@ -28,6 +30,8 @@ export default function FoundationCreditsHost({ gameState, teamId, onBorrow }: F
     <FoundationCreditsNewLook
       teamName={teamName}
       model={model}
+      gameState={gameState}
+      teamId={teamId}
       onBorrow={onBorrow ?? (async () => ({ ok: false, reason: "not_available" }))}
     />
   );
