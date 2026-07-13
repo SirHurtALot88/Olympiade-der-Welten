@@ -40,6 +40,13 @@ import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-poli
 
 export type TransferWindowPhase = "preseason" | "season_end";
 
+// Optional per-run seed salt (env, default empty) so a FIXED base save can produce VARIED organic
+// buy/sell composition across repeated A/B comparison runs: a different salt → a different but fully
+// reproducible jitter pattern, the same salt → identical results. Empty (production default) leaves the
+// draftSeed exactly as before, so nothing changes unless a run explicitly opts in.
+const ORGANIC_SEED_SALT = process.env.OLY_ORGANIC_SEED_SALT?.trim() || "";
+const saltOrganicSeed = (base: string) => (ORGANIC_SEED_SALT ? `${ORGANIC_SEED_SALT}:${base}` : base);
+
 export type TransferWindowSessionInput = {
   saveId: string;
   seasonId: string;
@@ -315,7 +322,7 @@ async function runTeamCycle(input: {
       // Season-end sell cycle: allow shedding below ROSTER_MIN (empty is fine — preseason rebuilds),
       // so profit/surplus sells fire even when the draft left the team exactly at min.
       allowBelowMin: true,
-      draftSeed: `${input.saveId}:${input.teamId}`,
+      draftSeed: saltOrganicSeed(`${input.saveId}:${input.teamId}`),
     });
     warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
     const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
@@ -423,7 +430,7 @@ async function runTeamCycle(input: {
       identity,
       startingSquad,
       candidates,
-      draftSeed: `${input.saveId}:${input.teamId}`,
+      draftSeed: saltOrganicSeed(`${input.saveId}:${input.teamId}`),
     });
     warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
     if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
