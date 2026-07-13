@@ -956,7 +956,7 @@ function PlayerCaPoStarStack({ data, newLook = false }: { data: PlayerDetailDraw
       <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
         <NlAbilityStars
           caStars={caStars}
-          caScore={data.developmentInsight?.currentRating ?? null}
+          caScore={data.attributeVisibility === "exact" ? data.developmentInsight?.currentRating ?? null : null}
           poStars={poStars}
           poScoreRange={poScoreRange}
           known={known}
@@ -1795,7 +1795,7 @@ export default function PlayerDetailDrawer({
     {
       key: "pps",
       label: "PPs",
-      value: data.pps ?? data.ppsRating,
+      value: data.pps,
       rank: data.ppsRank,
       delta: data.ppsDelta,
       deltaSourceLabel: data.ppsDeltaSourceLabel,

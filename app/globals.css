@@ -44536,6 +44536,30 @@ button.foundation-team-portrait-card {
   color: var(--nl-warn);
 }
 
+.is-new-look .nl-market-axis-min-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  align-items: center;
+}
+
+.is-new-look .nl-market-axis-min {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-axis-min input {
+  width: 52px;
+  padding: 4px 6px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Hauptraster */
 .is-new-look .nl-market-main-grid {
   display: grid;
@@ -44545,6 +44569,12 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-focus-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-market-deal-column {
   display: flex;
   flex-direction: column;
   gap: var(--nl-s4);
@@ -44604,8 +44634,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-focus-portrait {
-  width: 72px;
-  height: 72px;
+  width: 132px;
+  height: 132px;
 }
 
 .is-new-look .nl-market-portrait-img {
@@ -45134,7 +45164,8 @@ button.foundation-team-portrait-card {
     grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.4fr);
   }
 
-  .is-new-look .nl-market-deal-card {
+  .is-new-look .nl-market-deal-card,
+  .is-new-look .nl-market-deal-column {
     grid-column: 1 / -1;
   }
 }
@@ -53516,6 +53547,88 @@ span.nl-facility-ampel-chip {
 }
 .is-new-look .nl-market-talent-line strong {
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Transfermarkt: farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) --- */
+.is-new-look .nl-market-attr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: var(--nl-s2) 0;
+}
+
+.is-new-look .nl-market-attr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-attr-chip b {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: inherit;
+  opacity: 0.8;
+}
+
+.is-new-look .nl-market-attr-chip em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-splus {
+  color: var(--heat-best-text);
+  background: var(--heat-best-bg);
+  border-color: rgba(230, 240, 255, 0.34);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-s {
+  color: var(--heat-elite-text);
+  background: var(--heat-elite-bg);
+  border-color: rgba(12, 21, 39, 0.2);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-a {
+  color: var(--heat-strong-text);
+  background: var(--heat-strong-bg);
+  border-color: rgba(240, 255, 235, 0.22);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-b {
+  color: var(--heat-good-text);
+  background: var(--heat-good-bg);
+  border-color: rgba(20, 28, 20, 0.18);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-c {
+  color: var(--heat-neutral-text);
+  background: var(--heat-neutral-bg);
+  border-color: rgba(42, 31, 8, 0.18);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-d {
+  color: var(--heat-risk-text);
+  background: var(--heat-risk-bg);
+  border-color: rgba(42, 31, 8, 0.2);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-e {
+  color: var(--heat-danger-light-text);
+  background: var(--heat-danger-light-bg);
+  border-color: rgba(42, 18, 14, 0.2);
+}
+
+.is-new-look .nl-market-attr-chip.is-tier-f {
+  color: var(--heat-danger-text);
+  background: var(--heat-danger-bg);
+  border-color: rgba(255, 220, 220, 0.18);
 }
 
 /* --- Transfermarkt #69: Top-Disziplinen als Balken-Chart --- */
