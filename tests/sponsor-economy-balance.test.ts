@@ -22,6 +22,7 @@ import {
   resolveSponsorEconomyAnchors,
   SPONSOR_BASE_FLOOR_C,
   SPONSOR_BASE_SALARY_BUFFER_C,
+  SPONSOR_BUILDING_COST_OFFSET_C,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
@@ -400,8 +401,10 @@ describe("sponsor economy balance", () => {
     const settled = runSingleTeamSettlement(gameState, rrTeam.teamId);
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, rrTeam.teamId);
 
-    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98);
-    expect(payout).toBeLessThanOrEqual(leagueMin * salaryFactor * 1.08);
+    // Bounds include the flat per-team building-cost offset that now sits on the base (deckt den
+    // ~300/Liga-Gebäude-Drain — deliberate balancing change, siehe SPONSOR_BUILDING_COST_OFFSET_C).
+    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98 + SPONSOR_BUILDING_COST_OFFSET_C);
+    expect(payout).toBeLessThanOrEqual(leagueMin * salaryFactor * 1.08 + SPONSOR_BUILDING_COST_OFFSET_C);
   }, 60000);
 
   it("rewards rank-28 milestone for bottom teams", () => {
