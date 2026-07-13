@@ -601,9 +601,20 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // re-diagnosed as the latter and tracked separately (see the progress log entry for this session);
   // fixing that properly belongs in the preseason buy convergence path, not as a sell-side limiter.
 
+  // Organic cutover (MP-P5): when the organic squad builder is the active engine, the preseason BUYS
+  // must run through the same organic per-team cycle (runOrganicBuyCycle — trade-down, salary reserve,
+  // seed/strategy variance) as the S1 draft and the season-end sells, NOT the legacy Unified batch
+  // rebuild. Otherwise all the organic balancing is bypassed for the main buy phase. So the batch path
+  // is disabled under the organic flag and the per-team loop below (which dispatches to the organic
+  // cycle) owns the preseason buys.
+  const useOrganicEngine = process.env.OLY_ORGANIC_SQUAD_BUILDER === "1";
   const preseasonBuyMode = input.preseasonBuyMode ?? "s1_draft_batch";
   const usePreseasonS1DraftBatch =
-    isPreseasonBuyPhase && allowBuys && isUnifiedPickEnabledForMarket() && preseasonBuyMode === "s1_draft_batch";
+    isPreseasonBuyPhase &&
+    allowBuys &&
+    isUnifiedPickEnabledForMarket() &&
+    preseasonBuyMode === "s1_draft_batch" &&
+    !useOrganicEngine;
 
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();

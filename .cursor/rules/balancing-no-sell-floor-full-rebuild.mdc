@@ -43,3 +43,33 @@ Kader und lösten `team_roster_empty` als Hard-Blocker aus → `RUN-PAUSED`.
   Reparatur gehen ("Full-Rebuild-Teams"), und retry't für diese gezielt bis
   `getTeamOptTarget(...)` erreicht ist — nicht nur bis hardMin wie bei
   gewöhnlichen Coverage-Risk-Teams.
+
+## Saisonübergang: KEINE harte Min-Bindung beim Saison-Eintritt (User, verbindlich)
+
+Mehrfach korrigiertes Missverständnis — hier festgehalten, damit es nicht wieder
+kaputtgeht:
+
+- Ein Team **darf am Season-Ende bis auf 0 Spieler verkaufen** und geht dann mit
+  **0 Spielern (aber dem Cash) in die neue Season**. Das ist **kein** Fehler.
+- **Es gibt KEINE Bindung an hardMin VOR den Preseason-Käufen.** Man muss NICHT
+  mit ≥ min Spielern in die Season starten. Die Teams **kaufen sich IN der
+  Preseason mit dem Cash, das sie haben, bis Richtung min/Opt hoch** — inkl.
+  Trade-Down (teuren Spieler verkaufen → mehrere billige kaufen), wenn das Cash
+  knapp ist.
+- Folglich ist **`roster_post_buy` als HARTER, run-pausierender RED falsch**:
+  ein Team, das mit seinem verfügbaren Cash (auch nach Trade-Down) min nicht
+  erreicht, ist ein **akzeptables Ergebnis**, kein Abbruchgrund. Der Check gehört
+  in `isSoftPhaseAuditRed` (soft red / Warnung), nicht als Hard-Stop. Baue hier
+  keine „fülle notfalls per Alt-Engine auf min auf"-Krücke wieder ein.
+
+## Buy-Engine unter OLY_ORGANIC_SQUAD_BUILDER = Organic (MP-P5 Cutover)
+
+- Wenn `OLY_ORGANIC_SQUAD_BUILDER=1` aktiv ist, laufen **Draft, Preseason-Buys UND
+  Season-End-Sells alle über die Organic-Engine** (`runOrganicBuyCycle` /
+  `runOrganicSellCycle` in `ai-transfer-window-session-service.ts`), NICHT über
+  den Legacy-Unified-Batch (`runPreseasonBatchPickRebuild`). Der Batch-Pfad
+  (`usePreseasonS1DraftBatch`) ist unter dem Organic-Flag deaktiviert.
+- Grund: das gesamte Balancing (Trade-Down, Salary-Reserve, Support-Gating,
+  Seed-/Strategie-Varianz) lebt in der Organic-Engine. Kaufen mit der Alt-Engine
+  macht das Balancing für den Haupt-Kaufmoment wirkungslos. Route Preseason-Buys
+  daher nie zurück auf den Batch-Pfad, solange das Organic-Flag gesetzt ist.
