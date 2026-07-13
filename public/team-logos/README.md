@@ -27,6 +27,38 @@ a team, the app falls back to the legacy team-logo map (if present) and
 finally to a grey initials badge, so adding zero files never breaks
 anything.
 
+## Bulk import from the original Dropbox folder (all 32 at once)
+
+If you have the original logo files (the ones in the Dropbox
+`Chris/Olympiade der Welten/Logos/Logos/` folder, named after the team, e.g.
+`Armageddon Aftermath.jpg`), you don't have to rename them by hand — an
+importer maps each original filename to its team id automatically:
+
+1. Copy the contents of that Dropbox `Logos/Logos/` folder into a local
+   source folder — by default `public/team-logos-src/` (git-ignored, so the
+   originals never get committed; only the renamed copies do).
+2. Run the importer, then rebuild the index:
+
+   ```
+   npm run team-logos:import
+   npm run team-logos:index
+   ```
+
+   The importer reads `data/generated/team-logo-map.json` (which already
+   knows every team id → original filename), copies each original out of the
+   source folder, and writes it here as `<teamId>.<ext>`. Matching is
+   case-insensitive and extension-agnostic. It prints which teams were
+   imported and which source files are still missing.
+
+   You can also point it at any folder directly:
+
+   ```
+   npm run team-logos:import -- "/path/to/Logos/Logos"
+   ```
+
+3. Commit the resulting `public/team-logos/*.jpg` files plus the regenerated
+   `data/generated/team-logo-files.json`.
+
 ## Resolution priority (for reference)
 
 For a given team, the app resolves a crest in this order:

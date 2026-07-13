@@ -49,3 +49,6 @@ pnpm-debug.log*
 
 # Codex scratch artifacts
 .codex-temp-*
+
+# Bulk-import staging for team logos (originals; renamed copies get committed)
+public/team-logos-src/
