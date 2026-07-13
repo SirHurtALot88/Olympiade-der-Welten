@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
-import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
@@ -11,6 +11,7 @@ import {
   getExpectationRankObjective,
   getRosterObjectiveStatus,
   getSignatureAxisWinObjective,
+  getSportTarget,
   getTeamObjectiveAiBias,
   getTransferSpendCeilingObjective,
   getUpsetAvoidanceObjective,
@@ -230,6 +231,17 @@ function createRow(teamId: string, partial?: Partial<TeamManagementSnapshotRow>)
   } as TeamManagementSnapshotRow;
 }
 
+// Direct getSportTarget coverage helper: builds realistic snapshot rows from a full gameState
+// (exactly what selection used to feed getSportTarget) and calls getSportTarget for one team.
+function sportTargetForTeam(gameState: GameState, teamId: string) {
+  const rows = buildTeamSeasonOverviewRows({ gameState });
+  const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
+  const row = rowsByTeamId.get(teamId)!;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId)!;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  return getSportTarget({ team, identity, profile: null, row, rowsByTeamId });
+}
+
 function createGameState(input?: {
   teams?: Team[];
   identities?: TeamIdentity[];
@@ -383,11 +395,18 @@ describe("team season objectives service", () => {
     });
 
     const overview = buildTeamObjectiveOverview(gameState);
-    const mmSport = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.objectiveId === "sport-rank-3");
+    // Slot-1 sport goal is now expectation-rank for every team; the fixed sport-rank-X target is
+    // no longer selected (it lives on only as an internal fallback + direct unit coverage below).
+    const mmSport = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.category === "sport");
+    const mmFixedRank = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.objectiveId.startsWith("sport-rank-"));
     const ccTransfer = overview.objectives.find((objective) => objective.teamId === "C-C" && objective.objectiveId === "transfer-profit");
 
-    expect(mmSport?.label).toContain("Top 3");
-    expect(mmSport?.status).toBe("completed");
+    expect(mmSport?.objectiveId).toBe("expectation-rank");
+    expect(mmFixedRank).toBeUndefined();
+    // getSportTarget's M-M "Top 3" identity logic (still used as fallback) stays covered directly:
+    const mmTarget = sportTargetForTeam(gameState, "M-M");
+    expect(mmTarget.label).toContain("Top 3");
+    expect(mmTarget.rank).toBe(3);
     // Season 3 → C-C transfer target is 15 (seasonal scaling)
     expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
@@ -422,11 +441,15 @@ describe("team season objectives service", () => {
     });
 
     const overview = buildTeamObjectiveOverview(gameState);
+    // Slot-1 sport goal is now expectation-rank; the fixed sport-rank-X target is no longer selected.
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
+    expect(overview.objectives.some((objective) => objective.teamId === "V-W" && objective.objectiveId.startsWith("sport-rank-"))).toBe(false);
 
-    expect(sportGoal?.objectiveId).toBe("sport-rank-27");
-    expect(sportGoal?.label).toBe("Survival: nicht Bottom 5");
-    expect(sportGoal?.targetValue).toBe(27);
+    // getSportTarget's fixed-target logic (still used as fallback) stays covered directly:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBe(27);
+    expect(target.label).toBe("Survival: nicht Bottom 5");
   });
 
   it("does not fall back to top-10 goals when a weak team has no standing rank yet", () => {
@@ -449,9 +472,12 @@ describe("team season objectives service", () => {
 
     const overview = buildTeamObjectiveOverview(gameState);
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
 
-    expect(sportGoal?.objectiveId).toBe("sport-rank-24");
-    expect(sportGoal?.label).toBe("Kader stabilisieren");
+    // getSportTarget's fallback logic still avoids fantasy top-10 jumps for a weak, unranked team:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBe(24);
+    expect(target.label).toBe("Kader stabilisieren");
   });
 
   it("keeps weak lower-mid teams on rebuild style sport goals instead of fantasy jumps", () => {
@@ -520,9 +546,12 @@ describe("team season objectives service", () => {
 
     const overview = buildTeamObjectiveOverview(gameState);
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
 
-    expect((sportGoal?.targetValue ?? 0)).toBeGreaterThanOrEqual(24);
-    expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(sportGoal?.label);
+    // getSportTarget's fallback logic still keeps weak lower-mid teams on rebuild-style goals:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBeGreaterThanOrEqual(24);
+    expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(target.label);
   });
 
   it("updates objective status and board pressure when cash is negative", () => {

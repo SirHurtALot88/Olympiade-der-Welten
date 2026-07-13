@@ -623,7 +623,7 @@ export function getSignatureAxisWinObjective(input: {
   };
 }
 
-function getSportTarget(input: {
+export function getSportTarget(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
@@ -1291,7 +1291,15 @@ function selectBoardObjectiveDrafts(input: {
     if (picked.length < 4) picked.push(objective);
   };
 
-  add(pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-rank-")));
+  // Slot 1 (primary sport goal): the expectation-rank objective — "beat the finish your squad
+  // strength predicts" — replaces the fixed sport-rank-X target for every team. sport-rank-X
+  // remains only as an immediate fallback (expectation-rank currently always returns non-null,
+  // so in practice it wins slot 1).
+  const expectationRankPicked = pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "expectation-rank");
+  add(
+    expectationRankPicked ??
+      pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-rank-")),
+  );
 
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   const urgentEconomy =
@@ -1328,7 +1336,6 @@ function selectBoardObjectiveDrafts(input: {
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("rivalry-")) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-axis-")) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "finance-transfer-ceiling" && objective.status !== "open") ??
-      pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "expectation-rank") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-next-matchday-top10") ??
       pickUrgentObjective(input.objectives, "morale") ??
       pickUrgentObjective(input.objectives, "facility") ??
@@ -1336,6 +1343,9 @@ function selectBoardObjectiveDrafts(input: {
   );
 
   for (const objective of input.objectives) {
+    // Once expectation-rank holds the sport slot, skip the redundant fixed sport-rank-X target
+    // from the general fill loop — both are sport-category rank objectives.
+    if (expectationRankPicked && objective.objectiveId.startsWith("sport-rank-")) continue;
     add(objective);
   }
 
