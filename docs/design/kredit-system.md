@@ -92,14 +92,25 @@ rate = clamp( 0.10 + risk − termDiscount , 0.07 , 0.20 )
 
 ## Kreditlimit (Borrowing Capacity)
 
-Verhindert Infinite-Money. Maximale **zusätzliche** Restschuld beim Abschluss:
+Verhindert Infinite-Money. Die Kapazität ist eine **Kombination** aus Teamwert (Cash + Kaderwert)
+und Tragbarkeit (Jahreseinnahmen), nicht nur ein Einzelwert:
 
 ```
-capacity = min( 0.35 · marketValueTotal , 1.25 · jährlicheEinnahmen ) − aktuelleRestschuld
+capacity = min( teamwertCap , tragbarkeitsCap ) − aktuelleRestschuld
+  teamwertCap     = 0.15 · cash + 0.30 · marketValueTotal   // Cash + Kaderwert = Teamwert
+  tragbarkeitsCap = 1.5 · jährlicheEinnahmen                // deckelt nach Repay-Fähigkeit
 ```
 
-`jährlicheEinnahmen` = Proxy aus Sponsoren-Payout + ggf. Preisgeld-Benchmark der letzten Saison.
-Ein bereits hoch verschuldetes Team bekommt entsprechend weniger/keinen neuen Kredit.
+- Der `min`-Guardrail bleibt bewusst: ein Team mit dickem Kader, aber mageren Einnahmen kann sich
+  nicht überschulden — die Einnahmen begrenzen, was realistisch bedienbar ist.
+- `cash` = aktuelles `Team.cash`; `marketValueTotal` aus `buildTeamSeasonOverviewRows`.
+- `jährlicheEinnahmen` = Proxy aus Sponsoren-Payout der letzten Saison (TODO: Preisgeld ergänzen).
+- Ein bereits hoch verschuldetes Team bekommt entsprechend weniger/keinen neuen Kredit.
+
+**Season 1 = keine Kredite (harte Regel):** In Season 1 gibt es grundsätzlich keinen Kredit —
+`originateLoan`/`resolveAiLoanDecision` lehnen ab, unabhängig von der Kapazität. Man kommt mit dem
+aus, was man hat. (Zusätzlich ist der Einnahmen-Proxy in Season 1 ohnehin 0, weil noch keine
+Sponsoren-Payouts geloggt sind — aber die Regel ist explizit, nicht nur ein Nebeneffekt.)
 
 ## Integrationspunkte
 
@@ -128,6 +139,36 @@ Ein bereits hoch verschuldetes Team bekommt entsprechend weniger/keinen neuen Kr
   `principalOutstanding` addiert) + 5 % Strafzins darauf, `missedPayments++`,
   Board-Confidence-Hit. Bei wiederholtem Ausfall `status = "defaulted"` + Zwangsverkauf-Flag
   (spätere Transfermarkt-Anbindung).
+
+### Vorab-Rückzahlung (vorzeitige Ablösung)
+
+Ein Team kann einen Kredit vorzeitig ablösen, ohne die vollen Restzinsen bis Laufzeitende zu
+zahlen. Es zahlt die Restschuld plus nur einen kleinen Anteil der der Bank/dem Verleiher
+entgangenen Zukunftszinsen:
+
+```
+restrateGesamt          = installmentPerSeason · seasonsRemaining   // was der Spieler als "noch offen" sieht
+entgangeneZukunftszinsen = restrateGesamt − principalOutstanding
+earlyPayoff             = principalOutstanding + PREPAYMENT_FEE_RATE · entgangeneZukunftszinsen
+  PREPAYMENT_FEE_RATE = 0.20   // Vorfälligkeits-Entschädigung (Stellschraube)
+```
+
+- Beispiel: 25-Mio.-Kredit, „18 Mio. noch offen" (= Restraten). Restschuld z. B. 15 Mio.,
+  entgangene Zinsen 3 Mio. → `earlyPayoff ≈ 15,6 Mio.` — deutlich unter den 18 Mio.
+- `computeEarlyPayoff(loan)` liefert die Ablösesumme; `applyEarlyPayoff(gameState, loanId)` belastet
+  Cash, setzt den Kredit auf `status: "paid"`. Bei Team-Krediten (Phase 3) fließt die Ablösung an
+  den Verleiher.
+- **Timing:** in der **Verkaufsphase** (aus Spielererlösen finanzierbar). Mensch per UI, KI per
+  Entscheidung.
+
+**Anti-Churn-Balancing** (verhindert „am Saisonende alles ablösen → nächste Saison neu leihen"):
+- Natürliche Reibung: jede Ablösung kostet die Vorfälligkeits-Entschädigung, jeder neue Kredit
+  kostet neue Zinsen — Hin-und-Her ist strikt teurer als Halten.
+- KI-Regel: früh ablösen **nur aus echtem Überschuss** — Cash über dem Liquiditätspuffer *und* über
+  dem erwarteten Kaufbedarf der nächsten Saison. Ein Team, das nächste Saison ohnehin Spieler
+  braucht, löst nicht ab.
+- Hysterese: ein gerade erst (dieselbe/letzte Saison) aufgenommener Kredit wird nicht sofort
+  abgelöst; in derselben Saison nicht leihen *und* ablösen.
 
 ## KI-Anbindung (Phase 2)
 
@@ -187,20 +228,30 @@ Verleiher kassiert die Raten als Einnahme).
 
 ### Angebots-UI (Kreditaufnahme)
 
-- **Summen-Slider**: der Spieler stellt die gewünschte Kreditsumme ein.
-- Live darunter eine **Angebotsliste**: die Bank plus jedes Team, das die Summe stemmen kann,
-  jeweils mit seinem angebotenen Zinssatz (aufsteigend sortiert, bestes Angebot oben).
-- Schiebt der Spieler den Slider hoch, **fallen Teams raus**, deren freies Cash nicht mehr reicht
-  — nur die Bank ist immer verfügbar (bis Kreditlimit).
+- **Summen-Slider als Filter**: der Spieler stellt die gewünschte Kreditsumme ein.
+- Darunter **Angebots-Karten** — je eine Karte pro Anbieter (die Bank **und** jedes Team, das die
+  Summe anbieten kann), mit: Anbietername, angebotener Kreditbetrag (bei Teams: was sie maximal
+  geben würden), Zinssatz, Jahresrate, Beziehungs-Badge. Aufsteigend nach Zinssatz sortiert
+  (bestes Angebot oben).
+- Schiebt der Spieler den Slider hoch, **fallen Team-Karten raus**, deren Angebotsbetrag nicht mehr
+  reicht — die Bank-Karte bleibt immer (bis Kreditlimit). Der Spieler „sieht rein": z. B.
+  „Black Panthers würden 15 Mio. anbieten".
 
-### Verleiher-Eligibilität
+### Verleiher-Eligibilität & Angebotsbetrag
 
-Ein Team `L` erscheint als Angebot für Betrag `X`, wenn:
-- `lendableCash(L) >= X`, mit `lendableCash = max(0, cash − resolveTeamLiquidityBufferTarget(L))`
-  — ein Team verleiht nur Cash, das es selbst nicht als Puffer braucht (nicht das nackte
-  Kontoguthaben, sonst ruiniert es sich selbst), **und**
-- die Beziehung nicht feindlich ist: `getTeamRelationship(L, borrower) > rivalCutoff` (Rivalen mit
-  Relationship ≤ −4 bieten **nicht** an).
+Ein Team `L` erscheint als Karte für Betrag `X`, wenn `lenderOfferAmount(L) >= X` **und** die
+Beziehung nicht feindlich ist (`getTeamRelationship(L, borrower) > rivalCutoff`; Rivalen mit
+Relationship ≤ −4 bieten **nicht** an).
+
+**Angebotsbetrag** — ein Team verleiht nur einen **Teil** seines freien Cash, nicht alles (die
+Cash Creators mit 30 Mio. bieten eben nicht 30, sondern ~15–20):
+```
+lendableCash(L)     = max(0, cash − resolveTeamLiquidityBufferTarget(L))   // was L überhaupt entbehren kann
+lenderOfferAmount(L) = lendableCash(L) · LENDER_OFFER_SHARE
+  LENDER_OFFER_SHARE ≈ 0.5–0.66   // Verleiher behält eine Reserve; ggf. je nach cashPriority/Beziehung höher
+```
+Finanz-/renditehungrige Teams (hohe `finances`/`cashPriority`) oder gute Beziehungen können einen
+höheren Anteil anbieten; vorsichtige Teams weniger.
 
 ### Konditionen (Zinssatz eines Team-Angebots)
 
@@ -241,10 +292,28 @@ teamRate = clamp(
 - KI-zu-KI-Kredite: vorerst evtl. nur Mensch↔KI, KI↔KI später.
 - Balancing des Cash-Aufkommens (Vorbedingung oben) — braucht Daten aus echten Season-Läufen.
 
+## UI-Integration (Finanzansichten)
+
+Kredite sollen nicht nur in einer eigenen Bank-Ansicht leben, sondern dort auftauchen, wo Cashflow
+und Finanzen ohnehin gezeigt werden — als weitere Position neben Gehältern und Gebäudekosten:
+- **Cashflow-/Finanz-Übersicht**: die anstehende(n) Kreditrate(n) als Abzugsposition vom Cash
+  ausweisen — „Gehälter −X, Gebäudekosten −Y, **Kreditraten −Z**". So sieht der Spieler den echten
+  Netto-Cashflow.
+- **Restschuld** als Bilanz-Seite neben dem Cash-Bestand anzeigen (die „Schulden-Seite").
+- Konkrete Zielseiten identifizieren (Home/Finanzen-Tab, Team-Detail, Saison-Vorschau) und die
+  Kredit-Position dort einhängen, wo Salär-/Facility-Kosten bereits dargestellt werden.
+
+*(Umsetzung zusammen mit der menschlichen Bank-/Aufnahme-UI; die Service-Werte
+`getTeamOutstandingDebt` und die Rate aus `LoanRecord` liegen bereits vor.)*
+
 ## Tests
 
 - Zins/Rate-Berechnung gegen die Beispieltabelle (Annuität, Floor/Cap, Laufzeitrabatt,
   Monotonie der Absolut-Zinsen).
+- Kapazität: `min(teamwertCap, tragbarkeitsCap) − Restschuld`; Cash + Marktwert + Einnahmen fließen
+  ein; Season 1 → keine Kredite (harte Regel).
+- Vorab-Rückzahlung: `earlyPayoff = Restschuld + 0.20 · entgangeneZukunftszinsen`, Kredit wird
+  „paid", Cash korrekt belastet; Anti-Churn-Regeln der KI.
 - `loan_settlement`: Rate belastet Cash korrekt, Restschuld/Restlaufzeit sinken, Idempotenz über
   `loanApplyLogs` (kein Doppel-Charge bei Retry), Ausfall kapitalisiert korrekt.
 - Kreditaufnahme respektiert Kapazitätslimit.
