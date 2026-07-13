@@ -483,6 +483,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   openTrainingPlayerTarget,
   onOpenLeagueLeaders,
   orderedDisciplines,
+  originateLoanForActiveTeam,
   ownerQuickSwitchTeams,
   passiveTeams,
   persistenceError,
@@ -3633,7 +3634,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
 
           {activeView === "credits" ? (
-            <FoundationCreditsHost gameState={gameState} teamId={activeManagerTeamId} />
+            <FoundationCreditsHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              onBorrow={originateLoanForActiveTeam}
+            />
           ) : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>

@@ -3,45 +3,81 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { CreditsViewModel } from "@/lib/foundation/credits/credits-types";
+import { getTeamOutstandingDebt, originateLoan } from "@/lib/finance/loan-service";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import type { CreditsViewModel, TeamCreditState } from "@/lib/foundation/credits/credits-types";
+
+const MIN_TERM_SEASONS = 1;
+const MAX_TERM_SEASONS = 10;
 
 /**
- * Builds the Credits view model for one human team.
+ * Builds the Credits view model for one human team, wired to the real bank
+ * credit system (`lib/finance/loan-service.ts`, see
+ * `docs/design/kredit-system.md`).
  *
  * Fog of war: this must only ever be called with the ACTIVE MANAGER's own
  * team id (`activeManagerTeamId`, same id used by other "own team finances"
  * views like Sponsoren). Never pass another team's id in here — the credit
  * system is not league-visible data.
- *
- * === SEAM: parallel credit system connects HERE ===
- * This is currently a stub that always returns `{ status: "not_ready" }` so
- * the "Kredite" tab can be scaffolded, wired into navigation, and reviewed
- * before the real credit game-system (interest math, eligibility, cash
- * mutations) lands.
- *
- * To go live, replace the body of this function so it reads the real credit
- * state — e.g. from `gameState.seasonState` (once a `teamCredits` /
- * `creditContractsByTeamId` slice exists there) or from a dedicated credit
- * service — and returns:
- *
- *   { status: "ready", team: TeamCreditState }
- *
- * No other file needs to change: `FoundationCreditsHost` calls this function
- * (via `useCreditsViewModel` below) and passes the resulting model straight
- * through to `FoundationCreditsNewLook`, which already renders both the
- * `"not_ready"` placeholder and the real `"ready"` shape (KPIs, active-loan
- * table, offer cards).
  */
 export function buildCreditsViewModel(gameState: GameState, teamId: string | null): CreditsViewModel {
   if (!teamId) {
     return { status: "not_ready" };
   }
 
-  // Referenced only to keep the stub's signature stable for the real
-  // implementation — remove once real reads land here.
-  void gameState;
+  const team = gameState.teams.find((candidate) => candidate.teamId === teamId);
+  if (!team) {
+    return { status: "not_ready" };
+  }
 
-  return { status: "not_ready" };
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const finances = identity?.finances ?? 5;
+
+  const outstandingDebt = getTeamOutstandingDebt(gameState, teamId);
+
+  // Single source of truth for capacity: the exact same preview path
+  // `originateLoan` uses internally when it validates a real borrow request
+  // (principal/termSeasons here are throwaway probe values — capacity does
+  // not depend on either). This guarantees the KPI/slider max can never
+  // drift from what the mutation route will actually accept.
+  const capacityProbe = originateLoan(
+    gameState,
+    { borrowerTeamId: teamId, principal: 1, termSeasons: MIN_TERM_SEASONS },
+    { execute: false },
+  );
+  const creditLimit = capacityProbe.capacity;
+
+  const activeLoans = (gameState.seasonState.loans ?? [])
+    .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+    .map((loan) => ({
+      id: loan.loanId,
+      principal: loan.principalOriginal,
+      outstanding: loan.principalOutstanding,
+      interestRate: loan.interestRatePerSeason,
+      termSeasons: loan.termSeasons,
+      remainingSeasons: loan.seasonsRemaining,
+      nextInstalment: loan.installmentPerSeason,
+      status: loan.status,
+    }));
+
+  const isPreseason = evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
+  const canBorrow = isPreseason && creditLimit > 0;
+  const borrowBlockedReason = canBorrow ? null : !isPreseason ? "not_preseason" : "no_capacity";
+
+  const teamCreditState: TeamCreditState = {
+    teamId,
+    creditLimit,
+    outstandingDebt,
+    cash: team.cash,
+    finances,
+    canBorrow,
+    borrowBlockedReason,
+    minTermSeasons: MIN_TERM_SEASONS,
+    maxTermSeasons: MAX_TERM_SEASONS,
+    activeLoans,
+  };
+
+  return { status: "ready", team: teamCreditState };
 }
 
 /**
@@ -50,29 +86,5 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
  * render the same way other Foundation view models are.
  */
 export function useCreditsViewModel(gameState: GameState, teamId: string | null): CreditsViewModel {
-  // NOTE for the parallel team: once `buildCreditsViewModel` reads real
-  // slices off `gameState` (e.g. `gameState.seasonState.teamCredits`),
-  // narrow this dependency to that slice instead of the whole `gameState`
-  // object so the memo doesn't recompute on every unrelated state change.
   return useMemo(() => buildCreditsViewModel(gameState, teamId), [gameState, teamId]);
-}
-
-/**
- * Stub action handler for taking out a loan. No-op until the parallel
- * credit system exists — swap the Host's `onTakeLoan` prop for the real
- * handler (e.g. a call into the credit service / an API route) to go live.
- */
-export function stubOnTakeLoan(offerId: string): void {
-  // TODO(credits): wire to parallel credit service
-  void offerId;
-}
-
-/**
- * Stub action handler for repaying (part of) an active loan. No-op until
- * the parallel credit system exists — swap the Host's `onRepayLoan` prop
- * for the real handler to go live.
- */
-export function stubOnRepayLoan(loanId: string): void {
-  // TODO(credits): wire to parallel credit service
-  void loanId;
 }

@@ -4529,6 +4529,49 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Kreditaufnahme (Bank, Phase 1) — mirrors `chooseTeamSponsor`'s
+   * fetch-then-`loadSave` pattern 1:1: POST the mutation, then refetch the
+   * save so `gameState` (and everything derived from it, incl. the Credits
+   * view model) reflects the new loan/cash immediately. Always the active
+   * manager's own team (fog of war), never a `teamId` param.
+   */
+  async function originateLoanForActiveTeam(
+    principal: number,
+    termSeasons: number,
+  ): Promise<{ ok: boolean; reason: string | null }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    try {
+      const response = await fetch("/api/finance/loan/originate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          principal,
+          termSeasons,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null };
+      if (!response.ok || !payload.ok) {
+        return { ok: false, reason: payload.reason ?? "loan_originate_failed" };
+      }
+      await loadSave(activeSaveId);
+      return { ok: true, reason: null };
+    } catch {
+      return { ok: false, reason: "network_error" };
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -9974,6 +10017,7 @@ export function useFoundationShellRouterBodyScope({
     openTrainingPlayerTarget,
     onOpenLeagueLeaders,
     orderedDisciplines,
+    originateLoanForActiveTeam,
     ownerQuickSwitchTeams,
     passiveTeams,
     persistenceError,

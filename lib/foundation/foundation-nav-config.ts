@@ -1,11 +1,9 @@
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
 // Kredite tab visibility gate. The credit game-system (interest math,
-// eligibility, cash mutations) is being built in parallel; the scaffold
-// here (view, nav wiring, data seam) is ready but stays hidden from
-// players until that system is connected.
-// Flip to true once the parallel credit system is connected.
-export const CREDITS_TAB_ENABLED = false;
+// eligibility, cash mutations, borrow UX) is wired to the real bank credit
+// service (lib/finance/loan-service.ts, see docs/design/kredit-system.md).
+export const CREDITS_TAB_ENABLED = true;
 
 export type FoundationNavItem = {
   id: FoundationViewId;

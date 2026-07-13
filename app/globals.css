@@ -54006,6 +54006,142 @@ button.is-new-look .nl-thist-season-pill,
   font-size: 13px;
 }
 
+.is-new-look .nl-credits-blocked-card .nl-credits-empty-text {
+  color: var(--nl-mut);
+}
+
+/* --- Kredit-Aufnahme: Slider + exakter Betrag + Laufzeit + Live-Quote --- */
+.is-new-look .nl-credits-borrow-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-credits-borrow-amount {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-credits-borrow-amount-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s4);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-credits-slider {
+  flex: 1 1 220px;
+  min-width: 160px;
+  accent-color: var(--nl-accent);
+  cursor: pointer;
+}
+
+.is-new-look .nl-credits-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.is-new-look .nl-credits-amount-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--nl-r-md, 8px);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2, var(--nl-panel));
+}
+
+.is-new-look .nl-credits-amount-input {
+  width: 96px;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.is-new-look .nl-credits-amount-input:focus {
+  outline: none;
+}
+
+.is-new-look .nl-credits-amount-unit {
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-amount-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-term-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+}
+
+.is-new-look .nl-credits-term-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-term-select {
+  padding: 8px 10px;
+  border-radius: var(--nl-r-md, 8px);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2, var(--nl-panel));
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-credits-quote-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+  border-radius: var(--nl-r-lg);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-credits-quote-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .nl-credits-quote-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-credits-quote-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-credits-borrow-button {
+  align-self: flex-start;
+}
+
+.is-new-look .nl-credits-borrow-message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-thist-season-pill,

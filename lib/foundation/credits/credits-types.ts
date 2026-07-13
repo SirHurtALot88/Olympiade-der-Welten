@@ -1,65 +1,62 @@
 /**
- * "Kredite" (credits/loans) data seam types.
+ * "Kredite" (credits/loans) view-model types.
  *
- * These types describe the UI-facing shape of a human team's credit state.
- * They intentionally carry no game logic (interest math, eligibility rules,
- * cash mutations) — that lives in the parallel credit system. This file is
- * the contract the UI scaffold and the future real data source agree on.
+ * UI-facing shape of a human team's credit state, backed by the real bank
+ * credit system in `lib/finance/loan-service.ts` (see
+ * `docs/design/kredit-system.md`). Game logic (interest math, capacity,
+ * cash mutations) lives entirely in the service — this file only describes
+ * what the Credits UI needs to render.
  */
 
-/** A credit offer a team could take out. */
-export type CreditOffer = {
-  /** Stable id, passed back via `onTakeLoan(offerId)`. */
-  id: string;
-  /** Display label, e.g. "Kurzfristiger Kredit". */
-  label: string;
-  /** Lower bound of the principal range the team could borrow. */
-  principalMin: number;
-  /** Upper bound of the principal range the team could borrow. */
-  principalMax: number;
-  /** Interest rate as a fraction, e.g. 0.08 for 8%. */
-  interestRate: number;
-  /** Loan term expressed in matchdays. */
-  termMatchdays: number;
-};
-
-/** A loan the team currently owes money on. */
+/** A loan the team currently owes money on (mirrors `LoanRecord`, UI-shaped). */
 export type ActiveLoan = {
-  /** Stable id, passed back via `onRepayLoan(loanId)`. */
+  /** `LoanRecord.loanId`. */
   id: string;
-  /** Original amount borrowed. */
+  /** `principalOriginal` — ursprüngliche Kreditsumme. */
   principal: number;
-  /** Amount still outstanding. */
+  /** `principalOutstanding` — Restschuld. */
   outstanding: number;
-  /** Interest rate as a fraction, e.g. 0.08 for 8%. */
+  /** `interestRatePerSeason`, fix bei Abschluss. */
   interestRate: number;
-  /** Matchdays remaining until the loan is fully repaid. */
-  remainingMatchdays: number;
-  /** Amount due at the next instalment. */
+  /** Ursprüngliche Laufzeit in Saisons. */
+  termSeasons: number;
+  /** `seasonsRemaining` — verbleibende Saisons bis vollständig getilgt. */
+  remainingSeasons: number;
+  /** `installmentPerSeason` — konstante Jahresrate (Annuität), wird am Saisonende automatisch abgebucht. */
   nextInstalment: number;
+  status: "active" | "paid" | "defaulted";
 };
 
-/** A human team's full credit picture — own team only (fog of war applies). */
+/** Live-berechnetes Angebot für einen noch nicht aufgenommenen Kredit — aktualisiert sich sofort beim Ziehen/Tippen. */
+export type LoanQuote = {
+  interestRatePerSeason: number;
+  installmentPerSeason: number;
+  totalRepayment: number;
+  totalInterest: number;
+};
+
+/** Warum die Kreditaufnahme gerade gesperrt ist (Formular ausgeblendet, Note statt Slider). */
+export type CreditBorrowBlockedReason = "not_preseason" | "no_capacity";
+
+/** Ein menschliches Team's Kredit-Gesamtbild — nur das eigene Team (Fog of War). */
 export type TeamCreditState = {
   teamId: string;
-  /** Total amount the team is still allowed to borrow. */
+  /** Zusätzlicher Kreditrahmen (siehe `computeBorrowingCapacity`), bereits abzüglich bestehender Restschuld. */
   creditLimit: number;
-  /** Sum of all outstanding loan balances. */
+  /** Summe aller aktiven Restschulden (`getTeamOutstandingDebt`). */
   outstandingDebt: number;
-  /** Blended/representative interest rate, or null if not applicable. */
-  interestRate: number | null;
-  /** Next instalment due across all active loans, or null if none due. */
-  nextInstalment: number | null;
+  /** Aktuelles Cash des Teams. */
+  cash: number;
+  /** `TeamIdentity.finances` (0–10, Default 5), fließt in Zinssatz & Kapazität ein. */
+  finances: number;
+  /** Preseason und `creditLimit > 0`. */
+  canBorrow: boolean;
+  /** Wenn `!canBorrow`: warum (Preseason-Gate vs. ausgeschöpfter Rahmen). */
+  borrowBlockedReason: CreditBorrowBlockedReason | null;
+  minTermSeasons: number;
+  maxTermSeasons: number;
   activeLoans: ActiveLoan[];
-  offers: CreditOffer[];
 };
 
-/**
- * Discriminated view model consumed by the Credits UI.
- *
- * `"not_ready"` is the current stub state (the parallel credit system isn't
- * wired up yet). Once connected, `buildCreditsViewModel` returns
- * `{ status: "ready", team }` and the UI renders the real data — no other
- * file needs to change.
- */
+/** Discriminated view model consumed by the Credits UI. */
 export type CreditsViewModel = { status: "not_ready" } | { status: "ready"; team: TeamCreditState };
