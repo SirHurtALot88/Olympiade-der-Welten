@@ -1210,6 +1210,33 @@ export type SponsorPayoutLogRecord = {
   createdAt: string;
 };
 
+export type LoanLenderType = "bank" | "team"; // "team" erst Phase 3
+
+export type LoanRecord = {
+  loanId: string;
+  borrowerTeamId: string;
+  lenderType: LoanLenderType;
+  lenderTeamId?: string; // nur bei lenderType === "team"
+  principalOriginal: number; // ursprüngliche Kreditsumme
+  principalOutstanding: number; // Restschuld -> die Schulden-Seite
+  interestRatePerSeason: number; // fix bei Abschluss (z. B. 0.152)
+  termSeasons: number; // 1..10
+  seasonsRemaining: number;
+  installmentPerSeason: number; // Annuität, konstante Jahresrate
+  originatedSeasonId: string;
+  status: "active" | "paid" | "defaulted";
+  missedPayments: number;
+};
+
+export type LoanApplyLogRecord = {
+  seasonId: string; // Saison, in der die Rate verbucht wurde
+  loanId: string;
+  installmentCharged: number;
+  interestPortion: number;
+  principalPortion: number;
+  createdAt: string;
+};
+
 export type ScoutingWatchlistEntry = {
   playerId: string;
   teamId: string;
@@ -2195,6 +2222,8 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  loans?: LoanRecord[];
+  loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
   scoutingWatchlist?: ScoutingWatchlistEntry[];
   scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;
   formCards?: FormCardRecord[];

@@ -12,6 +12,7 @@ import {
   applyTeamSeasonObjectiveRewards,
 } from "@/lib/board/team-season-objectives-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applyLoanSettlement, previewLoanSettlement, type LoanSettlementApplyResult } from "@/lib/finance/loan-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -30,7 +31,17 @@ export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" | "blocked" | "skipped";
 
 export type SeasonCompletionStep = {
-  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "sponsor_settlement" | "relationships" | "snapshot" | "transition" | "ai_audit";
+  key:
+    | "season_check"
+    | "season_review"
+    | "objective_rewards"
+    | "cash_apply"
+    | "sponsor_settlement"
+    | "loan_settlement"
+    | "relationships"
+    | "snapshot"
+    | "transition"
+    | "ai_audit";
   label: string;
   status: SeasonCompletionStepStatus;
   warnings: string[];
@@ -276,23 +287,55 @@ async function runLocalSeasonCompletionUnsafe(
   const afterSponsorSave = sponsorSettlementApply.applied
     ? resolveLocalSave(persistence, initialSave.saveId)
     : afterCashSave;
-  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
+
+  const loanSettlementPreview = previewLoanSettlement(afterSponsorSave.gameState, seasonId);
+  const existingLoanSettlementLog =
+    (afterSponsorSave.gameState.seasonState.loanApplyLogs ?? []).some((log) => log.seasonId === seasonId) ?? false;
+  const shouldApplyLoanSettlement = !dryRun && blockingReasons.size === 0 && !existingLoanSettlementLog;
+  const loanSettlementApply: LoanSettlementApplyResult = shouldApplyLoanSettlement
+    ? applyLoanSettlement(afterSponsorSave.gameState, { execute: true, seasonId })
+    : { ok: true, applied: false, duplicateDetected: existingLoanSettlementLog, preview: loanSettlementPreview, gameState: afterSponsorSave.gameState };
+  if (shouldApplyLoanSettlement && loanSettlementApply.applied) {
+    persistence.saveSingleplayerState(afterSponsorSave.saveId, loanSettlementApply.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "loan_settlement",
+      label: "Kredit-Tilgung",
+      status: existingLoanSettlementLog
+        ? "already_done"
+        : loanSettlementApply.applied
+          ? "applied"
+          : loanSettlementPreview.canApply
+            ? "planned"
+            : "skipped",
+      warnings: [],
+      blockingReasons: [],
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterLoanSave = loanSettlementApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterSponsorSave;
+  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterLoanSave.gameState, {
     saveId: afterCashSave.saveId,
     seasonId,
     execute: false,
   });
   const existingObjectiveRewardLog =
-    (afterSponsorSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+    (afterLoanSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
   const shouldApplyObjectiveRewards = !dryRun && blockingReasons.size === 0 && !existingObjectiveRewardLog;
   const objectiveRewardApply = shouldApplyObjectiveRewards
-    ? applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
-        saveId: afterSponsorSave.saveId,
+    ? applyTeamSeasonObjectiveRewards(afterLoanSave.gameState, {
+        saveId: afterLoanSave.saveId,
         seasonId,
         execute: true,
       })
     : objectiveRewardPreview;
   if (shouldApplyObjectiveRewards && objectiveRewardApply.applied) {
-    persistence.saveSingleplayerState(afterSponsorSave.saveId, objectiveRewardApply.gameState);
+    persistence.saveSingleplayerState(afterLoanSave.saveId, objectiveRewardApply.gameState);
   }
   addStep(
     steps,
@@ -314,7 +357,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterSponsorSave;
+  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterLoanSave;
   const relationshipApply = upsertTeamRelationshipEvents(afterObjectiveSave.gameState);
   const existingRelationshipEvents = afterCashSave.gameState.seasonState.teamRelationshipEvents ?? [];
   const existingRelationshipIds = new Set(existingRelationshipEvents.map((event) => event.eventId));
