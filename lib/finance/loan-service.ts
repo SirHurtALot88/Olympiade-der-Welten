@@ -18,7 +18,6 @@ const RISK_PER_MISSING_FINANCE_POINT = 0.012;
 const TERM_DISCOUNT_PER_SEASON = 0.004;
 const CAPACITY_CASH_SHARE = 0.15;
 const CAPACITY_MARKET_VALUE_SHARE = 0.3;
-const CAPACITY_REVENUE_SHARE = 1.5;
 const DEFAULT_PENALTY_RATE = 0.05;
 /** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
 const PREPAYMENT_FEE_RATE = 0.2;
@@ -88,26 +87,21 @@ export function computeLoanTerms(input: { principal: number; termSeasons: number
 }
 
 /**
- * Kreditlimit: min(0.15 * cash + 0.30 * marketValueTotal, 1.5 * jährlicheEinnahmen) -
- * aktuelleRestschuld, floor 0. Siehe docs/design/kredit-system.md ("Kreditlimit").
+ * Kreditlimit: 0.15 * cash + 0.30 * marketValueTotal - aktuelleRestschuld, floor 0. Siehe
+ * docs/design/kredit-system.md ("Kreditlimit"). Die Kappe basiert allein auf dem Teamwert
+ * (Cash + Marktwert), damit Teams ohne Sponsor-Payout (z. B. Season 1) trotzdem eine
+ * realistische Kapazität sehen statt 0 — kein separates Tragbarkeits-Limit über Jahreseinnahmen
+ * mehr, das die Kappe sonst auf 0 kollabieren ließe.
  */
-export function computeBorrowingCapacity(
-  input: {
-    cash: number;
-    marketValueTotal: number;
-    annualRevenue: number;
-    currentOutstandingDebt: number;
-  },
-  options?: { ignoreRevenueCap?: boolean },
-): number {
+export function computeBorrowingCapacity(input: {
+  cash: number;
+  marketValueTotal: number;
+  annualRevenue: number;
+  currentOutstandingDebt: number;
+}): number {
   const teamwertCap =
     CAPACITY_CASH_SHARE * Math.max(0, input.cash) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
-  // Admin-Vorschau: Tragbarkeits-Kappe (Jahreseinnahmen-basiert) ignorieren, damit Teams ohne
-  // Sponsor-Payout (z. B. Season 1) trotzdem eine realistische Teamwert-Kappe zum Inspizieren
-  // sehen statt Kapazität 0. Normales Gameplay bleibt unverändert (Min aus beiden Kappen).
-  const tragbarkeitsCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
-  const cap = options?.ignoreRevenueCap ? teamwertCap : Math.min(teamwertCap, tragbarkeitsCap);
-  return roundCash(Math.max(0, cap - Math.max(0, input.currentOutstandingDebt)));
+  return roundCash(Math.max(0, teamwertCap - Math.max(0, input.currentOutstandingDebt)));
 }
 
 export function getTeamOutstandingDebt(gameState: GameState, teamId: string): number {
@@ -256,7 +250,7 @@ export function buildLoanOffers(
   borrowerTeamId: string,
   principal: number,
   termSeasons: number,
-  options?: { allowSeason1?: boolean; ignoreRevenueCap?: boolean },
+  options?: { allowSeason1?: boolean },
 ): LoanOffer[] {
   if (!options?.allowSeason1 && isSeasonOne(gameState.season.id)) return [];
 
@@ -269,15 +263,12 @@ export function buildLoanOffers(
   const marketValueTotal = getTeamMarketValueTotal(gameState, borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, borrowerTeamId);
   const currentOutstandingDebt = getTeamOutstandingDebt(gameState, borrowerTeamId);
-  const capacity = computeBorrowingCapacity(
-    {
-      cash: borrower.cash,
-      marketValueTotal,
-      annualRevenue,
-      currentOutstandingDebt,
-    },
-    { ignoreRevenueCap: options?.ignoreRevenueCap },
-  );
+  const capacity = computeBorrowingCapacity({
+    cash: borrower.cash,
+    marketValueTotal,
+    annualRevenue,
+    currentOutstandingDebt,
+  });
 
   const bankTerms = computeLoanTerms({ principal, termSeasons, finances: borrowerFinances });
   const offers: LoanOffer[] = [
@@ -351,7 +342,7 @@ export type OriginateLoanResult = {
 export function originateLoan(
   gameState: GameState,
   input: OriginateLoanInput,
-  options?: { execute?: boolean; allowSeason1?: boolean; ignoreRevenueCap?: boolean },
+  options?: { execute?: boolean; allowSeason1?: boolean },
 ): OriginateLoanResult {
   const borrower = gameState.teams.find((team) => team.teamId === input.borrowerTeamId) ?? null;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.borrowerTeamId) ?? null;
@@ -400,15 +391,12 @@ export function originateLoan(
   const marketValueTotal = getTeamMarketValueTotal(gameState, input.borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, input.borrowerTeamId);
   const currentOutstandingDebt = getTeamOutstandingDebt(gameState, input.borrowerTeamId);
-  const capacity = computeBorrowingCapacity(
-    {
-      cash: borrower.cash,
-      marketValueTotal,
-      annualRevenue,
-      currentOutstandingDebt,
-    },
-    { ignoreRevenueCap: options?.ignoreRevenueCap },
-  );
+  const capacity = computeBorrowingCapacity({
+    cash: borrower.cash,
+    marketValueTotal,
+    annualRevenue,
+    currentOutstandingDebt,
+  });
 
   if (input.principal > capacity) {
     return { ok: false, loan: null, reason: "over_capacity", capacity, terms: null, gameState };

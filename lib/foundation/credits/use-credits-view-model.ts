@@ -44,7 +44,6 @@ export function buildCreditsViewModel(gameState: GameState, teamId: string | nul
   // (hard rule), so both naturally fall to 0 without a separate probe.
   const probeOffers = buildLoanOffers(gameState, teamId, 1, MIN_TERM_SEASONS, {
     allowSeason1: adminOverride,
-    ignoreRevenueCap: adminOverride,
   });
   const bankOffer = probeOffers.find((offer) => offer.lenderType === "bank") ?? null;
   const creditLimit = bankOffer?.maxAmount ?? 0;

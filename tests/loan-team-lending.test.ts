@@ -135,9 +135,9 @@ function buildBorrowLenderState(input?: {
       createIdentity(FRIENDLY_LENDER_ID, { finances: input?.lenderFinances ?? 5 }),
     ],
     seasonId: input?.seasonId,
-    // Gives the borrower enough tragbarkeitsCap (1.5 * annualRevenue) headroom so principal=10
-    // clears computeBorrowingCapacity in these Phase-3 lending tests (unrelated to capacity math,
-    // which is already covered in loan-service.test.ts).
+    // Sponsor payout log kept for realism/fixture parity; borrowing capacity itself is now purely
+    // teamwert-based (cash + marketValueTotal), see computeBorrowingCapacity in loan-service.ts,
+    // and is already covered in detail in loan-service.test.ts.
     sponsorPayoutLogs: [
       {
         id: "payout-borrower",

@@ -148,23 +148,32 @@ describe("computeLoanTerms", () => {
 });
 
 describe("computeBorrowingCapacity", () => {
-  it("caps at the lower of teamwert (cash+marketvalue) share and revenue share", () => {
-    // teamwertCap = 0.15*cash + 0.30*marketValueTotal; tragbarkeitsCap = 1.5*annualRevenue.
+  it("caps at the teamwert (cash+marketvalue) share", () => {
+    // teamwertCap = 0.15*cash + 0.30*marketValueTotal.
     expect(
       computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 0 }),
-    ).toBeCloseTo(75, 1); // min(0.15*100=15 + 0.30*200=60 -> 75, 1.5*80=120) - 0 = 75
+    ).toBeCloseTo(75, 1); // 0.15*100=15 + 0.30*200=60 -> 75 - 0 = 75
     expect(
       computeBorrowingCapacity({ cash: 20, marketValueTotal: 40, annualRevenue: 200, currentOutstandingDebt: 0 }),
-    ).toBeCloseTo(15, 1); // min(0.15*20=3 + 0.30*40=12 -> 15, 1.5*200=300) - 0 = 15
+    ).toBeCloseTo(15, 1); // 0.15*20=3 + 0.30*40=12 -> 15 - 0 = 15
   });
 
   it("subtracts existing debt and floors at 0", () => {
     expect(
       computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 65 }),
-    ).toBeCloseTo(10, 1); // teamwertCap 75, min(75,120)=75 - 65 = 10
+    ).toBeCloseTo(10, 1); // teamwertCap 75 - 65 = 10
     expect(
       computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 80, currentOutstandingDebt: 999 }),
     ).toBe(0);
+  });
+
+  it("is not zeroed by zero annual revenue (team-value only, no revenue cap)", () => {
+    // Zero-revenue team (e.g. no sponsor payout yet) still gets a real, non-zero
+    // capacity purely from cash + market value — the old revenue cap used to
+    // collapse this to 0.
+    expect(
+      computeBorrowingCapacity({ cash: 100, marketValueTotal: 200, annualRevenue: 0, currentOutstandingDebt: 0 }),
+    ).toBeCloseTo(75, 1);
   });
 });
 
@@ -236,7 +245,7 @@ describe("originateLoan", () => {
         },
       ],
     });
-    // capacity = min(0.15*50 + 0.30*200=67.5, 1.5*80=120) - 0 = 67.5
+    // capacity = 0.15*50 + 0.30*200 = 67.5 - 0 = 67.5 (annualRevenue no longer caps capacity)
   }
 
   it("previews without mutating when execute is not set", () => {

@@ -135,8 +135,8 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const shortfall = round(needsEur - spendableCash, 1);
   if (shortfall <= 0) return noLoan("cash_sufficient");
 
-  // Reuse loan-service's own capacity math (market value + revenue + outstanding debt) instead of
-  // duplicating it — a provisional preview call is enough to read back `capacity`.
+  // Reuse loan-service's own capacity math (cash + market value, minus outstanding debt) instead
+  // of duplicating it — a provisional preview call is enough to read back `capacity`.
   const capacityPreview = originateLoan(
     gameState,
     { borrowerTeamId: teamId, principal: shortfall, termSeasons: DEFAULT_TERM_SEASONS },
