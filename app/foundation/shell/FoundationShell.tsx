@@ -22,6 +22,11 @@ type FoundationShellProps = {
   children: ReactNode;
   isPending?: boolean;
   activities?: FoundationActivityItem[];
+  // Compact "Aktives Team"-Umschalter, top-left in der Sidebar neben dem
+  // Neuer-Look-Toggle statt im großen Context-Banner (siehe Owner-Feedback:
+  // Banner + Titel fraßen die halbe Seite). Wiring bleibt bei der Router-Body,
+  // hier nur Platzierung.
+  teamPicker?: ReactNode;
 };
 
 function buildSeasonContextLabel(
@@ -52,6 +57,7 @@ export default function FoundationShell({
   children,
   isPending = false,
   activities = [],
+  teamPicker,
 }: FoundationShellProps) {
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
@@ -66,6 +72,7 @@ export default function FoundationShell({
         onPrefetchView={onPrefetchView}
         attentionByViewId={attentionByViewId}
         seasonContextLabel={seasonContextLabel}
+        teamPicker={teamPicker}
       />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         <FoundationActivityStrip activities={activities} />
