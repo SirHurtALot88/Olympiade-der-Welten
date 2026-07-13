@@ -1728,12 +1728,6 @@ function FoundationTeamsDetailPanel({
                         <span>Popularity</span>
                         <strong>{selectedIdentity.popularity}</strong>
                       </article>
-                      <article className="identity-card">
-                        <span>Kaderziel</span>
-                        <strong>
-                          {selectedIdentity.playerMin} - {selectedIdentity.playerOpt}
-                        </strong>
-                      </article>
                     </div>
                   ) : (
                     <p className="muted">Für dieses Team liegt noch keine Identity vor.</p>
