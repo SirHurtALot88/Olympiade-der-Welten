@@ -226,7 +226,11 @@ describe("sponsor economy balance", () => {
     const top = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
 
     expect(top).toBeGreaterThan(bottom);
-    expect(top / bottom).toBeGreaterThan(1.8);
+    // Der flache Gebäude-Offset (SPONSOR_BUILDING_COST_OFFSET_C, angehoben 300→500) hebt den Sockel
+    // additiv und komprimiert damit bewusst die relative Rang-Spreizung (der schwächste Rang profitiert
+    // relativ mehr — genau der beabsichtigte Deflations-Ausgleich). Top zahlt weiterhin klar mehr
+    // (~1.7×), nur nicht mehr >1.8× wie beim kleineren Offset.
+    expect(top / bottom).toBeGreaterThan(1.65);
     expect(top / bottom).toBeLessThan(3.5);
   });
 

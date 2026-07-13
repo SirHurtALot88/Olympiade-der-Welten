@@ -74,11 +74,27 @@ const MIN_DEBT_SERVICE_ROOM = 1;
  */
 const TERM_PRUDENCE_FRACTION = Number(process.env.OLY_LOAN_TERM_PRUDENCE ?? 0.5) || 0.5;
 
-/** Summe der offenen Restschuld (principalOutstanding) über alle aktiven Kredite eines Teams. */
-function sumActiveOutstanding(gameState: GameState, teamId: string): number {
+/**
+ * Summe der offenen Restschuld (principalOutstanding) über alle NOCH GESCHULDETEN Kredite eines Teams —
+ * aktive UND geplatzte (defaulted). Ein geplatzter Kredit ist keine getilgte Schuld: die Restschuld
+ * bleibt (und wächst über Strafzins), also muss sie in die Leverage-Vorsicht einfließen, sonst liest ein
+ * chronisch überschuldetes Team (nur defaulted-Kredite, 0 aktive) sich als schuldenfrei und leiht munter
+ * weiter — genau der Auslöser der beobachteten Abwärtsspirale (chronische Kreditnehmer).
+ */
+function sumOwedOutstanding(gameState: GameState, teamId: string): number {
   return (gameState.seasonState.loans ?? [])
-    .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+    .filter(
+      (loan) =>
+        loan.borrowerTeamId === teamId && (loan.status === "active" || loan.status === "defaulted"),
+    )
     .reduce((sum, loan) => sum + (loan.principalOutstanding ?? 0), 0);
+}
+
+/** Ob das Team aktuell mindestens einen geplatzten (defaulted) Kredit mit sich schleppt. */
+function hasDefaultedLoan(gameState: GameState, teamId: string): boolean {
+  return (gameState.seasonState.loans ?? []).some(
+    (loan) => loan.borrowerTeamId === teamId && loan.status === "defaulted",
+  );
 }
 
 /** Wettbewerbsfähige Roster-Zwischenstufe zwischen Min und Opt (Kredit-Zielgröße, nicht das volle Opt). */
@@ -160,7 +176,7 @@ function resolveWillingness(gameState: GameState, teamId: string, seasonId: stri
   // bereit ist das Team, weiter zu leihen (bewusste Zurückhaltung statt immer weiter aufzuhebeln).
   const revenue = estimateTeamAnnualRevenue(gameState, teamId);
   if (revenue > 0) {
-    const leverage = sumActiveOutstanding(gameState, teamId) / revenue;
+    const leverage = sumOwedOutstanding(gameState, teamId) / revenue;
     willingness = clamp(willingness * (1 - leverage * LEVERAGE_WILLINGNESS_STEP), MIN_WILLINGNESS, MAX_WILLINGNESS);
   }
   return willingness;
@@ -233,6 +249,14 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // Reine Hort-Teams (Cash-Creator-Identität) borgen aus Charakter nicht.
   if (isStrategicHoardTeam(gameState, teamId)) return noLoan("strategic_hoard");
 
+  // Distress-Vorsicht: ein Team, das bereits einen Kredit hat platzen lassen (defaulted), bekommt keinen
+  // NEUEN Kredit oben drauf, solange es nicht unter dem harten Roster-Minimum steht — erst stabilisieren
+  // (Verkäufe/Tilgung) statt weiter in die Spirale leihen. Das ist kein harter Mechanik-Block: below-min
+  // bleibt ausgenommen (Überlebenskredit, sonst bricht der Saison-Preflight teams_under_7), und ohne
+  // geplatzten Kredit greift es gar nicht. Kappt gezielt die chronischen Wiederholungs-Kreditnehmer.
+  const belowHardMin = rosterCount < playerMin;
+  if (hasDefaultedLoan(gameState, teamId) && !belowHardMin) return noLoan("distress_defaulted_debt");
+
   // Kein harter Leverage-Block mehr (User: Kredite sollen möglich bleiben, "wenn begründet"): die
   // Vorsicht gegen eine Schuldenspirale läuft jetzt weich über (a) das Kreditdienst-Budget in
   // resolveServiceableTermSeasons, das die bereits laufenden Raten UND Gehalt/Gebäudekosten
@@ -245,7 +269,6 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   // Kredit ist kein Routine-Top-up: nur bei spürbarer Finanzierungslücke. AUSNAHME: ein Team unter dem
   // harten Roster-Minimum darf immer leihen, um überhaupt einen spielfähigen Kader stellen zu können
   // (sonst hält der Saison-Preflight "teams_under_7" den ganzen Lauf an) — dafür greift die Schwelle nicht.
-  const belowHardMin = rosterCount < playerMin;
   if (!belowHardMin && shortfall < MIN_MEANINGFUL_SHORTFALL) return noLoan("shortfall_minor");
 
   // SIZING (getrennt von der Qualifikation): der Betrag wird zum größeren Fill-Preis bemessen, damit ein

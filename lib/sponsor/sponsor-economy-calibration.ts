@@ -12,12 +12,13 @@ export const SPONSOR_BASE_FLOOR_C = 32;
 /**
  * Flat Gebäude-Kosten-Ausgleich auf den Sponsor-Sockel PRO TEAM. Die Gebäude verbrauchen liga-weit
  * ~300/Season (~9–10/Team, überwiegend Upgrade-CapEx), was die Mehrsaison-Ökonomie deflationär macht.
- * Deshalb (User-Vorgabe): Sponsor = gehaltsbasierter Sockel + flat ~300/Liga on top → pro Team
- * 300/32 ≈ 9.4. Flach (NICHT salaryFactor-skaliert), sodass der Ausgleich bei fortschreitender Deflation
- * relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot UND
- * Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
+ * Deshalb (User-Vorgabe): Sponsor = gehaltsbasierter Sockel + flat ~500/Liga on top → pro Team
+ * 500/32 ≈ 15.6 (angehoben von 300→500, um Gebäude-Unterhalt breiter zu decken und den Kreditbedarf
+ * an der Quelle zu senken). Flach (NICHT salaryFactor-skaliert), sodass der Ausgleich bei fortschreitender
+ * Deflation relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot
+ * UND Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
  */
-export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 9.4) || 9.4;
+export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 15.6) || 15.6;
 
 /**
  * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
