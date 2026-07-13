@@ -171,9 +171,13 @@ export type PotentialRangeStarSlot = {
   showUncertain: boolean;
 };
 
-export function buildPotentialRangeStarSlots(minScore: number, maxScore: number): PotentialRangeStarSlot[] {
-  const minStars = potentialScoreToStars(minScore);
-  const maxStars = potentialScoreToStars(maxScore);
+/**
+ * Star-space range → per-star fill slots (uncertain overlay math).
+ * Shared primitive: works directly on star values (0..5). `buildPotentialRangeStarSlots`
+ * composes this with `potentialScoreToStars` for score-space callers. Do NOT reinvent this
+ * fill math elsewhere — the shared `NlAbilityStars` component consumes it.
+ */
+export function buildAbilityStarRangeSlots(minStars: number, maxStars: number): PotentialRangeStarSlot[] {
   return [0, 1, 2, 3, 4].map((index) => {
     const minFill = Math.max(0, Math.min(1, minStars - index));
     const maxFill = Math.max(0, Math.min(1, maxStars - index));
@@ -184,6 +188,10 @@ export function buildPotentialRangeStarSlots(minScore: number, maxScore: number)
       showUncertain: maxFill > minFill,
     };
   });
+}
+
+export function buildPotentialRangeStarSlots(minScore: number, maxScore: number): PotentialRangeStarSlot[] {
+  return buildAbilityStarRangeSlots(potentialScoreToStars(minScore), potentialScoreToStars(maxScore));
 }
 
 export function shouldShowPotentialRangeStars(minScore: number, maxScore: number) {

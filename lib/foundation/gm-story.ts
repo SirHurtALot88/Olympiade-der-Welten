@@ -58,10 +58,10 @@ export function getGmStoryDetail(input: GmStoryInput) {
     return dismissal ? `Neuer GM nach: ${dismissal}.` : "Board hat nach der Season neu besetzt.";
   }
   if ((input.boardPressure ?? 0) >= 8) {
-    return `Druck ${formatNumber(input.boardPressure, 1)}: naechste Zielauswertung kann den Job kosten.`;
+    return `Druck ${formatNumber(input.boardPressure, 1)}: nächste Zielauswertung kann den Job kosten.`;
   }
   if ((input.boardConfidenceValue ?? 100) <= 45 || (input.boardPressure ?? 0) >= 6) {
-    return `Confidence ${formatNumber(input.boardConfidenceValue, 1)}, Druck ${formatNumber(input.boardPressure, 1)}: Ergebnisse muessen sichtbarer werden.`;
+    return `Confidence ${formatNumber(input.boardConfidenceValue, 1)}, Druck ${formatNumber(input.boardPressure, 1)}: Ergebnisse müssen sichtbarer werden.`;
   }
   return `Confidence ${formatNumber(input.boardConfidenceValue, 1)}: Board vertraut dem Stil.`;
 }

@@ -7,6 +7,7 @@ import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
+import PlayerCareerStoryHeader from "@/app/foundation/player-profile/PlayerCareerStoryHeader";
 import PlayerTrainingControls from "@/app/foundation/player-profile/PlayerTrainingControls";
 import {
   PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP,
@@ -43,11 +44,21 @@ import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
 import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
-import { NlSparkline } from "@/components/foundation/new-look";
+import {
+  NlDeltaChip,
+  NlFatigueGauge,
+  NlProgressBar,
+  NlRadar,
+  NlSparkline,
+  formatNlNumber,
+  type NlRadarAxis,
+} from "@/components/foundation/new-look";
+import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
 import { buildPlayerCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import { useNewLook } from "@/lib/ui/new-look-preference";
+import { getMetricBarPercent, getPoolHeatTone } from "@/lib/foundation/player-league-heat";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -613,7 +624,7 @@ function getDemandCardTone(status: PlayerDetailDrawerData["demands"][number]["st
 
 function formatAvailabilityStatus(data: PlayerDetailDrawerData["availability"]) {
   if (data.isUnavailable) {
-    return `Verletzt bis ${data.injuryUntilMatchday ?? "naechster Matchday"}`;
+    return `Verletzt bis ${data.injuryUntilMatchday ?? "nächster Matchday"}`;
   }
   if (data.injuryStatus === "recovering") {
     return "Genesen";
@@ -702,7 +713,7 @@ function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
       <div className="player-drawer-injury-banner is-negative" data-testid="player-drawer-injury-banner">
         <strong>Verletzt</strong>
         <span>
-          Ausfall bis {data.availability.injuryUntilMatchday ?? "naechster Spieltag"}
+          Ausfall bis {data.availability.injuryUntilMatchday ?? "nächster Spieltag"}
           {data.availability.injuryRecovery != null
             ? ` · Regeneration ${formatValue(data.availability.injuryRecovery, 1)} (50%)`
             : " · Regeneration 50%"}
@@ -742,7 +753,7 @@ function formatGrowthOutlook(value: NonNullable<PlayerDetailDrawerData["developm
     case "stagnation":
       return "Stagnation";
     case "regression_risk":
-      return "Rueckschritt-Risiko";
+      return "Rückschritt-Risiko";
     default:
       return "—";
   }
@@ -863,7 +874,7 @@ function PotentialRangeStarRating({
     <span
       className={`player-drawer-star-rating is-range${compact ? " is-compact" : ""}`}
       aria-label={`${label ? `${label}: ` : ""}Potential ${formatValue(minStars, 1)} bis ${formatValue(maxStars, 1)} von 5 Sternen`}
-      title={`${label ? `${label}: ` : ""}Potential ${formatValue(minScore, 0)}-${formatValue(maxScore, 0)} (${formatValue(minStars, 1)}-${formatValue(maxStars, 1)} Sterne). Schwarze Sterne = moegliches, aber unsicheres Maximum.`}
+      title={`${label ? `${label}: ` : ""}Potential ${formatValue(minScore, 0)}-${formatValue(maxScore, 0)} (${formatValue(minStars, 1)}-${formatValue(maxStars, 1)} Sterne). Schwarze Sterne = mögliches, aber unsicheres Maximum.`}
     >
       {label ? <span className="player-drawer-star-label">{label}</span> : null}
       <span className="player-drawer-stars" aria-hidden="true">
@@ -935,8 +946,26 @@ function resolveCaPoDisplay(data: PlayerDetailDrawerData) {
   };
 }
 
-function PlayerCaPoStarStack({ data }: { data: PlayerDetailDrawerData }) {
+function PlayerCaPoStarStack({ data, newLook = false }: { data: PlayerDetailDrawerData; newLook?: boolean }) {
   const { caStars, poStars, caDisplay, poDisplay } = resolveCaPoDisplay(data);
+
+  if (newLook) {
+    const known = data.attributeVisibility === "exact";
+    const poScoreRange = data.developmentInsight?.potentialRangeDisplay ?? null;
+    return (
+      <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
+        <NlAbilityStars
+          caStars={caStars}
+          caScore={data.developmentInsight?.currentRating ?? null}
+          poStars={poStars}
+          poScoreRange={poScoreRange}
+          known={known}
+          label="Fähigkeiten"
+          compact
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
@@ -1082,6 +1111,7 @@ function renderTopDisciplineCell(
   columnId: TopDisciplineColumnId,
   isScoutedProfile: boolean,
   scoutingLevel: number,
+  newLookHeat: { enabled: boolean; pool: Record<string, number[]> | null } = { enabled: false, pool: null },
 ): ReactNode {
   switch (columnId) {
     case "discipline": {
@@ -1109,7 +1139,22 @@ function renderTopDisciplineCell(
           )}
         </span>
       ) : (
-        formatDisciplineValue(row.value, row.upgradeDelta)
+        <>
+          {formatDisciplineValue(row.value, row.upgradeDelta)}
+          {/* "Neuer Look" (flag-gated, additiv, #60 FM Data-Hub): Liga-Heat-Bar
+              unter dem Diszi-Wert — echte Pool-Verteilung aus allen Spielern
+              des aktiven Saves (`disciplinePool`), keine erfundene Skala. */}
+          {newLookHeat.enabled && newLookHeat.pool && row.value != null ? (
+            <NlProgressBar
+              className="is-new-look nl-player-discipline-heat-bar"
+              value={getMetricBarPercent(row.value, newLookHeat.pool[row.id] ?? [], 100)}
+              max={100}
+              tone={getPoolHeatTone(row.value, newLookHeat.pool[row.id] ?? [])}
+              showValue={false}
+              title={`${row.label}: ${formatValue(row.value, 0)} · Liga-Verteilung (Rang im Vergleich zu allen Spielern)`}
+            />
+          ) : null}
+        </>
       );
     case "seasonPps":
       return formatPointsWithRank(row.seasonPoints, row.seasonPointsRank ?? null);
@@ -1126,6 +1171,310 @@ function renderTopDisciplineCell(
     default:
       return "—";
   }
+}
+
+// "Neuer Look" (flag-gated, additiv, FM-Vergleichsscreen #60): Zwei-Spieler-
+// Vergleich — siehe `PlayerComparePanel` unten. POW/SPE/MEN/SOC kommen 1:1
+// aus `PlayerDetailDrawerData` (dieselben Felder wie der Hero-Radar).
+function buildRadarAxesFromPlayerData(source: Pick<PlayerDetailDrawerData, "pow" | "spe" | "men" | "soc">): NlRadarAxis[] {
+  return (
+    [
+      ["pow", source.pow],
+      ["spe", source.spe],
+      ["men", source.men],
+      ["soc", source.soc],
+    ] as const
+  )
+    .filter((entry): entry is readonly [NlRadarAxis["key"], number] => entry[1] != null && Number.isFinite(entry[1]))
+    .map(([key, value]) => ({ key, value }));
+}
+
+type ComparePlayerCandidate = {
+  id: string;
+  name: string;
+  className: string | null;
+  teamCode: string | null;
+};
+
+type CompareDisciplineRow = {
+  id: string;
+  label: string;
+  category: DisciplineCategoryLike;
+  entryA: PlayerDetailDrawerData["disciplineValues"][number];
+  entryB: PlayerDetailDrawerData["disciplineValues"][number] | undefined;
+  delta: number | null;
+};
+
+type DisciplineCategoryLike = PlayerDetailDrawerData["disciplineValues"][number]["category"];
+
+function renderComparePlayerLabel(name: string, teamCode: string | null | undefined, isFreeAgent: boolean) {
+  if (teamCode) {
+    return `${name} · ${teamCode}`;
+  }
+  return isFreeAgent ? `${name} · Free Agent` : name;
+}
+
+function renderCompareDisciplineCell(
+  entry: PlayerDetailDrawerData["disciplineValues"][number] | undefined,
+  isScouted: boolean,
+  scoutingLevel: number,
+) {
+  if (!entry) {
+    return <span className="nl-compare-metric-gap">—</span>;
+  }
+  if (isScouted) {
+    const tier = entry.scoutedTier ?? formatDisciplineTier(entry.value);
+    return (
+      <span
+        className={`player-drawer-chip ${getAttributeTierClass(tier)}`}
+        title="Gescoutete Klasse als Range, keine exakte Diszi-Zahl."
+      >
+        {getScoutingTierWindow(tier, resolveScoutingConfidenceFromLevel(scoutingLevel))}
+      </span>
+    );
+  }
+  return <span className="nl-tnum">{formatValue(entry.value, 0)}</span>;
+}
+
+/**
+ * "Vergleichen"-Affordanz im Spieler-Drawer (#60, FM-Vergleichsscreen):
+ * Spieler-Picker (Suche über die reale Spielerliste des Saves) + Vergleichs-
+ * Panel (Radar mit Ghost-Polygon, Kennzahlen-Deltas, Diszi-Tabelle). Für
+ * nicht-eigene/ungescoutete Spieler B werden exakte Diszi-Werte durch die
+ * bestehenden Scouting-Tier-Ranges ersetzt (`scoutedTier` + `getScoutingTierWindow`,
+ * dieselbe Quelle wie die Top-Disziplinen-Tabelle oben) — es wird nichts an
+ * verdeckten Daten erfunden oder vorbeigerechnet.
+ */
+function PlayerComparePanel({
+  dataA,
+  open,
+  onToggleOpen,
+  query,
+  onQueryChange,
+  candidates,
+  selectedPlayerId,
+  onSelectPlayer,
+  onClearSelection,
+  dataB,
+  loadingB,
+}: {
+  dataA: PlayerDetailDrawerData;
+  open: boolean;
+  onToggleOpen: () => void;
+  query: string;
+  onQueryChange: (value: string) => void;
+  candidates: ComparePlayerCandidate[];
+  selectedPlayerId: string | null;
+  onSelectPlayer: (playerId: string) => void;
+  onClearSelection: () => void;
+  dataB: PlayerDetailDrawerData | null;
+  loadingB: boolean;
+}) {
+  const aIsScouted = dataA.attributeVisibility === "scouted";
+  const bIsScouted = dataB != null && dataB.attributeVisibility === "scouted";
+  const bIsFreeAgent = dataB != null && dataB.transferStatus.toLowerCase().includes("free");
+
+  const radarAxesA = buildRadarAxesFromPlayerData(dataA);
+  const radarAxesB = dataB ? buildRadarAxesFromPlayerData(dataB) : [];
+
+  const compareMetrics = dataB
+    ? [
+        { key: "ovr", label: "OVR", aValue: dataA.ovr, bValue: dataB.ovr },
+        { key: "pps", label: "PPs", aValue: dataA.pps ?? dataA.ppsRating, bValue: dataB.pps ?? dataB.ppsRating },
+        { key: "mvs", label: "MVS", aValue: dataA.mvs, bValue: dataB.mvs },
+        { key: "mw", label: "MW", aValue: dataA.marketValue, bValue: dataB.marketValue },
+      ]
+    : [];
+
+  const compareDisciplineRows: CompareDisciplineRow[] = dataB
+    ? (() => {
+        const bById = new Map(dataB.disciplineValues.map((entry) => [entry.id, entry] as const));
+        return [...dataA.disciplineValues]
+          .sort((left, right) => (right.value ?? -1) - (left.value ?? -1))
+          .slice(0, 8)
+          .map((entryA) => {
+            const entryB = bById.get(entryA.id);
+            const delta =
+              !aIsScouted && !bIsScouted && entryA.value != null && entryB?.value != null
+                ? Number((entryA.value - entryB.value).toFixed(1))
+                : null;
+            return { id: entryA.id, label: entryA.label, category: entryA.category, entryA, entryB, delta };
+          });
+      })()
+    : [];
+
+  return (
+    <div className="is-new-look nl-player-compare" data-testid="player-compare-panel">
+      {/* #6: Deutlich sichtbarer Einstieg für den 2-Spieler-Vergleich —
+          Icon + ausformulierte Beschriftung + Kurzhinweis, damit die Funktion
+          nicht übersehen wird. */}
+      <div className="nl-player-compare-entry">
+        <button
+          type="button"
+          className="nl-player-compare-toggle"
+          aria-expanded={open}
+          aria-controls="player-compare-panel-body"
+          onClick={onToggleOpen}
+        >
+          <span className="nl-player-compare-toggle-icon" aria-hidden="true">
+            ⇆
+          </span>
+          {open ? "Vergleich schliessen" : "Spieler vergleichen"}
+        </button>
+        {!open ? (
+          <span className="nl-player-compare-hint muted">Stelle diesen Spieler einem zweiten direkt gegenüber.</span>
+        ) : null}
+      </div>
+      <div className="nl-compare-panel" id="player-compare-panel-body" hidden={!open}>
+        {!open ? null : selectedPlayerId == null ? (
+          <div className="nl-compare-picker">
+            <label className="nl-compare-picker-label" htmlFor="player-compare-search">
+              Spieler für Vergleich suchen
+            </label>
+            <input
+              id="player-compare-search"
+              type="search"
+              className="nl-compare-picker-input"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Spielername…"
+              autoComplete="off"
+            />
+            <ul className="nl-compare-picker-list" role="listbox" aria-label="Vergleichs-Kandidaten">
+              {candidates.map((candidate) => (
+                <li key={candidate.id}>
+                  <button
+                    type="button"
+                    className="nl-compare-picker-item"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => onSelectPlayer(candidate.id)}
+                  >
+                    <span className="nl-compare-picker-item-name">{candidate.name}</span>
+                    <span className="nl-compare-picker-item-meta">
+                      {candidate.className ?? "—"}
+                      {candidate.teamCode ? ` · ${candidate.teamCode}` : " · Free Agent"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {candidates.length === 0 ? <li className="nl-compare-picker-empty muted">Keine Treffer.</li> : null}
+            </ul>
+          </div>
+        ) : loadingB ? (
+          <p className="nl-compare-loading muted" role="status" aria-live="polite">
+            Lade Vergleichsprofil…
+          </p>
+        ) : dataB ? (
+          <div className="nl-compare-result">
+            <header className="nl-compare-result-head">
+              <div className="nl-compare-result-players">
+                <strong className="is-a">{dataA.name}</strong>
+                <span className="nl-compare-vs" aria-hidden="true">
+                  vs
+                </span>
+                <strong className="is-b">{renderComparePlayerLabel(dataB.name, dataB.teamCode, bIsFreeAgent)}</strong>
+              </div>
+              <button type="button" className="nl-compare-clear" onClick={onClearSelection}>
+                Anderen Spieler wählen
+              </button>
+            </header>
+
+            <div className="nl-compare-radar-block">
+              <NlRadar
+                axes={radarAxesA}
+                ghostAxes={radarAxesB.length === 4 ? radarAxesB : undefined}
+                ghostLabel={dataB.name}
+                max={100}
+                showValues
+                className="nl-compare-radar"
+                aria-label={`Achsen-Vergleich: ${dataA.name} vs ${dataB.name}`}
+              />
+              <p className="nl-player-hero-radar-legend" aria-label="Radar-Legende">
+                <span className="nl-player-hero-radar-legend-item is-current">
+                  <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+                  {dataA.name}
+                </span>
+                <span className="nl-player-hero-radar-legend-item is-ghost">
+                  <span className="nl-player-hero-radar-legend-swatch" aria-hidden="true" />
+                  {dataB.name}
+                </span>
+              </p>
+            </div>
+
+            <div className="nl-compare-metrics" role="group" aria-label="Kennzahlen-Vergleich">
+              {compareMetrics.map((metric) => (
+                <div className="nl-compare-metric-row" key={metric.key}>
+                  <span className="nl-compare-metric-a nl-tnum">{formatNlNumber(metric.aValue, 1)}</span>
+                  <span className="nl-compare-metric-label">{metric.label}</span>
+                  {metric.aValue != null && metric.bValue != null ? (
+                    <NlDeltaChip
+                      value={Number((metric.aValue - metric.bValue).toFixed(1))}
+                      title={`${dataA.name} − ${dataB.name}`}
+                    />
+                  ) : (
+                    <span className="nl-compare-metric-gap">—</span>
+                  )}
+                  <span className="nl-compare-metric-b nl-tnum">{formatNlNumber(metric.bValue, 1)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="table-shell nl-compare-discipline-table-shell">
+              <table className="team-table nl-compare-discipline-table">
+                <thead>
+                  <tr>
+                    <th>Diszi</th>
+                    <th>{dataA.name}</th>
+                    <th>Δ</th>
+                    <th>{dataB.name}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {compareDisciplineRows.map((row) => {
+                    const areaClass = getDisciplineAreaClass(row.category);
+                    return (
+                      <tr key={`compare-discipline-${row.id}`}>
+                        <td className={`player-drawer-discipline-name-cell ${areaClass}`}>
+                          <DisciplineIcon
+                            disciplineId={row.id}
+                            label={row.label}
+                            className={`discipline-icon-chip-inline player-drawer-discipline-area-chip ${areaClass}`}
+                          />
+                        </td>
+                        <td>{renderCompareDisciplineCell(row.entryA, aIsScouted, dataA.scoutingLevel ?? 0)}</td>
+                        <td>
+                          {row.delta != null ? (
+                            <NlDeltaChip value={row.delta} />
+                          ) : (
+                            <span className="nl-compare-metric-gap">—</span>
+                          )}
+                        </td>
+                        <td>{renderCompareDisciplineCell(row.entryB, bIsScouted, dataB.scoutingLevel ?? 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {bIsScouted ? (
+              <p className="nl-compare-fog-note muted">
+                {dataB.name} ist nicht vollständig gescoutet — Diszi-Werte als Klassen-Range (Scouting L
+                {dataB.scoutingLevel ?? 0}), keine exakten Zahlen.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="nl-compare-error">
+            <p className="muted">Vergleichsprofil nicht verfügbar.</p>
+            <button type="button" className="nl-compare-clear" onClick={onClearSelection}>
+              Anderen Spieler wählen
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function PlayerDetailDrawer({
@@ -1219,6 +1568,117 @@ export default function PlayerDetailDrawer({
         ? buildPlayerCareerSeries(werdegangGameState, werdegangPlayerId)
         : null,
     [newLookEnabled, werdegangGameState, werdegangPlayerId],
+  );
+
+  // "Neuer Look" (flag-gated, additiv, FM Data-Hub #60): Liga-Heat-Pool je
+  // Disziplin — reale disciplineRatings aller Spieler des aktiven Saves, für
+  // die Heat-Bar unter den Top-Disziplinen-Werten. Kein synthetischer Pool.
+  const disciplineHeatPool = useMemo(() => {
+    if (!newLookEnabled || !werdegangGameState) {
+      return null;
+    }
+    const pool: Record<string, number[]> = {};
+    for (const player of werdegangGameState.players) {
+      for (const disciplineId of Object.keys(player.disciplineRatings ?? {})) {
+        const value = player.disciplineRatings[disciplineId];
+        if (value != null && Number.isFinite(value)) {
+          (pool[disciplineId] ??= []).push(value);
+        }
+      }
+    }
+    return pool;
+  }, [newLookEnabled, werdegangGameState]);
+
+  // "Neuer Look" (flag-gated, additiv, FM-Vergleichsscreen #60): Zwei-
+  // Spieler-Vergleich. Spieler B wird über denselben Builder wie Spieler A
+  // geladen (`buildPlayerDrawerDataFromGameState`), damit Scouting-/Fog-of-
+  // war-Regeln identisch angewendet werden — es wird nichts an Spieler B
+  // vorbeigerechnet oder erfunden.
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareQuery, setCompareQuery] = useState("");
+  const [comparePlayerId, setComparePlayerId] = useState<string | null>(null);
+  const [comparePlayerBData, setComparePlayerBData] = useState<PlayerDetailDrawerData | null>(null);
+  const [comparePlayerBLoading, setComparePlayerBLoading] = useState(false);
+
+  useEffect(() => {
+    setCompareOpen(false);
+    setCompareQuery("");
+    setComparePlayerId(null);
+    setComparePlayerBData(null);
+  }, [data?.playerId]);
+
+  useEffect(() => {
+    if (!comparePlayerId || !werdegangGameState) {
+      setComparePlayerBData(null);
+      setComparePlayerBLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setComparePlayerBLoading(true);
+    void (async () => {
+      try {
+        const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+        const nextData = buildPlayerDrawerDataFromGameState({
+          gameState: werdegangGameState,
+          playerId: comparePlayerId,
+          source: data?.source ?? "sqlite",
+          manageableTeamIds: foundationState?.foundationManageableTeamIds ?? null,
+          saveId: foundationState?.activeSaveId ?? null,
+        });
+        if (!cancelled) {
+          setComparePlayerBData(nextData);
+        }
+      } catch {
+        if (!cancelled) {
+          setComparePlayerBData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setComparePlayerBLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comparePlayerId, werdegangGameState, data?.source, foundationState?.foundationManageableTeamIds, foundationState?.activeSaveId]);
+
+  const compareTeamCodeByPlayerId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!compareOpen || !werdegangGameState) {
+      return map;
+    }
+    const teamById = new Map(werdegangGameState.teams.map((team) => [team.teamId, team] as const));
+    for (const roster of werdegangGameState.rosters) {
+      const team = teamById.get(roster.teamId);
+      if (team) {
+        map.set(roster.playerId, team.shortCode || team.name);
+      }
+    }
+    return map;
+  }, [compareOpen, werdegangGameState]);
+
+  const compareCandidates = useMemo(() => {
+    if (!compareOpen || !werdegangGameState || !data) {
+      return [];
+    }
+    const query = compareQuery.trim().toLowerCase();
+    const currentPlayerId = data.playerId;
+    return werdegangGameState.players
+      .filter((player) => player.id !== currentPlayerId && (query.length === 0 || player.name.toLowerCase().includes(query)))
+      .sort((left, right) => left.name.localeCompare(right.name, "de"))
+      .slice(0, 20);
+  }, [compareOpen, werdegangGameState, data, compareQuery]);
+
+  const compareCandidateOptions = useMemo(
+    () =>
+      compareCandidates.map((player) => ({
+        id: player.id,
+        name: player.name,
+        className: player.className ?? null,
+        teamCode: compareTeamCodeByPlayerId.get(player.id) ?? null,
+      })),
+    [compareCandidates, compareTeamCodeByPlayerId],
   );
 
   if (!data) {
@@ -1418,15 +1878,33 @@ export default function PlayerDetailDrawer({
           {/* "Neuer Look" (flag-gated): ersetzt nur den Identitäts-/Ratings-Header.
               Mit Flag OFF rendert exakt der bisherige Header — byte-identisch. */}
           {newLookEnabled ? (
-            <PlayerHeroNewLook
-              data={data}
-              roleLabel={formatRoleTag(transferContext.roleTag)}
-              caStars={newLookCaPo?.caStars ?? null}
-              poStars={newLookCaPo?.poStars ?? null}
-              isFreeAgent={isFreeAgent}
-              onClose={onClose}
-              onOpenLeagueLeaders={onOpenLeagueLeaders}
-            />
+            <>
+              <PlayerHeroNewLook
+                data={data}
+                roleLabel={formatRoleTag(transferContext.roleTag)}
+                caStars={newLookCaPo?.caStars ?? null}
+                poStars={newLookCaPo?.poStars ?? null}
+                isFreeAgent={isFreeAgent}
+                onClose={onClose}
+                onOpenLeagueLeaders={onOpenLeagueLeaders}
+              />
+              <PlayerComparePanel
+                dataA={data}
+                open={compareOpen}
+                onToggleOpen={() => setCompareOpen((value) => !value)}
+                query={compareQuery}
+                onQueryChange={setCompareQuery}
+                candidates={compareCandidateOptions}
+                selectedPlayerId={comparePlayerId}
+                onSelectPlayer={setComparePlayerId}
+                onClearSelection={() => {
+                  setComparePlayerId(null);
+                  setComparePlayerBData(null);
+                }}
+                dataB={comparePlayerBData}
+                loadingB={comparePlayerBLoading}
+              />
+            </>
           ) : (
           <div className="player-drawer-header">
           <div className="player-drawer-hero">
@@ -1533,7 +2011,7 @@ export default function PlayerDetailDrawer({
                 </span>
                 {isFreeAgent ? (
                   <div className="player-drawer-header-scout-compact" data-testid="player-drawer-header-scout-compact">
-                    {hasKnownCaPoStars(data) ? <PlayerCaPoStarStack data={data} /> : null}
+                    {hasKnownCaPoStars(data) ? <PlayerCaPoStarStack data={data} newLook={newLookEnabled} /> : null}
                     <span className="player-drawer-header-metric">
                       <small>Scouting</small>
                       <strong>L{data.scoutingLevel ?? 0}</strong>
@@ -1560,7 +2038,7 @@ export default function PlayerDetailDrawer({
             </div>
           </div>
           <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Schliessen
+            Schließen
           </button>
         </div>
           )}
@@ -1587,7 +2065,7 @@ export default function PlayerDetailDrawer({
                       Rolle {formatRoleTag(transferContext.roleTag)}
                       {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
                     </p>
-                    <PlayerCaPoStarStack data={data} />
+                    <PlayerCaPoStarStack data={data} newLook={newLookEnabled} />
                     <div className="player-drawer-scout-meta">
                       <span>Scouting L{data.scoutingLevel ?? 0}</span>
                       <span title={buildFatigueImpactTooltip(data)}>
@@ -1600,6 +2078,11 @@ export default function PlayerDetailDrawer({
                           : ""}
                       </span>
                     </div>
+                    {newLookEnabled ? (
+                      <div className="player-drawer-fatigue-gauge-wrap">
+                        <NlFatigueGauge value={data.fatigue ?? 0} title={buildFatigueImpactTooltip(data)} />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="player-drawer-kpi-hero-grid">
@@ -1754,7 +2237,7 @@ export default function PlayerDetailDrawer({
                         <p>Top 5 Diszis dieser Achse mit Spielerwert, Einsatzslot, PPs und Mutator-Anteil.</p>
                       </div>
                       <button type="button" className="ghost-button" onClick={() => setSelectedAxisId(null)}>
-                        Schliessen
+                        Schließen
                       </button>
                     </div>
                     <div className="table-shell player-drawer-axis-detail-table-shell">
@@ -1836,12 +2319,6 @@ export default function PlayerDetailDrawer({
                 <strong>{formatValue(seasonPerformance?.averageContribution, 1)}</strong>
               </article>
             </div>
-            {variant === "page" && data.historyRows.length >= 2 ? (
-              <div className="player-drawer-stats-chart">
-                <h3>Stat-Entwicklung</h3>
-                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} />
-              </div>
-            ) : null}
           </section>
 
           {variant !== "page" ? (
@@ -1908,7 +2385,10 @@ export default function PlayerDetailDrawer({
                             key={`discipline-breakdown-${entry.id}-${columnId}`}
                             className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                           >
-                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
+                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel, {
+                              enabled: newLookEnabled,
+                              pool: disciplineHeatPool,
+                            })}
                           </td>
                         ))}
                       </tr>
@@ -2263,7 +2743,7 @@ export default function PlayerDetailDrawer({
                     ))}
                   </div>
                   <div className="player-drawer-progression-reason-grid" aria-label="Progressionsgruende">
-                    <span title="Positive Traits erhoehen das Trainingsbudget, negative Traits bremsen es.">
+                    <span title="Positive Traits erhöhen das Trainingsbudget, negative Traits bremsen es.">
                       <strong>
                         Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
                         {formatValue(data.organicProgression.traitModifierPct, 1)}%
@@ -2300,11 +2780,11 @@ export default function PlayerDetailDrawer({
 
           {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast || showOwnPotentialSnapshot) ? (
             <section className="player-drawer-section player-drawer-panel" id="player-drawer-potential">
-              <h3 title="Kurzfassung: Potential und Entwicklungsroute. Details koennen aufgeklappt werden.">Potential & Entwicklung</h3>
+              <h3 title="Kurzfassung: Potential und Entwicklungsroute. Details können aufgeklappt werden.">Potential & Entwicklung</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                 {showOwnPotentialSnapshot ? (
-                  <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status fuer den eigenen Kader.">
-                    <HelpLabel title="PO = geschaetzte Achsen-Decke. Delta zeigt die Veraenderung seit der letzten Saison.">Achsen-Potential</HelpLabel>
+                  <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status für den eigenen Kader.">
+                    <HelpLabel title="PO = geschätzte Achsen-Decke. Delta zeigt die Veränderung seit der letzten Saison.">Achsen-Potential</HelpLabel>
                     <strong className="player-drawer-star-stack">
                       PO {formatAxisStarValue(data.potentialOverallStars)}
                       {data.potentialOverallDelta != null ? (
@@ -2344,8 +2824,8 @@ export default function PlayerDetailDrawer({
                   </article>
                 ) : null}
                 {data.scoutPotential ? (
-                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschaetzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
-                    <HelpLabel title="Potential-Spanne = geschaetzter Zielbereich. Current = aktueller Stand. Gap = moegliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
+                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschätzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
+                    <HelpLabel title="Potential-Spanne = geschätzter Zielbereich. Current = aktueller Stand. Gap = mögliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
                     <strong>
                       {formatDevelopmentRange(data.developmentInsight)}{" "}
                       {showScoutedPotentialStars ? (
@@ -2382,7 +2862,7 @@ export default function PlayerDetailDrawer({
                     className="metric-card player-drawer-xp-balance-card"
                     title="Organische Saison-Prognose: Setpoints aus Training, Performance und Erhaltungsdruck — das ist die verbindliche Entwicklungslogik."
                   >
-                    <HelpLabel title="Netto-Setpoints = angewandtes Training + Performance + Regression (Basis + Marktwert). Das ist die Hauptzahl fuer organische Entwicklung.">
+                    <HelpLabel title="Netto-Setpoints = angewandtes Training + Performance + Regression (Basis + Marktwert). Das ist die Hauptzahl für organische Entwicklung.">
                       Saison-Prognose (Setpoints)
                     </HelpLabel>
                     <div className="player-drawer-xp-balance-grid">
@@ -2422,7 +2902,7 @@ export default function PlayerDetailDrawer({
                     {data.progressionForecast ? (
                       <>
                         <article className="metric-card">
-                          <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
+                          <HelpLabel title="CA = aktueller Stand. PO = geschätztes Potential. Je größer der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
                           <strong className="player-drawer-star-stack">
                             <ScoutStarDisplay
                               axisDisplay={data.axisStarsDisplay}
@@ -2498,7 +2978,7 @@ export default function PlayerDetailDrawer({
           ) : null}
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-training-progress">
-            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} /> : null}
+            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} /> : null}
           </section>
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-market">
@@ -2534,6 +3014,21 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-history">
             <h3>Historie</h3>
+            {/* D5 "Karriere-Story-Header" ("Neuer Look", flag-gated, additiv):
+                kompakter Story-Streifen (Peak-OVR, größter Sprung, Longevity,
+                letzter Trend) aus den bereits archivierten Saison-Metriken —
+                führt die Karriere-/Entwicklungs-Sektion an. Mit Flag OFF
+                unverändert. */}
+            {newLookEnabled ? <PlayerCareerStoryHeader historyRows={data.historyRows} /> : null}
+            {/* Entwicklung über Seasons gehört zur Karriere-Sektion (nicht zu
+                "Stats"): die Stat-Entwicklungskurve führt hier den saison-
+                weisen Verlauf an. */}
+            {variant === "page" && data.historyRows.length >= 2 ? (
+              <div className="player-drawer-stats-chart">
+                <h3>Stat-Entwicklung über Seasons</h3>
+                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} />
+              </div>
+            ) : null}
             {data.injurySummary.totalInjuries > 0 ? (
               <p className="player-drawer-injury-summary muted" data-testid="player-drawer-injury-summary">
                 {data.injurySummary.totalInjuries} Verletzung{data.injurySummary.totalInjuries === 1 ? "" : "en"} ·{" "}
@@ -2592,7 +3087,7 @@ export default function PlayerDetailDrawer({
                       return (
                         <span
                           className={getMoneyDeltaToneClass(row.marketValueBaselineDelta, "higher")}
-                          title="Marktwert mit Veraenderung gegenueber Kaufpreis (Fallback: Season-0-Baseline)."
+                          title="Marktwert mit Veränderung gegenüber Kaufpreis (Fallback: Season-0-Baseline)."
                         >
                           {formatMoneyWithBaselineDelta(row.marketValue, row.marketValueBaselineDelta)}
                         </span>
@@ -2617,7 +3112,7 @@ export default function PlayerDetailDrawer({
                 />
                 <p className="muted" style={{ marginTop: 10 }}>
                   Alte Seasons kommen aus gespeicherten Season-Snapshots. Fehlende Felder bedeuten: der damalige Snapshot
-                  wurde noch vor der vollstaendigen Spieler-Metric-Archivierung erstellt.
+                  wurde noch vor der vollständigen Spieler-Metric-Archivierung erstellt.
                 </p>
                 {marketValueHistoryRows.length > 0 ? (
                   <div className="player-drawer-injury-history" data-testid="player-drawer-market-value-history">

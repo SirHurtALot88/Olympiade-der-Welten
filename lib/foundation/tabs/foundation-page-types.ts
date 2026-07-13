@@ -81,6 +81,7 @@ export type FoundationView =
   | "teamProfile"
   | "ranks"
   | "diszis"
+  | "leagueLeaders"
   | "prize"
   | "market"
   | "marketV2"
@@ -89,7 +90,8 @@ export type FoundationView =
   | "generator"
   | "teamSettings"
   | "encyclopedia"
-  | "admin";
+  | "admin"
+  | "credits";
 
 export const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
@@ -788,7 +790,7 @@ export const SEASON_TRANSITION_STATIC_STEPS: SeasonTransitionStepResponse[] = [
     stepId: "next_season_ready",
     label: "Neue Saison starten",
     status: "open",
-    preview: "Start erfolgt ueber den bestaetigten Pre-Season Workflow.",
+    preview: "Start erfolgt über den bestaetigten Pre-Season Workflow.",
     warnings: ["next_season_apply_requires_preseason_confirm"],
     blockingReasons: [],
     canApply: false,

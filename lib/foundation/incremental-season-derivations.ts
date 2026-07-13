@@ -8,6 +8,7 @@ import {
 } from "./materialize-season-derivations";
 import { computeSeasonDerivationsFresh } from "./season-derivations-compute";
 import { buildGameStateContentSignature } from "./season-derivations-signature";
+import { buildLeagueMarketValuePlayerSignature } from "@/lib/player-formulas/league-market-value-snapshot";
 
 function serializeRecordMap<T>(record: Map<string, T>): Record<string, T> {
   return Object.fromEntries(record);
@@ -80,6 +81,17 @@ export function recomputeSeasonDerivationsForPlayerIds(
     Object.assign(mergedPerformance, serializeRecordMap(fresh.performanceByPlayerId));
   }
 
+  // Ligaweite MW-Map ueber die Transfer-Grenze MITNEHMEN, statt sie zu
+  // verwerfen: die MW-Map haengt ausschliesslich an disciplineRatings +
+  // mwChangeFix (= der PlayerSignature), und ein Transfer aendert die nicht.
+  // Solange die Signatur unveraendert ist, ist die alte Map per Konstruktion
+  // korrekt — ohne diese Weitergabe erzwang jeder Buy/Sell-Flush eine volle
+  // ~243ms-Neuberechnung beim naechsten Snapshot-Read (pro Runde/Team-Cycle).
+  const currentMarketValueSignature = buildLeagueMarketValuePlayerSignature(gameState.players);
+  const canCarryMarketValue =
+    priorRecord.marketValueByPlayerId != null &&
+    priorRecord.marketValuePlayerSignature === currentMarketValueSignature;
+
   const record: PersistedSeasonDerivationsRecord = {
     seasonId,
     contentSignature,
@@ -96,6 +108,12 @@ export function recomputeSeasonDerivationsForPlayerIds(
       reuseLedgerAndPerformance && playerIds.length === 0
         ? priorRecord.performanceByPlayerId
         : mergedPerformance,
+    ...(canCarryMarketValue
+      ? {
+          marketValueByPlayerId: priorRecord.marketValueByPlayerId,
+          marketValuePlayerSignature: priorRecord.marketValuePlayerSignature,
+        }
+      : {}),
   };
 
   return {

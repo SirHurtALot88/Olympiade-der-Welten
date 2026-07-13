@@ -122,6 +122,7 @@ export default function FoundationMatchdayArenaShellHost({
         },
         onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
         onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
+        onAdvanceMatchday: () => void triggerGlobalNext(),
       }}
       resultSummary={
         <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
@@ -150,9 +151,9 @@ export default function FoundationMatchdayArenaShellHost({
                   data-testid="arena-finish-matchday-button"
                   disabled={readOnly || cockpitBusyKey != null}
                   onClick={() => void runFinishMatchdaySimple()}
-                  title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum naechsten Spieltag."
+                  title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum nächsten Spieltag."
                 >
-                  {cockpitBusyKey === "matchday-auto-run-execute" ? "Laeuft..." : "Spieltag abschliessen"}
+                  {cockpitBusyKey === "matchday-auto-run-execute" ? "Läuft..." : "Spieltag abschliessen"}
                 </button>
               )}
             </div>

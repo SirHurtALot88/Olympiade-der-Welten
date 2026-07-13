@@ -129,6 +129,11 @@ import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-
 import { buildPlayerLeagueCareerStatsMap } from "@/lib/foundation/player-league-career-stats";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import {
+  buildFieldRaceLedger,
+  getFieldRaceRecentForm,
+  type FieldRaceLedgerEntry,
+} from "@/lib/foundation/build-field-race-ledger";
+import {
   deriveTeamIdentityAxisBias,
   buildResolvedTeamIdentities,
   buildTeamIdentityOverrideMap,
@@ -1065,7 +1070,11 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildGameFlow = shouldBuildFoundationGameFlow(activeView, homeV2Tab);
   const shouldBuildGameInbox = shouldBuildGameFlow;
   const shouldLoadSeasonOverviewFeed =
-    activeView === "seasonV2" || activeView === "prize" || activeView === "ranks" || activeView === "diszis";
+    activeView === "seasonV2" ||
+    activeView === "prize" ||
+    activeView === "ranks" ||
+    activeView === "diszis" ||
+    activeView === "leagueLeaders";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
   const shouldLoadSeasonArchive =
@@ -1073,6 +1082,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "seasonV2" ||
     activeView === "prize" ||
     activeView === "ranks" ||
+    activeView === "leagueLeaders" ||
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
@@ -1172,7 +1182,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationActionFeedback({
         tone: "warning",
         title: "Room-Session abgelaufen",
-        detail: payload.message ?? "Der gespeicherte Sitzplatz ist ungueltig. Bitte Room neu oeffnen oder Save neu laden.",
+        detail: payload.message ?? "Der gespeicherte Sitzplatz ist ungültig. Bitte Room neu öffnen oder Save neu laden.",
       });
     }
     socket.on("roomError", handleRoomError);
@@ -1272,13 +1282,15 @@ export function useFoundationShellRouterBodyScope({
     activeView === "seasonV2" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
+    activeView === "leagueLeaders" ||
     activeView === "prize";
   const shouldBuildSeasonTopPlayerRows =
     activeView === "seasonV2" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
+    activeView === "leagueLeaders" ||
     activeView === "prize";
-  const shouldBuildLeagueLeaderBoards = activeView === "ranks";
+  const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -1720,7 +1732,7 @@ export function useFoundationShellRouterBodyScope({
   function handleManagerTeamSelect(value: string) {
     if (value === "__all_teams__") {
       setTeamContextFilter("all");
-      setActiveManagerTeamWarning("Alle 32 Teams sind im Dropdown sichtbar. Aktives Manager-Team bleibt unveraendert.");
+      setActiveManagerTeamWarning("Alle 32 Teams sind im Dropdown sichtbar. Aktives Manager-Team bleibt unverändert.");
       return;
     }
 
@@ -1760,7 +1772,7 @@ export function useFoundationShellRouterBodyScope({
     setFoundationActionFeedback({
       tone: "warning",
       title: "Team gesperrt",
-      detail: `${teamName} gehoert nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`,
+      detail: `${teamName} gehört nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`,
     });
   }
 
@@ -1848,7 +1860,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationActionFeedback({
         tone: "warning",
         title: "Training gesperrt",
-        detail: "Trainingsintensitaet ist fuer diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Aenderung erst zum naechsten Saisonstart moeglich.",
+        detail: "Trainingsintensität ist für diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Änderung erst zum nächsten Saisonstart möglich.",
       });
       return;
     }
@@ -2062,7 +2074,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (gameModeOwnershipChrisIds.length > limits.chrisMax || gameModeOwnershipFrankyIds.length > limits.frankyMax) {
-      setTeamControlMessage("Zu viele Teams fuer den aktiven Spielmodus zugeordnet.");
+      setTeamControlMessage("Zu viele Teams für den aktiven Spielmodus zugeordnet.");
       return;
     }
 
@@ -2156,7 +2168,7 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (aiTeams.length === 0) {
-      setTeamControlMessage("Es gibt aktuell keine AI-Teams fuer die Marktfreigabe.");
+      setTeamControlMessage("Es gibt aktuell keine AI-Teams für die Marktfreigabe.");
       return;
     }
 
@@ -2537,7 +2549,10 @@ export function useFoundationShellRouterBodyScope({
     returnContext?: { playerId: string; playerName: string },
   ) {
     setLeagueLeadersReturnContext(returnContext ?? null);
-    setFoundationView("ranks", setActiveView);
+    // Rangliste wird i. d. R. aus einem Spieler-Profil heraus geöffnet (returnContext
+    // gesetzt) — ein History-Eintrag wird gepusht, damit Zurück (Browser-Back oder der
+    // "Zurück zu {Spieler}"-Link) verlässlich zum Herkunfts-Profil zurückführt.
+    setFoundationView("leagueLeaders", setActiveView, { push: true });
     scrollToFoundationTarget(`league-leaders-${categoryId}`);
   }
 
@@ -2567,6 +2582,15 @@ export function useFoundationShellRouterBodyScope({
 
   function closeTeamProfile() {
     setTeamProfileTeamId(null);
+    // Zurück soll auf den Herkunfts-Tab führen (z. B. Saisonstand), von dem das
+    // Team-Profil geöffnet wurde — nicht pauschal auf „Teams". Das Öffnen pusht
+    // einen History-Eintrag (openTeamProfileById, mode: "push"), also bringt uns
+    // der Browser-Back verlässlich dorthin zurück. Nur ohne History fällt es auf
+    // die Teams-Übersicht zurück.
+    if (canFoundationNavigateBack()) {
+      foundationNavigateBack();
+      return;
+    }
     setFoundationView("teams", setActiveView);
     syncFoundationViewInUrl("teams");
   }
@@ -2927,7 +2951,7 @@ export function useFoundationShellRouterBodyScope({
         status: "rejected",
         tone: "error",
         title: "Angebot abgelehnt",
-        message: `${marketBuyPreview.player.name} bricht die Verhandlung mit ${marketBuyPreview.team.shortCode} ab. Dieses Team-Spieler-Paar bekommt fuer kuenftige Angebote einen Vertrauensmalus.`,
+        message: `${marketBuyPreview.player.name} bricht die Verhandlung mit ${marketBuyPreview.team.shortCode} ab. Dieses Team-Spieler-Paar bekommt für künftige Angebote einen Vertrauensmalus.`,
       });
       window.requestAnimationFrame(() => {
       });
@@ -2978,7 +3002,7 @@ export function useFoundationShellRouterBodyScope({
   async function openMarketBuyModal(item: TransfermarktBuyPreviewSubject, teamIdOverride?: string) {
     const effectiveTeamId = resolveMarketBuyTeamId(teamIdOverride);
     if (!canManageTeamId(effectiveTeamId)) {
-      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehört nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
       return;
     }
@@ -3022,7 +3046,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketSellPreviewRequestVersion.current) {
         return;
       }
-      setMarketSellError("Prisma-Referenz ist read-only. Fuer Verkaeufe bitte lokalen Testspielstand nutzen.");
+      setMarketSellError("Prisma-Referenz ist read-only. Für Verkäufe bitte lokalen Testspielstand nutzen.");
       setMarketSellPreview(null);
       return;
     }
@@ -3031,7 +3055,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketSellPreviewRequestVersion.current) {
         return;
       }
-      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
+      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehört nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
       setMarketSellPreview(null);
       return;
     }
@@ -3040,7 +3064,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketSellPreviewRequestVersion.current) {
         return;
       }
-      setMarketSellError("Bitte zuerst ein Team im Kaderbereich waehlen.");
+      setMarketSellError("Bitte zuerst ein Team im Kaderbereich wählen.");
       setMarketSellPreview(null);
       return;
     }
@@ -3096,7 +3120,7 @@ export function useFoundationShellRouterBodyScope({
   async function openMarketSellModal(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
     const effectiveTeamId = teamIdOverride ?? selectedTeam?.teamId ?? "";
     if (!canManageTeamId(effectiveTeamId)) {
-      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
+      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehört nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
       return;
     }
@@ -3120,7 +3144,7 @@ export function useFoundationShellRouterBodyScope({
 
   async function confirmTransfermarktSell() {
     if (readMeta.source === "prisma") {
-      setMarketSellError("Prisma-Referenz ist read-only. Fuer Verkaeufe bitte lokalen Testspielstand nutzen.");
+      setMarketSellError("Prisma-Referenz ist read-only. Für Verkäufe bitte lokalen Testspielstand nutzen.");
       return;
     }
 
@@ -3128,7 +3152,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (!canManageTeamId(marketSellPreview.team.id)) {
-      setMarketSellError(`${getTeamLockedName(marketSellPreview.team.id)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
+      setMarketSellError(`${getTeamLockedName(marketSellPreview.team.id)} gehört nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(marketSellPreview.team.id));
       return;
     }
@@ -3163,7 +3187,7 @@ export function useFoundationShellRouterBodyScope({
         setMarketSellError(
           payload.error ??
             payload.summary?.blockingReasons?.[0] ??
-            "Verkauf konnte nicht bestaetigt werden.",
+            "Verkauf konnte nicht bestätigt werden.",
         );
         return;
       }
@@ -3194,7 +3218,7 @@ export function useFoundationShellRouterBodyScope({
       ]);
       setMarketReloadToken((current) => current + 1);
     } catch {
-      setMarketSellError("Verkauf konnte nicht bestaetigt werden.");
+      setMarketSellError("Verkauf konnte nicht bestätigt werden.");
     } finally {
       setMarketSellBusy(false);
     }
@@ -3423,7 +3447,7 @@ export function useFoundationShellRouterBodyScope({
       setSeasonStartResetFeed(payload);
 
       if (execute && response.ok && payload.executed) {
-        setFreshSeasonStartMessage("Aktueller Save wurde auf Season-Start-Basis zurueckgesetzt.");
+        setFreshSeasonStartMessage("Aktueller Save wurde auf Season-Start-Basis zurückgesetzt.");
         await Promise.all([
           loadSave(activeSaveId),
           reloadMarketFeed(),
@@ -3452,7 +3476,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (!selectedTeamCanManage) {
-      const message = `${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind read-only.`;
+      const message = `${selectedTeam?.name ?? "Dieses Team"} gehört nicht zu deinen steuerbaren Teams. Gebäude sind read-only.`;
       setFacilityUpgradeError(message);
       showTeamManagementLockedNotice();
       return;
@@ -3499,15 +3523,15 @@ export function useFoundationShellRouterBodyScope({
 
   async function confirmFacilityUpgrade() {
     if (!facilityUpgradePreview?.facility?.facilityId || !facilityUpgradePreview.confirmToken) {
-      setFacilityUpgradeError("facility_upgrade_preview_missing: Bitte Upgrade erneut pruefen.");
+      setFacilityUpgradeError("facility_upgrade_preview_missing: Bitte Upgrade erneut prüfen.");
       return;
     }
     if (facilityUpgradePreview.saveContext.saveId !== activeSaveId || facilityUpgradePreview.team?.teamId !== selectedTeam.teamId) {
-      setFacilityUpgradeError("facility_upgrade_preview_stale: Save oder Team hat sich geaendert. Bitte Preview neu laden.");
+      setFacilityUpgradeError("facility_upgrade_preview_stale: Save oder Team hat sich geändert. Bitte Preview neu laden.");
       return;
     }
     if (!selectedTeamCanManage) {
-      setFacilityUpgradeError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind read-only.`);
+      setFacilityUpgradeError(`${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Gebäude sind read-only.`);
       showTeamManagementLockedNotice();
       return;
     }
@@ -3563,7 +3587,7 @@ export function useFoundationShellRouterBodyScope({
       await Promise.all([loadSave(activeSaveId), reloadPrizePreviewFeed(), reloadStandingsPreviewFeed()]);
       setMarketReloadToken((current) => current + 1);
     } catch {
-      setFacilityUpgradeError("Facility-Upgrade konnte nicht ausgefuehrt werden.");
+      setFacilityUpgradeError("Facility-Upgrade konnte nicht ausgeführt werden.");
     } finally {
       setFacilityUpgradeBusy(false);
     }
@@ -3571,11 +3595,11 @@ export function useFoundationShellRouterBodyScope({
 
   async function runFacilityMaintenancePreview(facilityId: FacilityId) {
     if (readMeta.source === "prisma") {
-      setFacilityMaintenanceError("Prisma-Referenz ist read-only. Facility-Wartung laeuft nur im lokalen Save.");
+      setFacilityMaintenanceError("Prisma-Referenz ist read-only. Facility-Wartung läuft nur im lokalen Save.");
       return;
     }
     if (!selectedTeamCanManage) {
-      setFacilityMaintenanceError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
+      setFacilityMaintenanceError(`${selectedTeam?.name ?? "Dieses Team"} gehört nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
       showTeamManagementLockedNotice();
       return;
     }
@@ -3619,18 +3643,18 @@ export function useFoundationShellRouterBodyScope({
 
   async function confirmFacilityMaintenance() {
     if (!facilityMaintenancePreview?.facility?.facilityId || !facilityMaintenancePreview.confirmToken) {
-      setFacilityMaintenanceError("facility_maintenance_preview_missing: Bitte Wartung erneut pruefen.");
+      setFacilityMaintenanceError("facility_maintenance_preview_missing: Bitte Wartung erneut prüfen.");
       return;
     }
     if (
       facilityMaintenancePreview.saveContext.saveId !== activeSaveId ||
       facilityMaintenancePreview.team?.teamId !== selectedTeam.teamId
     ) {
-      setFacilityMaintenanceError("facility_maintenance_preview_stale: Save oder Team hat sich geaendert. Bitte Preview neu laden.");
+      setFacilityMaintenanceError("facility_maintenance_preview_stale: Save oder Team hat sich geändert. Bitte Preview neu laden.");
       return;
     }
     if (!selectedTeamCanManage) {
-      setFacilityMaintenanceError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
+      setFacilityMaintenanceError(`${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
       showTeamManagementLockedNotice();
       return;
     }
@@ -3680,7 +3704,7 @@ export function useFoundationShellRouterBodyScope({
       await Promise.all([loadSave(activeSaveId), reloadPrizePreviewFeed(), reloadStandingsPreviewFeed()]);
       setMarketReloadToken((current) => current + 1);
     } catch {
-      setFacilityMaintenanceError("Facility-Wartung konnte nicht ausgefuehrt werden.");
+      setFacilityMaintenanceError("Facility-Wartung konnte nicht ausgeführt werden.");
     } finally {
       setFacilityMaintenanceBusy(false);
     }
@@ -3710,13 +3734,13 @@ export function useFoundationShellRouterBodyScope({
         setFoundationActionFeedback({
           tone: "success",
           title: "Spieltag abgeschlossen",
-          detail: "Ergebnisse gesichert. Der naechste Spieltag ist bereit.",
+          detail: "Ergebnisse gesichert. Der nächste Spieltag ist bereit.",
         });
       } else {
         setFoundationActionFeedback({
           tone: "warning",
-          title: "Spieltag nicht vollstaendig abgeschlossen",
-          detail: "Bitte Cockpit pruefen — ein Schritt ist moeglicherweise blockiert.",
+          title: "Spieltag nicht vollständig abgeschlossen",
+          detail: "Bitte Cockpit prüfen — ein Schritt ist möglicherweise blockiert.",
         });
       }
     } finally {
@@ -3773,7 +3797,7 @@ export function useFoundationShellRouterBodyScope({
   async function startAdminSeasonSimulationRun() {
     const confirmed =
       adminSimulationMode === "dry_run" ||
-      window.confirm("Diese Simulation schreibt in den aktiv gewaehlten lokalen Save. Fortfahren?");
+      window.confirm("Diese Simulation schreibt in den aktiv gewählten lokalen Save. Fortfahren?");
     if (!confirmed) return;
     await postAdminSeasonSimulation("start");
   }
@@ -4015,7 +4039,7 @@ export function useFoundationShellRouterBodyScope({
       });
       setSelectedTeamId(nextContext.teamId);
       setActiveManagerTeamSource(nextContext.source);
-      setActiveManagerTeamWarning(nextContext.warning ?? "Aktives Team war in diesem Save nicht vorhanden und wurde zurueckgesetzt.");
+      setActiveManagerTeamWarning(nextContext.warning ?? "Aktives Team war in diesem Save nicht vorhanden und wurde zurückgesetzt.");
       return;
     }
 
@@ -4128,20 +4152,22 @@ export function useFoundationShellRouterBodyScope({
   }, [activeView, isFoundationBootstrapState]);
 
   useEffect(() => {
+    // Legacy→v2 view normalization: replace (no history entry), otherwise Back
+    // would land on the legacy id and immediately redirect again (a trap).
     if (activeView === "home") {
-      setFoundationView("homeV2", setActiveView);
+      setFoundationView("homeV2", setActiveView, { push: false });
     }
     if (activeView === "inbox") {
-      setFoundationView("inboxV2", setActiveView);
+      setFoundationView("inboxV2", setActiveView, { push: false });
     }
     if (activeView === "market") {
-      setFoundationView("marketV2", setActiveView);
+      setFoundationView("marketV2", setActiveView, { push: false });
     }
     if (activeView === "history") {
-      setFoundationView("historyV2", setActiveView);
+      setFoundationView("historyV2", setActiveView, { push: false });
     }
     if (activeView === "season") {
-      setFoundationView("seasonV2", setActiveView);
+      setFoundationView("seasonV2", setActiveView, { push: false });
     }
   }, [activeView]);
 
@@ -4168,7 +4194,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketBuyPreviewRequestVersion.current) {
         return;
       }
-      setMarketBuyError("Prisma-Referenz ist read-only. Fuer Kaeufe bitte lokalen Testspielstand starten.");
+      setMarketBuyError("Prisma-Referenz ist read-only. Für Käufe bitte lokalen Testspielstand starten.");
       setMarketBuyPreview(null);
       setMarketBuyPreviewContext(null);
       setMarketPreviewPlayerId(item.playerId);
@@ -4179,7 +4205,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketBuyPreviewRequestVersion.current) {
         return;
       }
-      setMarketBuyError("Bitte zuerst ein Team waehlen.");
+      setMarketBuyError("Bitte zuerst ein Team wählen.");
       setMarketBuyPreview(null);
       setMarketBuyPreviewContext(null);
       setMarketPreviewPlayerId(item.playerId);
@@ -4190,7 +4216,7 @@ export function useFoundationShellRouterBodyScope({
       if (requestVersion !== marketBuyPreviewRequestVersion.current) {
         return;
       }
-      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehört nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       setMarketBuyPreview(null);
       setMarketBuyPreviewContext(null);
       setMarketPreviewPlayerId(item.playerId);
@@ -4286,7 +4312,7 @@ export function useFoundationShellRouterBodyScope({
 
   async function confirmTransfermarktBuy() {
     if (readMeta.source === "prisma") {
-      setMarketBuyError("Prisma-Referenz ist read-only. Fuer Kaeufe bitte lokalen Testspielstand starten.");
+      setMarketBuyError("Prisma-Referenz ist read-only. Für Käufe bitte lokalen Testspielstand starten.");
       return;
     }
 
@@ -4294,7 +4320,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (!canManageTeamId(marketBuyPreview.team.id)) {
-      setMarketBuyError(`${getTeamLockedName(marketBuyPreview.team.id)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      setMarketBuyError(`${getTeamLockedName(marketBuyPreview.team.id)} gehört nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(marketBuyPreview.team.id));
       return;
     }
@@ -4348,7 +4374,7 @@ export function useFoundationShellRouterBodyScope({
         setMarketBuyError(
           payload.error ??
             payload.summary?.blockingReasons?.[0] ??
-            "Kauf konnte nicht bestaetigt werden.",
+            "Kauf konnte nicht bestätigt werden.",
         );
         return;
       }
@@ -4383,7 +4409,7 @@ export function useFoundationShellRouterBodyScope({
       ]);
       setMarketReloadToken((current) => current + 1);
     } catch {
-      setMarketBuyError("Kauf konnte nicht bestaetigt werden.");
+      setMarketBuyError("Kauf konnte nicht bestätigt werden.");
     } finally {
       setMarketBuyBusy(false);
     }
@@ -4400,7 +4426,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (!canManageTeamId(input.teamId)) {
-      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehoert nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
+      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehört nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
       return;
     }
@@ -4503,6 +4529,97 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Kreditaufnahme (Bank, Phase 1) — mirrors `chooseTeamSponsor`'s
+   * fetch-then-`loadSave` pattern 1:1: POST the mutation, then refetch the
+   * save so `gameState` (and everything derived from it, incl. the Credits
+   * view model) reflects the new loan/cash immediately. Always the active
+   * manager's own team (fog of war), never a `teamId` param.
+   */
+  async function originateLoanForActiveTeam(
+    principal: number,
+    termSeasons: number,
+    lenderTeamId?: string | null,
+    adminOverride?: boolean,
+  ): Promise<{ ok: boolean; reason: string | null }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    try {
+      const response = await fetch("/api/finance/loan/originate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          principal,
+          termSeasons,
+          // `null`/omitted selects the bank; a team id selects a team offer
+          // (Phase 3 — see docs/design/kredit-system.md).
+          lenderTeamId: lenderTeamId ?? null,
+          adminOverride: adminOverride === true,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null };
+      if (!response.ok || !payload.ok) {
+        return { ok: false, reason: payload.reason ?? "loan_originate_failed" };
+      }
+      await loadSave(activeSaveId);
+      return { ok: true, reason: null };
+    } catch {
+      return { ok: false, reason: "network_error" };
+    }
+  }
+
+  /**
+   * Vorab-Rückzahlung (vorzeitige Ablösung) — mirrors `originateLoanForActiveTeam`'s
+   * fetch-then-`loadSave` pattern 1:1: POST the mutation, then refetch the
+   * save so `gameState` reflects the freed-up cash/cleared loan immediately.
+   * Always the active manager's own team (fog of war), never a `teamId` param.
+   */
+  async function repayLoanEarlyForActiveTeam(
+    loanId: string,
+    adminOverride?: boolean,
+  ): Promise<{ ok: boolean; reason: string | null; payoff: number | null }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", payoff: null };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", payoff: null };
+    }
+    try {
+      const response = await fetch("/api/finance/loan/early-payoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          loanId,
+          adminOverride: adminOverride === true,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; payoff?: number | null };
+      if (!response.ok || !payload.ok) {
+        return { ok: false, reason: payload.reason ?? "loan_early_payoff_failed", payoff: payload.payoff ?? null };
+      }
+      await loadSave(activeSaveId);
+      return { ok: true, reason: null, payoff: payload.payoff ?? null };
+    } catch {
+      return { ok: false, reason: "network_error", payoff: null };
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -4516,7 +4633,7 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     if (!canManageTeamId(input.teamId)) {
-      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehoert nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
+      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehört nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
       return;
     }
@@ -4578,7 +4695,7 @@ export function useFoundationShellRouterBodyScope({
 
       setContractRenewalMessage(
         input.action === "renew"
-          ? `${input.playerName} wurde verlaengert.`
+          ? `${input.playerName} wurde verlängert.`
           : `${input.playerName} wurde freigegeben.`,
       );
       setFoundationActionFeedback({
@@ -4597,7 +4714,7 @@ export function useFoundationShellRouterBodyScope({
       ]);
       setMarketReloadToken((current) => current + 1);
     } catch {
-      setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgefuehrt werden.`);
+      setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgeführt werden.`);
     } finally {
       setContractRenewalBusy(null);
     }
@@ -4657,7 +4774,7 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (!dryRun && (!newGamePreview || newGamePreview.blockers.length > 0)) {
-      setNewGameError("Bitte erst ein gueltiges New-Game-Setup pruefen.");
+      setNewGameError("Bitte erst ein gültiges New-Game-Setup prüfen.");
       return;
     }
 
@@ -4692,7 +4809,7 @@ export function useFoundationShellRouterBodyScope({
       });
       const payload = (await response.json()) as NewGameSetupApiResponse;
       if (!response.ok || payload.error) {
-        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgefuehrt werden.");
+        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgeführt werden.");
         return;
       }
 
@@ -4915,7 +5032,7 @@ export function useFoundationShellRouterBodyScope({
     }
     setActiveManagerTeam(fallbackTeam.teamId, "saved_preference");
     setActiveManagerTeamWarning(
-      `${selectedTeam.name} war hier nur Ansicht. Fuer ${activeView === "trainingV2" || activeView === "trainingCompact" || activeView === "training" ? "Training oder Gebaeude" : "diese Management-Ansicht"} wurde auf ${fallbackTeam.name} gewechselt.`,
+      `${selectedTeam.name} war hier nur Ansicht. Für ${activeView === "trainingV2" || activeView === "trainingCompact" || activeView === "training" ? "Training oder Gebäude" : "diese Management-Ansicht"} wurde auf ${fallbackTeam.name} gewechselt.`,
     );
   }, [
     activeView,
@@ -5408,7 +5525,7 @@ export function useFoundationShellRouterBodyScope({
             : gameFlowActionStep.blockers,
         ) || "Leertaste: zum blockierten Schritt springen"
       : globalNextDisabled
-        ? "Aktion laeuft gerade."
+        ? "Aktion läuft gerade."
         : gameFlowActionStep.status === "optional" &&
             (gameFlowActionStep.stepId === "matchday_facilities" || gameFlowActionStep.stepId === "facilities")
           ? "Leertaste: optional prüfen oder überspringen"
@@ -5456,6 +5573,51 @@ export function useFoundationShellRouterBodyScope({
         setAcknowledgedFlowStepIds(new Set());
       } else {
         setShowGameFlowPanel(true);
+      }
+      return;
+    }
+    if (gameFlowActionStep.stepId === "finalize_transfers" && gameFlowActionStep.status === "ready") {
+      if (readMeta.readOnly) {
+        showReadOnlyNotice();
+        return;
+      }
+      const teamId = gameFlowActionStep.teamId ?? activeManagerTeamId;
+      if (!activeSaveId || activeSaveId === "loading-save" || !teamId) {
+        setShowGameFlowPanel(true);
+        return;
+      }
+      setCockpitBusyKey("finalize-transfers");
+      try {
+        const params = appendRoomContextToParams(
+          new URLSearchParams({
+            saveId: activeSaveId,
+            seasonId: gameState.season.id,
+            matchdayId: gameState.matchdayState.matchdayId,
+            teamId,
+          }),
+          roomContext,
+        );
+        const response = await fetch(`/api/lineups/legacy/finalize-transfers?${params.toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(withRoomContextBody({}, roomContext)),
+        });
+        if (!response.ok) {
+          setShowGameFlowPanel(true);
+          return;
+        }
+        // Re-hydrate gameState.seasonState (incl. formCards) for the already-active
+        // save without disrupting the current view -- loadSave() only clears
+        // save-scoped feeds / caches when switching to a *different* saveId, so
+        // calling it with the current activeSaveId is a light, in-place refresh.
+        await loadSave(activeSaveId);
+        acknowledgeFlowStep("finalize_transfers");
+        navigateToGameFlowStep("lineup", resolveLineupIssueTeamId(teamId));
+      } catch (error) {
+        console.error(error);
+        setShowGameFlowPanel(true);
+      } finally {
+        setCockpitBusyKey(null);
       }
       return;
     }
@@ -5820,7 +5982,7 @@ export function useFoundationShellRouterBodyScope({
       { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 120, minWidth: 100 },
       { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 120, minWidth: 100 },
       { id: "contract", label: "Vertrag", dataKey: "contract", defaultWidth: 96, minWidth: 80 },
-      { id: "appearances", label: "Einsaetze", dataKey: "appearances", defaultWidth: 94, minWidth: 78 },
+      { id: "appearances", label: "Einsätze", dataKey: "appearances", defaultWidth: 94, minWidth: 78 },
       { id: "bestDiscipline", label: "Beste Diszi", dataKey: "bestDiscipline", defaultWidth: 120, minWidth: 98 },
       {
         id: "careerLeague",
@@ -5849,7 +6011,7 @@ export function useFoundationShellRouterBodyScope({
       { id: "type", label: "Typ", dataKey: "type", defaultWidth: 90, minWidth: 72 },
       { id: "from", label: "Von", dataKey: "from", defaultWidth: 180, minWidth: 140 },
       { id: "to", label: "Zu", dataKey: "to", defaultWidth: 180, minWidth: 140 },
-      { id: "fee", label: "Abloese", dataKey: "fee", defaultWidth: 110, minWidth: 90 },
+      { id: "fee", label: "Ablöse", dataKey: "fee", defaultWidth: 110, minWidth: 90 },
       { id: "guv", label: "GuV", dataKey: "guv", defaultWidth: 110, minWidth: 90 },
       { id: "marketValue", label: "Marktwert", dataKey: "marketValue", defaultWidth: 110, minWidth: 90 },
       { id: "pow", label: "Power", dataKey: "pow", defaultWidth: 90, minWidth: 72 },
@@ -5940,7 +6102,7 @@ export function useFoundationShellRouterBodyScope({
         {
           id: "compact",
           label: "Compact",
-          description: "Kernwerte fuer schnellen Spieltagsblick.",
+          description: "Kernwerte für schnellen Spieltagsblick.",
           order: defaultOrder,
           visibleColumnIds: ["platz", "mannschaft", "punkte", "tdm", "gewichtheben", "hockey", "schach", "takeshi", "vertragslange", "actions"],
           pinnedLeft: ["platz", "mannschaft", "punkte"],
@@ -6396,6 +6558,46 @@ export function useFoundationShellRouterBodyScope({
     contentSignature: seasonContentSignature,
   });
   const seasonPointsLedger = shouldLoadSeasonLedger ? seasonDerivations.ledger : null;
+
+  // Feld-Rennen-Ledger (Wave D · D1/D2/D4): geteilte, fog-sichere Datenquelle
+  // für Feld-Form-Strip (letzte 5 Spieltage), feld-relative Home-KPIs und
+  // Rang-Movement. `useSeasonDerivations` ist aus Performance-Gründen nur im
+  // Fallback aktiv (`shouldLoadSeasonDerivations`), daher wird der bereits
+  // memoisierte `fieldRaceLedger` bevorzugt und nur bei leerem Cache über den
+  // sanktionierten Helper `buildFieldRaceLedger` (dieselbe Quelle) nachgezogen
+  // — ohne die teure Voll-Derivation zu erzwingen.
+  const fieldRaceLedger = useMemo(() => {
+    const shared = seasonDerivations.fieldRaceLedger;
+    if (shared.matchdays.length > 0) {
+      return shared;
+    }
+    // On-demand aus dem bereits gebauten Punkte-Ledger (kein Doppel-Build).
+    return buildFieldRaceLedger(gameState, gameState.season.id, seasonDerivations.ledger);
+  }, [seasonDerivations.fieldRaceLedger, seasonDerivations.ledger, gameState]);
+
+  /** Letzte bis zu 5 Spieltage des aktiven Teams (D1 Feld-Form-Strip). */
+  const selectedTeamFieldRaceForm: FieldRaceLedgerEntry[] = useMemo(
+    () => (selectedTeam ? getFieldRaceRecentForm(fieldRaceLedger, selectedTeam.teamId, 5) : []),
+    [fieldRaceLedger, selectedTeam?.teamId],
+  );
+
+  /** Anzahl bereits gespielter Spieltage der Season (für Frühphasen-Zustände). */
+  const fieldRacePlayedMatchdayCount = fieldRaceLedger.matchdays.length;
+  const fieldRaceTotalTeams = gameState.teams.length;
+
+  /** Rang-Movement (Δ vs. letzter Spieltag) je Team — letzter Ledger-Eintrag (D4). */
+  const fieldRaceRankDeltaByTeamId = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const [teamId, rows] of fieldRaceLedger.rowsByTeamId) {
+      map.set(teamId, rows.length > 0 ? rows[rows.length - 1].rankDeltaVsPrev : null);
+    }
+    return map;
+  }, [fieldRaceLedger]);
+
+  const homeFieldRaceRankMovement = selectedTeam
+    ? fieldRaceRankDeltaByTeamId.get(selectedTeam.teamId) ?? null
+    : null;
+
   const fullPlayerRatingsById = useMemo(() => {
     if (shouldBuildPlayerDirectory && playerDirectorySlice.ratingsById.size > 0 && !playerDirectorySlice.error) {
       return playerDirectorySlice.ratingsById;
@@ -6663,6 +6865,7 @@ export function useFoundationShellRouterBodyScope({
     seasonPointsLedger,
     teamObjectiveOverview,
     currentMatchdayDisciplineSchedule,
+    manageableTeamIds: foundationManageableTeamIds,
   });
 
   const playerSeasonPerformanceMap = useMemo(
@@ -6874,6 +7077,7 @@ export function useFoundationShellRouterBodyScope({
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
+    teamBeliebtheit,
     trainingV2ModeOptions,
   } = useFoundationCrossTabTraining({
     // Compact-tab derivations now live in `FoundationTrainingCompactShellHost`
@@ -7389,7 +7593,7 @@ export function useFoundationShellRouterBodyScope({
         const isActiveOwner = owner.ownerId === effectiveActiveOwnerId;
         const readyState =
           owner.ownerId === AI_OWNER_ID
-            ? `${aiTeams.length} Teams werden automatisch gefuehrt`
+            ? `${aiTeams.length} Teams werden automatisch geführt`
             : isActiveOwner
               ? gameFlowActionStep.label
               : owner.type === "remote_player"
@@ -7486,7 +7690,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationActionFeedback({
         tone: "success",
         title: "Lineup gespeichert",
-        detail: `${getTeamLockedName(payload.teamId)} ist fuer ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
+        detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
       });
     }
     void reloadLiveSeasonState("manual_apply", { compactReload: true });
@@ -7989,7 +8193,7 @@ export function useFoundationShellRouterBodyScope({
       {
         key: "team",
         kicker: "Teamzustand",
-        title: selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Team pruefen",
+        title: selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Team prüfen",
         detail: selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Roster & Finanzen",
         tone: "info",
         view: "teams",
@@ -7999,7 +8203,7 @@ export function useFoundationShellRouterBodyScope({
         key: "tasks",
         kicker: "Aufgaben",
         title: homeTasks.length > 0 ? `${homeTasks.length} Quest${homeTasks.length === 1 ? "" : "s"}` : "Keine offenen Quests",
-        detail: homeTasks[0]?.title ?? "bereit fuer den naechsten Zug",
+        detail: homeTasks[0]?.title ?? "bereit für den nächsten Zug",
         tone: homeTasks.some((task) => task.severity === "critical")
           ? "warning"
           : homeTasks.length > 0
@@ -8443,9 +8647,17 @@ export function useFoundationShellRouterBodyScope({
           rosterCount: row.rosterCount ?? 0,
           avgContractLength: row.avgContractLength ?? null,
           isSelected: selectedTeam?.teamId === row.teamId,
+          // D4 Rang-Movement: Δ Gesamtrang vs. letztem Spieltag (nicht saison-
+          // übergreifend wie `rankDiff`, sondern feldrennen-spezifisch pro
+          // Spieltag) — letzter Ledger-Eintrag; null am ersten Spieltag. Der
+          // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
+          // kein Live-Delta (sonst irreführend) → null.
+          fieldRaceRankDelta: isViewingArchivedSeason
+            ? null
+            : fieldRaceRankDeltaByTeamId.get(row.teamId) ?? null,
         };
       }),
-    [gameState, selectedTeam?.teamId, sortedSeasonStandRows],
+    [fieldRaceRankDeltaByTeamId, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
   const seasonV2PpRows = useMemo(
     () =>
@@ -8820,8 +9032,8 @@ export function useFoundationShellRouterBodyScope({
       : ["Filter lockern"];
     const buyWarnings = buyPick
       ? [
-          buyPick.item.teamContextAvailable ? null : "Team waehlen",
-          buyPick.item.affordabilityStatus && buyPick.item.affordabilityStatus !== "affordable" ? "Budget pruefen" : null,
+          buyPick.item.teamContextAvailable ? null : "Team wählen",
+          buyPick.item.affordabilityStatus && buyPick.item.affordabilityStatus !== "affordable" ? "Budget prüfen" : null,
           buyPick.item.rosterPressureStatus === "at_or_above_opt" ? "Kader voll" : null,
         ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
       : [];
@@ -9043,6 +9255,7 @@ export function useFoundationShellRouterBodyScope({
     setSelectedMatchdaySummaryId,
     setActiveView,
     openTeamProfileById,
+    triggerGlobalNext,
   };
 
   const foundationSeasonPreviewHostProps: FoundationSeasonPreviewShellHostProps = {
@@ -9075,6 +9288,7 @@ export function useFoundationShellRouterBodyScope({
     activeSaveId,
     saveName: activeSaveName,
     gameState,
+    ownTeamId: selectedTeamId ?? null,
     historyFeed,
     playerRatingsById,
     transferHistorySort: tableSorts.transferHistory,
@@ -9183,6 +9397,7 @@ export function useFoundationShellRouterBodyScope({
     resolvedTeamControlSettings,
     scheduleActiveManagerTeam,
     openTeamProfileById,
+    onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
     formatLocalePoints,
     getSeasonCashHeatClass,
     formatWholeNumber,
@@ -9259,6 +9474,9 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
+    // D1 Feld-Form-Strip auf dem Team-Profil (Neuer Look).
+    fieldRaceRecentForm: selectedTeamFieldRaceForm,
+    fieldRacePlayedMatchdayCount,
   };
 
   const foundationCockpitHostProps: FoundationCockpitHostProps = {
@@ -9506,11 +9724,21 @@ export function useFoundationShellRouterBodyScope({
     categories: leagueLeaderBoards,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
+    gameState,
     returnContext: leagueLeadersReturnContext,
     onReturnToPlayer: leagueLeadersReturnContext
       ? () => {
-          openPlayerProfileById(leagueLeadersReturnContext.playerId);
+          const returnPlayerId = leagueLeadersReturnContext.playerId;
           setLeagueLeadersReturnContext(null);
+          // "Zurück zu {Spieler}" soll zum Herkunfts-Profil zurückführen. Da das Öffnen
+          // der Rangliste (onOpenLeagueLeaders) einen History-Eintrag pusht, bringt uns
+          // der Browser-Back verlässlich dorthin zurück. Nur ohne History (z. B. direkter
+          // Deep-Link) fällt es auf ein erneutes Öffnen des Profils zurück.
+          if (canFoundationNavigateBack()) {
+            foundationNavigateBack();
+            return;
+          }
+          openPlayerProfileById(returnPlayerId);
         }
       : undefined,
     onOpenPlayer: openPlayerProfileById,
@@ -9574,10 +9802,10 @@ export function useFoundationShellRouterBodyScope({
     managementLocked: isSelectedTeamManagementLocked || trainingIntensityLockedForSeason,
     managementLockedReason: isSelectedTeamManagementLocked
       ? selectedTeam
-        ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
+        ? `${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
         : null
       : trainingIntensityLockedForSeason
-        ? "Trainingsintensitaet fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich (versiegelt seit dem ersten Spieltag)."
+        ? "Trainingsintensität für diese Season festgelegt — Änderung erst zum nächsten Saisonstart möglich (versiegelt seit dem ersten Spieltag)."
         : null,
     trainingClassOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
     onSetTrainingMode: (playerId, mode) => {
@@ -9837,6 +10065,8 @@ export function useFoundationShellRouterBodyScope({
     openTrainingPlayerTarget,
     onOpenLeagueLeaders,
     orderedDisciplines,
+    originateLoanForActiveTeam,
+    repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,
     passiveTeams,
     persistenceError,
@@ -9954,6 +10184,11 @@ export function useFoundationShellRouterBodyScope({
     selectedRosterTableRows,
     selectedSeasonOverviewLabel,
     selectedStandingRow,
+    // Wave D · Feld-Rennen-Ableitungen für die Home-Übersicht (D1/D2/D4).
+    selectedTeamFieldRaceForm,
+    fieldRacePlayedMatchdayCount,
+    fieldRaceTotalTeams,
+    homeFieldRaceRankMovement,
     selectedTeam,
     selectedTeamAverageAxisStats,
     selectedTeamCanManage,
@@ -10107,6 +10342,7 @@ export function useFoundationShellRouterBodyScope({
     toggleTransferWishlist,
     trainingDevelopmentFilter,
     trainingDevelopmentSummary,
+    teamBeliebtheit,
     trainingFacilityEffectPreview,
     trainingFacilityRows,
     trainingFacilitySeasonEndFinance,

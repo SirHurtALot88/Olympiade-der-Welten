@@ -161,7 +161,14 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       return pools;
     }
 
+    // Rang/Heat nur relativ zu AKTIVEN Spielern (mit Roster-Eintrag) berechnen —
+    // nicht gegen die gesamte Spielerdatenbank (Free Agents + generierte Reserve),
+    // sonst entstehen unsinnige Ränge wie "#1.988".
+    const activePlayerIds = new Set(input.gameState.rosters.map((roster) => roster.playerId));
     for (const player of input.gameState.players) {
+      if (!activePlayerIds.has(player.id)) {
+        continue;
+      }
       const playerRating = input.playerRatingsById.get(player.id) ?? null;
       if (playerRating?.ovrNormalized != null) {
         pools.ovr.push(playerRating.ovrNormalized);
@@ -196,6 +203,7 @@ export function useFoundationCrossTabPlayerDirectory(input: {
   }, [
     input.gameState.disciplines,
     input.gameState.players,
+    input.gameState.rosters,
     input.playerRatingsById,
     shouldBuildLeagueHeatPools,
   ]);

@@ -35,7 +35,7 @@ describe("cockpit ui helpers", () => {
 
   it("maps game flow status to labels and classes", () => {
     expect(getGameFlowStatusLabel("ready")).toBe("bereit");
-    expect(getGameFlowStatusLabel("applying")).toBe("laeuft");
+    expect(getGameFlowStatusLabel("applying")).toBe("läuft");
     expect(getGameFlowStatusClass("completed")).toBe("is-completed");
     expect(getGameFlowStatusClass("warning")).toBe("is-warning");
   });
@@ -56,7 +56,7 @@ describe("cockpit ui helpers", () => {
   });
 
   it("formats reasons and warnings with fallbacks", () => {
-    expect(formatCockpitReason("insufficient_cash")).toBe("Nicht genug Cash fuer dieses Upgrade.");
+    expect(formatCockpitReason("insufficient_cash")).toBe("Nicht genug Cash für dieses Upgrade.");
     expect(formatObjectiveStatusLabel("at_risk")).toBe("unter Druck");
     expect(formatSeasonCompletionStepStatus("already_done")).toBe("schon erledigt");
     expect(getSeasonCompletionStepTone("skipped")).toBe("is-warning");

@@ -106,7 +106,7 @@ const TEAM_POWER_SLOT_OVERRIDES: Record<string, Record<number, TeamPowerOverride
   "P-S": {
     0: {
       label: "Redline Protocol",
-      description: "Project Suicide eskaliert, wenn ein Rivale in genau dieser Disziplin gefaehrlich ist.",
+      description: "Project Suicide eskaliert, wenn ein Rivale in genau dieser Disziplin gefährlich ist.",
       category: "flex",
       effectType: "self_boost",
       targetMode: "self",
@@ -190,8 +190,8 @@ const AXIS_ATTRIBUTE_TAG_PACKS: Record<
 function buildTeamPowerArchetypesForDoctrine(doctrine: TeamPowerDoctrine): TeamPowerArchetype[] {
   if (doctrine === "tactical") {
     return [
-      { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 3, labelPrefix: "Planned", descriptionTone: "stoert Teams im direkten Rank-Fenster" },
-      { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Calculated", descriptionTone: "staerkt den eigenen Matchplan" },
+      { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 3, labelPrefix: "Planned", descriptionTone: "stört Teams im direkten Rank-Fenster" },
+      { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Calculated", descriptionTone: "stärkt den eigenen Matchplan" },
       { effectType: "rivalry_debuff", targetMode: "single_rival", targetLimit: 1, labelPrefix: "Counter", descriptionTone: "setzt bevorzugt beim Rivalen an" },
       { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, labelPrefix: "Pressure", descriptionTone: "drueckt die direkte Umgebung im Tableau" },
       { effectType: "support_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Control", descriptionTone: "stabilisiert den eigenen Ablauf" },
@@ -203,7 +203,7 @@ function buildTeamPowerArchetypesForDoctrine(doctrine: TeamPowerDoctrine): TeamP
     return [
       { effectType: "snipe_debuff", targetMode: "single_rival", targetLimit: 1, labelPrefix: "Warpath", descriptionTone: "geht hart auf einen Rivalen oder Top-Gegner" },
       { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Brutal", descriptionTone: "zwingt den eigenen Score nach oben" },
-      { effectType: "snipe_debuff", targetMode: "single_top", targetLimit: 1, labelPrefix: "Crush", descriptionTone: "schlaegt auf den staerksten Gegner" },
+      { effectType: "snipe_debuff", targetMode: "single_top", targetLimit: 1, labelPrefix: "Crush", descriptionTone: "schlaegt auf den stärksten Gegner" },
       { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, labelPrefix: "Shock", descriptionTone: "verursacht Kollateraldruck im direkten Umfeld" },
       { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Overrun", descriptionTone: "setzt auf rohe Eigenleistung" },
       { effectType: "rivalry_debuff", targetMode: "single_rival", targetLimit: 1, labelPrefix: "Vendetta", descriptionTone: "will einem Rivalen sichtbar wehtun" },
@@ -213,20 +213,20 @@ function buildTeamPowerArchetypesForDoctrine(doctrine: TeamPowerDoctrine): TeamP
   if (doctrine === "supportive") {
     return [
       { effectType: "support_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Rally", descriptionTone: "hebt die eigene Teamstruktur" },
-      { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Spotlight", descriptionTone: "verstaerkt den eigenen Auftritt" },
+      { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Spotlight", descriptionTone: "verstärkt den eigenen Auftritt" },
       { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, labelPrefix: "Distract", descriptionTone: "bringt Teams im Umfeld aus dem Rhythmus" },
-      { effectType: "support_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Harmony", descriptionTone: "federt Druck ueber Teamchemie ab" },
+      { effectType: "support_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Harmony", descriptionTone: "federt Druck über Teamchemie ab" },
       { effectType: "rivalry_debuff", targetMode: "single_rival", targetLimit: 1, labelPrefix: "Needle", descriptionTone: "setzt einen Rivalen social unter Druck" },
       { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Encore", descriptionTone: "spielt den grossen Moment aus" },
     ];
   }
 
   return [
-    { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Focused", descriptionTone: "staerkt den eigenen Kernplan" },
-    { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, labelPrefix: "Contest", descriptionTone: "stoert direkte Score-Nachbarn" },
+    { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Focused", descriptionTone: "stärkt den eigenen Kernplan" },
+    { effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, labelPrefix: "Contest", descriptionTone: "stört direkte Score-Nachbarn" },
     { effectType: "support_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Stabilize", descriptionTone: "haelt den eigenen Spieltag stabil" },
     { effectType: "snipe_debuff", targetMode: "single_top", targetLimit: 1, labelPrefix: "Check", descriptionTone: "nimmt einen Top-Gegner ins Visier" },
-    { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Lean In", descriptionTone: "erhoeht den eigenen Einsatz" },
+    { effectType: "self_boost", targetMode: "self", targetLimit: 0, labelPrefix: "Lean In", descriptionTone: "erhöht den eigenen Einsatz" },
     { effectType: "rivalry_debuff", targetMode: "single_rival", targetLimit: 1, labelPrefix: "Answer", descriptionTone: "antwortet auf Rivalitaetsdruck" },
   ];
 }
@@ -280,18 +280,18 @@ const FACILITY_POWER_DEFINITIONS: Record<
 > = {
   training_center: [
     { threshold: 2, label: "Prepared Drill", description: "Trainingszentrum: ein sauber vorbereiteter Matchday-Boost.", category: "flex", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 4 },
-    { threshold: 4, label: "Peak Cycle", description: "Trainingszentrum: harte Vorbereitung fuer den wichtigen Spieltag.", category: "flex", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 6 },
+    { threshold: 4, label: "Peak Cycle", description: "Trainingszentrum: harte Vorbereitung für den wichtigen Spieltag.", category: "flex", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 6 },
   ],
   recovery_center: [
     { threshold: 2, label: "Fresh Legs", description: "Recovery Center: stabilisiert den Spieltag trotz Belastung.", category: "flex", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 3 },
-    { threshold: 4, label: "Second Wind", description: "Recovery Center: gibt Reserven fuer eine spaete Leistungswelle.", category: "flex", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 5 },
+    { threshold: 4, label: "Second Wind", description: "Recovery Center: gibt Reserven für eine späte Leistungswelle.", category: "flex", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 5 },
   ],
   scouting_office: [
     { threshold: 2, label: "Scouted Angle", description: "Scouting Office: ein kleiner Vorteil aus besserer Vorbereitung.", category: "flex", effectType: "field_debuff", targetMode: "rank_band", targetLimit: 2, modifier: 4 },
-    { threshold: 4, label: "Exploit Matchup", description: "Scouting Office: klares Ausnutzen einer erkannten Luecke.", category: "flex", effectType: "field_debuff", targetMode: "rank_band", targetLimit: 3, modifier: 6 },
+    { threshold: 4, label: "Exploit Matchup", description: "Scouting Office: klares Ausnutzen einer erkannten Lücke.", category: "flex", effectType: "field_debuff", targetMode: "rank_band", targetLimit: 3, modifier: 6 },
   ],
   analytics_room: [
-    { threshold: 2, label: "Forecast Edge", description: "Analytics Room: bessere Prognosen werden in Punkte uebersetzt.", category: "mental", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 4 },
+    { threshold: 2, label: "Forecast Edge", description: "Analytics Room: bessere Prognosen werden in Punkte übersetzt.", category: "mental", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 4 },
     { threshold: 4, label: "Perfect Read", description: "Analytics Room: der Matchplan sitzt genau im richtigen Fenster.", category: "mental", effectType: "field_debuff", targetMode: "rank_band", targetLimit: 3, modifier: 6 },
   ],
   fan_shop: [
@@ -300,7 +300,7 @@ const FACILITY_POWER_DEFINITIONS: Record<
   ],
   arena_upgrade: [
     { threshold: 2, label: "Arena Noise", description: "Arena Upgrade: die Kulisse drueckt das Team nach vorne.", category: "social", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 4 },
-    { threshold: 4, label: "Home Roar", description: "Arena Upgrade: grosser Arena-Moment fuer den Spieltag.", category: "social", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 6 },
+    { threshold: 4, label: "Home Roar", description: "Arena Upgrade: grosser Arena-Moment für den Spieltag.", category: "social", effectType: "support_boost", targetMode: "self", targetLimit: 0, modifier: 6 },
   ],
   academy: [
     { threshold: 2, label: "Academy Pattern", description: "Academy: strukturierter Nachwuchs- und Technikvorteil.", category: "mental", effectType: "self_boost", targetMode: "self", targetLimit: 0, modifier: 3 },
@@ -605,11 +605,11 @@ export function calculateTeamPowerModifierForSide(input: {
 
   const power = input.teamPowers.find((entry) => entry.id === powerId) ?? null;
   if (!power) {
-    warnings.push(`Team-Power fuer ${input.disciplineSide.toUpperCase()} konnte nicht geladen werden.`);
+    warnings.push(`Team-Power für ${input.disciplineSide.toUpperCase()} konnte nicht geladen werden.`);
     return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
   }
   if (power.isUsedUp) {
-    warnings.push(`${power.label} hat keine Einsaetze mehr frei.`);
+    warnings.push(`${power.label} hat keine Einsätze mehr frei.`);
     return { teamPowerSelected: 1, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: power.label, warnings };
   }
 

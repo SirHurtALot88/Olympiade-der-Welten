@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { HomeV2ClientProps, HomeV2TodayCard, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
@@ -7,12 +9,15 @@ import FoundationPlayerPortraitCard from "@/components/foundation/player-portrai
 import {
   NlCard,
   NlDeltaChip,
+  NlFieldRaceFormStrip,
   NlProgressBar,
   NlRadar,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
   type NlAxisKey,
   type NlRadarAxis,
   type NlTone,
@@ -20,25 +25,22 @@ import {
 import { formatObjectiveStatusLabel } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 
 /**
- * "Neuer Look" Manager-Cockpit fuer Home V2 (flag-gated, additive).
+ * "Neuer Look" Manager-Cockpit für Home V2 (flag-gated, additive).
  *
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
- * `HomeV2Client` faellt ohne Flag unveraendert auf das bestehende Layout
- * zurueck. Konsumiert exakt dieselben Props/Daten wie der alte Client;
+ * `HomeV2Client` fällt ohne Flag unverändert auf das bestehende Layout
+ * zurück. Konsumiert exakt dieselben Props/Daten wie der alte Client;
  * es gibt keine Zeit-/Uhr-Simulation, daher bewusst keine Countdown- oder
  * "vs. letzte Woche"-Elemente.
+ *
+ * KPI-Ranking-Drawer (#37, `NlRankingDrawer`): bewusst NICHT hier verdrahtet.
+ * "Rang"/"Punkte" sind hier nur der eigene Skalar (kein Zeilen-Array anderer
+ * Teams in `HomeV2ClientProps`), und OVR/PPs/MVS laufen über
+ * `FoundationPlayerPortraitCard` (kein StatChip in dieser Datei, Komponente
+ * gehört nicht zum Wave-4-Scope). Ein Drawer bräuchte hier erfundene Daten —
+ * die Chips bleiben deshalb Navigation zu `onOpenSeason`, das die volle
+ * Rangliste samt Drawer trägt (`SeasonStandingsNewLook`).
  */
-
-/* --- Geld: kompakt in "Mio"/"k" (Werte liegen bereits in Mio vor) --- */
-function formatNlMoney(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  if (Math.abs(value) < 1 && value !== 0) {
-    return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value * 1000)}k`;
-  }
-  return `${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)} Mio`;
-}
 
 function toFiniteNumber(value: string | number | boolean | null | undefined): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -178,6 +180,60 @@ function IconClipboard({ className }: NlIconProps) {
   );
 }
 
+/* --- Aufsteiger/Risiken-Zeile (#40): CA/PO-Delta + Potenzialspanne + --- */
+/* Kaderrang + Mini-Balken (CA relativ zur Potenzialdecke). Eine          */
+/* gemeinsame Zeilen-Komponente für Aufsteiger und Risiken hält beide     */
+/* Listen synchron und vermeidet doppelten JSX. */
+function DevelopmentPlayerRow({
+  player,
+  tone,
+  onOpenPlayer,
+}: {
+  player: HomeV2TopPlayerCard;
+  tone: Extract<NlTone, "good" | "risk">;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const ca = player.caRating;
+  const poMin = player.poRangeMin;
+  const poMax = player.poRangeMax;
+  const delta = (poMax ?? 0) - (ca ?? 0);
+  const barMax = Math.max(poMax ?? 0, ca ?? 0, 1);
+
+  return (
+    <li>
+      <button
+        type="button"
+        className="nl-home-development-row nl-home-development-row-rich"
+        onClick={() => onOpenPlayer(player.playerId)}
+        title={`${player.name} öffnen · CA ${formatNlNumber(ca, 0)} · Potenzial ${formatNlNumber(poMin, 0)}–${formatNlNumber(poMax, 0)} · Kaderrang #${player.rosterRank}`}
+      >
+        <span className="nl-home-development-top">
+          <span className="nl-home-development-name">{player.name}</span>
+          <span className="nl-home-development-rank nl-tnum">Kaderrang #{player.rosterRank}</span>
+        </span>
+        <span className="nl-home-development-figures nl-tnum">
+          <span className="nl-home-development-ca">CA {formatNlNumber(ca, 0)}</span>
+          <NlDeltaChip
+            value={delta}
+            format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} PO`}
+          />
+        </span>
+        <NlProgressBar
+          className="nl-home-development-bar"
+          value={ca ?? 0}
+          max={barMax}
+          tone={tone}
+          showValue={false}
+          title={`CA relativ zur Potenzialdecke (${formatNlNumber(poMax, 0)})`}
+        />
+        <span className="nl-home-development-range nl-tnum">
+          Potenzial {formatNlNumber(poMin, 0)}–{formatNlNumber(poMax, 0)}
+        </span>
+      </button>
+    </li>
+  );
+}
+
 function getTodayCardIcon(key: string) {
   if (key === "lineup") return <IconClipboard />;
   if (key === "tasks") return <IconInboxTray />;
@@ -205,13 +261,20 @@ export default function HomeV2NewLook({
   cash,
   salaryTotal,
   guv,
+  loanInstallment,
+  outstandingDebt,
   rosterCount,
+  fieldRaceForm,
+  fieldRacePlayedMatchdays,
+  fieldRaceTotalTeams,
+  fieldRaceRankMovement,
   boardPressure,
   boardRating,
   boardObjectives,
   nextStepLabel,
   nextStepStatus,
   nextStepDetail,
+  nextStepBlocked = false,
   warnings,
   topPlayers,
   leagueHeatPools,
@@ -222,8 +285,10 @@ export default function HomeV2NewLook({
   todayCards,
   onContinue,
   onOpenLineup,
+  onOpenTeams,
   onOpenSeason,
   onOpenOffice,
+  onOpenFacilities,
   onOpenInbox,
   onCompleteInboxItem,
   onOpenBoardObjectives,
@@ -231,6 +296,33 @@ export default function HomeV2NewLook({
 }: HomeV2ClientProps) {
   const visibleTodayCards = todayCards.slice(0, 3);
   const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
+
+  // D2 Feld-relative Rang-KPI: "#{rank} von {total} · Top {pct}%". Perzentil aus
+  // Rang/Feldgröße (Beispiel: #31 von 32 → Top 97%). Fog-sicher — nur die
+  // öffentliche Feldgröße und der eigene Rang, keine fremden Werte.
+  const fieldRankPercentile =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? Math.max(1, Math.min(100, Math.round((rank / fieldRaceTotalTeams) * 100)))
+      : null;
+  const rankFieldSub =
+    rank != null && fieldRaceTotalTeams != null && fieldRaceTotalTeams > 0
+      ? `von ${formatNlNumber(fieldRaceTotalTeams, 0)}${fieldRankPercentile != null ? ` · Top ${fieldRankPercentile}%` : ""}`
+      : undefined;
+  // D4 Rang-Movement (Δ vs. letzter Spieltag): >0 ▲ Plätze gut, <0 ▼. Am ersten
+  // Spieltag (kein Vorwert) bewusst "neu" statt eines erfundenen Deltas.
+  const isFirstFieldRaceMatchday = (fieldRacePlayedMatchdays ?? 0) <= 1;
+
+  // Hero-/KPI-Zähler (#Wave2): nur die Headline-Zahlen zählen hoch — Tabellen
+  // und Listen bleiben unverändert. Fixe Anzahl Top-Level-Hooks (kein Loop),
+  // respektiert prefers-reduced-motion via `useCountUp`.
+  const animatedRank = useCountUp(rank);
+  const animatedCash = useCountUp(cash);
+  const animatedGuv = useCountUp(guv);
+  const animatedPoints = useCountUp(points);
+  const animatedRosterCount = useCountUp(rosterCount, { durationMs: 700 });
+  const animatedSalaryTotal = useCountUp(salaryTotal);
+  const animatedLoanInstallment = useCountUp(loanInstallment);
+  const hasActiveLoan = loanInstallment != null && loanInstallment > 0;
 
   // Team-Achsenprofil (#50): Durchschnitt der vier Spiel-Achsen über die
   // Top-Kader-Spieler — nur reale, endliche Werte, fehlende Achsen fallen
@@ -259,6 +351,14 @@ export default function HomeV2NewLook({
     .slice(0, 3);
   const hasDevelopmentHighlights = developmentWinners.length > 0 || developmentRisks.length > 0;
 
+  // Saisonstand-Kachel (Redundanz-Abbau #40): Rang/Punkte/GuV stehen
+  // bereits im Hero oben — hier stattdessen echte, dort nicht gezeigte
+  // Kennzahlen aus scheduleItems ableiten statt die Hero-Chips zu
+  // wiederholen.
+  const playedMatchdayCount = scheduleItems.filter((item) => item.isPast || item.isCurrent).length;
+  const pointsPerMatchday = points != null && playedMatchdayCount > 0 ? points / playedMatchdayCount : null;
+  const remainingMatchdayCount = scheduleItems.length > 0 ? scheduleItems.length - playedMatchdayCount : null;
+
   // Gleiche Ziel-Zuordnung wie im bestehenden HomeV2Client.
   const handleTodayCardClick = (key: string) => {
     if (key === "lineup") {
@@ -276,64 +376,107 @@ export default function HomeV2NewLook({
 
   return (
     <div className="nl-home" data-testid="foundation-home-v2" id="foundation-home-v2" data-new-look="true">
-      {/* --- Hero: 2 KPIs gross (Rang, Cash), Rest als StatChipRow --- */}
-      <header className="nl-home-hero">
-        <div className="nl-home-hero-identity">
-          {teamLogoUrl ? (
-            <OptimizedMediaImage className="nl-home-hero-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={56} height={56} />
-          ) : (
-            <span className="nl-home-hero-logo nl-home-hero-logo-fallback">{teamLogoInitials}</span>
-          )}
-          <div className="nl-home-hero-copy">
-            <span className="nl-home-eyebrow">{seasonName} · {matchdayLabel}</span>
-            <h2 className="nl-home-hero-title">{teamName}</h2>
-            <p className="nl-home-hero-meta">{teamCode} · {controlModeLabel}</p>
+      {/* --- Hero: NlCard-Kopfkarte, KPIs als StatChip-Portale --- */}
+      <NlCard
+        className="nl-home-hero-card"
+        data-testid="nl-home-hero"
+        actions={
+          <div className="nl-home-hero-next">
+            {/* CC7: the "Weiter · …" advance action is rendered once in the global
+                top-bar (foundation-global-next-button, wired to triggerGlobalNext).
+                The hero no longer duplicates that button — it only surfaces the
+                current flow status so the richer context stays without a second
+                advance control. */}
+            <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
+            {nextStepBlocked ? (
+              <span className={`nl-home-next-reason ${nlToneClass("warn")}`}>{nextStepDetail}</span>
+            ) : null}
           </div>
-        </div>
+        }
+      >
+        <div className="nl-home-hero-body">
+          <div className="nl-home-hero-identity">
+            {teamLogoUrl ? (
+              <OptimizedMediaImage className="nl-home-hero-logo" src={teamLogoUrl} alt={`${teamName} Logo`} width={56} height={56} />
+            ) : (
+              <span className="nl-home-hero-logo nl-home-hero-logo-fallback" role="img" aria-label={`${teamName} Logo`}>{teamLogoInitials}</span>
+            )}
+            <div className="nl-home-hero-copy">
+              <span className="nl-home-eyebrow">{seasonName} · {matchdayLabel}</span>
+              <h2 className="nl-home-hero-title">{teamName}</h2>
+              <p className="nl-home-hero-meta">{teamCode} · {controlModeLabel}</p>
+            </div>
+          </div>
 
-        <div className="nl-home-hero-kpis" aria-label="Team KPIs">
-          <button
-            type="button"
-            className="nl-home-kpi is-interactive"
-            onClick={onOpenSeason}
-            title="Zum Saisonstand"
-            data-testid="nl-home-hero-kpi-rank"
-          >
-            <span className="nl-home-kpi-label">
-              Rang
-              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
+          <StatChipRow className="nl-home-hero-kpis" aria-label="Team KPIs">
+            <span className="nl-home-rank-portal">
+              <StatChip
+                label="Rang"
+                value={rank != null ? `#${formatNlNumber(animatedRank ?? rank, 0)}` : "—"}
+                tone="accent"
+                sub={rankFieldSub}
+                onClick={onOpenSeason}
+                title={
+                  rankFieldSub
+                    ? `Rang ${rank} von ${fieldRaceTotalTeams} im Feld — zum Saisonstand`
+                    : "Zum Saisonstand"
+                }
+              />
+              {fieldRaceRankMovement != null ? (
+                <NlDeltaChip
+                  value={fieldRaceRankMovement}
+                  format={(n) => (n === 0 ? "±0" : `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}`)}
+                  title="Rang-Bewegung gegenüber dem letzten Spieltag"
+                  className="nl-home-rank-move"
+                />
+              ) : rank != null && isFirstFieldRaceMatchday ? (
+                <span
+                  className="nl-home-rank-move is-new nl-tnum"
+                  title="Erster Spieltag — noch keine Rang-Bewegung"
+                >
+                  neu
+                </span>
+              ) : null}
             </span>
-            <strong className="nl-home-kpi-value nl-tnum">{rank != null ? `#${rank}` : "—"}</strong>
-          </button>
-          <button
-            type="button"
-            className="nl-home-kpi is-interactive"
-            onClick={onOpenOffice}
-            title="Zum Front Office"
-            data-testid="nl-home-hero-kpi-cash"
-          >
-            <span className="nl-home-kpi-label">
-              Cash
-              <span className="nl-home-kpi-arrow" aria-hidden="true">→</span>
-            </span>
-            <strong className="nl-home-kpi-value nl-tnum">{formatNlMoney(cash)}</strong>
-          </button>
-        </div>
+            <StatChip
+              label="Cash"
+              value={formatNlMoney(animatedCash ?? cash)}
+              onClick={onOpenOffice}
+              title="Zum Front Office"
+            />
+          </StatChipRow>
 
-        <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
-          <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} title="Gewinn und Verlust" />
-          <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" onClick={onOpenSeason} title="Zum Saisonstand" />
-          <StatChip label="Kader" value={formatNlNumber(rosterCount, 0)} />
-          <StatChip label="Gehalt" value={formatNlMoney(salaryTotal)} />
-        </StatChipRow>
+          {fieldRaceForm != null ? (
+            <NlFieldRaceFormStrip
+              entries={fieldRaceForm}
+              playedMatchdayCount={fieldRacePlayedMatchdays}
+              compact
+              className="nl-home-hero-form"
+            />
+          ) : null}
 
-        <div className="nl-home-hero-next">
-          <button type="button" className="nl-home-continue" onClick={onContinue}>
-            Weiter · {nextStepLabel}
-          </button>
-          <span className="nl-home-next-status" title={nextStepDetail}>{nextStepStatus}</span>
+          <StatChipRow className="nl-home-hero-chips" aria-label="Weitere Team-Kennzahlen">
+            <StatChip label="GuV" value={formatNlMoney(animatedGuv ?? guv)} tone={getGuvTone(guv)} onClick={onOpenOffice} title="Gewinn und Verlust — zum Front Office" />
+            <StatChip label="Saisonpunkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Saison-Punktestand — identisch zum Saisonstand" />
+            <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
+            <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
+            {hasActiveLoan ? (
+              <StatChip
+                label="Kreditrate"
+                value={formatNlMoney(animatedLoanInstallment ?? loanInstallment)}
+                tone="warn"
+                onClick={onOpenOffice}
+                sub={
+                  outstandingDebt != null && outstandingDebt > 0
+                    ? `Restschuld ${formatNlMoney(outstandingDebt)}`
+                    : undefined
+                }
+                title="Jährliche Kreditrate — zum Front Office"
+              />
+            ) : null}
+          </StatChipRow>
         </div>
-      </header>
+      </NlCard>
 
       {relevantWarnings.length > 0 ? (
         <div className="nl-home-warning-row" aria-label="Hinweise">
@@ -349,15 +492,17 @@ export default function HomeV2NewLook({
           <ol className="nl-home-schedule-track">
             {scheduleItems.map((item) => {
               const state = item.isCurrent ? "is-current" : item.isPast ? "is-past" : "is-upcoming";
+              const stateLabel = item.isCurrent ? "aktuell" : item.isPast ? "gespielt" : "kommend";
               return (
                 <li
                   key={item.matchdayId}
                   className={`nl-home-schedule-node ${state}`}
                   aria-current={item.isCurrent ? "step" : undefined}
-                  title={item.label}
+                  title={`${item.label} · ${stateLabel}`}
                 >
                   <span className="nl-home-schedule-dot" aria-hidden="true" />
                   <span className="nl-home-schedule-label">{item.label}</span>
+                  <span className="sr-only">{stateLabel}</span>
                 </li>
               );
             })}
@@ -373,22 +518,23 @@ export default function HomeV2NewLook({
         </div>
         <div className="nl-home-today-grid">
           {visibleTodayCards.map((card, index) => (
-            <NlCard
-              key={card.key}
-              interactive
-              onClick={() => handleTodayCardClick(card.key)}
-              className={`nl-home-today-card ${nlToneClass(getTodayCardTone(card.tone))}${index === 0 ? " is-primary" : ""}`}
-              eyebrow={
-                <span className="nl-home-today-kicker">
-                  {getTodayCardIcon(card.key)}
-                  {index + 1}. {card.kicker}
-                </span>
-              }
-              title={card.title}
-              data-testid={`nl-home-today-card-${card.key}`}
-            >
-              <p className="nl-home-today-detail">{card.detail}</p>
-            </NlCard>
+            <div key={card.key} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+              <NlCard
+                interactive
+                onClick={() => handleTodayCardClick(card.key)}
+                className={`nl-home-today-card ${nlToneClass(getTodayCardTone(card.tone))}${index === 0 ? " is-primary" : ""}`}
+                eyebrow={
+                  <span className="nl-home-today-kicker">
+                    {getTodayCardIcon(card.key)}
+                    {index + 1}. {card.kicker}
+                  </span>
+                }
+                title={card.title}
+                data-testid={`nl-home-today-card-${card.key}`}
+              >
+                <p className="nl-home-today-detail">{card.detail}</p>
+              </NlCard>
+            </div>
           ))}
         </div>
       </section>
@@ -398,6 +544,9 @@ export default function HomeV2NewLook({
         <div className="nl-home-section-head">
           <span className="nl-home-section-icon"><IconUsers /></span>
           <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
+          <span className="nl-home-section-hint" title="Reihenfolge: Rolle (Stammspieler zuerst), dann Saisonleistung (PPS), MVS und OVR">
+            sortiert nach Rolle &amp; Saisonleistung
+          </span>
         </div>
         {topPlayers.length > 0 ? (
           <div className="nl-home-portrait-grid">
@@ -428,6 +577,10 @@ export default function HomeV2NewLook({
                 poRangeMax={player.poRangeMax}
                 variant="home"
                 context="teamGrid"
+                newLook
+                known
+                caStars={player.caStars}
+                poStars={player.poStars}
                 portraitLoading={index < 2 ? "eager" : "lazy"}
                 portraitFetchPriority={index < 2 ? "high" : "auto"}
                 onOpen={() => onOpenPlayer(player.playerId)}
@@ -447,15 +600,15 @@ export default function HomeV2NewLook({
             <span className="nl-home-section-icon"><IconTarget /></span>
             <h3 className="nl-home-section-title">Team-Profil &amp; Entwicklung</h3>
           </div>
-          <div className="nl-home-profile-grid">
+          <div className="nl-home-profile-grid nl-home-profile-grid-hero">
             {teamAxisProfile.length > 0 ? (
               <NlCard
-                className="nl-home-radar-card"
+                className="nl-home-radar-card nl-home-radar-card-hero"
                 eyebrow={<span className="nl-home-card-eyebrow-icon"><IconUsers /> Achsen-Profil</span>}
                 title="Team-Stärke"
                 data-testid="nl-home-team-radar"
               >
-                <div className="nl-home-radar-wrap">
+                <div className="nl-home-radar-wrap nl-home-radar-wrap-hero">
                   <NlRadar axes={teamAxisProfile} showValues aria-label="Team-Achsenprofil POW, SPE, MEN, SOC" />
                 </div>
                 <p className="nl-home-radar-note">Ø der Top-{topPlayers.length} nach POW · SPE · MEN · SOC</p>
@@ -475,23 +628,7 @@ export default function HomeV2NewLook({
                       <span className={`nl-home-development-heading ${nlToneClass("good")}`}>Aufsteiger</span>
                       <ul className="nl-home-development-list">
                         {developmentWinners.map((player) => (
-                          <li key={player.playerId}>
-                            <button
-                              type="button"
-                              className="nl-home-development-row"
-                              onClick={() => onOpenPlayer(player.playerId)}
-                              title={`${player.name} öffnen · CA ${player.caRating ?? "—"} → PO ${player.poRangeMax ?? "—"}`}
-                            >
-                              <span className="nl-home-development-name">{player.name}</span>
-                              <span className="nl-home-development-figures nl-tnum">
-                                <span className="nl-home-development-ca">CA {formatNlNumber(player.caRating, 0)}</span>
-                                <NlDeltaChip
-                                  value={(player.poRangeMax ?? 0) - (player.caRating ?? 0)}
-                                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} PO`}
-                                />
-                              </span>
-                            </button>
-                          </li>
+                          <DevelopmentPlayerRow key={player.playerId} player={player} tone="good" onOpenPlayer={onOpenPlayer} />
                         ))}
                       </ul>
                     </div>
@@ -501,23 +638,7 @@ export default function HomeV2NewLook({
                       <span className={`nl-home-development-heading ${nlToneClass("risk")}`}>Risiken</span>
                       <ul className="nl-home-development-list">
                         {developmentRisks.map((player) => (
-                          <li key={player.playerId}>
-                            <button
-                              type="button"
-                              className="nl-home-development-row"
-                              onClick={() => onOpenPlayer(player.playerId)}
-                              title={`${player.name} öffnen · CA ${player.caRating ?? "—"} über PO ${player.poRangeMax ?? "—"}`}
-                            >
-                              <span className="nl-home-development-name">{player.name}</span>
-                              <span className="nl-home-development-figures nl-tnum">
-                                <span className="nl-home-development-ca">CA {formatNlNumber(player.caRating, 0)}</span>
-                                <NlDeltaChip
-                                  value={(player.poRangeMax ?? 0) - (player.caRating ?? 0)}
-                                  format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} PO`}
-                                />
-                              </span>
-                            </button>
-                          </li>
+                          <DevelopmentPlayerRow key={player.playerId} player={player} tone="risk" onOpenPlayer={onOpenPlayer} />
                         ))}
                       </ul>
                     </div>
@@ -557,7 +678,11 @@ export default function HomeV2NewLook({
                   >
                     {current != null && target != null && target > 0 ? (
                       <NlProgressBar
-                        label={objective.label}
+                        label={
+                          tone === "risk" || tone === "warn"
+                            ? `${objective.label} · ${formatObjectiveStatusLabel(objective.status)}`
+                            : objective.label
+                        }
                         value={current}
                         max={target}
                         tone={tone}
@@ -591,13 +716,21 @@ export default function HomeV2NewLook({
           data-testid="nl-home-league-card"
         >
           <div className="nl-home-league-body">
-            <div className="nl-home-kpi">
-              <span className="nl-home-kpi-label">Rang</span>
-              <strong className="nl-home-kpi-value nl-tnum">{rank != null ? `#${rank}` : "—"}</strong>
-            </div>
-            <StatChipRow aria-label="Liga-Kennzahlen">
-              <StatChip label="Punkte" value={formatNlNumber(points, 1)} tone="accent" />
-              <StatChip label="GuV" value={formatNlMoney(guv)} tone={getGuvTone(guv)} />
+            {/* Rang/Punkte/GuV stehen bereits oben im Hero — hier bewusst
+                keine Wiederholung, sondern daraus abgeleitete Kennzahlen. */}
+            <StatChipRow aria-label="Saison-Kennzahlen">
+              <StatChip
+                label="Ø Punkte/Spieltag"
+                value={pointsPerMatchday != null ? formatNlNumber(pointsPerMatchday, 2) : "—"}
+                tone="accent"
+                title="Punkte geteilt durch bereits gespielte Spieltage"
+              />
+              <StatChip
+                label="Verbleibend"
+                value={remainingMatchdayCount != null ? formatNlNumber(remainingMatchdayCount, 0) : "—"}
+                sub="Spieltage"
+                title="Verbleibende Spieltage bis Saisonende"
+              />
             </StatChipRow>
           </div>
         </NlCard>
@@ -626,6 +759,7 @@ export default function HomeV2NewLook({
                 <li key={item.id} className="nl-home-inbox-row">
                   <button type="button" className={`nl-home-inbox-item ${nlToneClass(item.severity === "critical" ? "risk" : item.severity === "warning" ? "warn" : "accent")}`} onClick={onOpenInbox}>
                     <span className="nl-home-inbox-dot" aria-hidden="true" />
+                    <span className="sr-only">{item.severity === "critical" ? "kritisch" : item.severity === "warning" ? "Warnung" : "Info"}: </span>
                     <span className="nl-home-inbox-copy">
                       <strong>{item.title}</strong>
                       {item.detail ? <small>{item.detail}</small> : null}
@@ -659,6 +793,7 @@ export default function HomeV2NewLook({
             className="nl-home-facility-card"
             eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBuilding /> Gebäude</span>}
             title="Infrastruktur"
+            onClick={onOpenFacilities}
           >
             <StatChipRow aria-label="Facility-Level">
               {facilities.map((facility) => (

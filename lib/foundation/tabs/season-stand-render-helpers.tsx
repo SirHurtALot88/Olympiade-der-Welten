@@ -171,7 +171,11 @@ export function getRosterEntryDisplaySalary(
   player?: Player | null,
 ) {
   const economy = resolvePlayerEconomyContract({ playerId: player?.id ?? null, player, rosterEntry: entry });
-  return economy.annualSalary ?? economy.salary ?? entry.salary;
+  // Zeige das AKTUELLE Saison-Gehalt (was der Spieler diese Saison verdient), nicht den
+  // Jahres-/Nominalwert `annualSalary` — der weicht bei geformten Verträgen (front/back-loaded)
+  // stark ab (z.B. konstante 60) und wirkte in Tabelle/History falsch. `annualSalary` bleibt nur
+  // Fallback, falls kein Saison-Gehalt vorhanden ist.
+  return economy.salary ?? economy.annualSalary ?? entry.salary;
 }
 
 export function getRosterEntryCurrentSeasonSalary(

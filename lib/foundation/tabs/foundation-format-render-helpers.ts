@@ -48,10 +48,12 @@ export function getTransferSourceLabel(source: string | null | undefined) {
   return labels[source] ?? source.replaceAll("_", " ");
 }
 export function formatMoney(value: number) {
+  // Clamp a magnitude that rounds to zero so we never render "-0,0".
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  }).format(value);
+  }).format(normalized);
 }
 
 export function formatNullableMoney(value: number | null | undefined) {
@@ -59,10 +61,12 @@ export function formatNullableMoney(value: number | null | undefined) {
 }
 
 export function formatDisplayMoney(value: number) {
+  // Clamp a magnitude that rounds to zero so we never render "-0,0".
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  }).format(value);
+  }).format(normalized);
 }
 
 export function formatShortSaveId(saveId: string) {
@@ -95,14 +99,14 @@ export function formatScenarioTypeLabel(scenarioType?: string | null) {
 }
 
 export function formatGamePhaseLabel(phase?: string | null) {
-  if (phase === "season_active") return "Saison laeuft";
-  if (phase === "season_review") return "Saisonrueckblick";
+  if (phase === "season_active") return "Saison läuft";
+  if (phase === "season_review") return "Saisonrückblick";
   if (phase === "season_completed") return "Saison abgeschlossen";
   if (phase === "preseason_management") return "Preseason-Management";
   if (phase === "transfer_sell_phase") return "Verkaufsfenster";
   if (phase === "transfer_buy_phase") return "Kaufphase";
   if (phase === "lineup_setup") return "Lineup Setup";
-  if (phase === "next_season_ready") return "Naechste Saison bereit";
+  if (phase === "next_season_ready") return "Nächste Saison bereit";
   if (phase === "transfer_window") return "Transferfenster";
   if (phase === "setup") return "Vorbereitung";
   return phase ? phase.replaceAll("_", " ") : "Vorbereitung";
@@ -150,7 +154,7 @@ export function buildScenarioWarning(meta?: SaveSummary["scenarioMeta"] | null) 
     return "Sandbox-Testsave: lokale Test-Writes erlaubt, nicht produktiv.";
   }
   if (meta.scenarioType === "sandbox_snapshot") {
-    return "Sandbox-Snapshot: stabiler Ruecksprungpunkt, nicht aktiv beschreiben.";
+    return "Sandbox-Snapshot: stabiler Rücksprungpunkt, nicht aktiv beschreiben.";
   }
   if (meta.scenarioType === "ai_redraft_test" && !meta.containsFinalStandings) {
     return "Dieser Save ist ein Redraft-Testsave ohne abgeschlossene Season.";
@@ -211,7 +215,7 @@ export function buildViewContextWarning(
     return "Sandbox-Testsave: lokale Test-Writes sind erlaubt; Prisma/Remote/Direktinserts bleiben verboten.";
   }
   if (meta?.scenarioType === "sandbox_snapshot") {
-    return "Sandbox-Snapshot: stabiler Ruecksprungpunkt, bitte nicht als aktiven Schreibsave nutzen.";
+    return "Sandbox-Snapshot: stabiler Rücksprungpunkt, bitte nicht als aktiven Schreibsave nutzen.";
   }
 
   if (meta?.scenarioType === "ai_redraft_test") {
@@ -338,10 +342,10 @@ export function formatContractPreferenceCurrentStatus(
     return "Aktuell: Laufzeit und Form passen gut";
   }
   if (lengthMatches) {
-    return `Aktuell: Laufzeit passt, Form stoert (${formatContractShapeLabel(contractShape)})`;
+    return `Aktuell: Laufzeit passt, Form stört (${formatContractShapeLabel(contractShape)})`;
   }
   if (shapeMatches) {
-    return `Aktuell: Form passt, Laufzeit stoert (${safeLength ?? "?"} Saisons)`;
+    return `Aktuell: Form passt, Laufzeit stört (${safeLength ?? "?"} Saisons)`;
   }
   return `Aktuell: Laufzeit (${safeLength ?? "?"}) und Form (${formatContractShapeLabel(contractShape)}) weichen ab`;
 }
@@ -366,15 +370,15 @@ export function formatChancePercent(value: number | null | undefined) {
 
 export function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
-    Ambitious_reagiert_bei_schwachem_Angebot_kritischer: "Ambitionierter Spieler erwartet ein staerkeres Signal.",
+    Ambitious_reagiert_bei_schwachem_Angebot_kritischer: "Ambitionierter Spieler erwartet ein stärkeres Signal.",
     contract_length_override_in_effect: "Mehrjahresvertrag weicht vom Standard ab.",
     low_team_fit_reduces_acceptance: "Teamfit senkt die Zusagechance.",
-    market_bracket_factor_preview_pending: "Marktwertklasse wird im Vertragsrisiko nur als Preview beruecksichtigt.",
+    market_bracket_factor_preview_pending: "Marktwertklasse wird im Vertragsrisiko nur als Preview berücksichtigt.",
     negotiation_cancelled_after_contact: "Abgebrochene Verhandlung bleibt als schlechte Erfahrung gespeichert.",
     negotiation_rejected_bad_experience: "Abgelehntes Angebot bleibt als schlechte Erfahrung gespeichert.",
     offer_below_expected_salary: "Angebot liegt unter der Gehaltserwartung.",
     preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
+    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
     salary_source_missing: "Gehaltserwartung fehlt.",
     trait_salary_factor_source_missing: "Trait-Gehaltseffekt noch nicht final aus Quelle belegt.",
   };
@@ -426,7 +430,7 @@ export type DisciplineCategoryFilter = "all" | "power" | "speed" | "mental" | "s
 
 export function formatDisciplineCategoryLabel(category: string | null | undefined) {
   if (category === "power") return "rot";
-  if (category === "speed") return "gruen";
+  if (category === "speed") return "grün";
   if (category === "mental") return "blau";
   if (category === "social") return "gelb";
   return "neutral";
@@ -490,7 +494,7 @@ export function getAiPreseasonStatusLabel(status: FoundationAiPreseasonAutomatio
   if (status === "running") return "AI pickt gerade";
   if (status === "completed") return "AI fertig";
   if (status === "failed") return "AI blockiert";
-  return "AI uebersprungen";
+  return "AI übersprungen";
 }
 
 export function getAiPreseasonModeLabel(mode: FoundationAiPreseasonAutomationMode) {
@@ -532,7 +536,7 @@ export function getInboxCategoryLabel(category: GameInboxItem["category"]) {
   if (category === "transfer") return "Transfer";
   if (category === "training") return "Training";
   if (category === "contract") return "Vertrag";
-  if (category === "facility") return "Gebaeude";
+  if (category === "facility") return "Gebäude";
   return "Hinweis";
 }
 

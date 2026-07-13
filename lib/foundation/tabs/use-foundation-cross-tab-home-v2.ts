@@ -264,7 +264,7 @@ export function useFoundationCrossTabHomeV2(input: {
             : rawValue <= 3
               ? "niedrig"
               : rawValue >= 6
-                ? "spuerbar"
+                ? "spürbar"
                 : rawValue <= 4
                   ? "gebremst"
                   : "neutral";

@@ -2,6 +2,7 @@
 
 import type { GameInboxItem, GameState, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
@@ -149,6 +150,14 @@ export default function FoundationHomeV2Host({
 
   const homeActiveTeamLogo = selectedTeam ? getTeamLogoModel(selectedTeam, { variant: "thumb" }) : null;
 
+  // Kredit-Kern (Fog of War): nur für das aktive Manager-Team berechnet — nie
+  // für ein fremdes Team, siehe `use-credits-view-model.ts`. `null` statt `0`,
+  // wenn kein Team aktiv ist, damit die Home-/Office-Chips sauber ausblenden.
+  const loanInstallment = activeManagerTeamId
+    ? getTeamAnnualLoanInstallment(gameState, activeManagerTeamId)
+    : null;
+  const outstandingDebt = activeManagerTeamId ? getTeamOutstandingDebt(gameState, activeManagerTeamId) : null;
+
   return (
     <FoundationHomeV2Panel
       active
@@ -167,6 +176,8 @@ export default function FoundationHomeV2Host({
         cash: selectedStandingRow?.cash ?? null,
         salaryTotal: selectedStandingRow?.salaryTotal ?? null,
         guv: selectedStandingRow?.guv ?? null,
+        loanInstallment,
+        outstandingDebt,
         rosterCount: selectedRosterTableRows.length,
         gmStoryLabel: selectedHqGmStory?.label ?? null,
         gmStoryDetail: selectedHqGmStory?.detail ?? null,
@@ -181,7 +192,9 @@ export default function FoundationHomeV2Host({
             ? formatCockpitReason(gameFlowActionStep.blockers[0])
             : gameFlowActionStep.warnings[0]
               ? formatCockpitReason(gameFlowActionStep.warnings[0])
-              : "Flow bereit — weiter zum naechsten Schritt.",
+              : "Flow bereit — weiter zum nächsten Schritt.",
+        nextStepBlocked:
+          gameFlowActionStep.blockers.length > 0 || gameFlowActionStep.warnings.length > 0,
         warnings: overviewDerivations.homeWarnings.map(formatHomeWarningLabel),
         topPlayers: overviewDerivations.homeV2TopPlayers,
         leagueHeatPools: leaguePlayerHeatPools,
@@ -196,6 +209,7 @@ export default function FoundationHomeV2Host({
         onOpenMarket: () => onNavigateView("marketV2"),
         onOpenTraining: () => onNavigateView("trainingCompact"),
         onOpenOffice: () => navigateHomeTab("office"),
+        onOpenFacilities: () => onNavigateView("facilitiesOverviewV2"),
         onOpenSeason: () => onNavigateView("seasonV2"),
         onOpenInbox: () => onNavigateView("inboxV2"),
         onOpenBoardObjectives: () => {
@@ -208,6 +222,8 @@ export default function FoundationHomeV2Host({
         ...office,
         homeNextMatchdayStatus,
         selectedStandingRow,
+        loanInstallment,
+        outstandingDebt,
         activeTeamOpenInboxItems: activeTeamDecisionInboxItems,
         activeTeamCriticalInboxItems: activeTeamDecisionCriticalInboxItems,
         selectedRosterTableRows,

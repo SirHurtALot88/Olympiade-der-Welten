@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { nlToneClass, type NlTone } from "@/components/foundation/new-look/nl-tones";
+import { getGameTermTooltip } from "@/lib/ui/game-encyclopedia";
 
 export type StatChipProps = {
   /** Kleines Uppercase-Label, z. B. "OVR", "PPs", "MW". */
@@ -16,6 +17,8 @@ export type StatChipProps = {
   onClick?: () => void;
   title?: string;
   className?: string;
+  /** Expliziter Accessible-Name — sonst liest AT nur Label+Wert vor. */
+  ariaLabel?: string;
 };
 
 /**
@@ -23,14 +26,27 @@ export type StatChipProps = {
  * Label oben, tabularem Wert darunter. Mit `onClick` wird jeder Stat
  * zum Portal in die passende Detailansicht.
  */
-export function StatChip({ label, value, tone = "neutral", sub, onClick, title, className }: StatChipProps) {
+export function StatChip({ label, value, tone = "neutral", sub, onClick, title, className, ariaLabel }: StatChipProps) {
   const classes = ["nl-stat-chip", nlToneClass(tone), onClick ? "is-interactive" : "", className ?? ""]
     .filter(Boolean)
     .join(" ");
 
+  // Ohne expliziten `title` das Lexikon-Kurztooltip des Labels aufloesen
+  // (OVR/PPs/MVS/MW/GuV/Fit/Value/Bedarf/CA/PO …). Zentral hier, damit jede
+  // StatChip in der App automatisch die Erklaerung im Hover traegt.
+  const termTooltip = title ? null : getGameTermTooltip(label);
+  const resolvedTitle = title ?? termTooltip ?? undefined;
+
   const body = (
     <>
-      <span className="nl-stat-chip-label">{label}</span>
+      <span className="nl-stat-chip-label">
+        {label}
+        {termTooltip ? (
+          <span className="nl-stat-chip-help" aria-hidden="true">
+            ?
+          </span>
+        ) : null}
+      </span>
       <span className="nl-stat-chip-value nl-tnum">{value}</span>
       {sub ? <span className="nl-stat-chip-sub">{sub}</span> : null}
       {onClick ? (
@@ -43,14 +59,14 @@ export function StatChip({ label, value, tone = "neutral", sub, onClick, title, 
 
   if (onClick) {
     return (
-      <button type="button" className={classes} onClick={onClick} title={title}>
+      <button type="button" className={classes} onClick={onClick} title={resolvedTitle} aria-label={ariaLabel}>
         {body}
       </button>
     );
   }
 
   return (
-    <span className={classes} title={title}>
+    <span className={classes} title={resolvedTitle}>
       {body}
     </span>
   );

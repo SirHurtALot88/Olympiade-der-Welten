@@ -645,21 +645,36 @@ async function main() {
       const matchdayId = currentSave.gameState.matchdayState.matchdayId;
       const mdStep = makeStep(`md-${index + 1}`, `Spieltag ${index + 1} (${matchdayId})`);
 
-      const trainingApply = applyTeamTrainingSettings(
-        currentSave,
-        manualTeamId,
-        "BALANCED",
-        "normal",
-        previewTeamTrainingConfirmToken(currentSave, manualTeamId),
-        `full_season_md_${index + 1}`,
-        persistence,
-      );
-      if (!trainingApply.applied) {
-        failStep(mdStep, `Training blocked: ${trainingApply.blockingReasons.join(" | ")}`);
-        steps.push(mdStep);
-        break;
+      // Training-Intensität wird einmalig vor MD1 gesetzt (economyStep) und ist
+      // ab dem ersten gespielten Spieltag für den Rest der Saison gesperrt
+      // (siehe docs/training-intensity-season-lock.md). Ab MD2 ist daher nicht
+      // das erneute Anwenden erwartet, sondern die aktive Sperre — die prüfen
+      // wir hier explizit, statt den Lauf abzubrechen.
+      const trainingPreview = previewTeamTrainingSettings({
+        save: currentSave,
+        teamId: manualTeamId,
+        trainingFocus: "BALANCED",
+        trainingIntensity: "normal",
+      });
+      if (trainingPreview.blockingReasons.includes("training_intensity_locked_for_season")) {
+        passStep(mdStep, "Trainingsintensität saisongesperrt (ab MD2 erwartet) — kein erneutes Setzen.");
+      } else {
+        const trainingApply = applyTeamTrainingSettings(
+          currentSave,
+          manualTeamId,
+          "BALANCED",
+          "normal",
+          trainingPreview.confirmToken,
+          `full_season_md_${index + 1}`,
+          persistence,
+        );
+        if (!trainingApply.applied) {
+          failStep(mdStep, `Training blocked: ${trainingApply.blockingReasons.join(" | ")}`);
+          steps.push(mdStep);
+          break;
+        }
+        passStep(mdStep, "Training gesetzt.");
       }
-      passStep(mdStep, "Training gesetzt.");
 
       prepManualLineup({
         saveId: save.saveId,

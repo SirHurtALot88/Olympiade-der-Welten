@@ -75,6 +75,14 @@ export default function FoundationInboxV2Host({
         items={inboxV2Items}
         selectedItemId={inboxV2SelectedItemId ?? inboxV2Items[0]?.id ?? null}
         onSelectItem={setInboxV2SelectedItemId}
+        onOpenItem={(itemId) => {
+          const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+          if (sourceItem) {
+            navigateToInboxItem(sourceItem);
+          } else {
+            setInboxV2SelectedItemId(itemId);
+          }
+        }}
         openCount={inboxMode === "decisions" ? activeTeamDecisionInboxItems.length : activeTeamChronicleInboxItems.length}
         criticalCount={inboxMode === "decisions" ? activeTeamDecisionCriticalInboxItems.length : 0}
         mode={inboxMode}

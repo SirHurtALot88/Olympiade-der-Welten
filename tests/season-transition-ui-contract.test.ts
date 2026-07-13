@@ -28,8 +28,8 @@ describe("season transition ui contract", () => {
     expect(fileText).toContain("last_matchday_not_completed");
     expect(fileText).toContain("Saisonabschluss & Review");
     expect(fileText).toContain("Assistent previewen");
-    expect(fileText).toContain("Abschluss pruefen");
-    expect(fileText).toContain("Der echte Write laeuft atomar mit Recovery");
+    expect(fileText).toContain("Abschluss prüfen");
+    expect(fileText).toContain("Der echte Write läuft atomar mit Recovery");
     expect(fileText).toContain("/api/season/transition");
     expect(fileText).toContain("/api/season/completion");
     expect(fileText).toContain("Transition currentStep");

@@ -15,6 +15,8 @@ import {
 import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 
 import { isAiPickResettableSource } from "@/lib/ai/ai-pick-audit-reset-contract";
 import {
@@ -3780,7 +3782,38 @@ export async function runAiPicksExecutePreview(
 
     const beforeSnapshot = buildTeamEconomySnapshot(latestSave.gameState, latestTeam);
     const targetInfo = resolveTargetRoster(latestTeam, latestSave.gameState, runMode);
-    const teamRunContext = createLocalTransfermarktRunContext({ save: latestSave, persistence });
+
+    // Phase 2 KI-Anbindung (docs/design/kredit-system.md, "KI-Anbindung"): bedarfsgetriebene
+    // Kreditaufnahme unmittelbar vor der Kaufphase, damit die KI ihren Kader trotz knapper Kasse
+    // aufs Optimum auffüllen kann. Cash muss VOR teamRunContext credited & persistiert werden,
+    // damit die Kaufschleife das erhöhte Cash sieht. Schlägt die Aufnahme fehl, läuft die
+    // Kaufphase unverändert ohne Kredit weiter (kein Throw).
+    let preseasonLoanSave = latestSave;
+    const loanDecision = resolveAiLoanDecision(latestSave.gameState, latestTeam.teamId);
+    if (loanDecision.shouldBorrow) {
+      // Phase 3 (docs/design/kredit-system.md, "Team-zu-Team-Kredite"): die KI leiht sich gegen
+      // das guenstigste verfuegbare Angebot (Bank oder Team) statt immer nur bei der Bank -
+      // buildLoanOffers ist bereits aufsteigend nach Zinssatz sortiert, die Bank ist immer
+      // enthalten, daher gibt es hier immer mindestens ein Angebot.
+      const offers = buildLoanOffers(latestSave.gameState, latestTeam.teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+      const bestOffer = offers[0] ?? null;
+      const loanResult = originateLoan(
+        latestSave.gameState,
+        {
+          borrowerTeamId: latestTeam.teamId,
+          principal: loanDecision.loanAmount,
+          termSeasons: loanDecision.termSeasons,
+          lenderType: bestOffer?.lenderType ?? "bank",
+          lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
+        },
+        { execute: true },
+      );
+      if (loanResult.ok) {
+        preseasonLoanSave = persistence.saveSingleplayerState(latestSave.saveId, loanResult.gameState);
+      }
+    }
+
+    const teamRunContext = createLocalTransfermarktRunContext({ save: preseasonLoanSave, persistence });
     const useFastBatchExecute = runMode === "season1_optimum_execute";
     const executedPicks: AiPicksRunPick[] = [];
     const transferHistoryIds: string[] = [];

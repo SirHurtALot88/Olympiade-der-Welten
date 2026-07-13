@@ -175,7 +175,7 @@ export default function FacilitiesV2Client(props: FacilitiesV2ClientProps) {
     >
       <header className="facilities-v2-header">
         <div className="facilities-v2-header-main">
-          <TooltipHeading as="h2" tooltip="Upgrade, Wartung und Unterhalt pro Gebaeude.">
+          <TooltipHeading as="h2" tooltip="Upgrade, Wartung und Unterhalt pro Gebäude.">
             Gebäude
           </TooltipHeading>
           <p>
@@ -205,7 +205,7 @@ export default function FacilitiesV2Client(props: FacilitiesV2ClientProps) {
       </div>
 
       {trainingFacilityEffectPreview ? (
-        <div className="facilities-v2-kpi-row" aria-label="Trainings-Preview durch Gebaeude">
+        <div className="facilities-v2-kpi-row" aria-label="Trainings-Preview durch Gebäude">
           <article className="facilities-v2-kpi">
             <span>Trainingseffekt</span>
             <strong>{formatLocaleNumber(trainingFacilityEffectPreview.trainingXp.after, 1)}</strong>

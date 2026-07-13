@@ -304,18 +304,25 @@ describe("game inbox service", () => {
   });
 
   it("keeps dismissed stored status for deterministic generated items", () => {
-    const itemId = "lineup_missing:save-1:season-3:season-3-matchday-1:M-M";
+    // Hinweis (#43): "lineup_missing" ist inzwischen ein Auto-Resolve-Item
+    // (status wird live aus dem Spielstand abgeleitet, siehe Test weiter
+    // unten) und ignoriert daher bewusst gespeicherten Status. Dieser Test
+    // prueft weiterhin den generischen Mechanismus — dass ein gespeicherter
+    // Status eine Regeneration ueberlebt — anhand eines Items, das echtes
+    // Nutzer-Urteil braucht (welchen Vertrag man verlaengert) und deshalb
+    // NICHT auto-resolved.
+    const itemId = "contracts_expiring:save-1:season-3:M-M";
     const gameState = makeGameState({
       gameInboxItems: [
         {
           itemId,
           saveId: "save-1",
           seasonId: "season-3",
-          category: "task",
+          category: "contract",
           severity: "warning",
-          title: "Lineup fehlt",
+          title: "Verträge laufen aus",
           description: "dismissed earlier",
-          targetView: "lineup",
+          targetView: "teams",
           targetParams: {},
           status: "dismissed",
           createdAt: "2026-06-13T10:00:00.000Z",
@@ -327,6 +334,71 @@ describe("game inbox service", () => {
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     expect(items.find((item) => item.itemId === itemId)?.status).toBe("dismissed");
     expect(filterGameInboxItems(items, { includeDismissed: false }).some((item) => item.itemId === itemId)).toBe(false);
+  });
+
+  it("auto-resolves condition-based checklist items instead of requiring a manual click (#43)", () => {
+    const itemId = "lineup_missing:save-1:season-3:season-3-matchday-1:M-M";
+
+    // Bedingung erfuellt (Lineup ist vollstaendig gesetzt): das Item MUSS
+    // als "done" erscheinen, ganz ohne Klick auf "Erledigt".
+    const readyState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        lineupDrafts: [
+          {
+            seasonId: "season-3",
+            matchdayId: "season-3-matchday-1",
+            teamId: "M-M",
+            entries: Array.from({ length: 9 }, (_, index) => ({
+              slotKey: `slot-${index}`,
+              playerId: `p-${index + 1}`,
+              activePlayerId: `ap-${index + 1}`,
+            })),
+            submittedAt: null,
+          },
+        ],
+      },
+      players: Array.from({ length: 9 }, (_, index) => makePlayer(`p-${index + 1}`)),
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        teamId: "M-M",
+        playerId: `p-${index + 1}`,
+        contractLength: 2,
+        salary: 2,
+      })),
+    });
+    const readyItems = buildGameInboxItems({ gameState: readyState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const doneItem = readyItems.find((item) => item.itemId === itemId);
+    expect(doneItem?.status).toBe("done");
+    expect(doneItem?.title).toBe("Lineup gesetzt");
+
+    // Umgekehrt (Regressionstest fuer den eigentlichen #43-Bug): ein
+    // frueher manuell gesetzter "done"-Status darf eine WEITERHIN offene
+    // Bedingung nicht verstecken — sonst koennte man den Reminder
+    // wegklicken, ohne die Aufgabe tatsaechlich zu erledigen.
+    const missingState = makeGameState({
+      gameInboxItems: [
+        {
+          itemId,
+          saveId: "save-1",
+          seasonId: "season-3",
+          category: "task",
+          severity: "info",
+          title: "Lineup gesetzt",
+          description: "manually marked done earlier, but lineup is empty again",
+          targetView: "lineup",
+          targetParams: {},
+          status: "done",
+          createdAt: "2026-06-13T10:00:00.000Z",
+          source: "test",
+        },
+      ],
+    });
+    const missingItems = buildGameInboxItems({ gameState: missingState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const openItem = missingItems.find((item) => item.itemId === itemId);
+    expect(openItem?.status).toBe("open");
+    expect(openItem?.title).toBe("Lineup fehlt");
   });
 
 	  it("filters by participant/owner teams", () => {
@@ -381,7 +453,11 @@ describe("game inbox service", () => {
     expect(sponsorTask?.targetParams).toEqual({ team: "M-M", panel: "sponsor-choice" });
   });
 
-  it("skips sponsor choice task when a sponsor contract exists", () => {
+  it("auto-resolves the sponsor choice task (status done, not silently absent) once a contract exists (#43)", () => {
+    // Vorher: das Item verschwand spurlos, sobald ein Sponsor gewaehlt war
+    // (kein "erledigt"-Signal fuer den Nutzer). Jetzt bleibt es als
+    // erledigtes Item bestehen (sichtbar ueber "Erledigte anzeigen"), taucht
+    // aber nicht mehr offen/kritisch in der Aktionen-Ansicht auf.
     const gameState = makeGameState({
       seasonState: {
         seasonId: "season-3",
@@ -402,7 +478,10 @@ describe("game inbox service", () => {
       },
     });
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
-    expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:"))).toBe(false);
+    const sponsorTask = items.find((item) => item.itemId.startsWith("sponsor_choice_missing:"));
+    expect(sponsorTask?.status).toBe("done");
+    expect(sponsorTask?.title).toBe("Sponsor gewählt");
+    expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:") && item.status === "open")).toBe(false);
   });
 
   it("warns when negative form cards remain unused before season end", () => {

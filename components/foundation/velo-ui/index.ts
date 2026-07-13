@@ -15,6 +15,7 @@ export { formatTrainingAttributeWeight, formatVeloNumber, formatVeloSignedNumber
 export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/components/foundation/velo-ui/VeloAttributeFocusTags";
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";
 export { buildTrainingModeSegments, VeloIntensityRail, type VeloIntensitySegment } from "@/components/foundation/velo-ui/VeloIntensityRail";
+export { NlAbilityStars, type NlAbilityStarsProps } from "@/components/foundation/velo-ui/NlAbilityStars";
 export { VeloPotentialStars } from "@/components/foundation/velo-ui/VeloPotentialStars";
 export { VeloRangeBar, type VeloRangeBarProps } from "@/components/foundation/velo-ui/VeloRangeBar";
 export { VeloStarRating } from "@/components/foundation/velo-ui/VeloStarRating";

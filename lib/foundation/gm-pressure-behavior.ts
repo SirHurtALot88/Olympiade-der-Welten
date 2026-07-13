@@ -85,7 +85,7 @@ export function resolveGmPressureBehavior(gameState: GameState, teamId: string):
           ? "GM unter Druck: rotiert aggressiver, um Boardziele zu retten."
           : "GM unter Druck: Verkauf eines Core-Spielers kann das Mandat gefaehrden.";
   } else if (pressureLevel === "watch") {
-    warning = "Board beobachtet: unpopulaere Verkaeufe erhoehen den Druck.";
+    warning = "Board beobachtet: unpopulaere Verkäufe erhöhen den Druck.";
   }
 
   return {

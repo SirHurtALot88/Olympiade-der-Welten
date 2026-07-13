@@ -272,11 +272,32 @@ describe("game flow controller", () => {
     expect(flow.currentStep.cta).toContain("Training");
   });
 
-  it("opens lineup after training is set", () => {
+  it("requires transfers to be finalized before lineup opens", () => {
     const flow = buildGameFlowState({
       gameState: gameState({ players: [player("p-1", "mittel")] }),
       activeTeamId: "M-M",
     });
+    expect(flow.currentStepId).toBe("finalize_transfers");
+    expect(flow.currentStep.cta).toBe("Transfers finalisieren");
+    const lineupStep = flow.steps.find((step) => step.stepId === "set_lineup");
+    expect(lineupStep?.status).toBe("blocked");
+    expect(lineupStep?.blockers).toContain("transfers_not_finalized");
+  });
+
+  it("opens lineup after training is set and transfers are finalized", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 4, createdAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    expect(flow.steps.find((step) => step.stepId === "finalize_transfers")?.status).toBe("completed");
     expect(flow.currentStepId).toBe("set_lineup");
     expect(flow.currentStep.targetView).toBe("lineup");
   });
@@ -339,8 +360,10 @@ describe("game flow controller", () => {
       activeTeamId: "M-M",
     });
 
-    expect(flow.currentStepId).toBe("assign_formcards");
-    expect(flow.currentStep.blockers).toContain("missing_formcard_pool");
+    expect(flow.currentStepId).toBe("finalize_transfers");
+    expect(flow.steps.find((step) => step.stepId === "assign_formcards")?.blockers).toContain("missing_formcard_pool");
+    const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
+    expect(arenaStep?.status).toBe("blocked");
   });
 
   it("blocks arena when lineup is complete but not submitted", () => {

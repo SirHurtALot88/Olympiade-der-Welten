@@ -32,6 +32,12 @@ export type SelectedRosterTableRow = {
     salePrice?: number | null;
     saleFactor?: number | null;
   };
+  /** "Neuer Look" CA/PO-Sterne (Tier-3 Rosterkarten) — optional, nur von `NlTeamsRosterRow`-Konsumenten genutzt. */
+  known?: boolean;
+  caStars?: number | null;
+  poStarRange?: { min: number; max: number } | null;
+  caScore?: number | null;
+  poScoreRange?: { min: number; max: number } | null;
 };
 
 function getTeamRosterRoleBucket(roleTag: string | null | undefined): Exclude<TeamRosterRoleFilter, "all"> {
@@ -141,7 +147,7 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
       { id: "default" as const, label: "Standard", count: input.selectedRosterTableRows.length },
       { id: "salary" as const, label: "Gehaltsdruck", count: salaryCount },
       { id: "value" as const, label: "Value", count: valueCount },
-      { id: "contracts" as const, label: "Vertraege", count: expiringCount },
+      { id: "contracts" as const, label: "Verträge", count: expiringCount },
       { id: "training" as const, label: "Training", count: trainingCount },
     ].filter((entry) => entry.id === "default" || entry.count > 0);
   }, [input.gameState, input.getRosterEntryDisplaySalary, input.getRosterEntrySalaryDelta, input.selectedRosterTableRows]);

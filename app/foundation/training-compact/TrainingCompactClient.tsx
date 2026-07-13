@@ -169,16 +169,16 @@ export default function TrainingCompactClient(props: TrainingCompactClientProps)
         </div>
 
         <TooltipHeading as="p" className="muted" tooltip={TRAINING_FORECAST_EXPLANATION}>
-          Trainingsmodus sperrt pro Saison nach dem ersten Result, Trainingsklasse bleibt waehrend der Saison weiter aenderbar.
+          Trainingsmodus sperrt pro Saison nach dem ersten Result, Trainingsklasse bleibt während der Saison weiter änderbar.
         </TooltipHeading>
 
         <p className="muted training-v2-top-risk-line">
           {topGrowth || topRisk ? (
             <>
               Top Steigerer: <strong>{topGrowth?.player.name ?? "—"}</strong>
-              {topGrowth ? ` (+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Groesstes Risiko:{" "}
+              {topGrowth ? ` (+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Größtes Risiko:{" "}
               <strong>{topRisk?.player.name ?? "—"}</strong>
-              {topRisk ? ` (Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)})` : ""}
+              {topRisk ? ` (Rückschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)})` : ""}
             </>
           ) : (
             "Kein aktiver Kader"

@@ -78,6 +78,8 @@ export type MatchdayArenaV2ClientProps = {
   onOpenMatchdayResult?: (() => void) | null;
   onOpenSeason?: (() => void) | null;
   onOpenTraining?: (() => void) | null;
+  /** Schließt den Loop: startet den nächsten Spieltag (kanonische "Weiter"-Aktion). */
+  onAdvanceMatchday?: (() => void) | null;
 };
 
 type ArenaLabOptions = {
@@ -415,7 +417,7 @@ function formatArenaWarning(message: string) {
     return `${planningTargetMatch[1]}: Einsatzliste noch nicht voll geplant (${planningTargetMatch[2]}).`;
   }
   if (message === "missing_lineups") {
-    return "Es fehlen noch Einsatzlisten fuer diesen Spieltag.";
+    return "Es fehlen noch Einsatzlisten für diesen Spieltag.";
   }
   if (message.startsWith("resolve_preview:")) {
     return `Resolve-Vorschau fehlt: ${message.replace("resolve_preview:", "")}`;
@@ -619,7 +621,25 @@ function clampPct(value: number) {
   return Math.max(6, Math.min(100, value));
 }
 
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener?.("change", update);
+    return () => mediaQuery.removeEventListener?.("change", update);
+  }, []);
+
+  return reduced;
+}
+
 function ArenaAnimatedScore({ value, fractionDigits = 1 }: { value: number; fractionDigits?: number }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [displayValue, setDisplayValue] = useState(value);
   const previousValueRef = useRef(value);
   const frameRef = useRef<number | null>(null);
@@ -627,7 +647,8 @@ function ArenaAnimatedScore({ value, fractionDigits = 1 }: { value: number; frac
   useEffect(() => {
     const from = previousValueRef.current;
     const to = value;
-    if (Math.abs(from - to) < 0.01) {
+    // Reduced-motion: no per-frame tween — settle on the target value at once.
+    if (prefersReducedMotion || Math.abs(from - to) < 0.01) {
       setDisplayValue(to);
       previousValueRef.current = to;
       return;
@@ -653,10 +674,12 @@ function ArenaAnimatedScore({ value, fractionDigits = 1 }: { value: number; frac
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [value]);
+  }, [value, prefersReducedMotion]);
 
+  // The counting value mutates ~60×/s; hide it from assistive tech so it does not
+  // flood a surrounding live region. The settled value is announced separately.
   return (
-    <strong className="arena-v2-board-score is-counting">
+    <strong className="arena-v2-board-score is-counting" aria-hidden="true">
       {formatDecimalScore(displayValue, fractionDigits)}
     </strong>
   );
@@ -738,6 +761,8 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
   onOpenTeam,
   registerRowRef,
 }: ArenaBoardRowProps) {
+  // Control mode must not rely on row colour alone (colourblind + screen readers).
+  const controlModeLabel = row.tone === "ai" ? "KI" : row.tone === "passive" ? "Passiv" : null;
   return (
     <article
       ref={(node) => registerRowRef(row.teamId, node)}
@@ -766,11 +791,14 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
             </span>
           ) : null}
         </span>
-        {row.teamLogoUrl ? (
-          <OptimizedMediaImage className="arena-v2-board-logo" src={row.teamLogoUrl} alt={`${row.teamName} Logo`} width={32} height={32} />
-        ) : (
-          <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
-        )}
+        <OptimizedMediaImage
+          className="arena-v2-board-logo"
+          onErrorClassName="arena-v2-board-logo arena-v2-board-logo-fallback"
+          src={row.teamLogoUrl}
+          alt={`${row.teamName} Logo`}
+          width={32}
+          height={32}
+        />
         <div className="arena-v2-board-copy">
           <button
             type="button"
@@ -782,6 +810,16 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
           >
             {row.teamName}
           </button>
+          {(isActiveTeam || controlModeLabel) ? (
+            <span className="arena-v2-board-control-tags">
+              {isActiveTeam ? (
+                <span className="pill arena-v2-board-control-tag is-own">Dein Team</span>
+              ) : null}
+              {controlModeLabel ? (
+                <span className="pill arena-v2-board-control-tag">{controlModeLabel}</span>
+              ) : null}
+            </span>
+          ) : null}
           {row.detailChips.length > 0 ? (
             <div className="arena-v2-board-chips">
               {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
@@ -858,6 +896,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     d2: false,
   });
   const [restoredRevealSessionLabel, setRestoredRevealSessionLabel] = useState<string | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [isPlaying, setIsPlaying] = useState(false);
   const [revealEventActive, setRevealEventActive] = useState(false);
   const [mvpSpotlightActive, setMvpSpotlightActive] = useState(false);
@@ -2369,6 +2408,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     if (!targetTeamId) {
       return;
     }
+    // Honour the reader's reduced-motion preference: jump instead of smooth-scroll.
+    const effectiveBehavior: ScrollBehavior = prefersReducedMotion ? "auto" : behavior;
 
     const attemptScroll = () => {
       const listElement = boardListRef.current;
@@ -2385,7 +2426,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
       listElement.scrollTo({
         top: Math.max(0, Math.min(targetScrollTop, maxScrollTop)),
-        behavior,
+        behavior: effectiveBehavior,
       });
       return true;
     };
@@ -2658,7 +2699,18 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         return;
       }
 
+      // Space activates any focused control (a <button>, or a board row via its own
+      // Space handler). Hijacking it here would preventDefault that activation and also
+      // advance the reveal — a confusing double action. So when a real control is
+      // focused, let it own the key; only drive the global reveal from neutral focus.
+      const isInteractiveTarget = Boolean(
+        target?.closest('button, a[href], [role="button"], [role="listitem"], summary'),
+      );
+
       if (event.code === "Space") {
+        if (isInteractiveTarget) {
+          return;
+        }
         event.preventDefault();
         if (!canControlArenaReveal) {
           return;
@@ -3233,6 +3285,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               <div className="arena-v2-score-ticker" aria-live="polite" data-testid="arena-v2-score-ticker">
                 <span className="arena-v2-score-ticker-kicker">Live</span>
                 <ArenaAnimatedScore value={leaderRow.score} />
+                <span className="sr-only">{formatDecimalScore(leaderRow.score, 1)} Punkte</span>
                 <strong>{boardLeaderLabel}</strong>
                 <small>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Slots"}</small>
               </div>
@@ -3274,12 +3327,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   }}
                 >
                   {phaseIndex === slotsPhaseIndex && revealedSlotCount < maxSlotRevealCount
-                    ? "Naechster Reveal"
+                    ? "Nächster Reveal"
                     : !canShowResultLayer && activeDisciplinePhase === "d1" && activeDisciplineRevealComplete
                       ? `${d2Label} freischalten`
                       : !canShowResultLayer && activeDisciplinePhase === "d2" && activeDisciplineRevealComplete
                         ? "Result freischalten"
-                        : "Naechster Reveal"}
+                        : "Nächster Reveal"}
                 </button>
               )}
             </div>
@@ -3540,10 +3593,10 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   <article className="arena-v2-focus-card">
                     <span>Reveal</span>
                     <strong>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Slots"}</strong>
-                    <small>Weiter addiert den naechsten freigegebenen Baustein.</small>
+                    <small>Weiter addiert den nächsten freigegebenen Baustein.</small>
                   </article>
                   <article className="arena-v2-focus-card">
-                    <span>Naechste Freigabe</span>
+                    <span>Nächste Freigabe</span>
                     <strong>{activeDisciplinePhase === "d1" ? d2Label : "Result"}</strong>
                     <small>{activeDisciplineRevealComplete ? "Mit Weiter freischalten." : "Nach Abschluss dieser Disziplin."}</small>
                   </article>
@@ -3786,7 +3839,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           ) : null}
           {isResultPhase && canShowResultLayer ? (
             <div className="arena-v2-next-step-links" data-testid="arena-v2-next-steps">
-              <strong>Naechster sinnvoller Schritt</strong>
+              <strong>Nächster sinnvoller Schritt</strong>
               <div className="arena-v2-next-step-actions">
                 {props.onOpenMatchdayResult ? (
                   <button type="button" className="secondary-button inline-button" onClick={props.onOpenMatchdayResult}>

@@ -524,7 +524,7 @@ export default function LegacyResolveLabClient({
       <section className="hero">
         <h1>Legacy Resolve Lab</h1>
         <p>
-          <Link href="/foundation">Zurueck zur Foundation</Link>
+          <Link href="/foundation">Zurück zur Foundation</Link>
         </p>
       </section>
 
@@ -690,7 +690,7 @@ export default function LegacyResolveLabClient({
                 ))}
               </tbody>
             </table>
-            {teamRows.length === 0 ? <p className="muted">Keine Team-Resultate verfuegbar.</p> : null}
+            {teamRows.length === 0 ? <p className="muted">Keine Team-Resultate verfügbar.</p> : null}
           </div>
         </section>
 
@@ -714,7 +714,7 @@ export default function LegacyResolveLabClient({
               <p className="muted">{selectedTeamDetail.readinessExplanation}</p>
               {selectedTeamResult?.missingLineup ? (
                 <p className="muted">
-                  Fuer dieses Team wurde aktuell kein gespeichertes Legacy-Lineup gefunden. Team-Score bleibt im Preview deshalb auf dem Default-/Warnzustand.
+                  Für dieses Team wurde aktuell kein gespeichertes Legacy-Lineup gefunden. Team-Score bleibt im Preview deshalb auf dem Default-/Warnzustand.
                 </p>
               ) : null}
               {selectedTeamDetail.missingPlayersToRequirement > 0 ? (
@@ -808,10 +808,10 @@ export default function LegacyResolveLabClient({
                   </section>
                 ))}
               </div>
-              {selectedTeamDetail.entries.length === 0 ? <p className="muted">Keine eingesetzten Spieler fuer dieses Team vorhanden.</p> : null}
+              {selectedTeamDetail.entries.length === 0 ? <p className="muted">Keine eingesetzten Spieler für dieses Team vorhanden.</p> : null}
             </div>
           ) : (
-            <p className="muted">Kein Team ausgewaehlt.</p>
+            <p className="muted">Kein Team ausgewählt.</p>
           )}
         </section>
 

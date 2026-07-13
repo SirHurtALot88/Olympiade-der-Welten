@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
+import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
 
 /**
  * "Neuer Look" Entscheidungs-Triage fuer Inbox V2 (flag-gated, additive).
@@ -159,6 +160,14 @@ function IconDot({ className }: NlIconProps) {
   );
 }
 
+function IconCheck({ className }: NlIconProps) {
+  return (
+    <svg {...NL_ICON_SVG_PROPS} className={className}>
+      <path d="M5 12.5 9.5 17 19 6.5" />
+    </svg>
+  );
+}
+
 /** Reale Inbox-Kategorien (Enum) → deutsches Label + Icon. */
 const NL_INBOX_CATEGORY_META: Record<string, { label: string; icon: (props: NlIconProps) => ReturnType<typeof IconDot> }> = {
   task: { label: "Aufgabe", icon: IconClipboard },
@@ -188,10 +197,22 @@ function getSeverityTone(severity: InboxV2Item["severity"]): NlTone {
   return "accent";
 }
 
-function getStatusLabel(status: InboxV2Item["status"]): string | null {
-  if (status === "done") return "Erledigt";
-  if (status === "dismissed") return "Ausgeblendet";
+function getStatusLabel(item: InboxV2Item): string | null {
+  // #43: automatisch (aus dem Spielstand) erledigte Bedingungs-Items tragen
+  // ein eigenes Label statt "Erledigt" — das macht sichtbar, dass hier
+  // niemand geklickt hat, sondern die Bedingung schlicht erfüllt ist.
+  if (item.status === "done") {
+    return isAutoResolvingInboxItemId(item.id) ? "Automatisch erledigt" : "Erledigt";
+  }
+  if (item.status === "dismissed") return "Ausgeblendet";
   return null;
+}
+
+/** #44: kleines Cadence-Tag ("Wiederkehrend" / "Einmalig") für die Aktionen-Liste. */
+function getCadenceLabel(item: InboxV2Item): { text: string; cadence: "recurring" | "once" } | null {
+  const cadence = getInboxItemCadence(item.id);
+  if (!cadence) return null;
+  return { text: cadence === "recurring" ? "Wiederkehrend" : "Einmalig", cadence };
 }
 
 function getInboxItemDomId(itemId: string) {
@@ -202,6 +223,7 @@ export default function InboxV2NewLook({
   items,
   selectedItemId,
   onSelectItem,
+  onOpenItem,
   teamLabel,
   openCount = 0,
   criticalCount = 0,
@@ -219,6 +241,12 @@ export default function InboxV2NewLook({
 }: InboxV2ClientProps) {
   const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
   const categoryFilters = mode === "chronicle" ? NL_INBOX_CHRONICLE_CATEGORY_FILTERS : NL_INBOX_DECISION_CATEGORY_FILTERS;
+
+  // Klick auf eine Karte: springt zum Ziel-Screen (Deep-Link), wenn der Host
+  // `onOpenItem` durchreicht; sonst waehlt er die Karte nur aus. Eine Quelle
+  // fuer alle Karten-Klicks, damit Entscheidungs- und Chronik-Karten gleich
+  // reagieren.
+  const activateItem = (itemId: string) => (onOpenItem ?? onSelectItem)(itemId);
 
   // Kategorie-Filter als klickbare Portale (#3). Der Mount reicht aktuell
   // keinen `onCategoryFilterChange`-Handler durch (Host setzt
@@ -292,6 +320,135 @@ export default function InboxV2NewLook({
   const runInnerAction = (event: MouseEvent, action: () => void) => {
     event.stopPropagation();
     action();
+  };
+
+  // Chronik-"Magazin" (#Wave2): Lead-Story-Karte + Support-Karten-Grid statt
+  // der generischen Liste. Nur für Chronik-Items (news/result/transfer aus
+  // der Chronik-Quelle) — der Entscheidungen-Modus rendert unverändert die
+  // bestehende Listenansicht, funktionale Items bleiben also unangetastet.
+  const renderChronicleCardActions = (item: InboxV2Item) => (
+    <>
+      {item.choices && item.choices.length > 0 ? (
+        <div className="nl-inbox-card-choices" data-testid="inbox-v2-quick-actions">
+          {item.choices.map((choice, choiceIndex) => (
+            <button
+              key={choice.id}
+              type="button"
+              className={`nl-inbox-choice${choiceIndex === 0 ? " is-recommended" : ""}`}
+              data-testid={`inbox-quick-action-${choice.id}`}
+              onClick={(event) => runInnerAction(event, () => onRunChoice?.(item.id, choice.id))}
+            >
+              <span className="nl-inbox-choice-label">
+                {choice.label}
+                {choiceIndex === 0 && item.choices && item.choices.length > 1 ? (
+                  <span className="nl-inbox-choice-tag">Empfohlen</span>
+                ) : null}
+              </span>
+              {choice.detail ? <small className="nl-inbox-choice-hint">{choice.detail}</small> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {item.status === "open" && (onMarkDone || onDismiss) ? (
+        <div className="nl-inbox-card-actions">
+          {onMarkDone ? (
+            <button
+              type="button"
+              className="nl-inbox-card-action"
+              onClick={(event) => runInnerAction(event, () => onMarkDone(item.id))}
+            >
+              Erledigt
+            </button>
+          ) : null}
+          {onDismiss ? (
+            <button
+              type="button"
+              className="nl-inbox-card-action"
+              onClick={(event) => runInnerAction(event, () => onDismiss(item.id))}
+            >
+              Ausblenden
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+
+  const renderChronicleEyebrow = (meta: ReturnType<typeof getCategoryMeta>, statusLabel: string | null) => {
+    const CategoryIcon = meta.icon;
+    return (
+      <span className="nl-inbox-card-meta">
+        <CategoryIcon />
+        <span className="nl-inbox-card-category">{meta.label}</span>
+        {statusLabel ? <span className="nl-inbox-card-status">{statusLabel}</span> : null}
+      </span>
+    );
+  };
+
+  const renderChronicleLeadCard = (item: InboxV2Item) => {
+    const meta = getCategoryMeta(item.category);
+    const severityTone = getSeverityTone(item.severity);
+    const statusLabel = getStatusLabel(item);
+    const isSelected = selectedItemId === item.id;
+    return (
+      <div key={item.id} id={getInboxItemDomId(item.id)}>
+        <NlCard
+          interactive
+          onClick={() => activateItem(item.id)}
+          className={`nl-chronicle-lead ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          eyebrow={renderChronicleEyebrow(meta, statusLabel)}
+          title={item.title}
+          data-testid={`nl-chronicle-lead-${item.id}`}
+        >
+          <p className="nl-chronicle-lead-body">{item.detail}</p>
+          {renderChronicleCardActions(item)}
+        </NlCard>
+      </div>
+    );
+  };
+
+  const renderChronicleStoryCard = (item: InboxV2Item, revealIndex: number) => {
+    const meta = getCategoryMeta(item.category);
+    const severityTone = getSeverityTone(item.severity);
+    const statusLabel = getStatusLabel(item);
+    const isSelected = selectedItemId === item.id;
+    return (
+      <div
+        key={item.id}
+        id={getInboxItemDomId(item.id)}
+        className="nl-reveal"
+        style={{ "--nl-reveal-i": revealIndex } as CSSProperties}
+      >
+        <NlCard
+          interactive
+          onClick={() => activateItem(item.id)}
+          className={`nl-chronicle-story ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
+          eyebrow={renderChronicleEyebrow(meta, statusLabel)}
+          title={item.title}
+          data-testid={`nl-chronicle-story-${item.id}`}
+        >
+          <p className="nl-chronicle-story-body">{item.detail}</p>
+          {renderChronicleCardActions(item)}
+        </NlCard>
+      </div>
+    );
+  };
+
+  const renderChronicleMagazine = () => {
+    const [leadItem, ...restItems] = displayedItems;
+    if (!leadItem) {
+      return null;
+    }
+    return (
+      <div className="nl-chronicle-magazine" aria-label="Chronik-Magazin">
+        {renderChronicleLeadCard(leadItem)}
+        {restItems.length > 0 ? (
+          <div className="nl-chronicle-grid" aria-label="Weitere Chronik-Einträge">
+            {restItems.map((item, index) => renderChronicleStoryCard(item, index))}
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   const emptyTitle = mode === "chronicle" ? "Noch keine Chronik-Einträge" : "Alles erledigt";
@@ -374,19 +531,32 @@ export default function InboxV2NewLook({
         </div>
       ) : null}
 
-      {displayedItems.length > 0 ? (
+      {displayedItems.length === 0 ? (
+        <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
+          <p className="nl-inbox-empty-text">{emptyText}</p>
+        </NlCard>
+      ) : mode === "chronicle" ? (
+        renderChronicleMagazine()
+      ) : (
         <ul className="nl-inbox-list" aria-label="Inbox Einträge">
           {displayedItems.map((item) => {
             const meta = getCategoryMeta(item.category);
             const CategoryIcon = meta.icon;
             const severityTone = getSeverityTone(item.severity);
-            const statusLabel = getStatusLabel(item.status);
+            const statusLabel = getStatusLabel(item);
             const isSelected = selectedItemId === item.id;
+            // #43: Bedingungs-Items lösen sich selbst auf — keine manuelle
+            // "Erledigt/Ausblenden"-Aktion, die einen unerfüllten Zustand
+            // vortäuschen könnte. Solange die Bedingung offen ist, zeigt ein
+            // kleines "Automatisch"-Tag, warum hier kein Button steht.
+            const isAutoResolving = isAutoResolvingInboxItemId(item.id);
+            const cadenceLabel = getCadenceLabel(item);
+            const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
             return (
               <li key={item.id} id={getInboxItemDomId(item.id)} className="nl-inbox-list-row">
                 <NlCard
                   interactive
-                  onClick={() => onSelectItem(item.id)}
+                  onClick={() => activateItem(item.id)}
                   className={`nl-inbox-card ${nlToneClass(severityTone)}${isSelected ? " is-selected" : ""}${statusLabel ? " is-resolved" : ""}`}
                   data-testid={`nl-inbox-card-${item.id}`}
                 >
@@ -397,7 +567,22 @@ export default function InboxV2NewLook({
                     <div className="nl-inbox-card-copy">
                       <span className="nl-inbox-card-meta">
                         <span className="nl-inbox-card-category">{meta.label}</span>
-                        {statusLabel ? <span className="nl-inbox-card-status">{statusLabel}</span> : null}
+                        {cadenceLabel ? (
+                          <span className={`nl-inbox-cadence-tag nl-inbox-cadence-${cadenceLabel.cadence}`}>
+                            {cadenceLabel.text}
+                          </span>
+                        ) : null}
+                        {item.status === "open" && isAutoResolving ? (
+                          <span className="nl-inbox-auto-tag" title="Löst sich automatisch, sobald die Bedingung erfüllt ist.">
+                            Automatisch
+                          </span>
+                        ) : null}
+                        {statusLabel ? (
+                          <span className="nl-inbox-card-status">
+                            {item.status === "done" && isAutoResolving ? <IconCheck className="nl-inbox-card-status-icon" /> : null}
+                            {statusLabel}
+                          </span>
+                        ) : null}
                       </span>
                       <strong className="nl-inbox-card-title">{item.title}</strong>
                       {item.detail ? <p className="nl-inbox-card-detail">{item.detail}</p> : null}
@@ -424,7 +609,7 @@ export default function InboxV2NewLook({
                         </div>
                       ) : null}
 
-                      {item.status === "open" && (onMarkDone || onDismiss) ? (
+                      {showManualActions ? (
                         <div className="nl-inbox-card-actions">
                           {onMarkDone ? (
                             <button
@@ -453,10 +638,6 @@ export default function InboxV2NewLook({
             );
           })}
         </ul>
-      ) : (
-        <NlCard className="nl-inbox-empty-card" title={emptyTitle} eyebrow="Inbox">
-          <p className="nl-inbox-empty-text">{emptyText}</p>
-        </NlCard>
       )}
     </div>
   );

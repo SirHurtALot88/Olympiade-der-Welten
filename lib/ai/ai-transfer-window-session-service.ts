@@ -18,6 +18,8 @@ import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-
 import { runPreseasonBatchPickRebuild } from "@/lib/ai/preseason-batch-pick-rebuild-service";
 import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
+import { resolveAiEarlyPayoffDecision } from "@/lib/ai/ai-loan-decision-service";
+import { applyEarlyPayoff } from "@/lib/finance/loan-service";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -35,6 +37,7 @@ import { applyContractRenewalAction, previewContractRenewalAction } from "@/lib/
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
@@ -937,8 +940,29 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     flushLocalTransfermarktRunContext(sessionRunContext);
   }
 
-  const finalSave = readLiveSave();
+  let finalSave = readLiveSave();
   if (!finalSave) throw new Error("Save missing after transfer window session.");
+
+  // Phase 3 KI-Anbindung — Vorab-Rückzahlung (docs/design/kredit-system.md, "Vorab-Rückzahlung" /
+  // "Anti-Churn-Balancing"): Timing ist die Verkaufsphase, NACH den Verkäufen (Erlöse sind im
+  // Cash) und VOR dem Return der Session, damit die nächste Preseason-Kaufphase die (ggf.
+  // reduzierte) Restschuld bereits sieht. Läuft nur in der season_end (Sell-)Session, nie im
+  // dryRun (reine Vorschau darf nichts mutieren). Non-throwing: ein einzelner fehlschlagender
+  // applyEarlyPayoff (z. B. Cash inzwischen anderweitig verbraucht) darf die Session nicht kippen.
+  if (isSeasonEndSellPhase && !input.dryRun) {
+    const earlyPayoffCandidateTeamIds = scopeTeam(finalSave.gameState.teams.map((team) => team.teamId)).filter(
+      (teamId) => (getTeamControlSettings(finalSave!.gameState, teamId)?.controlMode ?? "ai") === "ai",
+    );
+    for (const teamId of earlyPayoffCandidateTeamIds) {
+      const decision = resolveAiEarlyPayoffDecision(finalSave.gameState, teamId);
+      for (const loanId of decision.loanIdsToPayoff) {
+        const payoffResult = applyEarlyPayoff(finalSave.gameState, loanId, { execute: true });
+        if (!payoffResult.ok) continue;
+        finalSave = persistence.saveSingleplayerState(input.saveId, payoffResult.gameState);
+      }
+    }
+  }
+
   const finalRosterCounts = rosterCountsByTeam(finalSave.gameState);
 
   for (const [teamId, result] of perTeamMap) {

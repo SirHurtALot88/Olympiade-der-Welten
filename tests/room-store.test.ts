@@ -127,7 +127,7 @@ describe("room store", () => {
     const advanced = advanceRoomFlow(created.room.roomCode, created.seat.seatToken);
     expect(advanced.ok).toBe(true);
     if (advanced.ok) {
-      expect(advanced.room.state.roomFlowState.step).toBe("lineup");
+      expect(advanced.room.state.roomFlowState.step).toBe("finalize_transfers");
       expect(advanced.room.state.roomFlowState.completedParticipantIds).toHaveLength(0);
       expect(advanced.room.state.roomFlowState.aiAutoCompletedTeamIds).toHaveLength(0);
       expect(advanced.room.state.teamOwnership.filter((entry) => entry.controllerType === "human")).toHaveLength(8);

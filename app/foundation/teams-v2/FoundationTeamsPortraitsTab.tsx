@@ -138,7 +138,7 @@ export default function FoundationTeamsPortraitsTab({
         ))}
       </div>
 
-      <div className="team-roster-focusbar" aria-label="Kaderfokus waehlen">
+      <div className="team-roster-focusbar" aria-label="Kaderfokus wählen">
         {teamRosterFocusOptions.map((option) => (
           <button
             key={`team-portraits-focus-${option.id}`}

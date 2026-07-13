@@ -23,8 +23,14 @@ import {
   formatNlNumber,
   type NlRadarAxis,
 } from "@/components/foundation/new-look";
+import {
+  getPlayerDisplaySalary,
+  getRosterEntryDisplaySalary,
+} from "@/app/foundation/foundation-page-client-exports";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 
 import ClassIcon from "./ClassIcon";
 import RaceIcon from "./RaceIcon";
@@ -41,24 +47,27 @@ function buildHeroInitials(name: string) {
 }
 
 function formatHeroRank(rank: number | null | undefined) {
-  return rank != null && Number.isFinite(rank) ? `#${formatNlNumber(rank, 0)} Liga` : undefined;
+  return rank != null && Number.isFinite(rank) ? `#${formatNlNumber(rank, 0)}` : undefined;
 }
 
 /**
- * Sub-Zeile der Hero-StatChips: Liga-Rang plus Trend-Delta (Vergleich zur
- * Vorsaison aus `ovrDelta`/`ppsDelta`/`mvsDelta`). Ohne reale Delta-Quelle
- * bleibt es beim Rang — es wird nichts erfunden.
+ * Sub-Zeile der Hero-StatChips: Liga-Rang, Liga-Perzentil (FM Data-Hub-Stil,
+ * "Top 8%" — `formatLeaguePercentile`) und Trend-Delta (Vergleich zur
+ * Vorsaison aus `ovrDelta`/`ppsDelta`/`mvsDelta`). Ohne reale Rang-/Delta-
+ * Quelle fällt der jeweilige Teil einfach weg — es wird nichts erfunden.
  */
-function formatHeroSub(rank: number | null | undefined, delta: number | null | undefined) {
+function formatHeroSub(
+  rank: number | null | undefined,
+  delta: number | null | undefined,
+  poolSize: number | null | undefined,
+) {
   const rankPart = formatHeroRank(rank);
+  const percentilePart = formatLeaguePercentile(rank, poolSize) ?? undefined;
   const deltaPart =
     delta != null && Number.isFinite(delta) && delta !== 0
       ? `${delta > 0 ? "▲" : "▼"} ${formatNlNumber(Math.abs(delta), 1)}`
       : undefined;
-  if (rankPart && deltaPart) {
-    return `${rankPart} · ${deltaPart}`;
-  }
-  return deltaPart ?? rankPart;
+  return [rankPart, percentilePart, deltaPart].filter(Boolean).join(" · ") || undefined;
 }
 
 function appendDeltaSource(baseTitle: string, deltaSourceLabel: string | null | undefined) {
@@ -87,6 +96,38 @@ export default function PlayerHeroNewLook({
   onClose,
   onOpenLeagueLeaders,
 }: PlayerHeroNewLookProps) {
+  // Liga-Poolgröße für die Perzentil-Chips (#60 → Data-Hub): reale
+  // Spielerzahl aus dem aktiven Save, kein geschätzter/erfundener Wert. Ohne
+  // Foundation-Kontext (z. B. Storybook/Isolation) bleibt es bei `null` —
+  // dann liefert `formatLeaguePercentile` schlicht kein Perzentil-Label.
+  const foundationState = useFoundationStateOptional();
+  const leaguePoolSize = foundationState?.gameState.players.length ?? null;
+
+  // GEHALT-Chip (neben MW): reales Saison-Gehalt.
+  //
+  // PRIMÄRQUELLE ist `data.salary` aus dem Drawer-Builder
+  // (`buildPlayerDrawerDataFromGameState`) — dort wird der echte Kader-Eintrag
+  // via `resolveRosterEntry` aufgelöst und das Gehalt aus derselben Economy
+  // gezogen wie MW/Vertrag (jetzt aktuelles Saison-Gehalt zuerst, s.
+  // `salary`-Feld im Builder). Das ist die zuverlässige Quelle für den
+  // ANGEZEIGTEN Spieler und UNABHÄNGIG vom Client-`foundationState`-Kontext:
+  // auf der Profil-Route ist `useFoundationStateOptional()` bzw. dessen
+  // `rosters` je nach Mount-Scope null/leer, weshalb eine reine
+  // Client-seitige Kader-Suche hier für gekaufte Spieler fälschlich "—"
+  // ergab. `data.salary` ist für jeden rostierten (gekauften) Spieler
+  // gesetzt → die harte Regel "Gehalt kann nicht '—' sein, wenn gekauft" hält.
+  //
+  // Sekundär (nur falls `data.salary` ausnahmsweise null ist, z. B. Isolation
+  // ohne Builder-Economy): eigene Kader-Auflösung über `foundationState`,
+  // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
+  const rosterEntry = foundationState
+    ? (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
+    : null;
+  const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
+  const heroSalary =
+    data.salary ??
+    (rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer) : getPlayerDisplaySalary(heroPlayer));
+
   const radarAxes: NlRadarAxis[] = (
     [
       ["pow", data.pow],
@@ -186,7 +227,7 @@ export default function PlayerHeroNewLook({
               label="OVR"
               value={formatNlNumber(data.ovr, 1)}
               tone="accent"
-              sub={formatHeroSub(data.ovrRank, data.ovrDelta)}
+              sub={formatHeroSub(data.ovrRank, data.ovrDelta, leaguePoolSize)}
               title={appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)}
               onClick={buildLeadersClick("ovr", data.ovrRank)}
             />
@@ -194,7 +235,7 @@ export default function PlayerHeroNewLook({
               label="PPs"
               value={formatNlNumber(data.pps ?? data.ppsRating, 1)}
               tone="spe"
-              sub={formatHeroSub(data.ppsRank, data.ppsDelta)}
+              sub={formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
               title={appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)}
               onClick={buildLeadersClick("pps", data.ppsRank)}
             />
@@ -202,7 +243,7 @@ export default function PlayerHeroNewLook({
               label="MVS"
               value={formatNlNumber(data.mvs, 1)}
               tone="soc"
-              sub={formatHeroSub(data.mvsRank, data.mvsDelta)}
+              sub={formatHeroSub(data.mvsRank, data.mvsDelta, leaguePoolSize)}
               title={appendDeltaSource(
                 "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
                 data.mvsDeltaSourceLabel,
@@ -215,6 +256,13 @@ export default function PlayerHeroNewLook({
               tone="neutral"
               sub="Marktwert"
               title="Marktwert"
+            />
+            <StatChip
+              label="GEHALT"
+              value={formatNlNumber(heroSalary, 1)}
+              tone="neutral"
+              sub="pro Saison"
+              title="Gehalt pro Saison"
             />
           </StatChipRow>
         </div>
@@ -244,7 +292,7 @@ export default function PlayerHeroNewLook({
         ) : null}
       </div>
       <button className="nl-player-hero-close" type="button" onClick={onClose}>
-        Schliessen
+        Schließen
       </button>
     </section>
   );

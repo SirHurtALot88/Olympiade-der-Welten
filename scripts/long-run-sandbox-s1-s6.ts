@@ -49,6 +49,7 @@ import {
   collectTeamFatigueInjuryMetrics,
   countSeasonInjuryEvents,
 } from "@/lib/season/long-run-fatigue-collect";
+import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getDatabase } from "@/lib/persistence/sqlite";
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
@@ -805,6 +806,7 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
       .map(({ team, rosterCount, optTarget, strategy }) => `${team.shortCode}:${rosterCount}/${optTarget}:${strategy}`)
       .join(",")}`,
   );
+  const preseasonConvergenceStartedAt = Date.now();
   const convergence = await runTransferWindowSession({
     saveId,
     seasonId,
@@ -820,6 +822,9 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
     skipIfExistingMarketTransfers: false,
     progressLog: true,
   });
+  console.error(
+    `[long-run] preseason-convergence ${seasonId} elapsed=${Date.now() - preseasonConvergenceStartedAt}ms`,
+  );
   const engineSummary = convergence.perTeam.reduce(
     (counts, entry) => {
       counts[entry.pickEngine] = (counts[entry.pickEngine] ?? 0) + 1;
@@ -2052,10 +2057,18 @@ function syncStaleMatchdayPointerIfNeeded(
   return true;
 }
 
-async function runSeasonMatchdays(saveId: string, persistence: PersistenceService) {
+async function runSeasonMatchdays(saveId: string, delegatePersistence: PersistenceService) {
   const matchdayRows: Array<Record<string, unknown>> = [];
   const performanceRows: PhaseMetric[] = [];
   const blockers: string[] = [];
+  // Matchday-Save-Batching: die 4-Schritt-Kette (Lineups → Result → Standings →
+  // Advance) schrieb den vollen State ~5× pro Matchday. Der Capture-Wrapper
+  // haelt die Writes im Speicher und flusht genau EINMAL pro Matchday — die
+  // Kette liest zwischen den Schritten konsistent den In-Memory-Stand, das
+  // Endergebnis pro Matchday ist identisch, nur die Voll-Writes fallen von
+  // ~5 auf 1. Per-Matchday-Flush erhaelt die Resume-Granularitaet.
+  const capture = createCaptureBatchPersistence({ delegate: delegatePersistence, saveId });
+  const persistence = capture.persistence;
   const resultApplyService = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
   const initialSave = persistence.getSaveById(saveId);
   if (
@@ -2072,6 +2085,9 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
     initialSave?.gameState.season.matchdayIds.findIndex((entry) => entry === loopStartMatchdayId) ?? 0,
   );
   for (const matchdayId of initialSave?.gameState.season.matchdayIds.slice(startIndex) ?? []) {
+    // Vorherigen Matchday genau einmal auf Platte schreiben (Resume-Granularitaet
+    // bleibt pro Matchday erhalten); der finale Flush steht nach der Schleife.
+    capture.flush();
     const currentSave = persistence.getSaveById(saveId);
     if (!currentSave) throw new Error("Long-run save disappeared during matchday loop.");
     const seasonId = currentSave.gameState.season.id;
@@ -2211,6 +2227,9 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
       status: standings.ok && standings.applied ? "ok" : "blocked",
       note: standings.ok ? standings.warnings.join("|") : standings.blockingReasons.join("|"),
     });
+    console.error(
+      `[long-run] resolve ${seasonId} ${matchdayId} done elapsed=${Date.now() - matchdayStartedAt}ms`,
+    );
     matchdayRows.push({
       seasonId,
       matchdayId,
@@ -2264,6 +2283,11 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
       }
     }
   }
+  // Letzten Matchday (bzw. den abgebrochenen Teilstand) einmal persistieren.
+  capture.flush();
+  console.error(
+    `[long-run] match-sim-batch ${saveId}: disk-writes=${capture.diskWrites()} (statt ~5/Matchday)`,
+  );
   return { matchdayRows, performanceRows, blockers };
 }
 
@@ -2679,6 +2703,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   // across ALL seasons) is now handled by the netNegativeStrikes exhaustion mechanism in
   // ai-transfer-window-session-service.ts, so this pass runs unchanged in every season including S1.
   if (existingMarketTransfers.length === 0) {
+    const seasonEndConvergenceStartedAt = Date.now();
     const marketConvergence = await runTransferWindowSession({
       saveId,
       seasonId,
@@ -2694,6 +2719,9 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       skipIfExistingMarketTransfers: false,
       progressLog: true,
     });
+    console.error(
+      `[long-run] season-end-convergence ${seasonId} elapsed=${Date.now() - seasonEndConvergenceStartedAt}ms`,
+    );
     marketStatus = marketConvergence.blockingReasons.length > 0 ? "blocked" : "applied";
     marketAppliedBuys = marketConvergence.appliedBuys;
     marketAppliedSells = marketConvergence.appliedSells;
@@ -3438,7 +3466,11 @@ async function main() {
       console.error(`[long-run] STOP_AFTER=preseason — ${seasonId} Preseason abgeschlossen, Save \`${save.saveId}\`.`);
       break;
     }
+    const matchSimStartedAt = Date.now();
     const matchdayRun = await runSeasonMatchdays(save.saveId, persistence);
+    console.error(
+      `[long-run] match-sim ${seasonId} matchdays=${matchdayRun.matchdayRows.length} elapsed=${Date.now() - matchSimStartedAt}ms`,
+    );
     matchdayRows.push(...matchdayRun.matchdayRows);
     performanceRows.push(...matchdayRun.performanceRows);
     if (matchdayRun.blockers.length > 0) {

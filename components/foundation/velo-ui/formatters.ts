@@ -2,6 +2,10 @@ export function formatVeloNumber(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
+  // Never render a negative sign for a value whose magnitude rounds to zero (e.g. "-0").
+  if (Math.round(value * 10 ** digits) === 0) {
+    value = 0;
+  }
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,

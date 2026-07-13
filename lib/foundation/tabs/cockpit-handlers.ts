@@ -449,8 +449,8 @@ export function createCockpitSeasonTransitionHandlers(
           tone: "success",
           title: "Season-Wechsel gestartet",
           detail: `${payload.summary?.saveContext.fromSeasonId ?? seasonId} → ${
-            payload.summary?.saveContext.toSeasonId ?? "naechste Season"
-          }. Cockpit zeigt die naechsten Schritte.`,
+            payload.summary?.saveContext.toSeasonId ?? "nächste Season"
+          }. Cockpit zeigt die nächsten Schritte.`,
         });
         await loadSave(activeSaveId);
         setActiveView("cockpit");
@@ -513,7 +513,7 @@ export function createCockpitSeasonTransitionHandlers(
           title: "Saisonabschluss geschrieben",
           detail:
             completedObjectives != null && failedObjectives != null
-              ? `Board-Ziele ${completedObjectives} erfuellt · ${failedObjectives} verfehlt. Cash, Snapshot, Storylines und Manager-Signale sind aktualisiert.`
+              ? `Board-Ziele ${completedObjectives} erfüllt · ${failedObjectives} verfehlt. Cash, Snapshot, Storylines und Manager-Signale sind aktualisiert.`
               : "Cash, Snapshot, Storylines und Manager-Signale sind aktualisiert.",
         });
         await Promise.all([

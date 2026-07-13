@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { GameInboxItem, GameState, Team } from "@/lib/data/olyDataTypes";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import type { FoundationReadMeta, FoundationScreenPrimaryAction, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
+import { isTransferBuyPhaseOpen } from "@/lib/market/transfer-window-policy";
 
 type SeasonTransitionGateSnapshot = {
   canCompleteSeason: boolean;
@@ -50,6 +51,11 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     ]);
     return sellWindowPhases.has(phase) || (phase === "season_active" && input.localSeasonTransitionGate.canCompleteSeason);
   }, [input.gameState.gamePhase, input.localSeasonTransitionGate.canCompleteSeason]);
+
+  const marketTransferWindowOpen = useMemo(
+    () => isTransferBuyPhaseOpen(input.gameState),
+    [input.gameState],
+  );
 
   const selectedTeamRosterActionsAvailable =
     seasonEndRosterActionsActive && input.selectedTeamCanManage && !input.readMeta.readOnly;
@@ -105,25 +111,37 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
       const marketTeamLocked = input.marketSelectedTeam ? !input.canManageTeamId(input.marketSelectedTeam.teamId) : false;
       const selectedCandidate = input.marketPreviewPlayer;
       const disabledReason =
-        !input.marketTeamId
-          ? "Waehle erst ein Team, damit Budget, Kaderdruck und Verhandlung fuer dieses Team berechnet werden."
-          : marketTeamLocked
-            ? `${input.marketSelectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Deals gehen nur mit steuerbaren Teams.`
-            : !selectedCandidate
-              ? "Waehle links erst einen Kandidaten aus der Liste aus."
-              : input.marketBuyBusy
-                ? "Deal wird gerade vorbereitet."
-                : null;
+        !marketTransferWindowOpen
+          ? "Transferfenster geschlossen: Der Markt bleibt zur Ansicht offen, Käufe sind erst im nächsten Fenster möglich."
+          : !input.marketTeamId
+            ? "Wähle erst ein Team, damit Budget, Kaderdruck und Verhandlung für dieses Team berechnet werden."
+            : marketTeamLocked
+              ? `${input.marketSelectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Deals gehen nur mit steuerbaren Teams.`
+              : !selectedCandidate
+                ? "Wähle links erst einen Kandidaten aus der Liste aus."
+                : input.marketBuyBusy
+                  ? "Deal wird gerade vorbereitet."
+                  : null;
       return {
         kicker: "Hauptaktion",
-        title: selectedCandidate ? `${selectedCandidate.name} prüfen` : "Deal vorbereiten",
-        detail: selectedCandidate
-          ? "Vertragsangebot mit Forderung, Vertrag und Teamwirkung öffnen."
-          : "Links Kandidat wählen, dann Vertrag und Folgen sauber prüfen.",
+        title: !marketTransferWindowOpen
+          ? "Transferfenster geschlossen"
+          : selectedCandidate
+            ? `${selectedCandidate.name} prüfen`
+            : "Deal vorbereiten",
+        detail: !marketTransferWindowOpen
+          ? "Markt und Scouting kannst du sichten; Käufe und Verkäufe öffnen erst im nächsten Transferfenster."
+          : selectedCandidate
+            ? "Vertragsangebot mit Forderung, Vertrag und Teamwirkung öffnen."
+            : "Links Kandidat wählen, dann Vertrag und Folgen sauber prüfen.",
         status: disabledReason ? "blockiert" : "bereit",
-        buttonLabel: selectedCandidate ? "Vertragsangebot öffnen" : "Kandidat wählen",
+        buttonLabel: !marketTransferWindowOpen
+          ? "Nur Ansicht"
+          : selectedCandidate
+            ? "Vertragsangebot öffnen"
+            : "Kandidat wählen",
         onClick: () => {
-          if (selectedCandidate) {
+          if (marketTransferWindowOpen && selectedCandidate) {
             if (input.activeView !== "marketV2") {
               input.setFoundationView("marketV2", input.setActiveView);
             }
@@ -196,22 +214,13 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     }
 
     if (input.activeView === "inboxV2" || input.activeView === "inbox") {
-      return {
-        kicker: "Hauptaktion",
-        title: input.inboxPrimaryTeamItem ? input.inboxPrimaryTeamItem.title : "Zur Manager-Zentrale",
-        detail:
-          input.inboxPrimaryTeamItem?.description ??
-          "Wenn hier nichts Kritisches liegt, geht es zurück in HQ für Markt, Kaderdruck und die nächsten Saison-Schritte.",
-        status: input.inboxPrimaryTeamItem ? "offen" : "optional",
-        buttonLabel: input.inboxPrimaryTeamItem ? "Hinweis öffnen" : "Office öffnen",
-        onClick: () => {
-          if (input.inboxPrimaryTeamItem) {
-            input.navigateToInboxItem(input.inboxPrimaryTeamItem);
-            return;
-          }
-          input.navigateHomeTab("office");
-        },
-      };
+      // #5: Kein separates "Hauptaktion"-Band für die Inbox. Der frühere
+      // "Hinweis öffnen"/"Office öffnen"-Button schwebte in einem leeren Band
+      // ohne klares Ziel und dupliziert die Panel-Interaktion (Klick auf einen
+      // Listeneintrag öffnet ihn direkt, der "kritisch"-Chip springt zum ersten
+      // kritischen Eintrag). Wie Home (oben) liefert die Inbox daher keine
+      // Screen-Hauptaktion.
+      return null;
     }
 
     if (input.activeView === "teamSettings") {
@@ -250,14 +259,13 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
   }, [
     input.activeManagerArenaBlockerReason,
     input.activeView,
-    input.inboxPrimaryTeamItem,
     input.isSelectedTeamManagementLocked,
     input.marketBuyBusy,
     input.marketPreviewPlayer,
     input.marketSelectedTeam,
     input.marketTeamId,
+    marketTransferWindowOpen,
     input.navigateHomeTab,
-    input.navigateToInboxItem,
     input.openMarketOfferPanel,
     input.selectedTeam,
     input.selectedTeamCanManage,
@@ -272,7 +280,7 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
       return "Nur Ansicht: Dieser Spielstand ist gerade nicht schreibbar. Anschauen ja, steuern nein.";
     }
     if (input.isSelectedTeamManagementLocked && input.selectedTeam) {
-      return `Nur Ansicht: ${input.selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Anschauen ja, steuern nein.`;
+      return `Nur Ansicht: ${input.selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Anschauen ja, steuern nein.`;
     }
     return null;
   }, [input.isSelectedTeamManagementLocked, input.readMeta.readOnly, input.selectedTeam]);

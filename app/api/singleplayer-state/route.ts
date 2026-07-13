@@ -301,7 +301,7 @@ export async function PUT(request: Request) {
       {
         error: "room_save_generic_write_forbidden",
         roomCode: activeRoom.roomCode,
-        message: "Room-Saves duerfen nicht ueber den Singleplayer-Fallback geschrieben werden.",
+        message: "Room-Saves dürfen nicht über den Singleplayer-Fallback geschrieben werden.",
       },
       { status: 409 },
     );

@@ -33,14 +33,14 @@ function formatContractShapeLabel(value: ContractShape | null | undefined) {
 function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
     contract_length_override_in_effect: "Laufzeit weicht vom Standarddeal ab.",
-    insufficient_cash: "Cash reicht fuer Kauf oder Gesamtpaket noch nicht.",
+    insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
     low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
     local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
     market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschaetzt.",
-    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus haengen.",
-    negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
+    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
+    negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
+    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
     preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
@@ -126,8 +126,8 @@ export function useMarketBuyDerivations(input: UseMarketBuyDerivationsInput) {
       if (contractLengthOutsidePreference) {
         concerns.push(
           activeContractLength < contractPreference.preferredMinLength
-            ? `Laufzeit zu kurz fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`
-            : `Laufzeit zu lang fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`,
+            ? `Laufzeit zu kurz für den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`
+            : `Laufzeit zu lang für den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`,
         );
       } else {
         likes.push(`Laufzeit passt in sein Wunschfenster (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength})`);
@@ -148,7 +148,7 @@ export function useMarketBuyDerivations(input: UseMarketBuyDerivationsInput) {
         likes.push(
           salaryDelta === 0
             ? "Gehalt trifft genau seine aktuelle Forderung"
-            : `Gehalt liegt ${formatTransfermarktCurrency(salaryDelta)} ueber seiner Forderung`,
+            : `Gehalt liegt ${formatTransfermarktCurrency(salaryDelta)} über seiner Forderung`,
         );
       } else {
         concerns.push(`Gehalt liegt ${formatTransfermarktCurrency(Math.abs(salaryDelta))} unter seiner Forderung`);

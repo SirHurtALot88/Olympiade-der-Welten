@@ -4,6 +4,7 @@ import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 import {
   activeTeamHasFormCardPool,
+  activeTeamTransfersFinalized,
   getFormCardFlowStatus,
 } from "@/lib/foundation/form-card-flow";
 import {
@@ -482,6 +483,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const formCardFlow = getFormCardFlowStatus(gameState, activeTeamId);
   const hasFormCardSelections = formCardFlow.hasSelections;
   const hasFormCardPool = activeTeamHasFormCardPool(gameState, activeTeamId);
+  // "Transfers finalisieren": explicit confirm gate that fires the fixed
+  // form-card pool distribution before the active team may field a lineup.
+  // Reuses hasFormCardPool as the completion signal (see form-card-flow.ts).
+  const transfersFinalized = activeTeamTransfersFinalized(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
   const formCardsRequired = hasLineup && !hasResults;
   const arenaPreparationReady = hasLineup;
@@ -579,6 +584,27 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       warnings: boardFlowWarnings,
     }),
     step({
+      stepId: "finalize_transfers",
+      label: GAME_LANGUAGE.flow.finalizeTransfersLabel,
+      cta: GAME_LANGUAGE.flow.finalizeTransfersCta,
+      status: !hasActiveTeam
+        ? "blocked"
+        : activeRosterCount === 0
+          ? "blocked"
+          : transfersFinalized
+            ? "completed"
+            : "ready",
+      targetView: "home",
+      targetPanel: "finalize-transfers",
+      teamId: activeTeamId,
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : activeRosterCount === 0
+          ? ["empty_roster"]
+          : [],
+      warnings: hasActiveTeam && activeRosterCount > 0 && !transfersFinalized ? ["transfers_finalize_pending"] : [],
+    }),
+    step({
       stepId: "set_lineup",
       label: GAME_LANGUAGE.flow.setLineupLabel,
       cta: GAME_LANGUAGE.flow.setLineupCta,
@@ -588,16 +614,20 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
           ? "blocked"
           : hasLineup
             ? "completed"
-            : trainingComplete
-              ? "ready"
-              : "warning",
+            : !transfersFinalized
+              ? "blocked"
+              : trainingComplete
+                ? "ready"
+                : "warning",
       targetView: "lineup",
       teamId: activeTeamId,
       blockers: !hasActiveTeam
         ? ["no_active_team"]
         : activeRosterCount === 0
           ? ["empty_roster"]
-          : [],
+          : !hasLineup && !transfersFinalized
+            ? ["transfers_not_finalized"]
+            : [],
       warnings: uniq([
         ...(!trainingComplete && !hasLineup ? ["training_missing"] : []),
         ...boardFlowWarnings,

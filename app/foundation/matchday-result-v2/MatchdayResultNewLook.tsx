@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
+  NlProgressBar,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
 } from "@/components/foundation/new-look";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type {
@@ -73,48 +76,6 @@ function getNlResultSortValue(row: MatchdaySummaryTeamRow, key: NlResultSortKey)
   }
 }
 
-/** Zähler-Animation, die `prefers-reduced-motion` respektiert. */
-function useCountUp(target: number | null, durationMs = 900): number | null {
-  const [display, setDisplay] = useState<number | null>(target);
-  const frameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (target == null || !Number.isFinite(target)) {
-      setDisplay(target ?? null);
-      return;
-    }
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      setDisplay(target);
-      return;
-    }
-
-    const start = performance.now();
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / durationMs);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(target * eased);
-      if (progress < 1) {
-        frameRef.current = requestAnimationFrame(tick);
-      } else {
-        setDisplay(target);
-      }
-    };
-    setDisplay(0);
-    frameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (frameRef.current != null) {
-        cancelAnimationFrame(frameRef.current);
-      }
-    };
-  }, [target, durationMs]);
-
-  return display;
-}
-
 function getBarPercent(value: number | null, max: number): number {
   if (value == null || !Number.isFinite(value) || value <= 0 || max <= 0) {
     return 0;
@@ -169,11 +130,14 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
     setSelectedMatchdaySummaryId,
     setActiveView,
     openTeamProfileById,
+    triggerGlobalNext,
   } = props;
 
   const [mode, setMode] = useState<NlResultMode>("board");
   const [sortKey, setSortKey] = useState<NlResultSortKey | null>(null);
   const [sortDir, setSortDir] = useState<NlResultSortDir>("asc");
+  // Tagessieger-Reveal (D3): kurzer, überspringbarer Moment über dem Detail.
+  const [tagessiegerDismissed, setTagessiegerDismissed] = useState(false);
 
   const boardRows = useMemo(
     () =>
@@ -245,19 +209,24 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
   );
   const mvpPlayer = topPlayers[0] ?? null;
 
-  function renderPodiumStep(row: MatchdaySummaryTeamRow) {
+  function renderPodiumStep(row: MatchdaySummaryTeamRow, revealIndex: number) {
     const rank = row.matchdayRank ?? 0;
     const medalKind = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
     const isActive = row.teamId === activeManagerTeamId;
     const logoSrc = getTeamLogoBrowserUrl(row.teamId, null, { variant: "thumb" });
+    // Podium-Reveal-Reihenfolge: gestaffelt nach Tagesrang (1 zuerst), nicht
+    // nach der visuellen Silber-Gold-Bronze-Anordnung.
     return (
       <div
         key={row.teamId}
         role="listitem"
-        className={`nl-result-podium-step is-rank-${rank}${isActive ? " is-active-team" : ""}`}
-        style={getSeasonV2TeamTagStyle(row.teamShortCode)}
+        className={`nl-result-podium-step nl-reveal is-rank-${rank}${isActive ? " is-active-team" : ""}`}
+        style={{ ...getSeasonV2TeamTagStyle(row.teamShortCode), "--nl-reveal-i": revealIndex } as CSSProperties}
       >
         <NlMedalBadge kind={medalKind} title={`Tagesrang ${rank}`} className="nl-result-podium-medal" />
+        {/* Explizites Rang-Label: die 2·1·3-Anordnung darf nicht als "wir haben
+            gewonnen" fehlgelesen werden — die Platzierung bleibt eindeutig (#6). */}
+        <span className="nl-result-podium-rank-label">Tagesrang {rank}</span>
         <BudgetedMediaImage
           src={logoSrc}
           alt={`${row.teamName} Logo`}
@@ -276,7 +245,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           {row.teamName}
         </button>
         <strong className="nl-result-podium-points nl-tnum">
-          {row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}
+          <NlCountUpValue value={row.matchdayPoints} format={(value) => formatNlNumber(value, 1)} />
           <small>Punkte</small>
         </strong>
         <span className="nl-result-podium-scores nl-tnum" title={`${matchdaySummary.d1.disciplineName ?? "D1"} · ${matchdaySummary.d2.disciplineName ?? "D2"}`}>
@@ -312,7 +281,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           </button>
         </span>
         <span
-          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "pow" : "men")}`}
+          className={`nl-result-mvp-discipline ${nlToneClass(player.disciplineSide === "d1" ? "accent" : "neutral")}`}
           title={player.disciplineName}
         >
           {player.disciplineSide === "d1" ? "D1" : "D2"}
@@ -368,12 +337,24 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
           {row.matchdayPoints != null ? formatNlNumber(row.matchdayPoints, 1) : "—"}
         </span>
         <span className="nl-result-scores" aria-hidden="true">
-          <span className={`nl-result-scorebar ${nlToneClass("pow")}`} title={`${matchdaySummary.d1.disciplineName ?? "D1"}: ${formatNlNumber(row.d1Score, 1)}`}>
-            <span className="nl-result-scorebar-fill" style={{ width: `${getBarPercent(row.d1Score, maxD1)}%` }} />
+          <span className="nl-result-scorebar" title={`${matchdaySummary.d1.disciplineName ?? "D1"}: ${formatNlNumber(row.d1Score, 1)}`}>
+            <NlProgressBar
+              className="nl-result-scorebar-progress"
+              value={getBarPercent(row.d1Score, maxD1)}
+              max={100}
+              tone="accent"
+              showValue={false}
+            />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d1Score, 1)}</span>
           </span>
-          <span className={`nl-result-scorebar ${nlToneClass("men")}`} title={`${matchdaySummary.d2.disciplineName ?? "D2"}: ${formatNlNumber(row.d2Score, 1)}`}>
-            <span className="nl-result-scorebar-fill" style={{ width: `${getBarPercent(row.d2Score, maxD2)}%` }} />
+          <span className="nl-result-scorebar" title={`${matchdaySummary.d2.disciplineName ?? "D2"}: ${formatNlNumber(row.d2Score, 1)}`}>
+            <NlProgressBar
+              className="nl-result-scorebar-progress"
+              value={getBarPercent(row.d2Score, maxD2)}
+              max={100}
+              tone="neutral"
+              showValue={false}
+            />
             <span className="nl-result-scorebar-value nl-tnum">{formatNlNumber(row.d2Score, 1)}</span>
           </span>
         </span>
@@ -522,13 +503,13 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
             <StatChip
               label="D1"
               value={matchdaySummary.d1.disciplineName ?? "—"}
-              tone="pow"
+              tone="accent"
               sub={heroRow?.d1Score != null ? `${formatNlNumber(heroRow.d1Score, 1)} Score` : undefined}
             />
             <StatChip
               label="D2"
               value={matchdaySummary.d2.disciplineName ?? "—"}
-              tone="men"
+              tone="neutral"
               sub={heroRow?.d2Score != null ? `${formatNlNumber(heroRow.d2Score, 1)} Score` : undefined}
             />
             {championRow ? (
@@ -545,6 +526,77 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         </div>
       </NlCard>
 
+      {championRow && !tagessiegerDismissed ? (
+        <section
+          className="nl-result-reveal"
+          data-testid="nl-result-tagessieger-reveal"
+          aria-label="Tagessieger-Reveal"
+        >
+          <div className="nl-result-reveal-inner">
+            <span
+              className="nl-result-reveal-eyebrow nl-reveal"
+              style={{ "--nl-reveal-i": 0 } as CSSProperties}
+            >
+              Spieltag {matchdaySummary.matchdayNumber ?? "—"} · Tagessieger
+            </span>
+            <div
+              className="nl-result-reveal-champion nl-reveal"
+              style={{ "--nl-reveal-i": 1 } as CSSProperties}
+            >
+              <NlMedalBadge kind="gold" title="Tagessieger" className="nl-result-reveal-medal" />
+              <BudgetedMediaImage
+                src={getTeamLogoBrowserUrl(championRow.teamId, null, { variant: "thumb" })}
+                alt={`${championRow.teamName} Logo`}
+                className="nl-result-reveal-crest"
+                width={64}
+                height={64}
+                fallback={
+                  <span className="nl-result-reveal-crest nl-result-reveal-crest-fallback">
+                    {championRow.teamShortCode}
+                  </span>
+                }
+              />
+              <div className="nl-result-reveal-copy">
+                <button
+                  type="button"
+                  className="nl-result-reveal-team"
+                  onClick={() => openTeamProfileById(championRow.teamId)}
+                  title={`${championRow.teamName} öffnen`}
+                >
+                  {championRow.teamName}
+                </button>
+                <span className="nl-result-reveal-points nl-tnum">
+                  <strong>
+                    <NlCountUpValue
+                      value={championRow.matchdayPoints}
+                      format={(value) => formatNlNumber(value, 1)}
+                    />
+                  </strong>
+                  <small>Tagespunkte</small>
+                </span>
+              </div>
+            </div>
+            {heroRow ? (
+              <p
+                className="nl-result-reveal-you nl-reveal nl-tnum"
+                style={{ "--nl-reveal-i": 2 } as CSSProperties}
+              >
+                Du: <strong>{heroRow.matchdayRank != null ? `#${heroRow.matchdayRank}` : "—"}</strong>{" "}
+                von {boardRows.length}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nl-result-reveal-skip"
+            onClick={() => setTagessiegerDismissed(true)}
+            aria-label="Tagessieger-Reveal überspringen"
+          >
+            Überspringen
+          </button>
+        </section>
+      ) : null}
+
       {podiumRows.length > 0 ? (
         <NlCard
           className="nl-result-podium-card"
@@ -558,7 +610,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
               podiumRows.find((row) => row.matchdayRank === 3),
             ]
               .filter((row): row is MatchdaySummaryTeamRow => row != null)
-              .map((row) => renderPodiumStep(row))}
+              .map((row) => renderPodiumStep(row, (row.matchdayRank ?? 4) - 1))}
           </div>
         </NlCard>
       ) : null}
@@ -609,7 +661,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
                     </button>
                   </div>
                   <span
-                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "pow" : "men")}`}
+                    className={`nl-result-mvp-discipline ${nlToneClass(mvpPlayer.disciplineSide === "d1" ? "accent" : "neutral")}`}
                     title={mvpPlayer.disciplineName}
                   >
                     {mvpPlayer.disciplineName}
@@ -617,11 +669,11 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
                 </div>
                 <div className="nl-result-mvp-hero-stats nl-tnum">
                   <span className="nl-result-mvp-hero-stat">
-                    <strong>{formatNlNumber(mvpPlayer.finalPlayerScore, 1)}</strong>
+                    <strong><NlCountUpValue value={mvpPlayer.finalPlayerScore} format={(value) => formatNlNumber(value, 1)} /></strong>
                     <small>Score</small>
                   </span>
                   <span className="nl-result-mvp-hero-stat">
-                    <strong>{mvpPlayer.points != null ? formatNlNumber(mvpPlayer.points, 1) : "—"}</strong>
+                    <strong><NlCountUpValue value={mvpPlayer.points} format={(value) => formatNlNumber(value, 1)} /></strong>
                     <small>PPs</small>
                   </span>
                   {mvpPlayer.totalBonus != null && mvpPlayer.totalBonus !== 0 ? (
@@ -646,7 +698,7 @@ export default function MatchdayResultNewLook(props: FoundationMatchdayResultShe
         className="nl-result-highlight-card"
         title="Highlights"
         actions={
-          <button className="nl-result-button is-primary" type="button" onClick={() => setFoundationView("cockpit", setActiveView)}>
+          <button className="nl-result-button is-primary" type="button" onClick={() => void triggerGlobalNext()}>
             Weiter zum nächsten Schritt
           </button>
         }

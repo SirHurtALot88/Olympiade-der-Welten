@@ -93,10 +93,10 @@ function formatContractPreferenceCurrentStatus(
     return "Aktuell: Laufzeit und Form passen gut";
   }
   if (lengthMatches) {
-    return `Aktuell: Laufzeit passt, Form stoert (${formatContractShapeLabel(contractShape)})`;
+    return `Aktuell: Laufzeit passt, Form stört (${formatContractShapeLabel(contractShape)})`;
   }
   if (shapeMatches) {
-    return `Aktuell: Form passt, Laufzeit stoert (${safeLength ?? "?"} Saisons)`;
+    return `Aktuell: Form passt, Laufzeit stört (${safeLength ?? "?"} Saisons)`;
   }
   return `Aktuell: Laufzeit (${safeLength ?? "?"}) und Form (${formatContractShapeLabel(contractShape)}) weichen ab`;
 }
@@ -284,7 +284,7 @@ export default function FoundationMarketBuyShellHost({
                   </div>
                 </div>
                 <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
+                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "prüfen"}
                 </span>
               </div>
 
@@ -331,7 +331,7 @@ export default function FoundationMarketBuyShellHost({
                   <strong>Spieler ist noch angefressen</strong>
                   <span>
                     {priorBadExperienceDemandEntry
-                      ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spuerbar schlechter.`
+                      ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spürbar schlechter.`
                       : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
                   </span>
                 </div>
@@ -521,7 +521,7 @@ export default function FoundationMarketBuyShellHost({
                         </div>
                       </div>
                     ) : (
-                      <p className="muted">Noch kein Jahresplan verfuegbar.</p>
+                      <p className="muted">Noch kein Jahresplan verfügbar.</p>
                     )}
                     <p className="muted" style={{ marginTop: 8 }}>
                       Forderungsweg: Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · aktuelle Forderung{" "}
@@ -537,7 +537,7 @@ export default function FoundationMarketBuyShellHost({
                     </div>
                     <div className="metric-grid compact">
                       <article className="metric-card">
-                        <span>Kaufpreis / Abloese</span>
+                        <span>Kaufpreis / Ablöse</span>
                         <strong>{formatTransfermarktCurrency(buyPreview.purchasePrice)}</strong>
                       </article>
                       <article className="metric-card">
@@ -609,7 +609,7 @@ export default function FoundationMarketBuyShellHost({
                           ))}
                         </ul>
                       ) : (
-                        <p className="muted">Noch keine Score-Faktoren verfuegbar.</p>
+                        <p className="muted">Noch keine Score-Faktoren verfügbar.</p>
                       )}
                       {buyPreview.negotiationReasons?.length ? (
                         <>
@@ -636,7 +636,7 @@ export default function FoundationMarketBuyShellHost({
                 </>
               ) : (
                 <p className="muted transfer-empty-hint">
-                  Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.
+                  Kaufvorschau wird geladen oder ist für diesen Kontext noch nicht verfügbar.
                 </p>
               )}
             </div>

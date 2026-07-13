@@ -354,7 +354,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (gameState.teams.length === 32) {
       return {
         status: "ready" as const,
-        message: "Lokaler Testspielstand ist aktiv und vollstaendig geladen.",
+        message: "Lokaler Testspielstand ist aktiv und vollständig geladen.",
       };
     }
     return {
@@ -423,14 +423,14 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (!marketTeamId) {
       return {
         status: "open" as const,
-        message: "Team waehlen, damit Kaufvorschau, Cash und Roster-Druck bewertet werden koennen.",
+        message: "Team wählen, damit Kaufvorschau, Cash und Roster-Druck bewertet werden können.",
       };
     }
 
     if (!marketFeed.teamContext) {
       return {
         status: "warning" as const,
-        message: "Teamkontext fehlt noch. Feed neu laden oder Team erneut waehlen.",
+        message: "Teamkontext fehlt noch. Feed neu laden oder Team erneut wählen.",
       };
     }
 
@@ -451,7 +451,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (!resolvePreviewFeed) {
       return {
         status: "open" as const,
-        message: "Status noch nicht geladen. Preview oeffnen, um Readiness und fehlende Teams zu sehen.",
+        message: "Status noch nicht geladen. Preview öffnen, um Readiness und fehlende Teams zu sehen.",
       };
     }
     if (lineupStatusSummary.missingTeams > 0) {
@@ -463,18 +463,18 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (lineupStatusSummary.incompleteTeams > 0) {
       return {
         status: "warning" as const,
-        message: `${lineupStatusSummary.incompleteTeams} Teams sind noch unvollstaendig oder ohne Score-Coverage.`,
+        message: `${lineupStatusSummary.incompleteTeams} Teams sind noch unvollständig oder ohne Score-Coverage.`,
       };
     }
     if (lineupStatusSummary.readyTeams === lineupStatusSummary.totalTeams && lineupStatusSummary.totalTeams > 0) {
       return {
         status: "ready" as const,
-        message: "Alle Teams sind fuer diesen Spieltag lineup-seitig ready.",
+        message: "Alle Teams sind für diesen Spieltag lineup-seitig ready.",
       };
     }
     return {
       status: "open" as const,
-      message: "Readiness ist vorhanden, aber noch nicht vollstaendig eingeordnet.",
+      message: "Readiness ist vorhanden, aber noch nicht vollständig eingeordnet.",
     };
   }, [lineupStatusSummary, resolvePreviewFeed]);
 
@@ -482,7 +482,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (readMeta.source === "prisma") {
       return {
         status: "blocked" as const,
-        message: "Prisma bleibt hier read-only. AI-Teams koennen im Cockpit nur im lokalen Save gespeichert werden.",
+        message: "Prisma bleibt hier read-only. AI-Teams können im Cockpit nur im lokalen Save gespeichert werden.",
       };
     }
     if (cockpitAiBatchApplyFeed?.error) {
@@ -507,7 +507,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       if (cockpitAiBatchApplyFeed.summary.plannedLineups > 0) {
         return {
           status: "ready" as const,
-          message: `${cockpitAiBatchApplyFeed.summary.plannedLineups} AI-Lineups koennen lokal gespeichert werden.`,
+          message: `${cockpitAiBatchApplyFeed.summary.plannedLineups} AI-Lineups können lokal gespeichert werden.`,
         };
       }
       return {
@@ -520,13 +520,13 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
         status: "warning" as const,
         message:
           aiTeams.length > 0
-            ? "AI-Teams sind vorhanden, aber AI-Lineup-Apply ist noch nicht freigegeben. Ueber den Aktivieren-Button oder in den Team Settings kann das lokal freigegeben werden."
+            ? "AI-Teams sind vorhanden, aber AI-Lineup-Apply ist noch nicht freigegeben. Über den Aktivieren-Button oder in den Team Settings kann das lokal freigegeben werden."
             : "Aktuell ist kein Team mit controlMode=ai und aktivem AI-Lineup-Apply freigegeben.",
       };
     }
     return {
       status: "open" as const,
-      message: "DryRun zeigt zuerst, welche AI-Teams lokal aufgestellt werden koennen.",
+      message: "DryRun zeigt zuerst, welche AI-Teams lokal aufgestellt werden können.",
     };
   }, [aiLineupApplyTeams.length, aiTeams.length, cockpitAiBatchApplyFeed, readMeta.source]);
 
@@ -539,7 +539,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return { status: "ready" as const, message: "Resolve Preview ist bereit und zeigt D1/D2 Rankings read-only." };
     }
     if (status === "blocked") {
-      return { status: "blocked" as const, message: "Resolve Preview ist blockiert und benoetigt erst geklaerte Quellen oder Lineups." };
+      return { status: "blocked" as const, message: "Resolve Preview ist blockiert und benötigt erst geklaerte Quellen oder Lineups." };
     }
     return { status: "warning" as const, message: `Resolve Preview meldet ${status}.` };
   }, [resolvePreviewFeed]);
@@ -554,9 +554,9 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return { status: "blocked" as const, message: blockingReasons[0] ?? "Result Apply ist aktuell blockiert." };
     }
     if (resolvePreviewFeed?.preview.status === "ready") {
-      return { status: "ready" as const, message: "Result Apply kann nach Dry-Run lokal bestaetigt werden." };
+      return { status: "ready" as const, message: "Result Apply kann nach Dry-Run lokal bestätigt werden." };
     }
-    return { status: "open" as const, message: "Erst Resolve Preview laden, dann Dry-Run oder Apply ausfuehren." };
+    return { status: "open" as const, message: "Erst Resolve Preview laden, dann Dry-Run oder Apply ausführen." };
   }, [resolvePreviewFeed, resultApplyFeed]);
 
   const cockpitStandingsPreviewStatus = useMemo(() => {
@@ -567,9 +567,9 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return { status: "warning" as const, message: standingsPreviewFeed.blockedRules[0] ?? "Standings Preview hat offene Blocker." };
     }
     if ((standingsPreviewFeed.summary.readyTeams ?? 0) === (standingsPreviewFeed.summary.totalTeams ?? 0) && (standingsPreviewFeed.summary.totalTeams ?? 0) > 0) {
-      return { status: "ready" as const, message: "Punkte-Delta und projected Rank sind fuer alle Teams berechnet." };
+      return { status: "ready" as const, message: "Punkte-Delta und projected Rank sind für alle Teams berechnet." };
     }
-    return { status: "warning" as const, message: "Standings Preview ist noch nicht fuer alle Teams ready." };
+    return { status: "warning" as const, message: "Standings Preview ist noch nicht für alle Teams ready." };
   }, [standingsPreviewFeed]);
 
   const cockpitStandingsApplyStatus = useMemo(() => {
@@ -582,7 +582,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return { status: "blocked" as const, message: blockingReasons[0] ?? "Standings Apply ist blockiert." };
     }
     if ((standingsPreviewFeed?.blockedRules?.length ?? 0) === 0 && (standingsPreviewFeed?.summary.readyTeams ?? 0) > 0) {
-      return { status: "ready" as const, message: "Standings Apply kann nach Dry-Run lokal bestaetigt werden." };
+      return { status: "ready" as const, message: "Standings Apply kann nach Dry-Run lokal bestätigt werden." };
     }
     return { status: "open" as const, message: "Erst Standings Preview in einen apply-faehigen Zustand bringen." };
   }, [standingsApplyFeed, standingsPreviewFeed]);
@@ -595,7 +595,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return { status: "blocked" as const, message: prizePreviewHardBlocked[0] ?? "Preisgeldtabelle ist nicht verwendbar." };
     }
     if ((prizePreviewFeed.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed.summary.blockedItemsCount ?? 0) === 0) {
-      return { status: "ready" as const, message: "Cash vorher, Preisgeld und Cash nachher sind fuer alle Teams berechenbar." };
+      return { status: "ready" as const, message: "Cash vorher, Preisgeld und Cash nachher sind für alle Teams berechenbar." };
     }
     return { status: "warning" as const, message: "Preisgeld-Vorschau ist nur teilweise berechenbar." };
   }, [prizePreviewFeed, prizePreviewHardBlocked]);
@@ -604,15 +604,15 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     const summary = cashApplyFeed?.summary;
     const blockingReasons = cashApplyFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
     if (cashApplyFeed?.applied || currentSeasonCashPrizeApplyLogs.length > 0) {
-      return { status: "applied" as const, message: currentSeasonCashPrizeApplyLogs.length > 0 ? "Preisgeld wurde fuer diese Season bereits angewendet." : "Cash Apply wurde lokal gespeichert." };
+      return { status: "applied" as const, message: currentSeasonCashPrizeApplyLogs.length > 0 ? "Preisgeld wurde für diese Season bereits angewendet." : "Cash Apply wurde lokal gespeichert." };
     }
     if (cashApplyFeed && (cashApplyFeed.canApply ?? summary?.canApply) === false) {
       return { status: "blocked" as const, message: blockingReasons[0] ?? "Cash Apply ist blockiert." };
     }
     if ((prizePreviewFeed?.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed?.summary.blockedItemsCount ?? 0) === 0) {
-      return { status: "ready" as const, message: "Cash Apply kann nach Dry-Run lokal bestaetigt werden." };
+      return { status: "ready" as const, message: "Cash Apply kann nach Dry-Run lokal bestätigt werden." };
     }
-    return { status: "open" as const, message: "Erst Preisgeld-Vorschau vollstaendig berechnen." };
+    return { status: "open" as const, message: "Erst Preisgeld-Vorschau vollständig berechnen." };
   }, [cashApplyFeed, currentSeasonCashPrizeApplyLogs.length, prizePreviewFeed]);
 
   const cockpitSeasonSnapshotStatus = useMemo(() => {
@@ -622,7 +622,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (readMeta.source === "prisma") {
       return {
         status: "blocked" as const,
-        message: "Prisma bleibt read-only. Season-Snapshots koennen nur im lokalen SQLite-Save gespeichert werden.",
+        message: "Prisma bleibt read-only. Season-Snapshots können nur im lokalen SQLite-Save gespeichert werden.",
       };
     }
     if (seasonSnapshotFeed?.applied) {
@@ -646,7 +646,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (currentSeasonSnapshot) {
       return {
         status: "applied" as const,
-        message: "Fuer diese Season existiert bereits ein lokaler Snapshot.",
+        message: "Für diese Season existiert bereits ein lokaler Snapshot.",
       };
     }
     return {
@@ -659,15 +659,15 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     const summary = matchdayAdvanceFeed?.summary;
     const blockingReasons = matchdayAdvanceFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
     if (matchdayAdvanceFeed?.applied) {
-      return { status: "applied" as const, message: "Der lokale Save wurde auf den naechsten Matchday fortgeschrieben." };
+      return { status: "applied" as const, message: "Der lokale Save wurde auf den nächsten Matchday fortgeschrieben." };
     }
     if (matchdayAdvanceFeed && (matchdayAdvanceFeed.canApply ?? summary?.canApply) === false) {
       return { status: "blocked" as const, message: blockingReasons[0] ?? "Matchday-Fortschritt ist blockiert." };
     }
     if (cashApplyFeed?.applied) {
-      return { status: "ready" as const, message: "Der Spieltag kann jetzt lokal abgeschlossen und auf den naechsten Matchday gesetzt werden." };
+      return { status: "ready" as const, message: "Der Spieltag kann jetzt lokal abgeschlossen und auf den nächsten Matchday gesetzt werden." };
     }
-    return { status: "open" as const, message: "Erst Result, Standings und Cash fuer den aktuellen Matchday lokal abschliessen." };
+    return { status: "open" as const, message: "Erst Result, Standings und Cash für den aktuellen Matchday lokal abschliessen." };
   }, [cashApplyFeed, matchdayAdvanceFeed]);
 
   const cockpitAutoRunStatus = useMemo(() => {
@@ -679,7 +679,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       const advanceText = matchdayAutoRunFeed.summary.advanceAllowed ? " Der Spieltag wurde fortgeschrieben." : "";
       return {
         status: "applied" as const,
-        message: `Der aktuelle Matchday wurde lokal ausgefuehrt. AI-Lineups und ${formCards} Formkarten wurden vorbereitet.${advanceText}`,
+        message: `Der aktuelle Matchday wurde lokal ausgeführt. AI-Lineups und ${formCards} Formkarten wurden vorbereitet.${advanceText}`,
       };
     }
     if (matchdayAutoRunFeed.status === "blocked") {
@@ -691,7 +691,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       };
     }
     if (matchdayAutoRunFeed.status === "warning") {
-      return { status: "warning" as const, message: "Der Auto-Run meldet Warnungen. Bitte Step-Details pruefen." };
+      return { status: "warning" as const, message: "Der Auto-Run meldet Warnungen. Bitte Step-Details prüfen." };
     }
     if (matchdayAutoRunFeed.summary.resolveReady) {
       const formCards = matchdayAutoRunFeed.summary.formCardsSelected ?? 0;
@@ -705,13 +705,13 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
 
   const cockpitWholeSeasonDryRunStatus = useMemo(() => {
     if (!wholeSeasonDryRunFeed) {
-      return { status: "open" as const, message: "Die Saison-Simulation nutzt eine isolierte lokale Kopie und zeigt zuerst moegliche Blocker ueber alle Spieltage." };
+      return { status: "open" as const, message: "Die Saison-Simulation nutzt eine isolierte lokale Kopie und zeigt zuerst mögliche Blocker über alle Spieltage." };
     }
     if (wholeSeasonDryRunFeed.status === "blocked") {
       if (wholeSeasonDryRunFeed.blockingReasons.includes("ai_lineup_apply_disabled")) {
         return {
           status: "blocked" as const,
-          message: `${wholeSeasonDryRunFeed.skippedDisabledAiTeams} AI-Teams sind noch nicht fuer AI-Lineup-Apply freigegeben. Aktiviere zuerst Step 5 oder die Team Settings.`,
+          message: `${wholeSeasonDryRunFeed.skippedDisabledAiTeams} AI-Teams sind noch nicht für AI-Lineup-Apply freigegeben. Aktiviere zuerst Step 5 oder die Team Settings.`,
         };
       }
       return {
@@ -765,7 +765,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     }
     return {
       status: "ready" as const,
-      message: "DryRun ist bereit. D1 und D2 koennen jetzt lokal in den aktiven Save geschrieben werden.",
+      message: "DryRun ist bereit. D1 und D2 können jetzt lokal in den aktiven Save geschrieben werden.",
     };
   }, [matchdayMvpScoringFeed]);
 
@@ -796,19 +796,19 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
       return "Matchday abgeschlossen";
     }
     if (cockpitMatchdayAdvanceStatus.status === "ready") {
-      return "bereit fuer Matchday-Abschluss";
+      return "bereit für Matchday-Abschluss";
     }
     if (cockpitCashApplyStatus.status === "ready") {
-      return "bereit fuer Cash Apply";
+      return "bereit für Cash Apply";
     }
     if (cockpitStandingsApplyStatus.status === "ready") {
-      return "bereit fuer Standings Apply";
+      return "bereit für Standings Apply";
     }
     if (cockpitResultApplyStatus.status === "ready") {
-      return "bereit fuer Result Apply";
+      return "bereit für Result Apply";
     }
     if (cockpitAiLineupStatus.status === "ready") {
-      return "bereit fuer AI-Lineup-Save";
+      return "bereit für AI-Lineup-Save";
     }
     if (
       cockpitAiLineupStatus.status === "warning" ||

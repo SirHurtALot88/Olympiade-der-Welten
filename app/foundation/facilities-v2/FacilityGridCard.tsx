@@ -32,7 +32,7 @@ export default function FacilityGridCard({ facility, selected, onSelect }: Facil
       </div>
       <FacilityLevelStrip facilityId={facility.id} level={facility.level} />
       <div className="facilities-v2-card-stats">
-        <span title="Effizienz">{formatLocaleNumber(facility.efficiencyPct, 0)}%</span>
+        <span title="Effizienz">{facility.level > 0 ? `${formatLocaleNumber(facility.efficiencyPct, 0)}%` : "—"}</span>
         <span title="Unterhalt">{formatTransfermarktCurrency(facility.currentUpkeep)}</span>
         <span title="Netto">{formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}</span>
       </div>

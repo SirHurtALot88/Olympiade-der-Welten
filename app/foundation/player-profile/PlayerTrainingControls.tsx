@@ -37,7 +37,7 @@ type PlayerTrainingControlsProps = {
 function getDemandStatusLabel(status: PlayerDemandStatus) {
   switch (status) {
     case "fulfilled":
-      return "erfuellt";
+      return "erfüllt";
     case "at_risk":
       return "unter Druck";
     case "failed":
@@ -54,14 +54,14 @@ function buildStatForecastTooltip(row: TrainingPlayerRowView) {
   return [
     "Netto = Summe aller Attribut-Deltas nach Regression, Training und Performance.",
     `Angewendet: Training ${formatVeloSignedNumber(appliedTraining, 1)} · Performance ${formatVeloSignedNumber(appliedPerformance, 1)} · Regression ${formatVeloSignedNumber(appliedRegression, 1)}`,
-    `Trainingsbudget +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitaets- und Potential-Multiplikatoren. Schritt-fuer-Schritt unten unter "Wie kommt das zustande?".`,
+    `Trainingsbudget +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitäts- und Potential-Multiplikatoren. Schritt-für-Schritt unten unter "Wie kommt das zustande?".`,
   ].join("\n");
 }
 
 function buildMatchdayRealityNote(row: TrainingPlayerRowView) {
   const pps = row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—";
   const mvs = row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—";
-  return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Matchday Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt.`;
+  return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Matchday Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt.`;
 }
 
 function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
@@ -172,14 +172,14 @@ export default function PlayerTrainingControls({
 
       {row.trainingIntensityLockWarning && !trainingIntensityLocked && !readOnly ? (
         <p className="muted training-v2-intensity-lock-note" role="status">
-          Vorsaisonfenster laeuft noch: Trainingsmodus bleibt bis zum ersten Result offen und sperrt danach fuer den Rest der Saison.
+          Vorsaisonfenster läuft noch: Trainingsmodus bleibt bis zum ersten Result offen und sperrt danach für den Rest der Saison.
           Trainingsklasse bleibt weiter anpassbar.
         </p>
       ) : null}
 
       {trainingIntensityLocked && !readOnly ? (
         <p className="muted training-v2-intensity-lock-note" role="status">
-          Trainingsmodus fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich. Trainingsklasse bleibt weiter anpassbar.
+          Trainingsmodus für diese Season festgelegt — Änderung erst zum nächsten Saisonstart möglich. Trainingsklasse bleibt weiter anpassbar.
         </p>
       ) : null}
 

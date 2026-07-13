@@ -90,6 +90,9 @@ export function hydrateSeasonDerivations(record: PersistedSeasonDerivationsRecor
     performanceByPlayerId: new Map(
       Object.entries(record.performanceByPlayerId) as Array<[string, PlayerSeasonPerformanceSummary]>,
     ),
+    // Platzhalter — der Feld-Rennen-Ledger wird billig aus dem GameState
+    // nachgerechnet (siehe readPersistedSeasonDerivations), statt ihn zu persistieren.
+    fieldRaceLedger: { seasonId: record.seasonId, matchdays: [], rowsByTeamId: new Map() },
   };
 }
 
@@ -104,6 +107,9 @@ export function readPersistedSeasonDerivations(
   if (persisted.seasonId !== gameState.season.id) {
     return null;
   }
+  // fieldRaceLedger bleibt der leere Platzhalter aus hydrateSeasonDerivations —
+  // der Shell-Scope-Hook baut ihn on-demand (reine UI-Ableitung, siehe
+  // computeSeasonDerivationsFresh).
   return hydrateSeasonDerivations(persisted);
 }
 
@@ -111,9 +117,24 @@ export function buildPersistedSeasonDerivationsRecord(gameState: GameState): Per
   const seasonId = gameState.season.id;
   const contentSignature = buildGameStateContentSignature(gameState);
   const derivations = computeSeasonDerivationsFresh(gameState, seasonId);
-  const marketValueByPlayerId = serializeLeagueMarketValueMap(
-    computeLeagueMarketValueMapFromPlayers(gameState.players),
-  );
+
+  // Die ligaweite MW-Berechnung (~3000 Spieler) dominiert diesen Record
+  // (~90 % der Zeit) und haengt AUSSCHLIESSLICH an den MW-relevanten
+  // Spielerdaten (disciplineRatings + mwChangeFix), die der PlayerSignature
+  // entspricht. Ein Matchday-Ergebnis aendert diese nicht — also die teure
+  // Map wiederverwenden, wenn die Signatur zum bereits persistierten Snapshot
+  // passt, statt sie bei jedem Result-Apply neu zu berechnen. Ergebnis ist
+  // per Konstruktion identisch (reine Funktion der Signatur).
+  const playerSignature = buildLeagueMarketValuePlayerSignature(gameState.players);
+  const existing = gameState.seasonState.persistedSeasonDerivations as PersistedSeasonDerivationsRecord | null | undefined;
+  const canReuseMarketValue =
+    existing?.marketValueByPlayerId != null &&
+    existing.seasonId === seasonId &&
+    existing.marketValuePlayerSignature === playerSignature;
+  const marketValueByPlayerId = canReuseMarketValue
+    ? existing.marketValueByPlayerId
+    : serializeLeagueMarketValueMap(computeLeagueMarketValueMapFromPlayers(gameState.players));
+
   return {
     ...serializeSeasonDerivations({
       derivations,
@@ -121,7 +142,7 @@ export function buildPersistedSeasonDerivationsRecord(gameState: GameState): Per
       contentSignature,
     }),
     marketValueByPlayerId,
-    marketValuePlayerSignature: buildLeagueMarketValuePlayerSignature(gameState.players),
+    marketValuePlayerSignature: playerSignature,
   };
 }
 

@@ -1,5 +1,5 @@
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
-import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
@@ -100,9 +100,13 @@ function createSeasonLog(message: string): GameLogEntry {
 }
 
 function buildCurrentMoraleState(gameState: GameState): PlayerMoraleState[] {
+  // Ligaweite Neuberechnung ueber ~320 Kader-Eintraege: den Lookup-Index EINMAL
+  // bauen statt pro Spieler linear ueber players/rosters/teams/moraleState zu
+  // scannen (players allein ~3000 Eintraege → vorher ~1 Mio Vergleiche/Matchday).
+  const index = buildMoraleLookupIndex(gameState);
   const rosteredPlayerIds = new Set(gameState.rosters.map((roster) => roster.playerId));
   const activeRows = gameState.rosters
-    .map((roster) => assessPlayerMorale({ gameState, playerId: roster.playerId, teamId: roster.teamId }))
+    .map((roster) => assessPlayerMorale({ gameState, playerId: roster.playerId, teamId: roster.teamId, index }))
     .filter((entry): entry is NonNullable<ReturnType<typeof assessPlayerMorale>> => Boolean(entry))
     .map((assessment) => ({
       playerId: assessment.playerId,

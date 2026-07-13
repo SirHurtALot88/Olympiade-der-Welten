@@ -315,6 +315,58 @@ export default function FoundationSponsorsNewLook({
     return list;
   }, [leagueSponsorRows, leagueSponsorSort]);
 
+  // #D12: Schwächster Treiber des Kommerz-Ratings. Die drei Treiber
+  // (Historie/Kader/Prestige) summieren sich additiv zum Score
+  // (buildSponsorCommercialRating: recentPerformance ≤ 55, rosterPotential ≤ 35,
+  // prestige ≤ 20). Vergleich fair über den Füllgrad (Wert / Max-Beitrag) —
+  // der Treiber mit dem geringsten Füllgrad hat das meiste Aufhol-Potenzial.
+  // Fog-safe: ausschließlich Treiber/Rohdaten des eigenen (selektierten) Teams.
+  const sponsorWeakestDriver = useMemo(() => {
+    if (!selectedTeamCommercialRating) return null;
+    const { breakdown, inputs } = selectedTeamCommercialRating;
+
+    const rankLabel = inputs.avgWeightedRank != null ? `Ø Rang #${formatNlNumber(inputs.avgWeightedRank, 1)}` : null;
+
+    // Kader-Untertreiber: schwächstes Perzentil/Kaderbreite → gezielter Tipp.
+    const kaderParts = [
+      { label: "Kaderwert", value: inputs.marketValuePercentile, hint: "steigere den Kader-Marktwert (Käufe/Entwicklung)" },
+      { label: "Achsenprofil", value: inputs.axisPercentile, hint: "hebe das Achsenprofil (Training/Skills)" },
+      { label: "Kaderbreite", value: inputs.depthScore, hint: "erweitere die Kaderbreite (mehr Spieler unter Vertrag)" },
+    ];
+    const weakestKaderPart = kaderParts.reduce((weakest, part) => (part.value < weakest.value ? part : weakest));
+
+    const drivers = [
+      {
+        key: "recentPerformance",
+        label: "Historie",
+        value: breakdown.recentPerformance,
+        maxContribution: 55,
+        context: rankLabel ?? "jüngste Platzierung",
+        suggestion: "verbessere deine Platzierung in der Liga",
+      },
+      {
+        key: "rosterPotential",
+        label: "Kader",
+        value: breakdown.rosterPotential,
+        maxContribution: 35,
+        context: `${weakestKaderPart.label} ${formatNlNumber(weakestKaderPart.value, 0)}${weakestKaderPart.label === "Kaderbreite" ? "" : "%"}`,
+        suggestion: weakestKaderPart.hint,
+      },
+      {
+        key: "prestige",
+        label: "Prestige",
+        value: breakdown.prestige,
+        maxContribution: 20,
+        context: `Prestige-Score ${formatNlNumber(inputs.prestigeMedalScore, 1)}/20`,
+        suggestion: "sammle Medaillen (Gold/Silber/Bronze) und Top-Platzierungen",
+      },
+    ];
+
+    return drivers.reduce((weakest, driver) =>
+      driver.value / driver.maxContribution < weakest.value / weakest.maxContribution ? driver : weakest,
+    );
+  }, [selectedTeamCommercialRating]);
+
   return (
     <div data-testid="foundation-sponsors">
       <section className="nl-sponsor" data-testid="team-sponsor-choice" id="sponsor-choice" data-new-look="true">
@@ -366,6 +418,24 @@ export default function FoundationSponsorsNewLook({
               />
               <small className="nl-sponsor-rating-hint">Erwartung ★{selectedTeamCommercialRating.tierHint}</small>
 
+              {/* #D12: Nudge zum schwächsten Rating-Treiber — echter Vergleich
+                  über den Füllgrad (Wert/Max-Beitrag), eigene Team-Daten. */}
+              {sponsorWeakestDriver ? (
+                <div className="nl-sponsor-nudge" role="note" data-testid="nl-sponsor-weakest-driver">
+                  <span className="nl-sponsor-nudge-icon" aria-hidden="true">
+                    ↑
+                  </span>
+                  <span className="nl-sponsor-nudge-copy">
+                    <strong>
+                      Schwächster Treiber: {sponsorWeakestDriver.label} ({sponsorWeakestDriver.context})
+                    </strong>
+                    <small>
+                      {sponsorWeakestDriver.suggestion} — um bessere Sponsor-Angebote zu bekommen.
+                    </small>
+                  </span>
+                </div>
+              ) : null}
+
               {/* #77: aufklappbares Treiber-Portal — echte Rohdaten aus commercialRating.inputs */}
               <button
                 type="button"
@@ -412,7 +482,11 @@ export default function FoundationSponsorsNewLook({
           ) : null}
         </NlCard>
 
-        {sponsorChoiceMessage ? <div className="status-banner is-success">{sponsorChoiceMessage}</div> : null}
+        {sponsorChoiceMessage ? (
+          <div className="nl-sponsor-banner" role="status">
+            {sponsorChoiceMessage}
+          </div>
+        ) : null}
 
         {selectedTeamSponsorContract ? (
           <>

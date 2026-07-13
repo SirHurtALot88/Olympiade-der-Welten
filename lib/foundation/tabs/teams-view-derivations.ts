@@ -267,6 +267,7 @@ export function buildTeamsViewRows(input: {
         historicalPointsTotal: row.historicalPointsTotal,
         historicalAvgPoints: row.historicalAvgPoints,
         historicalPointsBySeason: row.historicalPointsBySeason,
+        historicalEconomyBySeason: row.historicalEconomyBySeason,
         historicalHasData: row.historicalHasData,
         historicalSeasonsPlayed: row.historicalSeasonsPlayed,
         historicalBestRank: row.historicalBestRank,

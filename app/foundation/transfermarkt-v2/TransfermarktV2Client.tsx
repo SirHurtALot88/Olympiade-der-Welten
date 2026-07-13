@@ -108,6 +108,13 @@ export type TransfermarktV2ClientProps = {
   onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
   roomContext?: FoundationRoomContext | null;
+  /**
+   * Transferfenster-Status (additiv). Fehlt der Prop, bleibt der Markt voll
+   * bedienbar (Default „offen"). Ist das Fenster geschlossen, degradiert die
+   * Ansicht zu Read-only: Markt/Scouting bleiben sichtbar, nur Kauf/Verkauf
+   * werden gesperrt.
+   */
+  transferWindow?: { open: boolean; canBuy: boolean; canSell: boolean; phaseLabel: string };
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -158,6 +165,41 @@ type PoolBracketSortState = {
   key: PoolBracketSortKey;
   direction: "asc" | "desc";
 };
+
+/**
+ * Sortable table header cell. Exposes the sort state to assistive tech via
+ * `aria-sort` on the `<th>` and hides the decorative arrow glyph, so screen
+ * readers announce which column is sorted and in which direction.
+ */
+function MarketSortHeader({
+  label,
+  sortKey,
+  activeKey,
+  direction,
+  onSort,
+}: {
+  label: string;
+  sortKey: string;
+  activeKey: string;
+  direction: "asc" | "desc";
+  onSort: (key: string) => void;
+}) {
+  const isActive = activeKey === sortKey;
+  return (
+    <th aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        className={`sortable-header${isActive ? " is-active" : ""}`}
+        type="button"
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        <span className="sortable-arrow" aria-hidden="true">
+          {isActive ? (direction === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
 export type TransfermarktV2RosterRow = {
   activePlayerId: string;
   playerId: string;
@@ -321,7 +363,7 @@ const DISCIPLINE_CATEGORY_BY_KEY: Record<string, "power" | "speed" | "mental" | 
 const LABEL_MAP: Record<string, string> = {
   affordable: "bezahlbar",
   under_opt: "unter Soll",
-  over_opt: "ueber Soll",
+  over_opt: "über Soll",
   unknown: "unbekannt",
   ready: "bereit",
   not_ready: "noch roh",
@@ -505,6 +547,10 @@ function formatCompactNumber(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
+  // Never render a negative sign for a value whose magnitude rounds to zero (e.g. "-0 €").
+  if (Math.round(value * 10 ** digits) === 0) {
+    value = 0;
+  }
   return new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
@@ -564,7 +610,7 @@ function formatDevelopmentRouteLabel(value: string | null | undefined) {
     late_bloomer: "Spaetentwickler",
     veteran_plateau: "Plateau halten",
     free_agent_ambient: "freier Markt",
-    regression_watch: "Rueckschritt vermeiden",
+    regression_watch: "Rückschritt vermeiden",
     star_refinement: "Star verfeinern",
     balanced_growth: "balanciert entwickeln",
   };
@@ -578,7 +624,7 @@ function getScoutReliabilityCopy(confidence: number | null | undefined) {
     return "Scouting unscharf: Werte als grobe Richtung lesen.";
   }
   if (confidence >= 75) return "Scouting klar: Range ist relativ eng.";
-  if (confidence >= 50) return "Scouting solide: kleine Abweichungen moeglich.";
+  if (confidence >= 50) return "Scouting solide: kleine Abweichungen möglich.";
   if (confidence >= 30) return "Scouting grob: erst als Tendenz nutzen.";
   return "Scouting roh: grobe Spanne, nicht als exakte Wahrheit lesen.";
 }
@@ -624,10 +670,10 @@ function formatContractPreferenceCurrentStatus(
     return "Aktuell: Laufzeit und Form passen gut";
   }
   if (lengthMatches) {
-    return `Aktuell: Laufzeit passt, Form stoert (${formatContractShapeLabel(contractShape)})`;
+    return `Aktuell: Laufzeit passt, Form stört (${formatContractShapeLabel(contractShape)})`;
   }
   if (shapeMatches) {
-    return `Aktuell: Form passt, Laufzeit stoert (${safeLength ?? "?"} Saisons)`;
+    return `Aktuell: Form passt, Laufzeit stört (${safeLength ?? "?"} Saisons)`;
   }
   return `Aktuell: Laufzeit (${safeLength ?? "?"}) und Form (${formatContractShapeLabel(contractShape)}) weichen ab`;
 }
@@ -732,7 +778,7 @@ function getScoutedTopDisciplineHeadline(item: TransfermarktFreeAgentItem) {
 
 function getScoutedDisciplineLine(item: TransfermarktFreeAgentItem) {
   if (!item.topDisciplineScores.length) {
-    return "keine Diszi-Staerke bekannt";
+    return "keine Diszi-Stärke bekannt";
   }
 
   return item.topDisciplineScores
@@ -921,14 +967,14 @@ function getCandidateFocusAxes(item: TransfermarktFreeAgentItem) {
 function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
     contract_length_override_in_effect: "Laufzeit weicht vom Standarddeal ab.",
-    insufficient_cash: "Cash reicht fuer Kauf oder Gesamtpaket noch nicht.",
+    insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
     low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
     local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
     market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschaetzt.",
-    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus haengen.",
-    negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
+    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus hängen.",
+    negotiation_rejected_bad_experience: "Die letzte Absage macht die nächste Runde härter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
-    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
+    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
     preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
@@ -956,7 +1002,7 @@ function formatDealPreviewErrorLabel(value: string) {
 function formatCandidateAvailabilityLabel(teamCode: string | null | undefined, availableCount: number | null | undefined) {
   const safeCount = typeof availableCount === "number" && Number.isFinite(availableCount) ? availableCount : 0;
   if (teamCode) {
-    return `${safeCount} fuer ${teamCode} verfuegbar`;
+    return `${safeCount} für ${teamCode} verfügbar`;
   }
   return `${safeCount} im Markt`;
 }
@@ -1171,7 +1217,18 @@ export default function TransfermarktV2Client({
   onCloseOfferPanel,
   onSell,
   roomContext: roomContextProp = null,
+  transferWindow,
 }: TransfermarktV2ClientProps) {
+  // Transferfenster: fehlt der Prop -> als offen behandeln (kein Regress ohne Wiring).
+  const transferWindowOpen = transferWindow?.open ?? true;
+  const transferCanBuy = transferWindow?.canBuy ?? true;
+  const transferCanSell = transferWindow?.canSell ?? true;
+  const marketReadOnlyReason = "Transferfenster geschlossen — nur Ansicht.";
+  const marketWindowNotice = transferWindowOpen
+    ? null
+    : transferWindow?.phaseLabel
+      ? `Transferfenster geschlossen (${transferWindow.phaseLabel}) — Markt und Scouting bleiben offen, Kauf und Verkauf sind gesperrt.`
+      : `${marketReadOnlyReason} Markt und Scouting bleiben sichtbar, Kauf und Verkauf sind gesperrt.`;
   // "Neuer Look" Flag (additiv): der Hook läuft immer, das eigentliche Gate
   // sitzt unten direkt vor dem Haupt-Return — nach ALLEN Hooks, damit die
   // Hook-Reihenfolge beim Umschalten des Flags stabil bleibt.
@@ -1315,7 +1372,7 @@ export default function TransfermarktV2Client({
 
   function resetMarketFilters() {
     applyMarketFilterSnapshot(createDefaultMarketFilterSnapshot());
-    setFilterPresetMessage("Filter zurueckgesetzt.");
+    setFilterPresetMessage("Filter zurückgesetzt.");
   }
 
   const currentFilterSnapshot = useMemo<MarketFilterSnapshot>(
@@ -1383,7 +1440,7 @@ export default function TransfermarktV2Client({
   function deleteFilterPreset(presetId: string) {
     const preset = filterPresets.find((entry) => entry.id === presetId);
     setFilterPresets((current) => current.filter((entry) => entry.id !== presetId));
-    setFilterPresetMessage(preset ? `Filter "${preset.name}" geloescht.` : "Filter geloescht.");
+    setFilterPresetMessage(preset ? `Filter "${preset.name}" gelöscht.` : "Filter gelöscht.");
   }
 
   function toggleWishlistSort(key: WishlistSortKey) {
@@ -1717,7 +1774,7 @@ export default function TransfermarktV2Client({
   }, [defaultSaveId, marketItemByPlayerId, selectedTeamId, wishlistEntries, wishlistSort]);
   const selectedTeamCanManage = Boolean(selectedTeamId && manageableTeamIdSet.has(selectedTeamId));
   const selectedTeamLockedReason = selectedTeamId && !selectedTeamCanManage
-    ? `${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Du kannst scouten, aber keine Deals abschliessen.`
+    ? `${selectedTeam?.name ?? "Dieses Team"} gehört nicht zu deinen steuerbaren Teams. Du kannst scouten, aber keine Deals abschliessen.`
     : null;
   const selectedTeamReadOnlyReason =
     selectedTeamLockedReason ??
@@ -2195,7 +2252,7 @@ export default function TransfermarktV2Client({
   }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
   useEffect(() => {
-    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId) {
+    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId || defaultSaveId === "loading-save") {
       return;
     }
 
@@ -2343,7 +2400,7 @@ export default function TransfermarktV2Client({
   }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
-    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSeasonId === "loading") {
+    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSaveId === "loading-save" || defaultSeasonId === "loading") {
       setPoolBracketItems([]);
       setPoolBracketBusy(false);
       return;
@@ -2617,7 +2674,7 @@ export default function TransfermarktV2Client({
       }
       setBuyPreview(payload.summary);
       setBuySuccess(
-        `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
+        `${payload.summary.player?.name ?? "Spieler"} fix für ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Ablöse, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
       );
       deactivateOfferPanel();
       setBuyNegotiationOutcome(null);
@@ -2682,7 +2739,7 @@ export default function TransfermarktV2Client({
         status: "countered",
         tone: "warning",
         title: "Gegenseite verhandelt nach",
-        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenueber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
+        message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenüber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
         counterSalary,
       });
       window.requestAnimationFrame(() => {
@@ -2757,7 +2814,7 @@ export default function TransfermarktV2Client({
       }
       setPreviewError(
         shouldApplyAbortMalus
-          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
+          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus für die nächste Runde.`
           : `Kauf von ${playerName} abgebrochen.`,
       );
       window.requestAnimationFrame(() => {
@@ -2789,13 +2846,15 @@ export default function TransfermarktV2Client({
       ? `${formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(buyPreview.expectedSalary)}`
       : formatTransfermarktCurrency(previewAnnualSalary);
   const dealOpenDisabledReason =
-    !selectedTeamId
-      ? "Bitte erst ein Team wählen."
-      : !selectedPlayer
-        ? "Bitte erst links einen Kandidaten wählen."
-        : !selectedTeamCanManage
-          ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
-          : null;
+    !transferCanBuy
+      ? marketReadOnlyReason
+      : !selectedTeamId
+        ? "Bitte erst ein Team wählen."
+        : !selectedPlayer
+          ? "Bitte erst links einen Kandidaten wählen."
+          : !selectedTeamCanManage
+            ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
+            : null;
   const needBreakdownSummary = useMemo(() => {
     const breakdown = selectedPlayer?.needMatchBreakdown;
     if (!breakdown) {
@@ -2804,7 +2863,7 @@ export default function TransfermarktV2Client({
     const parts = [
       { label: "Identity", value: breakdown.identityFitScore },
       { label: "Achse", value: breakdown.axisScore },
-      { label: "Luecke", value: breakdown.rosterGapScore },
+      { label: "Lücke", value: breakdown.rosterGapScore },
       { label: "Tiefe", value: breakdown.depthQualityScore },
       { label: "Diszi", value: breakdown.preferredDisciplineScore },
       { label: "Value", value: breakdown.valueReliefScore },
@@ -2823,14 +2882,16 @@ export default function TransfermarktV2Client({
   // "Neuer Look" Gate (additiv): alle Hooks oben sind gelaufen, ab hier nur
   // noch Darstellung. Flag aus => bestehendes Markup unverändert.
   if (newLook) {
-    const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId));
+    const canSellRoster = Boolean(onSell && selectedTeamId && manageableTeamIdSet.has(selectedTeamId) && transferCanSell);
     return (
       <TransfermarktV2NewLook
         teamName={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
         teamShortCode={selectedTeam?.shortCode ?? null}
         availabilityLabel={availabilityLabel}
+        marketWindowNotice={marketWindowNotice}
         marketBusy={marketBusy}
         marketError={marketError}
+        onRetryMarket={() => setReloadToken((current) => current + 1)}
         buySuccess={buySuccess}
         onDismissBuySuccess={() => setBuySuccess(null)}
         teamCash={marketContext?.teamCash ?? null}
@@ -2909,8 +2970,9 @@ export default function TransfermarktV2Client({
         onRemoveWishlist={onRemoveWishlist}
         marketItemsById={marketItemByPlayerId}
         rosterRows={selectedRosterRows}
-        budgetStatusLabel={formatToneLabel(marketContext?.affordabilityStatus)}
-        readinessStatusLabel={formatReadinessLabel(marketContext?.readinessStatus)}
+        disciplines={orderedDisciplines}
+        budgetStatusLabel={marketContext?.affordabilityStatus ? formatToneLabel(marketContext.affordabilityStatus) : null}
+        readinessStatusLabel={marketContext?.readinessStatus ? formatReadinessLabel(marketContext.readinessStatus) : null}
         onSellRow={
           canSellRoster && onSell
             ? (row) =>
@@ -3253,8 +3315,8 @@ export default function TransfermarktV2Client({
                     <button type="button" onClick={() => loadFilterPreset(preset)} title={`Filter "${preset.name}" laden`}>
                       {preset.name}
                     </button>
-                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} title={`Filter "${preset.name}" loeschen`}>
-                      x
+                    <button type="button" className="is-danger" onClick={() => deleteFilterPreset(preset.id)} aria-label={`Filter "${preset.name}" löschen`} title={`Filter "${preset.name}" löschen`}>
+                      <span aria-hidden="true">x</span>
                     </button>
                   </span>
                 ))
@@ -3535,7 +3597,7 @@ export default function TransfermarktV2Client({
 
               <div
                 className="market-v2-attribute-grid"
-                title="Scouting L1 zeigt 4 Attribute als Range. Hoehere Scouting-Stufen decken mehr Attribute und spaeter exakte Werte auf."
+                title="Scouting L1 zeigt 4 Attribute als Range. Hoehere Scouting-Stufen decken mehr Attribute und später exakte Werte auf."
               >
                 {orderedAttributeRows.map((entry) => {
                   const shortLabel = ATTRIBUTE_SHORT_LABELS[entry.key as PlayerGeneratorAttributeKey] ?? entry.label.slice(0, 3).toUpperCase();
@@ -3647,7 +3709,7 @@ export default function TransfermarktV2Client({
                         <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt weitere Trainingsstaerken auf.">
                           <b>?</b>
                           <span>
-                            <strong>+{hiddenTrainingPositive} Staerken</strong>
+                            <strong>+{hiddenTrainingPositive} Stärken</strong>
                             <small>mehr Scouting</small>
                           </span>
                         </span>
@@ -3869,7 +3931,7 @@ export default function TransfermarktV2Client({
               <small>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Bitte Team wählen"}</small>
             </div>
             <span className={`transfer-status-pill ${buyPreview?.canBuy ? "is-ready" : "is-info"}`}>
-              {selectedTeamReadOnlyReason ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
+              {selectedTeamReadOnlyReason ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "prüfen"}
             </span>
           </div>
           {previewError ? (
@@ -4088,43 +4150,20 @@ export default function TransfermarktV2Client({
               <thead>
                 <tr>
                   <th>Bild</th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "playerName" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("playerName")}>
-                      <span>Gemerkter Spieler</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "playerName" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "className" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("className")}>
-                      <span>Klasse</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "className" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "marketValue" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("marketValue")}>
-                      <span>MW</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "marketValue" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "salary" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("salary")}>
-                      <span>Gehalt</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "salary" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button className={`sortable-header${wishlistSort.key === "bracket" ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort("bracket")}>
-                      <span>Bracket</span>
-                      <span className="sortable-arrow">{wishlistSort.key === "bracket" ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                    </button>
-                  </th>
+                  <MarketSortHeader label="Gemerkter Spieler" sortKey="playerName" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Klasse" sortKey="className" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="MW" sortKey="marketValue" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Gehalt" sortKey="salary" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
+                  <MarketSortHeader label="Bracket" sortKey="bracket" activeKey={wishlistSort.key} direction={wishlistSort.direction} onSort={(key) => toggleWishlistSort(key as WishlistSortKey)} />
                   {MARKET_AXIS_ORDER.map((axis) => (
-                    <th key={`wishlist-head-${axis}`}>
-                      <button className={`sortable-header${wishlistSort.key === axis ? " is-active" : ""}`} type="button" onClick={() => toggleWishlistSort(axis)}>
-                        <span>{AXIS_META[axis].label}</span>
-                        <span className="sortable-arrow">{wishlistSort.key === axis ? (wishlistSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                      </button>
-                    </th>
+                    <MarketSortHeader
+                      key={`wishlist-head-${axis}`}
+                      label={AXIS_META[axis].label}
+                      sortKey={axis}
+                      activeKey={wishlistSort.key}
+                      direction={wishlistSort.direction}
+                      onSort={(key) => toggleWishlistSort(key as WishlistSortKey)}
+                    />
                   ))}
                   <th aria-label="Aktionen" />
                 </tr>
@@ -4242,6 +4281,14 @@ export default function TransfermarktV2Client({
                       })}
                       <td>
                         <button
+                          className="primary-button inline-button market-v2-wishlist-deal-button"
+                          type="button"
+                          onClick={() => openWishlistDeal(entry)}
+                          title="Kaufdialog für diesen Spieler öffnen."
+                        >
+                          Deal
+                        </button>
+                        <button
                           className="secondary-button inline-button market-v2-remove-wishlist-button"
                           type="button"
                           onClick={() => onRemoveWishlist?.(entry.playerId)}
@@ -4317,12 +4364,12 @@ export default function TransfermarktV2Client({
                   <th>SOC</th>
                   {showRosterDisciplines
                     ? orderedDisciplines.map((discipline) => (
-                        <th className={`market-v2-roster-discipline-head is-${discipline.category}`} key={`roster-discipline-head-${discipline.id}`}>
-                          {getDisciplineAbbreviation(discipline.id, discipline.name)}
+                        <th className={`market-v2-roster-discipline-head is-${discipline.category}`} key={`roster-discipline-head-${discipline.id}`} scope="col" title={discipline.name}>
+                          <abbr title={discipline.name}>{getDisciplineAbbreviation(discipline.id, discipline.name)}</abbr>
                         </th>
                       ))
                     : null}
-                  {onSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
+                  {onSell && transferCanSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -4405,7 +4452,7 @@ export default function TransfermarktV2Client({
                           </td>
                         ))
                       : null}
-                    {onSell && manageableTeamIdSet.has(selectedTeamId) ? (
+                    {onSell && transferCanSell && manageableTeamIdSet.has(selectedTeamId) ? (
                       <td>
                         <button
                           className="secondary-button inline-button"
@@ -4525,55 +4572,22 @@ export default function TransfermarktV2Client({
                   <thead>
                     <tr>
                       <th>Bild</th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "playerName" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("playerName")}>
-                          <span>Spieler</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "playerName" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "className" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("className")}>
-                          <span>Klasse</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "className" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "race" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("race")}>
-                          <span>Rasse</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "race" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "marketValue" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("marketValue")}>
-                          <span>MW</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "marketValue" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "salary" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("salary")}>
-                          <span>Gehalt</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "salary" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "fit" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("fit")}>
-                          <span>Fit</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "fit" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
-                      <th>
-                        <button className={`sortable-header${poolBracketSort.key === "ovr" ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort("ovr")}>
-                          <span>OVR</span>
-                          <span className="sortable-arrow">{poolBracketSort.key === "ovr" ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                        </button>
-                      </th>
+                      <MarketSortHeader label="Spieler" sortKey="playerName" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Klasse" sortKey="className" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Rasse" sortKey="race" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="MW" sortKey="marketValue" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Gehalt" sortKey="salary" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="Fit" sortKey="fit" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
+                      <MarketSortHeader label="OVR" sortKey="ovr" activeKey={poolBracketSort.key} direction={poolBracketSort.direction} onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)} />
                       {MARKET_AXIS_ORDER.map((axis) => (
-                        <th key={`pool-bracket-head-${axis}`}>
-                          <button className={`sortable-header${poolBracketSort.key === axis ? " is-active" : ""}`} type="button" onClick={() => togglePoolBracketSort(axis)}>
-                            <span>{AXIS_META[axis].label}</span>
-                            <span className="sortable-arrow">{poolBracketSort.key === axis ? (poolBracketSort.direction === "asc" ? "↑" : "↓") : "↕"}</span>
-                          </button>
-                        </th>
+                        <MarketSortHeader
+                          key={`pool-bracket-head-${axis}`}
+                          label={AXIS_META[axis].label}
+                          sortKey={axis}
+                          activeKey={poolBracketSort.key}
+                          direction={poolBracketSort.direction}
+                          onSort={(key) => togglePoolBracketSort(key as PoolBracketSortKey)}
+                        />
                       ))}
                       <th aria-label="Aktion" />
                     </tr>

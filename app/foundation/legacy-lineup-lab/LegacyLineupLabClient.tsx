@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
-import LegacyLineupFocusV2Board from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
-import LineupNewLook from "@/app/foundation/legacy-lineup-lab/LineupNewLook";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
-import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { LegacyLineupVirtualCardGrid } from "@/app/foundation/legacy-lineup-lab/LegacyLineupVirtualTableBody";
 import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
@@ -71,6 +71,30 @@ import type {
 } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
+
+// Perf/DX (#57): these three sub-views are each only rendered behind a single
+// runtime condition (newLook flag, formBoard tab, focusV2 variant) — never all
+// at once. Lazy-loading them keeps LegacyLineupLabClient's own dev compile
+// graph from dragging in ~3.7k lines of sibling UI that a given session may
+// never touch. ssr:false is safe: none of the three read window/document at
+// module scope (only inside effects/handlers), and each is reached solely via
+// client-side state after this component has already mounted, so there is no
+// SSR/hydration path to preserve.
+const LegacyLineupFocusV2Board = dynamic(
+  () => import("@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board"),
+  {
+    ssr: false,
+    loading: () => <FoundationPanelSkeleton variant="lineup" label="Focus-Board wird geladen…" />,
+  },
+);
+const LineupNewLook = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LineupNewLook"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Neuer Look wird geladen…" />,
+});
+const FormBoardPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FormBoardPanel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Formplan wird geladen…" />,
+});
 
 type LabOptions = {
   saves: Array<{ id: string; name: string; status: string }>;
@@ -927,9 +951,9 @@ function LegacyLineupSlotMicroSteps({
   stepStates: Record<"choose" | "assign" | "next", SlotMicroStepState>;
 }) {
   const steps = [
-    { key: "choose" as const, label: "Waehlen" },
+    { key: "choose" as const, label: "Wählen" },
     { key: "assign" as const, label: "Einsetzen" },
-    { key: "next" as const, label: "Naechster Slot" },
+    { key: "next" as const, label: "Nächster Slot" },
   ];
 
   return (
@@ -1364,6 +1388,30 @@ function formatTeamOptionLabel(team: LabOptions["teams"][number]) {
   return team.currentMatchdayReady ? `✓ ${baseLabel}` : baseLabel;
 }
 
+/**
+ * "Neuer Look"-Team-Dropdown (nur hier verwendet, s. `controlsSlot` im
+ * flag-gated `LineupNewLook`-Zweig): `formatTeamOptionLabel`/`statusLabel`
+ * bleiben für den Alt-Look unangetastet, deren Kurzform "Lineup X/Y" ist dort
+ * unverändert — sie zählt aber SAISON-weit gespeicherte Aufstellungen
+ * (`lineupFilledCount`/`totalLineupSides`, s. `countSeasonLineupDisciplineSides`
+ * / `buildLineupDisciplineContract` in `lib/lineups/lineup-discipline-contract.ts`),
+ * NICHT die heute im Board belegten Slots. Genau diese Doppel-Bedeutung von
+ * "Lineup X/Y" (heute vs. Saison) hat für die gemeldete Verwechslung
+ * gesorgt ("9/5" oben vs. "0/20" hier). Diese Variante macht den Saison-Scope
+ * explizit, ohne die zugrunde liegende Zählung zu verändern.
+ */
+function formatNlTeamOptionLabel(team: LabOptions["teams"][number]) {
+  const readyMark = team.currentMatchdayReady ? "✓ " : "";
+  if (team.totalLineupSides != null && team.lineupFilledCount != null) {
+    const captainPart =
+      team.captainUsedCount != null && team.captainSlots != null
+        ? ` · Captain (Saison) ${team.captainUsedCount}/${team.captainSlots}`
+        : "";
+    return `${readyMark}${team.name} · Saison-Aufstellungen gespeichert ${team.lineupFilledCount}/${team.totalLineupSides}${captainPart}`;
+  }
+  return formatTeamOptionLabel(team);
+}
+
 function getTopAttributeWeights(
   weights: LegacyLineupLoadedContext["disciplineWeights"] | null | undefined,
   disciplineId: string | null | undefined,
@@ -1488,7 +1536,7 @@ function getTeamdeckCandidateGroupMeta(groupKey: TeamdeckCandidateQualityKey) {
     case "instant":
       return {
         label: "Passt sofort",
-        description: "Saubere Sofort-Picks fuer den aktiven Slot.",
+        description: "Saubere Sofort-Picks für den aktiven Slot.",
         tone: "ready" as const,
         order: 0,
       };
@@ -1502,14 +1550,14 @@ function getTeamdeckCandidateGroupMeta(groupKey: TeamdeckCandidateQualityKey) {
     case "fatigue":
       return {
         label: "Riskant wegen Fatigue",
-        description: "Nur mit Bedacht einsetzen oder ueber Team-Einsatz abfedern.",
+        description: "Nur mit Bedacht einsetzen oder über Team-Einsatz abfedern.",
         tone: "warning" as const,
         order: 2,
       };
     case "blocked":
       return {
         label: "Blockiert / schon eingesetzt",
-        description: "Sichtbar zum Verstehen, aber nicht fuer den direkten Flow.",
+        description: "Sichtbar zum Verstehen, aber nicht für den direkten Flow.",
         tone: "blocked" as const,
         order: 3,
       };
@@ -1832,7 +1880,7 @@ function formatModifierSourceLabel(source: LegacyModifierSourceSummary | null | 
 }
 
 function formatLegacyTeamControlModeLabel(mode: "manual" | "ai" | "passive" | null | undefined) {
-  if (mode === "manual") return "gefuehrt";
+  if (mode === "manual") return "geführt";
   if (mode === "ai") return "automatisch";
   if (mode === "passive") return "beobachtet";
   return "offen";
@@ -2038,7 +2086,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   } | null>(null);
   const formCardPlanSaveTimerRef = useRef<number | null>(null);
   const pendingFormBoardFocusRef = useRef(false);
-  const [expertPlayerTableScrollTop, setExpertPlayerTableScrollTop] = useState(0);
+  const [expertPlayerTableScrollTop, handleExpertPlayerTableScroll] = useRafThrottledScrollTop();
   const [expertPlayerTableViewportHeight, setExpertPlayerTableViewportHeight] = useState(560);
   const expertPlayerTableShellRef = useRef<HTMLDivElement | null>(null);
   const pendingFormCardPlanRef = useRef<{
@@ -3371,7 +3419,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         const captainDemand = relevantDisciplineDemands.find((demand) => demand.label === "Captain-Rolle") ?? null;
 
         let groupKey: TeamdeckCandidateQualityKey = "alternative";
-        let detail = "Spielbar fuer diesen Slot.";
+        let detail = "Spielbar für diesen Slot.";
         let shortReason = `${formatNullableScore(projectedScore)} Score`;
 
         if (selectedElsewhere) {
@@ -3384,7 +3432,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           shortReason = "blockiert";
         } else if (isElevatedFatigue(player.fatigueCount)) {
           groupKey = "fatigue";
-          detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spuerbar riskanter.`;
+          detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spürbar riskanter.`;
           shortReason = `F ${Math.round(player.fatigueCount ?? 0)}`;
         } else if (
           fitTier === "poor" ||
@@ -3917,11 +3965,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 detail:
                   missingCaptainCount > 0
                     ? `Slots voll · Captain optional (${missingCaptainCount} offen)`
-                    : "Slots voll · Captain gesetzt · bereit fuer den Matchday-Save",
+                    : "Slots voll · Captain gesetzt · bereit für den Matchday-Save",
                 tone: "ready" as const,
               }
             : {
-                label: draft ? "Bereit fuer Arena" : "Preview pruefen",
+                label: draft ? "Bereit für Arena" : "Preview prüfen",
                 detail: draft ? "Gespeicherter Draft liegt vor" : "Optional Preview berechnen oder direkt speichern",
                 tone: "ready" as const,
               };
@@ -3966,7 +4014,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}`
       : slotsDone
         ? "alle Slots"
-        : "Slot waehlen";
+        : "Slot wählen";
     const formatIntensityLabel = (value: MatchdayIntensityStage) =>
       value === "conserve" ? "Schonen" : value === "push" ? "Push" : "Normal";
     const tacticLabel = `D1 ${formatIntensityLabel(getDisciplineIntensity("d1"))} · D2 ${formatIntensityLabel(getDisciplineIntensity("d2"))}`;
@@ -3986,7 +4034,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       {
         key: "captains",
         label: "Captain",
-        detail: `${captainSeasonUsedWithDraft}/${captainSeasonLimit} Saison · ${captainDraftRemaining} uebrig`,
+        detail: `${captainSeasonUsedWithDraft}/${captainSeasonLimit} Saison · ${captainDraftRemaining} übrig`,
         status: captainBudgetExceeded ? "blocked" : captains.d1 || captains.d2 ? "done" : "open",
       },
       {
@@ -4090,7 +4138,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       chips.push({
         key: "warnings",
         label: `${previewPanelWarnings.length} Hinweis${previewPanelWarnings.length === 1 ? "" : "e"}`,
-        detail: "kurz pruefen",
+        detail: "kurz prüfen",
         tone: "warning",
       });
     }
@@ -4107,7 +4155,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       chips.push({
         key: "ready",
         label: draft ? "Arena bereit" : "Bereit zum Speichern",
-        detail: draft ? "Draft liegt vor" : "alles vollstaendig",
+        detail: draft ? "Draft liegt vor" : "alles vollständig",
         tone: "ready",
       });
     }
@@ -4511,19 +4559,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const labels: Record<TeamdeckSortMode, { label: string; detail: string }> = {
       fit: {
         label: "Passt sofort",
-        detail: `Gruppiert nach Slot-Fit fuer ${activeLabel}.`,
+        detail: `Gruppiert nach Slot-Fit für ${activeLabel}.`,
       },
       top: {
         label: "Top Fit",
-        detail: `Beste legale Picks fuer ${activeLabel}.`,
+        detail: `Beste legale Picks für ${activeLabel}.`,
       },
       d1: {
         label: d1Label,
-        detail: `Nach ${d1Label}-Staerke sortiert.`,
+        detail: `Nach ${d1Label}-Stärke sortiert.`,
       },
       d2: {
         label: d2Label,
-        detail: `Nach ${d2Label}-Staerke sortiert.`,
+        detail: `Nach ${d2Label}-Stärke sortiert.`,
       },
       captain: {
         label: "Captain",
@@ -4589,8 +4637,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         ? "ist bereits Captain"
         : rosterCard.captainEligible
           ? captainDemand
-            ? `Captain moeglich · Moral +${formatDecimalScore(captainDemand.moraleReward, 1)}`
-            : "Captain moeglich"
+            ? `Captain möglich · Moral +${formatDecimalScore(captainDemand.moraleReward, 1)}`
+            : "Captain möglich"
           : "kein Captain-Fokus";
     const riskLabel = blockReason
       ? "blockiert"
@@ -4634,7 +4682,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const candidateName = previewCandidate?.playerName ?? topCandidate?.player.name ?? "Top Pick";
     const candidateScore = previewCandidate?.projectedScore ?? topCandidate?.activeSlotCandidate?.projectedScore ?? null;
     const candidateDelta = previewCandidate?.scoreDelta ?? topCandidate?.activeSlotCandidate?.scoreDelta ?? null;
-    const candidateRisk = previewCandidate?.riskLabel ?? topCandidate?.detail ?? "Slot waehlen";
+    const candidateRisk = previewCandidate?.riskLabel ?? topCandidate?.detail ?? "Slot wählen";
     const fatigueText =
       previewCandidate != null
         ? `+${formatScore(previewCandidate.additionalFatigue)}`
@@ -4647,14 +4695,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         key: "slot",
         label: activeSlotLabel ?? "Slot",
         value: activeSlotRole?.label ?? "Auto",
-        detail: activeSlotIssues[0]?.detail ?? "Naechste Entscheidung",
+        detail: activeSlotIssues[0]?.detail ?? "Nächste Entscheidung",
         tone: activeSlot && !selections[activeSlot.key] ? "warning" : "ready",
       },
       {
         key: "candidate",
         label: "Kandidat",
         value: candidateName,
-        detail: candidateScore != null ? `Score ${formatNullableScore(candidateScore)}` : "auswaehlen",
+        detail: candidateScore != null ? `Score ${formatNullableScore(candidateScore)}` : "auswählen",
         tone: candidateScore != null ? "ready" : "warning",
       },
       {
@@ -5087,7 +5135,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
   async function handleGenerateFormCards() {
     if (source === "prisma" || isReadOnly) {
-      setErrors(["Formkarten koennen nur im lokalen Save erzeugt werden."]);
+      setErrors(["Formkarten können nur im lokalen Save erzeugt werden."]);
       setWarnings([]);
       setMessage("");
       return;
@@ -5127,7 +5175,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       await loadContext(params, source);
       setWarnings(payload.summary.warnings ?? []);
       setMessage(
-        `${payload.summary.seasonId}: ${payload.summary.generatedCardCount} Formkarten fuer ${payload.summary.coveredTeamCount} Teams und ${payload.summary.coveredPlayerCount} Spieler lokal erzeugt.` +
+        `${payload.summary.seasonId}: ${payload.summary.generatedCardCount} Formkarten für ${payload.summary.coveredTeamCount} Teams und ${payload.summary.coveredPlayerCount} Spieler lokal erzeugt.` +
           (payload.summary.scrubbedSelectionCount > 0
             ? ` ${payload.summary.scrubbedSelectionCount} alte Kartenauswahlen wurden bereinigt.`
             : ""),
@@ -5487,7 +5535,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       setAiPreview(null);
       setIsAiPreviewPanelOpen(true);
       setWarnings([]);
-      setMessage("AI-Vorschau fuer alle Teams geladen. Noch nichts gespeichert.");
+      setMessage("AI-Vorschau für alle Teams geladen. Noch nichts gespeichert.");
     } finally {
       setIsBusy(false);
     }
@@ -5511,13 +5559,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
 
     if (aiBatchPreview.length === 0) {
-      setMessage("Bitte zuerst die AI-Vorschau fuer alle Teams laden.");
+      setMessage("Bitte zuerst die AI-Vorschau für alle Teams laden.");
       return;
     }
 
     if (!dryRun) {
       if (!aiBatchApplyFeed?.dryRun) {
-        setMessage("Bitte zuerst Batch DryRun ausfuehren.");
+        setMessage("Bitte zuerst Batch DryRun ausführen.");
         return;
       }
 
@@ -5563,14 +5611,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const payload = (await response.json()) as AiBatchApplyResponse;
 
       if (!response.ok) {
-        setErrors([payload.error ?? "AI-Batch-Apply konnte nicht ausgefuehrt werden."]);
+        setErrors([payload.error ?? "AI-Batch-Apply konnte nicht ausgeführt werden."]);
         return;
       }
 
       setAiBatchApplyFeed(payload);
       setWarnings(payload.summary.warnings ?? []);
       if (dryRun) {
-        setMessage(`Batch-Test bereit: ${payload.summary.plannedLineups} Auto-Teams wuerden gespeichert.`);
+        setMessage(`Batch-Test bereit: ${payload.summary.plannedLineups} Auto-Teams würden gespeichert.`);
       } else {
         await loadContext(params, source);
         await handleAiPreviewAllTeams();
@@ -5607,7 +5655,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         "Aktuelle Auswahl ersetzen? Der AI-Vorschlag fuellt nur den UI-Draft und speichert noch nichts.",
       );
       if (!confirmed) {
-        setMessage("AI-Uebernahme abgebrochen. Aktuelle Auswahl bleibt unveraendert.");
+        setMessage("AI-Uebernahme abgebrochen. Aktuelle Auswahl bleibt unverändert.");
         return false;
       }
     }
@@ -5744,7 +5792,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   function jumpToNextLineupTask() {
     if (matchdayPreviewCards.openSlots > 0) {
       focusNextOpenSlot();
-      setMessage("Naechster offener Slot ist im Fokus.");
+      setMessage("Nächster offener Slot ist im Fokus.");
       return;
     }
     if (lineupReadyToSave && !isReadOnly) {
@@ -5752,7 +5800,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       scrollLineupTarget("lineup-command-center");
       return;
     }
-    setMessage(draft ? "Arena bereit." : "Preview pruefen oder Lineup speichern.");
+    setMessage(draft ? "Arena bereit." : "Preview prüfen oder Lineup speichern.");
   }
 
   function assignActiveSlotCandidateByIndex(index: number) {
@@ -6004,7 +6052,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
     if (filledCount > 0) {
       rememberLineupUndo(
-        `${filledCount} Slots gefuellt`,
+        `${filledCount} Slots gefüllt`,
         `${lineupMeta.d1Selected + lineupMeta.d2Selected}/${lineupFlowSummary.totalRequired || "—"} vorher gesetzt`,
       );
     }
@@ -6012,7 +6060,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setHoveredCandidate(null);
     setMessage(
       filledCount > 0
-        ? `${filledCount} offene Slots per Auto-Fill Rest gefuellt (Score-Projektion +${projectedScoreGain.toFixed(1)} gesamt). Undo ist direkt verfuegbar, Captain bleibt bewusst manuell (${captainSeasonUsedWithDraft}/${captainSeasonLimit}).`
+        ? `${filledCount} offene Slots per Auto-Fill Rest gefüllt (Score-Projektion +${projectedScoreGain.toFixed(1)} gesamt). Undo ist direkt verfügbar, Captain bleibt bewusst manuell (${captainSeasonUsedWithDraft}/${captainSeasonLimit}).`
         : "Keine offenen Slots oder keine legalen Kandidaten gefunden.",
     );
   }
@@ -6800,7 +6848,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
   function getTeamPowerSelectTitle(disciplineSide: "d1" | "d2") {
     return [
-      isReadOnly ? "Bearbeitung gesperrt: Das aktive Team ist fuer diesen Owner im Save nicht steuerbar." : null,
+      isReadOnly ? "Bearbeitung gesperrt: Das aktive Team ist für diesen Owner im Save nicht steuerbar." : null,
       context?.teamPowerSource?.sourceLabel ?? null,
       getTeamPowerEmptyOptionLabel(disciplineSide),
     ].filter(Boolean).join("\n");
@@ -7001,6 +7049,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onUndo={restoreLineupUndo}
         statusMessage={message}
         errors={errors}
+        resolvePreview={preview}
         controlsSlot={
           <>
             <label>
@@ -7030,7 +7079,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               >
                 {filteredTeamOptions.map((team) => (
                   <option key={team.id} value={team.id}>
-                    {formatTeamOptionLabel(team)}
+                    {formatNlTeamOptionLabel(team)}
                   </option>
                 ))}
               </select>
@@ -7189,7 +7238,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   ? "Bitte kurz warten."
                   : slots.every((slot) => Boolean(selections[slot.key]))
                     ? "Alle Slots sind schon belegt."
-                    : "Springt direkt zum naechsten offenen Slot."
+                    : "Springt direkt zum nächsten offenen Slot."
               }
             >
               Nächster Slot
@@ -7238,15 +7287,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             ))}
           </div>
         </section>
-        <div className="legacy-lineup-flow-ribbon" aria-label="Naechster Einsatzlisten-Schritt">
+        <div className="legacy-lineup-flow-ribbon" aria-label="Nächster Einsatzlisten-Schritt">
           <button className="legacy-lineup-flow-card is-active" type="button" onClick={jumpToNextLineupTask}>
             <span>Leertaste</span>
             <strong>
               {matchdayPreviewCards.openSlots > 0
-                ? "Zum naechsten offenen Slot"
+                ? "Zum nächsten offenen Slot"
                 : lineupReadyToSave
                     ? "Speichern bereit"
-                    : "Preview pruefen"}
+                    : "Preview prüfen"}
             </strong>
             <small>
               {activeSlotIssues[0]?.detail ??
@@ -7271,7 +7320,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             <small>
               {activeSlotSpotlightCandidates[0]
                 ? `${activeSlotSpotlightCandidates[0].groupMeta.label} · ${formatNullableScore(activeSlotSpotlightCandidates[0].activeSlotCandidate?.projectedScore)}`
-                : "Slot waehlen"}
+                : "Slot wählen"}
             </small>
             {activeSlot && activeSlotSpotlightCandidates[0] ? (
               <LegacyLineupCandidateReasonChips
@@ -7611,7 +7660,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	              <span className="is-score" title="Projected Score-Fenster aus aktuellem Lineup, Rollen, Fatigue und Modifikatoren.">
 	                Score <strong>{formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh)}</strong>
 	              </span>
-	              <span className={matchdayPreviewCards.totalFatigue >= 40 ? "is-warning" : "is-ready"} title="Summe der erwarteten Zusatz-Erschoepfung fuer diesen Spieltag.">
+	              <span className={matchdayPreviewCards.totalFatigue >= 40 ? "is-warning" : "is-ready"} title="Summe der erwarteten Zusatz-Erschöpfung für diesen Spieltag.">
 	                Fatigue <strong>{formatDecimalScore(matchdayPreviewCards.totalFatigue, 1)}</strong>
 	              </span>
 	              <span className={lineupMiniAudit.blockingItems.length > 0 ? "is-blocked" : "is-ready"} title={lineupMiniAudit.blockingItems.map((item) => item.detail).join(" · ") || "Keine harten Blocker."}>
@@ -7750,13 +7799,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	                      : side.requiredPlayers <= 3
 	                        ? "kleine Diszi"
 	                        : side.missingSlots > 0
-	                          ? "Kaderluecke"
+	                          ? "Kaderlücke"
 	                          : "stabiler Value";
 	                  return (
 	                    <article key={`ai-insight-${side.disciplineSide}`} className="legacy-lineup-ai-insight-side">
 	                      <div className="legacy-lineup-ai-insight-side-head">
 	                        <DisciplineIcon disciplineId={side.disciplineId} label={side.disciplineName ?? side.disciplineSide.toUpperCase()} showLabel />
-	                        <span title="Team-Rank und benoetigte Spielerzahl fuer diese Disziplin.">
+	                        <span title="Team-Rank und benoetigte Spielerzahl für diese Disziplin.">
 	                          #{side.teamDisciplineRank ?? "—"} · {side.selectedPlayers}/{side.requiredPlayers}
 	                        </span>
 	                      </div>
@@ -7780,7 +7829,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	                      </div>
 	                      <div className="legacy-lineup-ai-insight-reason">
 	                        <strong>{side.captainName ? `Captain ${side.captainName}` : "Captain offen"}</strong>
-	                        <span title={captainLine ?? undefined}>{captainLine ?? "AI spart den Captain fuer ein staerkeres Fenster."}</span>
+	                        <span title={captainLine ?? undefined}>{captainLine ?? "AI spart den Captain für ein stärkeres Fenster."}</span>
 	                      </div>
 	                      <div className="legacy-lineup-ai-reason-stack">
 	                        {side.reasoning.slice(0, 3).map((line, index) => (
@@ -8300,7 +8349,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           title={
                             captainSelectEntries.length === 0
                               ? "Setze zuerst mindestens einen Spieler auf dieser Seite ein."
-                              : `${captainDraftRemaining} Captain-Einsatz${captainDraftRemaining === 1 ? "" : "e"} fuer diesen Draft uebrig`
+                              : `${captainDraftRemaining} Captain-Einsatz${captainDraftRemaining === 1 ? "" : "e"} für diesen Draft übrig`
                           }
                         >
                           <option value="">Kein Captain</option>
@@ -8653,7 +8702,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           <div className="legacy-matchday-room-kpi">
             <span>Captain</span>
             <strong>{captainSeasonUsedWithDraft}/{captainSeasonLimit}</strong>
-            <small>{[captains.d1, captains.d2].filter(Boolean).length} heute · {captainDraftRemaining} uebrig</small>
+            <small>{[captains.d1, captains.d2].filter(Boolean).length} heute · {captainDraftRemaining} übrig</small>
           </div>
         </div>
       </section>
@@ -8671,7 +8720,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               >
                 Matchday Room · Lineup Prep
               </TooltipHeading>
-              <p className="legacy-lineup-teamdeck-kicker">Kartenpool fuer Drag & Drop</p>
+              <p className="legacy-lineup-teamdeck-kicker">Kartenpool für Drag & Drop</p>
             </div>
             <div className="legacy-matchday-room-badges">
               <span className="pill">
@@ -8687,13 +8736,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           </div>
           <div className={`legacy-lineup-active-slot-strip${activeSlot && !selections[activeSlot.key] ? " is-next-open" : ""}${nextOpenSlotKey && nextOpenSlotKey !== activeSlot?.key ? " has-next-target" : ""}`}>
             <div className="legacy-lineup-active-slot-copy">
-              <span>{activeSlot && !selections[activeSlot.key] ? "Hier weiter" : nextOpenSlotKey ? "Als Naechstes" : "Teamdeck sortiert fuer"}</span>
+              <span>{activeSlot && !selections[activeSlot.key] ? "Hier weiter" : nextOpenSlotKey ? "Als Nächstes" : "Teamdeck sortiert für"}</span>
               <strong>
                 {activeSlot && !selections[activeSlot.key]
                   ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1} · ${activeSlotRole?.label ?? "Standard"}`
                   : nextOpenSlot
                     ? `${nextOpenSlot.disciplineSide.toUpperCase()}-${nextOpenSlot.slotIndex + 1} · offener Slot`
-                    : "naechsten freien Slot"}
+                    : "nächsten freien Slot"}
               </strong>
               <small>
                 {activeSlotIssues[0]?.detail ??
@@ -8773,13 +8822,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             })}
           </div>
           {activeSlot && activeSlotSpotlightGroups.length ? (
-            <div className="legacy-lineup-active-candidate-rail" aria-label="Beste Kandidaten fuer aktiven Slot">
+            <div className="legacy-lineup-active-candidate-rail" aria-label="Beste Kandidaten für aktiven Slot">
               <div className="legacy-lineup-active-candidate-copy">
                 <span>Beste Kandidaten</span>
                 <strong>
                   {activeSlot.disciplineSide.toUpperCase()}-{activeSlot.slotIndex + 1}
                 </strong>
-                <small>Klick setzt direkt und fokussiert den naechsten offenen Slot.</small>
+                <small>Klick setzt direkt und fokussiert den nächsten offenen Slot.</small>
               </div>
               <div className="legacy-lineup-active-candidate-list">
                 {activeSlotSpotlightGroups.map((group) => (
@@ -8929,7 +8978,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       focusedSideScore,
                       player.fatigueCount,
                     );
-                    const assignmentLabel = player.selectedSides.length > 0 ? `Aktiv in ${player.selectedSides.join(" + ").toUpperCase()}` : "Verfuegbar";
+                    const assignmentLabel = player.selectedSides.length > 0 ? `Aktiv in ${player.selectedSides.join(" + ").toUpperCase()}` : "Verfügbar";
                     const isPreviewedCandidate = Boolean(
                       activeSlot &&
                         player.activePlayerId &&
@@ -9032,11 +9081,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             </span>
                           ) : null}
                           {!wantsActiveSlot && preferredSlotTags.length > 0 ? (
-                            <span className="legacy-matchday-player-score-chip" title="Beste empfohlene Slots fuer diesen Spieler.">
+                            <span className="legacy-matchday-player-score-chip" title="Beste empfohlene Slots für diesen Spieler.">
                               {preferredSlotTags.join(" / ")}
                             </span>
                           ) : null}
-                          {player.captainEligible ? <span className="legacy-matchday-player-score-chip">Captain moeglich</span> : null}
+                          {player.captainEligible ? <span className="legacy-matchday-player-score-chip">Captain möglich</span> : null}
                           {captainDemand ? (
                             <span className="legacy-matchday-player-score-chip is-active-slot-chip" title={captainDemand.detail}>
                               Captain-Wunsch
@@ -9087,7 +9136,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                 ? "Blockiert"
                                 : player.injuryStatus === "recovering"
                                   ? "Recovery"
-                                  : "Verfuegbar"}
+                                  : "Verfügbar"}
                             </strong>
                             <small>
                               {activeSlot
@@ -9121,7 +9170,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               disabled={!player.activePlayerId || Boolean(activeSlotCandidate?.blockReason)}
                               title={
                                 !player.activePlayerId
-                                  ? "Dieser Spieler ist gerade nicht verfuegbar."
+                                  ? "Dieser Spieler ist gerade nicht verfügbar."
                                   : activeSlotCandidate?.blockReason
                                     ? formatLegacyLineupDragBlockReason(activeSlotCandidate.blockReason) ?? "Passt gerade nicht legal in den aktiven Slot."
                                     : "Setzt den Spieler direkt in den aktiven Slot."
@@ -9287,7 +9336,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       <strong>Captain:</strong> {captains[disciplineSide] ? "gesetzt" : "offen"}
                     </span>
                     <span>
-                      <strong>Budget:</strong> {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison · {captainDraftRemaining} uebrig
+                      <strong>Budget:</strong> {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison · {captainDraftRemaining} übrig
                     </span>
                   </div>
                   <div className="legacy-lineup-side-body legacy-lineup-arena-slot-grid">
@@ -9342,7 +9391,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             ? "Verbraucht beim Speichern 1 von 3 Saison-Captains. Lohnt sich nur, wenn der Swing Ränge oder Forderung/Happiness rettet."
                             : captainDraftRemaining > 0
                               ? "Captain ist optional und wertvoll: Auto-Fill setzt keinen. Erst setzen, wenn Beitrag, Forderung oder Rivalendruck es rechtfertigen."
-                              : "Kein freier Captain mehr: entferne einen Draft-Captain oder spare die Ressource fuer spaeter."}
+                              : "Kein freier Captain mehr: entferne einen Draft-Captain oder spare die Ressource für später."}
                         </small>
                       </div>
                       <div className="legacy-lineup-captain-impact-grid">
@@ -9378,7 +9427,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           title={
                             captainSelectEntries.length === 0
                               ? "Setze zuerst mindestens einen Spieler auf dieser Seite ein."
-                              : `${captainDraftRemaining} Captain-Einsatz${captainDraftRemaining === 1 ? "" : "e"} fuer diesen Draft uebrig`
+                              : `${captainDraftRemaining} Captain-Einsatz${captainDraftRemaining === 1 ? "" : "e"} für diesen Draft übrig`
                           }
                         >
                           <option value="">Kein Captain</option>
@@ -9887,11 +9936,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                 </div>
                               ) : (
                                 <div className={`legacy-lineup-slot-empty-card${isMissingHighlighted ? " is-missing-highlight" : ""}`}>
-                                  <strong>{isActiveSlot ? "Naechster Slot" : "Freier Slot"}</strong>
+                                  <strong>{isActiveSlot ? "Nächster Slot" : "Freier Slot"}</strong>
                                   <span>
                                     {isActiveSlot
                                       ? "Spielerkarte hier ablegen oder Top Pick nutzen."
-                                      : "Offene Drop-Zone fuer eine Spielerkarte."}
+                                      : "Offene Drop-Zone für eine Spielerkarte."}
                                   </span>
                                 </div>
                               )}
@@ -9972,7 +10021,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             <div>
               <TooltipHeading
                 as="h3"
-                tooltip="Kompakter Zielbereich fuer D1/D2-Projektion, offene Slots, Risiko und Modifier-Status."
+                tooltip="Kompakter Zielbereich für D1/D2-Projektion, offene Slots, Risiko und Modifier-Status."
               >
                 Matchday Preview
               </TooltipHeading>
@@ -10249,7 +10298,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="muted">Noch keine Top-Spieler fuer diese Disziplin vorhanden.</td>
+                      <td colSpan={5} className="muted">Noch keine Top-Spieler für diese Disziplin vorhanden.</td>
                     </tr>
                   )}
                 </tbody>
@@ -10359,7 +10408,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 className="table-shell legacy-lineup-player-table-shell"
                 ref={expertPlayerTableShellRef}
                 data-virtualized={expertPlayerTableVirtualWindow.enabled ? "true" : undefined}
-                onScroll={(event) => setExpertPlayerTableScrollTop(event.currentTarget.scrollTop)}
+                onScroll={handleExpertPlayerTableScroll}
               >
                 <table className="team-table legacy-lineup-player-table">
                   <colgroup>
@@ -10621,7 +10670,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 </div>
                 <div className="legacy-ai-preview-actions">
                   <button className="secondary-button" type="button" onClick={handleAdoptAiPreview}>
-                    Vorschlag uebernehmen
+                    Vorschlag übernehmen
                   </button>
                   <button
                     className="primary-button"
@@ -10747,13 +10796,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               {aiBatchApplyFeed ? (
                 <div className="legacy-ai-preview-kpis" style={{ marginBottom: 12 }}>
                   <span>AI Eligible: {aiBatchApplyFeed.summary.aiEligibleTeams}</span>
-                  <span>Manual uebersprungen: {aiBatchApplyFeed.summary.skippedManual}</span>
-                  <span>Passive uebersprungen: {aiBatchApplyFeed.summary.skippedPassive}</span>
-                  <span>Disabled uebersprungen: {aiBatchApplyFeed.summary.skippedDisabled}</span>
+                  <span>Manual übersprungen: {aiBatchApplyFeed.summary.skippedManual}</span>
+                  <span>Passive übersprungen: {aiBatchApplyFeed.summary.skippedPassive}</span>
+                  <span>Disabled übersprungen: {aiBatchApplyFeed.summary.skippedDisabled}</span>
                   <span>Ready to Save: {aiBatchApplyFeed.summary.readyToSave}</span>
                   <span>Would Save: {aiBatchApplyFeed.summary.wouldSave}</span>
                   <span>Saved: {aiBatchApplyFeed.summary.savedTeams}</span>
-                  <span>Hinweise uebersprungen: {aiBatchApplyFeed.summary.skippedWarning}</span>
+                  <span>Hinweise übersprungen: {aiBatchApplyFeed.summary.skippedWarning}</span>
                   <span>Skipped Blocked: {aiBatchApplyFeed.summary.skippedBlocked}</span>
                   <span>Skipped Existing: {aiBatchApplyFeed.summary.skippedExisting}</span>
                   <span>Existing: {aiBatchApplyFeed.summary.existingLineups}</span>

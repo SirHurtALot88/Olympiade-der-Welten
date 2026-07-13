@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { ScoutingHubV2ClientProps, ScoutingHubV2TabId } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import ScoutingPriorityQueue from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
 import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingReportPanel";
+import ScoutingShortlistBoard from "@/app/foundation/scouting-center-v2/ScoutingShortlistBoard";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
@@ -161,6 +162,7 @@ export default function ScoutingCenterV2NewLook({
   hiddenAtTier,
   baseInfoAlwaysVisible,
   activeScoutTargets = [],
+  bookmarkedTargets = [],
   scoutPipeline = null,
   activeTab: controlledActiveTab,
   onActiveTabChange,
@@ -186,7 +188,13 @@ export default function ScoutingCenterV2NewLook({
     }
   };
 
-  const rosterGap = rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
+  // #Kader-Tile-Ton: "Minimum erreicht" (grün) nur behaupten, wenn das Minimum
+  // bekannt UND erfüllt ist. Bei unbekanntem Minimum (rosterMinimum == null, z. B.
+  // Büro L0) galt zuvor rosterGap === 0 => grün "Minimum erreicht", auch bei 0
+  // Spielern. Leerer Kader ist nie das erreichte Minimum.
+  const rosterKnown = rosterMinimum != null;
+  const rosterGap = rosterKnown && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
+  const rosterMinimumMet = rosterKnown ? rosterCount >= rosterMinimum : rosterCount > 0;
   const readyToBuyEntries = queueEntries.filter((entry) => entry.isFullyScouted);
   const focusEntry = queueEntries.find((entry) => entry.isFocusTarget && !entry.isFullyScouted) ?? null;
 
@@ -194,6 +202,9 @@ export default function ScoutingCenterV2NewLook({
   // L5 sind die Achswerte real freigegeben, decken sich mit den Roh-Achsen).
   // Teil-gescoutete Ziele bekommen bewusst kein Radar (kein Leak verdeckter Werte).
   const axisTargetById = new Map(activeScoutTargets.map((target) => [target.playerId, target] as const));
+  // #Shortlist-Board — aktive + nur gemerkte Ziele zusammen, damit die
+  // GESAMTE Wishlist (queueEntries) ihre CA/PO/Marktwert-Felder findet.
+  const shortlistTargets = [...activeScoutTargets, ...bookmarkedTargets];
   const getReadyRadarAxes = (playerId: string): NlRadarAxis[] => {
     const target = axisTargetById.get(playerId);
     if (!target) {
@@ -217,7 +228,14 @@ export default function ScoutingCenterV2NewLook({
         title={teamName}
         actions={
           <div className="nl-scout-header-actions">
-            <VeloStarRating value={scoutingFacilityLevel} label={scoutingFacilityLabel} compact />
+            {/* #Scout-Office-Sterne: Bei L0/ungebaut zeigt VeloStarRating sonst
+                5 (leere, aber gold glühende) Sterne — liest sich wie ein volles
+                5-Sterne-Rating. Ungebaut => expliziter "nicht gebaut"-Status. */}
+            {scoutingFacilityLevel > 0 ? (
+              <VeloStarRating value={scoutingFacilityLevel} label={scoutingFacilityLabel} compact />
+            ) : (
+              <span className="nl-scout-status-pill is-focus">{scoutingFacilityLabel} · nicht gebaut</span>
+            )}
           </div>
         }
       >
@@ -253,9 +271,9 @@ export default function ScoutingCenterV2NewLook({
           />
           <StatChip
             label="Kader"
-            value={rosterMinimum != null ? `${rosterCount}/${rosterMinimum}` : rosterCount}
-            tone={rosterGap > 0 ? "warn" : "good"}
-            sub={rosterGap > 0 ? `−${rosterGap} bis Minimum` : "Minimum erreicht"}
+            value={rosterKnown ? `${rosterCount}/${rosterMinimum}` : rosterCount}
+            tone={rosterMinimumMet ? "good" : "warn"}
+            sub={rosterGap > 0 ? `−${rosterGap} bis Minimum` : rosterMinimumMet ? "Minimum erreicht" : "Minimum nicht erreicht"}
             title={draftContextNote}
           />
           <StatChip
@@ -391,6 +409,27 @@ export default function ScoutingCenterV2NewLook({
               onOpenMarket={onOpenMarket}
             />
           </NlCard>
+
+          <NlCard
+            className="nl-scout-shortlist-card"
+            eyebrow="Shortlist-Analyse"
+            title="Shortlist vergleichen"
+            data-testid="scouting-shortlist-card"
+          >
+            <p className="nl-scout-muted">
+              Alle Wishlist-Spieler nebeneinander — sortierbar nach Intel, Erkenntnisstufe, CA/PO-Decke, Potenzial, Fee
+              und Team-Impact. "Vergleichen" lädt den Scouting Report der Zeile, damit der echte Top-6-Impact
+              erscheint.
+            </p>
+            <ScoutingShortlistBoard
+              entries={queueEntries}
+              targets={shortlistTargets}
+              report={report}
+              selectedReportPlayerId={selectedReportPlayerId}
+              onSelectReportPlayer={onSelectReportPlayer}
+              onOpenPlayer={onOpenPlayer}
+            />
+          </NlCard>
         </>
       ) : null}
 
@@ -448,6 +487,7 @@ export default function ScoutingCenterV2NewLook({
             onPromoteToFocus={(playerId) => onReorderQueue?.(playerId, 0)}
             onRemove={(playerId) => onRemoveFromQueue?.(playerId)}
             canPromoteToFocus={queueEntries.length > 1}
+            newLook
           />
           {queueEntries.length > 1 ? (
             <div className="nl-scout-report-picker">

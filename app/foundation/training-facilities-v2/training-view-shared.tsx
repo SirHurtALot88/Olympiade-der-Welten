@@ -17,7 +17,16 @@ import {
 } from "@/components/foundation/velo-ui";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
+import { getTrainingModePresentation, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
+import { PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE } from "@/lib/training/organic-season-progression";
+import {
+  getClassTrainingProfile,
+  normalizeProgressionClassName,
+  PROGRESSION_ATTRIBUTE_ORDER,
+  PROGRESSION_CLASS_ORDER,
+  type ProgressionClassName,
+} from "@/lib/training/class-progression-config";
+import { getAttributeGrowthMultiplier } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
@@ -48,6 +57,210 @@ export function getDevelopmentTone(row: TrainingPlayerRowView) {
     return "growth";
   }
   return "stable";
+}
+
+function roundTo(value: number, digits = 1) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+export type TrainingIntensityProjectionEntry = {
+  mode: PlayerTrainingMode;
+  label: string;
+  /** "durch Training" — Trainingsbudget für diese Intensität (potentialgetrieben, pro Spieler). */
+  trainingGain: number;
+  /** Angewendeter Performance-Anteil bei dieser Intensität. */
+  performanceGain: number;
+  /** Regressions-Drag (negativ), intensitätsunabhängig. */
+  regression: number;
+  /** Projizierter Netto-Forecast, wenn diese Intensität gewählt würde. */
+  net: number;
+  isCurrent: boolean;
+  fatigueLoad: number;
+  /** Regenerations-Delta dieser Intensität in % (echtes Feld aus `trainingModeOptions`, z. B. Recovery/Verletzungsschutz-Trade-off). */
+  recoveryDeltaPct: number;
+};
+
+/**
+ * Per-Spieler, per-Intensität (leicht/mittel/hart) Trainings-Prognose.
+ *
+ * Reine Ableitung aus real vorhandenen Row-Feldern, KEINE neue Balance-Formel:
+ * Die Engine (`buildOrganicSeasonProgression`, organic-season-progression.ts:628-636)
+ * berechnet `trainingSetpoints = TRAINING_SETPOINTS_BY_MODE[mode] * traitMult *
+ * potentialTrainingMultiplier * routeBonus * facility`. Nur die Modus-Basis ist
+ * modusabhängig → das Budget skaliert exakt linear mit `TRAINING_SETPOINTS_BY_MODE`,
+ * und der `potentialTrainingMultiplier` steckt schon im Budget des aktuellen Modus.
+ * Dadurch fällt die Prognose PRO SPIELER unterschiedlich aus: höheres Potential →
+ * größeres `organicForecast.trainingSetpoints` → größerer Zuwachs über alle Intensitäten.
+ *
+ * Angewendetes Training skaliert ebenfalls linear (die Attribut-Multiplikatoren sind
+ * modusunabhängig), daher wird der Netto-Wert exakt gegenüber dem echten aktuellen
+ * `netSetpoints` verschoben: Δtraining (angewendet) + Δperformance (Modus-Gewicht
+ * PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE).
+ */
+export function buildTrainingIntensityProjection(
+  row: TrainingPlayerRowView,
+  trainingModeOptions: TrainingModeOption[],
+): TrainingIntensityProjectionEntry[] {
+  const currentBudgetBase = TRAINING_SETPOINTS_BY_MODE[row.mode] ?? TRAINING_SETPOINTS_BY_MODE.mittel;
+  const currentTrainingBudget = row.organicForecast.trainingSetpoints;
+  const appliedTrainingCurrent = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
+  const appliedPerformanceCurrent = row.organicForecast.performanceSetpoints;
+  const regressionTotal = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+  const currentNet = row.organicForecast.netSetpoints;
+  const currentPerfWeight = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[row.mode] ?? 1;
+
+  return trainingModeOptions.map((option) => {
+    const budgetBase = TRAINING_SETPOINTS_BY_MODE[option.value] ?? option.trainingSetpoints;
+    const budgetScale = currentBudgetBase > 0 ? budgetBase / currentBudgetBase : 1;
+    const trainingGain = currentTrainingBudget * budgetScale;
+    const appliedTraining = appliedTrainingCurrent * budgetScale;
+    const perfWeight = PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[option.value] ?? 1;
+    const performanceGain = appliedPerformanceCurrent * (currentPerfWeight > 0 ? perfWeight / currentPerfWeight : 1);
+    const net = currentNet + (appliedTraining - appliedTrainingCurrent) + (performanceGain - appliedPerformanceCurrent);
+    return {
+      mode: option.value,
+      label: option.label,
+      trainingGain: roundTo(trainingGain, 1),
+      performanceGain: roundTo(performanceGain, 1),
+      regression: roundTo(regressionTotal, 1),
+      net: roundTo(net, 1),
+      isCurrent: option.value === row.mode,
+      fatigueLoad: option.fatigueLoad,
+      recoveryDeltaPct: option.recoveryDeltaPct,
+    };
+  });
+}
+
+export type TrainingClassSuggestion = {
+  className: ProgressionClassName;
+  label: string;
+  attributes: string[];
+};
+
+/**
+ * D3 — Klassen-Vorschlag aus den zwei Signature-Attributen (die ein Spieler am
+ * besten trainiert). Nutzt die ECHTE Klassen→Attribut-Gewichtung aus
+ * `CLASS_PROGRESSION_WEIGHTS` (class-progression-config.ts) via
+ * `getClassTrainingProfile`. Vorgeschlagen wird nur, wenn eine andere Klasse als
+ * die aktuelle beide Signature-Attribute deutlich stärker gewichtet — sonst `null`.
+ */
+export function buildTrainingClassSuggestion(
+  row: TrainingPlayerRowView,
+  trainingClassOptions: TrainingClassOption[],
+): TrainingClassSuggestion | null {
+  const signatureEntries = row.attributeForecast
+    .filter((entry) => entry.affinity === "signature")
+    .sort((left, right) => right.training - left.training);
+  if (signatureEntries.length < 2) return null;
+  const [first, second] = signatureEntries;
+  const keyA = first.attributeKey;
+  const keyB = second.attributeKey;
+
+  const combinedWeight = (className: ProgressionClassName) => {
+    const profile = getClassTrainingProfile(className, row.adminBalancingConfig);
+    const positiveTotal = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => sum + Math.max(0, profile[key]), 0);
+    if (positiveTotal <= 0) return { normalized: 0, weightA: profile[keyA], weightB: profile[keyB] };
+    return {
+      normalized: (Math.max(0, profile[keyA]) + Math.max(0, profile[keyB])) / positiveTotal,
+      weightA: profile[keyA],
+      weightB: profile[keyB],
+    };
+  };
+
+  const currentClass = normalizeProgressionClassName(row.trainingClass);
+  const currentCombined = currentClass ? combinedWeight(currentClass).normalized : 0;
+
+  let best: { className: ProgressionClassName; normalized: number; weightA: number; weightB: number } | null = null;
+  for (const className of PROGRESSION_CLASS_ORDER) {
+    const scored = combinedWeight(className);
+    if (best == null || scored.normalized > best.normalized) {
+      best = { className, ...scored };
+    }
+  }
+  if (best == null) return null;
+  // Nur echte Signale: andere Klasse, beide Signature-Attribute positiv gewichtet,
+  // und spürbar besserer Fit als die aktuelle Klasse.
+  if (best.className === currentClass) return null;
+  if (best.weightA <= 0 || best.weightB <= 0) return null;
+  if (best.normalized < currentCombined + 0.05) return null;
+
+  const label = trainingClassOptions.find((option) => option.value === best!.className)?.label ?? best.className;
+  return {
+    className: best.className,
+    label,
+    attributes: [first.attribute, second.attribute],
+  };
+}
+
+export type TrainingClassGainEstimate = {
+  className: ProgressionClassName;
+  label: string;
+  /** Geschätzter Trainings-SP-Zugewinn für diese Klasse (siehe Doku unten) — Schätzung, keine Garantie. */
+  estimatedGain: number;
+  isCurrent: boolean;
+  /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
+  rank: number;
+};
+
+/**
+ * #53 — Top-3 Klassen nach geschätztem Trainings-SP-Zugewinn.
+ *
+ * Schätzung, KEINE neue Balance-Formel: Das echte, bereits Trait-/Potential-/
+ * Facility-adjustierte Trainingsbudget des Spielers (`organicForecast.trainingSetpoints`)
+ * wird nach der jeweiligen Klassen-Attributgewichtung (`CLASS_PROGRESSION_WEIGHTS`,
+ * positiv normalisiert wie in `distributeByClassProfile`, organic-season-progression.ts)
+ * verteilt und mit dem ECHTEN Potential-Decke-Multiplikator je Attribut abgeschwächt
+ * (`getAttributeGrowthMultiplier` — dieselbe Funktion, die die Engine für den
+ * Headroom-Malus nutzt: 0.05 bei "capped", 0.45 bei "closing", 1 bei "open").
+ * Reale Werte weichen ab, sobald Performance-Anteil, Signature/Weak-Affinität und
+ * Trait-Nebenwirkungen mit einfließen — daher UI-seitig klar als Schätzung markieren.
+ */
+export function buildTrainingClassGainRanking(
+  row: TrainingPlayerRowView,
+  trainingClassOptions: TrainingClassOption[],
+  options?: { limit?: number; includeCurrent?: boolean },
+): TrainingClassGainEstimate[] {
+  const limit = options?.limit ?? 3;
+  const includeCurrent = options?.includeCurrent ?? false;
+  const budget = row.organicForecast.trainingSetpoints;
+  if (!(budget > 0)) return [];
+  const currentClass = normalizeProgressionClassName(row.trainingClass);
+  const capacityByAttribute = new Map(
+    row.attributeForecast.map((entry) => [entry.attributeKey, getAttributeGrowthMultiplier(entry.ceilingState ?? "open")]),
+  );
+
+  const estimates = PROGRESSION_CLASS_ORDER.map((className) => {
+    const profile = getClassTrainingProfile(className, row.adminBalancingConfig);
+    const positiveTotal = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => sum + Math.max(0, profile[key]), 0);
+    const estimatedGain =
+      positiveTotal > 0
+        ? PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => {
+            const weight = Math.max(0, profile[key]);
+            if (weight <= 0) return sum;
+            const capacity = capacityByAttribute.get(key) ?? 1;
+            return sum + budget * (weight / positiveTotal) * capacity;
+          }, 0)
+        : 0;
+    const label = trainingClassOptions.find((option) => option.value === className)?.label ?? className;
+    return {
+      className,
+      label,
+      estimatedGain: roundTo(estimatedGain, 1),
+      isCurrent: className === currentClass,
+    };
+  });
+
+  const sorted = estimates
+    .sort((left, right) => right.estimatedGain - left.estimatedGain)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const top = sorted.slice(0, Math.max(0, limit));
+  // Aktuelle Klasse immer zum Vergleich sichtbar halten, auch wenn außerhalb der Top-N.
+  if (includeCurrent && !top.some((entry) => entry.isCurrent)) {
+    const current = sorted.find((entry) => entry.isCurrent);
+    if (current) top.push(current);
+  }
+  return top;
 }
 
 export type TrainingBudgetBreakdownStep = {
@@ -83,7 +296,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "base",
       label: `Basis-Training (${modePresentation.label})`,
       value: `+${formatVeloNumber(baseBudget, 2)}`,
-      detail: "Fixer Startwert je Trainingsintensitaet, noch ohne Boni.",
+      detail: "Fixer Startwert je Trainingsintensität, noch ohne Boni.",
     },
     {
       key: "trait",
@@ -114,7 +327,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "add",
       label: "Weitere Boni (Rolle/Fokus)",
       value: formatSignedPercent(otherBonusPct),
-      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschluesselt.",
+      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschlüsselt.",
     });
   }
 
@@ -124,14 +337,14 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "result",
       label: "= Trainingsbudget",
       value: `+${formatVeloNumber(row.organicForecast.trainingSetpoints, 2)}`,
-      detail: "Gesamtbudget, das ueber alle 12 Attribute verteilt wird (Klassenprofil + Affinitaet).",
+      detail: "Gesamtbudget, das über alle 12 Attribute verteilt wird (Klassenprofil + Affinität).",
     },
     {
       key: "applied-training",
       operator: "add",
       label: "Angewendet auf Stats",
       value: `+${formatVeloNumber(appliedTraining, 2)}`,
-      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinitaet und Attribut-Decke.",
+      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinität und Attribut-Decke.",
     },
     {
       key: "performance",
@@ -147,7 +360,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       operator: "subtract",
       label: "− Regression",
       value: formatVeloNumber(appliedRegression, 2),
-      detail: "Laufende Basis-Abnutzung plus zusaetzlicher Marktwert-Druck bei teuren Spielern.",
+      detail: "Laufende Basis-Abnutzung plus zusätzlicher Marktwert-Druck bei teuren Spielern.",
     },
     {
       key: "net",
@@ -191,7 +404,7 @@ export function TrainingBudgetBreakdownDisclosure({ row }: { row: TrainingPlayer
         </small>
       </div>
       {expanded ? (
-        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt fuer Schritt">
+        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt für Schritt">
           {steps.map((step) => (
             <div className={`training-budget-breakdown-step is-${step.operator}`} key={step.key} title={step.detail}>
               <span className="training-budget-breakdown-operator">{BREAKDOWN_OPERATOR_SYMBOL[step.operator]}</span>
@@ -227,7 +440,7 @@ function getDevelopmentBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
 function getDemandStatusLabel(status: PlayerDemandStatus) {
   switch (status) {
     case "fulfilled":
-      return "erfuellt";
+      return "erfüllt";
     case "at_risk":
       return "unter Druck";
     case "failed":
@@ -439,7 +652,7 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
 
           <p
             className="muted training-v2-reality-note"
-            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt."
+            title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt."
           >
             Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
             {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
@@ -537,7 +750,7 @@ export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowV
               {entry.ceilingState === "capped" ? (
                 <span
                   className="training-v2-ceiling-mark is-capped"
-                  title="Potential erreicht — kaum noch Trainingswachstum moeglich"
+                  title="Potential erreicht — kaum noch Trainingswachstum möglich"
                 >
                   Limit
                 </span>
@@ -572,7 +785,7 @@ type TrainingModeGuideProps = {
 
 export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProps) {
   return (
-    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklaerung">
+    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklärung">
       {trainingModeOptions.map((option) => (
         <article
           className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
@@ -606,7 +819,7 @@ export function TrainingModeGuideDisclosure({ trainingModeOptions }: TrainingMod
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
       >
-        {expanded ? "Trainings-Erklaerung ausblenden" : "Wie funktioniert Training?"}
+        {expanded ? "Trainings-Erklärung ausblenden" : "Wie funktioniert Training?"}
       </button>
       {expanded ? <TrainingModeGuide trainingModeOptions={trainingModeOptions} /> : null}
     </div>
@@ -806,7 +1019,7 @@ export function TrainingPlayerLane({
               <TrainingCardCompactBadges row={row} />
               {tone === "regression" ? (
                 <FoundationCard variant="decision" className="training-v2-regression-callout">
-                  <span className="eyebrow">Rueckschritt sichtbar</span>
+                  <span className="eyebrow">Rückschritt sichtbar</span>
                   <strong>
                     {row.organicForecast.netSetpoints < 0
                       ? `Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)}`
@@ -823,7 +1036,7 @@ export function TrainingPlayerLane({
           );
         })}
         {playerRows.length === 0 ? (
-          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder waehle ein anderes Team." />
+          <EmptyState title="Keine Spieler im aktuellen Filter" text="Wechsle den Entwicklungsfokus oder wähle ein anderes Team." />
         ) : null}
       </div>
     </>

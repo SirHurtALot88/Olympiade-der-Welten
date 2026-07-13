@@ -11,6 +11,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { useRafThrottledScrollTop } from "@/lib/foundation/use-raf-throttled-scroll";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNewLook";
@@ -78,6 +79,13 @@ export type SeasonV2StandingsRow = {
   logoInitials: string;
   rank: number | null;
   rankDiff: number | null;
+  /**
+   * Wave D · D4 Rang-Movement: Δ Gesamtrang gegenüber dem letzten Spieltag
+   * (Feld-Rennen-Ledger, `rankDeltaVsPrev`). >0 = Plätze gutgemacht (▲),
+   * <0 = abgerutscht (▼), `null` am ersten Spieltag. Additiv/optional — der
+   * bestehende Render liest dieses Feld nur im "Neuer Look"-Board.
+   */
+  fieldRaceRankDelta?: number | null;
   points: number | null;
   pps: number | null;
   pow: number | null;
@@ -624,7 +632,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
     }
     setInternalSeasonV2Mode(mode);
   };
-  const [standingsTableScrollTop, setStandingsTableScrollTop] = useState(0);
+  const [standingsTableScrollTop, handleStandingsTableScroll] = useRafThrottledScrollTop();
   const [standingsTableViewportHeight, setStandingsTableViewportHeight] = useState(560);
   const standingsTableShellRef = useRef<HTMLDivElement | null>(null);
   const [focusedTeamId, setFocusedTeamId] = useState<string | null>(selectedTeamSummary?.teamId ?? null);
@@ -1173,7 +1181,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
                     <h4>{gmTitle}</h4>
                     <p>{row.description ?? row.lineupDoctrine ?? "Kein GM-Profil aktiv."}</p>
                   </div>
-                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und moeglichen Wechselgruenden.">
+                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und möglichen Wechselgruenden.">
                     <strong>
                       {getGmStoryLabel({
                         source: row.source,
@@ -1299,7 +1307,7 @@ export default function SeasonStandingsV2Client(props: SeasonStandingsV2ClientPr
             className={`table-shell season-v2-table-shell season-v2-table-shell-full${mobileCardsView ? " is-mobile-cards" : ""}`}
             ref={standingsTableShellRef}
             data-virtualized={standingsTableVirtualWindow.enabled ? "true" : undefined}
-            onScroll={(event) => setStandingsTableScrollTop(event.currentTarget.scrollTop)}
+            onScroll={handleStandingsTableScroll}
           >
             {mobileCardsView ? (
               <div className="season-v2-mobile-card-grid" data-testid="season-v2-mobile-cards">

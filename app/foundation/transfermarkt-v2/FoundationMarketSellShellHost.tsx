@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import ClassColorChip from "@/app/foundation/ClassColorChip";
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { Team } from "@/lib/data/olyDataTypes";
 import { formatLocalePoints } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 import {
@@ -128,25 +129,23 @@ export default function FoundationMarketSellShellHost({
           return (
             <div className="transfer-buy-player-line transfer-sell-hero-line">
               <div className="transfer-modal-player-hero transfer-sell-hero">
-                {portraitSrc ? (
-                  <img
-                    className="transfermarkt-portrait transfer-sell-portrait"
-                    src={portraitSrc}
-                    alt={playerName}
-                    width={72}
-                    height={72}
-                    loading="lazy"
-                    decoding="async"
-                    fetchPriority="low"
-                  />
-                ) : (
-                  <div
-                    className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait"
-                    aria-label={`${playerName} placeholder`}
-                  >
-                    {playerName.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <OptimizedMediaImage
+                  className="transfermarkt-portrait transfer-sell-portrait"
+                  src={portraitSrc}
+                  alt={playerName}
+                  width={72}
+                  height={72}
+                  loading="lazy"
+                  fetchPriority="low"
+                  fallback={
+                    <div
+                      className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait"
+                      aria-label={`${playerName} placeholder`}
+                    >
+                      {playerName.slice(0, 2).toUpperCase()}
+                    </div>
+                  }
+                />
                 <div className="transfer-modal-player-summary">
                   <div className="transfer-modal-player-head">
                     <strong>{playerName}</strong>
@@ -155,7 +154,7 @@ export default function FoundationMarketSellShellHost({
                       <span className="muted">{race}</span>
                       <span className="pill">
                         {marketSellPreview?.team?.shortCode ?? selectedTeam?.shortCode ?? "—"} ·{" "}
-                        {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewaehlt"}
+                        {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewählt"}
                       </span>
                     </div>
                   </div>
@@ -248,7 +247,7 @@ export default function FoundationMarketSellShellHost({
                   <small>Rang {marketSellPlayerContext?.rating?.ppsSeasonRank ?? "—"}</small>
                 </article>
                 <article className="metric-card">
-                  <span>Einsaetze</span>
+                  <span>Einsätze</span>
                   <strong>{marketSellPlayerContext?.performance?.appearances ?? "—"}</strong>
                   <small>
                     Top 10 {marketSellPlayerContext?.performance?.top10Count ?? "—"} · MVP{" "}
@@ -374,7 +373,7 @@ export default function FoundationMarketSellShellHost({
             <div className="transfer-sell-history-grid">
               <div className="transfer-modal-section">
                 <div className="transfer-callout-title">
-                  <strong>Letzte Einsaetze</strong>
+                  <strong>Letzte Einsätze</strong>
                   <span className="muted">{marketSellPlayerContext?.recentMatchdays.length ?? 0}</span>
                 </div>
                 {marketSellPlayerContext?.recentMatchdays.length ? (
@@ -390,7 +389,7 @@ export default function FoundationMarketSellShellHost({
                     ))}
                   </div>
                 ) : (
-                  <p className="muted transfer-empty-hint">Noch keine Matchday-Historie fuer diesen Spieler.</p>
+                  <p className="muted transfer-empty-hint">Noch keine Matchday-Historie für diesen Spieler.</p>
                 )}
               </div>
 
@@ -412,7 +411,7 @@ export default function FoundationMarketSellShellHost({
                     ))}
                   </div>
                 ) : (
-                  <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfuegbar.</p>
+                  <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfügbar.</p>
                 )}
               </div>
 
@@ -517,7 +516,7 @@ export default function FoundationMarketSellShellHost({
                   <article className="metric-card">
                     <span>Auto-Empfehlung</span>
                     <strong>{marketSellPreview.coaching.sellDecisionLabel ?? "—"}</strong>
-                    <small>Prioritaet {marketSellPreview.coaching.sellPriority ?? "—"}</small>
+                    <small>Priorität {marketSellPreview.coaching.sellPriority ?? "—"}</small>
                   </article>
                   <article className="metric-card">
                     <span>GM</span>
@@ -558,7 +557,7 @@ export default function FoundationMarketSellShellHost({
                 ) : null}
                 <div className="transfer-buy-meta-grid">
                   <div className="transfer-callout">
-                    <strong>Gruende fuer Verkauf</strong>
+                    <strong>Gruende für Verkauf</strong>
                     {marketSellPreview.coaching.reasonsToSell.length ? (
                       <ul className="warning-list">
                         {marketSellPreview.coaching.reasonsToSell.map((reason) => (
@@ -632,7 +631,7 @@ export default function FoundationMarketSellShellHost({
             </div>
           </>
         ) : (
-          <p className="muted transfer-empty-hint">Verkaufsvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.</p>
+          <p className="muted transfer-empty-hint">Verkaufsvorschau wird geladen oder ist für diesen Kontext noch nicht verfügbar.</p>
         )}
       </div>
 
@@ -665,7 +664,7 @@ export default function FoundationMarketSellShellHost({
             void confirmTransfermarktSell();
           }}
         >
-          {marketSellBusy ? "Verkauf laeuft..." : "Verkauf bestaetigen"}
+          {marketSellBusy ? "Verkauf läuft..." : "Verkauf bestätigen"}
         </button>
       </div>
     </section>

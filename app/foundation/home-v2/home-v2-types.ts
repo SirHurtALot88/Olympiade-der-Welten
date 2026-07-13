@@ -1,4 +1,5 @@
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 
 export type HomeV2TopPlayerCard = {
   playerId: string;
@@ -23,6 +24,9 @@ export type HomeV2TopPlayerCard = {
   caRating: number | null;
   poRangeMin: number | null;
   poRangeMax: number | null;
+  /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
+  caStars?: number | string | null;
+  poStars?: number | string | null;
 };
 
 export const HOME_V2_TOP_PLAYER_COUNT = 6;
@@ -79,6 +83,25 @@ export type HomeV2ClientProps = {
   salaryTotal: number | null;
   guv: number | null;
   rosterCount: number;
+  /**
+   * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate (Summe
+   * `installmentPerSeason` über aktive Kredite) und Restschuld. Eigenes Team
+   * only (Fog of War, siehe `use-credits-view-model.ts`) — `null`/`0` bei
+   * fehlenden Krediten, dann bleibt der Chip ausgeblendet.
+   */
+  loanInstallment: number | null;
+  outstandingDebt: number | null;
+  /**
+   * Wave D · Feld-Rennen (fog-sicher, additiv, optional):
+   * - `fieldRaceForm`: letzte bis zu 5 Spieltage des eigenen Teams (D1).
+   * - `fieldRacePlayedMatchdays`: bereits gespielte Spieltage (Frühphasen-Zustand).
+   * - `fieldRaceTotalTeams`: Feldgröße für die feld-relative Rang-KPI (D2).
+   * - `fieldRaceRankMovement`: Δ Gesamtrang vs. letztem Spieltag (D4).
+   */
+  fieldRaceForm?: FieldRaceLedgerEntry[];
+  fieldRacePlayedMatchdays?: number;
+  fieldRaceTotalTeams?: number;
+  fieldRaceRankMovement?: number | null;
   gmStoryLabel: string | null;
   gmStoryDetail: string | null;
   gmStoryTone: string | null;
@@ -87,6 +110,7 @@ export type HomeV2ClientProps = {
   nextStepLabel: string;
   nextStepStatus: string;
   nextStepDetail: string;
+  nextStepBlocked?: boolean;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
   leagueHeatPools: LeaguePlayerHeatPools;
@@ -102,6 +126,7 @@ export type HomeV2ClientProps = {
   onOpenMarket: () => void;
   onOpenTraining: () => void;
   onOpenOffice: () => void;
+  onOpenFacilities?: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
   onCompleteInboxItem?: (itemId: string) => void;

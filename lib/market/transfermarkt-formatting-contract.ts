@@ -52,10 +52,12 @@ export function formatTransfermarktCurrency(value: number | null) {
     return "—";
   }
 
+  // Clamp a magnitude that rounds to zero so we never render "-0,0 €".
+  const normalized = Math.round(value * 10) === 0 ? 0 : value;
   return `${new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  }).format(value)} €`;
+  }).format(normalized)} €`;
 }
 
 export function formatTransfermarktRatio(value: number | null) {

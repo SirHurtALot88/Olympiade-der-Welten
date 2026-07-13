@@ -188,7 +188,7 @@ describe("gameplay priorities wiring", () => {
   });
 
   it("formats lineup_not_submitted with explicit confirm copy", () => {
-    expect(formatGameFlowBlocker("lineup_not_submitted")).toContain("bestaetigt");
+    expect(formatGameFlowBlocker("lineup_not_submitted")).toContain("bestätigt");
   });
 
   it("falls back to sponsor contract basis when prize sheet basis is missing", () => {

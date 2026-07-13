@@ -27,6 +27,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
+import { createCaptureBatchPersistence } from "@/lib/persistence/capture-batch-persistence";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
@@ -595,7 +596,7 @@ export function applyAiManagerPlan(input: {
 }): AiManagerApplyPreview {
   const dryRun = input.dryRun ?? true;
   const longRunFast = input.longRunFast ?? isLongRunFastProfile();
-  const persistence = input.persistence ?? createPersistenceService();
+  const basePersistence = input.persistence ?? createPersistenceService();
   const preview = buildAiManagerApplyPreview(input.save, input.teamIds);
   const allowedTypes = input.actionTypes ? new Set(input.actionTypes) : null;
   let selectedActions = allowedTypes ? preview.actions.filter((action) => allowedTypes.has(action.actionType)) : preview.actions;
@@ -610,6 +611,14 @@ export function applyAiManagerPlan(input: {
   }
 
   const leaguePlanPreview = buildAiLeagueManagementPreview(input.save.gameState);
+  // Batch every per-team/per-action write in memory and flush ONCE at the end,
+  // instead of the ~4-5 full-state saves × teams this loop used to do.
+  const deferred = createCaptureBatchPersistence({
+    delegate: basePersistence,
+    saveId: input.save.saveId,
+    seed: input.save,
+  });
+  const persistence = deferred.persistence;
   let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, leaguePlanPreview);
   const appliedIds = new Set<string>();
   const orderedFacilityActions = selectedActions.filter(
@@ -761,6 +770,9 @@ export function applyAiManagerPlan(input: {
   if (anyDemandFulfilled) {
     currentSave = persistence.saveSingleplayerState(currentSave.saveId, demandGameState);
   }
+
+  // One real disk write for the whole plan apply (was up to ~5 × teams).
+  currentSave = deferred.flush() ?? currentSave;
 
   return {
     ...preview,

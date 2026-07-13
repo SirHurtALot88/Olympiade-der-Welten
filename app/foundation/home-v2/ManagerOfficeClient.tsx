@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { isSeasonOnePreseasonNeutralBoard } from "@/lib/board/team-season-objectives-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -105,6 +106,13 @@ export type ManagerOfficeClientProps = {
     points: number | null;
     guv: number | null;
   } | null;
+  /**
+   * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate und
+   * Restschuld des aktiven Manager-Teams (Fog of War — nie ein fremdes Team,
+   * siehe `use-credits-view-model.ts`). `null`/`0` blendet die Anzeige aus.
+   */
+  loanInstallment?: number | null;
+  outstandingDebt?: number | null;
   activeTeamOpenInboxItems: Array<{ title: string }>;
   activeTeamCriticalInboxItems: unknown[];
   selectedOpenObjectives: Array<{ label: string; detail?: string | null; actionHint?: string | null }>;
@@ -172,6 +180,8 @@ export function ManagerOfficeClient({
   selectedTeamPlayerDemands,
   selectedHqFinanceWarnings,
   selectedStandingRow,
+  loanInstallment,
+  outstandingDebt,
   activeTeamOpenInboxItems,
   activeTeamCriticalInboxItems,
   selectedOpenObjectives,
@@ -429,7 +439,7 @@ export function ManagerOfficeClient({
                   detail:
                     selectedHqFinanceWarnings[0] ??
                     `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
-                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex fuer Deals",
+                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex für Deals",
                   tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
                   priority: selectedHqFinanceWarnings.length > 0 ? 92 : 54,
                   accent: "finance",
@@ -518,17 +528,18 @@ export function ManagerOfficeClient({
 	                    onClick={() => selectedTeam?.teamId && onOpenTeam(selectedTeam.teamId)}
 	                    title="Team-Dossier öffnen"
 	                  >
-	                    {homeActiveTeamLogo?.src ? (
-	                      <img
-	                        className="foundation-home-logo"
-	                        src={homeActiveTeamLogo.src}
-	                        alt={`${selectedTeam?.name ?? "Team"} Logo`}
-	                        loading="eager"
-	                        decoding="async"
-	                      />
-	                    ) : (
-	                      <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
-	                    )}
+	                    <OptimizedMediaImage
+	                      className="foundation-home-logo"
+	                      src={homeActiveTeamLogo?.src}
+	                      alt={`${selectedTeam?.name ?? "Team"} Logo`}
+	                      loading="eager"
+	                      fetchPriority="high"
+	                      fallback={
+	                        <span className="foundation-home-logo team-logo-placeholder">
+	                          {homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}
+	                        </span>
+	                      }
+	                    />
 	                    <div className="stack">
 	                      <span className="eyebrow">HQ / Manager-Zentrale</span>
 	                      <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
@@ -589,7 +600,7 @@ export function ManagerOfficeClient({
                     <div
                       className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}
                       data-testid="foundation-hq-gm-story"
-                      title="GM-Mandat aus Board Confidence, Druck und moeglichen Wechselgruenden."
+                      title="GM-Mandat aus Board Confidence, Druck und möglichen Wechselgruenden."
                     >
                       <strong>{selectedHqGmStory.label}</strong>
                       <span>
@@ -718,6 +729,17 @@ export function ManagerOfficeClient({
 	                    <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
 	                    <small>laufender Druck</small>
 	                  </article>
+	                  {loanInstallment != null && loanInstallment > 0 ? (
+	                    <article className="foundation-hq-state-card">
+	                      <span>Kreditrate</span>
+	                      <strong>{formatMoney(loanInstallment)}</strong>
+	                      <small>
+	                        {outstandingDebt != null && outstandingDebt > 0
+	                          ? `Restschuld ${formatMoney(outstandingDebt)}`
+	                          : "jährliche Tilgung"}
+	                      </small>
+	                    </article>
+	                  ) : null}
 	                  <article className="foundation-hq-state-card">
 	                    <span>Kadergröße</span>
 	                    <strong>{selectedStandingRow?.rosterCount ?? rosterPlayers.length}</strong>
@@ -819,14 +841,14 @@ export function ManagerOfficeClient({
 	                            ))}
 	                          </div>
 	                        ) : (
-	                          <p className="muted">Noch leer. Gute Targets hier merken und spaeter schneller ziehen.</p>
+	                          <p className="muted">Noch leer. Gute Targets hier merken und später schneller ziehen.</p>
 	                        )}
 	                      </div>
 	                      <div className="foundation-hq-mini-card">
 	                        <span>Marktchance</span>
 	                        {selectedHqAxisSummary?.weakestTwo[0] ? (
 	                          <button className="foundation-hq-mini-row" type="button" onClick={() => onNavigate("marketV2")}>
-	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits pruefen"}</strong>
+	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits prüfen"}</strong>
 	                            <small>
                                 {selectedHqAxisSummary?.weakestTwo[0]
                                   ? `Schwachpunkt #${selectedHqAxisSummary.weakestTwo[0].rank} · Markt direkt auf diese Achse drehen`

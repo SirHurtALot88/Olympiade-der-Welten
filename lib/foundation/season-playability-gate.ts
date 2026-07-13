@@ -33,19 +33,19 @@ export type SeasonPlayabilityGate = {
 
 const KNOWN_DATA_GAP_LABELS: Record<string, string> = {
   class_factors_source_missing:
-    "Bekannte Datenluecke: Klassenfaktoren fehlen noch als echte Quelle; Generator/Progression nutzen den heuristischen Fallback.",
+    "Bekannte Datenlücke: Klassenfaktoren fehlen noch als echte Quelle; Generator/Progression nutzen den heuristischen Fallback.",
   class_factors_source_incomplete:
-    "Bekannte Datenluecke: Klassenfaktoren sind unvollstaendig; Generator/Progression nutzen den heuristischen Fallback.",
+    "Bekannte Datenlücke: Klassenfaktoren sind unvollständig; Generator/Progression nutzen den heuristischen Fallback.",
   attribute_salary_modifiers_source_missing:
-    "Bekannte Datenluecke: Attribut-Gehaltsfaktoren fehlen als Quelle.",
+    "Bekannte Datenlücke: Attribut-Gehaltsfaktoren fehlen als Quelle.",
   trait_salary_factors_source_missing:
-    "Bekannte Datenluecke: Trait-Gehaltsfaktoren fehlen als Quelle.",
+    "Bekannte Datenlücke: Trait-Gehaltsfaktoren fehlen als Quelle.",
   rank_to_discipline_market_value_source_missing:
-    "Bekannte Datenluecke: Rank-zu-Marktwert-Quelle fehlt.",
+    "Bekannte Datenlücke: Rank-zu-Marktwert-Quelle fehlt.",
   rank_to_discipline_market_value_source_incomplete:
-    "Bekannte Datenluecke: Rank-zu-Marktwert-Quelle ist unvollstaendig.",
+    "Bekannte Datenlücke: Rank-zu-Marktwert-Quelle ist unvollständig.",
   salary_engine_waits_for_market_value_input:
-    "Bekannte Datenluecke: Salary-Forecast wartet auf den finalen Marktwert-Input.",
+    "Bekannte Datenlücke: Salary-Forecast wartet auf den finalen Marktwert-Input.",
 };
 
 const BLOCKER_KEYS = new Set([
@@ -63,26 +63,26 @@ const BLOCKER_KEYS = new Set([
 const AUDIT_HINT_LABELS: Record<string, string> = {
   team_power_debuff: "Team-Power-Debuff wurde angewendet; nur Balance-/Audit-Hinweis, kein Flow-Blocker.",
   transfer_history_empty_in_block_smoke:
-    "Block-Smoke hatte keine Transfers; fuer den Season-Loop okay, fuer Economy-Balancing weiter beobachten.",
+    "Block-Smoke hatte keine Transfers; für den Season-Loop okay, für Economy-Balancing weiter beobachten.",
   ai_audit_team_warnings:
-    "AI-Audit hat teambezogene Hinweise; Gesamtnutzung wird separat geprueft.",
+    "AI-Audit hat teambezogene Hinweise; Gesamtnutzung wird separat geprüft.",
   ai_captain_unused: "Einzelne AI-Teams haben keine Captains genutzt; als Planungs-/Balancing-Hinweis verfolgen.",
   ai_push_unused: "Einzelne AI-Teams haben keinen Push genutzt; als Planungs-/Balancing-Hinweis verfolgen.",
   ai_form_cards_unused: "Einzelne AI-Teams haben keine Formkarten genutzt; als Planungs-/Balancing-Hinweis verfolgen.",
   ai_mutators_unused: "Einzelne AI-Teams haben keine Mutatoren genutzt; als Planungs-/Balancing-Hinweis verfolgen.",
   start_rank_derived_from_season1_start_budget:
-    "Preisgeld nutzt fuer Season 1 den Startbudget-Rang als Fallback; fuer Playtest okay, Economy-Balancing weiter beobachten.",
+    "Preisgeld nutzt für Season 1 den Startbudget-Rang als Fallback; für Playtest okay, Economy-Balancing weiter beobachten.",
   promised_role_usage_gap: "Promised-Role-Gap im Review; Konsequenz-Hinweis, kein technischer Blocker.",
-  missing_formcards: "Formkarten fehlen fuer den aktuellen Draft; Hinweis im Planungsflow.",
-  empty_roster: "Kader ist leer; im New-Game-Flow fuehrt das in Briefing/Markt statt zum harten Fehler.",
+  missing_formcards: "Formkarten fehlen für den aktuellen Draft; Hinweis im Planungsflow.",
+  empty_roster: "Kader ist leer; im New-Game-Flow führt das in Briefing/Markt statt zum harten Fehler.",
   next_season_apply_requires_preseason_confirm:
-    "Neue Saison wird bewusst nur ueber den bestaetigten Pre-Season Workflow gestartet.",
+    "Neue Saison wird bewusst nur über den bestaetigten Pre-Season Workflow gestartet.",
   uses_existing_prize_facility_cash_sources_only:
-    "Season-Rewards nutzen aktuell die vorhandenen Preisgeld-/Facility-Cash-Quellen; fuer Economy-Balancing weiter beobachten.",
+    "Season-Rewards nutzen aktuell die vorhandenen Preisgeld-/Facility-Cash-Quellen; für Economy-Balancing weiter beobachten.",
   preview_only_no_attribute_writes:
-    "Player-Development ist im Transition-Schritt als Preview markiert; echte Attribut-Writes laufen ueber Progression-Events.",
+    "Player-Development ist im Transition-Schritt als Preview markiert; echte Attribut-Writes laufen über Progression-Events.",
   human_teams_manual_only:
-    "Sell-Phase bleibt fuer Human-Teams manuell; AI-Teams laufen ueber ihre eigenen Auto-Entscheidungen.",
+    "Sell-Phase bleibt für Human-Teams manuell; AI-Teams laufen über ihre eigenen Auto-Entscheidungen.",
   buy_after_sell_only:
     "Buy-Phase startet bewusst nach Sell/Contract, damit Roster- und Budgetdruck nicht vermischt wird.",
   board_objectives_failed:
@@ -98,7 +98,7 @@ const AUDIT_HINT_LABELS: Record<string, string> = {
   formcards_assignment_optional:
     "Formkarten-Pool ist bereit — Zuweisung ist optional und blockiert den Spieltag nicht.",
   training_missing:
-    "Training fehlt fuer mindestens einen Kaderspieler; Flow-Schritt, kein Season-Gate-Blocker.",
+    "Training fehlt für mindestens einen Kaderspieler; Flow-Schritt, kein Season-Gate-Blocker.",
   transfer_window_closed:
     "Transferfenster ist geschlossen; erwarteter Phasen-Hinweis, kein technischer Season-Blocker.",
 };

@@ -186,7 +186,7 @@ const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
  * reflected in progression. "leicht"/"hart" stay at their prior balance. Small and
  * graduated on purpose (+12%); see progress-log.md for the pre/post comparison.
  */
-const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, number> = {
+export const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, number> = {
   leicht: 1.0,
   mittel: 1.12,
   hart: 1.0,
@@ -238,7 +238,7 @@ function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
   return null;
 }
 
-/** Marktwert fuer organische Regression — bewusst ohne MVS/displayMarketValue. */
+/** Marktwert für organische Regression — bewusst ohne MVS/displayMarketValue. */
 export function getMarktwertForRegression(player: Player) {
   const value = player.marketValue;
   if (!isFiniteNumber(value)) return 0;

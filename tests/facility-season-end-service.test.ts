@@ -101,13 +101,17 @@ describe("facility season-end finance service", () => {
       "team-1",
     );
 
+    // BALANCE: Fan-Shop L2 = 5, Arena-Basis L1 = 1.75, effektiv Basis ×
+    // Beliebtheit. Dieses Ein-Team-Setup ohne Kader/Tabelle liefert den
+    // neutralen Faktor 1.0 → Arena L1 = 1.75 × 1.0 = 1.75 (vorher 3.5).
     expect(preview.facilityUpkeepTotal).toBe(2.4);
-    expect(preview.fanShopIncome).toBe(7);
-    expect(preview.arenaIncome).toBe(4);
-    expect(preview.facilityIncomeTotal).toBe(11);
-    expect(preview.netFacilityResult).toBe(8.6);
+    expect(preview.fanShopIncome).toBe(5);
+    expect(preview.arenaIncome).toBe(1.75);
+    expect(preview.arenaPopularityFactor).toBe(1);
+    expect(preview.facilityIncomeTotal).toBe(6.75);
+    expect(preview.netFacilityResult).toBe(4.35);
     expect(preview.cashBeforeFacilities).toBe(100);
-    expect(preview.cashAfterFacilities).toBe(108.6);
+    expect(preview.cashAfterFacilities).toBe(104.35);
   });
 
   it("disables facilities when upkeep cannot be paid and removes their effects after apply", () => {
@@ -155,7 +159,7 @@ describe("facility season-end finance service", () => {
     const savedState = saveSingleplayerState.mock.calls[0]?.[1];
 
     if (!savedState) throw new Error("Expected paid facility season-end apply to persist state.");
-    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(12.3);
+    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(11.3);
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center.lastPaidSeasonId).toBe("season-1");
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_paid")).toBe(true);
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_income_collected")).toBe(true);
@@ -200,8 +204,8 @@ describe("facility season-end finance service", () => {
       "team-1",
     );
 
-    expect(preview.fanShopIncome).toBe(3.5);
-    expect(preview.facilityIncomeTotal).toBe(3.5);
+    expect(preview.fanShopIncome).toBe(2.5);
+    expect(preview.facilityIncomeTotal).toBe(2.5);
   });
 
   it("does not invent income for missing sponsor-like sources", () => {
@@ -226,6 +230,6 @@ describe("facility season-end finance service", () => {
     );
 
     expect(source).not.toMatch(/PrismaClient|@prisma\/client|prisma\./);
-    expect(calculateFacilityIncome(facilities({ fan_shop: { level: 1, enabled: true } }))).toBe(3.5);
+    expect(calculateFacilityIncome(facilities({ fan_shop: { level: 1, enabled: true } }))).toBe(2.5);
   });
 });

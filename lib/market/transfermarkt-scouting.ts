@@ -159,7 +159,7 @@ export function getTransfermarktScoutingVisibilityBuckets(
     "MW, Gehalt, Ratio und Potenzialband",
     "4 Attribute als grobe Bereiche",
     "Top-Diszis als grobe Slot-Fits",
-    "Deal-Vorschau fuer Cash, Kader und Bedarf",
+    "Deal-Vorschau für Cash, Kader und Bedarf",
   ];
 
   const scouted: string[] = [];
@@ -192,7 +192,7 @@ export function getTransfermarktScoutingVisibilityBuckets(
     hidden.push("negative Traits");
   }
   if (!disclosure.preferredDisciplinesVisible) {
-    hidden.push("vollstaendiges Trainings-/Diszi-Profil");
+    hidden.push("vollständiges Trainings-/Diszi-Profil");
   }
   if (!disclosure.exactAttributeValuesVisible) {
     hidden.push("exakte Attributwerte");

@@ -78,6 +78,17 @@ export type FacilitiesV2ClientProps = {
     netFacilityResult: number;
     recoveryAfterTraining: number;
   };
+  /**
+   * Beliebtheitsfaktor des Teams (real, echte Liga-Werte) — treibt die
+   * Arena-Einnahme (Basis × Beliebtheit). Optional: fehlt der Liga-Kontext im
+   * jeweiligen Render, bleibt der KPI-Chip ausgeblendet (kein Fake-Wert).
+   */
+  beliebtheit?: {
+    value: number;
+    erfolg: number;
+    favShare: number;
+    starpower: number;
+  } | null;
   trainingFacilityEffectPreview?: {
     trainingXp: {
       before: number;

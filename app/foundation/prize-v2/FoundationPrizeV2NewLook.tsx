@@ -1,17 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
   StatChip,
   StatChipRow,
   formatNlNumber,
+  useCountUp,
   type NlBarChartBar,
 } from "@/components/foundation/new-look";
 import type { FoundationPrizeV2PanelProps } from "@/app/foundation/prize-v2/FoundationPrizeV2Panel";
@@ -137,6 +139,14 @@ export default function FoundationPrizeV2NewLook({
   // Simulation folgen. "Cash vorher" bleibt der reale Startwert.
   const firstForecastRow = prizeForecastRows[0] ?? null;
 
+  // Headline-Geldbeträge zählen hoch (#Wave2) — die Haupttabelle und die
+  // Verteilungsbalken bleiben unverändert (sortierbar/groß, kein Zähler).
+  const animatedSummaryBonusMalus = useCountUp(prizePreviewFeed?.summary.totalRankChangePrize ?? null);
+  const animatedForecastCashBefore = useCountUp(prizeV2SelectedTeamSummary?.currentCash ?? null);
+  const animatedForecastPrizeMoney = useCountUp(prizeForecastRankRow?.prizeMoney ?? null);
+  const animatedForecastBonusMalus = useCountUp(firstForecastRow?.guv ?? null);
+  const animatedForecastCashAfter = useCountUp(firstForecastRow?.cashAfter ?? null);
+
   const sortedTableRows = useMemo(() => [...displayPrizePreviewRows].sort(compareByRank), [displayPrizePreviewRows]);
 
   const maxPrizeMoney = useMemo(
@@ -150,8 +160,105 @@ export default function FoundationPrizeV2NewLook({
 
   const championLogo = seasonEndChampionRow ? getTeamLogoModel(seasonEndChampionRow.team) : null;
 
+  // Champion-/Saisonende-Reveal (D3): überspringbarer Feier-Banner.
+  const [championDismissed, setChampionDismissed] = useState(false);
+  // Endplatz des eigenen Teams (nur öffentliche Rangdaten) für "Du: #.. von ..".
+  const ownFinalRank = (prizeV2SelectedTeamSummary?.rank as number | null | undefined) ?? null;
+
+  // Story-/Champion-Karten sind Portale: nur wenn die Zeile ein Team mit
+  // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
+  const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
+  const outlookTeamId = (prizeV2SelectedTeamSummary?.teamId as string | null | undefined) ?? null;
+  // Kredit-Kern (Fog of War, own-team-only — siehe `use-prize-v2-panel-model.ts`):
+  // nur für das ausgewählte eigene Team, nicht für Leader/Swing/Risiko-Karten,
+  // die auch andere Teams zeigen können.
+  const outlookLoanInstallment = (prizeV2SelectedTeamSummary?.loanInstallment as number | null | undefined) ?? null;
+  const outlookOutstandingDebt = (prizeV2SelectedTeamSummary?.outstandingDebt as number | null | undefined) ?? null;
+  const swingTeamId = prizeV2SwingRow?.teamId ?? null;
+  const riskTeamId = prizeV2RiskRow?.teamId ?? null;
+  const championTeamId = seasonEndChampionRow?.teamId ?? null;
+
   return (
     <div className="nl-prize" data-testid="foundation-prize-v2" data-new-look="true">
+      {seasonEndChampionRow && !championDismissed ? (
+        <section
+          className="nl-prize-champion-banner"
+          data-testid="nl-prize-champion-banner"
+          aria-label="Champion · Saisonende"
+        >
+          <div className="nl-prize-champion-banner-inner">
+            <span
+              className="nl-prize-champion-banner-eyebrow nl-reveal"
+              style={{ "--nl-reveal-i": 0 } as CSSProperties}
+            >
+              <NlMedalBadge kind="gold" title="Champion" />
+              Saisonende · Champion
+            </span>
+            <div
+              className="nl-prize-champion-banner-main nl-reveal"
+              style={{ "--nl-reveal-i": 1 } as CSSProperties}
+            >
+              <BudgetedMediaImage
+                src={championLogo?.src ?? null}
+                alt={`${seasonEndChampionRow.team.name} Logo`}
+                className="nl-prize-champion-banner-crest"
+                width={88}
+                height={88}
+                loading="lazy"
+                fallback={
+                  <span className="nl-prize-champion-banner-crest nl-prize-crest-fallback">
+                    {championLogo?.initials ?? "?"}
+                  </span>
+                }
+              />
+              <div className="nl-prize-champion-banner-copy">
+                <button
+                  type="button"
+                  className="nl-prize-champion-banner-team"
+                  onClick={championTeamId ? () => openTeamProfileById(championTeamId) : undefined}
+                  disabled={!championTeamId}
+                  title={championTeamId ? `${seasonEndChampionRow.team.name} öffnen` : undefined}
+                >
+                  {seasonEndChampionRow.team.name}
+                </button>
+                <span className="nl-prize-champion-banner-sub nl-tnum">
+                  <span className="nl-prize-champion-banner-rank">
+                    {seasonEndChampionRow.rank != null ? `#${seasonEndChampionRow.rank}` : "#1"}
+                  </span>
+                  {seasonEndChampionRow.points != null ? (
+                    <span className="nl-prize-champion-banner-points">
+                      <strong>
+                        <NlCountUpValue
+                          value={seasonEndChampionRow.points}
+                          format={(value) => formatLocalePoints(value, 1)}
+                        />
+                      </strong>{" "}
+                      Punkte
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            </div>
+            {ownFinalRank != null ? (
+              <p
+                className="nl-prize-champion-banner-you nl-reveal nl-tnum"
+                style={{ "--nl-reveal-i": 2 } as CSSProperties}
+              >
+                Du: <strong>#{ownFinalRank}</strong> von {prizeV2Summary.totalTeams}
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="nl-prize-champion-banner-skip"
+            onClick={() => setChampionDismissed(true)}
+            aria-label="Champion-Banner schließen"
+          >
+            Schließen
+          </button>
+        </section>
+      ) : null}
+
       <NlCard
         className="nl-prize-header-card"
         eyebrow={`${getViewSourceBadgeLabel("prize", activeContextMeta)} · ${gameState.season.name}`}
@@ -192,7 +299,7 @@ export default function FoundationPrizeV2NewLook({
             label="Bonus/Malus"
             value={
               prizePreviewFeed?.summary.totalRankChangePrize != null
-                ? formatSignedDisplayMoney(prizePreviewFeed.summary.totalRankChangePrize)
+                ? formatSignedDisplayMoney(animatedSummaryBonusMalus ?? prizePreviewFeed.summary.totalRankChangePrize)
                 : "—"
             }
             sub="Liga gesamt"
@@ -224,64 +331,59 @@ export default function FoundationPrizeV2NewLook({
       </NlCard>
 
       <div className="nl-prize-story-grid" aria-label="Preisgeld-Fokus">
-        <NlCard className="nl-prize-story-card" eyebrow="Top Auszahlung" title={prizeV2LeaderRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Top Auszahlung"
+          title={prizeV2LeaderRow?.teamName ?? "—"}
+          onClick={leaderTeamId ? () => openTeamProfileById(leaderTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2LeaderRow
               ? `#${prizeV2LeaderRow.rank ?? "—"} · ${formatNullableMoney(prizeV2LeaderRow.prizeMoney)}`
               : "kein Leader"}
           </p>
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Dein Outlook" title={prizeV2SelectedTeamSummary?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Dein Outlook"
+          title={prizeV2SelectedTeamSummary?.teamName ?? "—"}
+          onClick={outlookTeamId ? () => openTeamProfileById(outlookTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2SelectedTeamSummary
               ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)} → ${formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)}`
               : "kein Team aktiv"}
           </p>
+          {outlookOutstandingDebt != null ? (
+            <p className="nl-prize-story-line nl-tnum">Restschuld {formatLocalePoints(outlookOutstandingDebt, 1)}</p>
+          ) : null}
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Größter Swing" title={prizeV2SwingRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Größter Swing"
+          title={prizeV2SwingRow?.teamName ?? "—"}
+          onClick={swingTeamId ? () => openTeamProfileById(swingTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2SwingRow
               ? `${formatSignedDisplayMoney(prizeV2SwingRow.rankDelta)} Plätze · ${formatSignedDisplayMoney(prizeV2SwingRow.bonusMalus)}`
               : "kein Ausschlag"}
           </p>
         </NlCard>
-        <NlCard className="nl-prize-story-card" eyebrow="Finanzrisiko" title={prizeV2RiskRow?.teamName ?? "—"}>
+        <NlCard
+          className="nl-prize-story-card"
+          eyebrow="Finanzrisiko"
+          title={prizeV2RiskRow?.teamName ?? "—"}
+          onClick={riskTeamId ? () => openTeamProfileById(riskTeamId) : undefined}
+        >
           <p className="nl-prize-story-line nl-tnum">
             {prizeV2RiskRow
               ? `Cash danach ${formatLocalePoints(prizeV2RiskRow.projectedCash, 1)} · ${prizeV2RiskRow.warnings.length} Hinweise`
               : "kein Drucksignal"}
           </p>
         </NlCard>
-        {seasonEndChampionRow ? (
-          <NlCard
-            className="nl-prize-story-card nl-prize-champion-card"
-            eyebrow="Champion · Saisonende"
-            title={
-              <span className="nl-prize-champion-title">
-                <NlMedalBadge kind="gold" title="Champion" />
-                {seasonEndChampionRow.team.name}
-              </span>
-            }
-          >
-            <div className="nl-prize-champion-body">
-              <BudgetedMediaImage
-                src={championLogo?.src ?? null}
-                alt={`${seasonEndChampionRow.team.name} Logo`}
-                className="nl-prize-champion-crest"
-                width={44}
-                height={44}
-                loading="lazy"
-                fallback={
-                  <span className="nl-prize-champion-crest nl-prize-crest-fallback">{championLogo?.initials ?? "?"}</span>
-                }
-              />
-              <p className="nl-prize-story-line nl-tnum">
-                {seasonEndChampionRow.rank != null ? `#${seasonEndChampionRow.rank}` : "#1"}
-                {seasonEndChampionRow.points != null ? ` · ${formatLocalePoints(seasonEndChampionRow.points, 1)} Punkte` : ""}
-              </p>
-            </div>
-          </NlCard>
-        ) : null}
+        {/* Champion wird oben als voller Feier-Banner gezeigt (D3) — hier bewusst
+            nicht dupliziert. */}
       </div>
 
       <div className="nl-prize-chart-grid">
@@ -376,27 +478,42 @@ export default function FoundationPrizeV2NewLook({
               label="Cash vorher"
               value={
                 prizeV2SelectedTeamSummary?.currentCash != null
-                  ? formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)
+                  ? formatLocalePoints(animatedForecastCashBefore ?? prizeV2SelectedTeamSummary.currentCash, 1)
                   : "—"
               }
             />
             <StatChip
               label="Preisgeld"
-              value={prizeForecastRankRow?.prizeMoney != null ? formatLocalePoints(prizeForecastRankRow.prizeMoney, 1) : "—"}
+              value={
+                prizeForecastRankRow?.prizeMoney != null
+                  ? formatLocalePoints(animatedForecastPrizeMoney ?? prizeForecastRankRow.prizeMoney, 1)
+                  : "—"
+              }
               sub={prizeForecastRankRow ? `bei Platz ${prizeForecastRank}` : "kein Rang-Datum"}
               tone="accent"
             />
             <StatChip
               label="Bonus/Malus"
-              value={firstForecastRow?.guv != null ? formatSignedDisplayMoney(firstForecastRow.guv) : "—"}
+              value={firstForecastRow?.guv != null ? formatSignedDisplayMoney(animatedForecastBonusMalus ?? firstForecastRow.guv) : "—"}
               tone={firstForecastRow?.guv != null && firstForecastRow.guv < 0 ? "risk" : "good"}
             />
             <StatChip
               label="Cash nachher"
               value={
-                firstForecastRow?.cashAfter != null ? formatLocalePoints(firstForecastRow.cashAfter, 1) : "—"
+                firstForecastRow?.cashAfter != null
+                  ? formatLocalePoints(animatedForecastCashAfter ?? firstForecastRow.cashAfter, 1)
+                  : "—"
               }
             />
+            {outlookLoanInstallment != null ? (
+              <StatChip
+                label="Kreditrate"
+                value={formatLocalePoints(outlookLoanInstallment, 1)}
+                tone="warn"
+                sub={outlookOutstandingDebt != null ? `Restschuld ${formatLocalePoints(outlookOutstandingDebt, 1)}` : undefined}
+                title="Jährliche Kreditrate — bereits in Bonus/Malus und Cash nachher eingerechnet"
+              />
+            ) : null}
           </StatChipRow>
           {forecastBars.length > 0 ? (
             <NlBarChart
@@ -417,6 +534,7 @@ export default function FoundationPrizeV2NewLook({
                     <th>Faktor</th>
                     <th>Preisgeld</th>
                     <th>Gehalt</th>
+                    {outlookLoanInstallment != null ? <th>Kreditrate</th> : null}
                     <th>GuV</th>
                     <th>Cash</th>
                   </tr>
@@ -428,9 +546,16 @@ export default function FoundationPrizeV2NewLook({
                       <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
                       <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
                       <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                      {outlookLoanInstallment != null ? (
+                        <td>{row.loanInstallment != null ? formatLocalePoints(row.loanInstallment, 1) : "—"}</td>
+                      ) : null}
                       <td>
                         {row.guv != null ? (
-                          <NlDeltaChip value={row.guv} format={(n) => formatSignedDisplayMoney(n)} title="Gewinn und Verlust" />
+                          <NlDeltaChip
+                            value={row.guv}
+                            format={(n) => formatSignedDisplayMoney(n)}
+                            title={outlookLoanInstallment != null ? "Gewinn und Verlust — inkl. Kreditrate" : "Gewinn und Verlust"}
+                          />
                         ) : (
                           "—"
                         )}

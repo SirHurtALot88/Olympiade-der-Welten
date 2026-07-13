@@ -19,6 +19,17 @@ export function activeTeamHasFormCardPool(gameState: GameState, activeTeamId: st
   );
 }
 
+/**
+ * "Transfers finalisieren": the confirm gate that fires the fixed, unchanged
+ * form-card pool distribution before the active team is allowed to field a
+ * lineup. The signal is identical to `activeTeamHasFormCardPool` -- pool
+ * presence *is* "finalized" -- so the gate is idempotent by construction:
+ * once a team's season pool exists, re-confirming is a no-op.
+ */
+export function activeTeamTransfersFinalized(gameState: GameState, activeTeamId: string | null) {
+  return activeTeamHasFormCardPool(gameState, activeTeamId);
+}
+
 export function activeTeamHasFormCardModifierSelections(gameState: GameState, activeTeamId: string | null) {
   const draft = getActiveTeamLineupDraft(gameState, activeTeamId);
   const modifiers = draft?.modifiers;

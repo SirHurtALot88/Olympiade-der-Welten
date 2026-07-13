@@ -82,6 +82,9 @@ export type FoundationTeamsDetailPanelProps = {
   teamsHydrationPhase?: "shell" | "full";
   gameState: unknown;
   selectedTeam: unknown;
+  /** Wave D · D1 Feld-Form-Strip (nur im Neuen Look verwendet, additiv/optional). */
+  fieldRaceRecentForm?: unknown;
+  fieldRacePlayedMatchdayCount?: unknown;
   sortedTeamsViewRows: unknown;
   visibleTeamsViewColumns: unknown;
   SortableHeader: unknown;
@@ -473,7 +476,7 @@ function FoundationTeamsDetailPanel({
                       ))}
                     </div>
 
-                    <div className="team-roster-focusbar" aria-label="Kaderfokus waehlen">
+                    <div className="team-roster-focusbar" aria-label="Kaderfokus wählen">
                       {teamRosterFocusOptions.map((option) => (
                         <button
                           key={`team-roster-focus-${option.id}`}
@@ -522,7 +525,7 @@ function FoundationTeamsDetailPanel({
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown }) => {
+                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown, known: rowKnown, caStars: rowCaStars, poStarRange: rowPoStarRange, caScore: rowCaScore, poScoreRange: rowPoScoreRange }) => {
                               const hasPpsBreakdown = [ppPow, ppSpe, ppMen, ppSoc].some((value) => value != null && Number.isFinite(value));
                               const isContractExpiring = entry.contractLength <= 1;
                               return (
@@ -557,28 +560,23 @@ function FoundationTeamsDetailPanel({
                                           context="teamGrid"
                                           roleTag={entry.roleTag}
                                           playerClassName={player.className}
+                                          previewDensity="full"
+                                          newLook
+                                          known={rowKnown}
+                                          caStars={rowCaStars}
+                                          caScore={rowCaScore}
+                                          poStarRange={rowPoStarRange}
+                                          poScoreRange={rowPoScoreRange}
                                         >
-                                          {thumbSrc ? (
-                                            <img
-                                              className="transfermarkt-portrait"
-                                              src={thumbSrc}
-                                              alt={player.name}
-                                              width={imageSize}
-                                              height={imageSize}
-                                              loading={TEAM_ROSTER_PORTRAIT_LOADING.loading}
-                                              decoding="async"
-                                              fetchPriority={TEAM_ROSTER_PORTRAIT_LOADING.fetchPriority}
-                                              style={{ width: imageSize, minWidth: imageSize }}
-                                            />
-                                          ) : (
-                                            <div
-                                              className="transfermarkt-portrait transfermarkt-portrait-placeholder"
-                                              aria-label={`${player.name} placeholder`}
-                                              style={{ width: imageSize, minWidth: imageSize }}
-                                            >
-                                              {portrait.initials}
-                                            </div>
-                                          )}
+                                          <PlayerPortrait
+                                            className="transfermarkt-portrait"
+                                            src={thumbSrc}
+                                            initials={portrait.initials}
+                                            alt={player.name}
+                                            loading={TEAM_ROSTER_PORTRAIT_LOADING.loading}
+                                            fetchPriority={TEAM_ROSTER_PORTRAIT_LOADING.fetchPriority}
+                                            style={{ width: imageSize, minWidth: imageSize }}
+                                          />
                                         </FoundationPlayerPortraitPreview>
                                       </td>
                                     );
@@ -1527,7 +1525,7 @@ function FoundationTeamsDetailPanel({
                     <div className="panel-header compact">
                       <div className="stack">
                         <h2>Board-Ziele</h2>
-                        <p className="muted">Saisonziele fuer Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
+                        <p className="muted">Saisonziele für Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
                       </div>
                       <div className="room-meta foundation-admin-meta">
                         <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
@@ -1738,7 +1736,7 @@ function FoundationTeamsDetailPanel({
                       </article>
                     </div>
                   ) : (
-                    <p className="muted">Fuer dieses Team liegt noch keine Identity vor.</p>
+                    <p className="muted">Für dieses Team liegt noch keine Identity vor.</p>
                   )}
                 </section>
 
@@ -1801,7 +1799,7 @@ function FoundationTeamsDetailPanel({
                         </article>
                       </div>
                       <p className="muted">
-                        Groesste Luecken: {aiPreview.needs.uncoveredNeedAxes.join(", ") || "keine groesseren Luecken"}
+                        Größte Lücken: {aiPreview.needs.uncoveredNeedAxes.join(", ") || "keine größeren Lücken"}
                       </p>
                       <p className="muted">
                         Priorisierte Disziplinen: {aiPreview.needs.topNeedDisciplineIds.join(", ") || "noch offen"}
@@ -1843,7 +1841,7 @@ function FoundationTeamsDetailPanel({
                       </button>
                     </div>
                   ) : (
-                    <p className="muted">Kein KI-Team fuer eine Vorschau verfuegbar.</p>
+                    <p className="muted">Kein KI-Team für eine Vorschau verfügbar.</p>
                   )}
                 </section>
 

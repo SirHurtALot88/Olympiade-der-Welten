@@ -69,6 +69,7 @@ export type RoomFlowStepId =
   | "facilities"
   | "xp_spend"
   | "training"
+  | "finalize_transfers"
   | "lineup"
   | "formcards"
   | "formcards_season_regenerate"
