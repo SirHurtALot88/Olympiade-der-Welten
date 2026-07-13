@@ -49,6 +49,13 @@ const COMPETITIVE_FLOOR_OPT_FRACTION = 0.5;
  */
 const LOAN_NEED_FILL_FRACTION = Number(process.env.OLY_LOAN_NEED_FILL_FRACTION ?? 0.3) || 0.3;
 /**
+ * Fraction zum SIZING des Kredits (getrennt von der Qualifikation). Höher als LOAN_NEED_FILL_FRACTION,
+ * damit ein qualifiziertes Team genug für einen „guten" Spieler bekommt statt nur Trash — die
+ * resultierenden Kredite sind so nicht alle uniform winzig+2-jährig, sondern je nach Lücke/Kapazität
+ * größer und mit variablen Laufzeiten (User: „nicht alle klein/2 Jahre, gerne auch größere, breiter").
+ */
+const LOAN_AMOUNT_FILL_FRACTION = Number(process.env.OLY_LOAN_AMOUNT_FILL_FRACTION ?? 0.7) || 0.7;
+/**
  * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt. Das Gehalt
  * wird nur ANTEILIG gegengerechnet (Teams haben auch Transfer-/sonstige Einnahmen), der Gebäude-Unterhalt
  * voll. So behalten Teams Gehalt + Gebäudekosten vs. Sponsor im Blick und nehmen keine zu kurzen (zu
@@ -112,7 +119,11 @@ function noLoan(reason: string): AiLoanDecision {
  * (Bedarf für Kreditaufnahme) und `resolveAiEarlyPayoffDecision` (erwarteter Bedarf der nächsten
  * Saison, gegen den ein Überschuss geprüft wird).
  */
-function estimateRosterNeedEur(gameState: GameState, teamId: string): number {
+function estimateRosterNeedEur(
+  gameState: GameState,
+  teamId: string,
+  fillFraction: number = LOAN_NEED_FILL_FRACTION,
+): number {
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   if (!team) return 0;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
@@ -123,9 +134,11 @@ function estimateRosterNeedEur(gameState: GameState, teamId: string): number {
   const competitiveFloor = resolveCompetitiveFloor(playerMin, playerOpt);
   const rosterGap = Math.max(0, competitiveFloor - rosterCount);
   if (rosterGap <= 0) return 0;
-  // Moderater Fill-Preis pro Slot (Bruchteil des Upgrade-Preises) — Kredit als Liquiditäts-Backstop für
-  // einen spielfähigen Kader, nicht zur Fremdfinanzierung eines ganzen Upgrade-Kaders.
-  return round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId) * LOAN_NEED_FILL_FRACTION, 1);
+  // fillFraction steuert die Bewertung: die STRENGE (kleine) Fraction fürs QUALIFIKATIONS-Gate (wer
+  // überhaupt leiht — nur wirklich cash-knappe Teams), eine GRÖSSERE fürs SIZING (damit ein
+  // qualifiziertes Team genug für einen „guten" Spieler bekommt, nicht nur Trash → größere/variablere
+  // Kredite mit variablen Laufzeiten).
+  return round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId) * fillFraction, 1);
 }
 
 /** Skaliert die Kreditbereitschaft nach Persönlichkeit runter (Hoarder/Cash-Creator borgen konservativ). */
@@ -219,18 +232,24 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const belowHardMin = rosterCount < playerMin;
   if (!belowHardMin && shortfall < MIN_MEANINGFUL_SHORTFALL) return noLoan("shortfall_minor");
 
+  // SIZING (getrennt von der Qualifikation): der Betrag wird zum größeren Fill-Preis bemessen, damit ein
+  // qualifiziertes Team genug für einen guten Spieler bekommt statt nur Trash — so sind die Kredite nicht
+  // alle uniform winzig, sondern je nach Lücke/Kapazität unterschiedlich groß (und damit variabel lang).
+  const amountNeed = estimateRosterNeedEur(gameState, teamId, LOAN_AMOUNT_FILL_FRACTION);
+  const amountShortfall = round(Math.max(shortfall, amountNeed - spendableCash), 1);
+
   // Reuse loan-service's own capacity math (market value + revenue + outstanding debt) instead of
   // duplicating it — a provisional preview call is enough to read back `capacity`.
   const capacityPreview = originateLoan(
     gameState,
-    { borrowerTeamId: teamId, principal: shortfall, termSeasons: DEFAULT_TERM_SEASONS },
+    { borrowerTeamId: teamId, principal: amountShortfall, termSeasons: DEFAULT_TERM_SEASONS },
     { execute: false },
   );
   const capacity = capacityPreview.capacity;
   if (capacity <= 0) return noLoan("no_capacity");
 
   const willingness = resolveWillingness(gameState, teamId, seasonId);
-  const cappedAmount = Math.min(shortfall, capacity);
+  const cappedAmount = Math.min(amountShortfall, capacity);
   const loanAmount = round(cappedAmount * willingness, 1);
   if (loanAmount <= 0) return noLoan("no_capacity");
 

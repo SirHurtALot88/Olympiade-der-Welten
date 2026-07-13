@@ -10,6 +10,16 @@ const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
 export const SPONSOR_BASE_FLOOR_C = 32;
 
 /**
+ * Flat Gebäude-Kosten-Ausgleich auf den Sponsor-Sockel PRO TEAM. Die Gebäude verbrauchen liga-weit
+ * ~300/Season (~9–10/Team, überwiegend Upgrade-CapEx), was die Mehrsaison-Ökonomie deflationär macht.
+ * Deshalb (User-Vorgabe): Sponsor = gehaltsbasierter Sockel + flat ~300/Liga on top → pro Team
+ * 300/32 ≈ 9.4. Flach (NICHT salaryFactor-skaliert), sodass der Ausgleich bei fortschreitender Deflation
+ * relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot UND
+ * Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
+ */
+export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 9.4) || 9.4;
+
+/**
  * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
  * der Sockel liegt ÜBER dem 4.-niedrigsten Gehalt, sodass die ~4 gehaltsschwächsten Teams strukturell
  * abgesichert sind und ein kleines Plus machen (Design-Regel). Vorher +5, was mit der Gehalts-Inflation
@@ -188,9 +198,11 @@ export type SponsorEconomyAnchors = {
 export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSalary: number): SponsorEconomyAnchors {
   const scaledStaticFloor = round1(SPONSOR_BASE_FLOOR_C * salaryFactor);
   const scaledAnchor = round1(baseAnchorSalary * salaryFactor);
-  const effectiveBaseFloor = round1(Math.max(scaledStaticFloor, scaledAnchor));
+  const salaryBasedFloor = round1(Math.max(scaledStaticFloor, scaledAnchor));
   const fullMilestoneBonus = getTotalMilestoneBonusC(salaryFactor);
-  const baseElevation = Math.max(0, effectiveBaseFloor - scaledStaticFloor);
+  // baseElevation/Kompression aus dem gehaltsbasierten Sockel berechnen (VOR dem Gebäude-Offset), damit
+  // der flache Offset nicht die Milestone-Kompression verzerrt.
+  const baseElevation = Math.max(0, salaryBasedFloor - scaledStaticFloor);
   const elevationAboveThreshold = Math.max(0, baseElevation - SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C);
   const compressionFactor =
     elevationAboveThreshold <= 0 || fullMilestoneBonus <= 0
@@ -198,6 +210,8 @@ export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSal
       : Math.max(0.12, 1 - elevationAboveThreshold / (fullMilestoneBonus + elevationAboveThreshold));
   const milestonePool = round1(fullMilestoneBonus * compressionFactor);
   const milestoneScale = fullMilestoneBonus > 0 ? milestonePool / fullMilestoneBonus : 0;
+  // Flat Gebäude-Kosten-Ausgleich zuletzt auf den Sockel — deckt den ~300/Liga-Gebäude-Drain (User-Vorgabe).
+  const effectiveBaseFloor = round1(salaryBasedFloor + SPONSOR_BUILDING_COST_OFFSET_C);
   return { effectiveBaseFloor, milestonePool, milestoneScale };
 }
 
