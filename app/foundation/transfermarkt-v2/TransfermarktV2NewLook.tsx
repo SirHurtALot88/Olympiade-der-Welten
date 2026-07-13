@@ -28,6 +28,7 @@ import {
   formatTransfermarktRatio,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
+import { getAttributeTierClass, getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import {
@@ -157,6 +158,11 @@ export type TransfermarktV2NewLookProps = {
   onSortModeChange: (mode: TransfermarktNewLookSortMode) => void;
   selectedClassAxes: NlAxisKey[];
   onToggleClassAxis: (axis: NlAxisKey) => void;
+  /** Achsen mit aktivem Mindestwert-Filter (POW/SPE/MEN/SOC), unabhängig von selectedClassAxes. */
+  selectedAxes: NlAxisKey[];
+  axisMinimums: Record<NlAxisKey, number>;
+  onToggleAxis: (axis: NlAxisKey) => void;
+  onAxisMinimumChange: (axis: NlAxisKey, value: number) => void;
   onResetFilters: () => void;
   activeFilterCount: number;
   // Kandidaten-Rail
@@ -353,6 +359,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onSortModeChange,
     selectedClassAxes,
     onToggleClassAxis,
+    selectedAxes,
+    axisMinimums,
+    onToggleAxis,
+    onAxisMinimumChange,
     onResetFilters,
     activeFilterCount,
     candidates,
@@ -595,6 +605,39 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               Reset
             </button>
           </div>
+          <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
+            {NL_MARKET_AXES.map((axis) => {
+              const active = selectedAxes.includes(axis);
+              return (
+                <div key={`nl-axis-min-${axis}`} className={`nl-market-axis-min ${nlToneClass(axis)}${active ? " is-active" : ""}`}>
+                  <button
+                    type="button"
+                    className={`nl-market-pill ${nlToneClass(axis)}${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    onClick={() => onToggleAxis(axis)}
+                    title={`${NL_AXIS_LABELS[axis]}-Mindestwert aktivieren/deaktivieren`}
+                  >
+                    {NL_AXIS_LABELS[axis]} ≥
+                  </button>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={axisMinimums[axis]}
+                    aria-label={`${NL_AXIS_LABELS[axis]} Mindestwert`}
+                    onChange={(event) => {
+                      const next = Math.max(0, Math.min(100, Number(event.target.value) || 0));
+                      onAxisMinimumChange(axis, next);
+                      if (!active) {
+                        onToggleAxis(axis);
+                      }
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
         {marketError ? (
           <div className="nl-market-error" role="alert">
@@ -716,7 +759,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       const portrait = getTransfermarktPortraitModel(selectedPlayer);
                       const src = appendMediaImageVariant(portrait.src, "preview") ?? portrait.src;
                       return src ? (
-                        <OptimizedMediaImage src={src} alt="" width={72} height={72} className="nl-market-portrait-img" />
+                        <OptimizedMediaImage src={src} alt="" width={132} height={132} className="nl-market-portrait-img" />
                       ) : (
                         <span className="nl-market-portrait-initials">{portrait.initials}</span>
                       );
@@ -759,12 +802,32 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   />
                 </div>
 
+                {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
+                <div className="nl-market-attr-chips" aria-label="Attribut-Tiers">
+                  {NL_MARKET_AXES.flatMap((axis) => {
+                    const value = selectedPlayer[axis];
+                    if (typeof value !== "number" || !Number.isFinite(value)) {
+                      return [];
+                    }
+                    const tier = getTransfermarktTierFromPoints(value);
+                    return [
+                      <span
+                        key={`nl-attr-chip-${axis}`}
+                        className={`nl-market-attr-chip ${getAttributeTierClass(tier)}`}
+                      >
+                        <b>{NL_AXIS_LABELS[axis]}</b>
+                        <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
+                        {tier ? <em>{tier}</em> : null}
+                      </span>,
+                    ];
+                  })}
+                </div>
+
                 {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels). */}
                 {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay || selectedPlayer.developmentTrend ? (
                   <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
                     {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay ? (
                       <NlAbilityStars
-                        caScore={selectedPlayer.ovr}
                         caStars={selectedPlayer.axisStarsOverall ?? selectedPlayer.axisStarsDisplay}
                         poStarRange={
                           selectedPlayer.potentialStarsMin != null && selectedPlayer.potentialStarsMax != null
@@ -892,6 +955,77 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               </p>
             )}
           </NlCard>
+        </div>
+
+        <div className="nl-market-deal-column">
+          <NlCard
+            className="nl-market-deal-card"
+            eyebrow="Deal-Desk"
+            title="Deal-Vorschau"
+            actions={
+              <span className={`nl-market-live-pill${buyPreviewCanBuy ? " is-ready" : ""}`}>
+                {buyPreviewCanBuy ? "bereit" : "prüfen"}
+              </span>
+            }
+          >
+            {previewError ? <p className="nl-market-error">{previewError}</p> : null}
+            <div className="nl-market-pill-group" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
+              {[1, 2, 3].map((length) => (
+                <button
+                  key={`nl-contract-${length}`}
+                  type="button"
+                  className={`nl-market-pill${contractLength === length ? " is-active" : ""}`}
+                  aria-pressed={contractLength === length}
+                  onClick={() => onContractLengthChange(length)}
+                >
+                  {length} Saison{length === 1 ? "" : "en"}
+                </button>
+              ))}
+            </div>
+            <StatChipRow className="nl-market-deal-topline" aria-label="Deal-Kernzahlen">
+              <StatChip label="Ablöse" value={formatTransfermarktCurrency(previewPurchasePrice)} tone="accent" />
+              <StatChip label="Forderung p.a." value={previewSalaryLabel} tone="warn" />
+            </StatChipRow>
+            <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
+              <NlMarketBeforeAfterRow
+                label="Cash"
+                before={previewCashBefore}
+                after={previewCashAfter}
+                format={(value) => formatTransfermarktCurrency(value)}
+              />
+              <NlMarketBeforeAfterRow
+                label="Gehalt"
+                before={previewTeamSalaryBefore}
+                after={previewTeamSalaryAfter}
+                format={(value) => formatTransfermarktCurrency(value)}
+                invert
+              />
+              <NlMarketBeforeAfterRow
+                label="Kader"
+                before={previewRosterBefore}
+                after={previewRosterAfter}
+                format={(value) => formatNlNumber(value, 0)}
+              />
+              <NlMarketBeforeAfterRow
+                label="MW"
+                before={previewMarketValueBefore}
+                after={previewMarketValueAfter}
+                format={(value) => formatTransfermarktCurrency(value)}
+              />
+            </div>
+            {buyBlockingReasons.length > 0 ? (
+              <div className="nl-market-warning-box is-blocking">
+                <strong>Noch offen</strong>
+                <p>{buyBlockingReasons.join(" · ")}</p>
+              </div>
+            ) : null}
+            {buyWarnings.length > 0 ? (
+              <div className="nl-market-warning-box">
+                <strong>Hinweise</strong>
+                <p>{buyWarnings.slice(0, 3).join(" · ")}</p>
+              </div>
+            ) : null}
+          </NlCard>
 
           <NlCard
             className="nl-market-impact-card"
@@ -1001,75 +1135,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             )}
           </NlCard>
         </div>
-
-        <NlCard
-          className="nl-market-deal-card"
-          eyebrow="Deal-Desk"
-          title="Deal-Vorschau"
-          actions={
-            <span className={`nl-market-live-pill${buyPreviewCanBuy ? " is-ready" : ""}`}>
-              {buyPreviewCanBuy ? "bereit" : "prüfen"}
-            </span>
-          }
-        >
-          {previewError ? <p className="nl-market-error">{previewError}</p> : null}
-          <div className="nl-market-pill-group" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
-            {[1, 2, 3].map((length) => (
-              <button
-                key={`nl-contract-${length}`}
-                type="button"
-                className={`nl-market-pill${contractLength === length ? " is-active" : ""}`}
-                aria-pressed={contractLength === length}
-                onClick={() => onContractLengthChange(length)}
-              >
-                {length} Saison{length === 1 ? "" : "en"}
-              </button>
-            ))}
-          </div>
-          <StatChipRow className="nl-market-deal-topline" aria-label="Deal-Kernzahlen">
-            <StatChip label="Ablöse" value={formatTransfermarktCurrency(previewPurchasePrice)} tone="accent" />
-            <StatChip label="Forderung p.a." value={previewSalaryLabel} tone="warn" />
-          </StatChipRow>
-          <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
-            <NlMarketBeforeAfterRow
-              label="Cash"
-              before={previewCashBefore}
-              after={previewCashAfter}
-              format={(value) => formatTransfermarktCurrency(value)}
-            />
-            <NlMarketBeforeAfterRow
-              label="Gehalt"
-              before={previewTeamSalaryBefore}
-              after={previewTeamSalaryAfter}
-              format={(value) => formatTransfermarktCurrency(value)}
-              invert
-            />
-            <NlMarketBeforeAfterRow
-              label="Kader"
-              before={previewRosterBefore}
-              after={previewRosterAfter}
-              format={(value) => formatNlNumber(value, 0)}
-            />
-            <NlMarketBeforeAfterRow
-              label="MW"
-              before={previewMarketValueBefore}
-              after={previewMarketValueAfter}
-              format={(value) => formatTransfermarktCurrency(value)}
-            />
-          </div>
-          {buyBlockingReasons.length > 0 ? (
-            <div className="nl-market-warning-box is-blocking">
-              <strong>Noch offen</strong>
-              <p>{buyBlockingReasons.join(" · ")}</p>
-            </div>
-          ) : null}
-          {buyWarnings.length > 0 ? (
-            <div className="nl-market-warning-box">
-              <strong>Hinweise</strong>
-              <p>{buyWarnings.slice(0, 3).join(" · ")}</p>
-            </div>
-          ) : null}
-        </NlCard>
       </div>
 
       <div className="nl-market-context-grid">

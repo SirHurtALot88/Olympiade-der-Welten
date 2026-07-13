@@ -615,7 +615,10 @@ function buildDisciplineGlobalRankMaps(
   gameState: GameState,
   disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
   currentSeasonLedger = buildSeasonPointsLedger(gameState),
+  rankPoolPlayerIds?: string[] | null,
 ): DisciplineGlobalRankMaps {
+  const rankPoolSet = rankPoolPlayerIds != null ? new Set(rankPoolPlayerIds.filter(Boolean)) : null;
+  const rankedPlayers = rankPoolSet ? gameState.players.filter((player) => rankPoolSet.has(player.id)) : gameState.players;
   const valueRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const seasonPointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const allTimePointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
@@ -651,7 +654,7 @@ function buildDisciplineGlobalRankMaps(
     valueRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: player.currentDisciplineValues?.[discipline.id] ?? player.disciplineRatings?.[discipline.id] ?? null,
         })),
@@ -660,7 +663,7 @@ function buildDisciplineGlobalRankMaps(
     seasonPointsRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: currentSeasonTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         })),
@@ -669,7 +672,7 @@ function buildDisciplineGlobalRankMaps(
     allTimePointsRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: allTimeTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         })),
@@ -2211,6 +2214,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     input.gameState,
     input.gameState.disciplines,
     seasonDerivations.ledger,
+    rosterEntry ? activePlayerIds : null,
   );
   const axisRankContext = buildAxisRankContext({
     gameState: input.gameState,
