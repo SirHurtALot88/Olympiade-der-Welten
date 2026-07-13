@@ -213,28 +213,24 @@ function getRecommendedLength(
     (rating?.mvsRank != null && rating.mvsRank <= 40);
   const conservativeTeam = (team?.cash ?? 0) < 40;
 
-  // Anti-Churn (Phase A): kurze Verträge sparen KEIN Geld (Gehalt läuft pro Jahr eh), sie erzwingen nur,
-  // dass Spieler auslaufen und teuer neu gekauft werden müssen (64% 1-Jahres-Verträge → 40–80 Exits/Season
-  // → Rebuild-Churn → Kreditbedarf). Deshalb: (a) MIN überall ≥ 2 — keine 1-Jahres-Verträge mehr, jeder
-  // Behaltens-Spieler wird mindestens 2 Jahre gebunden; (b) gute Spieler (starter/prospect/highValue)
-  // länger; (c) der conservativeTeam-Malus verkürzt NICHT mehr die Untergrenze (er war kontraproduktiv —
-  // cash-knappe Teams zahlten sich über den Rebuild ärmer), er deckelt nur noch die Obergrenze etwas.
-  let min = 2;
+  // 1-Jahres-Verträge sind bewusst ERLAUBT: ein auslaufender Vertrag erzeugt einen sauberen Exit
+  // (Erlös ~MW, OHNE Buyout-Restgehalt) und ist damit ein legitimes Cash-Generierungs-Werkzeug — lange
+  // Verträge würden Teams beim Verkauf in den Buyout zwingen. Länge bleibt deshalb rollen-/wert-/cash-
+  // abhängig gebunden (kein Hardcode-Floor), die tatsächliche Länge kommt aus der organischen Präferenz.
+  let min = 1;
   let max = 5;
-  if (role === "starter" && highValue) {
+  if (role === "starter" && highValue && !conservativeTeam) {
     min = 3;
     max = 5;
   } else if (role === "starter") {
-    min = 3;
-    max = conservativeTeam ? 4 : 5;
-  } else if (role === "prospect") {
-    min = highValue ? 3 : 2;
-    max = highValue ? 5 : 4;
-  } else {
-    // Bench/Depth: mindestens 2 Jahre (kein 1-Jahres-Durchlauf), aber Obergrenze niedriger, damit
-    // schwache Spieler nicht über-gebunden werden und der Kader über Verkäufe erneuerbar bleibt.
     min = 2;
-    max = conservativeTeam ? 3 : 4;
+    max = 4;
+  } else if (role === "prospect") {
+    min = highValue ? 2 : 1;
+    max = highValue ? 4 : 3;
+  } else {
+    min = 1;
+    max = conservativeTeam ? 2 : 3;
   }
 
   const organicBaseline = buildPlayerContractPreference(player, teamStrategyProfile)?.idealLength ?? 2;

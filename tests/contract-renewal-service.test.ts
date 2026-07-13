@@ -511,11 +511,10 @@ describe("contract renewal service", () => {
       saveId: "contract-length-bounds-cash-tight",
     };
     const tightRow = previewSeasonEndContracts(tightSave).rows.find((row) => row.playerId === benchOnTightBudget.id);
-    // Anti-churn (Phase A): even a cash-tight team no longer hands out 1-year deals (short contracts
-    // save no money and force expensive rebuilds) — a bench player gets at least 2 years — but stays
-    // bounded (capped at 3 for a cash-tight team) so weak players remain refreshable, not over-committed.
-    expect(tightRow?.recommendedLength).toBeGreaterThanOrEqual(2);
-    expect(tightRow?.recommendedLength).toBeLessThanOrEqual(3);
+    // Cash-tight teams must still not commit long-term to a bench player, no matter what the
+    // player's own organic baseline would otherwise prefer. 1-year deals stay legitimate (clean expiry
+    // = cash generation without a buyout), so the floor is not raised.
+    expect(tightRow?.recommendedLength).toBeLessThanOrEqual(2);
 
     const wealthyTeam = createTeam({ teamId: "F-F", shortCode: "F-F", cash: 200 });
     const starPlayer = createPlayer("elite-starter", { rating: 99, marketValue: 90, displayMarketValue: 90 });
