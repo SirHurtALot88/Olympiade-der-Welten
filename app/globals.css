@@ -2536,32 +2536,47 @@ a {
   border-radius: 999px;
 }
 
+/* Slim status line — früher ein großer Grid-Banner mit Save-Name +
+   "AKTIVES TEAM"-Box (fraß halbe Seite auf jeder Ansicht). Der Team-Picker
+   wohnt jetzt in der Sidebar (.foundation-sidebar-team-picker); hier bleibt
+   nur eine schmale, content-getriebene Statuszeile (Save-Kurzmenü, optional
+   Room-/Action-Feedback, Kontext-Chips). display:flex statt fixer
+   Grid-Spalten, damit ungenutzte Slots keinen Leerraum reservieren. */
 .foundation-context-banner {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(210px, 0.7fr) minmax(260px, 0.9fr) minmax(280px, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 10px 14px;
-  border: 1px solid rgba(130, 156, 205, 0.28);
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 8% 0%, rgba(93, 143, 214, 0.18), transparent 30%),
-    rgba(18, 22, 28, 0.88);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(130, 156, 205, 0.2);
+  border-radius: 14px;
+  background: rgba(18, 22, 28, 0.68);
+  box-shadow: none;
 }
 
 .foundation-context-banner.is-compact {
-  grid-template-columns: minmax(180px, 0.7fr) minmax(220px, 0.9fr) minmax(220px, 1fr);
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 7px;
+  padding: 5px 10px;
 }
 
 .foundation-context-banner.is-loading {
   border-color: rgba(245, 158, 11, 0.48);
   background:
     linear-gradient(135deg, rgba(245, 158, 11, 0.14), transparent 34%),
-    rgba(18, 22, 28, 0.9);
+    rgba(18, 22, 28, 0.72);
+}
+
+.foundation-context-banner .foundation-context-main,
+.foundation-context-banner .foundation-ai-preseason-banner,
+.foundation-context-banner .foundation-action-feedback {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.foundation-context-banner .foundation-context-chips {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .foundation-context-main {
@@ -48827,49 +48842,91 @@ button.foundation-team-portrait-card {
   }
 }
 
-/* ── Prominenter "Neuer Look"-Umschalter oben in der Sidebar (global, auch im alten Look sichtbar) ── */
+/* ── Zurückhaltender "Neuer Look"-Umschalter oben in der Sidebar.
+   War früher ein breiter, prominenter Schalter — "Neuer Look" ist inzwischen
+   der permanente Default (NEW_LOOK_DEFAULT = true), daher hier nur noch ein
+   kleines, ruhiges Pill. Schaltet weiterhin das Flag, verschwindet aber nicht
+   in der Optik. Der kompakte Aktives-Team-Picker sitzt direkt darunter
+   (.foundation-sidebar-team-picker). ── */
 .foundation-sidebar-newlook {
-  margin: 8px 10px 4px;
+  margin: 8px 10px 2px;
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  justify-content: flex-start;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(120, 170, 255, 0.45);
-  background: linear-gradient(180deg, rgba(30, 52, 92, 0.55), rgba(18, 30, 55, 0.55));
-  box-shadow: 0 0 0 1px rgba(120, 170, 255, 0.1), 0 6px 18px -12px rgba(90, 150, 255, 0.8);
+  gap: 6px;
+  width: auto;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 108, 92, 0.35);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  opacity: 0.72;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar:hover {
-  transform: translateY(-1px);
-  border-color: rgba(120, 170, 255, 0.75);
+  transform: none;
+  opacity: 1;
+  border-color: rgba(120, 108, 92, 0.6);
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar.is-on {
-  border-color: rgba(90, 210, 140, 0.7);
-  background: linear-gradient(180deg, rgba(24, 60, 40, 0.6), rgba(16, 40, 28, 0.6));
+  border-color: rgba(90, 210, 140, 0.4);
+  background: transparent;
+  opacity: 0.82;
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar .werdegang-new-look-label {
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: 600;
+  font-size: 11px;
   letter-spacing: 0.01em;
-  color: #eaf0fa;
+  color: inherit;
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar::after {
   content: "AUS";
-  margin-left: auto;
-  font-size: 10px;
+  margin-left: 2px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: #9db0cc;
 }
 .foundation-sidebar-newlook .werdegang-new-look-toggle.is-sidebar.is-on::after {
   content: "AN";
   color: #57d08a;
+}
+
+/* ── Kompakter "Aktives Team"-Picker: relocated aus dem großen
+   Context-Banner (siehe FoundationShellRouterBody.tsx activeTeamPickerNode).
+   Gleiche .foundation-manager-team*-Klassen wie zuvor, hier nur auf die
+   schmale Sidebar-Spalte herunterskaliert. ── */
+.foundation-sidebar-team-picker {
+  margin: 0 10px 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.foundation-sidebar-team-picker .foundation-manager-team {
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 6px;
+  border-radius: 12px;
+}
+.foundation-sidebar-team-picker .foundation-manager-team-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 0.6rem;
+}
+.foundation-sidebar-team-picker .foundation-manager-team-select span {
+  font-size: 0.6rem;
+}
+.foundation-sidebar-team-picker .foundation-manager-team-select .input {
+  min-height: 27px;
+  padding-block: 3px;
+  font-size: 0.74rem;
+}
+.foundation-sidebar-team-picker .foundation-context-tag {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-size: 0.66rem;
 }
 
 /* ── Batch b1: Home Hero-KPI-Portale (#26), Spieltag-Rail (#4),
@@ -54886,7 +54943,9 @@ button.is-new-look .nl-thist-season-pill,
   background: var(--nl-accent);
 }
 
-/* --- #81 Header + Breadcrumb --------------------------------- */
+/* --- #81 Header + Breadcrumb ---------------------------------
+   Kompakte Kopfzeile statt XL-Titel: Aktives-Team-Kontext lebt jetzt in der
+   Sidebar, hier bleibt nur ein schmaler Brotkrumen. */
 .is-new-look .foundation-shell-header {
   justify-content: space-between;
   align-items: center;
@@ -54901,7 +54960,7 @@ button.is-new-look .nl-thist-season-pill,
 }
 
 .is-new-look .foundation-shell-breadcrumb-crumb {
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   color: var(--nl-mut);
   white-space: nowrap;
 }
@@ -54909,14 +54968,14 @@ button.is-new-look .nl-thist-season-pill,
 .is-new-look .foundation-shell-breadcrumb-crumb.is-root {
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--nl-mut-2);
 }
 
 .is-new-look .foundation-shell-breadcrumb-crumb.is-view {
   color: var(--nl-ink);
   font-weight: 700;
-  font-size: 0.94rem;
+  font-size: 0.84rem;
 }
 
 .is-new-look .foundation-shell-breadcrumb-crumb.is-context {

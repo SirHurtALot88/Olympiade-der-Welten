@@ -7,7 +7,6 @@ import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMoun
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { useNewLook } from "@/lib/ui/new-look-preference";
@@ -823,6 +822,48 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     </nav>
   ) : undefined;
 
+  // Cleanup: "AKTIVES TEAM"-Picker lebt jetzt kompakt in der Sidebar (neben dem
+  // Neuer-Look-Toggle) statt im großen Context-Banner auf jeder Ansicht.
+  // Value/onChange/Optionsliste bleiben unverändert aus dem Router-Body-Scope —
+  // hier wird die Kontrolle nur einmal gebaut und an FoundationShell durchgereicht.
+  const activeTeamPickerNode = selectedTeam ? (
+    <div className="foundation-manager-team" data-testid="active-manager-team">
+      {(() => {
+        const logo = getTeamLogoModel(selectedTeam);
+        return (
+          <OptimizedMediaImage
+            className="foundation-manager-team-logo"
+            src={logo.src}
+            alt={`${selectedTeam.name} Logo`}
+            loading="eager"
+            fetchPriority="high"
+            fallbackLabel={selectedTeam.shortCode}
+            fallback={
+              <span className="foundation-manager-team-logo team-logo-placeholder">{selectedTeam.shortCode}</span>
+            }
+          />
+        );
+      })()}
+      <label className="foundation-manager-team-select">
+        <span>Aktives Team</span>
+        <select
+          className="input"
+          value={selectedTeam.teamId}
+          aria-label="Aktives Manager-Team"
+          onChange={(event) => handleManagerTeamSelect(event.target.value)}
+        >
+          <option value="__all_teams__">Alle 32 Teams anzeigen</option>
+          {managerTeamOptions.map((team: Team) => (
+            <option key={team.teamId} value={team.teamId}>
+              {team.shortCode} · {team.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isTeamSwitchPending ? <span className="pill foundation-context-tag">Teamwechsel...</span> : null}
+    </div>
+  ) : null;
+
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
   const inboxAllBadgeCount =
     newLookEnabled && Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
@@ -873,6 +914,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         isPending={isPending}
         activities={foundationActivities}
         breadcrumb={newLookBreadcrumb}
+        teamPicker={activeTeamPickerNode}
         subNav={
           activeView === "marketV2" ? (
             <FoundationSubNav
@@ -1416,28 +1458,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         </div>
       ) : null}
 
+      {/* Slim status line only — Save-Name + "AKTIVES TEAM" leben jetzt kompakt
+          in der Sidebar (siehe activeTeamPickerNode oben). data-testid bleibt
+          erhalten, weil Screenshots/Smoke-Skripte darauf warten. */}
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
         <div className="foundation-context-main">
           {activeView !== "homeV2" ? (
-            showCompactHeader ? (
-              <details className="foundation-save-compact-menu" data-testid="foundation-save-compact-menu">
-                <summary>{isSaveBusy ? "Save lädt…" : formatShortSaveId(activeSaveId)}</summary>
-                <strong className="foundation-save-compact-full">{activeSaveName}</strong>
-                <span className="muted">
-                  {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-                  {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
-                </span>
-              </details>
-            ) : (
-              <>
-                <span className="eyebrow">Spielstand</span>
-                <strong>{isSaveBusy ? "Save-Wechsel lädt..." : activeSaveName}</strong>
-                <span className="muted">
-                  {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-                  {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
-                </span>
-              </>
-            )
+            <details className="foundation-save-compact-menu" data-testid="foundation-save-compact-menu">
+              <summary>{isSaveBusy ? "Save lädt…" : formatShortSaveId(activeSaveId)}</summary>
+              <strong className="foundation-save-compact-full">{activeSaveName}</strong>
+              <span className="muted">
+                {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
+                {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
+              </span>
+            </details>
           ) : null}
         </div>
         {roomContext ? (
@@ -1491,124 +1525,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </button>
           </div>
         ) : null}
-        {selectedTeam ? (
-          <div className="foundation-manager-team" data-testid="active-manager-team">
-            {(() => {
-              const logo = getTeamLogoModel(selectedTeam);
-              return (
-                <OptimizedMediaImage
-                  className="foundation-manager-team-logo"
-                  src={logo.src}
-                  alt={`${selectedTeam.name} Logo`}
-                  loading="eager"
-                  fetchPriority="high"
-                  fallbackLabel={selectedTeam.shortCode}
-                  fallback={
-                    <span className="foundation-manager-team-logo team-logo-placeholder">{selectedTeam.shortCode}</span>
-                  }
-                />
-              );
-            })()}
-            <label className="foundation-manager-team-select">
-              <span>Aktives Team</span>
-              <select
-                className="input"
-                value={selectedTeam.teamId}
-                aria-label="Aktives Manager-Team"
-                onChange={(event) => handleManagerTeamSelect(event.target.value)}
-              >
-                <option value="__all_teams__">Alle 32 Teams anzeigen</option>
-                {managerTeamOptions.map((team: Team) => (
-                  <option key={team.teamId} value={team.teamId}>
-                    {team.shortCode} · {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!showCompactHeader ? (
-            <div className="foundation-manager-team-meta">
-              <span className="pill">{selectedTeam.shortCode}</span>
-              <span className="pill">Manager {activeOwner?.label ?? activeOwnerId}</span>
-              <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
-              {FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? (
-                <span className="pill foundation-source-pill is-local" title="Temporärer Admin-Dev-Modus: alle Teams sind bearbeitbar.">
-                  Admin: alle Teams
-                </span>
-              ) : isSelectedTeamManagementLocked ? (
-                <span className="pill foundation-source-pill is-readonly">Nur Ansicht</span>
-              ) : null}
-              <span className="pill">Auswahl {formatActiveManagerTeamSource(activeManagerTeamSource)}</span>
-              {isTeamSwitchPending ? <span className="pill foundation-context-tag">Teamwechsel...</span> : null}
-            </div>
-            ) : null}
-            {!showCompactHeader ? (
-            <div className="foundation-manager-team-controls" data-testid="active-owner-controls">
-              <label className="foundation-mini-select">
-                <span>Manager</span>
-                <select
-                  className="input"
-                  value={activeOwner?.ownerId ?? DEFAULT_ACTIVE_OWNER_ID}
-                  aria-label="Aktiver Owner"
-                  onChange={(event) => {
-                    const nextOwnerId = event.target.value;
-                    setActiveOwnerId(nextOwnerId);
-                    setTeamContextFilter("my_teams");
-                    const nextTeams = filterTeamsByControlScope(gameState.teams, resolvedTeamControlSettings, "my_teams", nextOwnerId);
-                    const nextTeam = nextTeams[0] ?? manualTeams[0] ?? gameState.teams[0];
-                    if (nextTeam) {
-                      setActiveManagerTeam(nextTeam.teamId, "manual_select");
-                    }
-                  }}
-                >
-                  {teamOwners.map((owner: TeamOwner) => (
-                    <option key={owner.ownerId} value={owner.ownerId}>
-                      {owner.label} · {owner.controlledTeamIds.length}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="foundation-mini-select">
-                <span>Filter</span>
-                <select
-                  className="input"
-                  value={teamContextFilter}
-                  aria-label="Teamfilter"
-                  onChange={(event) => setTeamContextFilter(event.target.value as TeamControlFilter)}
-                >
-                  <option value="my_teams">Meine Teams</option>
-                  <option value="human">Geführte Teams</option>
-                  <option value="ai">Automatische Teams</option>
-                  <option value="passive">Beobachtete Teams</option>
-                  <option value="all">Alle Teams</option>
-                  {teamOwners
-                    .filter((owner: TeamOwner) => owner.ownerId !== "ai")
-                    .map((owner: TeamOwner) => (
-                      <option key={`owner-filter-${owner.ownerId}`} value={`owner:${owner.ownerId}`}>
-                        Manager: {owner.label}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            </div>
-            ) : null}
-            {!showCompactHeader ? (
-            <div className="foundation-manager-team-switch" data-testid="human-team-quick-switch">
-              {ownerQuickSwitchTeams.slice(0, 8).map((team: Team) => (
-                <button
-                  key={`quick-team-${team.teamId}`}
-                  className={`table-link-button${team.teamId === selectedTeam.teamId ? " is-active" : ""}`}
-                  type="button"
-                  onClick={() => scheduleActiveManagerTeam(team.teamId, "manual_select")}
-                >
-                  {team.shortCode}
-                </button>
-              ))}
-            </div>
-            ) : null}
-          </div>
-        ) : null}
         <div className="foundation-context-chips" aria-label="Spielstand- und Saisonkontext">
-          <NewLookToggle />
           <span className="pill foundation-context-tag">{resolveScenarioMetaLabel(activeContextMeta)}</span>
           <span className="pill">{formatScenarioTypeLabel(activeContextMeta?.scenarioType)}</span>
           {readMeta.readOnly ? (
