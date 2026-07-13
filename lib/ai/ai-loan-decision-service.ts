@@ -40,6 +40,15 @@ const MIN_MEANINGFUL_SHORTFALL = 8;
  */
 const COMPETITIVE_FLOOR_OPT_FRACTION = 0.5;
 /**
+ * Der Kredit-Bedarf wird zu einem MODERATEN Fill-Preis pro Slot bewertet, nicht zum vollen Upgrade-
+ * Qualitätspreis (estimateUpgradeBuyFloorMw liegt bei ~22–52/Slot). Ein Kredit ist ein Liquiditäts-
+ * Backstop, um bei knapper Kasse überhaupt einen spielfähigen Kader zu stellen — NICHT um einen ganzen
+ * Kader aus teuren Upgrades fremdzufinanzieren. Ohne diese Dämpfung „braucht" selbst ein Team mit 120+
+ * Cash einen Kredit, weil Lücke × Upgrade-Preis jeden Cash-Bestand übersteigt (Combined-Run-Befund:
+ * H-R/R-L/T-C leihen mit 110–138 Cash). ENV-tunebar zum schnellen Kalibrieren.
+ */
+const LOAN_NEED_FILL_FRACTION = Number(process.env.OLY_LOAN_NEED_FILL_FRACTION ?? 0.4) || 0.4;
+/**
  * Tragfähigkeits-Budget = was vom Sponsor-FC nach den Fixkosten für Kreditdienst übrig bleibt. Das Gehalt
  * wird nur ANTEILIG gegengerechnet (Teams haben auch Transfer-/sonstige Einnahmen), der Gebäude-Unterhalt
  * voll. So behalten Teams Gehalt + Gebäudekosten vs. Sponsor im Blick und nehmen keine zu kurzen (zu
@@ -114,7 +123,9 @@ function estimateRosterNeedEur(gameState: GameState, teamId: string): number {
   const competitiveFloor = resolveCompetitiveFloor(playerMin, playerOpt);
   const rosterGap = Math.max(0, competitiveFloor - rosterCount);
   if (rosterGap <= 0) return 0;
-  return round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId), 1);
+  // Moderater Fill-Preis pro Slot (Bruchteil des Upgrade-Preises) — Kredit als Liquiditäts-Backstop für
+  // einen spielfähigen Kader, nicht zur Fremdfinanzierung eines ganzen Upgrade-Kaders.
+  return round(rosterGap * estimateUpgradeBuyFloorMw(gameState, teamId) * LOAN_NEED_FILL_FRACTION, 1);
 }
 
 /** Skaliert die Kreditbereitschaft nach Persönlichkeit runter (Hoarder/Cash-Creator borgen konservativ). */
@@ -202,8 +213,11 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
   const shortfall = round(needsEur - spendableCash, 1);
   if (shortfall <= 0) return noLoan("cash_sufficient");
-  // Kredit ist kein Routine-Top-up: nur bei spürbarer Finanzierungslücke.
-  if (shortfall < MIN_MEANINGFUL_SHORTFALL) return noLoan("shortfall_minor");
+  // Kredit ist kein Routine-Top-up: nur bei spürbarer Finanzierungslücke. AUSNAHME: ein Team unter dem
+  // harten Roster-Minimum darf immer leihen, um überhaupt einen spielfähigen Kader stellen zu können
+  // (sonst hält der Saison-Preflight "teams_under_7" den ganzen Lauf an) — dafür greift die Schwelle nicht.
+  const belowHardMin = rosterCount < playerMin;
+  if (!belowHardMin && shortfall < MIN_MEANINGFUL_SHORTFALL) return noLoan("shortfall_minor");
 
   // Reuse loan-service's own capacity math (market value + revenue + outstanding debt) instead of
   // duplicating it — a provisional preview call is enough to read back `capacity`.
