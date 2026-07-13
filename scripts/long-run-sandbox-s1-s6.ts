@@ -64,6 +64,7 @@ import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/seas
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applyLoanSettlement } from "@/lib/finance/loan-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
@@ -2550,6 +2551,28 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       itemCount: sponsorApply.preview.rows.filter((row) => row.cashDelta !== 0).length,
       status: blockers.some((entry) => entry.startsWith("sponsor:")) ? "blocked" : "ok",
       note: `totalCashDelta:${sponsorApply.preview.totalCashDelta}|benchmarkPrizeMoney:${totalPrizeMoney}|deductSalary:true`,
+    });
+  }
+
+  // Loan settlement (season-end) — mirrors season-completion-service (which the sandbox does NOT use):
+  // pay each active loan's installment from cash, reduce principalOutstanding + seasonsRemaining, close
+  // fully-repaid loans. Without this the sandbox never serviced loans → debt only accumulated and teams
+  // got the borrowed cash for free (skewing the whole multi-season economy). Runs AFTER sponsor
+  // settlement (income booked first), same order as production.
+  save = persistence.getSaveById(saveId);
+  if (save) {
+    startedAt = Date.now();
+    const loanSettle = applyLoanSettlement(save.gameState, { execute: true, seasonId });
+    if (loanSettle.applied) {
+      persistence.saveSingleplayerState(saveId, loanSettle.gameState);
+    }
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season end loan settlement",
+      startedAt,
+      itemCount: loanSettle.preview?.rows?.length ?? 0,
+      status: "ok",
+      note: `applied:${loanSettle.applied}|totalCashDelta:${loanSettle.preview?.totalCashDelta ?? 0}`,
     });
   }
 
