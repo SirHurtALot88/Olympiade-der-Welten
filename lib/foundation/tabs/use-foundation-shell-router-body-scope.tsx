@@ -4529,6 +4529,91 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Kreditaufnahme (Bank, Phase 1) — mirrors `chooseTeamSponsor`'s
+   * fetch-then-`loadSave` pattern 1:1: POST the mutation, then refetch the
+   * save so `gameState` (and everything derived from it, incl. the Credits
+   * view model) reflects the new loan/cash immediately. Always the active
+   * manager's own team (fog of war), never a `teamId` param.
+   */
+  async function originateLoanForActiveTeam(
+    principal: number,
+    termSeasons: number,
+    lenderTeamId?: string | null,
+  ): Promise<{ ok: boolean; reason: string | null }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available" };
+    }
+    try {
+      const response = await fetch("/api/finance/loan/originate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          principal,
+          termSeasons,
+          // `null`/omitted selects the bank; a team id selects a team offer
+          // (Phase 3 — see docs/design/kredit-system.md).
+          lenderTeamId: lenderTeamId ?? null,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null };
+      if (!response.ok || !payload.ok) {
+        return { ok: false, reason: payload.reason ?? "loan_originate_failed" };
+      }
+      await loadSave(activeSaveId);
+      return { ok: true, reason: null };
+    } catch {
+      return { ok: false, reason: "network_error" };
+    }
+  }
+
+  /**
+   * Vorab-Rückzahlung (vorzeitige Ablösung) — mirrors `originateLoanForActiveTeam`'s
+   * fetch-then-`loadSave` pattern 1:1: POST the mutation, then refetch the
+   * save so `gameState` reflects the freed-up cash/cleared loan immediately.
+   * Always the active manager's own team (fog of war), never a `teamId` param.
+   */
+  async function repayLoanEarlyForActiveTeam(loanId: string): Promise<{ ok: boolean; reason: string | null; payoff: number | null }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", payoff: null };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", payoff: null };
+    }
+    try {
+      const response = await fetch("/api/finance/loan/early-payoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          loanId,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; payoff?: number | null };
+      if (!response.ok || !payload.ok) {
+        return { ok: false, reason: payload.reason ?? "loan_early_payoff_failed", payoff: payload.payoff ?? null };
+      }
+      await loadSave(activeSaveId);
+      return { ok: true, reason: null, payoff: payload.payoff ?? null };
+    } catch {
+      return { ok: false, reason: "network_error", payoff: null };
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -9974,6 +10059,8 @@ export function useFoundationShellRouterBodyScope({
     openTrainingPlayerTarget,
     onOpenLeagueLeaders,
     orderedDisciplines,
+    originateLoanForActiveTeam,
+    repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,
     passiveTeams,
     persistenceError,

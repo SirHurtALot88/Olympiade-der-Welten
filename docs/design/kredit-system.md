@@ -293,19 +293,20 @@ teamRate = clamp(
 - KI-zu-KI-Kredite: vorerst evtl. nur Mensch↔KI, KI↔KI später.
 - Balancing des Cash-Aufkommens (Vorbedingung oben) — braucht Daten aus echten Season-Läufen.
 
-## UI-Integration (Finanzansichten)
+## UI-Integration — Status: angebunden
 
-Kredite sollen nicht nur in einer eigenen Bank-Ansicht leben, sondern dort auftauchen, wo Cashflow
-und Finanzen ohnehin gezeigt werden — als weitere Position neben Gehältern und Gebäudekosten:
-- **Cashflow-/Finanz-Übersicht**: die anstehende(n) Kreditrate(n) als Abzugsposition vom Cash
-  ausweisen — „Gehälter −X, Gebäudekosten −Y, **Kreditraten −Z**". So sieht der Spieler den echten
-  Netto-Cashflow.
-- **Restschuld** als Bilanz-Seite neben dem Cash-Bestand anzeigen (die „Schulden-Seite").
-- Konkrete Zielseiten identifizieren (Home/Finanzen-Tab, Team-Detail, Saison-Vorschau) und die
-  Kredit-Position dort einhängen, wo Salär-/Facility-Kosten bereits dargestellt werden.
+Beide UI-Teile sind gegen den echten Service verdrahtet (kein offener Seam mehr):
 
-*(Umsetzung zusammen mit der menschlichen Bank-/Aufnahme-UI; die Service-Werte
-`getTeamOutstandingDebt` und die Rate aus `LoanRecord` liegen bereits vor.)*
+- **Kredite-Marktplatz** (`app/foundation/credits/FoundationCreditsNewLook.tsx`): Betrag-Slider +
+  Laufzeit-Dropdown als Filter, darunter eine Angebotsliste (Bank + Teams) aus
+  `buildLoanOffers(gameState, borrowerTeamId, { amount, termSeasons })` in
+  `lib/finance/loan-service.ts` — günstigster Zins zuerst, `eligible: false` greyed-out. Aufnahme
+  über `POST /api/finance/loan/originate` (`lenderTeamId` durchgereicht, `originateLoan`
+  behandelt Bank und Team). Vorzeitige Ablösung über `computeEarlyPayoff` / `applyEarlyPayoff`.
+- **Finanz-Integration**: Kreditrate (`getTeamAnnualLoanInstallment`) + Restschuld
+  (`getTeamOutstandingDebt`) erscheinen auf den eigenen Finanz-Flächen (Home-Cockpit, Front Office,
+  Prize-Forecast) neben Gehältern — fog-of-war-sicher (nur eigenes Team; liga-weite GuV-Tabellen
+  bleiben unberührt).
 
 ## Tests
 

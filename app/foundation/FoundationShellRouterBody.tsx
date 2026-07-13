@@ -9,6 +9,7 @@ import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, Foundatio
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
+import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -249,6 +250,10 @@ const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/Fou
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
 });
+const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -479,6 +484,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   openTrainingPlayerTarget,
   onOpenLeagueLeaders,
   orderedDisciplines,
+  originateLoanForActiveTeam,
+  repayLoanEarlyForActiveTeam,
   ownerQuickSwitchTeams,
   passiveTeams,
   persistenceError,
@@ -1777,7 +1784,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
 
-          {activeView === "homeV2" ? (
+          {activeView === "homeV2" ? (() => {
+          // Kredit-Kern (Fog of War): nur für das aktive Manager-Team, nie für
+          // ein fremdes Team, siehe `use-credits-view-model.ts`.
+          const homeLoanInstallment = activeManagerTeamId
+            ? getTeamAnnualLoanInstallment(gameState, activeManagerTeamId)
+            : null;
+          const homeOutstandingDebt = activeManagerTeamId
+            ? getTeamOutstandingDebt(gameState, activeManagerTeamId)
+            : null;
+          return (
           <FoundationHomeV2Panel
             active
             tab={homeV2Tab}
@@ -1795,6 +1811,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               cash: selectedStandingRow?.cash ?? null,
               salaryTotal: selectedStandingRow?.salaryTotal ?? null,
               guv: selectedStandingRow?.guv ?? null,
+              loanInstallment: homeLoanInstallment,
+              outstandingDebt: homeOutstandingDebt,
               rosterCount: selectedRosterTableRows.length,
               // Wave D · Feld-Rennen (D1/D2/D4) — fog-sicher, additiv.
               fieldRaceForm: selectedTeamFieldRaceForm,
@@ -1853,6 +1871,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               selectedTeamPlayerDemands,
               selectedHqFinanceWarnings,
               selectedStandingRow,
+              loanInstallment: homeLoanInstallment,
+              outstandingDebt: homeOutstandingDebt,
               activeTeamOpenInboxItems,
               activeTeamCriticalInboxItems,
               selectedOpenObjectives,
@@ -1888,7 +1908,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onNavigateInboxItem: navigateToInboxItem,
             }}
           />
-          ) : null}
+          );
+          })() : null}
 
           <FoundationShellRouterTeams
             active={activeView === "teams"}
@@ -3627,6 +3648,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             active={activeView === "history" || activeView === "historyV2"}
             hostProps={foundationHistoryV2HostProps}
           />
+
+          {activeView === "credits" ? (
+            <FoundationCreditsHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              onBorrow={originateLoanForActiveTeam}
+              onEarlyPayoff={repayLoanEarlyForActiveTeam}
+            />
+          ) : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

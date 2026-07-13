@@ -169,6 +169,11 @@ export default function FoundationPrizeV2NewLook({
   // Profil benennt, wird die Karte klickbar (öffnet das Teamprofil).
   const leaderTeamId = prizeV2LeaderRow?.teamId ?? null;
   const outlookTeamId = (prizeV2SelectedTeamSummary?.teamId as string | null | undefined) ?? null;
+  // Kredit-Kern (Fog of War, own-team-only — siehe `use-prize-v2-panel-model.ts`):
+  // nur für das ausgewählte eigene Team, nicht für Leader/Swing/Risiko-Karten,
+  // die auch andere Teams zeigen können.
+  const outlookLoanInstallment = (prizeV2SelectedTeamSummary?.loanInstallment as number | null | undefined) ?? null;
+  const outlookOutstandingDebt = (prizeV2SelectedTeamSummary?.outstandingDebt as number | null | undefined) ?? null;
   const swingTeamId = prizeV2SwingRow?.teamId ?? null;
   const riskTeamId = prizeV2RiskRow?.teamId ?? null;
   const championTeamId = seasonEndChampionRow?.teamId ?? null;
@@ -349,6 +354,9 @@ export default function FoundationPrizeV2NewLook({
               ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)} → ${formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)}`
               : "kein Team aktiv"}
           </p>
+          {outlookOutstandingDebt != null ? (
+            <p className="nl-prize-story-line nl-tnum">Restschuld {formatLocalePoints(outlookOutstandingDebt, 1)}</p>
+          ) : null}
         </NlCard>
         <NlCard
           className="nl-prize-story-card"
@@ -497,6 +505,15 @@ export default function FoundationPrizeV2NewLook({
                   : "—"
               }
             />
+            {outlookLoanInstallment != null ? (
+              <StatChip
+                label="Kreditrate"
+                value={formatLocalePoints(outlookLoanInstallment, 1)}
+                tone="warn"
+                sub={outlookOutstandingDebt != null ? `Restschuld ${formatLocalePoints(outlookOutstandingDebt, 1)}` : undefined}
+                title="Jährliche Kreditrate — bereits in Bonus/Malus und Cash nachher eingerechnet"
+              />
+            ) : null}
           </StatChipRow>
           {forecastBars.length > 0 ? (
             <NlBarChart
@@ -517,6 +534,7 @@ export default function FoundationPrizeV2NewLook({
                     <th>Faktor</th>
                     <th>Preisgeld</th>
                     <th>Gehalt</th>
+                    {outlookLoanInstallment != null ? <th>Kreditrate</th> : null}
                     <th>GuV</th>
                     <th>Cash</th>
                   </tr>
@@ -528,9 +546,16 @@ export default function FoundationPrizeV2NewLook({
                       <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
                       <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
                       <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                      {outlookLoanInstallment != null ? (
+                        <td>{row.loanInstallment != null ? formatLocalePoints(row.loanInstallment, 1) : "—"}</td>
+                      ) : null}
                       <td>
                         {row.guv != null ? (
-                          <NlDeltaChip value={row.guv} format={(n) => formatSignedDisplayMoney(n)} title="Gewinn und Verlust" />
+                          <NlDeltaChip
+                            value={row.guv}
+                            format={(n) => formatSignedDisplayMoney(n)}
+                            title={outlookLoanInstallment != null ? "Gewinn und Verlust — inkl. Kreditrate" : "Gewinn und Verlust"}
+                          />
                         ) : (
                           "—"
                         )}
