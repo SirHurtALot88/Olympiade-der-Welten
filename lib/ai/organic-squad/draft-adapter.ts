@@ -380,6 +380,38 @@ const OPT_SURPLUS_SELL_THRESHOLD = -18;
  */
 const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 8) || 0;
 
+/**
+ * WEAK-TEAM UPGRADE SWAP (flag OLY_WEAK_TEAM_UPGRADE_SWAP, default ON; =0 opts out).
+ *
+ * Multi-season measurement showed the "poor get poorer" driver behind a widening top/bottom wealth gap
+ * (Schere > 2×): weak clubs bank sponsor income they never convert into squad value. Their cash/MW ran
+ * ~0.8–1.1 (cash worth as much as the whole squad) vs ~0.5 for strong clubs, and their market value
+ * stagnated season over season. Root cause: the sell loop below NEVER sheds at/below optTarget ("refilling
+ * below opt is the buy side's job"), so a club sitting at opt with a weak, cheap core sells nobody, the
+ * additive preseason buy has no free slot to upgrade into, and the club hoards cash forever.
+ *
+ * Fix: after the normal surplus/profit sells, a cash-rich HOARDER (high cash/MW) sitting at/below opt sheds
+ * its single least-valuable KEEPER (highest sellUtility among the remaining held — the body whose removal
+ * costs the least strength) to FREE a slot. The preseason organic buy cycle then refills that slot with the
+ * best player the hoarded cash can afford → cash converts into market value, lifting the bottom of the table.
+ *
+ * Self-targeting + conservative: the cash/MW gate only fires for genuine hoarders, so strong clubs (low
+ * cash/MW) are untouched; it only runs at SEASON END (allowBelowMin, so the freed slot is safely refilled in
+ * preseason, never mid-window); it is bounded to 1–2 swaps/season; and it only fires when the hoarded cash
+ * can actually fund a MEANINGFUL upgrade over the shed body (uplift gate), never a lateral churn.
+ */
+function isWeakTeamUpgradeSwapEnabled(): boolean {
+  return process.env.OLY_WEAK_TEAM_UPGRADE_SWAP !== "0";
+}
+/** cash/MW at/above which a club counts as a hoarder eligible for one upgrade swap (strong clubs run ~0.5). */
+const UPGRADE_SWAP_CASH_TO_MW = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW ?? 0.75) || 0.75;
+/** cash/MW at/above which a deep hoarder (cash ≈ whole squad value) may make TWO swaps in one season. */
+const UPGRADE_SWAP_CASH_TO_MW_STRONG = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW_STRONG ?? 1.0) || 1.0;
+/** Replacement budget (cash + proceeds − buffer) must clear this multiple of the shed MW → a real upgrade. */
+const UPGRADE_SWAP_UPLIFT = Number(process.env.OLY_UPGRADE_SWAP_UPLIFT ?? 1.5) || 1.5;
+/** Absolute headroom (MW) the replacement budget must also clear, so tiny-MW swaps still need real cash. */
+const UPGRADE_SWAP_MIN_HEADROOM = Number(process.env.OLY_UPGRADE_SWAP_MIN_HEADROOM ?? 10) || 10;
+
 export type OrganicSellDecision = {
   /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
   playerId: string;
@@ -387,6 +419,8 @@ export type OrganicSellDecision = {
   step: number;
   /** The sell utility at the moment it was chosen (for the decision log / diagnostics). */
   utility: number;
+  /** Optional tag: "upgrade_churn" for a weak-team hoarder swap-out (see UPGRADE_SWAP docs), else undefined. */
+  reason?: "upgrade_churn";
 };
 
 export type OrganicSellPlanInput = {
@@ -507,6 +541,49 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     cash += Math.max(0, best.marketValue);
     salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
     decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
+  }
+
+  // WEAK-TEAM UPGRADE SWAP (see UPGRADE_SWAP docs above). Season-end only (allowBelowMin) so the freed slot
+  // is safely refilled in preseason. A cash-rich hoarder at/below its own opt sheds its least-valuable keeper
+  // to open a slot for a real upgrade the preseason buy funds from the hoarded cash — converting banked cash
+  // into market value and lifting the bottom of the table (Schere fix). Strong clubs (low cash/MW) never trip
+  // the gate, so this only touches the stagnating weak clubs it is meant to.
+  if (input.allowBelowMin && isWeakTeamUpgradeSwapEnabled()) {
+    const teamMw = held.reduce((sum, view) => sum + Math.max(0, view.marketValue), 0);
+    const cashToMw = teamMw > 0 ? cash / teamMw : 0;
+    let swapsRemaining =
+      cashToMw >= UPGRADE_SWAP_CASH_TO_MW_STRONG ? 2 : cashToMw >= UPGRADE_SWAP_CASH_TO_MW ? 1 : 0;
+    // Keep at least ROSTER_MIN bodies so even a stalled preseason buy leaves a fieldable-ish core.
+    while (swapsRemaining > 0 && held.length > ROSTER_MIN && held.length <= ctx.weights.optTarget) {
+      const state = buildState();
+      // Least-valuable keeper = highest sellUtility remaining. The loop above already shed everything above
+      // the keep line, so this is the body whose removal costs the least strength — the right one to upgrade.
+      let weakest: OrganicPlayerView | null = null;
+      let weakestUtility = -Infinity;
+      for (const view of held) {
+        const utility = sellUtility(view, state);
+        if (utility > weakestUtility) {
+          weakestUtility = utility;
+          weakest = view;
+        }
+      }
+      if (!weakest) break;
+      // Only swap when the hoarded cash can fund a MEANINGFUL upgrade over the shed body: after banking the
+      // sale proceeds and holding the solvency buffer, the free budget must clear an uplift over the sold MW.
+      const proceeds = Math.max(0, weakest.marketValue);
+      const replacementBudget = cash + proceeds - ctx.cashBuffer;
+      if (replacementBudget < weakest.marketValue * UPGRADE_SWAP_UPLIFT + UPGRADE_SWAP_MIN_HEADROOM) break;
+      held.splice(held.indexOf(weakest), 1);
+      cash += proceeds;
+      salaryTotal = Math.max(0, salaryTotal - Math.max(0, weakest.salary));
+      decisions.push({
+        playerId: weakest.playerId,
+        step: decisions.length,
+        utility: weakestUtility,
+        reason: "upgrade_churn",
+      });
+      swapsRemaining -= 1;
+    }
   }
 
   return {

@@ -130,6 +130,69 @@ describe("planOrganicSellsForTeam — organic in-season sells", () => {
   });
 });
 
+describe("planOrganicSellsForTeam — weak-team upgrade swap (season-end hoarder churn)", () => {
+  // Identity with a higher opt (12) so a roster of 10 sits BELOW opt — the main loop's strict at/below-opt
+  // threshold sheds nobody, isolating the upgrade-swap path. Ten cheap keepers spread across disciplines
+  // (low sale value → negative sellUtility → all kept by the normal loop).
+  const HOARDER_IDENTITY = {
+    ambition: 55,
+    finances: 45,
+    boardConfidence: 55,
+    harmony: 50,
+    playerOpt: 12,
+    pow: 55,
+    spe: 55,
+    men: 55,
+    soc: 55,
+  } as unknown as TeamIdentity;
+
+  function hoarderRoster(): Player[] {
+    const disc = ["tdm", "staffel", "tennis", "showcase"];
+    const roster: Player[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      roster.push(player(`body-${i}`, disc[i % disc.length], { pow: 60, rating: 60, mv: 5, salary: 8 }));
+    }
+    return roster;
+  }
+
+  function planSeasonEnd(cash: number, envValue?: string) {
+    const prev = process.env.OLY_WEAK_TEAM_UPGRADE_SWAP;
+    if (envValue === undefined) delete process.env.OLY_WEAK_TEAM_UPGRADE_SWAP;
+    else process.env.OLY_WEAK_TEAM_UPGRADE_SWAP = envValue;
+    try {
+      return planOrganicSellsForTeam({
+        gameState: makeGameState(),
+        team: { ...TEAM, cash } as unknown as Team,
+        identity: HOARDER_IDENTITY,
+        roster: hoarderRoster(),
+        allowBelowMin: true,
+      });
+    } finally {
+      if (prev === undefined) delete process.env.OLY_WEAK_TEAM_UPGRADE_SWAP;
+      else process.env.OLY_WEAK_TEAM_UPGRADE_SWAP = prev;
+    }
+  }
+
+  it("a cash-rich hoarder below opt sheds its weakest keeper(s) to fund an upgrade", () => {
+    // teamMw = 10*5 = 50, cash 200 → cash/MW 4.0 (deep hoarder) → up to 2 upgrade swaps.
+    const result = planSeasonEnd(200);
+    const churn = result.decisions.filter((d) => d.reason === "upgrade_churn");
+    expect(churn.length).toBeGreaterThan(0);
+    expect(result.finalRosterSize).toBeGreaterThanOrEqual(ROSTER_MIN);
+  });
+
+  it("a cash-poor team (low cash/MW) sheds nobody via the upgrade path", () => {
+    // cash 15 → cash/MW 0.30, below the 0.75 hoarder gate → no upgrade churn.
+    const result = planSeasonEnd(15);
+    expect(result.decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
+  });
+
+  it("the upgrade swap is off when OLY_WEAK_TEAM_UPGRADE_SWAP=0", () => {
+    const result = planSeasonEnd(200, "0");
+    expect(result.decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
+  });
+});
+
 describe("sellUtility profit-flip term (GM sellForProfitAggression → wProfit)", () => {
   // Identity fixed; the ONLY thing separating the two clubs is GM sellForProfitAggression → wProfit
   // (wWin/wThrift/wPatience are identical for both). wAsset differs slightly but is not read by sells.

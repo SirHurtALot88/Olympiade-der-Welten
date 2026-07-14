@@ -328,6 +328,10 @@ async function runTeamCycle(input: {
       draftSeed: saltOrganicSeed(`${input.saveId}:${input.teamId}`),
     });
     warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
+    const upgradeChurnCount = plan.decisions.filter((decision) => decision.reason === "upgrade_churn").length;
+    if (upgradeChurnCount > 0) {
+      warnings.push(`organic_squad_builder_upgrade_swap:sheds=${upgradeChurnCount}`);
+    }
     const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
 
     // (1) RENEW keepers BEFORE selling (product intent "renew before sell"): for each non-sold player
