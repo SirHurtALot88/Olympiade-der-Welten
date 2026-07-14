@@ -513,73 +513,18 @@ export async function runAutoRosterFillForMatchdaySetup(
     }
 
     let failedToAdvance = false;
-    while (teamResult.rosterAfter < targetInfo.targetRosterSize) {
-      const latestPreview = buildRosterFillCandidates({
-        gameState: resolveStrictLocalSave(persistence, save.saveId).gameState,
-        saveId: save.saveId,
-        seasonId,
-        team,
-        limit: previewLimit,
-      });
-      const latestCandidates = latestPreview.candidates;
-      const nextCandidate = latestCandidates[0] ?? null;
-      if (!nextCandidate) {
-        const latestFreeAgents = latestPreview.freeAgentFeed;
-        teamResult.freeAgentsAvailable = latestFreeAgents.total;
-        const unreachable = classifyUnreachableReason({
-          missingCount: Math.max(0, targetInfo.targetRosterSize - teamResult.rosterAfter),
-          freeAgentsAvailable: latestFreeAgents.total,
-          acquisitions: teamResult.acquiredPlayers,
-          fallbackWarnings: latestPreview.warnings,
-          fallbackBlockingReasons: latestPreview.blockingReasons,
-        });
-        teamResult.status = teamResult.acquiredPlayers.length > 0 ? "partially_filled" : unreachable.status;
-        teamResult.blockingReasons = unique([...teamResult.blockingReasons, ...unreachable.blockingReasons]);
-        teamResult.warnings = unique([...teamResult.warnings, ...unreachable.warnings]);
-        failedToAdvance = true;
-        break;
-      }
-
-      const buyPreview = previewLocalTransfermarktBuy({
-        saveId: save.saveId,
-        seasonId,
-        teamId: team.teamId,
-        playerId: nextCandidate.playerId,
-        transferSource: "auto_roster_fill",
-      });
-      if (!buyPreview.canBuy) {
-        teamResult.acquiredPlayers.push({
-          playerId: nextCandidate.playerId,
-          playerName: nextCandidate.name,
-          purchasePrice: buyPreview.purchasePrice ?? nextCandidate.marketValue ?? null,
-          salary: buyPreview.salary ?? nextCandidate.salary ?? null,
-          contractLength: buyPreview.contractLength,
-          transferHistoryId: null,
-          recommendationScore: scoreRosterFillCandidate({
-            gameState: resolveStrictLocalSave(persistence, save.saveId).gameState,
-            teamId: team.teamId,
-            item: nextCandidate,
-            cash: teamResult.cashAfter,
-          }),
-          status: "planned",
-          warnings: buyPreview.warnings,
-          blockingReasons: buyPreview.blockingReasons,
-        });
-        const unreachable = classifyUnreachableReason({
-          missingCount: Math.max(0, targetInfo.targetRosterSize - teamResult.rosterAfter),
-          freeAgentsAvailable: listLocalTransfermarktFreeAgents({ saveId: save.saveId, teamId: team.teamId, limit: previewLimit }).total,
-          acquisitions: teamResult.acquiredPlayers,
-          fallbackWarnings: latestPreview.warnings,
-          fallbackBlockingReasons: latestPreview.blockingReasons,
-        });
-        teamResult.status = teamResult.acquiredPlayers.some((entry) => entry.status === "applied")
-          ? "partially_filled"
-          : unreachable.status;
-        teamResult.blockingReasons = unique([...teamResult.blockingReasons, ...unreachable.blockingReasons]);
-        teamResult.warnings = unique([...teamResult.warnings, ...unreachable.warnings]);
-        failedToAdvance = true;
-        break;
-      }
+    // In-memory fill (mirrors the fast dryRun path above). The previous implementation reloaded the ENTIRE
+    // save from SQLite AND rebuilt+rescored the whole free-agent pool on EVERY pick (up to three full-save
+    // deserializations per acquired player). On a fresh 32-team season that drove the Roster-Fill execute to
+    // ~8 GB RAM / 11 min and crashed the dev server. Here we iterate the once-built, once-scored candidate
+    // pool in order and only call executeLocalTransfermarktBuy per pick (that call already persists the buy
+    // and validates cash/rules against live state) — no extra per-pick save reloads or pool rebuilds. The
+    // authoritative economy/roster numbers are reconciled from one save read after the loop (below).
+    let runningCash = beforeSnapshot.cash;
+    let runningSalary = beforeSnapshot.salaryTotal;
+    let runningMarketValue = beforeSnapshot.marketValueTotal;
+    for (const nextCandidate of candidatePool) {
+      if (teamResult.rosterAfter >= targetInfo.targetRosterSize) break;
 
       const buyResult = executeLocalTransfermarktBuy({
         saveId: save.saveId,
@@ -588,7 +533,32 @@ export async function runAutoRosterFillForMatchdaySetup(
         playerId: nextCandidate.playerId,
         transferSource: "auto_roster_fill",
       });
-      if (!buyResult.canBuy || !buyResult.transferCreated || !buyResult.transferId) {
+
+      // Cash/rules rejection: record as planned-blocked and try the NEXT (cheaper) candidate — matching the
+      // dryRun path's skip-and-continue instead of aborting the whole team on the first unaffordable pick.
+      if (!buyResult.canBuy) {
+        teamResult.acquiredPlayers.push({
+          playerId: nextCandidate.playerId,
+          playerName: nextCandidate.name,
+          purchasePrice: buyResult.purchasePrice ?? nextCandidate.marketValue ?? null,
+          salary: buyResult.salary ?? nextCandidate.salary ?? null,
+          contractLength: buyResult.contractLength,
+          transferHistoryId: null,
+          recommendationScore: scoreRosterFillCandidate({
+            gameState: beforeGameState,
+            teamId: team.teamId,
+            item: nextCandidate,
+            cash: runningCash,
+          }),
+          status: "planned",
+          warnings: buyResult.warnings,
+          blockingReasons: buyResult.blockingReasons,
+        });
+        continue;
+      }
+
+      // Buy was allowed but no transfer persisted → a real write-integrity failure; stop this team.
+      if (!buyResult.transferCreated || !buyResult.transferId) {
         teamResult.acquiredPlayers.push({
           playerId: nextCandidate.playerId,
           playerName: nextCandidate.name,
@@ -597,10 +567,10 @@ export async function runAutoRosterFillForMatchdaySetup(
           contractLength: buyResult.contractLength,
           transferHistoryId: buyResult.transferId,
           recommendationScore: scoreRosterFillCandidate({
-            gameState: resolveStrictLocalSave(persistence, save.saveId).gameState,
+            gameState: beforeGameState,
             teamId: team.teamId,
             item: nextCandidate,
-            cash: teamResult.cashAfter,
+            cash: runningCash,
           }),
           status: "planned",
           warnings: buyResult.warnings,
@@ -612,6 +582,8 @@ export async function runAutoRosterFillForMatchdaySetup(
         break;
       }
 
+      const purchasePrice = buyResult.purchasePrice ?? nextCandidate.marketValue ?? null;
+      const salary = buyResult.salary ?? nextCandidate.salary ?? null;
       teamResult.acquiredPlayers.push({
         playerId: nextCandidate.playerId,
         playerName: nextCandidate.name,
@@ -620,32 +592,43 @@ export async function runAutoRosterFillForMatchdaySetup(
         contractLength: buyResult.contractLength,
         transferHistoryId: buyResult.transferId,
         recommendationScore: scoreRosterFillCandidate({
-          gameState: resolveStrictLocalSave(persistence, save.saveId).gameState,
+          gameState: beforeGameState,
           teamId: team.teamId,
           item: nextCandidate,
-          cash: teamResult.cashAfter,
+          cash: runningCash,
         }),
         status: "applied",
         warnings: buyResult.warnings,
         blockingReasons: [],
       });
       teamResult.transferHistoryIds.push(buyResult.transferId);
-      const currentGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
-      const currentTeam = currentGameState.teams.find((entry) => entry.teamId === team.teamId) ?? team;
-      const snapshotAfterBuy = buildTeamEconomySnapshot(currentGameState, currentTeam);
-      const previousRosterAfter = teamResult.rosterAfter;
-      teamResult.rosterAfter = snapshotAfterBuy.rosterCount;
-      teamResult.cashAfter = snapshotAfterBuy.cash;
-      teamResult.salaryAfter = snapshotAfterBuy.salaryTotal;
-      teamResult.marketValueAfter = snapshotAfterBuy.marketValueTotal;
-      teamResult.missingAfter = Math.max(0, targetInfo.targetRosterSize - snapshotAfterBuy.rosterCount);
+      teamResult.rosterAfter += 1;
+      runningCash = runningCash != null && purchasePrice != null ? roundValue(runningCash - purchasePrice, 2) : runningCash;
+      runningSalary = runningSalary != null && salary != null ? roundValue(runningSalary + salary, 2) : runningSalary;
+      runningMarketValue =
+        runningMarketValue != null && purchasePrice != null ? roundValue(runningMarketValue + purchasePrice, 2) : runningMarketValue;
+      teamResult.cashAfter = runningCash;
+      teamResult.salaryAfter = runningSalary;
+      teamResult.marketValueAfter = runningMarketValue;
+      teamResult.missingAfter = Math.max(0, targetInfo.targetRosterSize - teamResult.rosterAfter);
+    }
 
-      if (snapshotAfterBuy.rosterCount <= previousRosterAfter) {
-        failedToAdvance = true;
-        teamResult.status = "buy_blocked_by_existing_rules";
-        teamResult.blockingReasons = unique([...teamResult.blockingReasons, "roster_fill_no_progress"]);
-        break;
-      }
+    // Ran out of candidates (or the fixed pool couldn't fund the full target) without a hard write failure →
+    // classify why (cash-limited vs. no free agents), same taxonomy the per-pick path used.
+    if (!failedToAdvance && teamResult.rosterAfter < targetInfo.targetRosterSize) {
+      const unreachable = classifyUnreachableReason({
+        missingCount: Math.max(0, targetInfo.targetRosterSize - teamResult.rosterAfter),
+        freeAgentsAvailable: freeAgentFeed.total,
+        acquisitions: teamResult.acquiredPlayers,
+        fallbackWarnings,
+        fallbackBlockingReasons,
+      });
+      failedToAdvance = true;
+      teamResult.status = teamResult.acquiredPlayers.some((entry) => entry.status === "applied")
+        ? "partially_filled"
+        : unreachable.status;
+      teamResult.blockingReasons = unique([...teamResult.blockingReasons, ...unreachable.blockingReasons]);
+      teamResult.warnings = unique([...teamResult.warnings, ...unreachable.warnings]);
     }
 
     const afterGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
