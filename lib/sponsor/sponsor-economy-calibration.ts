@@ -235,7 +235,7 @@ export function getScaledRankMilestoneBonus(
  *    stützt das die Bottom-5-Einnahmen jede Season und bremst ihre Erosion (Schere öffnet nicht auf 2.4×).
  * ENV-tunebar zum Kalibrieren gegen das Schere-Ziel.
  */
-const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.25) || 0.25;
+const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.2) || 0.2;
 const SPONSOR_QUALITY_MILESTONE_BALANCE_C = Number(process.env.OLY_SPONSOR_WEAK_MS_BALANCE ?? 0.1) || 0.1;
 export function getQualityRebalanceProfile(teamQualityRank: number | null | undefined): {
   milestoneScale: number;
