@@ -494,8 +494,11 @@ describe("player progression forecast", () => {
   });
 
   it("charges more maintenance for high CA and small CA-PO gaps", () => {
-    const lowCa = createPlayer({ id: "low", rating: 45, potential: 90 });
-    const highCa = createPlayer({ id: "high", rating: 88, potential: 90 });
+    // CA is now derived from the player's own core stats (absolute, peak-weighted),
+    // not from rating/ovrNormalized — so the high-vs-low CA difference must live in
+    // coreStats. See lib/scouting/current-ability-score.ts.
+    const lowCa = createPlayer({ id: "low", rating: 45, potential: 90, coreStats: { pow: 45, spe: 45, men: 45, soc: 45 } });
+    const highCa = createPlayer({ id: "high", rating: 88, potential: 90, coreStats: { pow: 88, spe: 88, men: 88, soc: 88 } });
     const lowForecast = buildPlayerProgressionForecast({ gameState: createGameState(lowCa), player: lowCa, playerRating: createRating({ ovrNormalized: 45 }), seasonPerformance: null });
     const highForecast = buildPlayerProgressionForecast({ gameState: createGameState(highCa), player: highCa, playerRating: createRating({ ovrNormalized: 88 }), seasonPerformance: null });
 

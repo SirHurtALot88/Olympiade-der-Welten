@@ -43,6 +43,7 @@ import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat"
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
 type NlPodiumMetricKey = "ovr" | "pps" | "mvs";
 
@@ -160,7 +161,11 @@ export default function FoundationPlayersLeaderPodium({
                     previewDensity="full"
                     newLook
                     known={playerOwned}
-                    caScore={row.playerOvr}
+                    // CA ist die absolute, peak-gewichtete Bewertung aus den Kernwerten —
+                    // NICHT `row.playerOvr` (liga-relativ). Ein Liga-#1 mit mittelmäßigen
+                    // Absolutwerten soll nicht als CA 100 / 5 Sterne erscheinen. Siehe
+                    // `lib/scouting/current-ability-score.ts`.
+                    caScore={computeCurrentAbilityScore(row.player.coreStats)}
                     {...(playerOwned
                       ? { poScore: row.player.potential ?? null }
                       : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) })}

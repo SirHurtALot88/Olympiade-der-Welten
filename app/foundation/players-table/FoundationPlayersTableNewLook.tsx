@@ -123,6 +123,7 @@ import {
   type FoundationPlayerScopeRow,
 } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
@@ -862,10 +863,17 @@ export default function FoundationPlayersTableNewLook({
   /**
    * CA/PO-Sterne-Zelle — identische Props wie die bestehende
    * `FoundationPlayerPortraitPreview`-Einbindung weiter unten in dieser Datei
-   * (`caScore={row.playerOvr}`, `poScore={row.player.potential}`), nur jetzt
-   * als eigene, immer sichtbare Spalte statt nur im Hover-Preview. Gleiche
-   * Quelle wie die Teams-Rosterkarten/Home-Portraitkarte (`NlAbilityStars`,
-   * siehe `components/foundation/velo-ui/NlAbilityStars.tsx`).
+   * (`caScore={computeCurrentAbilityScore(row.player.coreStats)}`,
+   * `poScore={row.player.potential}`), nur jetzt als eigene, immer sichtbare
+   * Spalte statt nur im Hover-Preview. Gleiche Quelle wie die Teams-
+   * Rosterkarten/Home-Portraitkarte (`NlAbilityStars`, siehe
+   * `components/foundation/velo-ui/NlAbilityStars.tsx`).
+   *
+   * CA ist bewusst NICHT `row.playerOvr` — OVR ist liga-relativ (Rang/Perzentil
+   * unter allen aktiven Spielern), CA ist die absolute, peak-gewichtete
+   * Bewertung aus den eigenen Kernwerten (`computeCurrentAbilityScore`, siehe
+   * `lib/scouting/current-ability-score.ts`). Ein Liga-#1 mit mittelmäßigen
+   * Absolutwerten soll nicht als CA 100 / 5 Sterne erscheinen.
    */
   function renderAbilityStars(row: FoundationPlayerScopeRow) {
     // Nur eigene (vom Menschen geführte) Spieler haben ein bekanntes PO — deren
@@ -876,7 +884,7 @@ export default function FoundationPlayersTableNewLook({
     const potential = row.player.potential ?? null;
     return (
       <NlAbilityStars
-        caScore={row.playerOvr}
+        caScore={computeCurrentAbilityScore(row.player.coreStats)}
         known={owned}
         {...(owned ? { poScore: potential } : { poScoreRange: getFoggedPoScoreRange(potential) })}
         compact
@@ -985,7 +993,9 @@ export default function FoundationPlayersTableNewLook({
       previewDensity: "full",
       newLook: true,
       known: playerOwned,
-      caScore: row.playerOvr,
+      // CA ist die absolute, peak-gewichtete Bewertung aus den Kernwerten —
+      // NICHT `row.playerOvr` (liga-relativ), siehe `renderAbilityStars` oben.
+      caScore: computeCurrentAbilityScore(row.player.coreStats),
       ...(playerOwned
         ? { poScore: row.player.potential ?? null }
         : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) }),
