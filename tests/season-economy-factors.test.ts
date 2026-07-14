@@ -15,7 +15,9 @@ describe("season economy factors", () => {
     });
 
     expect(window).toHaveLength(SEASON_ECONOMY_FACTOR_WINDOW_SIZE);
-    expect(window.map((entry) => entry.factor)).toEqual([1.09, 1.21, 1.16, 0.97, 0.9]);
+    // Default OLY_SALARY_FACTOR_SHIFT is 0.1, so the canonical pattern [1.09,1.21,1.16,0.97,0.9] is lifted
+    // uniformly by +0.1 (see season-economy-factors SALARY_FACTOR_SHIFT). Set the env to 0 to restore it.
+    expect(window.map((entry) => entry.factor)).toEqual([1.19, 1.31, 1.26, 1.07, 1]);
     expect(window.map((entry) => entry.horizonIndex)).toEqual([0, 1, 2, 3, 4]);
   });
 
@@ -27,10 +29,12 @@ describe("season economy factors", () => {
     });
 
     expect(advanced.nextWindow).toHaveLength(SEASON_ECONOMY_FACTOR_WINDOW_SIZE);
-    expect(advanced.nextWindow.slice(0, 4).map((entry) => entry.factor)).toEqual([1.21, 1.16, 0.97, 0.9]);
+    // +0.1 default shift applied to the canonical pattern (see note above).
+    expect(advanced.nextWindow.slice(0, 4).map((entry) => entry.factor)).toEqual([1.31, 1.26, 1.07, 1]);
     expect(advanced.rerolledSeasonPlus4.horizonIndex).toBe(4);
-    expect(advanced.rerolledSeasonPlus4.factor).toBeGreaterThanOrEqual(0.82);
-    expect(advanced.rerolledSeasonPlus4.factor).toBeLessThanOrEqual(1.24);
+    // Roll range is also shifted +0.1 at both ends: [0.82,1.24] → [0.92,1.34].
+    expect(advanced.rerolledSeasonPlus4.factor).toBeGreaterThanOrEqual(0.92);
+    expect(advanced.rerolledSeasonPlus4.factor).toBeLessThanOrEqual(1.34);
   });
 
   describe("OLY_LONG_RUN_SALARY_FACTOR_PATTERN override", () => {
