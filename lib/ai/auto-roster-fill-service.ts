@@ -372,6 +372,14 @@ export async function runAutoRosterFillForMatchdaySetup(
   const runContext = createLocalTransfermarktRunContext({ save, persistence });
 
   for (const team of save.gameState.teams) {
+    if (!dryRun) {
+      // Yield to the event loop between teams. The per-team buy work is CPU-bound and synchronous, so
+      // without this the whole ~40s execute fill would block the single JS thread in one go — the caller's
+      // "run this in the background" detach would be a no-op and any concurrent request (e.g. the client's
+      // league-setup status poll) would stall until the fill finished. Yielding keeps the fill cooperative
+      // and lets the fresh-season request return immediately while setup continues in the background.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
     const beforeGameState = runContext.save.gameState;
     const beforeSnapshot = buildTeamEconomySnapshot(beforeGameState, team);
     const targetInfo = resolveTargetRoster(team, beforeGameState);
