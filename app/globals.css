@@ -13344,6 +13344,79 @@ a {
   font-size: 0.72rem;
 }
 
+/* #106: pro Achsen-Karte getrennte Steuerelemente — Liga-Leaders-Link im
+   Kopf (klein, eigenständig) und ein Aufklapp-Toggle für das Diszi-Detail
+   (PPs + Rang je Disziplin), ohne den Liga-Leaders-Klick zu verlieren. */
+.player-drawer-axis-card-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-drawer-axis-leaders-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.player-drawer-axis-leaders-btn:hover,
+.player-drawer-axis-leaders-btn:focus-visible {
+  border-color: rgba(139, 171, 230, 0.5);
+  background: rgba(139, 171, 230, 0.16);
+  transform: translateY(-1px);
+}
+
+.player-drawer-axis-discipline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(214, 223, 241, 0.72);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.player-drawer-axis-discipline-toggle:hover,
+.player-drawer-axis-discipline-toggle:focus-visible {
+  color: #f7fbff;
+}
+
+.player-drawer-axis-discipline-toggle-caret {
+  display: inline-block;
+  transition: transform 140ms ease;
+}
+
+.player-drawer-axis-discipline-toggle-caret.is-open {
+  transform: rotate(90deg);
+}
+
+.player-drawer-axis-discipline-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+  color: rgba(214, 223, 241, 0.72);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .player-drawer-two-column-grid {
   display: grid;
   grid-template-columns: 1.08fr 1fr;
