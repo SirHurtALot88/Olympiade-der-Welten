@@ -19,6 +19,9 @@ const persistenceState = {
 
 vi.mock("@/lib/ai/ai-needs-picks-compare-service", () => ({
   buildAiNeedsPicksCompare,
+  // Mirror real module exports the service imports (mock drift caused "No <name> export" errors).
+  DRAFT_MAX_STEPS_CAP: 20,
+  isSeason1SpendDownRequired: () => false,
   resolveExpectedAiPickCostBandFromLane: (lane: string | null | undefined) => {
     const normalized = String(lane ?? "").trim().toLowerCase();
     if (["cheap_fill", "expensive_minimum_fill", "budget_risk_pick"].includes(normalized)) return "cheap_fill";
