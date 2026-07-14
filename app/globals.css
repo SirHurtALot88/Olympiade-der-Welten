@@ -63066,3 +63066,323 @@ button.nl-players-axis:focus-visible {
     align-items: center;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Spieler: Leader-Podium, Kader-Ridgeline, Hover-Steckbrief
+   Additiv, flag-gated unter `.is-new-look`. Betrifft:
+   - app/foundation/players-table/FoundationPlayersLeaderPodium.tsx
+   - app/foundation/players-table/FoundationPlayersSquadRidgeline.tsx
+   - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
+     (Namens-Zelle triggert jetzt denselben Hover-Steckbrief wie das Portrait)
+   ============================================================ */
+
+/* --- Namens-Zelle: derselbe Hover-Steckbrief-Anchor wie die Bild-Zelle --- */
+.is-new-look .nl-players-td-name .foundation-player-portrait-preview-anchor {
+  display: flex;
+  width: 100%;
+}
+
+/* --- Leader-Podium (Seiten-Hero, 1-2-3-Podest) -------------------------- */
+.is-new-look .nl-podium-card {
+  overflow: visible;
+}
+
+.is-new-look .nl-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--nl-s5);
+  padding-top: var(--nl-s4);
+}
+
+.is-new-look .nl-podium-plinth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 148px;
+  min-width: 0;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-1 {
+  order: 2;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-2 {
+  order: 1;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-3 {
+  order: 3;
+}
+
+.is-new-look .nl-podium-portrait-wrap {
+  position: relative;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-portrait {
+  width: 88px;
+  height: 88px;
+}
+
+.is-new-look .nl-podium-portrait,
+.is-new-look .nl-podium-portrait-fallback {
+  display: block;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  box-shadow: var(--nl-e2);
+  transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-podium-portrait-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--nl-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-portrait-wrap:hover .nl-podium-portrait,
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-portrait-wrap:focus-within .nl-podium-portrait {
+  border-color: #f5d878;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-2 .nl-podium-portrait-wrap:hover .nl-podium-portrait,
+.is-new-look .nl-podium-plinth.is-rank-2 .nl-podium-portrait-wrap:focus-within .nl-podium-portrait {
+  border-color: #e3e9f2;
+}
+
+.is-new-look .nl-podium-plinth.is-rank-3 .nl-podium-portrait-wrap:hover .nl-podium-portrait,
+.is-new-look .nl-podium-plinth.is-rank-3 .nl-podium-portrait-wrap:focus-within .nl-podium-portrait {
+  border-color: #e0a56f;
+}
+
+.is-new-look .nl-podium-portrait-wrap:hover .nl-podium-portrait,
+.is-new-look .nl-podium-portrait-wrap:focus-within .nl-podium-portrait {
+  transform: translateY(-2px);
+}
+
+.is-new-look .nl-podium-medal-slot {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  pointer-events: none;
+}
+
+.is-new-look .nl-podium-name-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-podium-name-btn:hover,
+.is-new-look .nl-podium-name-btn:focus-visible {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-podium-team-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--nl-mut);
+  font-family: var(--nl-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-podium-team-btn:hover,
+.is-new-look .nl-podium-team-btn:focus-visible {
+  color: var(--nl-ink);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-podium-team-btn.is-free-agent {
+  cursor: default;
+  font-style: italic;
+}
+
+.is-new-look .nl-podium-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-accent));
+}
+
+.is-new-look .nl-podium-value-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-podium-riser {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+  width: 100%;
+  border-radius: var(--nl-r-sm) var(--nl-r-sm) 0 0;
+  border: 1px solid var(--nl-line-2);
+  border-bottom: 0;
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .nl-podium-riser-rank {
+  font-family: var(--nl-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(11, 15, 23, 0.55);
+}
+
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-riser {
+  height: 88px;
+  background: linear-gradient(180deg, #f5d878, #c99b2e);
+}
+
+.is-new-look .nl-podium-plinth.is-rank-2 .nl-podium-riser {
+  height: 60px;
+  background: linear-gradient(180deg, #e3e9f2, #97a3b5);
+}
+
+.is-new-look .nl-podium-plinth.is-rank-3 .nl-podium-riser {
+  height: 44px;
+  background: linear-gradient(180deg, #e0a56f, #9c6431);
+}
+
+@media (max-width: 640px) {
+  .is-new-look .nl-podium {
+    gap: var(--nl-s3);
+  }
+
+  .is-new-look .nl-podium-plinth {
+    width: 104px;
+  }
+
+  .is-new-look .nl-podium-portrait,
+  .is-new-look .nl-podium-portrait-fallback,
+  .is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-portrait {
+    width: 56px;
+    height: 56px;
+  }
+
+  .is-new-look .nl-podium-value {
+    font-size: 16px;
+  }
+}
+
+/* --- Kader-Ridgeline (Joyplot POW/SPE/MEN/SOC) -------------------------- */
+.is-new-look .nl-ridge-card {
+  min-width: 0;
+}
+
+.is-new-look .nl-ridge-svg-wrap {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.is-new-look .nl-ridge-svg {
+  display: block;
+  width: 100%;
+  min-width: 420px;
+  height: auto;
+}
+
+.is-new-look .nl-ridge-grid {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.is-new-look .nl-ridge-tick {
+  font-family: var(--nl-sans);
+  font-size: 9px;
+  fill: var(--nl-mut-2);
+}
+
+.is-new-look .nl-ridge-axis-label {
+  font-family: var(--nl-sans);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  fill: var(--nl-mut);
+}
+
+.is-new-look .nl-ridge-baseline {
+  stroke: var(--nl-line);
+  stroke-width: 1;
+  opacity: 0.6;
+}
+
+.is-new-look .nl-ridge-row-label {
+  font-family: var(--nl-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  fill: var(--nl-mut);
+}
+
+.is-new-look .nl-ridge-area {
+  opacity: 0.55;
+  transition: opacity var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-ridge-area:hover {
+  opacity: 0.75;
+}
+
+.is-new-look .nl-ridge-line {
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.is-new-look .nl-ridge-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s2);
+  font-size: 10.5px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-ridge-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.is-new-look .nl-ridge-legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
