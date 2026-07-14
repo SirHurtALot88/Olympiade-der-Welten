@@ -4,7 +4,9 @@ import type { GameState, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
+  createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
+  flushLocalTransfermarktRunContext,
   listLocalTransferHistory,
   listLocalTransfermarktFreeAgents,
   previewLocalTransfermarktBuy,
@@ -354,7 +356,8 @@ export async function runAutoRosterFillForMatchdaySetup(
   const teamResults: AutoRosterFillTeamResult[] = [];
 
   for (const team of save.gameState.teams) {
-    const beforeGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
+    const beforeSave = resolveStrictLocalSave(persistence, save.saveId);
+    const beforeGameState = beforeSave.gameState;
     const beforeSnapshot = buildTeamEconomySnapshot(beforeGameState, team);
     const targetInfo = resolveTargetRoster(team, beforeGameState);
     const previewLimit = getRosterFillPreviewLimit(
@@ -520,6 +523,11 @@ export async function runAutoRosterFillForMatchdaySetup(
     // pool in order and only call executeLocalTransfermarktBuy per pick (that call already persists the buy
     // and validates cash/rules against live state) — no extra per-pick save reloads or pool rebuilds. The
     // authoritative economy/roster numbers are reconciled from one save read after the loop (below).
+    // Buy against ONE in-memory run context and persist ONCE per team (flush below), instead of letting
+    // every executeLocalTransfermarktBuy re-serialize the full ~33MB save to SQLite. On a fresh 32-team
+    // season that cut the fill from ~350 full-save writes to 32, the difference between a ~10-min blocking
+    // request and a fast one. The context validates cash/roster against its own accumulating in-memory state.
+    const teamRunContext = createLocalTransfermarktRunContext({ save: beforeSave, persistence });
     let runningCash = beforeSnapshot.cash;
     let runningSalary = beforeSnapshot.salaryTotal;
     let runningMarketValue = beforeSnapshot.marketValueTotal;
@@ -532,6 +540,8 @@ export async function runAutoRosterFillForMatchdaySetup(
         teamId: team.teamId,
         playerId: nextCandidate.playerId,
         transferSource: "auto_roster_fill",
+        localRunContext: teamRunContext,
+        deferPersist: true,
       });
 
       // Cash/rules rejection: record as planned-blocked and try the NEXT (cheaper) candidate — matching the
@@ -612,6 +622,10 @@ export async function runAutoRosterFillForMatchdaySetup(
       teamResult.marketValueAfter = runningMarketValue;
       teamResult.missingAfter = Math.max(0, targetInfo.targetRosterSize - teamResult.rosterAfter);
     }
+
+    // Persist all of this team's deferred buys in a single save write, so the reconcile + history-integrity
+    // reads below (and the next team's free-agent pool) observe the committed state.
+    flushLocalTransfermarktRunContext(teamRunContext);
 
     // Ran out of candidates (or the fixed pool couldn't fund the full target) without a hard write failure →
     // classify why (cash-limited vs. no free agents), same taxonomy the per-pick path used.
