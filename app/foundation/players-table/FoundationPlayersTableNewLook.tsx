@@ -46,8 +46,20 @@
  *   `use-foundation-shell-router-body-scope.tsx`; das ist außerhalb dieser
  *   additiven Komponente nicht herstellbar, ohne Shell-Dateien anzufassen.
  *
+ * Weitere Zusätze (UI/UX-Upgrades):
+ * - Leader-Podium (`FoundationPlayersLeaderPodium.tsx`): Seiten-Hero, klassisches
+ *   1-2-3-Podest der Top-3 nach OVR/PPs/MVS über dieselben (Umfang-/Team-/
+ *   Klassen-gefilterten) `rows` wie der Rest der Seite.
+ * - Kader-Ridgeline (`FoundationPlayersSquadRidgeline.tsx`, Analyse-Hub neben
+ *   dem Schnäppchen-Radar): handgerolltes SVG-Joyplot der POW/SPE/MEN/SOC-
+ *   Verteilung der aktuellen Hub-Auswahl (gebucketet, kein Knoten je Spieler).
+ * - Hover-Steckbrief: Namens-Zelle triggert jetzt denselben reichen
+ *   `FoundationPlayerPortraitPreview`-Hover wie die Bild-Zelle (eine
+ *   gemeinsame Props-Instanz je Zeile, `subMeta` zeigt zusätzlich Klasse/Rasse).
+ *
  * Styles: `app/globals.css` unter `.is-new-look .nl-players-*` /
- * `.is-new-look .nl-phub-scatter-*`.
+ * `.is-new-look .nl-phub-scatter-*` / `.is-new-look .nl-podium-*` /
+ * `.is-new-look .nl-ridge-*`.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -94,7 +106,9 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { NlAbilityStars } from "@/components/foundation/velo-ui/NlAbilityStars";
-import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import FoundationPlayerPortraitPreview, {
+  type FoundationPlayerPortraitPreviewProps,
+} from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
@@ -111,12 +125,15 @@ import {
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
+import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
 import {
   rowMatchesQueryChips,
   type QueryChip,
 } from "@/app/foundation/players-table/foundation-players-query-chips";
+import FoundationPlayersLeaderPodium from "@/app/foundation/players-table/FoundationPlayersLeaderPodium";
 import FoundationPlayersQueryChipsBar from "@/app/foundation/players-table/FoundationPlayersQueryChipsBar";
 import FoundationPlayersScatterCard from "@/app/foundation/players-table/FoundationPlayersScatterCard";
+import FoundationPlayersSquadRidgeline from "@/app/foundation/players-table/FoundationPlayersSquadRidgeline";
 
 export type FoundationPlayersTableNewLookProps = {
   /** Bereits nach `tableSorts.playersTable` sortierte, gefilterte Zeilen. */
@@ -353,28 +370,10 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
 
 const NL_PLAYERS_PAGE_SIZE = 100;
 
-/**
- * Fog of war: für Spieler, die NICHT zum vom Menschen geführten Team gehören,
- * ist das Potenzial (PO) verdeckt. Ein konkreter PO-Wert würde in `NlAbilityStars`
- * als volle Sterne rendern (z. B. ★★★★★) und so fremdes Potenzial leaken. Statt
- * dessen wird ein unscharfer PO-BEREICH (Score-Space 35..99) übergeben, damit die
- * Hohl-Kontur-Behandlung (`known={false}`) den Bereich als "geschätzt" zeichnet.
- * Bandbreite konsistent mit der ungescouteten Scouting-Unsicherheit (±16, vgl.
- * `getScoutingUncertainty(0)` in `lib/progression/player-potential-service.ts`),
- * auf 35..99 geklammert. Es wird KEINE PO-Zahl gerendert — nur die Sternmathematik
- * nutzt den Bereich (die `PO ≥ CA`-Klammerung passiert in `NlAbilityStars`).
- */
-const NL_FOG_PO_BAND = 16;
-function getFoggedPoScoreRange(potential: number | null | undefined): { min: number; max: number } | null {
-  if (potential == null || !Number.isFinite(potential) || potential <= 0) {
-    return null;
-  }
-  const hidden = Math.round(Math.min(99, Math.max(1, potential)));
-  return {
-    min: Math.round(Math.min(99, Math.max(35, hidden - NL_FOG_PO_BAND))),
-    max: Math.round(Math.min(99, Math.max(35, hidden + NL_FOG_PO_BAND))),
-  };
-}
+// Fog of war (verdecktes Potenzial fremder Spieler): siehe
+// `getFoggedPoScoreRange` in `foundation-players-fog-of-war.ts` (geteilt mit
+// `FoundationPlayersLeaderPodium.tsx`, daher in eine eigene Datei ausgelagert
+// statt hier lokal definiert — vermeidet einen zirkulären Modul-Import).
 
 /** Ligaweiter Rang eines Werts innerhalb eines Heat-Pools (1 = bester). */
 function getLeagueRank(value: number | null | undefined, pool: number[]): number | null {
@@ -956,6 +955,42 @@ export default function FoundationPlayersTableNewLook({
     const isCompareSelected = comparePlayerIds.includes(row.player.id);
     const compareDisabled = !isCompareSelected && comparePlayerIds.length >= 4;
 
+    /**
+     * Geteilte Props für den Hover-Steckbrief (#Hover-Steckbrief, additiv):
+     * dieselbe reiche `FoundationPlayerPortraitPreview`-Instanz (voller
+     * Dichte-Modus, Portrait + Name + Team/Klasse/Rasse + OVR/PPs/MVS +
+     * Achsen-Orbit + CA/PO-Sterne) wird jetzt sowohl vom Bild- als auch vom
+     * Namens-Zellinhalt getriggert — EINE Quelle statt einer zweiten,
+     * parallelen Hover-Implementierung. `subMeta` trägt zusätzlich Klasse und
+     * Rasse (zuvor nur der Teamname), damit der Steckbrief sie ohne neue
+     * Bausteine mit anzeigt.
+     */
+    const portraitPreviewProps: Omit<FoundationPlayerPortraitPreviewProps, "children"> = {
+      playerId: row.player.id,
+      name: row.player.name,
+      portraitUrl: portrait.previewSrc ?? portrait.src,
+      portraitInitials: portrait.initials,
+      playerOvr: row.playerOvr,
+      playerMvs: row.playerMvs,
+      playerPps: row.playerPps,
+      pow: row.player.coreStats.pow ?? null,
+      spe: row.player.coreStats.spe ?? null,
+      men: row.player.coreStats.men ?? null,
+      soc: row.player.coreStats.soc ?? null,
+      leagueHeatPools: leaguePlayerHeatPools,
+      variant: "team",
+      context: "teamGrid",
+      playerClassName: row.player.className,
+      subMeta: [row.team?.name ?? "Free Agent", row.player.className, row.player.race].filter(Boolean).join(" · "),
+      previewDensity: "full",
+      newLook: true,
+      known: playerOwned,
+      caScore: row.playerOvr,
+      ...(playerOwned
+        ? { poScore: row.player.potential ?? null }
+        : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) }),
+    };
+
     const rowElement = (
       <tr
         key={row.player.id}
@@ -981,31 +1016,7 @@ export default function FoundationPlayersTableNewLook({
           />
         </td>
         <td className="nl-players-td-image">
-          <FoundationPlayerPortraitPreview
-            playerId={row.player.id}
-            name={row.player.name}
-            portraitUrl={portrait.previewSrc ?? portrait.src}
-            portraitInitials={portrait.initials}
-            playerOvr={row.playerOvr}
-            playerMvs={row.playerMvs}
-            playerPps={row.playerPps}
-            pow={row.player.coreStats.pow ?? null}
-            spe={row.player.coreStats.spe ?? null}
-            men={row.player.coreStats.men ?? null}
-            soc={row.player.coreStats.soc ?? null}
-            leagueHeatPools={leaguePlayerHeatPools}
-            variant="team"
-            context="teamGrid"
-            playerClassName={row.player.className}
-            subMeta={row.team?.name ?? "Free Agent"}
-            previewDensity="full"
-            newLook
-            known={playerOwned}
-            caScore={row.playerOvr}
-            {...(playerOwned
-              ? { poScore: row.player.potential ?? null }
-              : { poScoreRange: getFoggedPoScoreRange(row.player.potential ?? null) })}
-          >
+          <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
             {portrait.src ? (
               <BudgetedMediaImage
                 className="nl-players-portrait"
@@ -1029,30 +1040,32 @@ export default function FoundationPlayersTableNewLook({
           </FoundationPlayerPortraitPreview>
         </td>
         <td className={`nl-players-td-name${sortCellClass("name")}`}>
-          <button
-            type="button"
-            className="nl-players-name-button"
-            onClick={(event) => {
-              event.stopPropagation();
-              openPlayerDrawerById(row.player.id, row.roster?.id);
-            }}
-            title={`${row.player.name} öffnen`}
-          >
-            <span className="nl-players-name-line">
-              {wishlistPlayerIds.has(row.player.id) ? (
-                <span className="nl-players-wishlist-star" aria-label="Auf deiner Transfermarkt-Wishlist" title="Auf deiner Transfermarkt-Wishlist">
-                  ★
-                </span>
+          <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
+            <button
+              type="button"
+              className="nl-players-name-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                openPlayerDrawerById(row.player.id, row.roster?.id);
+              }}
+              title={`${row.player.name} öffnen`}
+            >
+              <span className="nl-players-name-line">
+                {wishlistPlayerIds.has(row.player.id) ? (
+                  <span className="nl-players-wishlist-star" aria-label="Auf deiner Transfermarkt-Wishlist" title="Auf deiner Transfermarkt-Wishlist">
+                    ★
+                  </span>
+                ) : null}
+                <span className="nl-players-name">{row.player.name}</span>
+              </span>
+              {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
+                  bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
+                  Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
+              {row.transferStatus !== "Active Player" ? (
+                <span className="nl-players-status">{row.transferStatus}</span>
               ) : null}
-              <span className="nl-players-name">{row.player.name}</span>
-            </span>
-            {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
-                bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
-                Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
-            {row.transferStatus !== "Active Player" ? (
-              <span className="nl-players-status">{row.transferStatus}</span>
-            ) : null}
-          </button>
+            </button>
+          </FoundationPlayerPortraitPreview>
         </td>
         <td className={`nl-players-td-team${sortCellClass("team")}`}>
           <button
@@ -1236,6 +1249,12 @@ export default function FoundationPlayersTableNewLook({
 
   return (
     <div className="nl-players" id="players-table" data-testid="nl-players-table" data-new-look="true">
+      <FoundationPlayersLeaderPodium
+        rows={rows}
+        leaguePlayerHeatPools={leaguePlayerHeatPools}
+        openPlayerDrawerById={openPlayerDrawerById}
+        openTeamProfileById={openTeamProfileById}
+      />
       <NlCard
         className="nl-players-header-card"
         eyebrow={`Liga-Datenbank · ${gameState.season.name}`}
@@ -1867,6 +1886,8 @@ function FoundationPlayersHub({
       </NlCard>
 
       <FoundationPlayersScatterCard rows={rows} openPlayerDrawerById={openPlayerDrawerById} />
+
+      <FoundationPlayersSquadRidgeline rows={rows} />
 
       <div className="nl-phub-grid">
         <NlCard className="nl-phub-value-card" eyebrow="Kader-Ökonomie" title="Bestes Preis-Leistungs-Verhältnis">
