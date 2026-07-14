@@ -40,6 +40,8 @@ import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-ser
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
+import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
+import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -424,6 +426,25 @@ export async function POST(request: Request) {
     save = persistence.createFreshSeasonOneSave({
       name: body.name,
     });
+    // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has
+    // a lineup. Populate the whole league here at creation (the Roster-Fill engine is now safe + batched)
+    // so a human never lands on unplayable empty AI teams and never has to find/click the Cockpit admin tool.
+    // Non-fatal: if the fill errors, the save is still returned and the fill can be retried from the Cockpit.
+    try {
+      await runAutoRosterFillForMatchdaySetup(
+        {
+          source: "sqlite",
+          saveId: save.saveId,
+          seasonId: save.gameState.season.id,
+          dryRun: false,
+          confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+        },
+        persistence,
+      );
+      save = persistence.getSaveById(save.saveId) ?? save;
+    } catch (error) {
+      console.error("[fresh-season-1] auto roster-fill failed (save still created):", error);
+    }
   } else if (body.action === "assign-team-captain") {
     if (!body.saveId || !body.teamId || !body.playerId) {
       return NextResponse.json({ error: "saveId, teamId and playerId are required." }, { status: 400 });
