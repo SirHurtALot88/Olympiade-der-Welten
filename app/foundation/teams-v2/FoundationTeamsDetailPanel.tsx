@@ -89,6 +89,16 @@ function getContractLengthHeatBandClass(length) {
   return "heat-band-8";
 }
 
+/** Moral-Vertragsintent → Ton-Klasse für den Intent-Chip (Verträge-Tabelle):
+ * grün = verlängerungsbereit, gelb = fordert mehr/nur kurz, rot = denkt an
+ * Wechsel/blockt. Reine Anzeige-Einordnung, keine neue Spielmechanik. */
+function getContractIntentToneClass(intent) {
+  if (intent === "willing_to_extend") return "is-positive";
+  if (intent === "considering_exit" || intent === "refuses_extension") return "is-risk";
+  if (intent === "demands_raise" || intent === "short_term_only") return "is-watch";
+  return "is-neutral";
+}
+
 /** Balkengeometrie für den Gehaltsforecast-Chart (Verträge-Tab): pro Saison
  * ein Balken (gebundene Summe), plus ein zweiter Balken NUR wenn die
  * Preview-Summe (inkl. Kaufdialog-Drafts) tatsächlich abweicht — sonst
@@ -176,6 +186,64 @@ function buildContractExpiryBuckets(rows, seasonLabelCount) {
       isOverflowBucket: year === maxBucket,
       rows: [...bucketRows].sort((left, right) => left.playerName.localeCompare(right.playerName, "de-DE")),
     }));
+}
+
+/** Gehaltsverlauf-Treppe für die Verträge-Tabelle: pro Saison ein Mini-Balken,
+ * Höhe relativ zum HÖCHSTEN Saisongehalt DIESER Zeile skaliert (nicht Team-Max)
+ * — so bleibt die VertragsFORM (front-/back-/balanced) auch bei kleinen
+ * Gehältern gut lesbar. Leere/ausgelaufene Saisons bekommen einen flachen,
+ * blassen Platzhalter-Balken. */
+function buildContractSalarySteps(row, seasonLabels) {
+  const seasons = Array.isArray(seasonLabels) ? seasonLabels : [];
+  const values = seasons.map((label, index) => {
+    const raw = row.yearlySalarySchedule?.[index]?.salary;
+    return { label, salary: Number.isFinite(raw) && raw > 0 ? raw : null };
+  });
+  const maxSalary = Math.max(1, ...values.map((entry) => entry.salary ?? 0));
+  let lastActiveIndex = -1;
+  values.forEach((entry, index) => {
+    if (entry.salary != null) {
+      lastActiveIndex = index;
+    }
+  });
+  const steps = values.map((entry, index) => ({
+    label: entry.label,
+    salary: entry.salary,
+    heightPct: entry.salary != null ? Math.max(12, Math.round((entry.salary / maxSalary) * 100)) : 8,
+    isEmpty: entry.salary == null,
+    isLast: index === lastActiveIndex,
+  }));
+  return {
+    steps,
+    lastActiveSalary: lastActiveIndex >= 0 ? values[lastActiveIndex].salary : null,
+  };
+}
+
+/** Mini-Balkenstreifen für die Tabellen-Fußzeile (Team-Gehaltslast pro
+ * Saison) — dieselbe committed/preview-Farbsprache wie der
+ * Gehaltsforecast-Chart oben, nur kompakt je Saison statt als eigener
+ * Chart. */
+function buildContractFooterSteps(totalsCommitted, totalsWithPreview) {
+  const committed = Array.isArray(totalsCommitted) ? totalsCommitted : [];
+  const preview = Array.isArray(totalsWithPreview) ? totalsWithPreview : [];
+  const maxValue = Math.max(
+    1,
+    ...committed.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
+    ...preview.map((entry) => (Number.isFinite(entry?.salary) ? entry.salary : 0)),
+  );
+  return committed.map((entry, index) => {
+    const committedValue = Number.isFinite(entry?.salary) ? entry.salary : 0;
+    const previewEntry = preview[index];
+    const previewValue = Number.isFinite(previewEntry?.salary) ? previewEntry.salary : committedValue;
+    return {
+      label: entry?.label ?? "",
+      committedValue,
+      previewValue,
+      hasPreviewDelta: Math.abs(previewValue - committedValue) >= 0.01,
+      committedPct: Math.max(4, Math.round((committedValue / maxValue) * 100)),
+      previewPct: Math.max(4, Math.round((previewValue / maxValue) * 100)),
+    };
+  });
 }
 
 export type FoundationTeamsDetailPanelProps = {
@@ -1225,7 +1293,7 @@ function FoundationTeamsDetailPanel({
                         </button>
                       ) : null}
                     </div>
-                    <div className="table-shell team-focus-table-shell">
+                    <div className="table-shell team-focus-table-shell team-contracts-table-shell">
                       <table className="team-table team-contracts-table">
                         <thead>
                           <tr>
@@ -1237,9 +1305,7 @@ function FoundationTeamsDetailPanel({
                             <th>Intent</th>
                             <th>Buyout</th>
                             <th>VK</th>
-                            {selectedTeamContractTable?.seasonLabels.map((label) => (
-                              <th key={label}>{label}</th>
-                            ))}
+                            <th>Gehaltsverlauf</th>
                             <th>Aktionen</th>
                           </tr>
                         </thead>
@@ -1268,7 +1334,11 @@ function FoundationTeamsDetailPanel({
                                       {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
                                     </div>
                                   </td>
-                                  <td>{row.status === "preview" ? "Preview" : "Aktiv"}</td>
+                                  <td>
+                                    <span className={`team-status-chip is-${row.status === "preview" ? "preview" : "active"}`}>
+                                      {row.status === "preview" ? "Preview" : "Aktiv"}
+                                    </span>
+                                  </td>
                                   <td>
                                     <span className={`team-contract-shape is-${shapeClass}`}>
                                       {formatContractShapeLabel(row.contractShape)}
@@ -1292,6 +1362,7 @@ function FoundationTeamsDetailPanel({
                                   <td>
                                     {row.moraleContractIntent ? (
                                       <span
+                                        className={`team-contract-intent-chip ${getContractIntentToneClass(row.moraleContractIntent)}`}
                                         title={
                                           row.moraleRenewalRisk != null
                                             ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%`
@@ -1306,13 +1377,38 @@ function FoundationTeamsDetailPanel({
                                   </td>
                                   <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
                                   <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
-                                  {selectedTeamContractTable?.seasonLabels.map((label, index) => (
-                                    <td key={`${row.rowId}-${label}`}>
-                                      {row.yearlySalarySchedule[index]?.salary != null
-                                        ? formatDisplayMoney(row.yearlySalarySchedule[index]!.salary)
-                                        : "—"}
-                                    </td>
-                                  )) ?? null}
+                                  <td>
+                                    {(() => {
+                                      const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
+                                      return (
+                                        <div className={`team-contract-salary-cell is-${shapeClass}`}>
+                                          <div
+                                            className="team-contract-salary-steps"
+                                            role="img"
+                                            aria-label={`Gehaltsverlauf ${row.playerName}: ${staircase.steps
+                                              .map((step) => `${step.label} ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`)
+                                              .join(", ")}`}
+                                          >
+                                            {staircase.steps.map((step) => (
+                                              <span
+                                                key={`${row.rowId}-${step.label}`}
+                                                className={joinClassNames(
+                                                  "team-contract-salary-step",
+                                                  step.isEmpty && "is-empty",
+                                                  step.isLast && !step.isEmpty && "is-last",
+                                                )}
+                                                style={{ height: `${step.heightPct}%` }}
+                                                title={`${step.label} · ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`}
+                                              />
+                                            ))}
+                                          </div>
+                                          <span className="team-contract-salary-cell-value nl-tnum">
+                                            {staircase.lastActiveSalary != null ? formatDisplayMoney(staircase.lastActiveSalary) : "—"}
+                                          </span>
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
                                   <td>
                                     {row.status === "active" && selectedTeamRosterActionsAvailable ? (
                                       <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
@@ -1386,7 +1482,7 @@ function FoundationTeamsDetailPanel({
                             })
                           ) : (
                             <tr>
-                              <td colSpan={8 + (selectedTeamContractTable?.seasonLabels.length ?? 0) + 1} className="muted">
+                              <td colSpan={8 + 1 + 1} className="muted">
                                 {selectedTeamContractTable?.rows.length
                                   ? "Aktuell sind nur Preview-Zeilen vorhanden. Schalte Preview ein, um sie zu sehen."
                                   : "Noch keine Vertragsdaten im aktuellen Scope."}
@@ -1395,30 +1491,87 @@ function FoundationTeamsDetailPanel({
                           )}
                         </tbody>
                         {selectedTeamContractTable ? (
-                          <tfoot>
-                            <tr>
-                              <td colSpan={8}>
-                                <strong>Summe aktiv</strong>
-                              </td>
-                              {selectedTeamContractTable.totalsCommitted.map((entry) => (
-                                <td key={`committed-${entry.label}`}>
-                                  <strong>{formatDisplayMoney(entry.salary)}</strong>
-                                </td>
-                              ))}
-                              <td />
-                            </tr>
-                            <tr>
-                              <td colSpan={8}>
-                                <strong>Summe mit Preview</strong>
-                              </td>
-                              {selectedTeamContractTable.totalsWithPreview.map((entry) => (
-                                <td key={`preview-${entry.label}`}>
-                                  <strong>{formatDisplayMoney(entry.salary)}</strong>
-                                </td>
-                              ))}
-                              <td />
-                            </tr>
-                          </tfoot>
+                          (() => {
+                            const footerSteps = buildContractFooterSteps(
+                              selectedTeamContractTable.totalsCommitted,
+                              selectedTeamContractTable.totalsWithPreview,
+                            );
+                            const totalCommitted = selectedTeamContractTable.totalsCommitted.reduce(
+                              (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
+                              0,
+                            );
+                            const totalWithPreview = selectedTeamContractTable.totalsWithPreview.reduce(
+                              (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
+                              0,
+                            );
+                            return (
+                              <tfoot>
+                                <tr className="team-contracts-footer-row is-committed">
+                                  <td colSpan={8}>
+                                    <strong>Summe aktiv</strong>
+                                    <span className="muted">Team-Gehaltslast pro Saison</span>
+                                  </td>
+                                  <td>
+                                    <div className="team-contracts-footer-strip">
+                                      <div
+                                        className="team-contracts-footer-bars"
+                                        role="img"
+                                        aria-label={`Summe aktiv je Saison: ${footerSteps
+                                          .map((step) => `${step.label} ${formatDisplayMoney(step.committedValue)}`)
+                                          .join(", ")}`}
+                                      >
+                                        {footerSteps.map((step) => (
+                                          <span
+                                            key={`committed-${step.label}`}
+                                            className="team-contracts-footer-bar is-committed"
+                                            style={{ height: `${step.committedPct}%` }}
+                                            title={`${step.label} · ${formatDisplayMoney(step.committedValue)}`}
+                                          />
+                                        ))}
+                                      </div>
+                                      <strong className="team-contracts-footer-total nl-tnum">
+                                        {formatDisplayMoney(totalCommitted)}
+                                      </strong>
+                                    </div>
+                                  </td>
+                                  <td />
+                                </tr>
+                                <tr className="team-contracts-footer-row is-preview">
+                                  <td colSpan={8}>
+                                    <strong>Summe mit Preview</strong>
+                                    <span className="muted">inkl. Kaufdialog-Drafts</span>
+                                  </td>
+                                  <td>
+                                    <div className="team-contracts-footer-strip">
+                                      <div
+                                        className="team-contracts-footer-bars"
+                                        role="img"
+                                        aria-label={`Summe mit Preview je Saison: ${footerSteps
+                                          .map((step) => `${step.label} ${formatDisplayMoney(step.previewValue)}`)
+                                          .join(", ")}`}
+                                      >
+                                        {footerSteps.map((step) => (
+                                          <span
+                                            key={`preview-${step.label}`}
+                                            className={joinClassNames(
+                                              "team-contracts-footer-bar is-preview",
+                                              !step.hasPreviewDelta && "is-flat",
+                                            )}
+                                            style={{ height: `${step.previewPct}%` }}
+                                            title={`${step.label} · Preview ${formatDisplayMoney(step.previewValue)}`}
+                                          />
+                                        ))}
+                                      </div>
+                                      <strong className="team-contracts-footer-total nl-tnum">
+                                        {formatDisplayMoney(totalWithPreview)}
+                                      </strong>
+                                    </div>
+                                  </td>
+                                  <td />
+                                </tr>
+                              </tfoot>
+                            );
+                          })()
                         ) : null}
                       </table>
                     </div>

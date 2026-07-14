@@ -25189,6 +25189,199 @@ a {
   font-size: 0.78rem;
 }
 
+/* --- Verträge-Tabelle: Card-Look, Status-/Intent-Chips, Gehaltsverlauf-
+   Treppe & Fußzeilen-Streifen. Übernimmt die Amber/Blau/Slate-Palette der
+   Gehaltsforecast-/Vertragsmix-Panels darüber, damit Chart, Panels und
+   Tabelle als ein System wirken. --------------------------------------- */
+.team-contracts-table-shell {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.team-contracts-table {
+  min-width: 900px;
+}
+
+.foundation-shell .team-contracts-table tbody tr {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.foundation-shell .team-contracts-table tbody tr:hover {
+  background: rgba(91, 155, 255, 0.08);
+}
+
+.foundation-shell .team-contracts-table tbody tr.is-preview-row:hover {
+  background: rgba(91, 155, 255, 0.05);
+}
+
+.team-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.team-status-chip.is-active {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.team-status-chip.is-preview {
+  color: #93c5fd;
+  background: rgba(96, 165, 250, 0.16);
+  border: 1px dashed rgba(96, 165, 250, 0.55);
+}
+
+.team-contract-intent-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.team-contract-intent-chip.is-positive {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.team-contract-intent-chip.is-watch {
+  color: #fbd38d;
+  background: rgba(237, 190, 88, 0.16);
+}
+
+.team-contract-intent-chip.is-risk {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* --- Gehaltsverlauf-Treppe (ersetzt die alten 5 Season-Spalten) ----- */
+.team-contract-salary-cell {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.team-contract-salary-steps {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 30px;
+}
+
+.team-contract-salary-step {
+  display: block;
+  width: 7px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(148, 163, 184, 0.55);
+}
+
+.team-contract-salary-cell.is-front-loaded .team-contract-salary-step {
+  background: rgba(96, 165, 250, 0.55);
+}
+
+.team-contract-salary-cell.is-front-loaded .team-contract-salary-step.is-last {
+  background: rgba(96, 165, 250, 0.95);
+}
+
+.team-contract-salary-cell.is-back-loaded .team-contract-salary-step {
+  background: rgba(237, 190, 88, 0.55);
+}
+
+.team-contract-salary-cell.is-back-loaded .team-contract-salary-step.is-last {
+  background: rgba(237, 190, 88, 0.95);
+}
+
+.team-contract-salary-cell.is-balanced .team-contract-salary-step.is-last {
+  background: rgba(148, 163, 184, 0.95);
+}
+
+.team-contract-salary-step.is-empty {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.08) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  min-height: 2px !important;
+}
+
+.team-contract-salary-cell-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.86);
+  white-space: nowrap;
+}
+
+/* --- Fußzeile: Team-Gehaltslast pro Saison als Mini-Balkenstreifen -- */
+.team-contracts-footer-row td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: none;
+  background: rgba(237, 190, 88, 0.05);
+}
+
+.team-contracts-footer-row.is-preview td {
+  background: rgba(96, 165, 250, 0.05);
+}
+
+.team-contracts-footer-row td:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.team-contracts-footer-row td:first-child span {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.team-contracts-footer-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.team-contracts-footer-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+}
+
+.team-contracts-footer-bar {
+  display: block;
+  width: 9px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+}
+
+.team-contracts-footer-bar.is-committed {
+  background: rgba(237, 190, 88, 0.85);
+}
+
+.team-contracts-footer-bar.is-preview {
+  background: rgba(96, 165, 250, 0.75);
+  border: 1px dashed rgba(96, 165, 250, 0.9);
+}
+
+.team-contracts-footer-bar.is-preview.is-flat {
+  opacity: 0.4;
+}
+
+.team-contracts-footer-total {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.94);
+  white-space: nowrap;
+}
+
 @media (max-width: 1320px) {
   .training-summary-grid {
     grid-template-columns: repeat(3, minmax(150px, 1fr));
