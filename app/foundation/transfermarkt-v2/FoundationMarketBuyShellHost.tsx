@@ -199,6 +199,7 @@ export default function FoundationMarketBuyShellHost({
     priorBadExperienceActive,
     finalBuyDisabledReason,
     formatNegotiationSignalLabel,
+    visibleBuyWarnings,
   } = useMarketBuyDerivations({
     ...derivationsInput,
     buyPreview,
@@ -582,11 +583,11 @@ export default function FoundationMarketBuyShellHost({
                     <div className="transfer-callout is-warning">
                       <div className="transfer-callout-title">
                         <strong>Hinweise</strong>
-                        <span className="muted">{buyPreview.warnings.length}</span>
+                        <span className="muted">{visibleBuyWarnings.length}</span>
                       </div>
-                      {buyPreview.warnings.length > 0 ? (
+                      {visibleBuyWarnings.length > 0 ? (
                         <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.warnings.map((warning) => (
+                          {visibleBuyWarnings.map((warning) => (
                             <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
                           ))}
                         </ul>

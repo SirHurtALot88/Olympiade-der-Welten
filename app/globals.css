@@ -54314,15 +54314,30 @@ span.nl-facility-ampel-chip {
    Batch b8 — Transfermarkt & Scouting NewLook (flag-gated, additiv)
    ======================================================================= */
 
-/* --- Transfermarkt #68: Achsen-Radar im Scouting-Profil --- */
+/* --- Transfermarkt #68: Achsen-Radar im Scouting-Profil ---
+   Radar + Tier-Chips laufen als kompakte Reihe nebeneinander (statt radar
+   groß + chips separat darunter), damit die Top-Disziplinen-Karte darunter
+   ohne großes Scrollen sichtbar bleibt. */
+.is-new-look .nl-market-radar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3);
+  margin: var(--nl-s2) 0;
+}
 .is-new-look .nl-market-focus-radar {
   display: flex;
   justify-content: center;
-  margin: var(--nl-s3) 0;
+  flex: 0 0 auto;
+  margin: 0;
 }
 .is-new-look .nl-market-focus-radar .nl-market-axis-radar {
-  width: 280px;
+  width: 150px;
   max-width: 100%;
+}
+.is-new-look .nl-market-radar-row .nl-market-attr-chips {
+  flex: 1 1 160px;
+  margin: 0;
 }
 
 /* --- Transfermarkt #18: Potenzial-Sterne & Entwicklungs-Trend --- */
