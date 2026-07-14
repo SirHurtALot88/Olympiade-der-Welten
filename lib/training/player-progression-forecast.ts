@@ -5,6 +5,7 @@ import { applyTrainingXpFacilityModifiers, getFacilityLevel, getTeamFacilityStat
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { getCombinedAttributeTrainingMultiplier, getPotentialGapXpFactor } from "@/lib/foundation/player-potential-display-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
@@ -275,9 +276,14 @@ function getStarLabel(value: number | null) {
 }
 
 function getCurrentAbility(input: { player: Player; playerRating: PlayerRatingContractRow | null }) {
-  const coreValues = [input.player.coreStats.pow, input.player.coreStats.spe, input.player.coreStats.men, input.player.coreStats.soc].filter(isFiniteNumber);
-  const coreAverage = coreValues.length > 0 ? coreValues.reduce((sum, value) => sum + value, 0) / coreValues.length : null;
-  return roundValue(input.playerRating?.ovrNormalized ?? input.player.rating ?? coreAverage ?? input.player.potential ?? null, 1);
+  // CA is deliberately NOT the league-relative OVR (`ovrNormalized`) — a league's
+  // #1 player must not read as CA 100 just because he tops a weak league. CA is
+  // the absolute, peak-weighted score from the player's own core axis values, so
+  // it also works for free agents (who have no OVR at all). `player.rating` /
+  // `player.potential` are last-resort fallbacks for the rare case where core
+  // stats are entirely missing.
+  const absoluteCurrentAbility = computeCurrentAbilityScore(input.player.coreStats);
+  return roundValue(absoluteCurrentAbility ?? input.player.rating ?? input.player.potential ?? null, 1);
 }
 
 function getDisplayMarketValue(player: Player) {
