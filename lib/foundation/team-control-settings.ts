@@ -176,6 +176,10 @@ export function getGameModeOwnershipLimits(saveMode: FoundationSaveModePreset): 
       return { chrisMax: 2, frankyMax: 0 };
     case "solo_1":
       return { chrisMax: 1, frankyMax: 0 };
+    case "custom":
+      // Free single-player-first selection: up to 4 teams for the human (Chris) seat,
+      // with the 2nd (Franky) seat available but optional/hidden by default.
+      return { chrisMax: 4, frankyMax: 4 };
     default:
       return { chrisMax: 1, frankyMax: 0 };
   }

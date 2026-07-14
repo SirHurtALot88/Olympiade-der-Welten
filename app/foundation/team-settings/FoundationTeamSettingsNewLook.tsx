@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   NlCard,
@@ -10,12 +10,8 @@ import {
   formatNlNumber,
 } from "@/components/foundation/new-look";
 import type { FoundationTeamSettingsPanelProps } from "@/app/foundation/team-settings/FoundationTeamSettingsPanel";
-import {
-  FOUNDATION_SAVE_MODE_OPTIONS,
-  NEW_GAME_PRESET_DEFAULTS,
-  NEW_GAME_VISIBLE_PRESET_IDS,
-} from "@/app/foundation/foundation-page-client-exports";
-import type { NewGamePresetId, TeamStrategyProfile } from "@/app/foundation/foundation-page-client-exports";
+import { FOUNDATION_SAVE_MODE_OPTIONS } from "@/app/foundation/foundation-page-client-exports";
+import type { TeamStrategyProfile } from "@/app/foundation/foundation-page-client-exports";
 import type {
   RosterEntry,
   Team,
@@ -181,7 +177,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     setNewGamePreview,
     setNewGameSandbox,
     setNewGameSaveName,
-    setNewGameSoloTeam,
     setSoloPlayerTeam,
     setTeamControlDraft,
     setTeamControlMessage,
@@ -211,6 +206,18 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   } = props;
 
   const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>("saves");
+
+  // Single-player-first: das New-Game-Setup ist eine freie Team-Auswahl (1-4 Teams
+  // für die Chris-Seat), nicht mehr an einen vorab gewählten Spielmodus-Preset
+  // gebunden. Unter der Haube bleibt das Preset-Feld bestehen (für /api/new-game),
+  // wird hier aber einmalig auf "custom" normalisiert, damit toggleNewGameTeam die
+  // volle Ownership-Grenze (bis zu 4 Teams) nutzt statt der Solo-1-Vorgabe.
+  useEffect(() => {
+    if (newGamePresetId !== "custom") {
+      applyNewGamePreset("custom");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const exportDisabledReason = !selectedTeam
     ? "Wähle zuerst ein Team aus."
@@ -252,33 +259,13 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
       <section className="nl-teamsettings-subpanel" data-testid="new-game-setup-wizard">
         <header className="nl-teamsettings-subhead">
           <h4>Neues Spiel starten</h4>
-          <span className="nl-teamsettings-hint">Baseline · Startbudget · Ownership</span>
+          <span className="nl-teamsettings-hint">Single-Player · Baseline · Startbudget</span>
         </header>
         <p className="nl-teamsettings-note">
           Erst prüfen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save
           aktiv.
         </p>
         <div className="nl-teamsettings-field-grid">
-          <NlField label="Spielmodus">
-            <select
-              value={newGamePresetId}
-              disabled={newGameBusy || readMeta.readOnly}
-              title={
-                readMeta.readOnly
-                  ? getReadOnlyActionReason("den Spielmodus")
-                  : newGameBusy
-                    ? getBusyActionReason("Das New-Game-Setup")
-                    : "Wählt das Basissetup für das neue Spiel."
-              }
-              onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
-            >
-              {NEW_GAME_VISIBLE_PRESET_IDS.map((presetId) => (
-                <option key={presetId} value={presetId}>
-                  {NEW_GAME_PRESET_DEFAULTS[presetId].label}
-                </option>
-              ))}
-            </select>
-          </NlField>
           <NlField label="Save-Name">
             <input
               value={newGameSaveName}
@@ -318,118 +305,134 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </label>
         </div>
 
-        {newGamePresetId === "solo_1" ? (
-          <NlField label="Dein Team" data-testid="new-game-solo-team-select">
-            <select
-              disabled={newGameBusy || readMeta.readOnly}
-              value={newGameChrisTeamIds[0] ?? ""}
-              title={
-                readMeta.readOnly
-                  ? getReadOnlyActionReason("die Team-Zuordnung")
-                  : newGameBusy
-                    ? getBusyActionReason("Das New-Game-Setup")
-                    : "Wähle genau 1 Team für den Solo-Spielstand."
-              }
-              onChange={(event) => {
-                if (event.target.value) {
-                  setNewGameSoloTeam(event.target.value);
-                }
-              }}
-            >
-              <option value="" disabled>
-                Team wählen
-              </option>
-              {[...gameState.teams]
-                .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
-                .map((team) => (
-                  <option key={`new-game-solo-${team.teamId}`} value={team.teamId}>
-                    {team.name} ({team.shortCode}) · Budget {formatMoney(team.budget)}
-                  </option>
-                ))}
-            </select>
-          </NlField>
-        ) : (
-          <>
-            <div className="nl-teamsettings-metric-grid">
-              <NlMetric
-                label="Chris"
-                value={`${newGameChrisTeamIds.length}/4`}
-                sub={newGameChrisTeamIds.join(" · ") || "kein Team"}
-              />
-              <NlMetric
-                label="Franky"
-                value={`${newGameFrankyTeamIds.length}/4`}
-                sub={newGameFrankyTeamIds.join(" · ") || "kein Team"}
-              />
-              <NlMetric
-                label="Rest"
-                value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
-                sub="Auto-Teams"
-              />
-            </div>
-            <div className="nl-teamsettings-team-grid" data-testid="new-game-ownership-picker">
-              {[...gameState.teams]
-                .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
-                .map((team) => {
-                  const isChris = newGameChrisTeamIds.includes(team.teamId);
-                  const isFranky = newGameFrankyTeamIds.includes(team.teamId);
-                  return (
-                    <article
-                      key={`new-game-team-${team.teamId}`}
-                      className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
+        <div className="nl-teamsettings-metric-grid">
+          <NlMetric
+            label="Deine Teams"
+            value={`${newGameChrisTeamIds.length}/4`}
+            sub={newGameChrisTeamIds.join(" · ") || "noch kein Team gewählt"}
+          />
+          <NlMetric
+            label="KI-Teams (Rest)"
+            value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+            sub="automatisch gesteuert"
+          />
+          {newGameFrankyTeamIds.length > 0 ? (
+            <NlMetric
+              label="2. Spieler"
+              value={`${newGameFrankyTeamIds.length}/4`}
+              sub={newGameFrankyTeamIds.join(" · ")}
+            />
+          ) : null}
+        </div>
+
+        <NlField label="Deine Teams — 1 bis 4 wählen">
+          <p className="nl-teamsettings-note">
+            Tippe auf „Auswählen“, um ein Team selbst zu übernehmen. Alle nicht gewählten Teams laufen automatisch
+            unter KI-Kontrolle.
+          </p>
+        </NlField>
+        <div className="nl-teamsettings-team-grid" data-testid="new-game-ownership-picker">
+          {[...gameState.teams]
+            .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+            .map((team) => {
+              const isChris = newGameChrisTeamIds.includes(team.teamId);
+              const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+              const ownerLabel = isChris ? "Du steuerst" : isFranky ? "2. Spieler" : "KI-Team";
+              return (
+                <article
+                  key={`new-game-team-${team.teamId}`}
+                  className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="nl-teamsettings-team-card-main"
+                    onClick={() => openTeamProfileById(team.teamId)}
+                    title="Teamprofil öffnen"
+                  >
+                    <strong>{team.shortCode}</strong>
+                    <span>{team.name}</span>
+                    <small className="nl-tnum">Budget {formatMoney(team.budget)}</small>
+                    <small>{ownerLabel}</small>
+                  </button>
+                  <div className="nl-teamsettings-team-card-actions">
+                    <button
+                      type="button"
+                      className={`nl-teamsettings-btn is-small${isChris ? " is-primary" : ""}`}
+                      disabled={newGameBusy || readMeta.readOnly || isFranky}
+                      title={
+                        isFranky
+                          ? "Dieses Team ist bereits dem 2. Spieler zugeordnet."
+                          : readMeta.readOnly
+                            ? getReadOnlyActionReason("die Team-Zuordnung")
+                            : newGameBusy
+                              ? getBusyActionReason("Das New-Game-Setup")
+                              : isChris
+                                ? "Team wieder freigeben — die KI übernimmt."
+                                : "Dieses Team steuerst du selbst (bis zu 4 Teams)."
+                      }
+                      onClick={() => toggleNewGameTeam("chris", team.teamId)}
                     >
+                      {isChris ? "Dein Team ✓" : "Auswählen"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+        </div>
+
+        <details className="nl-teamsettings-details">
+          <summary>2. Spieler (Multiplayer — später)</summary>
+          <p className="nl-teamsettings-note">
+            Optional: Weise zusätzliche Teams einem zweiten menschlichen Spieler (Franky) zu. Für den
+            Single-Player-Start kannst du diesen Bereich ignorieren — ohne Auswahl bleiben alle übrigen Teams bei
+            der KI.
+          </p>
+          <div className="nl-teamsettings-metric-grid">
+            <NlMetric
+              label="Franky"
+              value={`${newGameFrankyTeamIds.length}/4`}
+              sub={newGameFrankyTeamIds.join(" · ") || "kein Team"}
+            />
+          </div>
+          <div className="nl-teamsettings-team-grid">
+            {[...gameState.teams]
+              .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+              .map((team) => {
+                const isChris = newGameChrisTeamIds.includes(team.teamId);
+                const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+                return (
+                  <article
+                    key={`new-game-franky-${team.teamId}`}
+                    className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
+                  >
+                    <div className="nl-teamsettings-team-card-main">
+                      <strong>{team.shortCode}</strong>
+                      <span>{team.name}</span>
+                    </div>
+                    <div className="nl-teamsettings-team-card-actions">
                       <button
                         type="button"
-                        className="nl-teamsettings-team-card-main"
-                        onClick={() => openTeamProfileById(team.teamId)}
-                        title="Teamprofil öffnen"
+                        className={`nl-teamsettings-btn is-small${isFranky ? " is-primary" : ""}`}
+                        disabled={newGameBusy || readMeta.readOnly || isChris}
+                        title={
+                          isChris
+                            ? "Dieses Team steuerst du bereits selbst."
+                            : readMeta.readOnly
+                              ? getReadOnlyActionReason("die Team-Zuordnung")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : "Ordnet dieses Team dem 2. Spieler (Franky) zu."
+                        }
+                        onClick={() => toggleNewGameTeam("franky", team.teamId)}
                       >
-                        <strong>{team.shortCode}</strong>
-                        <span>{team.name}</span>
-                        <small className="nl-tnum">Budget {formatMoney(team.budget)}</small>
+                        {isFranky ? "Franky ✓" : "Franky"}
                       </button>
-                      <div className="nl-teamsettings-team-card-actions">
-                        <button
-                          type="button"
-                          className={`nl-teamsettings-btn is-small${isChris ? " is-primary" : ""}`}
-                          disabled={newGameBusy || readMeta.readOnly || isFranky}
-                          title={
-                            isFranky
-                              ? "Dieses Team ist bereits Franky zugeordnet."
-                              : readMeta.readOnly
-                                ? getReadOnlyActionReason("die Team-Zuordnung")
-                                : newGameBusy
-                                  ? getBusyActionReason("Das New-Game-Setup")
-                                  : "Ordnet dieses Team Chris/User für den neuen Spielstand zu."
-                          }
-                          onClick={() => toggleNewGameTeam("chris", team.teamId)}
-                        >
-                          Chris
-                        </button>
-                        <button
-                          type="button"
-                          className={`nl-teamsettings-btn is-small${isFranky ? " is-primary" : ""}`}
-                          disabled={newGameBusy || readMeta.readOnly || isChris}
-                          title={
-                            isChris
-                              ? "Dieses Team ist bereits Chris/User zugeordnet."
-                              : readMeta.readOnly
-                                ? getReadOnlyActionReason("die Team-Zuordnung")
-                                : newGameBusy
-                                  ? getBusyActionReason("Das New-Game-Setup")
-                                  : "Ordnet dieses Team Franky für den neuen Spielstand zu."
-                          }
-                          onClick={() => toggleNewGameTeam("franky", team.teamId)}
-                        >
-                          Franky
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-            </div>
-          </>
-        )}
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
+        </details>
 
         <div className="nl-teamsettings-actions">
           <button
