@@ -405,10 +405,13 @@ describe("sponsor economy balance", () => {
     const settled = runSingleTeamSettlement(gameState, rrTeam.teamId);
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, rrTeam.teamId);
 
-    // Bounds include the flat per-team building-cost offset that now sits on the base (deckt den
-    // ~300/Liga-Gebäude-Drain — deliberate balancing change, siehe SPONSOR_BUILDING_COST_OFFSET_C).
+    // Bounds include (a) den flachen Gebäude-Kosten-Offset auf dem Sockel (SPONSOR_BUILDING_COST_OFFSET_C)
+    // und (b) den Schwachen-Schutz: R-R ist das schwächste Team (quality rank ~32) und bekommt daher einen
+    // um bis zu ~+20 % angehobenen GARANTIERTEN Sockel (baseScale, OLY_SPONSOR_WEAK_BASE_PROTECT) — genau
+    // das hält die Top5/Bottom5-Schere unter Ziel. Deshalb liegt die Obergrenze ~×1.2 über dem reinen Sockel.
+    const weakProtect = 1.2;
     expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98 + SPONSOR_BUILDING_COST_OFFSET_C);
-    expect(payout).toBeLessThanOrEqual(leagueMin * salaryFactor * 1.08 + SPONSOR_BUILDING_COST_OFFSET_C);
+    expect(payout).toBeLessThanOrEqual((leagueMin * salaryFactor * 1.08 + SPONSOR_BUILDING_COST_OFFSET_C) * weakProtect + 2);
   }, 60000);
 
   it("rewards rank-28 milestone for bottom teams", () => {

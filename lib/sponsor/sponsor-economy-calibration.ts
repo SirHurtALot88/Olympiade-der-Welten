@@ -225,17 +225,30 @@ export function getScaledRankMilestoneBonus(
   return round1(getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale);
 }
 
-/** Soft milestone redistribution: top slightly less, bottom slightly more. Base stays flat. */
+/**
+ * Umverteilung nach Team-Stärke (quality rank) zum SCHUTZ der schwachen Teams — hält die Top5/Bottom5-
+ * Schere (MW+Cash) unter ~2×. Zwei Hebel:
+ *  - milestoneScale: schwache Teams etwas mehr Rang-Upside (klein, ±BALANCE_C), aber sie erreichen die
+ *    Milestones ohnehin kaum → der eigentliche Schutz läuft über den Sockel.
+ *  - baseScale: die WICHTIGE Größe — schwache Teams bekommen einen deutlich höheren GARANTIERTEN Sockel
+ *    (bis +BASE_PROTECT_C), starke einen Abschlag. Da der Sockel unabhängig von der Platzierung fließt,
+ *    stützt das die Bottom-5-Einnahmen jede Season und bremst ihre Erosion (Schere öffnet nicht auf 2.4×).
+ * ENV-tunebar zum Kalibrieren gegen das Schere-Ziel.
+ */
+const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.2) || 0.2;
+const SPONSOR_QUALITY_MILESTONE_BALANCE_C = Number(process.env.OLY_SPONSOR_WEAK_MS_BALANCE ?? 0.1) || 0.1;
 export function getQualityRebalanceProfile(teamQualityRank: number | null | undefined): {
   milestoneScale: number;
+  baseScale: number;
 } {
   if (teamQualityRank == null || !Number.isFinite(teamQualityRank)) {
-    return { milestoneScale: 1 };
+    return { milestoneScale: 1, baseScale: 1 };
   }
   const t = (teamQualityRank - 16.5) / 15.5;
-  const clamped = Math.max(-1, Math.min(1, t));
+  const clamped = Math.max(-1, Math.min(1, t)); // rank 1 → -1 (stark), rank 32 → +1 (schwach)
   return {
-    milestoneScale: round1(1 + clamped * 0.1),
+    milestoneScale: round1(1 + clamped * SPONSOR_QUALITY_MILESTONE_BALANCE_C),
+    baseScale: round1(1 + clamped * SPONSOR_QUALITY_BASE_PROTECT_C),
   };
 }
 
@@ -246,7 +259,7 @@ function applyQualityRebalanceToPayout(input: {
 }) {
   const profile = getQualityRebalanceProfile(input.teamQualityRank);
   return {
-    base: input.base,
+    base: round1(input.base * profile.baseScale),
     milestoneBonus: round1(input.milestoneBonus * profile.milestoneScale),
   };
 }
@@ -308,9 +321,15 @@ export function buildOfferCashAmounts(input: {
 
   const rebalance = getQualityRebalanceProfile(input.teamQualityRank);
   rankCash = round1(rankCash * rebalance.milestoneScale);
+  // Schwachen-Schutz: der garantierte Sockel wird für schwache Teams angehoben (baseScale), für starke
+  // gekürzt — hält die Bottom-5 wirtschaftlich oben und die Schere unter Ziel. Muss zur Settlement-Seite
+  // (applyQualityRebalanceToPayout) passen, die denselben baseScale anwendet.
+  baseCash = round1(baseCash * rebalance.baseScale);
 
   if (input.archetype === "security") {
-    baseCash = round1(Math.max(baseCash, effectiveBaseFloor));
+    // Security behält den effektiven Sockel als harte Untergrenze (aber ein hochgeschützter schwacher
+    // Sockel darf darüber liegen).
+    baseCash = round1(Math.max(baseCash, effectiveBaseFloor * rebalance.baseScale));
   }
 
   const totalAtMaxRank = round1(
