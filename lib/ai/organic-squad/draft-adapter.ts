@@ -403,10 +403,16 @@ const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 8) || 
 function isWeakTeamUpgradeSwapEnabled(): boolean {
   return process.env.OLY_WEAK_TEAM_UPGRADE_SWAP !== "0";
 }
-/** cash/MW at/above which a club counts as a hoarder eligible for one upgrade swap (strong clubs run ~0.5). */
-const UPGRADE_SWAP_CASH_TO_MW = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW ?? 0.75) || 0.75;
+/**
+ * cash/MW at/above which a club counts as a hoarder eligible for one upgrade swap. Strong clubs run ~0.5,
+ * so 0.65 stays clear of them while catching more of the weak/mid hoarders each season (0.75 left the
+ * just-under-threshold tier — bottom cash/MW ~0.65–0.75 — unconverted in S1/S3/S5). Because a swap lowers a
+ * club's cash/MW next season, a lower gate keeps topping up the NEXT tier of hoarders instead of firing hard
+ * once and then going quiet — the season-to-season consistency lever.
+ */
+const UPGRADE_SWAP_CASH_TO_MW = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW ?? 0.65) || 0.65;
 /** cash/MW at/above which a deep hoarder (cash ≈ whole squad value) may make TWO swaps in one season. */
-const UPGRADE_SWAP_CASH_TO_MW_STRONG = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW_STRONG ?? 1.0) || 1.0;
+const UPGRADE_SWAP_CASH_TO_MW_STRONG = Number(process.env.OLY_UPGRADE_SWAP_CASH_TO_MW_STRONG ?? 0.85) || 0.85;
 /** Replacement budget (cash + proceeds − buffer) must clear this multiple of the shed MW → a real upgrade. */
 const UPGRADE_SWAP_UPLIFT = Number(process.env.OLY_UPGRADE_SWAP_UPLIFT ?? 1.5) || 1.5;
 /** Absolute headroom (MW) the replacement budget must also clear, so tiny-MW swaps still need real cash. */
