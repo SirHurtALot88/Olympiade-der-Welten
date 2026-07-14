@@ -26,10 +26,12 @@ import {
   PROGRESSION_CLASS_ORDER,
   type ProgressionClassName,
 } from "@/lib/training/class-progression-config";
-import { getAttributeGrowthMultiplier } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
-import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
+import type { Player, PlayerDemandStatus } from "@/lib/data/olyDataTypes";
+import { estimateClassTrainingGains } from "@/lib/training/class-training-gain-estimate";
+import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 
 import type {
   TrainingClassOption,
@@ -48,6 +50,13 @@ export function formatSignedPercent(value: number | null | undefined) {
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${formatVeloNumber(value, 0)}%`;
 }
+
+const TRAINING_FOCUS_AXIS_LABEL: Record<"pow" | "spe" | "men" | "soc", string> = {
+  pow: "Power",
+  spe: "Speed",
+  men: "Mental",
+  soc: "Social",
+};
 
 export function getDevelopmentTone(row: TrainingPlayerRowView) {
   if (row.organicForecast.netSetpoints < 0 || row.forecast.regressionRisk === "high") {
@@ -201,53 +210,68 @@ export type TrainingClassGainEstimate = {
   isCurrent: boolean;
   /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
   rank: number;
+  /** Development-Route dieser Klasse (POW/SPE/MEN/SOC/BALANCED/RECOVERY), siehe `classNameToDevelopmentRoute`. */
+  developmentRoute: PlayerDevelopmentRouteSuggestion;
+  /**
+   * True wenn diese Klasse den Trainingsfokus-Route-Bonus (×1.08) tatsächlich erhalten hat, d.h. ihre
+   * Development-Route-Achse deckt sich mit dem aktuellen Team-Trainingsfokus (`trainingFocusAxis`).
+   * Immer false wenn kein Fokus gesetzt ist.
+   */
+  hasFocusRouteBonus: boolean;
 };
 
 /**
- * #53 — Top-3 Klassen nach geschätztem Trainings-SP-Zugewinn.
+ * #53 — Top-N Klassen nach geschätztem Trainings-SP-Zugewinn.
  *
- * Schätzung, KEINE neue Balance-Formel: Das echte, bereits Trait-/Potential-/
- * Facility-adjustierte Trainingsbudget des Spielers (`organicForecast.trainingSetpoints`)
- * wird nach der jeweiligen Klassen-Attributgewichtung (`CLASS_PROGRESSION_WEIGHTS`,
- * positiv normalisiert wie in `distributeByClassProfile`, organic-season-progression.ts)
- * verteilt und mit dem ECHTEN Potential-Decke-Multiplikator je Attribut abgeschwächt
- * (`getAttributeGrowthMultiplier` — dieselbe Funktion, die die Engine für den
- * Headroom-Malus nutzt: 0.05 bei "capped", 0.45 bei "closing", 1 bei "open").
- * Reale Werte weichen ab, sobald Performance-Anteil, Signature/Weak-Affinität und
- * Trait-Nebenwirkungen mit einfließen — daher UI-seitig klar als Schätzung markieren.
+ * Thin UI-Adapter: Die eigentliche Schätzung kommt aus `estimateClassTrainingGains`
+ * (lib/training/class-training-gain-estimate.ts), die je Klasse Signature-/Weak-
+ * Affinität und den klassen-eigenen Development-Route-Bonus berücksichtigt. Dieser
+ * Wrapper übernimmt nur Sortierung, Rang-Nummerierung, Top-N-Truncation und das
+ * "aktuelle Klasse immer sichtbar halten"-Fallback für `NlTrainingClassRanking`.
+ * (Vorherige, hier veraltete Inline-Formel: siehe Doku-Kommentar in
+ * `estimateClassTrainingGains` für den Bug, den sie hatte.)
  */
 export function buildTrainingClassGainRanking(
   row: TrainingPlayerRowView,
   trainingClassOptions: TrainingClassOption[],
-  options?: { limit?: number; includeCurrent?: boolean },
+  options?: { limit?: number; includeCurrent?: boolean; trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null },
 ): TrainingClassGainEstimate[] {
   const limit = options?.limit ?? 3;
   const includeCurrent = options?.includeCurrent ?? false;
   const budget = row.organicForecast.trainingSetpoints;
   if (!(budget > 0)) return [];
   const currentClass = normalizeProgressionClassName(row.trainingClass);
-  const capacityByAttribute = new Map(
-    row.attributeForecast.map((entry) => [entry.attributeKey, getAttributeGrowthMultiplier(entry.ceilingState ?? "open")]),
+  const ceilingStateByAttribute = Object.fromEntries(
+    row.attributeForecast.map((entry) => [entry.attributeKey, entry.ceilingState ?? "open"]),
   );
+  const trainingFocusAxis = options?.trainingFocusAxis ?? row.trainingFocusAxis ?? null;
+
+  // `row.player` is the same underlying `Player` record threaded through by
+  // `buildOrganicSeasonProgression`/`buildTrainingPlayerRowView` — it is only
+  // typed down to the slim `TrainingPlayerRowView["player"]` shape for display
+  // purposes. Same cast precedent as `mapAttributeForecast` in
+  // lib/foundation/training-player-row-view.ts.
+  const gains = estimateClassTrainingGains({
+    player: row.player as unknown as Player,
+    currentClassName: row.trainingClass,
+    trainingSetpoints: budget,
+    ceilingStateByAttribute,
+    adminBalancingConfig: row.adminBalancingConfig,
+    trainingFocusAxis,
+  });
+  const gainByClassName = new Map(gains.map((entry) => [entry.className, entry]));
 
   const estimates = PROGRESSION_CLASS_ORDER.map((className) => {
-    const profile = getClassTrainingProfile(className, row.adminBalancingConfig);
-    const positiveTotal = PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => sum + Math.max(0, profile[key]), 0);
-    const estimatedGain =
-      positiveTotal > 0
-        ? PROGRESSION_ATTRIBUTE_ORDER.reduce((sum, key) => {
-            const weight = Math.max(0, profile[key]);
-            if (weight <= 0) return sum;
-            const capacity = capacityByAttribute.get(key) ?? 1;
-            return sum + budget * (weight / positiveTotal) * capacity;
-          }, 0)
-        : 0;
     const label = trainingClassOptions.find((option) => option.value === className)?.label ?? className;
+    const gain = gainByClassName.get(className);
+    const developmentRoute = gain?.developmentRoute ?? "BALANCED";
     return {
       className,
       label,
-      estimatedGain: roundTo(estimatedGain, 1),
+      estimatedGain: gain?.estimatedGain ?? 0,
       isCurrent: className === currentClass,
+      developmentRoute,
+      hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis) > 1,
     };
   });
 
@@ -328,6 +352,17 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       label: "Weitere Boni (Rolle/Fokus)",
       value: formatSignedPercent(otherBonusPct),
       detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschlüsselt.",
+    });
+  }
+
+  if (row.trainingFocusAxis) {
+    const axisLabel = TRAINING_FOCUS_AXIS_LABEL[row.trainingFocusAxis];
+    steps.push({
+      key: "route-focus",
+      operator: "add",
+      label: "Trainingsfokus-Route-Bonus",
+      value: "+8%",
+      detail: `Team-Trainingsfokus aktuell: ${axisLabel}. Klassen auf dieser Achse (siehe "Beste Klassen"-Rangliste oben) erhalten +8% auf ihren geschätzten SP-Zugewinn.`,
     });
   }
 

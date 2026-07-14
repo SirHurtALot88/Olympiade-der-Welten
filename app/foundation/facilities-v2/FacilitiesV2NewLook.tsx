@@ -204,9 +204,10 @@ function FacilityMotif({ facilityId }: { facilityId: FacilityId }) {
   }
 }
 
-/** Horizontale Meilenstein-Leiter L1–L5: erreicht = voll, nächste = pulsierend, gesperrt = gedimmt.
- *  Unbebaut (Level 0) bekommt einen expliziten, neutralen "L0"-Schritt vor der Leiter, damit
- *  L1 (amber/pulsierend = "nächstes Ziel") nicht als aktuell erreichter Stand missverstanden wird. */
+/** Horizontale Meilenstein-Leiter L1–L5: nur der aktuell erreichte Stand ist markiert
+ *  (erreicht = voll), alle noch nicht erreichten Stufen sind gedimmt/gesperrt — bewusst KEIN
+ *  amber "nächstes Ziel"-Highlight mehr, das wurde als aktueller Stand missverstanden.
+ *  Unbebaut (Level 0) bekommt einen expliziten "L0"-Schritt vor der Leiter als aktueller Stand. */
 function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId; level: number }) {
   const isUnbuilt = level <= 0;
   return (
@@ -216,8 +217,8 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
     >
       {isUnbuilt ? (
         // Reused "is-reached" (voll gefüllt/grün) statt eines neuen Status: das ist der
-        // tatsächliche aktuelle Stand ("Level 0 erreicht"), damit er gegenüber dem
-        // gepulsten "is-next"-Schritt (L1 = nächstes Ziel) eindeutig als "aktuell" erkennbar ist.
+        // tatsächliche aktuelle Stand ("Level 0 erreicht") — der einzige markierte Schritt,
+        // solange nicht gebaut.
         <span
           className="nl-facility-ladder-step is-reached"
           title="Aktuell: Level 0 · noch nicht gebaut"
@@ -229,7 +230,9 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
       {Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
         const targetLevel = index + 1;
         const definition = getFacilityLevelDefinition(facilityId, targetLevel);
-        const state = targetLevel <= level ? "is-reached" : targetLevel === level + 1 ? "is-next" : "is-locked";
+        // Nur der tatsächlich erreichte Stand wird markiert — kein amber "is-next"
+        // (nächstes Ziel) mehr, das wurde als aktueller Stand missverstanden.
+        const state = targetLevel <= level ? "is-reached" : "is-locked";
         return (
           <span
             key={`${facilityId}-ladder-${targetLevel}`}

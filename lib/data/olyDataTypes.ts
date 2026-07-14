@@ -1556,6 +1556,13 @@ export type TransferWishlistEntry = {
   createdAt: string;
   /** Scouting focus queue order — lower rank scouts first. Falls back to createdAt for legacy entries. */
   priorityRank?: number | null;
+  /**
+   * Projected yearly salary schedule this (not-yet-signed) target would command
+   * if signed today — view-model-only, computed via `projectWishlistSalarySchedule`
+   * (see `lib/market/contract-negotiation-preview.ts`). Never persisted; only set
+   * on the derived wishlist rows the UI renders.
+   */
+  projectedSalarySchedule?: ContractYearSalary[] | null;
 };
 
 export type TransferSellMarkerEntry = {

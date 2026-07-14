@@ -379,7 +379,7 @@ function NlTrainingIntensityProjection({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue ${formatVeloNumber(entry.fatigueLoad, 0)} · Regeneration ${formatSignedPercent(entry.recoveryDeltaPct)}`}
+            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue-Last ${formatVeloNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -399,9 +399,9 @@ function NlTrainingIntensityProjection({
             </span>
             <span
               className={`nl-training-intensity-recovery nl-tnum${entry.recoveryDeltaPct < 0 ? " is-negative" : entry.recoveryDeltaPct > 0 ? " is-positive" : ""}`}
-              title="Regenerations-Delta dieser Intensität (Erholung ↔ Verletzungsrisiko-Trade-off)"
+              title="Erholungs-Tempo dieser Intensität (Erholungs-Rate, nicht Fatigue-Last) — Erholung ↔ Verletzungsrisiko-Trade-off"
             >
-              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Reg</small>
+              {formatSignedPercent(entry.recoveryDeltaPct)} <small>Erholung</small>
             </span>
             <NlDeltaChip
               value={entry.net}
@@ -420,9 +420,9 @@ function NlTrainingIntensityProjection({
 }
 
 /**
- * #53 — Top-3 Klassen nach geschätztem Trainings-SP-Zugewinn (siehe
+ * #53 — Top-4 Klassen nach geschätztem Trainings-SP-Zugewinn (siehe
  * `buildTrainingClassGainRanking` für die Herleitung). Die aktuell trainierte
- * Klasse wird, falls unter den Top-3, klar markiert ("aktiv").
+ * Klasse wird, falls unter den Top-4, klar markiert ("aktiv").
  */
 function NlTrainingClassRanking({
   row,
@@ -436,19 +436,19 @@ function NlTrainingClassRanking({
   onSelectClass: (className: string) => void;
 }) {
   const ranking = useMemo(
-    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 2, includeCurrent: true }),
+    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 4, includeCurrent: true }),
     [row, trainingClassOptions],
   );
   if (ranking.length === 0) return null;
   const best = ranking.reduce((max, entry) => Math.max(max, entry.estimatedGain), 0.01);
-  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 2);
+  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 4);
 
   return (
     <div
       className="nl-training-class-ranking is-selectable"
       data-testid="nl-training-class-ranking"
       role="radiogroup"
-      aria-label="Trainingsklasse wählen — Top-2 plus deine aktuelle"
+      aria-label="Trainingsklasse wählen — Top-4 plus deine aktuelle"
     >
       <span className="nl-training-class-ranking-title">
         Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
@@ -468,12 +468,19 @@ function NlTrainingClassRanking({
             onClick={() => onSelectClass(entry.className)}
             title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
-            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
+            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke und gewichtet nach Signature-/Weak-Attribut-Affinität sowie dem Development-Route-Bonus der Klasse. Reale Werte hängen zusätzlich von Performance-Anteil ab.${
+              entry.hasFocusRouteBonus ? " · +8% Trainingsfokus-Bonus (Achse passt)" : ""
+            }`}
           >
             <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
             <span className="nl-training-class-ranking-label">
               {entry.label}
               {entry.isCurrent ? <span className="nl-training-class-ranking-current">aktiv</span> : null}
+              {entry.hasFocusRouteBonus ? (
+                <span className="nl-training-class-ranking-focus-bonus" title="Trainingsfokus-Route-Bonus: +8%">
+                  +8% Fokus
+                </span>
+              ) : null}
             </span>
             <span className="nl-training-class-ranking-bar" aria-hidden="true">
               <span

@@ -219,7 +219,7 @@ function normalizeTrainingMode(value: Player["trainingMode"]): PlayerTrainingMod
   return value === "leicht" || value === "mittel" || value === "hart" ? value : "mittel";
 }
 
-function classNameToDevelopmentRoute(className: ProgressionClassName): PlayerDevelopmentRouteSuggestion {
+export function classNameToDevelopmentRoute(className: ProgressionClassName): PlayerDevelopmentRouteSuggestion {
   if (className === "Berserker" || className === "Warlord" || className === "Tank" || className === "Badass") return "POW";
   if (className === "Sprinter" || className === "Rogue" || className === "Charger") return "SPE";
   if (className === "Mage" || className === "Overseer" || className === "Tactician") return "MEN";
@@ -227,7 +227,7 @@ function classNameToDevelopmentRoute(className: ProgressionClassName): PlayerDev
   return "BALANCED";
 }
 
-function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
+export function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
   const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
   if (!rosterEntry) return null;
   const focus = gameState.seasonState.aiManagerTrainingSettings?.[rosterEntry.teamId]?.trainingFocus;
@@ -493,7 +493,7 @@ export function resolveOrganicRegressionCombinedTotal(input: {
   return null;
 }
 
-function getOrganicGrowthMultiplier(affinity: AttributeAffinityKind) {
+export function getOrganicGrowthMultiplier(affinity: AttributeAffinityKind) {
   if (affinity === "signature") return SIGNATURE_ORGANIC_GROWTH_MULTIPLIER;
   if (affinity === "weak") return WEAK_ORGANIC_GROWTH_MULTIPLIER;
   return 1;

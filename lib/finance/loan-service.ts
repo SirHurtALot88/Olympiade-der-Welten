@@ -18,7 +18,6 @@ const RISK_PER_MISSING_FINANCE_POINT = 0.012;
 const TERM_DISCOUNT_PER_SEASON = 0.004;
 const CAPACITY_CASH_SHARE = 0.15;
 const CAPACITY_MARKET_VALUE_SHARE = 0.3;
-const CAPACITY_REVENUE_SHARE = 1.5;
 const DEFAULT_PENALTY_RATE = 0.05;
 /** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
 const PREPAYMENT_FEE_RATE = 0.2;
@@ -88,8 +87,11 @@ export function computeLoanTerms(input: { principal: number; termSeasons: number
 }
 
 /**
- * Kreditlimit: min(0.15 * cash + 0.30 * marketValueTotal, 1.5 * jährlicheEinnahmen) -
- * aktuelleRestschuld, floor 0. Siehe docs/design/kredit-system.md ("Kreditlimit").
+ * Kreditlimit: 0.15 * cash + 0.30 * marketValueTotal - aktuelleRestschuld, floor 0. Siehe
+ * docs/design/kredit-system.md ("Kreditlimit"). Die Kappe basiert allein auf dem Teamwert
+ * (Cash + Marktwert), damit Teams ohne Sponsor-Payout (z. B. Season 1) trotzdem eine
+ * realistische Kapazität sehen statt 0 — kein separates Tragbarkeits-Limit über Jahreseinnahmen
+ * mehr, das die Kappe sonst auf 0 kollabieren ließe.
  */
 export function computeBorrowingCapacity(input: {
   cash: number;
@@ -99,9 +101,7 @@ export function computeBorrowingCapacity(input: {
 }): number {
   const teamwertCap =
     CAPACITY_CASH_SHARE * Math.max(0, input.cash) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, input.marketValueTotal);
-  const tragbarkeitsCap = CAPACITY_REVENUE_SHARE * Math.max(0, input.annualRevenue);
-  const cap = Math.min(teamwertCap, tragbarkeitsCap);
-  return roundCash(Math.max(0, cap - Math.max(0, input.currentOutstandingDebt)));
+  return roundCash(Math.max(0, teamwertCap - Math.max(0, input.currentOutstandingDebt)));
 }
 
 export function getTeamOutstandingDebt(gameState: GameState, teamId: string): number {

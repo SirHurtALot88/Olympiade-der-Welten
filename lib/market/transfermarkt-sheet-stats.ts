@@ -112,6 +112,30 @@ export function getTransfermarktTierFromPoints(value: number | null): Transferma
   return "F";
 }
 
+/** Tier → CSS-Klasse für farbige Tier-Chips (Spiegel von PlayerDetailDrawer.getAttributeTierClass). */
+export function getAttributeTierClass(tier: TransfermarktRatingTier | null | undefined): string {
+  switch (tier) {
+    case "S+":
+      return "is-tier-splus";
+    case "S":
+      return "is-tier-s";
+    case "A":
+      return "is-tier-a";
+    case "B":
+      return "is-tier-b";
+    case "C":
+      return "is-tier-c";
+    case "D":
+      return "is-tier-d";
+    case "E":
+      return "is-tier-e";
+    case "F":
+      return "is-tier-f";
+    default:
+      return "";
+  }
+}
+
 function buildProxyRatings(playerName: string, pow: number | null, spe: number | null, men: number | null, soc: number | null) {
   return {
     playerName,

@@ -277,8 +277,8 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const amountNeed = estimateRosterNeedEur(gameState, teamId, LOAN_AMOUNT_FILL_FRACTION);
   const amountShortfall = round(Math.max(shortfall, amountNeed - spendableCash), 1);
 
-  // Reuse loan-service's own capacity math (market value + revenue + outstanding debt) instead of
-  // duplicating it — a provisional preview call is enough to read back `capacity`.
+  // Reuse loan-service's own capacity math (cash + market value, minus outstanding debt) instead
+  // of duplicating it — a provisional preview call is enough to read back `capacity`.
   const capacityPreview = originateLoan(
     gameState,
     { borrowerTeamId: teamId, principal: amountShortfall, termSeasons: DEFAULT_TERM_SEASONS },

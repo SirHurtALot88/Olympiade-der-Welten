@@ -18,6 +18,8 @@ export type TransfermarktDisciplineTopSixImpactRow = {
   beforeTopSixAvg: number | null;
   afterTopSixAvg: number | null;
   delta: number | null;
+  /** Teilnehmerzahl der Saison-Disziplin (gleiche Quelle wie Top-Disziplinen-Chart), null wenn unbekannt. */
+  playerCount: number | null;
 };
 
 export type TransfermarktAxisTeamRankEstimate = {
@@ -172,6 +174,7 @@ export function computeDisciplineTopSixImpact(
     disciplineName: string;
     displayedScore: number | null;
     tierWindow: string;
+    playerCount?: number | null;
   }>,
   topCount = 6,
 ): TransfermarktDisciplineTopSixImpactRow[] {
@@ -198,6 +201,10 @@ export function computeDisciplineTopSixImpact(
       delta:
         beforeTopSixAvg != null && afterTopSixAvg != null
           ? Number((afterTopSixAvg - beforeTopSixAvg).toFixed(1))
+          : null,
+      playerCount:
+        typeof discipline.playerCount === "number" && Number.isFinite(discipline.playerCount)
+          ? discipline.playerCount
           : null,
     };
   });

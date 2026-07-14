@@ -102,7 +102,7 @@ function getSeedValue(seed: string) {
 }
 
 function getAccuracyFactor(level: number) {
-  return [0.24, 0.36, 0.5, 0.68, 0.84, 1][level] ?? 0.24;
+  return [0.42, 0.58, 0.68, 0.78, 0.88, 1][level] ?? 0.42;
 }
 
 function getSharedBiasAmplitude(level: number) {
@@ -111,6 +111,17 @@ function getSharedBiasAmplitude(level: number) {
 
 function getDisciplineNoiseAmplitude(level: number) {
   return [8, 6, 4.5, 3, 1.5, 0][level] ?? 8;
+}
+
+// How much each discipline rank (0 = strongest) is pulled down from the
+// top-band floor. A non-zero step keeps the top slots from reading as an
+// identical shared value ("40/40/40") — it lets rank 1 sit visibly above
+// rank 2, which sits above rank 3, and so on. The step shrinks as scouting
+// level rises because accuracyFactor increasingly carries the real spread
+// on its own; it is unused entirely once floor protection stops applying
+// (level >= 4, see buildScoutedDisciplineTiers).
+function getFloorRankStep(level: number) {
+  return [3.2, 2.4, 1.6, 0.9][level] ?? 3.2;
 }
 
 function getNumericNoiseAmplitude(level: number) {
@@ -255,11 +266,16 @@ export function buildScoutedDisciplineTiers(input: {
   const accuracyFactor = getAccuracyFactor(normalizedLevel);
   const sharedBiasAmplitude = getSharedBiasAmplitude(normalizedLevel);
   const disciplineNoiseAmplitude = getDisciplineNoiseAmplitude(normalizedLevel);
+  const floorRankStep = getFloorRankStep(normalizedLevel);
   const meanScore = input.disciplines.reduce((sum, entry) => sum + entry.score, 0) / input.disciplines.length;
   const sortedRawScores = [...input.disciplines].map((entry) => entry.score).sort((left, right) => right - left);
   const topScore = sortedRawScores[0] ?? meanScore;
-  const secondScore = sortedRawScores[1] ?? topScore;
-  const thirdScore = sortedRawScores[2] ?? secondScore;
+  const rankByDisciplineId = new Map(
+    [...input.disciplines]
+      .sort((left, right) => right.score - left.score)
+      .map((entry, index) => [entry.disciplineId, index] as const),
+  );
+  const topBandBase = topScore >= 78 ? 50 : topScore >= 70 ? 46 : topScore >= 60 ? 42 : 36;
   const sharedBias =
     normalizedLevel >= 5
       ? 0
@@ -278,30 +294,8 @@ export function buildScoutedDisciplineTiers(input: {
           ? entry.score
           : meanScore + (entry.score - meanScore) * accuracyFactor + sharedBias + disciplineNoise;
       const strengthSignal = clamp((entry.score - meanScore) / 20, -1, 1);
-      const topBandFloor =
-        entry.score >= thirdScore
-          ? topScore >= 78
-            ? 50
-            : topScore >= 70
-              ? 46
-              : topScore >= 60
-                ? 42
-                : 36
-          : entry.score >= secondScore
-            ? topScore >= 78
-              ? 46
-              : topScore >= 70
-                ? 43
-                : topScore >= 60
-                  ? 39
-                  : 34
-            : topScore >= 78
-              ? 42
-              : topScore >= 70
-                ? 39
-                : topScore >= 60
-                  ? 36
-                  : 32;
+      const rank = rankByDisciplineId.get(entry.disciplineId) ?? 0;
+      const topBandFloor = Math.max(20, topBandBase - rank * floorRankStep);
       const protectedScoreRaw =
         normalizedLevel >= 4
           ? displayedScoreRaw

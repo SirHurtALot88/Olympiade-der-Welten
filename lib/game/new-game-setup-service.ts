@@ -9,6 +9,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-service";
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
+import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -311,7 +312,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       ? `Oly Online 4v4 New Game ${new Date(now).toLocaleString("de-DE")}`
       : `Oly New Game ${getPreset(input.presetId).label} ${new Date(now).toLocaleString("de-DE")}`);
 
-  const gameState: GameState = {
+  const baseGameStateBeforeSponsorOffers: GameState = {
     ...resetGameState,
     gamePhase: "preseason_management",
     saveVersion: 1,
@@ -416,6 +417,14 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       },
     ],
   };
+
+  // Seed sponsor offers up front so the "choose_sponsor" flow step (open by default, see
+  // newGameFlow.steps above) always has real, selectable offers to show — otherwise the
+  // Sponsoren tab flags red with nothing to pick from until some later flow (preseason
+  // workflow / AI autopilot / choose route) happens to generate them. Offer generation is
+  // deterministic for a given (season id, teamId), so calling this here is idempotent and
+  // safe to run again later (e.g. via ensureSeasonSponsorOffers elsewhere) without reshuffling.
+  const gameState: GameState = ensureSeasonSponsorOffers(baseGameStateBeforeSponsorOffers);
 
   const preview: NewGameSetupPreview = {
     mode: "preview",

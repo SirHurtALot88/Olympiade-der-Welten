@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 
-import type { GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   getPlayerDisplayMarketValue,
   getPlayerDisplaySalary,
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
+import { projectWishlistSalarySchedule } from "@/lib/market/contract-negotiation-preview";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktScoutingVisibilityBuckets } from "@/lib/market/transfermarkt-scouting";
 import { getFacilityLevel } from "@/lib/facilities/facility-effects";
@@ -31,6 +32,8 @@ export type FoundationTransferWishlistEntryForMarketV2 = {
   spe?: number | null;
   men?: number | null;
   soc?: number | null;
+  /** Yearly salary schedule this target would command if signed — see `projectWishlistSalarySchedule`. */
+  projectedSalarySchedule?: ContractYearSalary[] | null;
 };
 
 export function shouldBuildFoundationTransferWishlistDerivations(shouldBuildMarketView: boolean): boolean {
@@ -131,9 +134,10 @@ export function useFoundationCrossTabMarketFilters(input: {
         spe: player?.coreStats.spe ?? entry.spe ?? null,
         men: player?.coreStats.men ?? entry.men ?? null,
         soc: player?.coreStats.soc ?? entry.soc ?? null,
+        projectedSalarySchedule: projectWishlistSalarySchedule(input.gameState, entry.playerId)?.yearlySalarySchedule ?? null,
       };
     });
-  }, [input.gameState.players, shouldBuildTransferWishlist, transferWishlistEntries]);
+  }, [input.gameState, shouldBuildTransferWishlist, transferWishlistEntries]);
 
   const scoutingHubV2TargetSections = useMemo(() => {
     if (!shouldBuildScoutingHub || !input.selectedTeam) {

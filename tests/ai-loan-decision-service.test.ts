@@ -150,12 +150,12 @@ describe("resolveAiLoanDecision", () => {
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(true);
     expect(decision.loanAmount).toBeGreaterThan(0);
-    // capacity = min(0.15*cash + 0.30*marketValueTotal, 1.5*annualRevenue) - outstandingDebt
-    //          = min(0.15*3 + 0.30*90, 1.5*50) - 0 = min(27.45, 75) = 27.45
+    // Merged capacity model (from origin/main): capacity = 0.15*cash + 0.30*marketValueTotal − debt
+    // (no revenue cap). marketValueTotal = 6*15 = 90 → 0.15*3 + 0.30*90 = 27.45.
     expect(decision.loanAmount).toBeLessThanOrEqual(27.45);
-    // Short terms only (anti-spiral: no 10-season loans).
+    // Prudent serviceability-driven term (TERM_CANDIDATES [2..10]); a small distressed loan stays short.
     expect(decision.termSeasons).toBeGreaterThanOrEqual(2);
-    expect(decision.termSeasons).toBeLessThanOrEqual(4);
+    expect(decision.termSeasons).toBeLessThanOrEqual(10);
   });
 
   it("does not borrow to top up a team that already reaches the competitive floor with its own cash", () => {
@@ -228,8 +228,33 @@ describe("resolveAiLoanDecision", () => {
   });
 
   it("does not borrow when there is need and a cash gap but no borrowing capacity", () => {
-    // No sponsor revenue at all -> annualRevenue 0 -> revenue cap 0 -> capacity 0.
-    const gameState = buildTeamGameState({ cash: 3, rosterCount: 6, playerOpt: 14 });
+    // Merged model: capacity is purely teamwert-based (cash + marketValueTotal − debt), no revenue cap,
+    // AND the need-gate (competitive floor + cash gap) still runs first. So the team must be GENUINELY
+    // needy (roster 6 < floor 11, cash 3 can't fill it → passes need) yet have its small teamwertCap
+    // exhausted by debt: teamwertCap = 0.15*3 + 0.30*(6*15=90) = 27.45, an outstanding loan of 35 exceeds
+    // it → capacity floors at 0 → no_capacity (checked before the serviceability/term gate).
+    const gameState = buildTeamGameState({
+      cash: 3,
+      rosterCount: 6,
+      playerOpt: 14,
+      annualRevenue: 50,
+      loans: [
+        {
+          loanId: "loan-existing",
+          borrowerTeamId: "T-1",
+          lenderType: "bank",
+          principalOriginal: 35,
+          principalOutstanding: 35,
+          interestRatePerSeason: 0.1,
+          termSeasons: 5,
+          seasonsRemaining: 5,
+          installmentPerSeason: 8,
+          originatedSeasonId: "season-1",
+          status: "active",
+          missedPayments: 0,
+        },
+      ],
+    });
     const decision = resolveAiLoanDecision(gameState, "T-1");
     expect(decision.shouldBorrow).toBe(false);
     expect(decision.reason).toBe("no_capacity");

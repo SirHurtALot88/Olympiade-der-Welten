@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { FOUNDATION_NAV_GROUPS, isFoundationNavViewActive } from "@/lib/foundation/foundation-nav-config";
@@ -22,6 +23,9 @@ type FoundationSidebarProps = {
   onPrefetchView?: (view: FoundationViewId) => void;
   attentionByViewId?: FoundationNavAttentionMap;
   seasonContextLabel?: string | null;
+  // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
+  // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
+  teamPicker?: ReactNode;
 };
 
 type SidebarDragState = {
@@ -35,6 +39,7 @@ export default function FoundationSidebar({
   onPrefetchView,
   attentionByViewId,
   seasonContextLabel,
+  teamPicker,
 }: FoundationSidebarProps) {
   const [newLookEnabled] = useNewLook();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
@@ -186,6 +191,7 @@ export default function FoundationSidebar({
       <div className="foundation-sidebar-newlook">
         <NewLookToggle className="is-sidebar" />
       </div>
+      {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
       {navGroups.map((group) => (
         <section key={group.id} className="foundation-sidebar-group">
           <span className="foundation-sidebar-group-label">{group.label}</span>

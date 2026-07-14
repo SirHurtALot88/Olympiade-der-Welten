@@ -120,6 +120,12 @@ export type TrainingPlayerRowView = {
   recommendedTrainingMatchesCurrent?: boolean;
   adminBalancingConfig?: AdminBalancingConfigInput | null;
   /**
+   * The player's team's current training focus axis (AI manager training settings), if any.
+   * Drives the development-route ×1.08 bonus in `estimateClassTrainingGains` /
+   * `buildTrainingClassGainRanking` — null means no focus is set (bonus dormant everywhere).
+   */
+  trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null;
+  /**
    * True once the team's training intensity is sealed for the current season
    * (preseason setup window closed / first matchday result recorded). See
    * `evaluateGamePhaseAction(gameState, "set_training")` and

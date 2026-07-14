@@ -93,25 +93,25 @@ rate = clamp( 0.10 + risk − termDiscount , 0.07 , 0.20 )
 
 ## Kreditlimit (Borrowing Capacity)
 
-Verhindert Infinite-Money. Die Kapazität ist eine **Kombination** aus Teamwert (Cash + Kaderwert)
-und Tragbarkeit (Jahreseinnahmen), nicht nur ein Einzelwert:
+Verhindert Infinite-Money. Die Kapazität basiert allein auf dem Teamwert (Cash + Kaderwert):
 
 ```
-capacity = min( teamwertCap , tragbarkeitsCap ) − aktuelleRestschuld
-  teamwertCap     = 0.15 · cash + 0.30 · marketValueTotal   // Cash + Kaderwert = Teamwert
-  tragbarkeitsCap = 1.5 · jährlicheEinnahmen                // deckelt nach Repay-Fähigkeit
+capacity = teamwertCap − aktuelleRestschuld
+  teamwertCap = 0.15 · cash + 0.30 · marketValueTotal   // Cash + Kaderwert = Teamwert
 ```
 
-- Der `min`-Guardrail bleibt bewusst: ein Team mit dickem Kader, aber mageren Einnahmen kann sich
-  nicht überschulden — die Einnahmen begrenzen, was realistisch bedienbar ist.
 - `cash` = aktuelles `Team.cash`; `marketValueTotal` aus `buildTeamSeasonOverviewRows`.
-- `jährlicheEinnahmen` = Proxy aus Sponsoren-Payout der letzten Saison (TODO: Preisgeld ergänzen).
 - Ein bereits hoch verschuldetes Team bekommt entsprechend weniger/keinen neuen Kredit.
+- Kein separates Tragbarkeits-Limit über Jahreseinnahmen mehr: eine frühere Version deckelte
+  zusätzlich mit `1.5 · jährlicheEinnahmen`, was die Kapazität auf 0 kollabieren ließ, sobald ein
+  Team noch keinen Sponsoren-Payout hatte (z. B. Season 1 oder neu gegründete Teams) — selbst bei
+  gesundem Cash/Kaderwert. `estimateTeamAnnualRevenue` lebt als Einnahmen-Proxy für andere Zwecke
+  (z. B. `resolveAiLoanDecision`s Tragbarkeits-/Laufzeitwahl) weiter, geht aber nicht mehr in die
+  Kapazität selbst ein.
 
 **Season 1 = keine Kredite (harte Regel):** In Season 1 gibt es grundsätzlich keinen Kredit —
 `originateLoan`/`resolveAiLoanDecision` lehnen ab, unabhängig von der Kapazität. Man kommt mit dem
-aus, was man hat. (Zusätzlich ist der Einnahmen-Proxy in Season 1 ohnehin 0, weil noch keine
-Sponsoren-Payouts geloggt sind — aber die Regel ist explizit, nicht nur ein Nebeneffekt.)
+aus, was man hat.
 
 ## Integrationspunkte
 
@@ -312,8 +312,8 @@ Beide UI-Teile sind gegen den echten Service verdrahtet (kein offener Seam mehr)
 
 - Zins/Rate-Berechnung gegen die Beispieltabelle (Annuität, Floor/Cap, Laufzeitrabatt,
   Monotonie der Absolut-Zinsen).
-- Kapazität: `min(teamwertCap, tragbarkeitsCap) − Restschuld`; Cash + Marktwert + Einnahmen fließen
-  ein; Season 1 → keine Kredite (harte Regel).
+- Kapazität: `teamwertCap − Restschuld`; nur Cash + Marktwert fließen ein (keine Einnahmen-Kappe
+  mehr); Season 1 → keine Kredite (harte Regel).
 - Vorab-Rückzahlung: `earlyPayoff = Restschuld + 0.20 · entgangeneZukunftszinsen`, Kredit wird
   „paid", Cash korrekt belastet; Anti-Churn-Regeln der KI.
 - `loan_settlement`: Rate belastet Cash korrekt, Restschuld/Restlaufzeit sinken, Idempotenz über
