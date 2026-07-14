@@ -13133,12 +13133,53 @@ a {
   font-style: normal;
 }
 
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table-shell {
-  max-height: 340px;
+/* Modernisierte "Top-Disziplinen"-Tabelle (ersetzt die frühere plain-graue
+   `team-table`): dunkles Panel im player-drawer-Look, Diszi-Chip mit Area-
+   Tint, Mini-Bar unter dem Stat-Wert, sortierbare Spaltenköpfe (unverändert
+   wiederverwendet aus dem Drag/Sort-State). Zeigt bei eigenen Spielern ALLE
+   Disziplinen (nicht nur Top-5); Scouting-Profile bleiben auf Diszi + grobe
+   Klasse beschränkt (Fog-of-war, siehe `visibleTopDisciplineColumnIds`). */
+.player-drawer-disciplines-table-shell {
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table {
+.player-drawer-disciplines-table {
   width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.player-drawer-disciplines-table th,
+.player-drawer-disciplines-table td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.player-drawer-disciplines-table thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(20, 26, 36, 0.94);
+  color: rgba(214, 223, 241, 0.72);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.player-drawer-disciplines-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.player-drawer-disciplines-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .player-drawer-top-disciplines-panel .player-drawer-draggable-header {
@@ -13159,69 +13200,46 @@ a {
   color: #ffffff;
 }
 
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-8 > td {
-  background: var(--heat-best-bg);
-  color: var(--heat-best-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-7 > td {
-  background: var(--heat-elite-bg);
-  color: var(--heat-elite-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-6 > td {
-  background: var(--heat-strong-bg);
-  color: var(--heat-strong-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-5 > td {
-  background: var(--heat-good-bg);
-  color: var(--heat-good-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-4 > td {
-  background: var(--heat-neutral-bg);
-  color: var(--heat-neutral-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-3 > td {
-  background: var(--heat-watch-bg);
-  color: var(--heat-watch-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-2 > td {
-  background: var(--heat-risk-bg);
-  color: var(--heat-risk-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr.heat-band-1 > td {
-  background: var(--heat-danger-bg);
-  color: var(--heat-danger-text);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr[class*="heat-band-"] > td {
-  border-color: rgba(9, 14, 22, 0.22);
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr[class*="heat-band-"] td:first-child {
-  font-weight: 900;
-}
-
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody td.player-drawer-discipline-name-cell {
+.player-drawer-disciplines-table tbody td.player-drawer-discipline-name-cell {
   position: relative;
   overflow: hidden;
-  box-shadow: inset 5px 0 0 var(--discipline-area-accent, rgba(255, 255, 255, 0.22));
+  box-shadow: inset 4px 0 0 var(--discipline-area-accent, rgba(255, 255, 255, 0.22));
 }
 
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr[class*="heat-band-"] > td.player-drawer-discipline-name-cell {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--discipline-area-accent) 66%, #111821), color-mix(in srgb, var(--discipline-area-accent) 34%, #202830));
-  color: #f8fbff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.38);
+.player-drawer-disc-table-stat {
+  display: grid;
+  gap: 3px;
+  min-width: 64px;
 }
 
-.player-drawer-top-disciplines-panel .player-drawer-breakdown-table tbody tr[class*="heat-band-"] > td.player-drawer-discipline-name-cell + td {
-  border-left-color: rgba(255, 255, 255, 0.16);
+.player-drawer-disc-table-stat-value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #f7fbff;
+}
+
+.player-drawer-disc-table-stat-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.player-drawer-disc-table-stat-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.76));
+}
+
+.player-drawer-season-snapshot-heading {
+  margin: 0 0 2px;
+  color: rgba(163, 194, 255, 0.72);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .player-drawer-discipline-name-cell.is-power,
@@ -13344,9 +13362,10 @@ a {
   font-size: 0.72rem;
 }
 
-/* #106: pro Achsen-Karte getrennte Steuerelemente — Liga-Leaders-Link im
-   Kopf (klein, eigenständig) und ein Aufklapp-Toggle für das Diszi-Detail
-   (PPs + Rang je Disziplin), ohne den Liga-Leaders-Klick zu verlieren. */
+/* #106: Liga-Leaders-Link im Kopf der Achsen-Karte (klein, eigenständig). Das
+   frühere Aufklapp-Toggle für ein Diszi-Detail direkt in der Karte wurde
+   entfernt (PO-Feedback) — das volle Detail lebt jetzt ausschließlich in der
+   dedizierten "Top-Disziplinen"-Tabelle weiter unten. */
 .player-drawer-axis-card-controls {
   display: inline-flex;
   align-items: center;
@@ -13375,46 +13394,6 @@ a {
   border-color: rgba(139, 171, 230, 0.5);
   background: rgba(139, 171, 230, 0.16);
   transform: translateY(-1px);
-}
-
-.player-drawer-axis-discipline-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: rgba(214, 223, 241, 0.72);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.player-drawer-axis-discipline-toggle:hover,
-.player-drawer-axis-discipline-toggle:focus-visible {
-  color: #f7fbff;
-}
-
-.player-drawer-axis-discipline-toggle-caret {
-  display: inline-block;
-  transition: transform 140ms ease;
-}
-
-.player-drawer-axis-discipline-toggle-caret.is-open {
-  transform: rotate(90deg);
-}
-
-.player-drawer-axis-discipline-detail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-top: 2px;
-  color: rgba(214, 223, 241, 0.72);
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .player-drawer-two-column-grid {
