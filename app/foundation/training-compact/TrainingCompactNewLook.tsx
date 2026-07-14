@@ -420,9 +420,9 @@ function NlTrainingIntensityProjection({
 }
 
 /**
- * #53 — Top-3 Klassen nach geschätztem Trainings-SP-Zugewinn (siehe
+ * #53 — Top-4 Klassen nach geschätztem Trainings-SP-Zugewinn (siehe
  * `buildTrainingClassGainRanking` für die Herleitung). Die aktuell trainierte
- * Klasse wird, falls unter den Top-3, klar markiert ("aktiv").
+ * Klasse wird, falls unter den Top-4, klar markiert ("aktiv").
  */
 function NlTrainingClassRanking({
   row,
@@ -436,19 +436,19 @@ function NlTrainingClassRanking({
   onSelectClass: (className: string) => void;
 }) {
   const ranking = useMemo(
-    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 2, includeCurrent: true }),
+    () => buildTrainingClassGainRanking(row, trainingClassOptions, { limit: 4, includeCurrent: true }),
     [row, trainingClassOptions],
   );
   if (ranking.length === 0) return null;
   const best = ranking.reduce((max, entry) => Math.max(max, entry.estimatedGain), 0.01);
-  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 2);
+  const currentOutsideTop = ranking.some((entry) => entry.isCurrent && entry.rank > 4);
 
   return (
     <div
       className="nl-training-class-ranking is-selectable"
       data-testid="nl-training-class-ranking"
       role="radiogroup"
-      aria-label="Trainingsklasse wählen — Top-2 plus deine aktuelle"
+      aria-label="Trainingsklasse wählen — Top-4 plus deine aktuelle"
     >
       <span className="nl-training-class-ranking-title">
         Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
@@ -468,7 +468,7 @@ function NlTrainingClassRanking({
             onClick={() => onSelectClass(entry.className)}
             title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
-            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
+            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke und gewichtet nach Signature-/Weak-Attribut-Affinität sowie dem Development-Route-Bonus der Klasse. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
           >
             <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
             <span className="nl-training-class-ranking-label">
