@@ -261,6 +261,8 @@ export default function HomeV2NewLook({
   cash,
   salaryTotal,
   guv,
+  loanInstallment,
+  outstandingDebt,
   rosterCount,
   fieldRaceForm,
   fieldRacePlayedMatchdays,
@@ -319,6 +321,8 @@ export default function HomeV2NewLook({
   const animatedPoints = useCountUp(points);
   const animatedRosterCount = useCountUp(rosterCount, { durationMs: 700 });
   const animatedSalaryTotal = useCountUp(salaryTotal);
+  const animatedLoanInstallment = useCountUp(loanInstallment);
+  const hasActiveLoan = loanInstallment != null && loanInstallment > 0;
 
   // Team-Achsenprofil (#50): Durchschnitt der vier Spiel-Achsen über die
   // Top-Kader-Spieler — nur reale, endliche Werte, fehlende Achsen fallen
@@ -456,6 +460,20 @@ export default function HomeV2NewLook({
             <StatChip label="Saisonpunkte" value={formatNlNumber(animatedPoints ?? points, 1)} tone="accent" onClick={onOpenSeason} title="Saison-Punktestand — identisch zum Saisonstand" />
             <StatChip label="Kader" value={formatNlNumber(animatedRosterCount ?? rosterCount, 0)} onClick={onOpenTeams} title="Zum Kader" />
             <StatChip label="Gehalt" value={formatNlMoney(animatedSalaryTotal ?? salaryTotal)} onClick={onOpenOffice} title="Gehaltsbudget — zum Front Office" />
+            {hasActiveLoan ? (
+              <StatChip
+                label="Kreditrate"
+                value={formatNlMoney(animatedLoanInstallment ?? loanInstallment)}
+                tone="warn"
+                onClick={onOpenOffice}
+                sub={
+                  outstandingDebt != null && outstandingDebt > 0
+                    ? `Restschuld ${formatNlMoney(outstandingDebt)}`
+                    : undefined
+                }
+                title="Jährliche Kreditrate — zum Front Office"
+              />
+            ) : null}
           </StatChipRow>
         </div>
       </NlCard>

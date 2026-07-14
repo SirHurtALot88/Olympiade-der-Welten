@@ -1,5 +1,10 @@
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
+// Kredite tab visibility gate. The credit game-system (interest math,
+// eligibility, cash mutations, borrow UX) is wired to the real bank credit
+// service (lib/finance/loan-service.ts, see docs/design/kredit-system.md).
+export const CREDITS_TAB_ENABLED = true;
+
 export type FoundationNavItem = {
   id: FoundationViewId;
   label: string;
@@ -42,6 +47,9 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "marketV2", label: "Transfermarkt", tooltip: "Kaufen, verkaufen und verhandeln.", icon: "⇄" },
       { id: "scoutingCenterV2", label: "Scouting", tooltip: "Reports, Watchlist und Empfehlungen.", icon: "◐" },
       { id: "historyV2", label: "Historie", tooltip: "Vergangene Transfers.", icon: "↺" },
+      ...(CREDITS_TAB_ENABLED
+        ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
+        : []),
     ],
   },
   {

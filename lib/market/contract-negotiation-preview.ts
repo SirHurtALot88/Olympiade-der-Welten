@@ -237,6 +237,59 @@ export function buildContractSalarySchedule(input: ContractPreviewInput): Contra
   };
 }
 
+export type WishlistSalaryProjection = {
+  playerId: string;
+  contractLength: number;
+  contractShape: ContractShape;
+  annualSalary: number | null;
+  yearlySalarySchedule: ContractYearSalary[];
+  totalSalary: number | null;
+};
+
+/**
+ * Projects the yearly salary schedule a scouted-but-unsigned wishlist target
+ * would command if signed today. `TransferWishlistEntry` only carries a flat
+ * `salary` snapshot — there is no real contract for a not-yet-signed player —
+ * so this composes the SAME machinery a live negotiation draft uses instead
+ * of inventing new economy math: `buildPlayerContractPreference` supplies the
+ * player's own `shapePreference` and ideal contract length (the same default
+ * term `recommendContractOfferForPlayer` starts from before team-specific
+ * nudges), `resolvePlayerEconomyContract` supplies the salary demand, and
+ * `buildContractSalarySchedule` splits it into the per-season schedule. Pure
+ * and deterministic: same player + season in, same schedule out.
+ */
+export function projectWishlistSalarySchedule(
+  gameState: GameState,
+  playerId: string,
+  options?: { contractLength?: number | null; shape?: ContractShape | null },
+): WishlistSalaryProjection | null {
+  const player = gameState.players.find((candidate) => candidate.id === playerId) ?? null;
+  if (!player) {
+    return null;
+  }
+
+  const preference = buildPlayerContractPreference(player);
+  const contractLength = normalizeContractLength(options?.contractLength ?? preference?.idealLength ?? 1);
+  const contractShape = options?.shape ?? preference?.shapePreference ?? "balanced";
+  const economy = resolvePlayerEconomyContract({ playerId, player });
+  const schedule = buildContractSalarySchedule({
+    annualSalary: economy.salary,
+    contractLength,
+    shape: contractShape,
+    seasonIdBase: gameState.season.id,
+    seasonLabelBase: gameState.season.name,
+  });
+
+  return {
+    playerId,
+    contractLength,
+    contractShape,
+    annualSalary: economy.salary,
+    yearlySalarySchedule: schedule.yearlySalarySchedule,
+    totalSalary: schedule.totalSalary,
+  };
+}
+
 export function calculateOpenBuyoutCost(yearlySalarySchedule: ContractYearSalary[], seasonsElapsed = 0) {
   if (!yearlySalarySchedule.length) {
     return null;

@@ -90,7 +90,8 @@ export type FoundationView =
   | "generator"
   | "teamSettings"
   | "encyclopedia"
-  | "admin";
+  | "admin"
+  | "credits";
 
 export const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",

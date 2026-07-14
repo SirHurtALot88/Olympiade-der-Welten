@@ -1210,6 +1210,33 @@ export type SponsorPayoutLogRecord = {
   createdAt: string;
 };
 
+export type LoanLenderType = "bank" | "team"; // "team" erst Phase 3
+
+export type LoanRecord = {
+  loanId: string;
+  borrowerTeamId: string;
+  lenderType: LoanLenderType;
+  lenderTeamId?: string; // nur bei lenderType === "team"
+  principalOriginal: number; // ursprüngliche Kreditsumme
+  principalOutstanding: number; // Restschuld -> die Schulden-Seite
+  interestRatePerSeason: number; // fix bei Abschluss (z. B. 0.152)
+  termSeasons: number; // 1..10
+  seasonsRemaining: number;
+  installmentPerSeason: number; // Annuität, konstante Jahresrate
+  originatedSeasonId: string;
+  status: "active" | "paid" | "defaulted";
+  missedPayments: number;
+};
+
+export type LoanApplyLogRecord = {
+  seasonId: string; // Saison, in der die Rate verbucht wurde
+  loanId: string;
+  installmentCharged: number;
+  interestPortion: number;
+  principalPortion: number;
+  createdAt: string;
+};
+
 export type ScoutingWatchlistEntry = {
   playerId: string;
   teamId: string;
@@ -1521,6 +1548,13 @@ export type TransferWishlistEntry = {
   createdAt: string;
   /** Scouting focus queue order — lower rank scouts first. Falls back to createdAt for legacy entries. */
   priorityRank?: number | null;
+  /**
+   * Projected yearly salary schedule this (not-yet-signed) target would command
+   * if signed today — view-model-only, computed via `projectWishlistSalarySchedule`
+   * (see `lib/market/contract-negotiation-preview.ts`). Never persisted; only set
+   * on the derived wishlist rows the UI renders.
+   */
+  projectedSalarySchedule?: ContractYearSalary[] | null;
 };
 
 export type TransferSellMarkerEntry = {
@@ -2195,6 +2229,8 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  loans?: LoanRecord[];
+  loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
   scoutingWatchlist?: ScoutingWatchlistEntry[];
   scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;
   formCards?: FormCardRecord[];

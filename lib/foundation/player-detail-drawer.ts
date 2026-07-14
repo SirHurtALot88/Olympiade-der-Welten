@@ -97,6 +97,10 @@ type PlayerDrawerAxisCard = {
   seasonPoints: number | null;
   seasonPointsRank: number | null;
   previousSeasonPointsRank: number | null;
+  // Achsen-KPI-Karte konsolidiert jetzt auch PPs All-Time (Summe der
+  // All-Time-PPs aller Diszis dieser Achse) — ersetzt die separate
+  // Detail-Tabelle je Achse (Space-Saving, siehe PlayerDetailDrawer.tsx).
+  allTimePoints: number | null;
 };
 
 type PlayerDisciplineDrawerDetail = {
@@ -615,7 +619,10 @@ function buildDisciplineGlobalRankMaps(
   gameState: GameState,
   disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
   currentSeasonLedger = buildSeasonPointsLedger(gameState),
+  rankPoolPlayerIds?: string[] | null,
 ): DisciplineGlobalRankMaps {
+  const rankPoolSet = rankPoolPlayerIds != null ? new Set(rankPoolPlayerIds.filter(Boolean)) : null;
+  const rankedPlayers = rankPoolSet ? gameState.players.filter((player) => rankPoolSet.has(player.id)) : gameState.players;
   const valueRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const seasonPointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
   const allTimePointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
@@ -651,7 +658,7 @@ function buildDisciplineGlobalRankMaps(
     valueRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: player.currentDisciplineValues?.[discipline.id] ?? player.disciplineRatings?.[discipline.id] ?? null,
         })),
@@ -660,7 +667,7 @@ function buildDisciplineGlobalRankMaps(
     seasonPointsRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: currentSeasonTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         })),
@@ -669,7 +676,7 @@ function buildDisciplineGlobalRankMaps(
     allTimePointsRanksByDiscipline.set(
       discipline.id,
       buildSharedRankMap(
-        gameState.players.map((player) => ({
+        rankedPlayers.map((player) => ({
           playerId: player.id,
           value: allTimeTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         })),
@@ -792,6 +799,7 @@ function maskAxisCardsForVisibility(
       seasonPoints: null,
       seasonPointsRank: null,
       previousSeasonPointsRank: null,
+      allTimePoints: null,
     }));
   }
   return cards.map((card) => ({
@@ -801,6 +809,7 @@ function maskAxisCardsForVisibility(
     seasonPoints: null,
     seasonPointsRank: null,
     previousSeasonPointsRank: null,
+    allTimePoints: null,
   }));
 }
 
@@ -1179,6 +1188,27 @@ function buildAxisRankContext(input: {
   };
 }
 
+// Summiert die All-Time-PPs aller Diszis einer Achse aus den bereits
+// berechneten `disciplineValues` (keine neue Datenquelle) — Grundlage für
+// die "PPs All-Time"-Zeile in der Achsen-KPI-Karte. Liefert null, wenn keine
+// Diszi dieser Achse eine All-Time-PPs-Zahl hat (Fog-of-War bleibt "—").
+function sumAxisAllTimePoints(
+  disciplineValues: PlayerDetailDrawerData["disciplineValues"] | null | undefined,
+  category: DisciplineCategory,
+): number | null {
+  if (!disciplineValues || disciplineValues.length === 0) {
+    return null;
+  }
+  const relevant = disciplineValues.filter((entry) => entry.category === category && entry.allTimePoints != null);
+  if (relevant.length === 0) {
+    return null;
+  }
+  return roundValue(
+    relevant.reduce((total, entry) => total + (entry.allTimePoints ?? 0), 0),
+    1,
+  );
+}
+
 function buildAxisCards(input: {
   player: Pick<Player, "id" | "coreStats">;
   playerRating: PlayerRatingContractRow | null;
@@ -1188,6 +1218,7 @@ function buildAxisCards(input: {
     current?: AxisRankMap;
     previous?: AxisRankMap;
   } | null;
+  disciplineValues?: PlayerDetailDrawerData["disciplineValues"] | null;
 }): PlayerDrawerAxisCard[] {
   return [
     {
@@ -1199,6 +1230,7 @@ function buildAxisCards(input: {
       seasonPoints: input.playerRating?.ppPow ?? input.seasonPerformance?.pointsByArea.pow ?? null,
       seasonPointsRank: input.playerRating?.ppPowRank ?? input.axisRankContext?.current?.pow ?? null,
       previousSeasonPointsRank: input.axisRankContext?.previous?.pow ?? null,
+      allTimePoints: sumAxisAllTimePoints(input.disciplineValues, AXIS_DISCIPLINE_CATEGORIES.pow),
     },
     {
       id: "spe",
@@ -1209,6 +1241,7 @@ function buildAxisCards(input: {
       seasonPoints: input.playerRating?.ppSpe ?? input.seasonPerformance?.pointsByArea.spe ?? null,
       seasonPointsRank: input.playerRating?.ppSpeRank ?? input.axisRankContext?.current?.spe ?? null,
       previousSeasonPointsRank: input.axisRankContext?.previous?.spe ?? null,
+      allTimePoints: sumAxisAllTimePoints(input.disciplineValues, AXIS_DISCIPLINE_CATEGORIES.spe),
     },
     {
       id: "men",
@@ -1219,6 +1252,7 @@ function buildAxisCards(input: {
       seasonPoints: input.playerRating?.ppMen ?? input.seasonPerformance?.pointsByArea.men ?? null,
       seasonPointsRank: input.playerRating?.ppMenRank ?? input.axisRankContext?.current?.men ?? null,
       previousSeasonPointsRank: input.axisRankContext?.previous?.men ?? null,
+      allTimePoints: sumAxisAllTimePoints(input.disciplineValues, AXIS_DISCIPLINE_CATEGORIES.men),
     },
     {
       id: "soc",
@@ -1229,6 +1263,7 @@ function buildAxisCards(input: {
       seasonPoints: input.playerRating?.ppSoc ?? input.seasonPerformance?.pointsByArea.soc ?? null,
       seasonPointsRank: input.playerRating?.ppSocRank ?? input.axisRankContext?.current?.soc ?? null,
       previousSeasonPointsRank: input.axisRankContext?.previous?.soc ?? null,
+      allTimePoints: sumAxisAllTimePoints(input.disciplineValues, AXIS_DISCIPLINE_CATEGORIES.soc),
     },
   ];
 }
@@ -2211,6 +2246,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     input.gameState,
     input.gameState.disciplines,
     seasonDerivations.ledger,
+    rosterEntry ? activePlayerIds : null,
   );
   const axisRankContext = buildAxisRankContext({
     gameState: input.gameState,
@@ -2363,6 +2399,26 @@ export function buildPlayerDrawerDataFromGameState(input: {
   const recovery = playerTeamId ? calculateTeamRecovery(input.gameState, playerTeamId) : null;
   const injuryRiskBand = getInjuryRiskBand(availability.fatigue ?? player.fatigue ?? 0);
   const performancePenaltyPercent = getFatiguePerformancePenaltyPercent(availability.fatigue ?? player.fatigue ?? 0);
+  // Vorgezogen (statt inline im Return-Objekt), damit `buildAxisCards` die
+  // All-Time-PPs je Achse aus denselben Diszi-Werten summieren kann, die
+  // auch die Achsen-KPI-Karten/Disziplinen-Mini-Bars im Player-Profil
+  // speisen — keine zweite Datenquelle.
+  const disciplineValues =
+    attributeVisibility === "scouted" && !DEBUG_FORCE_PLAYER_VISIBILITY
+      ? buildScoutedDisciplineValuesFromPlayer({
+          gameState: input.gameState,
+          player,
+          scoutingLevel,
+          topN: 5,
+        })
+      : buildDisciplineValuesFromPlayer(
+          player,
+          input.gameState.disciplines,
+          seasonPerformance,
+          latestArchivedPerformance,
+          input.gameState,
+          disciplineGlobalRankMaps,
+        );
 
   return {
     playerId: player.id,
@@ -2558,26 +2614,12 @@ export function buildPlayerDrawerDataFromGameState(input: {
         seasonPerformance,
         coreAxisRankMaps,
         axisRankContext,
+        disciplineValues,
       }),
       attributeVisibility,
       { preserveCoreStats: !rosterEntry && attributeVisibility === "scouted" },
     ),
-    disciplineValues:
-      attributeVisibility === "scouted" && !DEBUG_FORCE_PLAYER_VISIBILITY
-        ? buildScoutedDisciplineValuesFromPlayer({
-            gameState: input.gameState,
-            player,
-            scoutingLevel,
-            topN: 5,
-          })
-        : buildDisciplineValuesFromPlayer(
-            player,
-            input.gameState.disciplines,
-            seasonPerformance,
-            latestArchivedPerformance,
-            input.gameState,
-            disciplineGlobalRankMaps,
-          ),
+    disciplineValues,
     progressionForecast,
     projectedClassPreview,
     seasonOrganicForecast,
@@ -2681,6 +2723,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
           player: catalogPlayer,
           playerRating,
           coreAxisRankMaps,
+          disciplineValues,
         })
       : [
           {
@@ -2692,6 +2735,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             seasonPoints: null,
             seasonPointsRank: null,
             previousSeasonPointsRank: null,
+            allTimePoints: null,
           },
           {
             id: "spe",
@@ -2702,6 +2746,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             seasonPoints: null,
             seasonPointsRank: null,
             previousSeasonPointsRank: null,
+            allTimePoints: null,
           },
           {
             id: "men",
@@ -2712,6 +2757,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             seasonPoints: null,
             seasonPointsRank: null,
             previousSeasonPointsRank: null,
+            allTimePoints: null,
           },
           {
             id: "soc",
@@ -2722,6 +2768,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             seasonPoints: null,
             seasonPointsRank: null,
             previousSeasonPointsRank: null,
+            allTimePoints: null,
           },
         ] satisfies PlayerDrawerAxisCard[];
   const historyRows: PlayerDrawerHistoryRow[] = [

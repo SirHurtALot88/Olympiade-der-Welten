@@ -2905,6 +2905,10 @@ export default function TransfermarktV2Client({
         onSortModeChange={(mode) => setSortMode(mode)}
         selectedClassAxes={selectedClassAxes}
         onToggleClassAxis={(axis) => setSelectedClassAxes((current) => toggleSelection(current, axis))}
+        selectedAxes={selectedAxes}
+        axisMinimums={axisMinimums}
+        onToggleAxis={(axis) => setSelectedAxes((current) => toggleSelection(current, axis))}
+        onAxisMinimumChange={(axis, value) => setAxisMinimums((current) => ({ ...current, [axis]: value }))}
         onResetFilters={resetMarketFilters}
         activeFilterCount={selectedClassNames.length + selectedRaceNames.length + selectedAxes.length + selectedClassAxes.length}
         candidates={renderedVisibleItems}

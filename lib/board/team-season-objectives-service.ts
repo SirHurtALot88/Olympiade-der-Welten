@@ -829,34 +829,6 @@ function getAllRoundAxisObjective(input: {
   };
 }
 
-export function getRosterObjectiveStatus(input: { current: number; playerMin: number; playerOpt: number }) {
-  const tolerance = 1;
-  const lowerBound = Math.max(input.playerMin, input.playerOpt - tolerance);
-  const upperBound = input.playerOpt + tolerance;
-
-  if (input.current < input.playerMin) return "failed" satisfies TeamSeasonObjectiveStatus;
-  if (input.current >= lowerBound && input.current <= upperBound) return "completed" satisfies TeamSeasonObjectiveStatus;
-  if (input.current > upperBound) return "at_risk" satisfies TeamSeasonObjectiveStatus;
-  return "open" satisfies TeamSeasonObjectiveStatus;
-}
-
-function getRosterTarget(row: TeamManagementSnapshotRow) {
-  const playerMin = row.playerMin ?? 7;
-  const target = row.playerOpt ?? row.playerMin ?? 10;
-  const current = row.rosterCount;
-  const status = getRosterObjectiveStatus({ current, playerMin, playerOpt: target });
-  return {
-    objectiveId: "roster-optimum",
-    category: "roster" as const,
-    label: "Kaderziel erreichen",
-    targetValue: target,
-    currentValue: current,
-    status,
-    boardConfidenceDelta: status === "failed" ? -0.8 : status === "completed" ? 0.2 : status === "at_risk" ? -0.1 : 0,
-    source: "team_identity_player_min_opt",
-  };
-}
-
 function getFacilityObjective(gameState: GameState, team: Team, profile: TeamStrategyProfile | null): ObjectiveDraft {
   const facilities = gameState.seasonState.teamFacilities?.[team.teamId]?.facilities ?? {};
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
@@ -1311,8 +1283,7 @@ function selectBoardObjectiveDrafts(input: {
   add(urgentEconomy);
 
   add(
-    pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "roster-optimum" && objective.status !== "completed") ??
-      pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "roster-form-color-cover") ??
+    pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "roster-form-color-cover") ??
       pickUrgentObjective(input.objectives, "roster"),
   );
 
@@ -1502,7 +1473,6 @@ function buildTeamObjectives(input: {
       },
       buildSalaryPressureObjective({ row, rowsByTeamId, seasonId: gameState.season.id }),
       transferObjective,
-      getRosterTarget(row),
       getFormColorObjective(gameState, team),
       getNextMatchdayTop10Objective(gameState, team),
       getMatchdayMedalObjective({ gameState, team, identity, profile }),
@@ -1639,23 +1609,11 @@ function calculateBoardConfidence(input: {
   };
 }
 
-function inferRosterSizeOnTarget(objectives: TeamSeasonObjectiveRecord[]) {
-  const rosterOptimum = objectives.find((objective) => objective.objectiveId === "roster-optimum");
-  if (rosterOptimum) {
-    return rosterOptimum.status === "completed";
-  }
-  return objectives.some(
-    (objective) => objective.category === "roster" && objective.objectiveId !== "roster-optimum",
-  );
-}
-
-function hasRosterObjectiveRisk(objectives: TeamSeasonObjectiveRecord[]) {
-  const rosterSizeOnTarget = inferRosterSizeOnTarget(objectives);
-  return objectives.some((objective) => {
-    if (objective.category !== "roster" || objective.status === "completed") return false;
-    if (rosterSizeOnTarget && objective.objectiveId !== "roster-optimum") return false;
-    return true;
-  });
+function hasRosterObjectiveRisk(_objectives: TeamSeasonObjectiveRecord[]) {
+  // The dedicated "roster-optimum" board objective was removed, so roster size is
+  // treated as on target and there is no remaining objective that signals
+  // roster-size risk. This keeps buildAiBias's roster-urgency logic unaffected.
+  return false;
 }
 
 function buildAiBias(input: {

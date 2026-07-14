@@ -70,7 +70,7 @@ describe("player profile ui contract", () => {
     expect(drawerText).toContain("player-drawer-training-controls");
     expect(drawerText).toContain("PlayerDrawerHistoryTable");
     expect(drawerText).toContain("PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP");
-    expect(drawerText).toContain("isSeasonDisciplineKey");
+    expect(drawerText).toContain("player-drawer-axis-discipline-list");
     expect(drawerText).toContain("formatValue(row.pow, 1)");
     expect(drawerText).toContain("PlayerDrawerTransferHistoryTable");
     expect(drawerText).toContain("PlayerAttributeProgressChart");

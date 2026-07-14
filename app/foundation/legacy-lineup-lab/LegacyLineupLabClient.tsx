@@ -8199,33 +8199,39 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
                     const disciplineColor = getFormCardColorForCategory(discipline?.category ?? null);
                     return (
-                      <section key={`v2-draft-tactics-${disciplineSide}`}>
-                        <div>
+                      <section
+                        key={`v2-draft-tactics-${disciplineSide}`}
+                        className={`legacy-lineup-v2-tactics-side is-${disciplineSide} ${disciplineColorClassBySide[disciplineSide]}`.trim()}
+                      >
+                        <div className="legacy-lineup-v2-tactics-side-head">
                           <span>{disciplineSide.toUpperCase()}</span>
                           <strong>{discipline?.displayName ?? "—"}</strong>
                         </div>
                         {renderInlineFormCardSelectors(disciplineSide, disciplineColor)}
-                        <select
-                          className="input"
-                          value={modifiers[disciplineSide].teamPowerId ?? ""}
-                          onChange={(event) => updateModifier(disciplineSide, "teamPowerId", event.target.value)}
-                          disabled={isReadOnly || context?.teamPowerSource?.selectionStatus === "missing_source"}
-                          aria-label={`${disciplineSide.toUpperCase()} Team-Power`}
-                          title={getTeamPowerSelectTitle(disciplineSide)}
-                        >
-                          <option value="">{getTeamPowerEmptyOptionLabel(disciplineSide)}</option>
-                          {getTeamPowerOptionsForSide(disciplineSide).map((power) => (
-                            <option key={power.id} value={power.id}>
-                              {formatTeamPowerOptionLabel(
-                                power,
-                                discipline?.category ?? null,
-                                getTeamPowerConditionalInfo(power, discipline?.disciplineId).active,
-                                discipline?.disciplineId ?? null,
-                                context?.disciplineWeights ?? null,
-                              )}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="legacy-lineup-form-select-field">
+                          <span>Team-Power</span>
+                          <select
+                            className="input"
+                            value={modifiers[disciplineSide].teamPowerId ?? ""}
+                            onChange={(event) => updateModifier(disciplineSide, "teamPowerId", event.target.value)}
+                            disabled={isReadOnly || context?.teamPowerSource?.selectionStatus === "missing_source"}
+                            aria-label={`${disciplineSide.toUpperCase()} Team-Power`}
+                            title={getTeamPowerSelectTitle(disciplineSide)}
+                          >
+                            <option value="">{getTeamPowerEmptyOptionLabel(disciplineSide)}</option>
+                            {getTeamPowerOptionsForSide(disciplineSide).map((power) => (
+                              <option key={power.id} value={power.id}>
+                                {formatTeamPowerOptionLabel(
+                                  power,
+                                  discipline?.category ?? null,
+                                  getTeamPowerConditionalInfo(power, discipline?.disciplineId).active,
+                                  discipline?.disciplineId ?? null,
+                                  context?.disciplineWeights ?? null,
+                                )}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                       </section>
                     );
                   })}

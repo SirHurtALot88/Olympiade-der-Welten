@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { GameState, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import type {
   FoundationPrizePreviewItem,
   FoundationPrizePreviewResponse,
@@ -143,11 +144,31 @@ export function usePrizeV2PanelModel({
     );
   }, [gameState.players, selectedPrizePreviewRow?.salaryTotal, selectedRoster, selectedTeam]);
 
+  // Kredit-Kern (Fog of War): nur für das ausgewählte/aktive Manager-Team,
+  // nie für ein fremdes Team, siehe `use-credits-view-model.ts`. Anders als
+  // die öffentliche Preisgeld-Tabelle (`displayPrizePreviewRows`, alle Teams)
+  // ist dieser 5-Seasons-Forecast schon heute exklusiv "Eigenes Team" —
+  // die Kreditrate darf hier also mit in GuV/Cash einfließen, ohne fremde
+  // Restschuld öffentlich zu machen.
+  const selectedTeamLoanInstallment = useMemo(
+    () => (selectedTeam ? getTeamAnnualLoanInstallment(gameState, selectedTeam.teamId) : 0),
+    [gameState, selectedTeam],
+  );
+  const selectedTeamOutstandingDebt = useMemo(
+    () => (selectedTeam ? getTeamOutstandingDebt(gameState, selectedTeam.teamId) : 0),
+    [gameState, selectedTeam],
+  );
+
   const prizeForecastRows = useMemo(() => {
     const startCash = selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null;
     const salaryTotal = prizeForecastSalaryTotal;
     const rankRow = prizeForecastRankRow;
     const currentFactor = prizePreviewFeed?.summary.currentFactor ?? null;
+    // Vereinfachende Annahme (analog zum bereits flach projizierten
+    // `salaryTotal` oben): die aktuelle Kreditrate wird für alle 5
+    // Forecast-Seasons konstant angenommen, auch wenn ein Kredit vorher
+    // ausläuft. Keine Simulation künftiger Kreditaufnahmen/-tilgungen.
+    const loanInstallment = selectedTeamLoanInstallment;
 
     if (startCash == null || salaryTotal == null || !rankRow) {
       return [];
@@ -176,7 +197,11 @@ export function usePrizeV2PanelModel({
     let runningCash = startCash;
     return paddedRows.map((row) => {
       const projectedSalaryTotal = roundViewNumber(salaryTotal, 1);
-      const guv = row.prizeMoney == null ? null : roundViewNumber(row.prizeMoney - projectedSalaryTotal, 1);
+      const projectedLoanInstallment = loanInstallment > 0 ? roundViewNumber(loanInstallment, 1) : null;
+      const guv =
+        row.prizeMoney == null
+          ? null
+          : roundViewNumber(row.prizeMoney - projectedSalaryTotal - (projectedLoanInstallment ?? 0), 1);
       const cashAfter = guv == null ? null : roundViewNumber(runningCash + guv, 1);
       if (cashAfter != null) {
         runningCash = cashAfter;
@@ -185,6 +210,7 @@ export function usePrizeV2PanelModel({
       return {
         ...row,
         salaryTotal: projectedSalaryTotal,
+        loanInstallment: projectedLoanInstallment,
         guv,
         cashAfter,
       };
@@ -195,6 +221,7 @@ export function usePrizeV2PanelModel({
     prizePreviewFeed?.summary.currentFactor,
     selectedPrizePreviewRow?.currentCash,
     selectedTeam?.cash,
+    selectedTeamLoanInstallment,
   ]);
 
   const sortedPrizePreviewRows = useMemo(
@@ -343,8 +370,10 @@ export function usePrizeV2PanelModel({
       salaryTotal: selectedPrizePreviewRow.salaryTotal ?? null,
       payoutIfTenBetter: selectedPrizePreviewRow.payoutIfTenBetter ?? null,
       payoutIfTenWorse: selectedPrizePreviewRow.payoutIfTenWorse ?? null,
+      loanInstallment: selectedTeamLoanInstallment > 0 ? selectedTeamLoanInstallment : null,
+      outstandingDebt: selectedTeamOutstandingDebt > 0 ? selectedTeamOutstandingDebt : null,
     };
-  }, [selectedPrizePreviewRow]);
+  }, [selectedPrizePreviewRow, selectedTeamLoanInstallment, selectedTeamOutstandingDebt]);
 
   const prizeV2LeaderRow = prizeV2Rows[0] ?? null;
 

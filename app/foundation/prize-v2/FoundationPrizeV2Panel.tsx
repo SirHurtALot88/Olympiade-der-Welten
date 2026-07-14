@@ -33,6 +33,7 @@ export interface FoundationPrizeV2PanelProps {
     factor: number | null;
     prizeMoney: number | null;
     salaryTotal: number | null;
+    loanInstallment: number | null;
     guv: number | null;
     cashAfter: number | null;
   }>;
@@ -142,6 +143,10 @@ export default function FoundationPrizeV2Panel(props: FoundationPrizeV2PanelProp
     ColumnVisibilityManager,
     SortableHeader,
   } = props;
+  // Kreditrate-Spalte nur einblenden, wenn das ausgewählte Team überhaupt
+  // einen aktiven Kredit hat — sonst keine leere "0"-Spalte (siehe
+  // `getTeamAnnualLoanInstallment`, own-team-only).
+  const prizeForecastHasLoan = prizeForecastRows.some((row) => row.loanInstallment != null && row.loanInstallment > 0);
   return (
             <div className="prize-v2-shell">
               <section className="prize-v2-hero">
@@ -291,6 +296,12 @@ export default function FoundationPrizeV2Panel(props: FoundationPrizeV2PanelProp
                         <span>Simulierter Platz</span>
                         <strong>{prizeForecastRankRow ? `${prizeForecastRank}.` : "—"}</strong>
                       </article>
+                      {prizeV2SelectedTeamSummary?.loanInstallment != null ? (
+                        <article>
+                          <span>Kreditrate</span>
+                          <strong>{formatLocalePoints(prizeV2SelectedTeamSummary.loanInstallment, 1)}</strong>
+                        </article>
+                      ) : null}
                     </div>
                     {prizeForecastRows.length === 0 ? (
                       <p className="muted">Forecast wartet auf Preisgeld-Preview, Team-Cash und Gehaltssumme.</p>
@@ -303,6 +314,7 @@ export default function FoundationPrizeV2Panel(props: FoundationPrizeV2PanelProp
                               <th>Faktor</th>
                               <th>Preisgeld</th>
                               <th>Gehalt</th>
+                              {prizeForecastHasLoan ? <th>Kreditrate</th> : null}
                               <th>GuV</th>
                               <th>Cash</th>
                             </tr>
@@ -314,6 +326,9 @@ export default function FoundationPrizeV2Panel(props: FoundationPrizeV2PanelProp
                                 <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
                                 <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
                                 <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                                {prizeForecastHasLoan ? (
+                                  <td>{row.loanInstallment != null ? formatLocalePoints(row.loanInstallment, 1) : "—"}</td>
+                                ) : null}
                                 <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>{formatSignedDisplayMoney(row.guv)}</td>
                                 <td>{row.cashAfter != null ? formatLocalePoints(row.cashAfter, 1) : "—"}</td>
                               </tr>
