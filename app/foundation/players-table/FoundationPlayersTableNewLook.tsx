@@ -420,12 +420,15 @@ function renderMetricPercentileChip(value: number | null | undefined, pool: numb
  * OVR-Spalte (Produkt-Feedback: absoluter Rang ist griffiger als "Top X%").
  * `null`, wenn kein valider Rang/Pool vorliegt (keine Erfindung).
  *
- * Ton ist bewusst FEST (`.nl-ptable-ovr-rank`, Amber/Gold), NICHT mehr die
+ * Ton ist bewusst FEST (`.nl-ptable-ovr-rank`), NICHT mehr die
  * wertabhängige `getPoolHeatTone`-Ton-Klasse: OVR ist die Kopf-Kennzahl der
  * Tabelle und bekommt EINEN eigenen, von PPs/MVS abgesetzten Akzent statt
  * einer dritten überlagerten Farb-Ebene (Value-Heat-Zellenhintergrund +
  * Sortier-Highlight + ton-gefärbter Chip sahen zusammen wie zufälliger
- * Regenbogen aus). Siehe die OVR-`<td>`-Zelle unten und die Scratch-CSS
+ * Regenbogen aus). Seit #111 nutzt dieser feste Akzent `--nl-accent`
+ * (dasselbe Blau-Vokabular wie PPs, nur schwächer) statt Amber/Gold — der
+ * Chip-Text ist ein fester heller `--nl-ink`-Vordergrund statt Ton-auf-Ton,
+ * damit er lesbar bleibt. Siehe die OVR-`<td>`-Zelle unten und die CSS
  * `.nl-ptable-ovr-cell` / `.nl-ptable-ovr-rank`.
  */
 function renderMetricRankChip(value: number | null | undefined, pool: number[]) {

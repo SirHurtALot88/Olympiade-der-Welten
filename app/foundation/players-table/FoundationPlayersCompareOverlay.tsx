@@ -3,9 +3,12 @@
 /**
  * Vergleichs-Overlay (additiv, "Neuer Look") — 2 bis 4 Spieler aus dem
  * Verzeichnis nebeneinander: Achsen-Radar (POW/SPE/MEN/SOC, überlagert, je
- * Spieler eine Farbe) + kompakte Kennzahlen-Tabelle (OVR/PPs/MVS/MW/
- * Gehalt), bester Wert je Zeile hervorgehoben. Rein clientseitig aus den
- * bereits geladenen Verzeichnis-`rows` — kein Fetch, keine neue
+ * Spieler eine Farbe) + kompakte Kennzahlen-Tabelle in Gruppen (Kern-
+ * Kennzahlen OVR/CA/PPs/MVS/MW/Gehalt, Achsen-Werte POW/SPE/MEN/SOC als
+ * Zahlen, Saison-Einsätze sowie ein eigener "All-Time/Karriere"-Block mit
+ * Karriere-PPs/-Einsätzen/-Saisons, Restlaufzeit und bester Disziplin —
+ * #112), bester Wert je (hervorhebbarer) Zeile markiert. Rein clientseitig
+ * aus den bereits geladenen Verzeichnis-`rows` — kein Fetch, keine neue
  * Datenquelle. Auswahl passiert per Checkbox je Tabellenzeile in
  * `FoundationPlayersTableNewLook.tsx` (`comparePlayerIds`, max. 4).
  *
@@ -20,7 +23,7 @@
  * Styles: `app/globals.css` unter `.is-new-look .nl-pcompare-*`.
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 
 import {
   getPlayerDisplayMarketValue,
@@ -29,6 +32,7 @@ import {
 } from "@/app/foundation/foundation-page-client-exports";
 import { formatNlMoney, formatNlNumber, nlToneClass, NL_AXIS_LABELS, type NlAxisKey, type NlTone } from "@/components/foundation/new-look";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 const RADAR_AXIS_ORDER: NlAxisKey[] = ["pow", "spe", "men", "soc"];
@@ -48,27 +52,96 @@ function radarPoint(axisIndex: number, ratio: number) {
 /** Bis zu 4 unterscheidbare Serienfarben — bestehende Ton-Tokens statt neu erfundener Hex-Werte. */
 const COMPARE_SERIES_TONES: NlTone[] = ["accent", "good", "warn", "risk"];
 
-type CompareStatKey = "ovr" | "pps" | "mvs" | "mw" | "salary";
+type CompareStatKey =
+  | "ovr"
+  | "ca"
+  | "pps"
+  | "mvs"
+  | "mw"
+  | "salary"
+  | "pow"
+  | "spe"
+  | "men"
+  | "soc"
+  | "appearances"
+  | "allTimePps"
+  | "careerAppearances"
+  | "careerSeasons"
+  | "contractLength"
+  | "bestDiscipline";
 
-const COMPARE_STAT_ROWS: ReadonlyArray<{
+type CompareStatRowDef = {
   key: CompareStatKey;
   label: string;
-  digits: number;
+  digits?: number;
   money?: boolean;
   /** Gehalt: niedriger ist besser (gleiche Konvention wie der Gehalts-Delta-Chip in der Tabelle). */
   lowerIsBetter?: boolean;
-}> = [
-  { key: "ovr", label: "OVR", digits: 1 },
-  { key: "pps", label: "PPs", digits: 1 },
-  { key: "mvs", label: "MVS", digits: 1 },
-  { key: "mw", label: "MW", digits: 2, money: true },
-  { key: "salary", label: "Gehalt", digits: 2, money: true, lowerIsBetter: true },
+  /** Keine "bester Wert"-Hervorhebung — Restlaufzeit (länger ist nicht per se besser) und Text-Zeilen. */
+  noHighlight?: boolean;
+  /** Text-Zeile (z. B. "Beste Disziplin") — kein Zahlenwert, keine Formatierung/Bestwert-Logik. */
+  text?: boolean;
+};
+
+type CompareGroup = {
+  id: string;
+  /** Optionale Zwischenüberschrift, z. B. um die All-Time-/Karriere-Zeilen als eigenen Block zu lesen. */
+  heading?: string;
+  rows: readonly CompareStatRowDef[];
+};
+
+/**
+ * Vergleichs-Zeilen in Gruppen (#112 — mehr Stats inkl. All-Time-Perspektive,
+ * Produkt-Feedback "vielleicht noch paar Stats mehr die interessant sein
+ * könnten auch aus All-Time Sicht"). Alle Werte kommen aus bereits auf
+ * `FoundationPlayerScopeRow` vorhandenen Feldern — keine neue Datenquelle.
+ */
+const COMPARE_GROUPS: readonly CompareGroup[] = [
+  {
+    id: "core",
+    rows: [
+      { key: "ovr", label: "OVR", digits: 1 },
+      { key: "ca", label: "CA", digits: 1 },
+      { key: "pps", label: "PPs", digits: 1 },
+      { key: "mvs", label: "MVS", digits: 1 },
+      { key: "mw", label: "MW", digits: 2, money: true },
+      { key: "salary", label: "Gehalt", digits: 2, money: true, lowerIsBetter: true },
+    ],
+  },
+  {
+    id: "axes",
+    heading: "Achsen",
+    rows: [
+      { key: "pow", label: "POW", digits: 0 },
+      { key: "spe", label: "SPE", digits: 0 },
+      { key: "men", label: "MEN", digits: 0 },
+      { key: "soc", label: "SOC", digits: 0 },
+    ],
+  },
+  {
+    id: "season",
+    heading: "Saison",
+    rows: [{ key: "appearances", label: "Einsätze", digits: 0 }],
+  },
+  {
+    id: "career",
+    heading: "All-Time / Karriere",
+    rows: [
+      { key: "allTimePps", label: "All-Time-PPs", digits: 1 },
+      { key: "careerAppearances", label: "Karriere-Einsätze", digits: 0 },
+      { key: "careerSeasons", label: "Karriere-Saisons", digits: 0 },
+      { key: "contractLength", label: "Restlaufzeit", digits: 0, noHighlight: true },
+      { key: "bestDiscipline", label: "Beste Disziplin", noHighlight: true, text: true },
+    ],
+  },
 ];
 
 function getCompareStatValue(row: FoundationPlayerScopeRow, key: CompareStatKey): number | null {
   switch (key) {
     case "ovr":
       return row.playerOvr;
+    case "ca":
+      return computeCurrentAbilityScore(row.player.coreStats);
     case "pps":
       return row.playerPps;
     case "mvs":
@@ -77,6 +150,34 @@ function getCompareStatValue(row: FoundationPlayerScopeRow, key: CompareStatKey)
       return getPlayerDisplayMarketValue(row.player);
     case "salary":
       return row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player);
+    case "pow":
+      return row.player.coreStats.pow ?? null;
+    case "spe":
+      return row.player.coreStats.spe ?? null;
+    case "men":
+      return row.player.coreStats.men ?? null;
+    case "soc":
+      return row.player.coreStats.soc ?? null;
+    case "appearances":
+      return row.appearances;
+    case "allTimePps":
+      return row.careerLeagueStats?.totalPps ?? null;
+    case "careerAppearances":
+      return row.careerLeagueStats?.appearances ?? null;
+    case "careerSeasons":
+      return row.careerLeagueStats?.seasonsPlayed ?? null;
+    case "contractLength":
+      return row.roster?.contractLength ?? null;
+    default:
+      return null;
+  }
+}
+
+/** Text-Zeilen (aktuell nur "Beste Disziplin") — getrennt von `getCompareStatValue`, da kein Zahlenwert/Bestwert. */
+function getCompareTextValue(row: FoundationPlayerScopeRow, key: CompareStatKey): string | null {
+  switch (key) {
+    case "bestDiscipline":
+      return row.bestDiscipline ?? null;
     default:
       return null;
   }
@@ -144,14 +245,19 @@ export default function FoundationPlayersCompareOverlay({
 
   const bestByStat = useMemo(() => {
     const result = new Map<CompareStatKey, number>();
-    for (const statRow of COMPARE_STAT_ROWS) {
-      const values = compareRows
-        .map((row) => getCompareStatValue(row, statRow.key))
-        .filter((value): value is number => value != null && Number.isFinite(value));
-      if (values.length === 0) {
-        continue;
+    for (const group of COMPARE_GROUPS) {
+      for (const statRow of group.rows) {
+        if (statRow.text || statRow.noHighlight) {
+          continue;
+        }
+        const values = compareRows
+          .map((row) => getCompareStatValue(row, statRow.key))
+          .filter((value): value is number => value != null && Number.isFinite(value));
+        if (values.length === 0) {
+          continue;
+        }
+        result.set(statRow.key, statRow.lowerIsBetter ? Math.min(...values) : Math.max(...values));
       }
-      result.set(statRow.key, statRow.lowerIsBetter ? Math.min(...values) : Math.max(...values));
     }
     return result;
   }, [compareRows]);
@@ -314,29 +420,45 @@ export default function FoundationPlayersCompareOverlay({
                 </tr>
               </thead>
               <tbody>
-                {COMPARE_STAT_ROWS.map((statRow) => {
-                  const best = bestByStat.get(statRow.key);
-                  return (
-                    <tr key={statRow.key}>
-                      <th scope="row">{statRow.label}</th>
-                      {compareRows.map((row) => {
-                        const value = getCompareStatValue(row, statRow.key);
-                        const isBest = value != null && Number.isFinite(value) && best != null && value === best;
-                        const formatted =
-                          value == null || !Number.isFinite(value)
-                            ? "—"
-                            : statRow.money
-                              ? formatNlMoney(value)
-                              : formatNlNumber(value, statRow.digits);
-                        return (
-                          <td key={row.player.id} className={isBest ? "is-best" : undefined}>
-                            {formatted}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                {COMPARE_GROUPS.map((group) => (
+                  <Fragment key={group.id}>
+                    {group.heading ? (
+                      <tr className="nl-pcompare-group-heading">
+                        <th scope="colgroup" colSpan={compareRows.length + 1}>
+                          {group.heading}
+                        </th>
+                      </tr>
+                    ) : null}
+                    {group.rows.map((statRow) => {
+                      const best = statRow.text || statRow.noHighlight ? undefined : bestByStat.get(statRow.key);
+                      return (
+                        <tr key={statRow.key}>
+                          <th scope="row">{statRow.label}</th>
+                          {compareRows.map((row) => {
+                            if (statRow.text) {
+                              const textValue = getCompareTextValue(row, statRow.key);
+                              return <td key={row.player.id}>{textValue ?? "—"}</td>;
+                            }
+                            const value = getCompareStatValue(row, statRow.key);
+                            const isBest =
+                              !statRow.noHighlight && value != null && Number.isFinite(value) && best != null && value === best;
+                            const formatted =
+                              value == null || !Number.isFinite(value)
+                                ? "—"
+                                : statRow.money
+                                  ? formatNlMoney(value)
+                                  : formatNlNumber(value, statRow.digits ?? 0);
+                            return (
+                              <td key={row.player.id} className={isBest ? "is-best" : undefined}>
+                                {formatted}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
               </tbody>
             </table>
           </div>
