@@ -56288,6 +56288,77 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: var(--nl-r-sm);
 }
 
+/* --- Achsen-Spaltenkopf: kein einzelner Sortier-Button (die Spalte bündelt
+   POW/SPE/MEN/SOC + optional eine Disziplin, siehe `renderAxisBars`), statt
+   dessen ein Sortier-Hinweis + Disziplinen-Umschalter/-Picker. Braucht mehr
+   vertikalen Raum als die sonst einzeiligen Köpfe, daher `white-space: normal`
+   nur für diese eine Kopfzelle. --------------------------------------------- */
+.is-new-look .nl-players-th:has(.nl-players-axes-th) {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.is-new-look .nl-players-axes-th {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.is-new-look .nl-players-axes-th-hint {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-players-disc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.is-new-look .nl-players-disc-toggle b {
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.is-new-look .nl-players-disc-toggle:hover,
+.is-new-look .nl-players-disc-toggle.is-open {
+  color: var(--nl-accent);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-players-disc-toggle:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-players-disc-select {
+  width: 100%;
+  max-width: 168px;
+  padding: 3px 6px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 /* --- Zeilen ---------------------------------------------------------- */
 .is-new-look .nl-players-row {
   cursor: pointer;
@@ -56440,6 +56511,56 @@ button.is-new-look .nl-thist-season-pill,
   grid-template-columns: 30px minmax(48px, 1fr) 28px;
   align-items: center;
   gap: var(--nl-s2);
+  width: 100%;
+  margin: 0;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--nl-r-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+/* Achsenwert anklicken sortiert die Tabelle danach (`onToggleSort`) — nur die
+   POW/SPE/MEN/SOC-Achsen sind echte `<button>`s, die zusätzliche
+   Disziplin-Zeile (`.nl-players-axis-discipline`) ist rein informativ. */
+button.nl-players-axis {
+  cursor: pointer;
+}
+
+button.nl-players-axis:hover {
+  background: var(--nl-panel-2);
+}
+
+button.nl-players-axis:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-players-axis.is-active-sort {
+  background: var(--nl-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--nl-accent);
+}
+
+.is-new-look .nl-players-axis.is-active-sort .nl-players-axis-label,
+.is-new-look .nl-players-axis.is-active-sort .nl-players-axis-value {
+  color: var(--nl-accent);
+}
+
+/* Disziplin-Zeile (Disziplinen-Picker im Achsen-Header aktiv): eigener,
+   breiterer Label-Bereich statt der 30px-Achsenspur (Disziplinnamen sind
+   länger als "POW"/"SPE"/"MEN"/"SOC"), optisch abgesetzt über der Achsenliste. */
+.is-new-look .nl-players-axis-discipline {
+  grid-template-columns: minmax(52px, auto) minmax(30px, 1fr) 26px;
+  margin-top: 2px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--nl-line-2);
+}
+
+.is-new-look .nl-players-axis-discipline .nl-players-axis-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .is-new-look .nl-players-axis-label {

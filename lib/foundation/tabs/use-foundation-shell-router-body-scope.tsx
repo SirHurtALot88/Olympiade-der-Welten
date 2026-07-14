@@ -1754,11 +1754,20 @@ export function useFoundationShellRouterBodyScope({
         };
       }
 
+      // Achsen (POW/SPE/MEN/SOC) und Einzeldisziplinen in der Spielerliste
+      // beantworten "wer ist der Beste?" — dort ist beim ersten Klick
+      // absteigend (höchster Wert zuerst) die natürliche Erwartung, sonst
+      // muss man immer zweimal klicken. Alle anderen Spalten bleiben beim
+      // bisherigen "asc zuerst"-Verhalten.
+      const wantsDescendingFirst =
+        tableId === "playersTable" &&
+        (columnKey.startsWith("discipline:") || ["pow", "spe", "men", "soc"].includes(columnKey));
+
       return {
         ...current,
         [tableId]: {
           key: columnKey,
-          direction: "asc",
+          direction: wantsDescendingFirst ? "desc" : "asc",
         },
       };
     });
