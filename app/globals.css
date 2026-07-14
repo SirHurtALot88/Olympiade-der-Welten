@@ -59597,6 +59597,17 @@ button.nl-players-axis:focus-visible {
   border: 1px solid color-mix(in srgb, var(--nl-soc) 45%, transparent);
 }
 
+.is-new-look .nl-training-class-ranking-focus-bonus {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--nl-good);
+  padding: 1px 6px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-good) 45%, transparent);
+  white-space: nowrap;
+}
+
 /* Bar sitzt in einer eigenen Reihe unter Rank+Label+Value, damit die
    Zeile bei schmalen Karten nicht zu voll wird (grid-template-areas s.o.). */
 .is-new-look .nl-training-class-ranking-rank {

@@ -1,7 +1,8 @@
-import type { Player, PlayerGeneratorAttributeName, PlayerPotentialRecord, AdminBalancingConfigInput } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributeName, PlayerPotentialRecord, AdminBalancingConfigInput } from "@/lib/data/olyDataTypes";
 import type { TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
 import { buildAffinityAlignedTopGains, buildAffinityForecastFocus } from "@/lib/training/affinity-forecast-focus";
 import type { OrganicProgressionAttributeBreakdown } from "@/lib/training/organic-season-progression";
+import { resolveTeamTrainingFocusAxis } from "@/lib/training/organic-season-progression";
 import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
 import { getAttributeHeadroom, getHeadroomLabel } from "@/lib/scouting/player-attribute-ceiling-service";
 
@@ -59,6 +60,13 @@ type TrainingForecastRowInput = {
   trainingDemand: TrainingModeDemandView | null;
   potentialRecord?: PlayerPotentialRecord | null;
   adminBalancingConfig?: AdminBalancingConfigInput | null;
+  /**
+   * Full game state — used only to resolve the team's current training focus axis via
+   * `resolveTeamTrainingFocusAxis`. Optional so existing callers/tests that don't need the
+   * route bonus surfaced can omit it (resolves to `trainingFocusAxis: null`, i.e. no bonus,
+   * same as today's behavior).
+   */
+  gameState?: GameState;
 };
 
 function mapAttributeForecast(
@@ -113,6 +121,7 @@ export function buildTrainingPlayerRowView(
     signatureAttributes: row.organicProgression.attributeAffinity.signatureAttributes,
     weakAttribute: row.organicProgression.attributeAffinity.weakAttribute,
   });
+  const trainingFocusAxis = row.gameState ? resolveTeamTrainingFocusAxis(row.gameState, row.player.id) : null;
 
   return {
     entryId: row.entry.id,
@@ -185,5 +194,6 @@ export function buildTrainingPlayerRowView(
     },
     forecast: row.forecast,
     adminBalancingConfig: row.adminBalancingConfig ?? null,
+    trainingFocusAxis,
   };
 }

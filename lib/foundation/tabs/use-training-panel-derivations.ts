@@ -213,7 +213,7 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
 
   const trainingPlayerRowViews = useMemo(() => {
     return filteredTrainingPlayerForecastRows.map((row) => {
-      const view = buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS);
+      const view = buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS);
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
         return view;
@@ -225,7 +225,7 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
         recommendedTrainingMatchesCurrent: plan.selectedMode === row.mode,
       };
     });
-  }, [filteredTrainingPlayerForecastRows, trainingLoadPlanByPlayerId]);
+  }, [filteredTrainingPlayerForecastRows, input.gameState, trainingLoadPlanByPlayerId]);
 
   const trainingV2ModeOptions = useMemo(
     () =>
