@@ -3,10 +3,17 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
+import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
+  computeTeamExpectation,
+  getExpectationRankObjective,
+  getSignatureAxisWinObjective,
+  getSportTarget,
   getTeamObjectiveAiBias,
+  getTransferSpendCeilingObjective,
+  getUpsetAvoidanceObjective,
   refreshTeamObjectiveState,
 } from "@/lib/board/team-season-objectives-service";
 
@@ -160,6 +167,80 @@ function createPlayerPerformance(
   };
 }
 
+function createRow(teamId: string, partial?: Partial<TeamManagementSnapshotRow>): TeamManagementSnapshotRow {
+  return {
+    team: createTeam({ teamId, shortCode: teamId, identityId: teamId }),
+    teamId,
+    teamCode: teamId,
+    teamName: teamId,
+    generalManagerName: null,
+    generalManagerTitle: null,
+    generalManagerInfluencePct: null,
+    rank: partial?.rank ?? null,
+    points: partial?.points ?? null,
+    rosterCount: partial?.rosterCount ?? 10,
+    salaryTotal: partial?.salaryTotal ?? 40,
+    avgContractLength: null,
+    marketValueTotal: partial?.marketValueTotal ?? 100,
+    cash: partial?.cash ?? 50,
+    cashFc: null,
+    budget: null,
+    formAvg: null,
+    financeForm: null,
+    needScore: null,
+    avgMarketValue: null,
+    avgPps: null,
+    avgOvr: null,
+    ppsTotal: partial?.ppsTotal ?? 60,
+    ppsPow: partial?.ppsPow ?? 15,
+    ppsSpe: partial?.ppsSpe ?? 15,
+    ppsMen: partial?.ppsMen ?? 15,
+    ppsSoc: partial?.ppsSoc ?? 15,
+    playerMin: null,
+    playerOpt: null,
+    rosterTarget: null,
+    transferCount: 0,
+    transferBuyTotal: 0,
+    transferSellTotal: 0,
+    transferNet: partial?.transferNet ?? 0,
+    transfersSeasonValue: null,
+    cashDelta: null,
+    startplatz: null,
+    rankDiff: null,
+    sponsorBasis: null,
+    sponsorRank: null,
+    sponsorTotal: null,
+    sponsorSeason: null,
+    guv: null,
+    cashTotal: null,
+    historicalPow: null,
+    historicalSpe: null,
+    historicalMen: null,
+    historicalSoc: null,
+    historicalGoldCount: 0,
+    historicalSilverCount: 0,
+    historicalBronzeCount: 0,
+    historicalTop5Count: 0,
+    historicalTop10Count: 0,
+    historicalAvgRank: null,
+    historicalAvgPoints: null,
+    historicalPointsTotal: null,
+    historicalPointsBySeason: [],
+    ...partial,
+  } as TeamManagementSnapshotRow;
+}
+
+// Direct getSportTarget coverage helper: builds realistic snapshot rows from a full gameState
+// (exactly what selection used to feed getSportTarget) and calls getSportTarget for one team.
+function sportTargetForTeam(gameState: GameState, teamId: string) {
+  const rows = buildTeamSeasonOverviewRows({ gameState });
+  const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
+  const row = rowsByTeamId.get(teamId)!;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId)!;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  return getSportTarget({ team, identity, profile: null, row, rowsByTeamId });
+}
+
 function createGameState(input?: {
   teams?: Team[];
   identities?: TeamIdentity[];
@@ -293,11 +374,18 @@ describe("team season objectives service", () => {
     });
 
     const overview = buildTeamObjectiveOverview(gameState);
-    const mmSport = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.objectiveId === "sport-rank-3");
+    // Slot-1 sport goal is now expectation-rank for every team; the fixed sport-rank-X target is
+    // no longer selected (it lives on only as an internal fallback + direct unit coverage below).
+    const mmSport = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.category === "sport");
+    const mmFixedRank = overview.objectives.find((objective) => objective.teamId === "M-M" && objective.objectiveId.startsWith("sport-rank-"));
     const ccTransfer = overview.objectives.find((objective) => objective.teamId === "C-C" && objective.objectiveId === "transfer-profit");
 
-    expect(mmSport?.label).toContain("Top 3");
-    expect(mmSport?.status).toBe("completed");
+    expect(mmSport?.objectiveId).toBe("expectation-rank");
+    expect(mmFixedRank).toBeUndefined();
+    // getSportTarget's M-M "Top 3" identity logic (still used as fallback) stays covered directly:
+    const mmTarget = sportTargetForTeam(gameState, "M-M");
+    expect(mmTarget.label).toContain("Top 3");
+    expect(mmTarget.rank).toBe(3);
     // Season 3 → C-C transfer target is 15 (seasonal scaling)
     expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
@@ -332,11 +420,15 @@ describe("team season objectives service", () => {
     });
 
     const overview = buildTeamObjectiveOverview(gameState);
+    // Slot-1 sport goal is now expectation-rank; the fixed sport-rank-X target is no longer selected.
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
+    expect(overview.objectives.some((objective) => objective.teamId === "V-W" && objective.objectiveId.startsWith("sport-rank-"))).toBe(false);
 
-    expect(sportGoal?.objectiveId).toBe("sport-rank-27");
-    expect(sportGoal?.label).toBe("Survival: nicht Bottom 5");
-    expect(sportGoal?.targetValue).toBe(27);
+    // getSportTarget's fixed-target logic (still used as fallback) stays covered directly:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBe(27);
+    expect(target.label).toBe("Survival: nicht Bottom 5");
   });
 
   it("does not fall back to top-10 goals when a weak team has no standing rank yet", () => {
@@ -359,9 +451,12 @@ describe("team season objectives service", () => {
 
     const overview = buildTeamObjectiveOverview(gameState);
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
 
-    expect(sportGoal?.objectiveId).toBe("sport-rank-24");
-    expect(sportGoal?.label).toBe("Kader stabilisieren");
+    // getSportTarget's fallback logic still avoids fantasy top-10 jumps for a weak, unranked team:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBe(24);
+    expect(target.label).toBe("Kader stabilisieren");
   });
 
   it("keeps weak lower-mid teams on rebuild style sport goals instead of fantasy jumps", () => {
@@ -430,9 +525,12 @@ describe("team season objectives service", () => {
 
     const overview = buildTeamObjectiveOverview(gameState);
     const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+    expect(sportGoal?.objectiveId).toBe("expectation-rank");
 
-    expect((sportGoal?.targetValue ?? 0)).toBeGreaterThanOrEqual(24);
-    expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(sportGoal?.label);
+    // getSportTarget's fallback logic still keeps weak lower-mid teams on rebuild-style goals:
+    const target = sportTargetForTeam(gameState, "V-W");
+    expect(target.rank).toBeGreaterThanOrEqual(24);
+    expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(target.label);
   });
 
   it("updates objective status and board pressure when cash is negative", () => {
@@ -1023,5 +1121,310 @@ describe("human board pressure + C-C eco rules", () => {
 
     expect(objective?.targetValue).toBe(20);
     expect(objective?.penaltyCash).toBe(3);
+  });
+});
+
+describe("board goal targets: expectation, upset-avoidance, transfer ceiling, signature axis wins", () => {
+  it("computeTeamExpectation ranks a team by ppsTotal (tiebreak marketValueTotal) among all rows", () => {
+    const rowsByTeamId = new Map([
+      ["strong", createRow("strong", { ppsTotal: 90, marketValueTotal: 200 })],
+      ["mid", createRow("mid", { ppsTotal: 60, marketValueTotal: 100 })],
+      ["weak", createRow("weak", { ppsTotal: 30, marketValueTotal: 50 })],
+    ]);
+
+    const strong = computeTeamExpectation({ row: rowsByTeamId.get("strong")!, rowsByTeamId, identity: null });
+    const mid = computeTeamExpectation({ row: rowsByTeamId.get("mid")!, rowsByTeamId, identity: null });
+    const weak = computeTeamExpectation({ row: rowsByTeamId.get("weak")!, rowsByTeamId, identity: null });
+
+    expect(strong.expectedRank).toBe(1);
+    expect(mid.expectedRank).toBe(2);
+    expect(weak.expectedRank).toBe(3);
+    expect(strong.strengthPct).toBe(1);
+    expect(weak.strengthPct).toBe(0);
+    expect(strong.teamCount).toBe(3);
+  });
+
+  it("computeTeamExpectation breaks ppsTotal ties using marketValueTotal", () => {
+    const rowsByTeamId = new Map([
+      ["a", createRow("a", { ppsTotal: 50, marketValueTotal: 120 })],
+      ["b", createRow("b", { ppsTotal: 50, marketValueTotal: 90 })],
+    ]);
+
+    const a = computeTeamExpectation({ row: rowsByTeamId.get("a")!, rowsByTeamId, identity: null });
+    const b = computeTeamExpectation({ row: rowsByTeamId.get("b")!, rowsByTeamId, identity: null });
+
+    expect(a.expectedRank).toBe(1);
+    expect(b.expectedRank).toBe(2);
+  });
+
+  it("computeTeamExpectation normalizes ambition into ambitionMod within -1..1", () => {
+    const rowsByTeamId = new Map([["only", createRow("only")]]);
+    const row = rowsByTeamId.get("only")!;
+
+    const highAmbition = computeTeamExpectation({ row, rowsByTeamId, identity: createIdentity("only", { ambition: 10 }) });
+    const lowAmbition = computeTeamExpectation({ row, rowsByTeamId, identity: createIdentity("only", { ambition: 1 }) });
+    const neutral = computeTeamExpectation({ row, rowsByTeamId, identity: null });
+
+    expect(highAmbition.ambitionMod).toBeCloseTo(1, 5);
+    expect(lowAmbition.ambitionMod).toBeCloseTo(-0.8, 5);
+    expect(neutral.ambitionMod).toBe(0);
+  });
+
+  it("getExpectationRankObjective sets a tighter target and bigger reward for ambitious teams beating expectation", () => {
+    const rowsByTeamId = new Map([
+      ["hero", createRow("hero", { ppsTotal: 40, marketValueTotal: 60, rank: 3 })],
+      ["r2", createRow("r2", { ppsTotal: 70, marketValueTotal: 140 })],
+      ["r3", createRow("r3", { ppsTotal: 65, marketValueTotal: 130 })],
+      ["r4", createRow("r4", { ppsTotal: 55, marketValueTotal: 110 })],
+      ["r5", createRow("r5", { ppsTotal: 50, marketValueTotal: 100 })],
+    ]);
+    const heroRow = rowsByTeamId.get("hero")!;
+    const heroTeam = createTeam({ teamId: "hero", shortCode: "hero" });
+
+    // Expectation model: hero has the weakest squad (ppsTotal 40) so expectedRank = 5 (last).
+    // Actual current rank is 3, well ahead of expectation.
+    const ambitious = getExpectationRankObjective({
+      team: heroTeam,
+      identity: createIdentity("hero", { ambition: 10 }),
+      profile: null,
+      row: heroRow,
+      rowsByTeamId,
+    });
+    const modest = getExpectationRankObjective({
+      team: heroTeam,
+      identity: createIdentity("hero", { ambition: 1 }),
+      profile: null,
+      row: heroRow,
+      rowsByTeamId,
+    });
+
+    // Higher ambition -> larger overachieveGap -> tighter (smaller) target rank number.
+    expect(Number(ambitious.targetValue?.toString().replace("Top ", ""))).toBeLessThanOrEqual(
+      Number(modest.targetValue?.toString().replace("Top ", "")),
+    );
+    // Beating expectation (rank 3 vs expected 5) should be a positive, graduated confidence swing,
+    // even though the tighter ambitious target (Top 1) isn't fully met yet (at_risk, not failed).
+    expect(ambitious.boardConfidenceDelta ?? 0).toBeGreaterThan(0);
+    expect(ambitious.rewardCash ?? 0).toBeGreaterThan(0);
+    expect(ambitious.status).toBe("at_risk");
+    // The modest team's looser target (Top 4) is already met by the same actual rank.
+    expect(modest.status).toBe("completed");
+  });
+
+  it("getExpectationRankObjective applies a negative confidence swing when missing expectation badly", () => {
+    const rowsByTeamId = new Map([
+      ["hero", createRow("hero", { ppsTotal: 90, marketValueTotal: 200, rank: 20 })],
+      ["r2", createRow("r2", { ppsTotal: 40, marketValueTotal: 80 })],
+      ["r3", createRow("r3", { ppsTotal: 35, marketValueTotal: 70 })],
+    ]);
+    const heroRow = rowsByTeamId.get("hero")!;
+    const objective = getExpectationRankObjective({
+      team: createTeam({ teamId: "hero", shortCode: "hero" }),
+      identity: createIdentity("hero", { ambition: 5 }),
+      profile: null,
+      row: heroRow,
+      rowsByTeamId,
+    });
+
+    // Strongest squad (expectedRank 1) but actual rank 20 -> big negative rankDelta.
+    expect(objective.boardConfidenceDelta ?? 0).toBeLessThan(0);
+    expect(objective.penaltyCash ?? 0).toBeGreaterThan(0);
+    expect(objective.status).toBe("failed");
+  });
+
+  it("getUpsetAvoidanceObjective returns null for weak, low-ambition teams", () => {
+    const rowsByTeamId = new Map([
+      ["weak", createRow("weak", { ppsTotal: 20, marketValueTotal: 40 })],
+      ["strong", createRow("strong", { ppsTotal: 90, marketValueTotal: 200 })],
+    ]);
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "weak", shortCode: "weak" })],
+      identities: [createIdentity("weak", { ambition: 3 })],
+    });
+
+    const objective = getUpsetAvoidanceObjective({
+      team: createTeam({ teamId: "weak", shortCode: "weak" }),
+      identity: createIdentity("weak", { ambition: 3 }),
+      profile: null,
+      row: rowsByTeamId.get("weak")!,
+      rowsByTeamId,
+      gameState,
+    });
+
+    expect(objective).toBeNull();
+  });
+
+  it("getUpsetAvoidanceObjective counts matchdays where a weaker-expectation team outranked us", () => {
+    const teams = [
+      createTeam({ teamId: "top", shortCode: "top" }),
+      createTeam({ teamId: "under", shortCode: "under" }),
+      createTeam({ teamId: "filler", shortCode: "filler" }),
+    ];
+    const rowsByTeamId = new Map([
+      ["top", createRow("top", { ppsTotal: 90, marketValueTotal: 200 })],
+      ["under", createRow("under", { ppsTotal: 20, marketValueTotal: 40 })],
+      ["filler", createRow("filler", { ppsTotal: 55, marketValueTotal: 100 })],
+    ]);
+    const gameState = createGameState({ teams });
+    gameState.season.matchdayIds = ["md-1", "md-2", "md-3", "md-4"];
+    gameState.seasonState.matchdayResults = [
+      createMatchdayResult("result-1", "md-1"),
+      createMatchdayResult("result-2", "md-2"),
+    ];
+    // Matchday 1: "under" (weaker expectation) outscores "top" -> an upset.
+    // Matchday 2: "top" outscores everyone -> no upset.
+    gameState.seasonState.disciplineResults = [
+      createDisciplineResult("dr-1", "result-1", "under", 300),
+      createDisciplineResult("dr-2", "result-1", "top", 200),
+      createDisciplineResult("dr-3", "result-1", "filler", 150),
+      createDisciplineResult("dr-4", "result-2", "top", 300),
+      createDisciplineResult("dr-5", "result-2", "under", 100),
+      createDisciplineResult("dr-6", "result-2", "filler", 90),
+    ];
+
+    const objective = getUpsetAvoidanceObjective({
+      team: teams[0],
+      identity: createIdentity("top", { ambition: 8 }),
+      profile: null,
+      row: rowsByTeamId.get("top")!,
+      rowsByTeamId,
+      gameState,
+    });
+
+    expect(objective).not.toBeNull();
+    expect(objective?.currentValue).toBe(1);
+    expect(objective?.objectiveId).toBe("sport-upset-avoidance");
+  });
+
+  it("getUpsetAvoidanceObjective fails when upsets exceed the cap", () => {
+    const teams = [createTeam({ teamId: "top", shortCode: "top" }), createTeam({ teamId: "under", shortCode: "under" })];
+    const rowsByTeamId = new Map([
+      ["top", createRow("top", { ppsTotal: 95, marketValueTotal: 220 })],
+      ["under", createRow("under", { ppsTotal: 15, marketValueTotal: 30 })],
+    ]);
+    const gameState = createGameState({ teams });
+    gameState.season.matchdayIds = ["md-1", "md-2", "md-3", "md-4", "md-5"];
+    gameState.seasonState.matchdayResults = [
+      createMatchdayResult("result-1", "md-1"),
+      createMatchdayResult("result-2", "md-2"),
+      createMatchdayResult("result-3", "md-3"),
+      createMatchdayResult("result-4", "md-4"),
+    ];
+    // "under" outscores "top" on every matchday -> 4 upsets, well above any cap.
+    gameState.seasonState.disciplineResults = [
+      createDisciplineResult("dr-1", "result-1", "under", 300),
+      createDisciplineResult("dr-2", "result-1", "top", 100),
+      createDisciplineResult("dr-3", "result-2", "under", 300),
+      createDisciplineResult("dr-4", "result-2", "top", 100),
+      createDisciplineResult("dr-5", "result-3", "under", 300),
+      createDisciplineResult("dr-6", "result-3", "top", 100),
+      createDisciplineResult("dr-7", "result-4", "under", 300),
+      createDisciplineResult("dr-8", "result-4", "top", 100),
+    ];
+
+    const objective = getUpsetAvoidanceObjective({
+      team: teams[0],
+      identity: createIdentity("top", { ambition: 9 }),
+      profile: null,
+      row: rowsByTeamId.get("top")!,
+      rowsByTeamId,
+      gameState,
+    });
+
+    expect(objective?.status).toBe("failed");
+    expect(objective?.currentValue).toBe(4);
+    expect(objective?.penaltyCash ?? 0).toBeGreaterThan(0);
+  });
+
+  it("getTransferSpendCeilingObjective is null for teams without a cash-conscious board", () => {
+    const objective = getTransferSpendCeilingObjective({
+      team: createTeam({ teamId: "spender", shortCode: "spender", budget: 100 }),
+      identity: createIdentity("spender", { finances: 3 }),
+      profile: null,
+      row: createRow("spender", { transferNet: -50 }),
+    });
+
+    expect(objective).toBeNull();
+  });
+
+  it("getTransferSpendCeilingObjective flags a completed status under the cap and failed over it", () => {
+    const team = createTeam({ teamId: "disciplined", shortCode: "disciplined", budget: 100 });
+    const identity = createIdentity("disciplined", { finances: 8 });
+
+    const underCap = getTransferSpendCeilingObjective({
+      team,
+      identity,
+      profile: null,
+      row: createRow("disciplined", { transferNet: -5 }), // net spend 5, cap = max(4, 100*0.2)=20
+    });
+    const overCap = getTransferSpendCeilingObjective({
+      team,
+      identity,
+      profile: null,
+      row: createRow("disciplined", { transferNet: -60 }), // net spend 60, well above cap 20
+    });
+
+    expect(underCap?.status).toBe("completed");
+    expect(underCap?.currentValue).toBe(5);
+    expect(overCap?.status).toBe("failed");
+    expect(overCap?.penaltyCash ?? 0).toBeGreaterThan(0);
+  });
+
+  it("getSignatureAxisWinObjective counts matchdays where the team ranked #1 in its signature axis", () => {
+    const team = createTeam({ teamId: "P-P", shortCode: "P-P", name: "Power Pushers" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("P-P", { pow: 10, spe: 2, men: 2, soc: 2, ambition: 8 })],
+      disciplines: [
+        { id: "d-pow", name: "Power Disc", category: "power", weight: 1 },
+        { id: "d-soc", name: "Social Disc", category: "social", weight: 1 },
+      ],
+    });
+    gameState.season.matchdayIds = ["md-1", "md-2"];
+    gameState.seasonState.matchdayResults = [createMatchdayResult("result-1", "md-1"), createMatchdayResult("result-2", "md-2")];
+    gameState.seasonState.disciplineResults = [
+      // Matchday 1: P-P wins the power (signature) axis.
+      { id: "dr-1", matchdayResultId: "result-1", teamId: "P-P", disciplineId: "d-pow", disciplineSide: "d1", rank: 1, baseScore: 100, totalScore: 100, readinessStatus: "ready", warnings: [], createdAt: "2026-06-13T10:00:00.000Z" },
+      { id: "dr-2", matchdayResultId: "result-1", teamId: "OTHER", disciplineId: "d-pow", disciplineSide: "d1", rank: 2, baseScore: 50, totalScore: 50, readinessStatus: "ready", warnings: [], createdAt: "2026-06-13T10:00:00.000Z" },
+      // Matchday 1: social discipline should NOT count toward the power signature axis.
+      { id: "dr-3", matchdayResultId: "result-1", teamId: "OTHER", disciplineId: "d-soc", disciplineSide: "d1", rank: 1, baseScore: 500, totalScore: 500, readinessStatus: "ready", warnings: [], createdAt: "2026-06-13T10:00:00.000Z" },
+      // Matchday 2: P-P loses the power axis.
+      { id: "dr-4", matchdayResultId: "result-2", teamId: "P-P", disciplineId: "d-pow", disciplineSide: "d1", rank: 2, baseScore: 40, totalScore: 40, readinessStatus: "ready", warnings: [], createdAt: "2026-06-13T10:00:00.000Z" },
+      { id: "dr-5", matchdayResultId: "result-2", teamId: "OTHER", disciplineId: "d-pow", disciplineSide: "d1", rank: 1, baseScore: 90, totalScore: 90, readinessStatus: "ready", warnings: [], createdAt: "2026-06-13T10:00:00.000Z" },
+    ];
+
+    const objective = getSignatureAxisWinObjective({ team, identity: gameState.teamIdentities[0], profile: null, gameState });
+
+    expect(objective).not.toBeNull();
+    expect(objective?.currentValue).toBe(1);
+    expect(objective?.objectiveId).toBe("sport-signature-wins");
+    expect(objective?.label).toContain("POW-Achse");
+  });
+
+  it("getSignatureAxisWinObjective returns null for teams without a clear axis bias or ambition", () => {
+    const team = createTeam({ teamId: "flat", shortCode: "flat" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("flat", { pow: 5, spe: 5, men: 5, soc: 5, ambition: 4 })],
+    });
+
+    const objective = getSignatureAxisWinObjective({
+      team,
+      identity: createIdentity("flat", { pow: 5, spe: 5, men: 5, soc: 5, ambition: 4 }),
+      profile: null,
+      gameState,
+    });
+
+    expect(objective).toBeNull();
+  });
+
+  it("wires the new objectives into buildTeamObjectiveOverview as selectable candidates without breaking the 4-slot cap", () => {
+    const team = createTeam({ teamId: "M-M" });
+    const gameState = createGameState({ teams: [team], identities: [createIdentity("M-M")] });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const coreObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor");
+
+    expect(coreObjectives).toHaveLength(4);
   });
 });

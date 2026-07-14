@@ -392,7 +392,238 @@ function getPlayerPeakSummary(gameState: GameState, teamId: string) {
   };
 }
 
-function getSportTarget(input: {
+/**
+ * Where a team's squad strength says it "should" finish in the league, independent of the
+ * board's ambition. Used as the baseline that #6 (expectation-rank) and #2a (upset-avoidance)
+ * measure against.
+ */
+export function computeTeamExpectation(input: {
+  row: TeamManagementSnapshotRow;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  identity: TeamIdentity | null;
+}): { expectedRank: number; strengthPct: number; ambitionMod: number; teamCount: number } {
+  const teamCount = input.rowsByTeamId.size;
+  const ranked = [...input.rowsByTeamId.values()].sort((left, right) => {
+    const ppsDiff = (right.ppsTotal ?? 0) - (left.ppsTotal ?? 0);
+    if (ppsDiff !== 0) return ppsDiff;
+    return (right.marketValueTotal ?? 0) - (left.marketValueTotal ?? 0);
+  });
+  const index = ranked.findIndex((row) => row.teamId === input.row.teamId);
+  const expectedRank = index >= 0 ? index + 1 : Math.max(1, teamCount);
+  const strengthPct = clamp(teamCount > 1 ? (teamCount - expectedRank) / (teamCount - 1) : 1, 0, 1);
+  // Normalize identity ambition (1..10, default 5) onto roughly -1..1.
+  const ambitionMod = clamp(((input.identity?.ambition ?? 5) - 5) / 5, -1, 1);
+  return { expectedRank, strengthPct, ambitionMod, teamCount: Math.max(1, teamCount) };
+}
+
+/**
+ * Per-matchday, per-team totals for the current season, scoped to a single discipline
+ * category (i.e. a single AxisKey). Mirrors getTeamMatchdayMedalSummary's scan/group
+ * pattern but sums only disciplines whose category maps to the requested axis.
+ */
+function getAxisScoresByMatchday(input: {
+  gameState: GameState;
+  axis: AxisKey;
+}): Map<string, Map<string, number>> {
+  const disciplineCategoryById = new Map(
+    input.gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const),
+  );
+  const axisByCategory: Record<string, AxisKey> = {
+    power: "pow",
+    speed: "spe",
+    mental: "men",
+    social: "soc",
+  };
+  const resultIds = getCurrentSeasonMatchdayResultIds(input.gameState);
+  const scoresByResultId = new Map<string, Map<string, number>>();
+  for (const result of input.gameState.seasonState.disciplineResults ?? []) {
+    if (!resultIds.has(result.matchdayResultId)) continue;
+    const category = disciplineCategoryById.get(result.disciplineId);
+    if (!category || axisByCategory[category] !== input.axis) continue;
+    const teamScores = scoresByResultId.get(result.matchdayResultId) ?? new Map<string, number>();
+    teamScores.set(result.teamId, (teamScores.get(result.teamId) ?? 0) + (result.totalScore ?? 0));
+    scoresByResultId.set(result.matchdayResultId, teamScores);
+  }
+  return scoresByResultId;
+}
+
+// #6 — reward/punish teams for beating (or missing) the finish their squad strength predicts,
+// scaled by how ambitious the board is.
+export function getExpectationRankObjective(input: {
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  row: TeamManagementSnapshotRow;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+}): ObjectiveDraft {
+  const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
+  const ambition = input.identity?.ambition ?? 5;
+  const overachieveGap = Math.max(1, Math.round(1 + ambition / 3));
+  const targetRank = clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
+  const currentRank = input.row.rank ?? null;
+  const status = statusForRank(currentRank, targetRank);
+
+  // Graduated confidence swing: beating expectation by many ranks earns a bigger boost than
+  // a strong team barely clearing a low bar. rankDelta > 0 means "finished better than expected".
+  const rankDelta = currentRank == null ? 0 : expectation.expectedRank - currentRank;
+  const boardConfidenceDelta = clamp(roundValue(0.1 + rankDelta * 0.12, 2), -3, 4);
+  const rewardCash = currentRank != null && rankDelta > 0 ? clamp(Math.round(2 + rankDelta * 0.8), 0, 12) : undefined;
+  const penaltyCash = currentRank != null && rankDelta < 0 ? clamp(Math.round(2 + Math.abs(rankDelta) * 0.6), 0, 10) : undefined;
+
+  return {
+    objectiveId: "expectation-rank",
+    category: "sport",
+    label: `Übertreffe die Erwartung (Top ${targetRank})`,
+    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${overachieveGap} Plätze besser abschneiden.`,
+    actionHint: "Transfers und Aufstellung so priorisieren, dass die Erwartung der Kaderstärke übertroffen wird.",
+    targetValue: `Top ${targetRank}`,
+    currentValue: currentRank ?? "offen",
+    status,
+    rewardCash,
+    penaltyCash,
+    boardConfidenceDelta,
+    source: "team_expectation_rank_model",
+  };
+}
+
+// #2a — teams strong enough to matter shouldn't shed too many "upset" losses (matchdays where a
+// weaker-expectation team outranks them).
+export function getUpsetAvoidanceObjective(input: {
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  row: TeamManagementSnapshotRow;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  gameState: GameState;
+}): ObjectiveDraft | null {
+  const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
+  const ambition = input.identity?.ambition ?? 5;
+  if (expectation.strengthPct < 0.4 && ambition < 6) return null;
+
+  const expectedRankByTeamId = new Map<string, number>();
+  for (const row of input.rowsByTeamId.values()) {
+    expectedRankByTeamId.set(
+      row.teamId,
+      computeTeamExpectation({ row, rowsByTeamId: input.rowsByTeamId, identity: null }).expectedRank,
+    );
+  }
+  const ownExpectedRank = expectedRankByTeamId.get(input.team.teamId) ?? expectation.expectedRank;
+
+  const resultIds = getCurrentSeasonMatchdayResultIds(input.gameState);
+  const scoresByResultId = new Map<string, Map<string, number>>();
+  for (const result of input.gameState.seasonState.disciplineResults ?? []) {
+    if (!resultIds.has(result.matchdayResultId)) continue;
+    const teamScores = scoresByResultId.get(result.matchdayResultId) ?? new Map<string, number>();
+    teamScores.set(result.teamId, (teamScores.get(result.teamId) ?? 0) + (result.totalScore ?? 0));
+    scoresByResultId.set(result.matchdayResultId, teamScores);
+  }
+
+  let upsetCount = 0;
+  for (const teamScores of scoresByResultId.values()) {
+    const ranked = [...teamScores.entries()].sort((left, right) => right[1] - left[1]);
+    const ownIndex = ranked.findIndex(([teamId]) => teamId === input.team.teamId);
+    if (ownIndex < 0) continue;
+    for (let i = 0; i < ownIndex; i++) {
+      const [otherTeamId] = ranked[i];
+      const otherExpectedRank = expectedRankByTeamId.get(otherTeamId) ?? Number.POSITIVE_INFINITY;
+      // An "upset": a team our model expected to finish worse than us (higher expectedRank
+      // number) still outscored us this matchday.
+      if (otherExpectedRank > ownExpectedRank) upsetCount += 1;
+    }
+  }
+
+  const cap = Math.max(1, Math.round(3 - expectation.strengthPct * 2));
+  const status = statusForMax(upsetCount, cap);
+
+  return {
+    objectiveId: "sport-upset-avoidance",
+    category: "sport",
+    label: `Verliere höchstens ${cap}x gegen schwächere Teams`,
+    detail: `Bisher ${upsetCount} Aufholjagden schwächer erwarteter Teams zugelassen.`,
+    actionHint: "Aufstellung und Form gegen vermeintlich schwächere Gegner konstant hoch halten.",
+    targetValue: `<= ${cap}`,
+    currentValue: upsetCount,
+    status,
+    penaltyCash: status === "failed" ? clamp(Math.round((upsetCount - cap) * 1.5), 1, 8) : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.3 : status === "at_risk" ? -0.15 : status === "failed" ? -0.6 : 0,
+    source: "matchday_team_score_rank_upset_model",
+  };
+}
+
+// #2b — a soft ceiling on net transfer spend for teams whose board cares about cash discipline.
+export function getTransferSpendCeilingObjective(input: {
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  row: TeamManagementSnapshotRow;
+}): ObjectiveDraft | null {
+  const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
+  if (cashPriority < 7) return null;
+
+  const netSpend = Math.max(0, -(input.row.transferNet ?? 0));
+  // Cap scales with the team's declared budget/finances discipline: financially disciplined
+  // (high cashPriority) boards tolerate less net spend before flagging it as a concern.
+  const cap = roundValue(Math.max(4, input.team.budget * (cashPriority >= 9 ? 0.12 : 0.2)), 1);
+  const status = statusForMax(netSpend, cap);
+
+  return {
+    objectiveId: "finance-transfer-ceiling",
+    category: "finance",
+    label: `Netto-Transferausgaben unter ${formatObjectiveMoney(cap)}`,
+    detail: `Formel: max(4, Budget * ${cashPriority >= 9 ? "12%" : "20%"}). Aktuell ${formatObjectiveMoney(netSpend)} Netto-Ausgaben.`,
+    actionHint: "Transferausgaben im Rahmen halten: Verkäufe priorisieren, teure Neuzugänge nur bei klarem Mehrwert.",
+    targetValue: `<= ${formatObjectiveMoney(cap)}`,
+    currentValue: netSpend,
+    status,
+    penaltyCash: status === "failed" ? 3 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.25 : status === "at_risk" ? -0.1 : status === "failed" ? -0.4 : 0,
+    source: "team_transfer_net_spend_ceiling",
+  };
+}
+
+// #7 — reward repeatedly finishing #1 on a matchday within the team's own signature axis.
+export function getSignatureAxisWinObjective(input: {
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  gameState: GameState;
+}): ObjectiveDraft | null {
+  const axis = getPrimaryAxis(input);
+  const bias = getAxisBias({ axis, identity: input.identity, profile: input.profile });
+  const ambition = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  if (bias < 6 && ambition < 6) return null;
+
+  const scoresByResultId = getAxisScoresByMatchday({ gameState: input.gameState, axis });
+  let signatureWins = 0;
+  for (const teamScores of scoresByResultId.values()) {
+    const ranked = [...teamScores.entries()].sort((left, right) => right[1] - left[1]);
+    if (ranked[0]?.[0] === input.team.teamId) signatureWins += 1;
+  }
+
+  const remaining = getRemainingMatchdays(input.gameState);
+  const played = getCurrentSeasonMatchdayResults(input.gameState).length;
+  const total = input.gameState.season.matchdayIds?.length ?? 0;
+  const target = Math.max(1, 4 + (ambition >= 8 || bias >= 9 ? 2 : ambition >= 7 || bias >= 8 ? 1 : 0));
+  const status = statusForSeasonCount({ current: signatureWins, target, remaining, played, total });
+  const meta = AXIS_OBJECTIVE_META[axis];
+
+  return {
+    objectiveId: "sport-signature-wins",
+    category: "sport",
+    label: `Gewinne ${target} Spieltage über deine ${meta.label}-Achse`,
+    detail: `Bisher ${signatureWins}/${target} Spieltagssiege in der ${meta.fullLabel}-Wertung.`,
+    actionHint: `${meta.label}-Spezialisten und passendes Training priorisieren, um Spieltage in dieser Achse zu dominieren.`,
+    targetValue: target,
+    currentValue: signatureWins,
+    status,
+    rewardCash: status === "completed" ? 6 : undefined,
+    penaltyCash: status === "failed" ? 2 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.5 : status === "failed" ? -0.4 : status === "at_risk" ? -0.15 : 0,
+    source: "matchday_axis_score_rank",
+  };
+}
+
+export function getSportTarget(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
@@ -1032,7 +1263,15 @@ function selectBoardObjectiveDrafts(input: {
     if (picked.length < 4) picked.push(objective);
   };
 
-  add(pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-rank-")));
+  // Slot 1 (primary sport goal): the expectation-rank objective — "beat the finish your squad
+  // strength predicts" — replaces the fixed sport-rank-X target for every team. sport-rank-X
+  // remains only as an immediate fallback (expectation-rank currently always returns non-null,
+  // so in practice it wins slot 1).
+  const expectationRankPicked = pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "expectation-rank");
+  add(
+    expectationRankPicked ??
+      pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-rank-")),
+  );
 
   const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
   const urgentEconomy =
@@ -1063,8 +1302,11 @@ function selectBoardObjectiveDrafts(input: {
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-matchday-medals") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top50-season") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "player-top5-discipline-star") ??
+      pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-signature-wins" && objective.status !== "open") ??
+      pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-upset-avoidance" && objective.status !== "open") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("rivalry-")) ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId.startsWith("sport-axis-")) ??
+      pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "finance-transfer-ceiling" && objective.status !== "open") ??
       pickFirstObjective(input.objectives, (objective) => objective.objectiveId === "sport-next-matchday-top10") ??
       pickUrgentObjective(input.objectives, "morale") ??
       pickUrgentObjective(input.objectives, "facility") ??
@@ -1072,6 +1314,9 @@ function selectBoardObjectiveDrafts(input: {
   );
 
   for (const objective of input.objectives) {
+    // Once expectation-rank holds the sport slot, skip the redundant fixed sport-rank-X target
+    // from the general fill loop — both are sport-category rank objectives.
+    if (expectationRankPicked && objective.objectiveId.startsWith("sport-rank-")) continue;
     add(objective);
   }
 
@@ -1211,6 +1456,10 @@ function buildTeamObjectives(input: {
       getPreferredAxisObjective({ team, identity, profile, row }),
       getAxisRankObjective({ team, identity, profile, rowsByTeamId }),
       getAllRoundAxisObjective({ team, identity, profile, rowsByTeamId }),
+      getExpectationRankObjective({ team, identity, profile, row, rowsByTeamId }),
+      getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
+      getTransferSpendCeilingObjective({ team, identity, profile, row }),
+      getSignatureAxisWinObjective({ team, identity, profile, gameState }),
       {
         objectiveId: "finance-cash-positive",
         category: "finance",
