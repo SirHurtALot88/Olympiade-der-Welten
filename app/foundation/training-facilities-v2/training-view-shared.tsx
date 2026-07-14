@@ -30,6 +30,8 @@ import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { Player, PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 import { estimateClassTrainingGains } from "@/lib/training/class-training-gain-estimate";
+import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 
 import type {
   TrainingClassOption,
@@ -48,6 +50,13 @@ export function formatSignedPercent(value: number | null | undefined) {
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${formatVeloNumber(value, 0)}%`;
 }
+
+const TRAINING_FOCUS_AXIS_LABEL: Record<"pow" | "spe" | "men" | "soc", string> = {
+  pow: "Power",
+  spe: "Speed",
+  men: "Mental",
+  soc: "Social",
+};
 
 export function getDevelopmentTone(row: TrainingPlayerRowView) {
   if (row.organicForecast.netSetpoints < 0 || row.forecast.regressionRisk === "high") {
@@ -201,6 +210,14 @@ export type TrainingClassGainEstimate = {
   isCurrent: boolean;
   /** 1-basierte Position in der vollständigen Gain-Rangliste (auch wenn außerhalb der Top-N gezeigt). */
   rank: number;
+  /** Development-Route dieser Klasse (POW/SPE/MEN/SOC/BALANCED/RECOVERY), siehe `classNameToDevelopmentRoute`. */
+  developmentRoute: PlayerDevelopmentRouteSuggestion;
+  /**
+   * True wenn diese Klasse den Trainingsfokus-Route-Bonus (×1.08) tatsächlich erhalten hat, d.h. ihre
+   * Development-Route-Achse deckt sich mit dem aktuellen Team-Trainingsfokus (`trainingFocusAxis`).
+   * Immer false wenn kein Fokus gesetzt ist.
+   */
+  hasFocusRouteBonus: boolean;
 };
 
 /**
@@ -227,6 +244,7 @@ export function buildTrainingClassGainRanking(
   const ceilingStateByAttribute = Object.fromEntries(
     row.attributeForecast.map((entry) => [entry.attributeKey, entry.ceilingState ?? "open"]),
   );
+  const trainingFocusAxis = options?.trainingFocusAxis ?? row.trainingFocusAxis ?? null;
 
   // `row.player` is the same underlying `Player` record threaded through by
   // `buildOrganicSeasonProgression`/`buildTrainingPlayerRowView` — it is only
@@ -239,17 +257,21 @@ export function buildTrainingClassGainRanking(
     trainingSetpoints: budget,
     ceilingStateByAttribute,
     adminBalancingConfig: row.adminBalancingConfig,
-    trainingFocusAxis: options?.trainingFocusAxis ?? null,
+    trainingFocusAxis,
   });
-  const gainByClassName = new Map(gains.map((entry) => [entry.className, entry.estimatedGain]));
+  const gainByClassName = new Map(gains.map((entry) => [entry.className, entry]));
 
   const estimates = PROGRESSION_CLASS_ORDER.map((className) => {
     const label = trainingClassOptions.find((option) => option.value === className)?.label ?? className;
+    const gain = gainByClassName.get(className);
+    const developmentRoute = gain?.developmentRoute ?? "BALANCED";
     return {
       className,
       label,
-      estimatedGain: gainByClassName.get(className) ?? 0,
+      estimatedGain: gain?.estimatedGain ?? 0,
       isCurrent: className === currentClass,
+      developmentRoute,
+      hasFocusRouteBonus: getDevelopmentRouteBonusMultiplier(developmentRoute, trainingFocusAxis) > 1,
     };
   });
 
@@ -330,6 +352,17 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       label: "Weitere Boni (Rolle/Fokus)",
       value: formatSignedPercent(otherBonusPct),
       detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschlüsselt.",
+    });
+  }
+
+  if (row.trainingFocusAxis) {
+    const axisLabel = TRAINING_FOCUS_AXIS_LABEL[row.trainingFocusAxis];
+    steps.push({
+      key: "route-focus",
+      operator: "add",
+      label: "Trainingsfokus-Route-Bonus",
+      value: "+8%",
+      detail: `Team-Trainingsfokus aktuell: ${axisLabel}. Klassen auf dieser Achse (siehe "Beste Klassen"-Rangliste oben) erhalten +8% auf ihren geschätzten SP-Zugewinn.`,
     });
   }
 

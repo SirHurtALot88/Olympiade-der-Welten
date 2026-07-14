@@ -319,7 +319,7 @@ export function useFoundationCrossTabTraining(input: {
       return [];
     }
     return filteredTrainingPlayerForecastRows.map((row) => {
-      const view = buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS);
+      const view = buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS);
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
         return { ...view, trainingIntensityLocked, trainingIntensityLockWarning };
@@ -335,6 +335,7 @@ export function useFoundationCrossTabTraining(input: {
     });
   }, [
     filteredTrainingPlayerForecastRows,
+    input.gameState,
     shouldBuildTrainingCompactDerivations,
     trainingLoadPlanByPlayerId,
     trainingIntensityLocked,
@@ -348,12 +349,12 @@ export function useFoundationCrossTabTraining(input: {
     const row = trainingPlayerForecastRows.find((entry) => entry.player.id === input.playerProfileData?.playerId);
     return row
       ? {
-          ...buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS),
+          ...buildTrainingPlayerRowView({ ...row, gameState: input.gameState }, TRAINING_ATTRIBUTE_LABELS),
           trainingIntensityLocked,
           trainingIntensityLockWarning,
         }
       : null;
-  }, [input.playerProfileData, trainingPlayerForecastRows, trainingIntensityLocked, trainingIntensityLockWarning]);
+  }, [input.playerProfileData, input.gameState, trainingPlayerForecastRows, trainingIntensityLocked, trainingIntensityLockWarning]);
 
   const trainingFacilityRows = useMemo(() => {
     if (!shouldBuildTrainingFacilitiesDerivations) {

@@ -202,7 +202,7 @@ export function classNameToDevelopmentRoute(className: ProgressionClassName): Pl
   return "BALANCED";
 }
 
-function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
+export function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
   const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
   if (!rosterEntry) return null;
   const focus = gameState.seasonState.aiManagerTrainingSettings?.[rosterEntry.teamId]?.trainingFocus;

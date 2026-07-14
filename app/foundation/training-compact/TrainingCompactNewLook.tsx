@@ -468,12 +468,19 @@ function NlTrainingClassRanking({
             onClick={() => onSelectClass(entry.className)}
             title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
-            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke und gewichtet nach Signature-/Weak-Attribut-Affinität sowie dem Development-Route-Bonus der Klasse. Reale Werte hängen zusätzlich von Performance-Anteil ab.`}
+            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke und gewichtet nach Signature-/Weak-Attribut-Affinität sowie dem Development-Route-Bonus der Klasse. Reale Werte hängen zusätzlich von Performance-Anteil ab.${
+              entry.hasFocusRouteBonus ? " · +8% Trainingsfokus-Bonus (Achse passt)" : ""
+            }`}
           >
             <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
             <span className="nl-training-class-ranking-label">
               {entry.label}
               {entry.isCurrent ? <span className="nl-training-class-ranking-current">aktiv</span> : null}
+              {entry.hasFocusRouteBonus ? (
+                <span className="nl-training-class-ranking-focus-bonus" title="Trainingsfokus-Route-Bonus: +8%">
+                  +8% Fokus
+                </span>
+              ) : null}
             </span>
             <span className="nl-training-class-ranking-bar" aria-hidden="true">
               <span
