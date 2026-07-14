@@ -99,10 +99,15 @@ import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";
 import {
   formatLeaguePercentile,
+  getMetricBarPercent,
   getPoolHeatTone,
   type LeaguePlayerHeatPools,
 } from "@/lib/foundation/player-league-heat";
-import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
+import {
+  buildDisciplineSortKey,
+  getDisciplineIdFromSortKey,
+  type FoundationPlayerScopeRow,
+} from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
@@ -299,7 +304,7 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
     label: "Achsen",
     align: "left",
     tooltip:
-      "POW/SPE/MEN/SOC — liga-relative Achsenwerte (0–100). Farben sind liga-relativ: jede Stufe ist ein Achtel des aktuellen Liga-Pools.",
+      "POW/SPE/MEN/SOC — liga-relative Achsenwerte (0–100), anklickbar zum Sortieren. Farben sind liga-relativ: jede Stufe ist ein Achtel des aktuellen Liga-Pools. Über \"Disziplinen\" lässt sich zusätzlich nach einer einzelnen Disziplin-Wertung sortieren.",
   },
   {
     id: "pps",
@@ -476,6 +481,27 @@ export default function FoundationPlayersTableNewLook({
   /** Für den Vergleich ausgewählte Spieler-IDs (2–4), Reihenfolge = Auswahlreihenfolge. */
   const [comparePlayerIds, setComparePlayerIds] = useState<string[]>([]);
   const [compareOverlayOpen, setCompareOverlayOpen] = useState(false);
+  /**
+   * Disziplinen-Sortier-Picker der Achsen-Spaltenkopfzeile (additiv, #Diszi-Sort):
+   * Auf-/zugeklappt über den "Disziplinen"-Umschalter im Achsen-Header. Der
+   * eigentliche "welche Disziplin ist gerade sortiert"-Zustand lebt NICHT hier,
+   * sondern wird direkt aus `sortState.key` abgeleitet (`activeDisciplineSortId`
+   * unten) — so bleibt genau EINE Quelle der Wahrheit (der geteilte Sort-State),
+   * der Picker ist nur die Sichtbarkeit des Auswahl-Controls.
+   */
+  const [disciplinePickerOpen, setDisciplinePickerOpen] = useState(false);
+
+  /** Aktuell sortierte Disziplin (`discipline:<id>`-Sortierschlüssel), falls aktiv. */
+  const activeDisciplineSortId = useMemo(() => getDisciplineIdFromSortKey(sortState?.key), [sortState?.key]);
+  const activeDisciplineSortName = useMemo(
+    () => (activeDisciplineSortId ? gameState.disciplines.find((d) => d.id === activeDisciplineSortId)?.name ?? null : null),
+    [activeDisciplineSortId, gameState.disciplines],
+  );
+  /** Alphabetisch sortierte Disziplin-Optionen für den Picker (gleiche Konvention wie `raceOptions` unten). */
+  const disciplinePickerOptions = useMemo(
+    () => [...gameState.disciplines].sort((left, right) => left.name.localeCompare(right.name)),
+    [gameState.disciplines],
+  );
 
   // Bei Filterwechsel wieder auf die erste "Seite" zurück.
   useEffect(() => {
@@ -682,6 +708,57 @@ export default function FoundationPlayersTableNewLook({
     );
   }
 
+  /**
+   * Kopfzelle der Achsen-Spalte: kein einzelner `sortKey` (die Spalte bündelt
+   * POW/SPE/MEN/SOC + optional eine Disziplin, siehe `renderAxisBars`) — statt
+   * eines Sortier-Buttons gibt es hier den Hinweis "Wert anklicken sortiert"
+   * plus den Disziplinen-Umschalter/-Picker (additiv, wählt `discipline:<id>`
+   * als `sortState.key` über denselben `onToggleSort`-Callback wie jede
+   * andere Spalte).
+   */
+  function renderAxesColumnHeader(tooltip?: string) {
+    return (
+      <div className="nl-players-axes-th">
+        <span className="nl-players-axes-th-label" title={tooltip}>
+          {NL_PLAYERS_COLUMNS.find((column) => column.id === "axes")?.label ?? "Achsen"}
+        </span>
+        <span className="nl-players-axes-th-hint">Wert anklicken sortiert</span>
+        <button
+          type="button"
+          className={`nl-players-disc-toggle${disciplinePickerOpen ? " is-open" : ""}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            setDisciplinePickerOpen((open) => !open);
+          }}
+          aria-expanded={disciplinePickerOpen}
+          title="Nach einer Disziplin-Wertung sortieren"
+        >
+          Disziplinen <b aria-hidden="true">{disciplinePickerOpen ? "▾" : "▸"}</b>
+        </button>
+        {disciplinePickerOpen ? (
+          <select
+            className="nl-players-disc-select"
+            value={activeDisciplineSortId ?? ""}
+            onClick={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              const disciplineId = event.target.value;
+              onToggleSort(disciplineId ? buildDisciplineSortKey(disciplineId) : "ovr");
+            }}
+            aria-label="Nach Disziplin sortieren"
+            title="Sortiert die Spielerliste absteigend/aufsteigend nach der Wertung dieser Disziplin"
+          >
+            <option value="">Disziplin wählen…</option>
+            {disciplinePickerOptions.map((discipline) => (
+              <option key={discipline.id} value={discipline.id}>
+                {discipline.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
+      </div>
+    );
+  }
+
   /** Leader-Chip: Wert + Spielername, Klick = Portal in den Spieler-Drawer. */
   function renderLeaderChip(
     label: string,
@@ -731,11 +808,20 @@ export default function FoundationPlayersTableNewLook({
             value != null && Number.isFinite(value) ? Math.max(2, Math.min(100, value)) : 0;
           const pool = leaguePlayerHeatPools[key];
           const rank = getLeagueRank(value, pool);
+          const isAxisSort = sortState?.key === key;
           return (
-            <span
+            <button
               key={key}
-              className={`nl-players-axis nl-ptable-axis-enhanced ${nlToneClass(key)}`}
-              title={`${label}: ${formatNlNumber(value, 0)} von 100${
+              type="button"
+              className={`nl-players-axis nl-ptable-axis-enhanced ${nlToneClass(key)}${isAxisSort ? " is-active-sort" : ""}`}
+              onClick={(event) => {
+                // Nicht zum Zeilenklick (öffnet den Spieler-Drawer) durchreichen —
+                // ein Achsenwert-Klick soll ausschließlich sortieren.
+                event.stopPropagation();
+                onToggleSort(key);
+              }}
+              aria-pressed={isAxisSort}
+              title={`Nach ${label} sortieren — ${label}: ${formatNlNumber(value, 0)} von 100${
                 rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
               }`}
             >
@@ -744,9 +830,32 @@ export default function FoundationPlayersTableNewLook({
                 <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
               </span>
               <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
-            </span>
+            </button>
           );
         })}
+        {activeDisciplineSortId
+          ? (() => {
+              const value = row.player.disciplineRatings[activeDisciplineSortId] ?? null;
+              const pool = leaguePlayerHeatPools.disciplines[activeDisciplineSortId] ?? [];
+              const percent = getMetricBarPercent(value, pool);
+              const rank = getLeagueRank(value, pool);
+              const disciplineLabel = activeDisciplineSortName ?? "Disziplin";
+              return (
+                <span
+                  className={`nl-players-axis nl-players-axis-discipline ${nlToneClass("accent")} is-active-sort`}
+                  title={`Sortiert nach ${disciplineLabel} — ${disciplineLabel}: ${formatNlNumber(value, 0)}${
+                    rank != null ? ` — Liga-Rang #${rank} von ${pool.length}` : ""
+                  }`}
+                >
+                  <span className="nl-players-axis-label">{disciplineLabel}</span>
+                  <span className="nl-players-axis-track" aria-hidden="true">
+                    <span className="nl-players-axis-fill" style={{ width: `${percent}%` }} />
+                  </span>
+                  <span className="nl-players-axis-value nl-tnum">{formatNlNumber(value, 0)}</span>
+                </span>
+              );
+            })()
+          : null}
       </div>
     );
   }
@@ -1408,6 +1517,8 @@ export default function FoundationPlayersTableNewLook({
                     >
                       {column.sortKey ? (
                         renderSortHeader(column.sortKey, column.label, column.tooltip)
+                      ) : column.id === "axes" ? (
+                        renderAxesColumnHeader(column.tooltip)
                       ) : (
                         <span title={column.tooltip}>{column.label}</span>
                       )}

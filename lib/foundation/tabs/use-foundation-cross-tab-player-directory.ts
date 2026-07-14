@@ -47,6 +47,26 @@ export function shouldBuildFoundationPlayerDirectory(activeView: FoundationViewI
   return activeView === "players";
 }
 
+/**
+ * Sortier-Schlüssel-Präfix für "nach Disziplin-Wertung sortieren" (Neuer Look,
+ * Achsen-Spalte). Dynamischer Schlüssel statt eines festen Katalog-Eintrags,
+ * weil die Disziplinliste (`gameState.disciplines`) pro Save variiert — siehe
+ * `buildDisciplineSortKey`/`getDisciplineIdFromSortKey` und deren Verwendung
+ * in BEIDEN Accessor-Maps unten (`sortedPlayersTableRows` + der `useEffect`).
+ */
+const DISCIPLINE_SORT_KEY_PREFIX = "discipline:";
+
+export function buildDisciplineSortKey(disciplineId: string): string {
+  return `${DISCIPLINE_SORT_KEY_PREFIX}${disciplineId}`;
+}
+
+export function getDisciplineIdFromSortKey(sortKey: string | null | undefined): string | null {
+  if (!sortKey || !sortKey.startsWith(DISCIPLINE_SORT_KEY_PREFIX)) {
+    return null;
+  }
+  return sortKey.slice(DISCIPLINE_SORT_KEY_PREFIX.length);
+}
+
 export function shouldBuildFoundationLeagueHeatPools(input: {
   shouldBuildPlayerDirectory: boolean;
   shouldBuildMarketView: boolean;
@@ -302,7 +322,8 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       if (!input.shouldBuildPlayerDirectory) {
         return [];
       }
-      return sortRows(playersTableRows, input.tableSorts.playersTable, {
+      const sortState = input.tableSorts.playersTable;
+      const accessors: Record<string, (row: (typeof playersTableRows)[number]) => string | number> = {
         name: (row) => row.player.name,
         team: (row) => row.team?.name ?? (row.isFreeAgent ? "Free Agent" : ""),
         class: (row) => row.player.className,
@@ -317,7 +338,16 @@ export function useFoundationCrossTabPlayerDirectory(input: {
         bestDiscipline: (row) => row.bestDiscipline ?? "",
         careerLeague: (row) => row.careerLeagueStats?.totalPps ?? Number.NEGATIVE_INFINITY,
         traits: (row) => `${row.player.traitsPositive.join(", ")} ${row.player.traitsNegative.join(", ")}`.trim(),
-      });
+        pow: (row) => row.player.coreStats.pow ?? Number.NEGATIVE_INFINITY,
+        spe: (row) => row.player.coreStats.spe ?? Number.NEGATIVE_INFINITY,
+        men: (row) => row.player.coreStats.men ?? Number.NEGATIVE_INFINITY,
+        soc: (row) => row.player.coreStats.soc ?? Number.NEGATIVE_INFINITY,
+      };
+      const disciplineId = getDisciplineIdFromSortKey(sortState?.key);
+      if (disciplineId && sortState) {
+        accessors[sortState.key] = (row) => row.player.disciplineRatings[disciplineId] ?? Number.NEGATIVE_INFINITY;
+      }
+      return sortRows(playersTableRows, sortState, accessors);
     },
     [input.shouldBuildPlayerDirectory, input.tableSorts.playersTable, playersTableRows],
   );
@@ -342,7 +372,15 @@ export function useFoundationCrossTabPlayerDirectory(input: {
       bestDiscipline: (row) => row.bestDiscipline ?? "",
       careerLeague: (row) => row.careerLeagueStats?.totalPps ?? Number.NEGATIVE_INFINITY,
       traits: (row) => `${row.player.traitsPositive.join(", ")} ${row.player.traitsNegative.join(", ")}`.trim(),
+      pow: (row) => row.player.coreStats.pow ?? Number.NEGATIVE_INFINITY,
+      spe: (row) => row.player.coreStats.spe ?? Number.NEGATIVE_INFINITY,
+      men: (row) => row.player.coreStats.men ?? Number.NEGATIVE_INFINITY,
+      soc: (row) => row.player.coreStats.soc ?? Number.NEGATIVE_INFINITY,
     };
+    const disciplineId = getDisciplineIdFromSortKey(sortState.key);
+    if (disciplineId) {
+      accessors[sortState.key] = (row) => row.player.disciplineRatings[disciplineId] ?? Number.NEGATIVE_INFINITY;
+    }
     const accessor = accessors[sortState.key];
     if (!accessor) {
       return;
