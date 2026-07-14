@@ -96,6 +96,9 @@ const LOCAL_SYSTEM_SELL_SOURCES = new Set([
   // bypass the interactive sell-window gate — otherwise every organic sell is blocked with
   // "sell_only_at_season_end" and no trader/surplus flip ever executes across seasons.
   "ai_organic_squad_sell",
+  // Weak-team upgrade swap (flag OLY_WEAK_TEAM_UPGRADE_SWAP): a distinct source for the season-end
+  // hoarder churn-out so it is countable/auditable separately from ordinary surplus/profit sells.
+  "ai_organic_squad_upgrade_sell",
   "emergency_negative_cash_liquidation",
   "preseason_proactive_cash_recovery_sell",
   "full_churn_roster_sell",

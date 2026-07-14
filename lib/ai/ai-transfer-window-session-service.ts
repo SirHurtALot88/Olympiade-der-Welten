@@ -393,7 +393,8 @@ async function runTeamCycle(input: {
         seasonId: input.seasonId,
         teamId: input.teamId,
         activePlayerId,
-        transferSource: "ai_organic_squad_sell",
+        transferSource:
+          decision.reason === "upgrade_churn" ? "ai_organic_squad_upgrade_sell" : "ai_organic_squad_sell",
         localRunContext: input.sessionRunContext,
         deferPersist: true,
       });
