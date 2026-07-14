@@ -191,6 +191,26 @@ describe("planOrganicSellsForTeam — weak-team upgrade swap (season-end hoarder
     const result = planSeasonEnd(200, "0");
     expect(result.decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
   });
+
+  it("a small-opt hoarder sitting at optTarget == ROSTER_MIN still swaps (the transient-floor fix)", () => {
+    // The stagnating hoarders are small clubs whose optTarget clamps to ROSTER_MIN (8). A `> ROSTER_MIN`
+    // floor would exclude exactly them; the transient sub-min floor lets the swap free a slot the preseason
+    // buy refills. Roster of 8 at opt 8, cash-rich.
+    const SMALL_OPT_IDENTITY = { ...HOARDER_IDENTITY, playerOpt: ROSTER_MIN } as unknown as TeamIdentity;
+    const disc = ["tdm", "staffel", "tennis", "showcase"];
+    const roster: Player[] = [];
+    for (let i = 0; i < ROSTER_MIN; i += 1) {
+      roster.push(player(`body-${i}`, disc[i % disc.length], { pow: 60, rating: 60, mv: 5, salary: 8 }));
+    }
+    const result = planOrganicSellsForTeam({
+      gameState: makeGameState(),
+      team: { ...TEAM, cash: 200 } as unknown as Team,
+      identity: SMALL_OPT_IDENTITY,
+      roster,
+      allowBelowMin: true,
+    });
+    expect(result.decisions.filter((d) => d.reason === "upgrade_churn").length).toBeGreaterThan(0);
+  });
 });
 
 describe("sellUtility profit-flip term (GM sellForProfitAggression → wProfit)", () => {

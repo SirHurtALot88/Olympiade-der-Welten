@@ -553,8 +553,13 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     const cashToMw = teamMw > 0 ? cash / teamMw : 0;
     let swapsRemaining =
       cashToMw >= UPGRADE_SWAP_CASH_TO_MW_STRONG ? 2 : cashToMw >= UPGRADE_SWAP_CASH_TO_MW ? 1 : 0;
-    // Keep at least ROSTER_MIN bodies so even a stalled preseason buy leaves a fieldable-ish core.
-    while (swapsRemaining > 0 && held.length > ROSTER_MIN && held.length <= ctx.weights.optTarget) {
+    // The hoarders that stagnate are typically SMALL clubs sitting at optTarget ≈ ROSTER_MIN (8) — the opt
+    // floor. A `> ROSTER_MIN` guard would exclude exactly them, so the swap would never fire for the teams
+    // it targets. Season-end explicitly permits shedding below ROSTER_MIN (the preseason buy + min-fill
+    // topup restore hardMin), so the swap may dip below min TRANSIENTLY: the freed slot is refilled with a
+    // better body next preseason. Keep a small absolute transient floor so it can't strip a club to nothing.
+    const transientFloor = Math.max(1, ROSTER_MIN - 2);
+    while (swapsRemaining > 0 && held.length > transientFloor && held.length <= ctx.weights.optTarget) {
       const state = buildState();
       // Least-valuable keeper = highest sellUtility remaining. The loop above already shed everything above
       // the keep line, so this is the body whose removal costs the least strength — the right one to upgrade.
