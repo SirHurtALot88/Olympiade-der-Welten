@@ -173,26 +173,29 @@ describe("planOrganicSellsForTeam — weak-team upgrade swap (season-end hoarder
     }
   }
 
-  it("a cash-rich hoarder below opt sheds its weakest keeper(s) to fund an upgrade", () => {
+  // NOTE: the swap is DEFAULT OFF (opt-in "1") after a same-seed A/B showed it is net-negative (see
+  // isWeakTeamUpgradeSwapEnabled docs). These tests pin the flag explicitly to exercise the gate mechanics
+  // of the opt-in path, they are NOT an endorsement of enabling it by default.
+  it("a cash-rich hoarder below opt sheds its weakest keeper(s) when the opt-in flag is on", () => {
     // teamMw = 10*5 = 50, cash 200 → cash/MW 4.0 (deep hoarder) → up to 2 upgrade swaps.
-    const result = planSeasonEnd(200);
+    const result = planSeasonEnd(200, "1");
     const churn = result.decisions.filter((d) => d.reason === "upgrade_churn");
     expect(churn.length).toBeGreaterThan(0);
     expect(result.finalRosterSize).toBeGreaterThanOrEqual(ROSTER_MIN);
   });
 
-  it("a cash-poor team (low cash/MW) sheds nobody via the upgrade path", () => {
-    // cash 15 → cash/MW 0.30, below the 0.75 hoarder gate → no upgrade churn.
-    const result = planSeasonEnd(15);
+  it("even with the flag on, a cash-poor team (low cash/MW) sheds nobody via the upgrade path", () => {
+    // cash 15 → cash/MW 0.30, below the 0.65 hoarder gate → no upgrade churn.
+    const result = planSeasonEnd(15, "1");
     expect(result.decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
   });
 
-  it("the upgrade swap is off when OLY_WEAK_TEAM_UPGRADE_SWAP=0", () => {
-    const result = planSeasonEnd(200, "0");
-    expect(result.decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
+  it("the upgrade swap is off by default (flag unset) and when OLY_WEAK_TEAM_UPGRADE_SWAP=0", () => {
+    expect(planSeasonEnd(200).decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
+    expect(planSeasonEnd(200, "0").decisions.filter((d) => d.reason === "upgrade_churn")).toHaveLength(0);
   });
 
-  it("a small-opt hoarder sitting at optTarget == ROSTER_MIN still swaps (the transient-floor fix)", () => {
+  it("with the flag on, a small-opt hoarder at optTarget == ROSTER_MIN still swaps (transient-floor fix)", () => {
     // The stagnating hoarders are small clubs whose optTarget clamps to ROSTER_MIN (8). A `> ROSTER_MIN`
     // floor would exclude exactly them; the transient sub-min floor lets the swap free a slot the preseason
     // buy refills. Roster of 8 at opt 8, cash-rich.
@@ -202,14 +205,21 @@ describe("planOrganicSellsForTeam — weak-team upgrade swap (season-end hoarder
     for (let i = 0; i < ROSTER_MIN; i += 1) {
       roster.push(player(`body-${i}`, disc[i % disc.length], { pow: 60, rating: 60, mv: 5, salary: 8 }));
     }
-    const result = planOrganicSellsForTeam({
-      gameState: makeGameState(),
-      team: { ...TEAM, cash: 200 } as unknown as Team,
-      identity: SMALL_OPT_IDENTITY,
-      roster,
-      allowBelowMin: true,
-    });
-    expect(result.decisions.filter((d) => d.reason === "upgrade_churn").length).toBeGreaterThan(0);
+    const prev = process.env.OLY_WEAK_TEAM_UPGRADE_SWAP;
+    process.env.OLY_WEAK_TEAM_UPGRADE_SWAP = "1";
+    try {
+      const result = planOrganicSellsForTeam({
+        gameState: makeGameState(),
+        team: { ...TEAM, cash: 200 } as unknown as Team,
+        identity: SMALL_OPT_IDENTITY,
+        roster,
+        allowBelowMin: true,
+      });
+      expect(result.decisions.filter((d) => d.reason === "upgrade_churn").length).toBeGreaterThan(0);
+    } finally {
+      if (prev === undefined) delete process.env.OLY_WEAK_TEAM_UPGRADE_SWAP;
+      else process.env.OLY_WEAK_TEAM_UPGRADE_SWAP = prev;
+    }
   });
 });
 

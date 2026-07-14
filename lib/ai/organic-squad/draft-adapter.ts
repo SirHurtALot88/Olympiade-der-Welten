@@ -400,8 +400,14 @@ const ORGANIC_SELL_JITTER = Number(process.env.OLY_ORGANIC_SELL_JITTER ?? 8) || 
  * preseason, never mid-window); it is bounded to 1–2 swaps/season; and it only fires when the hoarded cash
  * can actually fund a MEANINGFUL upgrade over the shed body (uplift gate), never a lateral churn.
  */
+// DEFAULT OFF (opt-in via OLY_WEAK_TEAM_UPGRADE_SWAP=1). A same-seed A/B showed this swap is NET-NEGATIVE:
+// bottom-5 clubs ended ~20 MW LOWER with it on than off. The "weakest keeper" it sheds has negative
+// sellUtility (it still contributes strength), so selling it and rebuying from the picked-over free-agent
+// pool — plus buy premium and a higher wage bill — DESTROYS value instead of converting cash into quality.
+// Kept behind an opt-in flag (with its tests/instrumentation) pending a corrected matched-upgrade design
+// that verifies the replacement actually beats the shed player before committing the sell.
 function isWeakTeamUpgradeSwapEnabled(): boolean {
-  return process.env.OLY_WEAK_TEAM_UPGRADE_SWAP !== "0";
+  return process.env.OLY_WEAK_TEAM_UPGRADE_SWAP === "1";
 }
 /**
  * cash/MW at/above which a club counts as a hoarder eligible for one upgrade swap. Strong clubs run ~0.5,
