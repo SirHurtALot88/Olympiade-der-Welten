@@ -95,7 +95,7 @@ export function FacilityLevelStrip({ facilityId, level }: { facilityId: Facility
         return (
           <div
             key={`${facilityId}-l${targetLevel}`}
-            className={`facilities-v2-level-step${targetLevel <= level ? " is-active" : ""}${targetLevel === level + 1 ? " is-next" : ""}`}
+            className={`facilities-v2-level-step${targetLevel <= level ? " is-active" : ""}`}
             title={definition?.effectDescription ?? undefined}
           >
             <span>L{targetLevel}</span>
