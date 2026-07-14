@@ -1630,6 +1630,23 @@ export default function PlayerDetailDrawer({
   const [comparePlayerBData, setComparePlayerBData] = useState<PlayerDetailDrawerData | null>(null);
   const [comparePlayerBLoading, setComparePlayerBLoading] = useState(false);
 
+  // #106: Achsen-Karten (POW/SPE/MEN/SOC) lassen sich einzeln aufklappen, um
+  // die Top-Disziplinen mit PPs + Rang im Detail zu zeigen. Separiert vom
+  // Liga-Leaders-Klick (eigener kleiner Button), damit beide Aktionen
+  // eindeutig erreichbar bleiben.
+  const [expandedAxisCardIds, setExpandedAxisCardIds] = useState<Set<string>>(new Set());
+  const toggleAxisCardExpanded = (cardId: string) => {
+    setExpandedAxisCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     setCompareOpen(false);
     setCompareQuery("");
@@ -2274,11 +2291,35 @@ export default function PlayerDetailDrawer({
                     const axisDisciplines = data.disciplineValues
                       .filter((entry) => entry.category === card.tone)
                       .slice(0, 5);
+                    // #106: Diszis-Detail ist ein eigener Aufklapp-Zustand pro
+                    // Karte, getrennt vom Liga-Leaders-Klick, damit beide
+                    // Aktionen (Detail aufklappen vs. Liga-Leaders öffnen)
+                    // unabhängig voneinander erreichbar bleiben.
+                    const isExpanded = expandedAxisCardIds.has(card.id);
+                    const disciplineListId = `player-drawer-axis-disciplines-${card.id}`;
                     const cardBody = (
                       <>
                         <div className="player-drawer-category-head">
                           <span title={getGameTermTooltip(card.label) ?? undefined}>{card.label}</span>
-                          <span title={getGameTermTooltip("PPs") ?? undefined}>Stat / PPs</span>
+                          <span className="player-drawer-axis-card-controls">
+                            <span title={getGameTermTooltip("PPs") ?? undefined}>Stat / PPs</span>
+                            {canOpenAxisLeaders ? (
+                              <button
+                                type="button"
+                                className="player-drawer-axis-leaders-btn"
+                                title={`Liga-Leaders: ${card.label} · Stat / PPs`}
+                                aria-label={`Liga-Leaders: ${card.label}`}
+                                onClick={() =>
+                                  onOpenLeagueLeaders(card.id, {
+                                    playerId: data.playerId,
+                                    playerName: data.name,
+                                  })
+                                }
+                              >
+                                <span aria-hidden="true">🏆</span>
+                              </button>
+                            ) : null}
+                          </span>
                         </div>
                         <div className="player-drawer-axis-combo-values">
                           <span>
@@ -2306,7 +2347,19 @@ export default function PlayerDetailDrawer({
                           <span>PPs All-Time</span>
                           <span>{formatValue(card.allTimePoints, 1)}</span>
                         </div>
-                        <div className="player-drawer-axis-discipline-list">
+                        <button
+                          type="button"
+                          className="player-drawer-axis-discipline-toggle"
+                          aria-expanded={isExpanded}
+                          aria-controls={disciplineListId}
+                          onClick={() => toggleAxisCardExpanded(card.id)}
+                        >
+                          <span aria-hidden="true" className={`player-drawer-axis-discipline-toggle-caret${isExpanded ? " is-open" : ""}`}>
+                            ▸
+                          </span>
+                          Diszis im Detail
+                        </button>
+                        <div className="player-drawer-axis-discipline-list" id={disciplineListId}>
                           {axisDisciplines.length ? (
                             axisDisciplines.map((entry) => {
                               const barPercent = Math.max(0, Math.min(100, entry.value ?? 0));
@@ -2324,6 +2377,21 @@ export default function PlayerDetailDrawer({
                                   <div className="player-drawer-axis-discipline-meter">
                                     <div className="player-drawer-axis-discipline-meter-fill" style={{ width: `${barPercent}%` }} />
                                   </div>
+                                  {isExpanded ? (
+                                    <div className="player-drawer-axis-discipline-detail">
+                                      <span title="Statwert-Rang in dieser Disziplin">
+                                        Rang {formatRankLabel(entry.rank)}
+                                        {entry.playerCount != null ? ` / ${entry.playerCount}` : ""}
+                                      </span>
+                                      <span title={getGameTermTooltip("PPs") ?? "Season-Punkte dieser Disziplin"}>
+                                        PPs {formatValue(entry.seasonPoints, 1)} · {formatOptionalRankLabel(entry.seasonPointsRank)}
+                                      </span>
+                                      <span title="Punkte aus allen bisherigen Seasons in dieser Disziplin">
+                                        All-Time {formatValue(entry.allTimePoints, 1)}
+                                        {entry.allTimePointsRank != null ? ` · ${formatOptionalRankLabel(entry.allTimePointsRank)}` : ""}
+                                      </span>
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })
@@ -2333,22 +2401,7 @@ export default function PlayerDetailDrawer({
                         </div>
                       </>
                     );
-                    return canOpenAxisLeaders ? (
-                      <button
-                        key={card.id}
-                        type="button"
-                        className={`player-drawer-category-card player-drawer-category-button player-drawer-axis-combo-card is-interactive ${getAxisToneClass(card.tone)}`}
-                        onClick={() =>
-                          onOpenLeagueLeaders(card.id, {
-                            playerId: data.playerId,
-                            playerName: data.name,
-                          })
-                        }
-                        title={`Liga-Leaders: ${card.label} · Stat / PPs`}
-                      >
-                        {cardBody}
-                      </button>
-                    ) : (
+                    return (
                       <article
                         key={card.id}
                         className={`player-drawer-category-card player-drawer-axis-combo-card ${getAxisToneClass(card.tone)}`}
@@ -2717,153 +2770,25 @@ export default function PlayerDetailDrawer({
             )}
           </section>
 
-          {data.organicProgression || data.seasonOrganicForecast || data.classHistory.length > 0 ? (
-            <section className="player-drawer-section player-drawer-panel">
-              <h3>Organische Entwicklung</h3>
-              {data.seasonOrganicForecast ? (
-                <>
-                  <p className="muted player-drawer-section-lead">
-                    Prognose aktuelle Saison · Signature +15% / Weak -20% sind in Training und Performance eingerechnet.
-                  </p>
-                  <div className="player-drawer-list-grid player-drawer-list-grid-wide">
-                    <article className="metric-card">
-                      <span>Klassen-Prognose</span>
-                      <strong>
-                        {formatTrainingClassDirection(data.className, data.seasonOrganicForecast.primaryTrainingClass)}
-                      </strong>
-                      <small>
-                        Prognose nach Setpoints: {data.seasonOrganicForecast.classBefore}
-                        {data.seasonOrganicForecast.classChanged ? ` → ${data.seasonOrganicForecast.classAfter}` : " (stabil)"}
-                      </small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Netto-Setpoints</span>
-                      <strong className={getDeltaToneClass(data.seasonOrganicForecast.netSetpoints)}>
-                        {data.seasonOrganicForecast.netSetpoints > 0 ? "+" : ""}
-                        {formatValue(data.seasonOrganicForecast.netSetpoints, 1)}
-                      </strong>
-                      <small>
-                        {formatOrganicNetSubline({
-                          appliedTrainingSetpoints: data.seasonOrganicForecast.appliedTrainingSetpoints,
-                          appliedPerformanceSetpoints: data.seasonOrganicForecast.appliedPerformanceSetpoints,
-                          regressionCombinedTotal:
-                            resolveOrganicRegressionCombinedTotal(data.seasonOrganicForecast) ?? 0,
-                        })}
-                      </small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Regression</span>
-                      <strong className="is-negative">
-                        {formatSignedSetpoints(resolveOrganicRegressionCombinedTotal(data.seasonOrganicForecast) ?? 0, 1)}
-                      </strong>
-                      <small>
-                        Basis {formatSignedSetpoints(data.seasonOrganicForecast.regressionBreakdown.baseFlatTotal, 1)} · MW{" "}
-                        {formatSignedSetpoints(data.seasonOrganicForecast.regressionBreakdown.marketValueTotal, 1)}
-                      </small>
-                    </article>
-                  </div>
-                </>
-              ) : null}
-              {data.organicProgression ? (
-                <>
-                  <p className="muted player-drawer-section-lead">
-                    Letzte Anwendung · {getCanonicalSeasonLabel({ seasonId: data.organicProgression.seasonId })} — das ist der abgeschlossene Klassenwechsel, nicht die aktuelle Anzeige oben.
-                  </p>
-                  <div className="player-drawer-list-grid player-drawer-list-grid-wide">
-                    <article className="metric-card">
-                      <span>Letzter Klassenwechsel</span>
-                      <strong>
-                        {data.organicProgression.classBefore} → {data.organicProgression.classAfter}
-                      </strong>
-                      <small>
-                        {getCanonicalSeasonLabel({ seasonId: data.organicProgression.seasonId })} · damals Training:{" "}
-                        {data.organicProgression.trainingClass}
-                      </small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Netto-Setpoints</span>
-                      <strong className={getDeltaToneClass(data.organicProgression.netSetpoints)}>
-                        {data.organicProgression.netSetpoints > 0 ? "+" : ""}
-                        {formatValue(data.organicProgression.netSetpoints, 1)}
-                      </strong>
-                      <small>
-                        {formatOrganicNetSubline({
-                          appliedTrainingSetpoints:
-                            data.organicProgression.appliedTrainingSetpoints ?? data.organicProgression.trainingSetpoints,
-                          appliedPerformanceSetpoints:
-                            data.organicProgression.appliedPerformanceSetpoints ?? data.organicProgression.performanceSetpoints,
-                          regressionCombinedTotal:
-                            resolveOrganicRegressionCombinedTotal(data.organicProgression) ?? -data.organicProgression.marketValuePressureTotal,
-                        })}
-                      </small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Regression</span>
-                      <strong className="is-negative">
-                        {formatSignedSetpoints(
-                          resolveOrganicRegressionCombinedTotal(data.organicProgression) ??
-                            -data.organicProgression.marketValuePressureTotal,
-                          1,
-                        )}
-                      </strong>
-                      <small>
-                        Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
-                        {formatValue(data.organicProgression.traitModifierPct, 1)}% · Facility +
-                        {formatValue(data.organicProgression.facilityModifierPct, 1)}%
-                      </small>
-                    </article>
-                  </div>
-                  <div className="player-drawer-chip-row">
-                    {data.organicProgression.topGains.map((entry) => (
-                      <span key={`organic-gain-${entry.attribute}`} className="player-drawer-chip is-positive">
-                        {entry.attribute} +{formatValue(entry.delta, 1)}
-                      </span>
-                    ))}
-                    {data.organicProgression.topLosses.map((entry) => (
-                      <span key={`organic-loss-${entry.attribute}`} className="player-drawer-chip is-negative">
-                        {entry.attribute} {formatValue(entry.delta, 1)}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="player-drawer-progression-reason-grid" aria-label="Progressionsgruende">
-                    <span title="Positive Traits erhöhen das Trainingsbudget, negative Traits bremsen es.">
-                      <strong>
-                        Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
-                        {formatValue(data.organicProgression.traitModifierPct, 1)}%
-                      </strong>
-                      <small>Bonus/Malus wirkt auf organisches Wachstum</small>
-                    </span>
-                    <span title="Signature-Attribute bekommen +15% organisches Wachstum.">
-                      <strong>Signature</strong>
-                      <small>{developmentLevelup?.affinity.signatureAttributes.join(" / ") || data.seasonOrganicForecast?.attributeAffinity.signatureAttributes.join(" / ") || "Spielerprofil"}</small>
-                    </span>
-                    <span title="Weak-Attribut entwickelt sich mit -20% langsamer.">
-                      <strong>Weak</strong>
-                      <small>{developmentLevelup?.affinity.weakAttribute ?? data.seasonOrganicForecast?.attributeAffinity.weakAttribute ?? "Profil offen"}</small>
-                    </span>
-                    <span title="Matchday-Leistung zahlt Setpoints ein. Nahe der Attribut-Decke nur leicht gedrosselt, deutlich milder als Training.">
-                      <strong>Performance +{formatValue(data.organicProgression.performanceSetpoints, 1)}</strong>
-                      <small>Matchday-Anteil nach dieser Season</small>
-                    </span>
-                  </div>
-                </>
-              ) : null}
-              {data.classHistory.length > 0 ? (
-                <div className="player-drawer-chip-row">
-                  {data.classHistory.slice(-5).map((entry, index) => (
-                    <span key={`class-history-${entry.seasonId}-${index}`} className="player-drawer-chip is-subclass">
-                      {entry.seasonId}: {entry.previousClassName ? `${entry.previousClassName} → ` : ""}
-                      {entry.className}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast || showOwnPotentialSnapshot) ? (
+          {/* #107: "Organische Entwicklung" und "Potential & Entwicklung" waren
+              zwei separate, sich stark überschneidende Tabellen-Blöcke
+              (beide drehten sich um Training-Setpoints/Regression/Potential).
+              Zusammengelegt in EINEN Block: die grafischen Teile (Potential-
+              Track, Confidence, Trend, Achsen-Potential-Chips) bleiben, die
+              Setpoints/Regression-Zahlen gibt es nur noch einmal kompakt.
+              Der Training-Reiter fasst Trainingsdetails ohnehin bereits
+              zusammen, hier bleibt es bewusst schlank. `id` bleibt erhalten,
+              da der "Entwicklung"-Tab-Anker (#player-drawer-potential)
+              darauf zeigt. */}
+          {showScoutedDevelopmentSection &&
+          (data.scoutPotential ||
+            data.progressionForecast ||
+            showOwnPotentialSnapshot ||
+            data.seasonOrganicForecast ||
+            data.organicProgression ||
+            data.classHistory.length > 0) ? (
             <section className="player-drawer-section player-drawer-panel" id="player-drawer-potential">
-              <h3 title="Kurzfassung: Potential und Entwicklungsroute. Details können aufgeklappt werden.">Potential & Entwicklung</h3>
+              <h3 title="Potential-Decke und Saison-Prognose der Entwicklung. Details können aufgeklappt werden.">Entwicklung & Potential</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                 {showOwnPotentialSnapshot ? (
                   <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status für den eigenen Kader.">
@@ -3019,7 +2944,7 @@ export default function PlayerDetailDrawer({
                       );
                     })()
                   : null}
-                {data.seasonOrganicForecast && !data.organicProgression ? (
+                {data.seasonOrganicForecast ? (
                   <article
                     className="metric-card player-drawer-xp-balance-card"
                     title="Organische Saison-Prognose: Setpoints aus Training, Performance und Erhaltungsdruck — das ist die verbindliche Entwicklungslogik."
@@ -3057,7 +2982,7 @@ export default function PlayerDetailDrawer({
                   </article>
                 ) : null}
               </div>
-              {showScoutedDeepDevelopmentDetails ? (
+              {showScoutedDeepDevelopmentDetails && (data.progressionForecast || data.scoutPotential || data.organicProgression) ? (
                 <details className="player-drawer-compact-details">
                   <summary>Mehr Entwicklungsdetails</summary>
                   <div className="player-drawer-compact-details-grid">
@@ -3105,8 +3030,49 @@ export default function PlayerDetailDrawer({
                         </small>
                       </article>
                     ) : null}
+                    {data.organicProgression ? (
+                      <article className="metric-card" title="Letzter abgeschlossener Klassenwechsel — nicht die aktuelle Anzeige oben.">
+                        <span>Letzter Klassenwechsel</span>
+                        <strong>
+                          {data.organicProgression.classBefore} → {data.organicProgression.classAfter}
+                        </strong>
+                        <small>
+                          {getCanonicalSeasonLabel({ seasonId: data.organicProgression.seasonId })} · damals Training:{" "}
+                          {data.organicProgression.trainingClass} · Regression{" "}
+                          {formatSignedSetpoints(
+                            resolveOrganicRegressionCombinedTotal(data.organicProgression) ??
+                              -data.organicProgression.marketValuePressureTotal,
+                            1,
+                          )}
+                        </small>
+                      </article>
+                    ) : null}
                   </div>
+                  {data.organicProgression && (data.organicProgression.topGains.length || data.organicProgression.topLosses.length) ? (
+                    <div className="player-drawer-chip-row">
+                      {data.organicProgression.topGains.map((entry) => (
+                        <span key={`organic-gain-${entry.attribute}`} className="player-drawer-chip is-positive">
+                          {entry.attribute} +{formatValue(entry.delta, 1)}
+                        </span>
+                      ))}
+                      {data.organicProgression.topLosses.map((entry) => (
+                        <span key={`organic-loss-${entry.attribute}`} className="player-drawer-chip is-negative">
+                          {entry.attribute} {formatValue(entry.delta, 1)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </details>
+              ) : null}
+              {data.classHistory.length > 0 ? (
+                <div className="player-drawer-chip-row">
+                  {data.classHistory.slice(-5).map((entry, index) => (
+                    <span key={`class-history-${entry.seasonId}-${index}`} className="player-drawer-chip is-subclass">
+                      {entry.seasonId}: {entry.previousClassName ? `${entry.previousClassName} → ` : ""}
+                      {entry.className}
+                    </span>
+                  ))}
+                </div>
               ) : null}
               {data.demands.length ? (
                 <article className={`metric-card player-drawer-board-trust-card${getDemandCardTone(data.demands[0].status)}`}>
