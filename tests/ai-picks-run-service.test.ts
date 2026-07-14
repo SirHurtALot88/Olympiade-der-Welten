@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi , afterEach} from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -527,7 +527,13 @@ function buildCompareEntry(teamId: "C-C" | "W-W", pickClassName: string, playerI
 }
 
 describe("ai picks run service", () => {
+  // Organic Squad Builder ist jetzt DEFAULT-ON (Cutover); diese Mock-basierte Suite prüft den Legacy-Pfad
+  // und schaltet organic daher explizit per Opt-out (=0) ab. Organic ist über organic-* + Long-Run gedeckt.
+  afterEach(() => {
+    delete process.env.OLY_ORGANIC_SQUAD_BUILDER;
+  });
   beforeEach(() => {
+    process.env.OLY_ORGANIC_SQUAD_BUILDER = "0";
     persistenceState.save.gameState = buildGameState();
     buildAiNeedsPicksCompare.mockReset();
     previewLocalTransfermarktBuy.mockReset();

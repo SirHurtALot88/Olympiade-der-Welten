@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi , afterEach} from "vitest";
 
 const runAiPicksExecutePreview = vi.fn();
 
@@ -7,8 +7,13 @@ vi.mock("@/lib/ai/ai-picks-run-service", () => ({
 }));
 
 describe("ai picks run api", () => {
+  // Legacy-Pfad-Suite: organic (jetzt Default-ON) hier per Opt-out (=0) ab.
   beforeEach(() => {
+    process.env.OLY_ORGANIC_SQUAD_BUILDER = "0";
     runAiPicksExecutePreview.mockReset();
+  });
+  afterEach(() => {
+    delete process.env.OLY_ORGANIC_SQUAD_BUILDER;
   });
 
   it("passes preview params through to the service", async () => {

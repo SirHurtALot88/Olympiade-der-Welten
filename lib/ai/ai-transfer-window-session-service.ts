@@ -480,7 +480,8 @@ async function runTeamCycle(input: {
     if (input.allowBuys) runOrganicBuyCycle();
   }
 
-  const useOrganic = process.env.OLY_ORGANIC_SQUAD_BUILDER === "1";
+  // Organic squad builder DEFAULT-ON (Cutover). Opt-out nur explizit mit OLY_ORGANIC_SQUAD_BUILDER=0.
+  const useOrganic = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
 
   // Strict phase separation: season_end cycles sell-only, preseason cycles buy-only.
   // Replace-mode floor sells belong in the S1 season_end pass, not paired inside S2 buy cycles.
@@ -609,7 +610,8 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // rebuild. Otherwise all the organic balancing is bypassed for the main buy phase. So the batch path
   // is disabled under the organic flag and the per-team loop below (which dispatches to the organic
   // cycle) owns the preseason buys.
-  const useOrganicEngine = process.env.OLY_ORGANIC_SQUAD_BUILDER === "1";
+  // Organic squad builder DEFAULT-ON (Cutover). Opt-out nur explizit mit OLY_ORGANIC_SQUAD_BUILDER=0.
+  const useOrganicEngine = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
   const preseasonBuyMode = input.preseasonBuyMode ?? "s1_draft_batch";
   const usePreseasonS1DraftBatch =
     isPreseasonBuyPhase &&

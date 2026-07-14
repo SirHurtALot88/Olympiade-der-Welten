@@ -3740,7 +3740,11 @@ export async function runAiPicksExecutePreview(
   const executedGlobalRows: GlobalPickRow[] = [];
   const executeStartedAt = Date.now();
   const liveTakenPlayerIds = new Set<string>();
-  const useOrganicSquadBuilder = process.env.OLY_ORGANIC_SQUAD_BUILDER === "1";
+  // Organic squad builder ist jetzt DEFAULT-ON (Cutover): jedes Team pickt live bei seinem Zug aus dem
+  // Restpool, statt über den Legacy-partialExecutionPlan vorab eingefroren/ausgeschlossen zu werden (der
+  // Bug, bei dem das zuletzt gedraftete Team mit 0 Spielern endete). Opt-out nur noch explizit mit
+  // OLY_ORGANIC_SQUAD_BUILDER=0 (Legacy-Pfad für A/B-Vergleiche).
+  const useOrganicSquadBuilder = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
 
   for (const previewTeam of previewTeams) {
     const teamExecuteStartedAt = Date.now();
