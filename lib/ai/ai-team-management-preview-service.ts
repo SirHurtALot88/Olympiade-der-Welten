@@ -758,8 +758,14 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (context.team.cash < 15) negative.push("Cash ist für Scouts/Forecasts knapp");
     } else if (facility.facilityId === "fan_shop" || facility.facilityId === "arena_upgrade") {
       score += finances * 0.25 + (context.team.cash < 20 ? 8 : 0);
+      // Decaying level bonus: reliably clears the build threshold for the first level (0->1) and
+      // the first upgrade (1->2), then falls off so teams don't keep pouring cash into L4/L5 with
+      // shrinking payback. fan_shop stays slightly preferred over arena_upgrade (cheaper, faster
+      // payback), mirroring the level-0 differential the old flat bonus used (24 vs 16).
+      const incomeFacilityBonusBase = facility.facilityId === "fan_shop" ? 55 : 47;
+      const incomeFacilityLevelBonus = Math.max(0, incomeFacilityBonusBase - currentLevel * 15);
+      score += incomeFacilityLevelBonus;
       if (currentLevel === 0) {
-        score += facility.facilityId === "fan_shop" ? 24 : 16;
         positive.push("Income-Gebäude fehlt komplett");
       }
       if (profile.strategicIntent === "roster_repair") score -= 10;

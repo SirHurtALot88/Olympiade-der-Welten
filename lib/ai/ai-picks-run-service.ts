@@ -43,6 +43,7 @@ import {
 } from "@/lib/ai/market-pick-engine/execute-live-pick";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { isLongRunContext } from "@/lib/season/long-run-profile";
+import { planOrganicDraftForTeam } from "@/lib/ai/organic-squad/draft-adapter";
 
 const LEGAL_MINIMUM_ROSTER_SIZE = 7;
 const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
@@ -2913,6 +2914,301 @@ function runSeason1ExecuteEmergencyMinFill(input: {
   return emergencyFillCount;
 }
 
+/**
+ * Organic-squad-builder execute path for ONE team (flag: OLY_ORGANIC_SQUAD_BUILDER, default OFF).
+ *
+ * SELF-CONTAINED: replaces the entire per-team execute body (frozenTrace loop + spend-down/emergency
+ * fills + team-end flush + result push) when the flag is on, so the flag-off default path stays
+ * byte-identical. It reuses the same buy primitive (`executeLocalTransfermarktBuy`, deferPersist),
+ * the same result collections (executedPicks/transferHistoryIds/visibleTransferIds/executedGlobalRows),
+ * the same taken-id tracking (liveTakenPlayerIds) and the same per-team flush + AiPicksRunTeamResult
+ * shape as the default path — only the buy SELECTION comes from the organic builder instead of the
+ * frozen preview trace.
+ */
+function runOrganicTeamDraftExecute(input: {
+  saveId: string;
+  seasonId: string;
+  persistence: PersistenceService;
+  teamRunContext: LocalTransfermarktRunContext;
+  latestTeam: Team;
+  previewTeam: AiPicksRunTeamResult;
+  activeControlMode: TeamControlMode;
+  targetInfo: ReturnType<typeof resolveTargetRoster>;
+  beforeSnapshot: ReturnType<typeof buildTeamEconomySnapshot>;
+  useFastBatchExecute: boolean;
+  executedPicks: AiPicksRunPick[];
+  transferHistoryIds: string[];
+  visibleTransferIds: string[];
+  missingTransferIds: string[];
+  executedGlobalRows: GlobalPickRow[];
+  executedTeams: AiPicksRunTeamResult[];
+  liveTakenPlayerIds: Set<string>;
+  teamTimings: Map<string, {
+    teamId: string;
+    teamCode: string;
+    teamName: string;
+    previewMs: number;
+    executeMs: number;
+    totalMs: number;
+    plannedPicks: number;
+    appliedPicks: number;
+  }>;
+  teamExecuteStartedAt: number;
+  teamWarnings: string[];
+  teamBlockingReasons: string[];
+}) {
+  const {
+    saveId,
+    seasonId,
+    persistence,
+    teamRunContext,
+    latestTeam,
+    previewTeam,
+    activeControlMode,
+    targetInfo,
+    beforeSnapshot,
+    useFastBatchExecute,
+    executedPicks,
+    transferHistoryIds,
+    visibleTransferIds,
+    missingTransferIds,
+    executedGlobalRows,
+    executedTeams,
+    liveTakenPlayerIds,
+    teamTimings,
+    teamExecuteStartedAt,
+    teamWarnings,
+    teamBlockingReasons,
+  } = input;
+
+  const gameState = teamRunContext.save.gameState;
+  const teamId = latestTeam.teamId;
+
+  // 2. startingSquad = the team's current roster as domain Players (their disciplines feed coverage).
+  const rosterPlayerIds = new Set(getTeamRosterPlayers(gameState, teamId).map((item) => item.player.id));
+  const startingSquad = getTeamRosterPlayers(gameState, teamId).map((item) => item.player);
+
+  // 1. candidates = currently-available free agents mapped to domain Players (real coreStats /
+  //    disciplineRatings, not the market items), excluding taken + already-rostered players.
+  const freeAgentItems = listLocalTransfermarktFreeAgents({
+    saveId,
+    seasonId,
+    teamId,
+    mode: "ai_preview",
+    localRunContext: teamRunContext,
+    fullPool: true,
+  }).items;
+  const freeAgentItemsById = new Map<string, TransfermarktFreeAgentItem>(
+    freeAgentItems.map((item) => [item.playerId, item]),
+  );
+  const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
+  const candidates: Player[] = [];
+  for (const item of freeAgentItems) {
+    if (liveTakenPlayerIds.has(item.playerId) || rosterPlayerIds.has(item.playerId)) continue;
+    const player = playersById.get(item.playerId);
+    if (player) candidates.push(player);
+  }
+
+  // 3. Run the organic plan for this team.
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  const plan = planOrganicDraftForTeam({
+    gameState,
+    team: latestTeam,
+    identity,
+    startingSquad,
+    candidates,
+    draftSeed: `${saveId}:${teamId}`,
+  });
+  teamWarnings.push(`organic_squad_builder:decisions=${plan.decisions.length}`);
+  if (plan.stoppedBelowMin) {
+    teamWarnings.push("organic_squad_builder_stopped_below_min");
+  }
+
+  // 4. Execute each decision in order via the shared buy primitive. The plan is a RANKED wishlist,
+  //    so a single unbuyable pick (raced/taken between plan and apply, or a transient price/validation
+  //    edge) must NOT abort the whole team — skip it and try the next decision. Each buy is validated
+  //    against live cash independently, so continuing can only ever fill MORE of the roster, never
+  //    overspend. This is the clean "don't hang the draft" behaviour (no emergency repair): a team
+  //    whose top pick fell through still drafts the rest of its ranked plan instead of ending empty.
+  let appliedCount = 0;
+  for (const decision of plan.decisions) {
+    if (liveTakenPlayerIds.has(decision.playerId)) continue;
+    const buyResult = executeLocalTransfermarktBuy({
+      saveId,
+      seasonId,
+      teamId,
+      playerId: decision.playerId,
+      transferSource: "ai_roster_fill",
+      fastLocalBatch: useFastBatchExecute,
+      localRunContext: teamRunContext,
+      deferPersist: true,
+    });
+    if (!buyResult.transferCreated || !buyResult.transferId) {
+      teamBlockingReasons.push(...buyResult.blockingReasons, "organic_squad_builder_buy_skipped");
+      continue;
+    }
+    const item = freeAgentItemsById.get(decision.playerId) ?? null;
+    const player = playersById.get(decision.playerId) ?? null;
+    const appliedPick: AiPicksRunPick = {
+      step: appliedCount + 1,
+      playerId: decision.playerId,
+      playerName: item?.name ?? player?.name ?? decision.playerId,
+      className: item?.className ?? player?.className ?? "",
+      race: item?.race ?? player?.race ?? "",
+      marketValue: buyResult.purchasePrice ?? item?.marketValue ?? null,
+      salary: buyResult.salary ?? item?.salary ?? null,
+      ovr: item?.ovr ?? null,
+      mvs: item?.mvs ?? null,
+      budgetLane: "organic_fill",
+      pickLane: "organic_fill",
+      plannedLane: "organic_fill",
+      laneReason: "organic_squad_builder",
+      laneBudgetLimit: null,
+      laneBudgetUsed: null,
+      effectiveLaneCap: null,
+      phaseCap: null,
+      capExceeded: false,
+      capOverrideReason: null,
+      budgetStretchApplied: false,
+      budgetStretchReason: null,
+      budgetStretchPhaseAllowed: false,
+      budgetStretchBlockedReason: null,
+      isSuperstar: false,
+      isStar: false,
+      starPressureWarning: null,
+      cheaperAlternativeAvailable: false,
+      cheaperMinimumSafeAlternativeAvailable: false,
+      specialistNeedFilled: false,
+      coreNeedFilled: false,
+      depthNeedFilled: true,
+      minimumReachableAfterPick: true,
+      remainingMinimumReserve: null,
+      needLabel: null,
+      primaryReason: "organic_squad_builder",
+      secondaryReason: null,
+      bestNeedDisciplineId: null,
+      aiScore: decision.utility,
+      pickScore: decision.utility,
+      teamFit: null,
+      budgetFit: null,
+      rosterRole: null,
+      pickPhase: "organic_squad_builder",
+      teamCashTier: null,
+      minimumSecured: true,
+      reserveSecured: true,
+      mustFeelRightScore: null,
+      mustFeelRightWarning: null,
+      draftSeed: null,
+      baseScore: null,
+      tieBreakJitter: null,
+      scoreWithSeed: null,
+      tieBreakBand: null,
+      strategicExceptionReason: "organic_squad_builder",
+      pickedForFormColor: false,
+      formColorReason: null,
+      scoreBreakdown: {
+        playerQualityScore: 0,
+        needMatchScore: 0,
+        disciplineCoverageScore: 0,
+        teamAxisFitScore: 0,
+        teamThemeFitScore: 0,
+        classFitScore: 0,
+        raceOrArchetypeFitScore: 0,
+        teamIdentityScore: 0,
+        formColorCoverageScore: 0,
+        formColorFlexScore: 0,
+        classDisciplineFitScore: 0,
+        rosterBalanceScore: 0,
+        budgetFitScore: 0,
+        laneFitScore: 0,
+        valueScore: 0,
+        harmonyFitScore: 0,
+        harmonyPenalty: 0,
+        riskPenalty: 0,
+        duplicateProfilePenalty: 0,
+        offThemePenalty: 0,
+        classSpamPenalty: 0,
+        colorspamPenalty: 0,
+        evenSpreadPenalty: 0,
+        mercenaryNegativeFitPenalty: 0,
+      },
+      reasons: ["organic_squad_builder"],
+      warnings: [...buyResult.warnings],
+      expectedCashAfter: buyResult.cashAfter ?? null,
+      expectedSalaryAfter: buyResult.salaryAfter ?? null,
+      expectedRosterAfter: buyResult.rosterAfter ?? null,
+      transferHistoryId: buyResult.transferId,
+      status: "applied",
+      plannedAxisNeed: null,
+      actualPlayerPrimaryAxis: null,
+      costBandExpected: null,
+      costBandActual: null,
+      laneMatch: true,
+      axisMatch: true,
+      costBandMatch: true,
+      cheapestCandidateSeen: item?.marketValue ?? null,
+      cheapestCandidateSameAxis: null,
+      cheapestCandidateSameTeamFitBand: null,
+      cheapestCandidateSameClassFamily: null,
+      priceDeltaVsCheapest: null,
+      valueJustification: [],
+      rejectedCheaperAlternatives: [],
+      auditWarnings: [],
+    };
+    executedPicks.push(appliedPick);
+    transferHistoryIds.push(buyResult.transferId);
+    visibleTransferIds.push(buyResult.transferId);
+    liveTakenPlayerIds.add(decision.playerId);
+    executedGlobalRows.push({
+      ...appliedPick,
+      teamId: previewTeam.teamId,
+      teamName: previewTeam.teamName,
+      controlMode: activeControlMode,
+    });
+    appliedCount += 1;
+  }
+
+  // Team-end flush + result push + timing (mirrors the default path's per-team tail).
+  const afterSave = teamRunContext.deferredWrites > 0
+    ? flushLocalTransfermarktRunContext(teamRunContext)
+    : resolveStrictLocalSave(persistence, saveId);
+  const afterTeam = afterSave.gameState.teams.find((entry) => entry.teamId === teamId) ?? latestTeam;
+  for (const transferId of transferHistoryIds) {
+    if (!afterSave.gameState.transferHistory.some((entry) => entry.id === transferId)) {
+      missingTransferIds.push(transferId);
+    }
+  }
+  const afterSnapshot = buildTeamEconomySnapshot(afterSave.gameState, afterTeam);
+  const executedTeam: AiPicksRunTeamResult = {
+    ...previewTeam,
+    controlMode: activeControlMode,
+    targetRosterSize: targetInfo.targetRosterSize,
+    targetSource: targetInfo.targetSource,
+    rosterBefore: beforeSnapshot.rosterCount,
+    rosterAfter: afterSnapshot.rosterCount,
+    missingBefore: targetInfo.targetRosterSize != null ? Math.max(targetInfo.targetRosterSize - beforeSnapshot.rosterCount, 0) : null,
+    missingAfter: targetInfo.targetRosterSize != null ? Math.max(targetInfo.targetRosterSize - afterSnapshot.rosterCount, 0) : null,
+    cashBefore: beforeSnapshot.cash,
+    cashAfter: afterSnapshot.cash,
+    salaryBefore: beforeSnapshot.salaryTotal,
+    salaryAfter: afterSnapshot.salaryTotal,
+    plannedPicks: executedPicks,
+    transferHistoryIds,
+    warnings: unique(teamWarnings),
+    blockingReasons: unique(teamBlockingReasons),
+    previewSummary: previewTeam.previewSummary,
+  };
+  executedTeam.previewSummary = buildTeamPreviewSummary(executedTeam);
+  executedTeams.push(executedTeam);
+  const timing = teamTimings.get(previewTeam.teamId);
+  const executeMs = Date.now() - teamExecuteStartedAt;
+  if (timing) {
+    timing.executeMs = executeMs;
+    timing.totalMs = timing.previewMs + executeMs;
+    timing.appliedPicks = executedPicks.filter((pick) => pick.status === "applied").length;
+  }
+}
+
 function runSeason1ExecuteSpendDownTopUp(input: {
   saveId: string;
   seasonId: string;
@@ -3444,10 +3740,20 @@ export async function runAiPicksExecutePreview(
   const executedGlobalRows: GlobalPickRow[] = [];
   const executeStartedAt = Date.now();
   const liveTakenPlayerIds = new Set<string>();
+  // Organic squad builder ist jetzt DEFAULT-ON (Cutover): jedes Team pickt live bei seinem Zug aus dem
+  // Restpool, statt über den Legacy-partialExecutionPlan vorab eingefroren/ausgeschlossen zu werden (der
+  // Bug, bei dem das zuletzt gedraftete Team mit 0 Spielern endete). Opt-out nur noch explizit mit
+  // OLY_ORGANIC_SQUAD_BUILDER=0 (Legacy-Pfad für A/B-Vergleiche).
+  const useOrganicSquadBuilder = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
 
   for (const previewTeam of previewTeams) {
     const teamExecuteStartedAt = Date.now();
-    if (partialExecutionPlan?.blockedTeamIds.has(previewTeam.teamId)) {
+    // The partial-execution plan is derived from the NON-organic preview planner. When the organic
+    // squad builder owns the execute (flag on), it recomputes its OWN min-feasible plan from the live
+    // free-agent pool and never touches the preview's picks — so a preview-side team veto (e.g. the
+    // unified planner failing to reach hard-min for this team) must NOT exclude it here, or the team
+    // ends up with an empty roster despite the organic builder being able to draft it cleanly.
+    if (!useOrganicSquadBuilder && partialExecutionPlan?.blockedTeamIds.has(previewTeam.teamId)) {
       // Season-1 partial execution: this team's own narrow blocker keeps it excluded, but must
       // not prevent every other clean team from being applied (see resolveSeason1PartialExecutionPlan).
       executedTeams.push({
@@ -3535,6 +3841,36 @@ export async function runAiPicksExecutePreview(
       continue;
     }
 
+    if (useOrganicSquadBuilder) {
+      // Flag-gated organic-squad-builder execute path. Self-contained: it does its own buying,
+      // per-team flush and result push, then skips the entire default frozenTrace execute body
+      // below. When the flag is OFF this branch is never entered and the default path is unchanged.
+      runOrganicTeamDraftExecute({
+        saveId: save.saveId,
+        seasonId,
+        persistence,
+        teamRunContext,
+        latestTeam,
+        previewTeam,
+        activeControlMode,
+        targetInfo,
+        beforeSnapshot,
+        useFastBatchExecute,
+        executedPicks,
+        transferHistoryIds,
+        visibleTransferIds,
+        missingTransferIds,
+        executedGlobalRows,
+        executedTeams,
+        liveTakenPlayerIds,
+        teamTimings,
+        teamExecuteStartedAt,
+        teamWarnings,
+        teamBlockingReasons,
+      });
+      continue;
+    }
+
     const previewNonBlockedPicks = previewTeam.plannedPicks.filter((pick) => pick.status !== "blocked");
     let frozenTrace = previewNonBlockedPicks
       .filter((pick) => teamExcludedPickPlayerIds.length === 0 || !teamExcludedPickPlayerIds.includes(pick.playerId))
@@ -3580,7 +3916,22 @@ export async function runAiPicksExecutePreview(
         (player) => player.marketValue ?? player.displayMarketValue ?? null,
       ),
     );
-    const executePoolCache = new Map<string, TransfermarktFreeAgentItem[]>();
+    // Build the team's league free-agent feed once for this execute loop instead of re-deriving it
+    // per pick. `listExecuteFreeAgentsForSlot` otherwise re-enters `listLocalTransfermarktFreeAgents`
+    // on every pick, and because the market-context cache key includes rosters/transferHistory counts
+    // (which grow with each applied pick), that call rebuilds the whole ~league-wide base feed every
+    // time. The pick-selection fields (marketValue/mvs/ovr/salary/core stats/preferredDisciplineIds)
+    // are roster-invariant during the draft, so the loop-start feed is reused with an availability
+    // filter (`unavailablePlayerIds`) applied per pick — behaviour-preserving, ~O(teams) rebuilds
+    // instead of O(picks).
+    const executeBaseFreeAgents = listLocalTransfermarktFreeAgents({
+      saveId: save.saveId,
+      seasonId,
+      teamId: latestTeam.teamId,
+      mode: "ai_preview",
+      localRunContext: teamRunContext,
+      fullPool: true,
+    }).items;
     for (const frozenPick of frozenTrace) {
       const currentTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
       const loopSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam);
@@ -3615,6 +3966,9 @@ export async function runAiPicksExecutePreview(
       });
       const underMinExecute = previewTeam.targetRosterMin != null && loopSnapshot.rosterCount < previewTeam.targetRosterMin;
       const effectiveSlotLane = underMinExecute ? "cheap_fill" : slotLane;
+      const availableBaseFreeAgents = executeBaseFreeAgents.filter(
+        (item) => !unavailablePlayerIds.has(item.playerId),
+      );
       const executeFreeAgents = listExecuteFreeAgentsForSlot({
         saveId: save.saveId,
         seasonId,
@@ -3625,7 +3979,10 @@ export async function runAiPicksExecutePreview(
         slotPriceCeiling,
         affordabilityCash,
         includeCheapFillFallback: !underMinExecute,
-        poolCache: executePoolCache,
+        // Availability-filtered loop-start feed → in-memory MW-band filtering (no per-pick league
+        // rebuild). The pool already excludes taken players, so no bounds-keyed pool cache is used
+        // (it would not reflect availability and could serve a stale pool).
+        precomputedFreeAgents: availableBaseFreeAgents,
       });
       const livePick = resolveExecuteLivePickForSlot({
         saveId: save.saveId,

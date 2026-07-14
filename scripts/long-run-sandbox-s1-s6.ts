@@ -64,6 +64,7 @@ import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/seas
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applyLoanSettlement } from "@/lib/finance/loan-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
@@ -2553,6 +2554,28 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     });
   }
 
+  // Loan settlement (season-end) — mirrors season-completion-service (which the sandbox does NOT use):
+  // pay each active loan's installment from cash, reduce principalOutstanding + seasonsRemaining, close
+  // fully-repaid loans. Without this the sandbox never serviced loans → debt only accumulated and teams
+  // got the borrowed cash for free (skewing the whole multi-season economy). Runs AFTER sponsor
+  // settlement (income booked first), same order as production.
+  save = persistence.getSaveById(saveId);
+  if (save) {
+    startedAt = Date.now();
+    const loanSettle = applyLoanSettlement(save.gameState, { execute: true, seasonId });
+    if (loanSettle.applied) {
+      persistence.saveSingleplayerState(saveId, loanSettle.gameState);
+    }
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season end loan settlement",
+      startedAt,
+      itemCount: loanSettle.preview?.rows?.length ?? 0,
+      status: "ok",
+      note: `applied:${loanSettle.applied}|totalCashDelta:${loanSettle.preview?.totalCashDelta ?? 0}`,
+    });
+  }
+
   save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared before facilities.");
   console.error(`[long-run] season-end ${seasonId}: facilities`);
@@ -2671,6 +2694,12 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
 
   save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared before AI market.");
+  // Post-sponsor, PRE-SELL cash snapshot: sponsor settlement + facilities + contract tick have run,
+  // but the season-end sells/market below have NOT. This is the true "wallet" for hoarding analysis —
+  // uncontaminated by sell proceeds (a team's high END cash is often just sells, not hoarded budget).
+  const cashPostSponsorPreSellByTeamId = Object.fromEntries(
+    save.gameState.teams.map((team) => [team.teamId, round(team.cash ?? 0)]),
+  );
   console.error(`[long-run] season-end ${seasonId}: ai-market`);
   startedAt = Date.now();
   const seasonEndMatchdayId = save.gameState.matchdayState.matchdayId;
@@ -2872,6 +2901,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     aiMarketStatus: marketStatus,
     plannerFinalGateRows,
     stabilizationPurchases: seasonEndStabilizationPurchases,
+    cashPostSponsorPreSellByTeamId,
   };
 }
 
@@ -3491,11 +3521,17 @@ async function main() {
     const seasonEnd = await applySeasonEnd(save.saveId, persistence);
     performanceRows.push(...seasonEnd.performanceRows);
     plannerFinalGateRows.push(...seasonEnd.plannerFinalGateRows);
+    // Defer any abort until AFTER this completed season's rows are recorded + flushed below, so a
+    // finished season is never dropped from the reports (previously a hard blocker or a RED-audit
+    // checkpoint throw broke here, before the economy/roster rows were written — which is why S2's
+    // economy-cash-flow row went missing). The break still fires (preserving the pipeline's
+    // auto-tune-retry on RED), just after the data is safe.
+    let seasonEndFatalBreak = false;
     if (seasonEnd.blockers.length > 0) {
       const hardBlockers = seasonEnd.blockers.filter((entry) => !isSoftLongRunBlocker(seasonId, entry));
       if (hardBlockers.length > 0) {
         openTechnicalBugs.push(...hardBlockers.map((entry) => `${seasonId}:${entry}`));
-        break;
+        seasonEndFatalBreak = true;
       }
       balanceIssues.push(
         ...seasonEnd.blockers
@@ -3510,7 +3546,7 @@ async function main() {
       runPhaseCheckpoint(save.saveId, persistence, "season_end", { seasonEndBlockers: seasonEnd.blockers });
     } catch (error) {
       openTechnicalBugs.push(`${seasonId}:season_end_audit:${error instanceof Error ? error.message : String(error)}`);
-      break;
+      seasonEndFatalBreak = true;
     }
     save = persistence.getSaveById(save.saveId) ?? save;
     allSeasonSummaries.push(audit.summary);
@@ -3519,6 +3555,7 @@ async function main() {
       teamId: row.teamId,
       teamName: row.teamName,
       cash: row.cash,
+      cashPostSponsorPreSell: seasonEnd.cashPostSponsorPreSellByTeamId?.[row.teamId] ?? null,
       salarySum: row.salarySum,
       transferFeesIn: row.transferFeesIn,
       transferFeesOut: row.transferFeesOut,
@@ -3573,6 +3610,10 @@ async function main() {
       matchdayStart,
       performanceStart,
     });
+
+    // Deferred abort: the completed season's rows are now flushed, so it is safe to stop the
+    // multi-season loop on a hard blocker / RED-audit checkpoint failure.
+    if (seasonEndFatalBreak) break;
 
     if (LONG_RUN_STOP_AFTER === "season_end") {
       console.error(`[long-run] STOP_AFTER=season_end — ${seasonId} abgeschlossen, Save \`${save.saveId}\`.`);

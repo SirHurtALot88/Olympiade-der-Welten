@@ -9,8 +9,31 @@ const PRIZE_MONEY_NORMALIZED = prizeMoneyNormalized as {
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
-/** Abzug vom Referenz-Gehalt für den Rang-32-Basis-Anker (4. niedrigstes Gehalt − Buffer). */
-export const SPONSOR_BASE_SALARY_BUFFER_C = 5;
+/**
+ * Flat Gebäude-Kosten-Ausgleich auf den Sponsor-Sockel PRO TEAM. Die Gebäude verbrauchen liga-weit
+ * ~300/Season (~9–10/Team, überwiegend Upgrade-CapEx), was die Mehrsaison-Ökonomie deflationär macht.
+ * Deshalb (User-Vorgabe): Sponsor = gehaltsbasierter Sockel + flat ~500/Liga on top → pro Team
+ * 500/32 ≈ 15.6 (angehoben von 300→500, um Gebäude-Unterhalt breiter zu decken und den Kreditbedarf
+ * an der Quelle zu senken). Flach (NICHT salaryFactor-skaliert), sodass der Ausgleich bei fortschreitender
+ * Deflation relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot
+ * UND Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
+ */
+export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 15.6) || 15.6;
+
+/**
+ * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
+ * der Sockel liegt ÜBER dem 4.-niedrigsten Gehalt, sodass die ~4 gehaltsschwächsten Teams strukturell
+ * abgesichert sind und ein kleines Plus machen (Design-Regel). Vorher +5, was mit der Gehalts-Inflation
+ * (salaryFactor > 1) den Sockel unter die realen Gehälter zog und die Schwächsten ins Minus rutschen ließ.
+ */
+export const SPONSOR_BASE_SALARY_BUFFER_C = -2;
+
+/**
+ * Globale Stauchung der kumulativen Rang-Meilenstein-Leiter im Sponsor-Payout. <1 ⇒ die Spitze (die alle
+ * Meilensteine stapelt) zahlt nicht mehr komplett über: sie kappt den Top-Bonus, ohne den Sockel (der die
+ * Kleinen absichert) anzutasten. So sinkt die Rang-Spreizung Richtung der funktionierenden Preisgeld-Kurve.
+ */
+export const SPONSOR_MILESTONE_LADDER_SCALE = 0.6;
 
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
@@ -176,9 +199,11 @@ export type SponsorEconomyAnchors = {
 export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSalary: number): SponsorEconomyAnchors {
   const scaledStaticFloor = round1(SPONSOR_BASE_FLOOR_C * salaryFactor);
   const scaledAnchor = round1(baseAnchorSalary * salaryFactor);
-  const effectiveBaseFloor = round1(Math.max(scaledStaticFloor, scaledAnchor));
+  const salaryBasedFloor = round1(Math.max(scaledStaticFloor, scaledAnchor));
   const fullMilestoneBonus = getTotalMilestoneBonusC(salaryFactor);
-  const baseElevation = Math.max(0, effectiveBaseFloor - scaledStaticFloor);
+  // baseElevation/Kompression aus dem gehaltsbasierten Sockel berechnen (VOR dem Gebäude-Offset), damit
+  // der flache Offset nicht die Milestone-Kompression verzerrt.
+  const baseElevation = Math.max(0, salaryBasedFloor - scaledStaticFloor);
   const elevationAboveThreshold = Math.max(0, baseElevation - SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C);
   const compressionFactor =
     elevationAboveThreshold <= 0 || fullMilestoneBonus <= 0
@@ -186,6 +211,8 @@ export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSal
       : Math.max(0.12, 1 - elevationAboveThreshold / (fullMilestoneBonus + elevationAboveThreshold));
   const milestonePool = round1(fullMilestoneBonus * compressionFactor);
   const milestoneScale = fullMilestoneBonus > 0 ? milestonePool / fullMilestoneBonus : 0;
+  // Flat Gebäude-Kosten-Ausgleich zuletzt auf den Sockel — deckt den ~300/Liga-Gebäude-Drain (User-Vorgabe).
+  const effectiveBaseFloor = round1(salaryBasedFloor + SPONSOR_BUILDING_COST_OFFSET_C);
   return { effectiveBaseFloor, milestonePool, milestoneScale };
 }
 
@@ -198,17 +225,30 @@ export function getScaledRankMilestoneBonus(
   return round1(getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale);
 }
 
-/** Soft milestone redistribution: top slightly less, bottom slightly more. Base stays flat. */
+/**
+ * Umverteilung nach Team-Stärke (quality rank) zum SCHUTZ der schwachen Teams — hält die Top5/Bottom5-
+ * Schere (MW+Cash) unter ~2×. Zwei Hebel:
+ *  - milestoneScale: schwache Teams etwas mehr Rang-Upside (klein, ±BALANCE_C), aber sie erreichen die
+ *    Milestones ohnehin kaum → der eigentliche Schutz läuft über den Sockel.
+ *  - baseScale: die WICHTIGE Größe — schwache Teams bekommen einen deutlich höheren GARANTIERTEN Sockel
+ *    (bis +BASE_PROTECT_C), starke einen Abschlag. Da der Sockel unabhängig von der Platzierung fließt,
+ *    stützt das die Bottom-5-Einnahmen jede Season und bremst ihre Erosion (Schere öffnet nicht auf 2.4×).
+ * ENV-tunebar zum Kalibrieren gegen das Schere-Ziel.
+ */
+const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.2) || 0.2;
+const SPONSOR_QUALITY_MILESTONE_BALANCE_C = Number(process.env.OLY_SPONSOR_WEAK_MS_BALANCE ?? 0.1) || 0.1;
 export function getQualityRebalanceProfile(teamQualityRank: number | null | undefined): {
   milestoneScale: number;
+  baseScale: number;
 } {
   if (teamQualityRank == null || !Number.isFinite(teamQualityRank)) {
-    return { milestoneScale: 1 };
+    return { milestoneScale: 1, baseScale: 1 };
   }
   const t = (teamQualityRank - 16.5) / 15.5;
-  const clamped = Math.max(-1, Math.min(1, t));
+  const clamped = Math.max(-1, Math.min(1, t)); // rank 1 → -1 (stark), rank 32 → +1 (schwach)
   return {
-    milestoneScale: round1(1 + clamped * 0.1),
+    milestoneScale: round1(1 + clamped * SPONSOR_QUALITY_MILESTONE_BALANCE_C),
+    baseScale: round1(1 + clamped * SPONSOR_QUALITY_BASE_PROTECT_C),
   };
 }
 
@@ -219,7 +259,7 @@ function applyQualityRebalanceToPayout(input: {
 }) {
   const profile = getQualityRebalanceProfile(input.teamQualityRank);
   return {
-    base: input.base,
+    base: round1(input.base * profile.baseScale),
     milestoneBonus: round1(input.milestoneBonus * profile.milestoneScale),
   };
 }
@@ -238,7 +278,10 @@ export function getSponsorPayoutForFinalRankAndTier(
       ? round1(effectiveBaseFloor)
       : round1(effectiveBaseFloor * getStarTierBaseMultiplier(starTier));
   const rawMilestone = round1(
-    getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale * getStarTierMilestoneMultiplier(starTier),
+    getRankMilestoneBonus(finalRank, salaryFactor) *
+      milestoneScale *
+      SPONSOR_MILESTONE_LADDER_SCALE *
+      getStarTierMilestoneMultiplier(starTier),
   );
   const { base, milestoneBonus } = applyQualityRebalanceToPayout({
     base: rawBase,
@@ -278,9 +321,15 @@ export function buildOfferCashAmounts(input: {
 
   const rebalance = getQualityRebalanceProfile(input.teamQualityRank);
   rankCash = round1(rankCash * rebalance.milestoneScale);
+  // Schwachen-Schutz: der garantierte Sockel wird für schwache Teams angehoben (baseScale), für starke
+  // gekürzt — hält die Bottom-5 wirtschaftlich oben und die Schere unter Ziel. Muss zur Settlement-Seite
+  // (applyQualityRebalanceToPayout) passen, die denselben baseScale anwendet.
+  baseCash = round1(baseCash * rebalance.baseScale);
 
   if (input.archetype === "security") {
-    baseCash = round1(Math.max(baseCash, effectiveBaseFloor));
+    // Security behält den effektiven Sockel als harte Untergrenze (aber ein hochgeschützter schwacher
+    // Sockel darf darüber liegen).
+    baseCash = round1(Math.max(baseCash, effectiveBaseFloor * rebalance.baseScale));
   }
 
   const totalAtMaxRank = round1(

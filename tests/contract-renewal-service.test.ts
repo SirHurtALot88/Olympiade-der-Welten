@@ -512,7 +512,8 @@ describe("contract renewal service", () => {
     };
     const tightRow = previewSeasonEndContracts(tightSave).rows.find((row) => row.playerId === benchOnTightBudget.id);
     // Cash-tight teams must still not commit long-term to a bench player, no matter what the
-    // player's own organic baseline would otherwise prefer.
+    // player's own organic baseline would otherwise prefer. 1-year deals stay legitimate (clean expiry
+    // = cash generation without a buyout), so the floor is not raised.
     expect(tightRow?.recommendedLength).toBeLessThanOrEqual(2);
 
     const wealthyTeam = createTeam({ teamId: "F-F", shortCode: "F-F", cash: 200 });

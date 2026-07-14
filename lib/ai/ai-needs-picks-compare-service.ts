@@ -7112,27 +7112,39 @@ function scoreCandidate(input: {
     price != null && price > 0
       ? roundValue(
           clamp(
-            (Math.max(0, needMatchScore) * 0.45 +
+            // A2: fold raw ability (playerQualityScore) into the numerator so this is genuine
+            // "quality-per-cost", not just "fit-per-cost". Combined with the raised clamp below, a
+            // strong, well-priced player now scores real value — a marginally-better outlier priced
+            // multiples higher no longer wins on ability alone. Modest quality weight = milder tilt (G1).
+            (Math.max(0, playerQualityScore) * 0.5 +
+              Math.max(0, needMatchScore) * 0.45 +
               Math.max(0, disciplineCoverageScore) * 0.75 +
               Math.max(0, teamIdentityScore) * 0.55 +
               Math.max(0, rosterBalanceScore) * 0.35) /
               Math.max(1, price * 0.22 + (input.recommendation.salary ?? 0) * 0.65),
             0,
-            12,
+            16,
           ),
           1,
         )
       : 0;
   const laneFitScore = roundValue(
     clamp(
+      // Star/superstar now reward VALUE (quality-per-cost), like every other lane — instead of the
+      // old term that paid +4 for buying near the (uncapped) price ceiling and -3 for the cheaper
+      // in-lane option. That regression made teams grab only the most expensive star; folding
+      // valueScore back in lets a strong, well-priced 60-70 star beat a marginally-better outlier
+      // priced multiples higher. Ability still counts (playerQualityScore); value now breaks the tie.
+      // Star/superstar value weight lifted to 0.55 — the strongest historical value lane (cheap_fill)
+      // — so value bites against the uncapped raw-quality term instead of being overshadowed by it.
       input.budgetLane.lane === "superstar"
-        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + (price != null && laneCap != null && price >= laneCap * 0.72 ? 4 : -3)
+        ? playerQualityScore * 0.32 + disciplineCoverageScore * 0.12 + valueScore * 0.55
         : input.budgetLane.lane === "star"
-          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
+          ? playerQualityScore * 0.22 + disciplineCoverageScore * 0.08 + valueScore * 0.55 + (price != null && laneCap != null && price <= laneCap ? 2 : -2)
           : input.budgetLane.lane === "core"
             ? needMatchScore * 0.18 +
               rosterBalanceScore * 0.28 +
-              valueScore * 0.1 +
+              valueScore * 0.24 +
               (price != null && price >= resolveMarketBracketFloorMw("core")
                 ? price <= (MARKET_BRACKET_DEFINITIONS.find((entry) => entry.lane === "core")?.ceilingMw ?? 45)
                   ? 8
@@ -7175,6 +7187,19 @@ function scoreCandidate(input: {
         : input.budgetLane.lane === "core" || input.budgetLane.lane === "specialist"
           ? -clamp(((price / Math.max(averageSkeletonBudget * 1.5, 1)) - 1) * 8, 0, 12)
           : 0
+      : 0;
+  // A3: spend-concentration discipline for premium lanes. The per-slot skeleton penalty above skips
+  // star/superstar (returns 0) and only fires below min-roster — so nothing stopped a team from
+  // dumping a large share of its cash (and wage bill) into one budget-wrecking star. Add a soft,
+  // growing malus once a single premium buy eats more than ~30% of spendable cash. No hard cap: a
+  // genuinely cash-rich team can still afford a star; it just won't blow the roster on the priciest
+  // one when a cheaper, similar-quality option keeps cash spread across slots.
+  const spendConcentrationPenalty =
+    (input.budgetLane.lane === "superstar" || input.budgetLane.lane === "star") &&
+    price != null &&
+    remainingCash != null &&
+    remainingCash > 0
+      ? -clamp((price / remainingCash - 0.3) * 55, 0, 26)
       : 0;
   const harmonyFitScore = identityBreakdown.harmonyPenalty;
   const riskPenalty = roundValue(
@@ -7485,6 +7510,7 @@ function scoreCandidate(input: {
     phaseCapPenalty +
     riskPenalty +
     earlySkeletonCostPenalty +
+    spendConcentrationPenalty +
     duplicateProfilePenalty +
     offThemePenalty +
     classSpamPenalty +
@@ -7555,6 +7581,7 @@ function scoreCandidate(input: {
           hardBudgetPenalty +
           minimumReservePenalty +
           earlySkeletonCostPenalty +
+          spendConcentrationPenalty +
           laneNeedGatePenalty +
           laneThemeGatePenalty,
         1,

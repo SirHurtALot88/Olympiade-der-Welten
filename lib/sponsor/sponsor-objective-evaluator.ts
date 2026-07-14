@@ -2,6 +2,7 @@ import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
+  fanInfrastructureLevelSum,
   getTeamAxisRank,
   parseAxisTargetValue,
   type SponsorAxisKey,
@@ -74,6 +75,24 @@ export function evaluateSpecialComponentForObjective(
     );
     const target = typeof component.targetValue === "number" ? component.targetValue : 2;
     return performances.length >= target ? "completed" : performances.length >= target - 1 ? "at_risk" : "open";
+  }
+  if (specialKey === "fan_infrastructure") {
+    // Greift, sobald mindestens ein Income-Gebäude (fan_shop / arena_upgrade) auf L1 steht. Die
+    // eigentliche Höhe der Auszahlung skaliert dann in der Settlement mit der Gesamtstufe (siehe
+    // fanInfrastructureLevelSum / die Settlement-Skalierung) — hier nur die Ja/Nein-Schwelle.
+    const target = typeof component.targetValue === "number" ? component.targetValue : 1;
+    const levelSum = fanInfrastructureLevelSum(gameState, teamId);
+    if (levelSum >= target) return "completed";
+    return "open";
+  }
+  if (specialKey === "beat_expected_rank") {
+    // targetValue = beim Signing eingefrorene absolute Ziel-Platzierung (erwartete Qualität − margin).
+    const target = typeof component.targetValue === "number" ? component.targetValue : Number(component.targetValue);
+    const rank = row?.rank ?? null;
+    if (rank == null || !Number.isFinite(target)) return "open";
+    if (rank <= target) return "completed";
+    if (rank <= target + 2) return "at_risk";
+    return "open";
   }
   if (specialKey === "form_color_cover") {
     const rosterPlayerIds = new Set(

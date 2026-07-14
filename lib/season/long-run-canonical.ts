@@ -7,7 +7,6 @@ import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
-import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
@@ -268,7 +267,14 @@ export async function runSeasonOnePicksDraft(
   }
 
   let latest = persistence.getSaveById(saveId) ?? save;
-  if (result.executed && isEmergencyRosterRepairEnabled()) {
+  // Pflicht-Min-Fill: ein Team unter dem HARTEN Roster-Minimum hat einen nicht spielfähigen Kader, der den
+  // Saison-Preflight (teams_under_7) sprengt. Der S1-Picks-Run ist nicht-deterministisch — ein Team kann
+  // gelegentlich unter Min „ausgehungert" werden (Pool-/Timing-Varianz), obwohl genug Cash da ist. Deshalb
+  // läuft der bezahlte Min-Fill-Topup jetzt IMMER für jedes Team unter Min, nicht mehr optional hinter
+  // OLY_ENABLE_EMERGENCY_REPAIR. Die Schleife ist ein No-Op, wenn bereits alle Teams Min erreicht haben, ein
+  // sauberer Draft bleibt also unangetastet. Der Topup kauft echte Free Agents über den BEZAHLTEN Pfad
+  // (Cash abgezogen, Fee gebucht, Source season1_autoprep_topup) — kein Gratis-Filler.
+  if (result.executed) {
     const maxTopupPasses = 3;
     for (let topupPass = 0; topupPass < maxTopupPasses; topupPass += 1) {
       const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
@@ -307,13 +313,6 @@ export async function runSeasonOnePicksDraft(
       if (stillBelowMin.length === 0) {
         break;
       }
-    }
-  } else if (result.executed) {
-    const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
-    if (belowMinAfterDraft.length > 0) {
-      console.error(
-        `[long-run] S1 post-draft min topup skipped (OLY_ENABLE_EMERGENCY_REPAIR!=1): ${belowMinAfterDraft.length} teams below min`,
-      );
     }
   }
 

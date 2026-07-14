@@ -164,7 +164,22 @@ function listExecuteFreeAgentsInBounds(input: {
   teamRunContext: LocalTransfermarktRunContext;
   minMarketValue: number;
   maxMarketValue: number;
+  /**
+   * Pre-built, availability-filtered free-agent feed for this team. When provided, the MW-band
+   * pool is derived by an in-memory filter instead of re-entering the local market service — this
+   * avoids rebuilding the whole league free-agent base feed on every draft-execute pick. The bounds
+   * filter mirrors `matchesFreeAgentFilters` (min/max MW) exactly, so the returned set is identical
+   * to a fresh `listLocalTransfermarktFreeAgents` call over the same available players.
+   */
+  precomputedFreeAgents?: TransfermarktFreeAgentItem[];
 }): TransfermarktFreeAgentItem[] {
+  if (input.precomputedFreeAgents) {
+    return input.precomputedFreeAgents.filter(
+      (item) =>
+        (item.marketValue ?? Number.NEGATIVE_INFINITY) >= input.minMarketValue &&
+        (item.marketValue ?? Number.POSITIVE_INFINITY) <= input.maxMarketValue,
+    );
+  }
   return listLocalTransfermarktFreeAgents({
     saveId: input.saveId,
     seasonId: input.seasonId,
@@ -188,6 +203,13 @@ export function listExecuteFreeAgentsForSlot(input: {
   affordabilityCash: number;
   includeCheapFillFallback?: boolean;
   poolCache?: Map<string, TransfermarktFreeAgentItem[]>;
+  /**
+   * Availability-filtered league free-agent feed for this team, built once per draft-execute team
+   * loop. Threaded to `listExecuteFreeAgentsInBounds` so per-pick pool loads are an in-memory MW
+   * filter rather than a full league feed rebuild. Behaviour-preserving: the caller filters taken
+   * players out of this feed before each pick, so bounded pools match a fresh service call.
+   */
+  precomputedFreeAgents?: TransfermarktFreeAgentItem[];
 }): TransfermarktFreeAgentItem[] {
   const cacheKey = (bounds: ExecutePoolMwBounds) =>
     `${input.teamId}:${input.slotLane}:${bounds.minMarketValue}:${bounds.maxMarketValue}:${input.slotPriceCeiling ?? "na"}`;
@@ -205,6 +227,7 @@ export function listExecuteFreeAgentsForSlot(input: {
       teamRunContext: input.teamRunContext,
       minMarketValue: bounds.minMarketValue,
       maxMarketValue: bounds.maxMarketValue,
+      precomputedFreeAgents: input.precomputedFreeAgents,
     });
     input.poolCache?.set(key, items);
     return items;
@@ -257,6 +280,35 @@ function resolveNeedAxisScore(item: TransfermarktFreeAgentItem, bestNeedDiscipli
   const statPool = [item.pow ?? 0, item.spe ?? 0, item.men ?? 0, item.soc ?? 0];
   const topStat = statPool.length > 0 ? Math.max(...statPool) : 0;
   return disciplineHit + topStat * 0.22 + (item.mvs ?? item.ovr ?? 0) * 0.12;
+}
+
+/**
+ * Mild value-tilt for the execute pick ranking (G1: milder Tilt, G2: Top-Stars leicht positiv).
+ * Within an MW band the raw quality sort (mvs/ovr desc) always lands on the priciest player in the
+ * band. This discounts a candidate's quality by how far its price sits above the band floor, so a
+ * cheaper comparable player can beat the most expensive one — "hier und da ein 60er/70er". Kept mild
+ * so a genuinely superior star (much higher mvs) still wins its slot.
+ */
+const EXECUTE_VALUE_TILT_STRENGTH = 0.15;
+
+function executeValueAdjustedQuality(input: {
+  quality: number;
+  marketValue: number | null | undefined;
+  slotLane: MarketPickLane;
+  brackets: LeagueMarketBrackets;
+}): number {
+  const price = input.marketValue ?? 0;
+  if (price <= 0 || input.quality <= 0) {
+    return input.quality;
+  }
+  const band = getBracketBandForPickLane(input.slotLane, input.brackets);
+  const floor = band.floorMW;
+  // Superstar has no ceiling — use a nominal band width so the tilt still applies at the top end.
+  const ceiling = Number.isFinite(band.ceilingMW) ? band.ceilingMW : floor * 1.65;
+  const bandRef = Math.max(1, ceiling - floor);
+  const priceExcess = Math.max(0, price - floor);
+  const tilt = EXECUTE_VALUE_TILT_STRENGTH * Math.min(1, priceExcess / bandRef);
+  return input.quality * (1 - tilt);
 }
 
 function isPriceInSlotBand(input: {
@@ -347,12 +399,18 @@ function resolveExecuteLivePickForLane(input: {
     .map((item) => ({
       item,
       needRankScore: resolveNeedAxisScore(item, input.bestNeedDisciplineId),
+      valueAdjustedQuality: executeValueAdjustedQuality({
+        quality: item.mvs ?? item.ovr ?? 0,
+        marketValue: item.marketValue,
+        slotLane: input.slotLane,
+        brackets: input.brackets,
+      }),
     }))
     .sort((left, right) => {
       if (right.needRankScore !== left.needRankScore) {
         return right.needRankScore - left.needRankScore;
       }
-      return (right.item.mvs ?? right.item.ovr ?? 0) - (left.item.mvs ?? left.item.ovr ?? 0);
+      return right.valueAdjustedQuality - left.valueAdjustedQuality;
     });
 
   for (const entry of ranked) {

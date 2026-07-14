@@ -23,6 +23,9 @@ function createFreshSeasonOneSaveId() {
   return `fresh-season-1-${Date.now()}`;
 }
 
+/** Env-gated (OLY_PERF_COUNT_SAVES=1) profiling counter for saveSingleplayerState cost. No behaviour change. */
+const SAVE_PERF = { count: 0, ms: 0 };
+
 export function createPersistenceService(): PersistenceService {
   const saveRepository = createSaveRepository();
 
@@ -63,13 +66,23 @@ export function createPersistenceService(): PersistenceService {
       return saveRepository.getSaveVersionMetadata(saveId);
     },
     saveSingleplayerState(saveId, gameState, input) {
+      const perfCount = process.env.OLY_PERF_COUNT_SAVES === "1";
+      const t0 = perfCount ? Number(process.hrtime.bigint()) : 0;
       const existing = saveRepository.getSaveById(saveId);
       const nextGameState = withNextSaveVersion(gameState, existing?.gameState.saveVersion);
-      return saveRepository.saveGameState({
+      const result = saveRepository.saveGameState({
         saveId,
         status: input?.status ?? existing?.status,
         gameState: nextGameState,
       });
+      if (perfCount) {
+        SAVE_PERF.count += 1;
+        SAVE_PERF.ms += (Number(process.hrtime.bigint()) - t0) / 1e6;
+        if (SAVE_PERF.count % 25 === 0) {
+          console.error(`[perf-saves] count=${SAVE_PERF.count} totalMs=${SAVE_PERF.ms.toFixed(0)} avgMs=${(SAVE_PERF.ms / SAVE_PERF.count).toFixed(0)}`);
+        }
+      }
+      return result;
     },
     createSave(name) {
       const save = saveRepository.createSaveFromSeed({

@@ -91,6 +91,14 @@ const LOCAL_SELL_WINDOW_PHASES = new Set<NonNullable<GameState["gamePhase"]>>([
 
 const LOCAL_SYSTEM_SELL_SOURCES = new Set([
   "ai_preseason_market_sell",
+  // Organic-squad-builder season-end sell cycle (flag OLY_ORGANIC_SQUAD_BUILDER). Like the other
+  // AI-driven batch sell sources it runs inside the season_end transfer-window session, so it must
+  // bypass the interactive sell-window gate — otherwise every organic sell is blocked with
+  // "sell_only_at_season_end" and no trader/surplus flip ever executes across seasons.
+  "ai_organic_squad_sell",
+  // Weak-team upgrade swap (flag OLY_WEAK_TEAM_UPGRADE_SWAP): a distinct source for the season-end
+  // hoarder churn-out so it is countable/auditable separately from ordinary surplus/profit sells.
+  "ai_organic_squad_upgrade_sell",
   "emergency_negative_cash_liquidation",
   "preseason_proactive_cash_recovery_sell",
   "full_churn_roster_sell",

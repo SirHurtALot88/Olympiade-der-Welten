@@ -2,7 +2,23 @@ import type { SeasonEconomyFactorRecord, SeasonState } from "@/lib/data/olyDataT
 
 export const SEASON_ECONOMY_FACTOR_WINDOW_SIZE = 5;
 
-const DEFAULT_SEASON_FACTOR_VALUES = [1.09, 1.21, 1.16, 0.97, 0.9];
+/**
+ * Uniform shift added to BOTH the default per-season pattern AND the random roll range (both ends), so the
+ * whole salary-factor distribution can be raised/lowered with one knob. Default 0.1 (validated): a same-seed
+ * A/B (shift 0 vs 0.1) showed the whole league MW+Cash ~+10% richer at every season with the top/bottom gap
+ * essentially unchanged (peak Schere 1.87 vs 1.84, still <2.0) and the bottom-5 absolutely richer — the
+ * mean factor lifts above ~1.0 so the economy trends up instead of slowly shrinking, and because the shift
+ * is uniform the ratio-based Schere barely moves. Set OLY_SALARY_FACTOR_SHIFT=0 to restore the old
+ * neutral pattern. NOTE: the effect COMPOUNDS across seasons, so keep it modest.
+ */
+const SALARY_FACTOR_SHIFT = Number(process.env.OLY_SALARY_FACTOR_SHIFT ?? 0.1) || 0;
+/** Random roll range for future (beyond-default-window) seasons, both ends shiftable via SALARY_FACTOR_SHIFT. */
+const SALARY_FACTOR_ROLL_MIN = 0.82 + SALARY_FACTOR_SHIFT;
+const SALARY_FACTOR_ROLL_WIDTH = 0.42;
+
+const DEFAULT_SEASON_FACTOR_VALUES = [1.09, 1.21, 1.16, 0.97, 0.9].map(
+  (value) => Math.round((value + SALARY_FACTOR_SHIFT) * 100) / 100,
+);
 
 type SheetFactorInput = {
   seasonLabel: string;
@@ -42,7 +58,7 @@ function createSeededRandom(seed: string) {
 
 function rollFutureSeasonFactor(seed: string) {
   const random = createSeededRandom(seed);
-  return round2(0.82 + random() * 0.42);
+  return round2(SALARY_FACTOR_ROLL_MIN + random() * SALARY_FACTOR_ROLL_WIDTH);
 }
 
 function normalizeSheetFactors(sheetFactors?: SheetFactorInput[]) {

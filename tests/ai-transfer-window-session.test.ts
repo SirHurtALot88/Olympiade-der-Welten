@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi , afterEach} from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -31,6 +31,7 @@ function buildGameState(overrides?: Partial<GameState>): GameState {
       slot: index,
     })),
     players: [],
+    disciplines: [],
     transferHistory: [],
     ...overrides,
   } as GameState;
@@ -95,8 +96,15 @@ function buildShrinkingSellPersistence(initialRosterSize: number) {
 }
 
 describe("ai transfer window session service", () => {
+  // Der Organic Squad Builder ist jetzt DEFAULT-ON (Cutover). Diese Suite prüft gezielt den Legacy-Pfad
+  // (Mock-basiert), daher wird organic hier explizit per Opt-out (=0) abgeschaltet. Die Organic-Verhalten
+  // sind in den organic-*-Testdateien + im Long-Run abgedeckt.
   beforeEach(() => {
+    process.env.OLY_ORGANIC_SQUAD_BUILDER = "0";
     applyAiMarketPlanLocally.mockReset();
+  });
+  afterEach(() => {
+    delete process.env.OLY_ORGANIC_SQUAD_BUILDER;
   });
 
   // Design correction (2026-07-04): "Verkauf findet separat statt und vor allem VOR dem Kaufen" —

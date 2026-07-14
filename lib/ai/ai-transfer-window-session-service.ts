@@ -18,21 +18,37 @@ import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-
 import { runPreseasonBatchPickRebuild } from "@/lib/ai/preseason-batch-pick-rebuild-service";
 import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
-import { resolveAiEarlyPayoffDecision } from "@/lib/ai/ai-loan-decision-service";
-import { applyEarlyPayoff } from "@/lib/finance/loan-service";
+import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
+import { applyEarlyPayoff, buildLoanOffers, originateLoan } from "@/lib/finance/loan-service";
 import {
   createLocalTransfermarktRunContext,
+  executeLocalTransfermarktBuy,
+  executeLocalTransfermarktSell,
   flushLocalTransfermarktRunContext,
+  listLocalTransfermarktFreeAgents,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
+import {
+  planOrganicDraftForTeam,
+  planOrganicSellsForTeam,
+  resolveOrganicRenewalContractLength,
+} from "@/lib/ai/organic-squad/draft-adapter";
+import { applyContractRenewalAction, previewContractRenewalAction } from "@/lib/contracts/contract-renewal-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
 export type TransferWindowPhase = "preseason" | "season_end";
+
+// Optional per-run seed salt (env, default empty) so a FIXED base save can produce VARIED organic
+// buy/sell composition across repeated A/B comparison runs: a different salt → a different but fully
+// reproducible jitter pattern, the same salt → identical results. Empty (production default) leaves the
+// draftSeed exactly as before, so nothing changes unless a run explicitly opts in.
+const ORGANIC_SEED_SALT = process.env.OLY_ORGANIC_SEED_SALT?.trim() || "";
+const saltOrganicSeed = (base: string) => (ORGANIC_SEED_SALT ? `${ORGANIC_SEED_SALT}:${base}` : base);
 
 export type TransferWindowSessionInput = {
   saveId: string;
@@ -245,21 +261,257 @@ async function runTeamCycle(input: {
     }
   }
 
+  // Organic-squad-builder cycle (flag: OLY_ORGANIC_SQUAD_BUILDER, default OFF). Same per-team unit as
+  // runSellPass/runBuyPass — it returns via the same closure accumulators (appliedSells/appliedBuys/
+  // applyResult/warnings) and mutates the same exclusion sets, so the outer-loop bookkeeping is
+  // unchanged. Respects the hard phase separation: input.allowSells (season_end) ⇒ organic SELLS only,
+  // input.allowBuys (preseason) ⇒ organic BUYS only. The outer loop never sets both in one cycle.
+  function organicRosterEntries(gameState: GameState, teamId: string) {
+    // Trivial replica of ai-picks-run-service.getTeamRosterPlayers (not exported): each roster entry
+    // paired with its domain Player, so the sell call has the roster entry `id` (activePlayerId). Also
+    // carries the entry's cost basis (purchasePrice → profit-flip term) and contract state (whether the
+    // player is expiring, i.e. renewal-eligible) for the season-end renew→sell decision.
+    const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
+    const entries: Array<{
+      activePlayerId: string;
+      player: Player;
+      purchasePrice: number | null;
+      contractLength: number;
+      contractStatus?: ContractStatus;
+    }> = [];
+    for (const entry of gameState.rosters) {
+      if (entry.teamId !== teamId) continue;
+      const player = playersById.get(entry.playerId);
+      if (player) {
+        entries.push({
+          activePlayerId: entry.id,
+          player,
+          purchasePrice: entry.purchasePrice ?? null,
+          contractLength: entry.contractLength,
+          contractStatus: entry.contractStatus,
+        });
+      }
+    }
+    return entries;
+  }
+
+  async function runOrganicSellCycle() {
+    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!save) return;
+    const gameState = save.gameState;
+    const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
+    if (!team) return;
+    const entries = organicRosterEntries(gameState, input.teamId).filter(
+      (entry) => !input.excludeSellPlayerIds.has(entry.player.id),
+    );
+    if (entries.length === 0) return;
+    const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+
+    // Organic season-end economic flow: score every held player with the organic sell model (profit +
+    // coverage + patience). High-sellUtility bodies are the SELLABLE surplus/profit-flips; everyone
+    // else is a KEEPER. purchasePrice (cost basis) feeds the profit-flip term so a trader sheds gains.
+    const purchasePriceByPlayerId: Record<string, number> = {};
+    for (const entry of entries) {
+      if (typeof entry.purchasePrice === "number" && Number.isFinite(entry.purchasePrice)) {
+        purchasePriceByPlayerId[entry.player.id] = entry.purchasePrice;
+      }
+    }
+    const plan = planOrganicSellsForTeam({
+      gameState,
+      team,
+      identity,
+      roster: entries.map((entry) => entry.player),
+      purchasePriceByPlayerId,
+      // Season-end sell cycle: allow shedding below ROSTER_MIN (empty is fine — preseason rebuilds),
+      // so profit/surplus sells fire even when the draft left the team exactly at min.
+      allowBelowMin: true,
+      draftSeed: saltOrganicSeed(`${input.saveId}:${input.teamId}`),
+    });
+    warnings.push(`organic_squad_builder_sell:decisions=${plan.decisions.length}`);
+    const upgradeChurnCount = plan.decisions.filter((decision) => decision.reason === "upgrade_churn").length;
+    if (upgradeChurnCount > 0) {
+      warnings.push(`organic_squad_builder_upgrade_swap:sheds=${upgradeChurnCount}`);
+    }
+    const sellPlayerIds = new Set(plan.decisions.map((decision) => decision.playerId));
+
+    // (1) RENEW keepers BEFORE selling (product intent "renew before sell"): for each non-sold player
+    // whose contract is already expiring (length 0 / renewal-eligible — the per-season −1 decrement and
+    // exit are existing engine behaviour we do NOT re-apply here), extend it via the existing
+    // contract-renewal service at the identity/GM-derived length. Non-eligible players (still under
+    // contract) need no action; keepers the renewal gate rejects (not affordable/valid) fall through to
+    // the existing contract-exit machinery. Reuses previewContractRenewalAction for the confirm token
+    // and affordability/validity gate, then applyContractRenewalAction to write.
+    const renewLength = resolveOrganicRenewalContractLength({ gameState, team, identity });
+    let renewed = 0;
+    for (const entry of entries) {
+      if (sellPlayerIds.has(entry.player.id)) continue; // surplus/profit-flip → sold below, not renewed
+      const renewalEligible =
+        entry.contractLength <= 0 ||
+        entry.contractStatus === "renewal_pending" ||
+        entry.contractStatus === "out_of_contract";
+      if (!renewalEligible) continue; // still under contract → stays without action
+      const renewSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+      if (!renewSave) break;
+      const preview = previewContractRenewalAction({
+        save: renewSave,
+        teamId: input.teamId,
+        playerId: entry.player.id,
+        action: "renew",
+        contractLength: renewLength,
+      });
+      if (!preview.ok) continue; // not affordable/eligible/blocked → let contract-exit handle it
+      const applied = applyContractRenewalAction({
+        save: renewSave,
+        teamId: input.teamId,
+        playerId: entry.player.id,
+        action: "renew",
+        confirmToken: preview.confirmToken,
+        persistence: input.persistence,
+        contractLength: renewLength,
+        source: "ai_contract_renewal",
+      });
+      if (!applied.applied) continue;
+      renewed += 1;
+      // applyContractRenewalAction persists the full derived gameState directly (bypassing the deferred
+      // run-context buffer). Re-sync the run context to that persisted state so subsequent sells build
+      // on the renewed roster and the session's final flush does not clobber the renewal.
+      if (input.sessionRunContext) {
+        const reloaded = input.persistence.getSaveById(input.saveId);
+        if (reloaded) input.sessionRunContext.save = reloaded;
+      }
+    }
+    if (renewed > 0) warnings.push(`organic_squad_builder_renew:renewed=${renewed}:length=${renewLength}`);
+
+    // (2) SELL the sellable surplus/profit-flips (unchanged execute path; ROSTER_MIN respected upstream
+    // by planOrganicSellsForTeam). The remaining non-renewed, non-sold players are left to contract-exit.
+    const activePlayerIdByPlayerId = new Map(entries.map((entry) => [entry.player.id, entry.activePlayerId]));
+    for (const decision of plan.decisions) {
+      const activePlayerId = activePlayerIdByPlayerId.get(decision.playerId);
+      if (!activePlayerId) continue;
+      const sellResult = executeLocalTransfermarktSell({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        activePlayerId,
+        transferSource:
+          decision.reason === "upgrade_churn" ? "ai_organic_squad_upgrade_sell" : "ai_organic_squad_sell",
+        localRunContext: input.sessionRunContext,
+        deferPersist: true,
+      });
+      if (!sellResult.transferCreated) {
+        warnings.push(...sellResult.blockingReasons.slice(0, 2));
+        continue;
+      }
+      appliedSells += 1;
+      input.excludeSellPlayerIds.add(decision.playerId);
+    }
+  }
+
+  function runOrganicBuyCycle() {
+    const save = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!save) return;
+    const gameState = save.gameState;
+    const team = gameState.teams.find((entry) => entry.teamId === input.teamId);
+    if (!team) return;
+    const rosterPlayerIds = new Set(organicRosterEntries(gameState, input.teamId).map((entry) => entry.player.id));
+    const startingSquad = organicRosterEntries(gameState, input.teamId).map((entry) => entry.player);
+    const freeAgentItems = listLocalTransfermarktFreeAgents({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      mode: "ai_preview",
+      localRunContext: input.sessionRunContext,
+      fullPool: true,
+    }).items;
+    const playersById = new Map<string, Player>(gameState.players.map((player) => [player.id, player]));
+    const candidates: Player[] = [];
+    for (const item of freeAgentItems) {
+      if (input.excludeBuyPlayerIds.has(item.playerId) || rosterPlayerIds.has(item.playerId)) continue;
+      const player = playersById.get(item.playerId);
+      if (player) candidates.push(player);
+    }
+    const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+    // Preseason buys reuse the draft planner with the CURRENT roster as the startingSquad.
+    const plan = planOrganicDraftForTeam({
+      gameState,
+      team,
+      identity,
+      startingSquad,
+      candidates,
+      draftSeed: saltOrganicSeed(`${input.saveId}:${input.teamId}`),
+    });
+    warnings.push(`organic_squad_builder_buy:decisions=${plan.decisions.length}`);
+    if (plan.stoppedBelowMin) warnings.push("organic_squad_builder_stopped_below_min");
+
+    // PURE BUY (clean two-phase model — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc):
+    // the preseason cycle only ever BUYS. It spends the team's CURRENT cash to fill toward min/opt with the
+    // organic buy planner; it never sells. All selling happens exclusively at season end
+    // (runOrganicSellCycle) — a team enters the preseason with whatever roster + cash it has and buys up
+    // from there. Because this cycle only buys, the roster can only GROW here, so a preseason buy pass can
+    // never shrink a team below the count it needs to field a lineup (that guarantee is what makes
+    // autoprep's teams_under_7 preflight safe). The buy list is a RANKED wishlist; a single unbuyable pick
+    // (raced away or priced out at apply) is SKIPPED, not fatal — the team keeps buying the rest of its
+    // ranked plan, and the outer convergence loop re-plans it next cycle/round until it reaches min/opt or
+    // runs out of cash. A failed pick is added to the exclude set so it is never re-proposed: earlier the
+    // loop `break`d on the first failure and left the pick in play, so one plan/execute affordability
+    // disagreement re-proposed the same unbuyable pick every cycle and stranded the team permanently below
+    // min (the 2026-07-13 S2 buy-convergence stall). Continuing past it can only ever buy MORE of the
+    // roster (each buy is validated against live cash independently), never overspend.
+    for (const decision of plan.decisions) {
+      if (input.excludeBuyPlayerIds.has(decision.playerId)) continue;
+      const buyResult = executeLocalTransfermarktBuy({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        playerId: decision.playerId,
+        transferSource: "ai_organic_squad_buy",
+        localRunContext: input.sessionRunContext,
+        deferPersist: true,
+      });
+      if (!buyResult.transferCreated || !buyResult.transferId) {
+        warnings.push(...buyResult.blockingReasons.slice(0, 2));
+        if (applyResult !== "applied") applyResult = "hold";
+        input.excludeBuyPlayerIds.add(decision.playerId); // don't re-propose an unbuyable pick next cycle
+        continue;
+      }
+      appliedBuys += 1;
+      applyResult = "applied";
+      input.excludeBuyPlayerIds.add(decision.playerId);
+    }
+  }
+
+  async function runOrganicTeamCycle() {
+    if (input.allowSells) await runOrganicSellCycle();
+    if (input.allowBuys) runOrganicBuyCycle();
+  }
+
+  // Organic squad builder DEFAULT-ON (Cutover). Opt-out nur explizit mit OLY_ORGANIC_SQUAD_BUILDER=0.
+  const useOrganic = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
+
   // Strict phase separation: season_end cycles sell-only, preseason cycles buy-only.
   // Replace-mode floor sells belong in the S1 season_end pass, not paired inside S2 buy cycles.
-  if (input.allowSells) {
-    await runSellPass(mandate);
-  }
-  const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
-  const postSellMandate =
-    afterSellSave != null ? resolvePostOptUpgradeMandate(afterSellSave.gameState, input.teamId) : null;
-  if (input.allowBuys) {
-    await runBuyPass(postSellMandate);
+  if (useOrganic) {
+    await runOrganicTeamCycle();
+  } else {
+    if (input.allowSells) {
+      await runSellPass(mandate);
+    }
+    const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    const postSellMandate =
+      afterSellSave != null ? resolvePostOptUpgradeMandate(afterSellSave.gameState, input.teamId) : null;
+    if (input.allowBuys) {
+      await runBuyPass(postSellMandate);
+    }
   }
 
   if (input.progressLog && (appliedSells > 0 || appliedBuys > 0)) {
+    // Engine label reflects the ACTUAL executor: under OLY_ORGANIC_SQUAD_BUILDER the per-team buy/sell
+    // ran through the organic squad builder (runOrganicBuyCycle/runOrganicSellCycle), NOT the unified/
+    // legacy convergence path — resolveActiveConvergencePickEngine only knows the unified-market flag, so
+    // labelling organic runs "unified" was misleading in the log.
+    const engineLabel = useOrganic ? "organic" : resolveActiveConvergencePickEngine();
     console.error(
-      `[transfer-window] ${input.seasonId} ${input.teamId} round=${input.leagueRound} cycle=${input.cycleIndex} engine=${resolveActiveConvergencePickEngine()} sells=${appliedSells} buys=${appliedBuys}`,
+      `[transfer-window] ${input.seasonId} ${input.teamId} round=${input.leagueRound} cycle=${input.cycleIndex} engine=${engineLabel} sells=${appliedSells} buys=${appliedBuys}`,
     );
   }
 
@@ -357,9 +609,68 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // re-diagnosed as the latter and tracked separately (see the progress log entry for this session);
   // fixing that properly belongs in the preseason buy convergence path, not as a sell-side limiter.
 
+  // Organic cutover (MP-P5): when the organic squad builder is the active engine, the preseason BUYS
+  // must run through the same organic per-team cycle (runOrganicBuyCycle — trade-down, salary reserve,
+  // seed/strategy variance) as the S1 draft and the season-end sells, NOT the legacy Unified batch
+  // rebuild. Otherwise all the organic balancing is bypassed for the main buy phase. So the batch path
+  // is disabled under the organic flag and the per-team loop below (which dispatches to the organic
+  // cycle) owns the preseason buys.
+  // Organic squad builder DEFAULT-ON (Cutover). Opt-out nur explizit mit OLY_ORGANIC_SQUAD_BUILDER=0.
+  const useOrganicEngine = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
   const preseasonBuyMode = input.preseasonBuyMode ?? "s1_draft_batch";
   const usePreseasonS1DraftBatch =
-    isPreseasonBuyPhase && allowBuys && isUnifiedPickEnabledForMarket() && preseasonBuyMode === "s1_draft_batch";
+    isPreseasonBuyPhase &&
+    allowBuys &&
+    isUnifiedPickEnabledForMarket() &&
+    preseasonBuyMode === "s1_draft_batch" &&
+    !useOrganicEngine;
+
+  // Phase 2 KI-Anbindung — Kreditaufnahme im ORGANIC-Preseason (docs/design/kredit-system.md,
+  // "KI-Anbindung"): der Bank-/Team-Kredit-Hook lebt in runAiPicksExecutePreview (S1-Draft +
+  // Legacy-Batch-Rebuild), aber unter OLY_ORGANIC_SQUAD_BUILDER laufen die S2+ Preseason-Käufe durch
+  // runOrganicBuyCycle und umgehen diesen Pfad komplett — die KI würde also nie einen Kredit aufnehmen,
+  // egal wie knapp die Kasse ist. Dieser Pass schließt die Lücke: EINMALIG pro Team, VOR den Kaufzyklen,
+  // bedarfsgetrieben (resolveAiLoanDecision: Roster < Opt + Cash-Lücke + Kapazität frei, Season 1 hart
+  // ausgenommen). Das geliehene Cash wird in die Session (persist + sessionRunContext.save) geschrieben,
+  // damit die anschließende Kaufschleife das erhöhte Budget sieht. Nur im Organic-Pfad, damit es sich
+  // nicht mit dem Batch-Hook (der bereits über runAiPicksExecutePreview leiht) doppelt.
+  if (useOrganicEngine && isPreseasonBuyPhase && allowBuys && !input.dryRun) {
+    const borrowSave = readLiveSave();
+    if (borrowSave) {
+      const borrowTeamIds = scopeTeam(borrowSave.gameState.teams.map((team) => team.teamId)).filter(
+        (teamId) => (getTeamControlSettings(borrowSave!.gameState, teamId)?.controlMode ?? "ai") === "ai",
+      );
+      for (const teamId of borrowTeamIds) {
+        const current = readLiveSave();
+        if (!current) break;
+        const loanDecision = resolveAiLoanDecision(current.gameState, teamId);
+        if (!loanDecision.shouldBorrow) continue;
+        // Günstigstes Angebot (Bank oder Team); buildLoanOffers ist aufsteigend nach Zinssatz sortiert
+        // und enthält immer die Bank, es gibt also mindestens ein Angebot.
+        const offers = buildLoanOffers(current.gameState, teamId, loanDecision.loanAmount, loanDecision.termSeasons);
+        const bestOffer = offers[0] ?? null;
+        const loanResult = originateLoan(
+          current.gameState,
+          {
+            borrowerTeamId: teamId,
+            principal: loanDecision.loanAmount,
+            termSeasons: loanDecision.termSeasons,
+            lenderType: bestOffer?.lenderType ?? "bank",
+            lenderTeamId: bestOffer?.lenderTeamId ?? undefined,
+          },
+          { execute: true },
+        );
+        if (!loanResult.ok) continue;
+        const persisted = persistence.saveSingleplayerState(input.saveId, loanResult.gameState);
+        if (sessionRunContext) {
+          // Nur Cash + seasonState.loans ändern sich — die Free-Agent-/Player-Caches des RunContext
+          // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
+          sessionRunContext.save = persisted;
+        }
+        warnings.push(`ai_loan_borrow:${teamId}:${loanDecision.loanAmount}:${loanDecision.termSeasons}s`);
+      }
+    }
+  }
 
   if (usePreseasonS1DraftBatch) {
     const batchSave = readLiveSave();

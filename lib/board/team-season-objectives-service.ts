@@ -19,6 +19,17 @@ import {
   evaluateSponsorImprovementObjective,
   evaluateSponsorRankObjective,
 } from "@/lib/sponsor/sponsor-objective-evaluator";
+import { buildLeagueMarketBrackets, classifyMarketBracket } from "@/lib/ai/market-pick-engine/market-brackets";
+import {
+  BOARD_V2_CALIBRATION,
+  BOARD_V2_CAPTAIN,
+  BOARD_V2_COMPOSITION,
+  BOARD_V2_DISPOSITION,
+  BOARD_V2_NET_TRANSFER,
+  BOARD_V2_SLATE,
+  isBoardObjectivesV2Enabled,
+} from "@/lib/board/board-objectives-config";
+import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -718,6 +729,159 @@ export function getSportTarget(input: {
   return strengthReady ? { rank: 12, label: "Breite Playoff-Zone erreichen" } : { rank: 16, label: "Mittelfeld erreichen" };
 }
 
+/**
+ * Board-Objectives V2 — expected league rank from team strength (composite of PPs + market-value
+ * rank), the same signal getSportTarget uses internally, extracted for reuse by the calibrated
+ * targets. Lower = stronger (1 = strongest team).
+ */
+function resolveExpectedLeagueRank(input: {
+  teamId: string;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+}) {
+  const ppsRank = getRelativeMetricRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId, metric: "ppsTotal" }).rank;
+  const marketValueRank = getRelativeMetricRank({
+    teamId: input.teamId,
+    rowsByTeamId: input.rowsByTeamId,
+    metric: "marketValueTotal",
+  }).rank;
+  return Math.round((ppsRank * 2 + marketValueRank) / 3);
+}
+
+/**
+ * Board disposition (Slice 3): ambition + patience that drift with recent results. Derived from
+ * identity temperament plus a normalized "last season vs expectation" signal (the carried board
+ * value relative to neutral). F1: disappointment (low carried value) lowers patience + ambition;
+ * overperformance raises both. Multi-season memory comes for free via the board-value carry.
+ */
+export function resolveBoardDisposition(input: {
+  identity: TeamIdentity | null;
+  previousSeasonBoard?: TeamBoardConfidenceRecord | null;
+}) {
+  const baseAmbition = clamp((input.identity?.ambition ?? 5) / 10, 0, 1);
+  const seed = normalizeBoardConfidence(input.identity?.boardConfidence ?? null);
+  const basePatience = clamp(0.5 * (seed / 10) + 0.5 * ((input.identity?.harmony ?? 5) / 10), 0.1, 0.95);
+  // Performance signal in [-~0.8, +1.0]: previous-season board value above/below neutral.
+  const perf =
+    input.previousSeasonBoard?.value != null
+      ? (input.previousSeasonBoard.value - BOARD_V2_DISPOSITION.neutralValue) / BOARD_V2_DISPOSITION.neutralValue
+      : 0;
+  const ambition = clamp(
+    baseAmbition + perf * BOARD_V2_DISPOSITION.ambitionResponse,
+    BOARD_V2_DISPOSITION.ambitionMin,
+    BOARD_V2_DISPOSITION.ambitionMax,
+  );
+  const patience = clamp(
+    basePatience + perf * BOARD_V2_DISPOSITION.patienceResponse,
+    BOARD_V2_DISPOSITION.patienceMin,
+    BOARD_V2_DISPOSITION.patienceMax,
+  );
+  return { ambition, patience };
+}
+
+/**
+ * V2 calibrated sport target: targetRank = expectedRank − stretch(ambition). Replaces the hardcoded
+ * tier ladder + per-team shortCode special-cases with a strength-relative goal — weak teams get an
+ * achievable "hold your ground" target, strong+ambitious teams get a real climb. Organic, no quotas.
+ * `ambition01` overrides the identity ambition with the dynamic disposition value when provided.
+ */
+export function getSportTargetV2(input: {
+  identity: TeamIdentity | null;
+  teamId: string;
+  rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  ambition01?: number;
+}) {
+  const leagueSize = Math.max(1, input.rowsByTeamId.size);
+  const expectedRank = clamp(resolveExpectedLeagueRank({ teamId: input.teamId, rowsByTeamId: input.rowsByTeamId }), 1, leagueSize);
+  const ambition01 = clamp(input.ambition01 ?? (input.identity?.ambition ?? 5) / 10, 0, 1);
+  let maxStretch = BOARD_V2_CALIBRATION.maxStretch;
+  if (expectedRank >= BOARD_V2_CALIBRATION.bottomDampFromRank) {
+    maxStretch *= BOARD_V2_CALIBRATION.bottomDampFactor;
+  }
+  const stretch = Math.round(BOARD_V2_CALIBRATION.minStretch + (maxStretch - BOARD_V2_CALIBRATION.minStretch) * ambition01);
+  const rank = clamp(expectedRank - stretch, 1, leagueSize);
+  const label =
+    stretch <= 0
+      ? `Erwartung bestätigen (~Rang ${rank})`
+      : `Rang ${rank} angreifen (Stärke-Erwartung ~${expectedRank})`;
+  return { rank, label };
+}
+
+/**
+ * V2 finance goal (replaces the tautological "cash > 0"): a net transfer-balance target scaled by
+ * cash priority + season maturity — a real "run a sustainable transfer economy" objective.
+ */
+function getNetTransferBalanceObjective(input: {
+  row: TeamManagementSnapshotRow;
+  profile: TeamStrategyProfile | null;
+  seasonNum: number;
+}): ObjectiveDraft {
+  const cashPriority = input.profile?.bias.cashPriority ?? 5;
+  const seasonScale = Math.min(1 + (input.seasonNum - 1) * 0.15, 1.6);
+  const target = roundValue(
+    Math.max(0, BOARD_V2_NET_TRANSFER.baseTargetM + (cashPriority - 5) * BOARD_V2_NET_TRANSFER.perCashPriorityM) * seasonScale,
+    1,
+  );
+  const current = roundValue(input.row.transferNet ?? 0, 1);
+  const status = statusForMin(input.row.transferNet ?? null, target);
+  return {
+    objectiveId: "finance-net-transfer-balance",
+    category: "finance",
+    label: target > 0 ? `Transferbilanz ≥ ${target}M` : "Transferbilanz stabil halten",
+    targetValue: target,
+    currentValue: current,
+    status,
+    rewardCash: target > 0 ? 4 : undefined,
+    penaltyCash: target > 0 ? 3 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+    source: "board_v2_net_transfer_balance",
+  };
+}
+
+/**
+ * V2 roster goal (replaces the trivial "roster >= N"): minimum share of non-reserve players
+ * (superstar+star+core+depth via fixed market-value tiers) on the roster, nudged by ambition. This
+ * is the organic composition metric — a team is judged on squad *quality mix*, not headcount. No
+ * hard tier quotas: it's a share target the AI/human satisfies by buying real core/depth over reserve.
+ */
+function getRosterQualityCompositionObjective(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+}): ObjectiveDraft {
+  const brackets = buildLeagueMarketBrackets(
+    input.gameState.players.map((player) => player.marketValue ?? player.displayMarketValue ?? null),
+  );
+  const rosterPlayerIds = new Set(
+    input.gameState.rosters.filter((entry) => entry.teamId === input.team.teamId).map((entry) => entry.playerId),
+  );
+  const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+  const rosterPlayers = [...rosterPlayerIds].map((id) => playersById.get(id)).filter((player): player is NonNullable<typeof player> => Boolean(player));
+  const rosterCount = rosterPlayers.length;
+  const nonReserve = rosterPlayers.filter((player) => {
+    const tier = classifyMarketBracket(player.marketValue ?? player.displayMarketValue ?? null, brackets);
+    return tier !== "Reserve" && tier !== "Backup";
+  }).length;
+  const currentShare = rosterCount > 0 ? nonReserve / rosterCount : 0;
+  const ambition = input.identity?.ambition ?? 5;
+  const targetShare = clamp(
+    BOARD_V2_COMPOSITION.baseCoreShare + (ambition - 5) * BOARD_V2_COMPOSITION.perAmbitionShare,
+    BOARD_V2_COMPOSITION.minCoreShare,
+    BOARD_V2_COMPOSITION.maxCoreShare,
+  );
+  const status = statusForMin(currentShare, targetShare);
+  return {
+    objectiveId: "roster-quality-composition",
+    category: "roster",
+    label: `Kaderqualität: ≥ ${Math.round(targetShare * 100)}% Kern/Depth/Star`,
+    detail: `Aktuell ${Math.round(currentShare * 100)}% Nicht-Reserve (${nonReserve}/${rosterCount}).`,
+    targetValue: roundValue(targetShare, 2),
+    currentValue: roundValue(currentShare, 2),
+    status,
+    boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" ? -0.6 : status === "at_risk" ? -0.15 : 0,
+    source: "board_v2_roster_quality_composition",
+  };
+}
+
 function getPreferredAxisObjective(input: {
   team: Team;
   identity: TeamIdentity | null;
@@ -1252,15 +1416,18 @@ function pickUrgentObjective(objectives: ObjectiveDraft[], category: TeamSeasonO
   );
 }
 
-function selectBoardObjectiveDrafts(input: {
+export function selectBoardObjectiveDrafts(input: {
   objectives: ObjectiveDraft[];
   profile: TeamStrategyProfile | null;
   identity: TeamIdentity | null;
+  slateSize?: number;
 }) {
+  // F4: slate size is dynamic under V2 (3–5 by disposition); defaults to the legacy fixed 4.
+  const slateSize = input.slateSize ?? 4;
   const picked: ObjectiveDraft[] = [];
   const add = (objective: ObjectiveDraft | null) => {
     if (!objective || picked.some((entry) => entry.objectiveId === objective.objectiveId)) return;
-    if (picked.length < 4) picked.push(objective);
+    if (picked.length < slateSize) picked.push(objective);
   };
 
   // Slot 1 (primary sport goal): the expectation-rank objective — "beat the finish your squad
@@ -1415,7 +1582,25 @@ function buildTeamObjectives(input: {
   profile: TeamStrategyProfile | null;
 }): TeamSeasonObjectiveRecord[] {
   const { gameState, team, row, rowsByTeamId, identity, profile } = input;
-  const sportTarget = getSportTarget({ team, identity, profile, row, rowsByTeamId });
+  const boardV2 = isBoardObjectivesV2Enabled();
+  const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
+  const storedBoard = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
+  const disposition = boardV2 ? resolveBoardDisposition({ identity, previousSeasonBoard }) : null;
+  const sportTarget = boardV2
+    ? getSportTargetV2({ identity, teamId: team.teamId, rowsByTeamId, ambition01: disposition?.ambition })
+    : getSportTarget({ team, identity, profile, row, rowsByTeamId });
+  // F4: dynamic slate size 3–5 from disposition ambition + last-known perceived pressure.
+  const slateSize = disposition
+    ? clamp(
+        BOARD_V2_SLATE.minSize +
+          Math.round(
+            (BOARD_V2_SLATE.maxSize - BOARD_V2_SLATE.minSize) *
+              (0.5 * disposition.ambition + 0.5 * ((storedBoard?.perceivedPressure ?? storedBoard?.pressure ?? 5) / 10)),
+          ),
+        BOARD_V2_SLATE.minSize,
+        BOARD_V2_SLATE.maxSize,
+      )
+    : 4;
   const seasonNum = resolveSeasonNumberFromState(gameState) ?? 1;
   const isInitialSeason = seasonNum === 1;
   // C-C and high-profit teams have a transfer target that scales up over seasons.
@@ -1440,6 +1625,7 @@ function buildTeamObjectives(input: {
   const objectiveDrafts = selectBoardObjectiveDrafts({
     identity,
     profile,
+    slateSize,
     objectives: [
       {
         objectiveId: `sport-rank-${sportTarget.rank}`,
@@ -1456,23 +1642,33 @@ function buildTeamObjectives(input: {
       getPreferredAxisObjective({ team, identity, profile, row }),
       getAxisRankObjective({ team, identity, profile, rowsByTeamId }),
       getAllRoundAxisObjective({ team, identity, profile, rowsByTeamId }),
+      // From origin/main: richer board objective slate.
       getExpectationRankObjective({ team, identity, profile, row, rowsByTeamId }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
       getTransferSpendCeilingObjective({ team, identity, profile, row }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
-      {
-        objectiveId: "finance-cash-positive",
-        category: "finance",
-        label: "Cash positiv halten",
-        targetValue: "> 0",
-        currentValue: row.cash,
-        status: (row.cash ?? 0) >= 0 ? "completed" : "failed",
-        penaltyCash: (row.cash ?? 0) < 0 ? 3 : undefined,
-        boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
-        source: "active_local_team_cash",
-      },
+      // From the balancing branch: V2 replaces the tautological "cash > 0" with a real
+      // net-transfer-balance goal; V1 keeps the plain cash-positive objective (so no duplicate with the
+      // standalone cash-positive that origin/main added — this conditional subsumes it).
+      boardV2
+        ? getNetTransferBalanceObjective({ row, profile, seasonNum })
+        : {
+            objectiveId: "finance-cash-positive",
+            category: "finance",
+            label: "Cash positiv halten",
+            targetValue: "> 0",
+            currentValue: row.cash,
+            status: (row.cash ?? 0) >= 0 ? "completed" : "failed",
+            penaltyCash: (row.cash ?? 0) < 0 ? 3 : undefined,
+            boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
+            source: "active_local_team_cash",
+          },
       buildSalaryPressureObjective({ row, rowsByTeamId, seasonId: gameState.season.id }),
       transferObjective,
+      // From the balancing branch: V2 adds a composition-quality (non-reserve share) roster goal. The old
+      // V1 "roster >= N" objective (getRosterTarget) was removed on origin/main, so V1 now has no roster
+      // objective here — null is filtered out of the slate below.
+      boardV2 ? getRosterQualityCompositionObjective({ gameState, team, identity }) : null,
       getFormColorObjective(gameState, team),
       getNextMatchdayTop10Objective(gameState, team),
       getMatchdayMedalObjective({ gameState, team, identity, profile }),
@@ -1559,7 +1755,7 @@ function mergeStoredTeamObjectives(input: {
   return [...merged, ...input.generated.filter((objective) => !storedIds.has(objective.objectiveId))];
 }
 
-function calculateBoardConfidence(input: {
+export function calculateBoardConfidence(input: {
   teamId: string;
   identity: TeamIdentity | null;
   objectives: TeamSeasonObjectiveRecord[];
@@ -1567,13 +1763,17 @@ function calculateBoardConfidence(input: {
   previousSeasonBoard?: TeamBoardConfidenceRecord | null;
   gmChangedThisSeason?: boolean;
   neutralPreseasonBoard?: boolean;
+  /** Slice 4 (F2): team captain's leadership score; dampens perceivedPressure under V2. */
+  captainLeadershipScore?: number | null;
 }): TeamBoardConfidenceRecord {
+  const boardV2 = isBoardObjectivesV2Enabled();
   if (input.neutralPreseasonBoard) {
     return {
       teamId: input.teamId,
       value: DEFAULT_BOARD_RATING,
       pressure: DEFAULT_BOARD_RATING,
       warnings: [],
+      ...(boardV2 ? { perceivedPressure: DEFAULT_BOARD_RATING, pressureMomentum: 0 } : {}),
     };
   }
   const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
@@ -1594,11 +1794,32 @@ function calculateBoardConfidence(input: {
   const atRisk = input.objectives.filter((objective) => objective.status === "at_risk").length;
   const value = roundValue(clamp(base + delta, 1, 10), 1);
   const pressure = roundValue(clamp(11 - value + failed * 0.8 + atRisk * 0.35, 1, 10), 1);
+
+  // V2 perceived-pressure layer: momentum-smoothed pressure minus a patience damp derived from the
+  // board's temperament. Goals never move; only the *felt* pressure has its own (laggier) dynamics.
+  // Slice 3 makes `patience` dynamic (disposition); here it's an identity-temperament proxy.
+  let perceivedPressure: number | undefined;
+  let pressureMomentum: number | undefined;
+  if (boardV2) {
+    const rawGap = failed * 0.8 + atRisk * 0.35;
+    const prevMomentum = input.storedBoard?.pressureMomentum ?? rawGap;
+    pressureMomentum = roundValue(0.6 * prevMomentum + 0.4 * rawGap, 2);
+    // Slice 3 (F1): patience is now the dynamic disposition value — disappointment (low carried board
+    // value) lowers it, so a struggling team's board escalates pressure faster.
+    const patience = resolveBoardDisposition({ identity: input.identity, previousSeasonBoard: input.previousSeasonBoard }).patience;
+    const patienceDamp = 2.5 * patience;
+    // Slice 4 (F2): a strong captain absorbs pressure — lowers perceivedPressure (and thereby GM-firing
+    // risk + AI panic, which read it). Goals are untouched.
+    const captainDamp = clamp((input.captainLeadershipScore ?? 0) / BOARD_V2_CAPTAIN.leadershipDivisor, 0, BOARD_V2_CAPTAIN.maxDamp);
+    perceivedPressure = roundValue(clamp(11 - value + pressureMomentum - patienceDamp - captainDamp, 1, 10), 1);
+  }
+
+  const effectivePressure = perceivedPressure ?? pressure;
   const warnings = [
     input.storedBoard ? "board_confidence_source_saved_state" : null,
     failed > 0 ? "board_objectives_failed" : null,
     atRisk > 0 ? "board_objectives_at_risk" : null,
-    pressure >= 8 ? "high_board_pressure" : null,
+    effectivePressure >= 8 ? "high_board_pressure" : null,
   ].filter((warning): warning is string => Boolean(warning));
 
   return {
@@ -1606,6 +1827,7 @@ function calculateBoardConfidence(input: {
     value,
     pressure,
     warnings,
+    ...(boardV2 ? { perceivedPressure, pressureMomentum } : {}),
   };
 }
 
@@ -1653,7 +1875,8 @@ function buildAiBias(input: {
     }
   }
   const hasAxisPushNeed = Object.values(axisPriorities).some((value) => (value ?? 0) >= 0.7);
-  const pressureFactor = input.board.pressure / 10;
+  // V2: react to the perceived-pressure layer when present (falls back to raw pressure under V1).
+  const pressureFactor = (input.board.perceivedPressure ?? input.board.pressure) / 10;
   const budgetConservatism = clamp((hasFinanceRisk ? 0.65 : 0.35) + pressureFactor * 0.15, 0, 1);
   const sellAggression = clamp((hasFinanceRisk ? 0.7 : 0.35) + pressureFactor * 0.25, 0, 1);
   const buyAggression = clamp(
@@ -1721,6 +1944,11 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
     const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
     const gmAssignment = gameState.seasonState.teamGeneralManagers?.[team.teamId];
     const gmChangedThisSeason = gmAssignment?.assignedSeasonId === gameState.season.id;
+    // Slice 4 (F2): captain leadership dampens perceivedPressure under V2. selectTeamCaptain auto-derives
+    // the top-leadership roster player, so this works even when no captain was manually assigned.
+    const captainLeadershipScore = isBoardObjectivesV2Enabled()
+      ? selectTeamCaptain(gameState, team.teamId)?.leadershipScore ?? null
+      : null;
     const board = calculateBoardConfidence({
       teamId: team.teamId,
       identity,
@@ -1729,6 +1957,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       previousSeasonBoard,
       gmChangedThisSeason,
       neutralPreseasonBoard,
+      captainLeadershipScore,
     });
     boardConfidence[team.teamId] = board;
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives: teamObjectives, board });

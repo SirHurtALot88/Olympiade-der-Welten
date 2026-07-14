@@ -71,7 +71,7 @@ export function buildPremiumFirstSlotSequence(input: SlotSequenceInput): MarketP
   return slotPlan.slice(0, input.steps);
 }
 
-function stableDraftHash(value: string) {
+export function stableDraftHash(value: string) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
@@ -80,7 +80,7 @@ function stableDraftHash(value: string) {
   return hash >>> 0;
 }
 
-function draftUnit(seed: string) {
+export function draftUnit(seed: string) {
   return (stableDraftHash(seed) % 10000) / 9999;
 }
 

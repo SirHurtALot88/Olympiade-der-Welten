@@ -38,6 +38,12 @@ export function isSoftPhaseAuditRed(
 ) {
   // S2 preseason: no buildings yet is expected (manager skips on insufficient_cash).
   if (checkId === "facilities_active" && phase === "preseason" && seasonId === "season-2") return true;
+  // Preseason roster min is NOT a hard binding at season entry (see
+  // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc): a team may sell down to 0 at season end and
+  // buys back up to min/opt with the cash it has via the organic engine (incl. trade-down). A club that
+  // genuinely can't reach min with its available cash is an acceptable outcome, not a run-pausing failure
+  // — so roster_post_buy is a soft red (logged, never hard-stops the resilient run).
+  if (checkId === "roster_post_buy" && phase === "preseason") return true;
   // TEMP diagnostic-only escape hatch (2026-07-04): unrelated, pre-existing draft-RNG issue
   // (team S-S consistently ~72% draft spend) blocks getting a fresh draft past the audit gate
   // to test the sell/buy phase-separation fix in preseason/season_end. Not a real fix; only

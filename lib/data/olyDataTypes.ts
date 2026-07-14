@@ -1270,6 +1270,14 @@ export type TeamBoardConfidenceRecord = {
   value: number;
   pressure: number;
   warnings: string[];
+  /**
+   * Board-Objectives V2 (OLY_BOARD_OBJECTIVES_V2): the perceived-pressure layer — a momentum-smoothed,
+   * patience-adjusted pressure distinct from the raw inverse-of-value `pressure`. Consequences (GM
+   * firing, AI bias, GM psychology) read this when present. Undefined under V1.
+   */
+  perceivedPressure?: number;
+  /** V2 EMA state for perceivedPressure momentum, carried across refreshes/seasons. */
+  pressureMomentum?: number;
 };
 
 export type TeamRelationshipEventRecord = {

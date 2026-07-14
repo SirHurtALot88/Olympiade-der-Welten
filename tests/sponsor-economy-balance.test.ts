@@ -22,6 +22,7 @@ import {
   resolveSponsorEconomyAnchors,
   SPONSOR_BASE_FLOOR_C,
   SPONSOR_BASE_SALARY_BUFFER_C,
+  SPONSOR_BUILDING_COST_OFFSET_C,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
@@ -225,7 +226,11 @@ describe("sponsor economy balance", () => {
     const top = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
 
     expect(top).toBeGreaterThan(bottom);
-    expect(top / bottom).toBeGreaterThan(1.8);
+    // Der flache Gebäude-Offset (SPONSOR_BUILDING_COST_OFFSET_C, angehoben 300→500) hebt den Sockel
+    // additiv und komprimiert damit bewusst die relative Rang-Spreizung (der schwächste Rang profitiert
+    // relativ mehr — genau der beabsichtigte Deflations-Ausgleich). Top zahlt weiterhin klar mehr
+    // (~1.7×), nur nicht mehr >1.8× wie beim kleineren Offset.
+    expect(top / bottom).toBeGreaterThan(1.65);
     expect(top / bottom).toBeLessThan(3.5);
   });
 
@@ -301,7 +306,9 @@ describe("sponsor economy balance", () => {
     const twoStar = getSponsorPayoutForFinalRankAndTier(1, factor, 2, leagueMin);
     const oneStar = getSponsorPayoutForFinalRankAndTier(1, factor, 1, leagueMin);
 
-    expect(fiveStar).toBeGreaterThan(95);
+    // Milestone ladder compressed (SPONSOR_MILESTONE_LADDER_SCALE) so the 5★ champion no longer
+    // over-pays: still a strong ~2× base-floor premium, but capped well below the old steep curve.
+    expect(fiveStar).toBeGreaterThan(80);
     expect(twoStar).toBeLessThan(fiveStar * 0.92);
     expect(oneStar).toBeLessThan(twoStar);
     expect(fiveStar / oneStar).toBeGreaterThan(1.12);
@@ -398,8 +405,13 @@ describe("sponsor economy balance", () => {
     const settled = runSingleTeamSettlement(gameState, rrTeam.teamId);
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, rrTeam.teamId);
 
-    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98);
-    expect(payout).toBeLessThanOrEqual(leagueMin * salaryFactor * 1.08);
+    // Bounds include (a) den flachen Gebäude-Kosten-Offset auf dem Sockel (SPONSOR_BUILDING_COST_OFFSET_C)
+    // und (b) den Schwachen-Schutz: R-R ist das schwächste Team (quality rank ~32) und bekommt daher einen
+    // um bis zu ~+20 % angehobenen GARANTIERTEN Sockel (baseScale, OLY_SPONSOR_WEAK_BASE_PROTECT) — genau
+    // das hält die Top5/Bottom5-Schere unter Ziel. Deshalb liegt die Obergrenze ~×1.2 über dem reinen Sockel.
+    const weakProtect = 1.2;
+    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98 + SPONSOR_BUILDING_COST_OFFSET_C);
+    expect(payout).toBeLessThanOrEqual((leagueMin * salaryFactor * 1.08 + SPONSOR_BUILDING_COST_OFFSET_C) * weakProtect + 2);
   }, 60000);
 
   it("rewards rank-28 milestone for bottom teams", () => {
@@ -476,7 +488,9 @@ describe("sponsor economy balance", () => {
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, mmTeam.teamId);
     const baseFloor = leagueMin * salaryFactor;
 
-    expect(payout).toBeGreaterThan(baseFloor * 1.5);
+    // Compressed milestone ladder: top teams keep a meaningful upside over the base floor (~1.3–1.5×),
+    // just not the old steep multiple.
+    expect(payout).toBeGreaterThan(baseFloor * 1.3);
     expect(payout).toBeLessThan(115);
   }, 60000);
 

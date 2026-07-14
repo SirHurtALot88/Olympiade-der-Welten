@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi , afterEach} from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -19,6 +19,9 @@ const persistenceState = {
 
 vi.mock("@/lib/ai/ai-needs-picks-compare-service", () => ({
   buildAiNeedsPicksCompare,
+  // Mirror real module exports the service imports (mock drift caused "No <name> export" errors).
+  DRAFT_MAX_STEPS_CAP: 20,
+  isSeason1SpendDownRequired: () => false,
   resolveExpectedAiPickCostBandFromLane: (lane: string | null | undefined) => {
     const normalized = String(lane ?? "").trim().toLowerCase();
     if (["cheap_fill", "expensive_minimum_fill", "budget_risk_pick"].includes(normalized)) return "cheap_fill";
@@ -527,7 +530,13 @@ function buildCompareEntry(teamId: "C-C" | "W-W", pickClassName: string, playerI
 }
 
 describe("ai picks run service", () => {
+  // Organic Squad Builder ist jetzt DEFAULT-ON (Cutover); diese Mock-basierte Suite prüft den Legacy-Pfad
+  // und schaltet organic daher explizit per Opt-out (=0) ab. Organic ist über organic-* + Long-Run gedeckt.
+  afterEach(() => {
+    delete process.env.OLY_ORGANIC_SQUAD_BUILDER;
+  });
   beforeEach(() => {
+    process.env.OLY_ORGANIC_SQUAD_BUILDER = "0";
     persistenceState.save.gameState = buildGameState();
     buildAiNeedsPicksCompare.mockReset();
     previewLocalTransfermarktBuy.mockReset();

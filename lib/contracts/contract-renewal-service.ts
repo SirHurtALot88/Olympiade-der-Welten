@@ -213,6 +213,10 @@ function getRecommendedLength(
     (rating?.mvsRank != null && rating.mvsRank <= 40);
   const conservativeTeam = (team?.cash ?? 0) < 40;
 
+  // 1-Jahres-Verträge sind bewusst ERLAUBT: ein auslaufender Vertrag erzeugt einen sauberen Exit
+  // (Erlös ~MW, OHNE Buyout-Restgehalt) und ist damit ein legitimes Cash-Generierungs-Werkzeug — lange
+  // Verträge würden Teams beim Verkauf in den Buyout zwingen. Länge bleibt deshalb rollen-/wert-/cash-
+  // abhängig gebunden (kein Hardcode-Floor), die tatsächliche Länge kommt aus der organischen Präferenz.
   let min = 1;
   let max = 5;
   if (role === "starter" && highValue && !conservativeTeam) {
@@ -231,6 +235,27 @@ function getRecommendedLength(
 
   const organicBaseline = buildPlayerContractPreference(player, teamStrategyProfile)?.idealLength ?? 2;
   return Math.max(min, Math.min(max, organicBaseline));
+}
+
+/**
+ * Phase B — Sicherheits-Rabatt fürs Gehalt bei LÄNGEREN Verträgen. Ein zufriedener (hohe Morale),
+ * loyaler Spieler gibt für die Sicherheit einer längeren Bindung Gehalt ab; je länger der Vertrag und je
+ * zufriedener/loyaler, desto größer der Rabatt (gedeckelt). Greift erst ab 3 Jahren — kurze Verträge
+ * bekommen keinen Rabatt (da ist keine „Sicherheit" zu vergüten).
+ */
+function resolveLengthSecurityDiscount(
+  morale: PlayerMoraleAssessment | null | undefined,
+  recommendedLength: number,
+  profile: TeamStrategyProfile | null,
+): number {
+  if (recommendedLength <= 2) return 0;
+  const moraleScore = morale?.morale ?? 50; // 0..100
+  const contentment = clamp01((moraleScore - 50) / 50); // 0 bei neutral, 1 bei Top-Morale
+  if (contentment <= 0) return 0;
+  const extraYears = recommendedLength - 2; // 1 bei 3y … 3 bei 5y
+  const loyalty = clamp01((profile?.bias.loyaltyBias ?? 5) / 10);
+  // Max ~12 % bei Top-Morale + 5-Jahres-Vertrag + loyaler Kultur.
+  return Math.min(0.15, contentment * extraYears * 0.04 * (0.6 + 0.4 * loyalty));
 }
 
 function getTeamRosterCount(gameState: GameState, teamId: string) {
@@ -398,6 +423,35 @@ export function resolveContractExitRenewBias(input: {
   };
 }
 
+/**
+ * Quality proxy on the OVR ~0–100 scale for players WITHOUT a computed OVR. The organic squad builder
+ * deliberately leaves mvs/ovr null and scores from stats, so `rawOvrScore`/`player.rating` are 0/null
+ * for its players — which made EVERY renewal signal below fail and `badValueContract` fire for the
+ * whole league (ratingValue < 65 is always true at 0), so no keeper was ever renewed and rosters
+ * collapsed season over season. Fall back to a core-stat average plus a small "solide discipline"
+ * breadth bonus so the OVR-based signals + badValueContract behave sensibly for stats-only players.
+ */
+function resolveStatsQualityScore(player: Player | null): number {
+  const cs = player?.coreStats;
+  if (!cs) return 0;
+  const core = ((cs.pow ?? 0) + (cs.spe ?? 0) + (cs.men ?? 0) + (cs.soc ?? 0)) / 4;
+  let solide = 0;
+  for (const value of Object.values(player?.disciplineRatings ?? {})) {
+    if (typeof value === "number" && value > 60) solide += 1;
+  }
+  return core + Math.min(solide, 6) * 2;
+}
+
+/** OVR when present, otherwise the stats-based quality proxy (organic players carry no OVR). */
+function resolveContractRatingValue(
+  rating: { rawOvrScore?: number | null } | null,
+  player: Player | null,
+): number {
+  const ovr = rating?.rawOvrScore ?? player?.rating ?? null;
+  if (typeof ovr === "number" && ovr > 0) return ovr;
+  return resolveStatsQualityScore(player);
+}
+
 function shouldAiRenewContract(input: {
   entry: RosterEntry;
   player: Player | null;
@@ -441,7 +495,7 @@ function shouldAiRenewContract(input: {
     entry.currentValue ??
     entry.purchasePrice ??
     0;
-  const ratingValue = rating?.rawOvrScore ?? player?.rating ?? 0;
+  const ratingValue = resolveContractRatingValue(rating, player);
   const salaryAfterRenewal = renewalSalaryPreview ?? entry.salary ?? 0;
   const salaryToMarketRatio = marketValue > 0 ? salaryAfterRenewal / marketValue : 1;
   const badValueContract = marketValue > 0 && salaryToMarketRatio > 0.42 && ratingValue < 65;
@@ -805,7 +859,17 @@ function buildPreviewRow(input: {
         renewalSalaryPreview: negotiationPreview.expectedSalary,
       })
     : null;
-  const moraleAdjustedRenewalSalary = applyMoraleToSalary(negotiationPreview.expectedSalary, morale);
+  // Phase B: a motivated (high-morale) / loyal player accepts a further discount for the SECURITY of a
+  // longer commitment — the longer the offered contract, the more salary they'll give up, scaled by how
+  // content they are and the club's loyalty culture. Gives teams a real lever: bind willing players LONG
+  // AND cheaper (deine „motivierte Spieler akzeptieren weniger Gehalt für Sicherheit"-Idee). Only kicks in
+  // above 2 years and is capped, so it never turns into a fire-sale of wages.
+  const moraleSalaryBase = applyMoraleToSalary(negotiationPreview.expectedSalary, morale);
+  const lengthSecurityDiscount = resolveLengthSecurityDiscount(morale, recommendedLength, teamStrategyProfile);
+  const moraleAdjustedRenewalSalary =
+    moraleSalaryBase != null && lengthSecurityDiscount > 0
+      ? roundMoney(moraleSalaryBase * (1 - lengthSecurityDiscount)) ?? moraleSalaryBase
+      : moraleSalaryBase;
   const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
   const exit = buildContractExitValue(save.gameState, player, entry);
   const renewalCashGate = buildAiRenewalCashGate({
@@ -833,7 +897,7 @@ function buildPreviewRow(input: {
     player?.marketValue ??
     entry.currentValue ??
     0;
-  const ratingValueForBad = rating?.rawOvrScore ?? player?.rating ?? 0;
+  const ratingValueForBad = resolveContractRatingValue(rating, player);
   const salaryAfterRenewalForBad = moraleAdjustedRenewalSalary ?? entry.salary ?? 0;
   const salaryToMarketRatioForBad = marketValueForBad > 0 ? salaryAfterRenewalForBad / marketValueForBad : 1;
   const badValueContract =
