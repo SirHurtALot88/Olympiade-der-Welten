@@ -423,28 +423,49 @@ export async function POST(request: Request) {
   } else if (body.action === "activate") {
     save = persistence.activateSave(body.saveId);
   } else if (body.action === "fresh-season-1") {
-    save = persistence.createFreshSeasonOneSave({
-      name: body.name,
+    const created = persistence.createFreshSeasonOneSave({ name: body.name });
+    // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a
+    // roster/lineup. The whole-league roster-fill (~40s) runs in the BACKGROUND (detached) on this long-lived
+    // custom Node server so the "new game" request returns immediately instead of blocking ~40s (which would
+    // time out behind a proxy). We mark the save "in_progress" now; the background fill flips it to "ready"
+    // when every team is populated (or "failed" on error, retryable from the Cockpit). The UI shows a
+    // "Liga wird erstellt…" gate and polls until "ready".
+    const setupSaveId = created.saveId;
+    const setupSeasonId = created.gameState.season.id;
+    save = persistence.saveSingleplayerState(setupSaveId, {
+      ...created.gameState,
+      seasonState: { ...created.gameState.seasonState, leagueSetupStatus: "in_progress" },
     });
-    // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has
-    // a lineup. Populate the whole league here at creation (the Roster-Fill engine is now safe + batched)
-    // so a human never lands on unplayable empty AI teams and never has to find/click the Cockpit admin tool.
-    // Non-fatal: if the fill errors, the save is still returned and the fill can be retried from the Cockpit.
-    try {
-      await runAutoRosterFillForMatchdaySetup(
-        {
-          source: "sqlite",
-          saveId: save.saveId,
-          seasonId: save.gameState.season.id,
-          dryRun: false,
-          confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
-        },
-        persistence,
-      );
-      save = persistence.getSaveById(save.saveId) ?? save;
-    } catch (error) {
-      console.error("[fresh-season-1] auto roster-fill failed (save still created):", error);
-    }
+    void (async () => {
+      try {
+        await runAutoRosterFillForMatchdaySetup(
+          {
+            source: "sqlite",
+            saveId: setupSaveId,
+            seasonId: setupSeasonId,
+            dryRun: false,
+            confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+          },
+          persistence,
+        );
+        const filled = persistence.getSaveById(setupSaveId);
+        if (filled) {
+          persistence.saveSingleplayerState(setupSaveId, {
+            ...filled.gameState,
+            seasonState: { ...filled.gameState.seasonState, leagueSetupStatus: "ready" },
+          });
+        }
+      } catch (error) {
+        console.error("[fresh-season-1] background roster-fill failed (retryable from Cockpit):", error);
+        const errored = persistence.getSaveById(setupSaveId);
+        if (errored) {
+          persistence.saveSingleplayerState(setupSaveId, {
+            ...errored.gameState,
+            seasonState: { ...errored.gameState.seasonState, leagueSetupStatus: "failed" },
+          });
+        }
+      }
+    })();
   } else if (body.action === "assign-team-captain") {
     if (!body.saveId || !body.teamId || !body.playerId) {
       return NextResponse.json({ error: "saveId, teamId and playerId are required." }, { status: 400 });

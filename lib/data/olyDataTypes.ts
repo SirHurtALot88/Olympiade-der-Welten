@@ -2208,6 +2208,14 @@ export type SeasonState = {
   schedule: Fixture[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[];
   seasonEconomyFactors?: SeasonEconomyFactorRecord[];
+  /**
+   * Fresh-Season-1 league setup: the AI teams' rosters are auto-filled in the background right after the
+   * save is created (the fill takes ~40s). "in_progress" while it runs, "ready" once every team has a roster,
+   * "failed" if the background fill errored (the human can retry the fill from the Cockpit). Absent = no
+   * background setup pending (e.g. an already-populated save). The UI shows a "Liga wird erstellt…" state and
+   * polls until "ready" before letting the human start matchdays.
+   */
+  leagueSetupStatus?: "in_progress" | "ready" | "failed";
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;
