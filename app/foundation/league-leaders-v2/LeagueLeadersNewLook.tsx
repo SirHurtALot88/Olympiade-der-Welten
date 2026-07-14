@@ -16,6 +16,8 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { LeagueLeaderCategory, LeagueLeaderEntry, LeagueLeaderTone } from "@/lib/foundation/league-leaders-service";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import {
@@ -47,9 +49,13 @@ import {
  * ist komplett aus `category.entries` berechnet — inkl. des absoluten
  * `entry.rank` des besten eigenen Spielers, wenn er gelistet ist.
  *
+ * Spieler-Portraits werden über `entry.playerId` aufgelöst — derselbe
+ * Mechanismus (`getPlayerPortraitBrowserUrl` + `BudgetedMediaImage`) wie in
+ * der Spieler-Tabelle/dem Leader-Podium (siehe `FoundationPlayersTableNewLook`
+ * / `FoundationPlayersLeaderPodium`). Ohne auflösbares Portrait (oder bei
+ * Ladefehler) fällt jeder Avatar ehrlich auf die Initialen zurück.
+ *
  * Bewusst weggelassen, weil es dafür keine echten Daten gibt:
- * - keine Spieler-Portraits (`LeagueLeaderEntry` trägt keine Portrait-URL,
- *   nur Name/Team) — stattdessen Initialen-Avatare,
  * - keine Rang-Bewegung/Trends (nicht in den Props vorhanden),
  * - kein erfundener Rang außerhalb der gelisteten Einträge: ist kein eigener
  *   Spieler in `entries`, zeigt "Dein Bester" ehrlich "außerhalb Top N".
@@ -74,6 +80,38 @@ function getLeaderInitials(name: string): string {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "?"
+  );
+}
+
+/**
+ * Avatar für eine Leader-/Rekord-Zeile: löst das Portrait über `playerId`
+ * per `getPlayerPortraitBrowserUrl` auf — derselbe Mechanismus wie in
+ * `FoundationPlayersTableNewLook`/`FoundationPlayersLeaderPodium`
+ * (`BudgetedMediaImage`, "thumb"-Variante für die kleinen Kreis-Avatare).
+ * Ohne auflösbares Portrait oder bei Ladefehler greift ehrlich der
+ * Initialen-Fallback (`BudgetedMediaImage`/`OptimizedMediaImage`s eigener
+ * `fallback`-Mechanismus).
+ */
+function LeaderAvatar({ playerId, name, className }: { playerId: string; name: string; className: string }) {
+  const portraitSrc = getPlayerPortraitBrowserUrl(playerId, null, null, { variant: "thumb" });
+  const initials = getLeaderInitials(name);
+  return (
+    <span className={className} aria-hidden="true">
+      {portraitSrc ? (
+        <BudgetedMediaImage
+          className="nl-leaders-avatar-img"
+          src={portraitSrc}
+          alt={name}
+          width={44}
+          height={44}
+          loading="lazy"
+          fetchPriority="low"
+          fallback={initials}
+        />
+      ) : (
+        initials
+      )}
+    </span>
   );
 }
 
@@ -264,9 +302,7 @@ export default function LeagueLeadersNewLook({
                   onClick={() => onOpenPlayer(leader.playerId)}
                   title={`${leader.name} · ${leader.teamName} · Profil öffnen`}
                 >
-                  <span className="nl-leaders-hero-avatar" aria-hidden="true">
-                    {getLeaderInitials(leader.name)}
-                  </span>
+                  <LeaderAvatar playerId={leader.playerId} name={leader.name} className="nl-leaders-hero-avatar" />
                   <span className="nl-leaders-hero-copy">
                     <span className="nl-leaders-hero-rankline">
                       <NlMedalBadge kind="gold" title={`Rang 1 · ${category.label}`} />
@@ -296,9 +332,7 @@ export default function LeagueLeadersNewLook({
                         style={{ width: `${getLeaderBarPercent(entry, topValue)}%` }}
                       />
                       <span className="nl-leaders-row-rank nl-tnum">{entry.rank}</span>
-                      <span className="nl-leaders-row-avatar" aria-hidden="true">
-                        {getLeaderInitials(entry.name)}
-                      </span>
+                      <LeaderAvatar playerId={entry.playerId} name={entry.name} className="nl-leaders-row-avatar" />
                       <span className="nl-leaders-row-player">
                         <strong>{entry.name}</strong>
                         <small>{entry.teamCode ?? entry.teamName}</small>
@@ -559,9 +593,7 @@ function LeagueRecordsPanel({
                   title={`${row.playerName} · Profil öffnen`}
                 >
                   <span className="nl-leaders-row-rank nl-tnum">{index + 1}</span>
-                  <span className="nl-leaders-row-avatar" aria-hidden="true">
-                    {getLeaderInitials(row.playerName)}
-                  </span>
+                  <LeaderAvatar playerId={row.playerId} name={row.playerName} className="nl-leaders-row-avatar" />
                   <span className="nl-leaders-row-player">
                     <strong>{row.playerName}</strong>
                     <small>

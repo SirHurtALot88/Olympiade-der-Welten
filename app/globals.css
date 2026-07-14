@@ -43750,6 +43750,8 @@ button.foundation-team-portrait-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -43758,6 +43760,16 @@ button.foundation-team-portrait-card {
   font-size: 14px;
   font-weight: 700;
   color: var(--nl-ink);
+}
+
+/* Portrait-Avatar (Hero + Zeilen): füllt den bestehenden Kreis, Initialen
+   bleiben der Fallback (kein Portrait / Ladefehler), siehe `LeaderAvatar`. */
+.is-new-look .nl-leaders-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .is-new-look .nl-leaders-hero-copy {
@@ -43851,6 +43863,8 @@ button.foundation-team-portrait-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
   width: 26px;
   height: 26px;
   border-radius: 50%;
