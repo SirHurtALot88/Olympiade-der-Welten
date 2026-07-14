@@ -60790,85 +60790,76 @@ button.nl-players-axis:focus-visible {
 }
 
 /* ============================================================
-   Scratch CSS — merge target: app/globals.css
-   (near the existing "Wave 3 — Spieler-Verzeichnis" block, e.g. next to
-   `.is-new-look .nl-ptable-percentile` / the `.is-active-sort` Fix #4
-   block). ADDITIVE ONLY — introduces new classes, does not redefine any
-   existing selector.
+   FIX 2 (#111, überarbeitet) — OVR-Spalte: zurück ins Marken-
+   Farbschema statt festem Gold/Amber-Akzent + "Gold-auf-Gold"-Chip.
 
-   Scope of the TSX change this CSS supports:
+   Scope of the TSX this CSS supports:
      - app/foundation/players-table/FoundationPlayersTableNewLook.tsx
        (OVR column body cell + `renderMetricRankChip`)
 
-   ------------------------------------------------------------
-   FIX 2 — OVR-Spalte: eigener Gold/Amber-Akzent statt Value-Heat-
-   Regenbogen ("Einheitsbrei").
-
-   Vorher trug die OVR-Zelle DREI überlappende Farbsysteme gleichzeitig:
-     (a) die liga-relative Value-Heat-Hintergrundfarbe (`getPoolHeatClass`,
-         dieselbe Blau→Grün→Gelb→Orange→Rot-Rampe wie PPs/MVS),
-     (b) den hellblauen "aktive Sortierspalte"-Zustand (`.is-active-sort`,
-         app/globals.css Fix #4), und
-     (c) einen wertabhängigen ton-gefärbten Rang-Chip (`getPoolHeatTone`:
-         blau/grün/gelb/rot).
-   Drei Systeme auf einer Zelle → nicht mehr von PPs/MVS unterscheidbar,
-   und der Sortier-Blau-Zustand kollidierte mit dem Chip-Ton.
+   Der vorherige Ansatz gab der OVR-Zelle einen festen `--nl-warn`
+   (Amber/Gold) Akzent, um sie von PPs/MVS abzusetzen. Zwei Probleme
+   (Produkt-Feedback #111):
+     (a) Amber/Gold ist kein Teil des Blau-zentrierten "Neuer Look"-
+         Markenschemas (Accent = `--nl-accent`, wie bei PPs) — die
+         Spalte wirkte wie eine off-brand "goldene Bande".
+     (b) Der Rang-Chip (`#N`) setzte Amber-Text auf einen ebenfalls
+         Amber-getönten Hintergrund ("Gold auf Gold") — dadurch kaum
+         lesbar.
 
    PPs/MVS behalten ihre Value-Heat-Hintergrundfarbe UNVERÄNDERT (dieselben
    `.heat-band-*`-Klassen über `getPoolHeatClass`, hier nicht angefasst).
 
-   OVR ist die Kopf-/Primär-Fähigkeitskennzahl und bekommt stattdessen EINEN
-   festen Akzent (App-Token `--nl-warn` = Amber/Gold, bereits Teil des
-   "Neuer Look"-Vokabulars, hier aber FEST statt wertabhängig zugewiesen —
-   ein klar anderer Farbton als das PPs/MVS-Blau):
-     - dezente Amber-Tönung als Zellenhintergrund (Spalten-Identität)
-     - 3px linker Akzent-Rand in Amber statt der bisherigen dünnen
-       neutralen `is-highlight-secondary`-Umrandung
-     - der Rang-Chip (`#N`, `.nl-ptable-ovr-rank` — siehe
-       `renderMetricRankChip` in der TSX) trägt jetzt dieselbe feste
-       Amber-Farbe statt der wertabhängigen `nl-tone-*`-Klasse.
-   → EIN konsolidiertes Farbsystem statt drei.
+   Diese Version bringt OVR zurück in dasselbe Blau-Vokabular wie die
+   PPs-Spalte (`is-highlight-primary`, `--nl-accent`), aber eine Stufe
+   leiser/sekundär (nur linker Akzent-Rand statt beidseitig, dezentere
+   8%-Tönung statt Volltönung) — dieselbe Betonungs-Sprache wie PPs, damit
+   OVR weiterhin als zweite Kopf-Kennzahl ("Hero"-Metrik) erkennbar bleibt,
+   ohne mit PPs zu konkurrieren oder wie ein Fremdkörper zu wirken.
 
-   Ist OVR die aktive Sortierspalte, gewinnt der Amber-Akzent (kräftigere
-   Amber-Wäsche statt des generischen Hellblaus aus Fix #4) — Selektoren
-   sind absichtlich spezifischer (Element + 2 Klassen bzw. + 4 Klassen)
-   als die bestehenden `.is-active-sort`-Regeln in app/globals.css, damit
-   sie ohne `!important` gewinnen. Der bestehende dunkle Kontrast-Text aus
-   dem `.is-active-sort`-Block (`#0b1220`) bleibt unverändert und ist auf
-   der helleren Amber-Wäsche weiterhin lesbar.
+   Der Rang-Chip bekommt einen FESTEN, hellen Vordergrund (`--nl-ink`) auf
+   einem dezent Akzent-getönten, dunklen Hintergrund statt Ton-auf-Ton —
+   dasselbe Muster wie überall sonst im "Neuer Look" (helle Schrift auf
+   getöntem Grund, siehe z. B. `.nl-ptable-percentile` Basis-Regel oben),
+   das unabhängig vom Akzentton ausreichenden Kontrast liefert (heller
+   Text auf dunklem, nur leicht getöntem Grund statt gesättigter Ton-Text
+   auf gesättigtem Ton-Hintergrund).
    ------------------------------------------------------------ */
 
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell {
-  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 12%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 8%, transparent);
   box-shadow:
-    inset 3px 0 0 var(--nl-warn, #e0a53a),
+    inset 2px 0 0 var(--nl-accent),
     inset -1px 0 0 var(--nl-line-2);
 }
 
+/* Aktive Sortierspalte: Hintergrund/Text kommen weiterhin von der
+   bestehenden generischen `.is-active-sort`-Regel weiter oben (helles
+   Blau + dunkler Text `#0b1220`) — hier bleibt nur der linke Akzent-Rand
+   der Spalten-Identität erhalten. */
 .is-new-look td.nl-players-td-metric.nl-ptable-ovr-cell.is-active-sort {
-  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 45%, var(--nl-panel, #131a26) 55%);
   box-shadow:
-    inset 3px 0 0 var(--nl-warn, #e0a53a),
+    inset 2px 0 0 var(--nl-accent),
     inset -1px 0 0 var(--nl-line-2);
 }
 
-/* Rang-Chip (#N) in der OVR-Spalte: feste Amber-Farbe, eigene Klasse statt
-   der generischen `--nl-tone`-Var, damit sie nicht versehentlich von einer
-   geerbten `nl-tone-*`-Klasse überschrieben wird. */
+/* Rang-Chip (#N) in der OVR-Spalte: heller `--nl-ink`-Vordergrund auf
+   Akzent-getöntem, dunklem Grund — behebt den "Gold auf Gold"-Kontrast
+   aus #111 unabhängig vom gewählten Akzentton. */
 .is-new-look .nl-ptable-percentile.nl-ptable-ovr-rank {
-  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 22%, transparent);
-  color: var(--nl-warn, #e0a53a);
+  background: color-mix(in srgb, var(--nl-accent) 30%, var(--nl-panel-2, #0f1621) 70%);
+  color: var(--nl-ink);
 }
 
 /* Im aktiv sortierten Zustand erzwingt die bestehende
    `.is-active-sort .nl-ptable-percentile`-Regel bereits dunklen Text
    (#0b1220) für Kontrast auf der helleren Wäsche (app/globals.css Fix #4)
-   — hier nur der Chip-Hintergrund kräftiger, damit der dunkle Text nicht
-   auf der dezenten 22%-Amber-Wäsche "schwimmt". Vier Klassen + Element:
-   gewinnt gegenüber der 3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basis-
-   regel oben, ohne `!important`. */
+   — hier nur der Chip-Hintergrund kräftiger, damit er sich weiterhin von
+   der Zellen-Wäsche abhebt. Vier Klassen + Element: gewinnt gegenüber der
+   3-Klassen-Regel aus Fix #4 und der 3-Klassen-Basisregel oben, ohne
+   `!important`. */
 .is-new-look td.is-active-sort .nl-ptable-percentile.nl-ptable-ovr-rank {
-  background: color-mix(in srgb, var(--nl-warn, #e0a53a) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 55%, transparent);
 }
 
 /* ============================================================
@@ -62768,6 +62759,24 @@ button.nl-players-axis:focus-visible {
   color: var(--nl-good);
   font-weight: 700;
   background: color-mix(in srgb, var(--nl-good) 10%, transparent);
+}
+
+/* Zwischenüberschriften-Zeile (#112) — gruppiert die zusätzlichen
+   Vergleichszeilen (Achsen/Saison/All-Time-Karriere) optisch von den
+   Kern-Kennzahlen (OVR/CA/PPs/MVS/MW/Gehalt), damit z. B. die All-Time-
+   Stats klar als eigener Block lesbar sind, statt in einer langen Liste
+   unterzugehen. */
+.is-new-look .nl-pcompare-table tbody tr.nl-pcompare-group-heading th {
+  padding-top: 14px;
+  padding-bottom: 4px;
+  border-bottom: none;
+  border-top: 1px solid var(--nl-line);
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
 }
 
 /* --- Query-Chip-Builder (nl-pquery-*) --------------------------------- */
