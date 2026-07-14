@@ -32,12 +32,14 @@ import {
   type FoundationSaveMode,
 } from "@/lib/persistence/foundation-save-mode";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
-import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
+import type { PersistedSaveGame, PersistenceService, SaveSummary } from "@/lib/persistence/types";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { setTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
+import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -159,6 +161,47 @@ async function loadPrismaResponse(saveId?: string) {
   });
 }
 
+/**
+ * Self-heals saves that reached the sponsor-choice flow (or already play a season) without
+ * ever having sponsor offers generated for their human-controlled team(s) — e.g. saves created
+ * before offer seeding was added to new-game setup, or saves whose preseason workflow / AI
+ * autopilot hasn't run yet. Offer generation (`buildSponsorOffersForTeam`) is deterministic for
+ * a given (season id, teamId): it derives entirely from stable hashes of those ids plus the
+ * current gameState-derived team quality, never `Math.random()`. So it's safe to generate here
+ * and persist once — the result won't reshuffle on a later, redundant call.
+ *
+ * Guarded to only touch real singleplayer sqlite saves: callers only invoke this from the
+ * sqlite load path (never the read-only Prisma path), and we additionally skip any save that is
+ * currently an active multiplayer room save (rooms own their own write path and explicitly
+ * forbid writes through the singleplayer fallback, see the PUT handler above).
+ */
+function healSponsorOffersForSave(persistence: PersistenceService, save: PersistedSaveGame): GameState {
+  if (getActiveRoomBySaveId(save.saveId)) {
+    return save.gameState;
+  }
+
+  const needsHeal = save.gameState.teams.some((team) => {
+    if (!team.humanControlled) {
+      return false;
+    }
+    if (getTeamSponsorContract(save.gameState, team.teamId)) {
+      return false;
+    }
+    return getTeamSponsorOffers(save.gameState, team.teamId).length === 0;
+  });
+  if (!needsHeal) {
+    return save.gameState;
+  }
+
+  const healedGameState = ensureSeasonSponsorOffers(save.gameState);
+  if (healedGameState === save.gameState) {
+    return save.gameState;
+  }
+
+  const persisted = persistence.saveSingleplayerState(save.saveId, healedGameState);
+  return persisted.gameState;
+}
+
 function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMode = "all", compactInitial = false) {
   const persistence = createPersistenceService();
   let allSaves = persistence.listSaves().map(enrichSaveSummary);
@@ -209,15 +252,22 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     );
   }
 
-  const normalizedGameState = withNormalizedLocalTeamSettings(save.gameState);
+  const healedGameState = healSponsorOffersForSave(persistence, save);
+  const normalizedGameState = withNormalizedLocalTeamSettings(healedGameState);
   const gameState = compactInitial ? normalizedGameState : refreshTeamObjectiveState(normalizedGameState);
+  // Healing may have bumped this save's updatedAt/saveVersion — refresh the summary list so it
+  // doesn't report stale metadata for the entry we just persisted.
+  const finalResponseModeSaves =
+    healedGameState === save.gameState
+      ? responseModeSaves
+      : listSavesForMode(persistence, requestedSaveMode);
 
   return NextResponse.json({
     save: serializeSave({
       ...save,
       gameState: compactInitial ? compactFoundationInitialGameState(gameState) : gameState,
     }),
-    saves: responseModeSaves.map(serializeSaveSummary),
+    saves: finalResponseModeSaves.map(serializeSaveSummary),
     _meta: {
       source: "sqlite",
       readOnly: false,

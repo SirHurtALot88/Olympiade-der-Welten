@@ -5,6 +5,7 @@ import {
   previewNewGameSetup,
 } from "@/lib/game/new-game-setup-service";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
+import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -92,5 +93,32 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.standings["R-R"]?.startplatz).toBe(32);
     expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
     expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
+  }, 120_000);
+
+  it("seeds sponsor offers for the human team so the choose_sponsor step has real cards to show", () => {
+    const { gameState } = buildNewGameStateFromBaseline({
+      presetId: "solo_1",
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    const chooseSponsorStep = gameState.seasonState.newGameFlow?.steps?.find(
+      (step) => step.stepId === "choose_sponsor",
+    );
+    expect(chooseSponsorStep?.status).toBe("open");
+    expect(getTeamSponsorContract(gameState, "M-M")).toBeNull();
+
+    const offers = getTeamSponsorOffers(gameState, "M-M");
+    expect(offers).toHaveLength(3);
+    expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
+    expect(offers.every((offer) => offer.seasonId === gameState.season.id)).toBe(true);
+
+    // Deterministic: rebuilding from the same baseline input yields identical offer ids, not a
+    // reshuffled set — this is what makes it safe to (re)generate on load without persisting.
+    const second = buildNewGameStateFromBaseline({
+      presetId: "solo_1",
+      now: "2026-06-13T10:00:00.000Z",
+    });
+    const offersAgain = getTeamSponsorOffers(second.gameState, "M-M");
+    expect(offersAgain.map((offer) => offer.offerId)).toEqual(offers.map((offer) => offer.offerId));
   }, 120_000);
 });
