@@ -68,13 +68,6 @@ function formatValue(value: number | null | undefined, digits = 0) {
   }).format(value);
 }
 
-function formatPointsWithAppearances(points: number | null | undefined, appearances: number | null | undefined) {
-  if (points == null || !Number.isFinite(points)) {
-    return "—";
-  }
-  return `${formatValue(points, 1)}${appearances != null ? ` / ${appearances}` : ""}`;
-}
-
 function formatPointsWithRank(points: number | null | undefined, rank: number | null | undefined) {
   if (points == null || !Number.isFinite(points)) {
     return "—";
@@ -92,13 +85,6 @@ function formatPointsWithAppearancesAndRank(
   }
   const base = `${formatValue(points, 1)}${appearances != null ? ` / ${appearances}` : ""}`;
   return rank != null ? `${base} · #${rank}` : base;
-}
-
-function formatAveragePoints(points: number | null | undefined, appearances: number | null | undefined) {
-  if (points == null || appearances == null || appearances <= 0 || !Number.isFinite(points)) {
-    return "—";
-  }
-  return formatValue(points / appearances, 1);
 }
 
 function formatMoney(value: number | null | undefined) {
@@ -1060,33 +1046,33 @@ function formatCompactSeasonLabel(value: string | null | undefined) {
   return match?.[1] ?? canonical;
 }
 
-type TopDisciplineColumnId = "discipline" | "value" | "seasonPps" | "lastSeasonPps" | "allTimePps" | "average";
+type TopDisciplineColumnId = "discipline" | "value" | "slot" | "seasonPps" | "mutator" | "allTimePps";
 type TopDisciplineSortDirection = "asc" | "desc";
 type TopDisciplineRow = PlayerDetailDrawerData["disciplineValues"][number];
 
 const TOP_DISCIPLINE_COLUMN_ORDER: TopDisciplineColumnId[] = [
   "discipline",
   "value",
+  "slot",
   "seasonPps",
-  "lastSeasonPps",
+  "mutator",
   "allTimePps",
-  "average",
 ];
 
 function getTopDisciplineColumnLabel(columnId: TopDisciplineColumnId, isScoutedProfile: boolean) {
   switch (columnId) {
     case "discipline":
-      return "Diszi";
+      return "Disziplin";
     case "value":
-      return isScoutedProfile ? "Klasse" : "Wert";
+      return isScoutedProfile ? "Klasse" : "Stat";
+    case "slot":
+      return "Slot";
     case "seasonPps":
       return "PPs";
-    case "lastSeasonPps":
-      return "PPs -1";
+    case "mutator":
+      return "Mutator";
     case "allTimePps":
-      return "PPs All Time";
-    case "average":
-      return "Ø";
+      return "All-Time";
     default:
       return columnId;
   }
@@ -1098,16 +1084,14 @@ function getTopDisciplineSortValue(row: TopDisciplineRow, columnId: TopDisciplin
       return row.label;
     case "value":
       return row.value;
+    case "slot":
+      return row.slotLabels.length ? row.slotLabels.join(", ") : null;
     case "seasonPps":
       return row.seasonPoints;
-    case "lastSeasonPps":
-      return row.lastSeasonPoints;
+    case "mutator":
+      return row.currentSeasonMutatorPps;
     case "allTimePps":
       return row.allTimePoints;
-    case "average":
-      return row.allTimePoints != null && row.allTimeAppearances != null && row.allTimeAppearances > 0
-        ? row.allTimePoints / row.allTimeAppearances
-        : null;
     default:
       return null;
   }
@@ -1187,32 +1171,42 @@ function renderTopDisciplineCell(
         </>
       );
     }
-    case "value":
-      return isScoutedProfile ? (
-        <span
-          className={`player-drawer-chip ${getAttributeTierClass(row.scoutedTier ?? formatDisciplineTier(row.value))}`}
-          title="Gescoutete Klasse als Range, keine exakte Diszi-Zahl."
-        >
-          {getScoutingTierWindow(
-            row.scoutedTier ?? formatDisciplineTier(row.value),
-            resolveScoutingConfidenceFromLevel(scoutingLevel),
-          )}
+    case "value": {
+      if (isScoutedProfile) {
+        return (
+          <span
+            className={`player-drawer-chip ${getAttributeTierClass(row.scoutedTier ?? formatDisciplineTier(row.value))}`}
+            title="Gescoutete Klasse als Range, keine exakte Diszi-Zahl."
+          >
+            {getScoutingTierWindow(
+              row.scoutedTier ?? formatDisciplineTier(row.value),
+              resolveScoutingConfidenceFromLevel(scoutingLevel),
+            )}
+          </span>
+        );
+      }
+      const barPercent = Math.max(0, Math.min(100, row.value ?? 0));
+      return (
+        <span className="player-drawer-disc-table-stat">
+          <span className="player-drawer-disc-table-stat-value">{formatDisciplineValue(row.value, row.upgradeDelta)}</span>
+          <span className="player-drawer-disc-table-stat-bar">
+            <span className="player-drawer-disc-table-stat-bar-fill" style={{ width: `${barPercent}%` }} />
+          </span>
         </span>
-      ) : (
-        formatDisciplineValue(row.value, row.upgradeDelta)
       );
+    }
+    case "slot":
+      return row.slotLabels.length ? row.slotLabels.slice(0, 2).join(", ") : "—";
     case "seasonPps":
       return formatPointsWithRank(row.seasonPoints, row.seasonPointsRank ?? null);
-    case "lastSeasonPps":
-      return formatPointsWithAppearances(row.lastSeasonPoints, row.lastSeasonAppearances);
+    case "mutator":
+      return row.currentSeasonMutatorPps != null ? `+${formatValue(row.currentSeasonMutatorPps, 1)}` : "—";
     case "allTimePps":
       return formatPointsWithAppearancesAndRank(
         row.allTimePoints,
         row.allTimeAppearances,
         row.allTimePointsRank ?? null,
       );
-    case "average":
-      return formatAveragePoints(row.allTimePoints, row.allTimeAppearances);
     default:
       return "—";
   }
@@ -1629,23 +1623,6 @@ export default function PlayerDetailDrawer({
   const [comparePlayerId, setComparePlayerId] = useState<string | null>(null);
   const [comparePlayerBData, setComparePlayerBData] = useState<PlayerDetailDrawerData | null>(null);
   const [comparePlayerBLoading, setComparePlayerBLoading] = useState(false);
-
-  // #106: Achsen-Karten (POW/SPE/MEN/SOC) lassen sich einzeln aufklappen, um
-  // die Top-Disziplinen mit PPs + Rang im Detail zu zeigen. Separiert vom
-  // Liga-Leaders-Klick (eigener kleiner Button), damit beide Aktionen
-  // eindeutig erreichbar bleiben.
-  const [expandedAxisCardIds, setExpandedAxisCardIds] = useState<Set<string>>(new Set());
-  const toggleAxisCardExpanded = (cardId: string) => {
-    setExpandedAxisCardIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(cardId)) {
-        next.delete(cardId);
-      } else {
-        next.add(cardId);
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     setCompareOpen(false);
@@ -2287,15 +2264,13 @@ export default function PlayerDetailDrawer({
                     // Konsolidierte Achsen-KPI-Karte (Space-Saving statt separater
                     // "Top-Disziplinen"-Tabelle + Achsen-"Detail"-Tabelle): STAT,
                     // PPs, Vorsaison-PPs und PPs-All-Time bündeln sich hier, direkt
-                    // darunter die Top-5-Diszis dieser Achse als kompakte Mini-Bars.
+                    // darunter die Top-5-Diszis dieser Achse als kompakte Mini-Bar-
+                    // Preview. Das volle Detail (alle Diszis, sortierbar) lebt in der
+                    // eigenen "Top-Disziplinen"-Tabelle weiter unten (kein inline
+                    // Aufklapp-Zustand mehr in der Karte selbst, siehe PO-Feedback).
                     const axisDisciplines = data.disciplineValues
                       .filter((entry) => entry.category === card.tone)
                       .slice(0, 5);
-                    // #106: Diszis-Detail ist ein eigener Aufklapp-Zustand pro
-                    // Karte, getrennt vom Liga-Leaders-Klick, damit beide
-                    // Aktionen (Detail aufklappen vs. Liga-Leaders öffnen)
-                    // unabhängig voneinander erreichbar bleiben.
-                    const isExpanded = expandedAxisCardIds.has(card.id);
                     const disciplineListId = `player-drawer-axis-disciplines-${card.id}`;
                     const cardBody = (
                       <>
@@ -2347,18 +2322,6 @@ export default function PlayerDetailDrawer({
                           <span>PPs All-Time</span>
                           <span>{formatValue(card.allTimePoints, 1)}</span>
                         </div>
-                        <button
-                          type="button"
-                          className="player-drawer-axis-discipline-toggle"
-                          aria-expanded={isExpanded}
-                          aria-controls={disciplineListId}
-                          onClick={() => toggleAxisCardExpanded(card.id)}
-                        >
-                          <span aria-hidden="true" className={`player-drawer-axis-discipline-toggle-caret${isExpanded ? " is-open" : ""}`}>
-                            ▸
-                          </span>
-                          Diszis im Detail
-                        </button>
                         <div className="player-drawer-axis-discipline-list" id={disciplineListId}>
                           {axisDisciplines.length ? (
                             axisDisciplines.map((entry) => {
@@ -2377,21 +2340,6 @@ export default function PlayerDetailDrawer({
                                   <div className="player-drawer-axis-discipline-meter">
                                     <div className="player-drawer-axis-discipline-meter-fill" style={{ width: `${barPercent}%` }} />
                                   </div>
-                                  {isExpanded ? (
-                                    <div className="player-drawer-axis-discipline-detail">
-                                      <span title="Statwert-Rang in dieser Disziplin">
-                                        Rang {formatRankLabel(entry.rank)}
-                                        {entry.playerCount != null ? ` / ${entry.playerCount}` : ""}
-                                      </span>
-                                      <span title={getGameTermTooltip("PPs") ?? "Season-Punkte dieser Disziplin"}>
-                                        PPs {formatValue(entry.seasonPoints, 1)} · {formatOptionalRankLabel(entry.seasonPointsRank)}
-                                      </span>
-                                      <span title="Punkte aus allen bisherigen Seasons in dieser Disziplin">
-                                        All-Time {formatValue(entry.allTimePoints, 1)}
-                                        {entry.allTimePointsRank != null ? ` · ${formatOptionalRankLabel(entry.allTimePointsRank)}` : ""}
-                                      </span>
-                                    </div>
-                                  ) : null}
                                 </div>
                               );
                             })
@@ -2466,75 +2414,76 @@ export default function PlayerDetailDrawer({
           ) : null}
 
           <section className="player-drawer-section player-drawer-panel player-drawer-top-disciplines-panel" id="player-drawer-disciplines">
-              {isScoutedProfile ? (
-                <>
-                  <h3 title="Scouting zeigt nur grobe Klassen der besten Disziplinen. Exakte Diszi-Werte werden nicht gespoilert.">Top-Disziplinen</h3>
-                  <div className="player-drawer-top-disciplines-layout">
-                    <div className="table-shell player-drawer-breakdown-table-shell">
-                      <table className="team-table player-drawer-breakdown-table">
-                        <thead>
-                          <tr>
-                            {visibleTopDisciplineColumnIds.map((columnId) => {
-                              const isActiveSort = topDisciplineSort.columnId === columnId;
-                              const sortArrow = !isActiveSort ? "↕" : topDisciplineSort.direction === "asc" ? "↑" : "↓";
-                              return (
-                                <th
-                                  key={`top-discipline-header-${columnId}`}
-                                  className={`player-drawer-draggable-header${draggedTopDisciplineColumnId === columnId ? " is-dragging" : ""}`}
-                                  aria-sort={
-                                    isActiveSort ? (topDisciplineSort.direction === "asc" ? "ascending" : "descending") : "none"
-                                  }
-                                  draggable
-                                  onDragStart={(event) => handleTopDisciplineColumnDragStart(columnId, event)}
-                                  onDragOver={(event) => {
-                                    event.preventDefault();
-                                    event.dataTransfer.dropEffect = "move";
-                                  }}
-                                  onDragEnd={() => setDraggedTopDisciplineColumnId(null)}
-                                  onDrop={(event) => handleTopDisciplineColumnDrop(columnId, event)}
-                                  title="Klicken zum Sortieren, ziehen zum Verschieben."
-                                >
-                                  <button
-                                    className={`sortable-header player-drawer-column-header${isActiveSort ? " is-active" : ""}`}
-                                    type="button"
-                                    onClick={() => handleTopDisciplineSort(columnId)}
-                                  >
-                                    <span>{getTopDisciplineColumnLabel(columnId, isScoutedProfile)}</span>
-                                    <span className="sortable-arrow">{sortArrow}</span>
-                                  </button>
-                                </th>
-                              );
-                            })}
+              <h3
+                title={
+                  isScoutedProfile
+                    ? "Scouting zeigt nur grobe Klassen der besten Disziplinen. Exakte Diszi-Werte werden nicht gespoilert."
+                    : "Alle Disziplinen des Spielers mit Stat, Slot, PPs, Mutator-Anteil und All-Time-Werten. Sortierbar per Klick auf die Spaltenköpfe."
+                }
+              >
+                Top-Disziplinen
+              </h3>
+              {!seasonPerformance && !isScoutedProfile ? <p className="muted">{noSeasonPerformanceMessage}</p> : null}
+              <div className="player-drawer-top-disciplines-layout">
+                <div className="table-shell player-drawer-disciplines-table-shell">
+                  <table className="player-drawer-disciplines-table">
+                    <thead>
+                      <tr>
+                        {visibleTopDisciplineColumnIds.map((columnId) => {
+                          const isActiveSort = topDisciplineSort.columnId === columnId;
+                          const sortArrow = !isActiveSort ? "↕" : topDisciplineSort.direction === "asc" ? "↑" : "↓";
+                          return (
+                            <th
+                              key={`top-discipline-header-${columnId}`}
+                              className={`player-drawer-draggable-header${draggedTopDisciplineColumnId === columnId ? " is-dragging" : ""}`}
+                              aria-sort={
+                                isActiveSort ? (topDisciplineSort.direction === "asc" ? "ascending" : "descending") : "none"
+                              }
+                              draggable
+                              onDragStart={(event) => handleTopDisciplineColumnDragStart(columnId, event)}
+                              onDragOver={(event) => {
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = "move";
+                              }}
+                              onDragEnd={() => setDraggedTopDisciplineColumnId(null)}
+                              onDrop={(event) => handleTopDisciplineColumnDrop(columnId, event)}
+                              title="Klicken zum Sortieren, ziehen zum Verschieben."
+                            >
+                              <button
+                                className={`sortable-header player-drawer-column-header${isActiveSort ? " is-active" : ""}`}
+                                type="button"
+                                onClick={() => handleTopDisciplineSort(columnId)}
+                              >
+                                <span>{getTopDisciplineColumnLabel(columnId, isScoutedProfile)}</span>
+                                <span className="sortable-arrow">{sortArrow}</span>
+                              </button>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topDisciplineCards.map((entry) => {
+                        const areaClass = getDisciplineAreaClass(entry.category);
+                        return (
+                          <tr key={`discipline-breakdown-${entry.id}`} className={`player-drawer-discipline-area-row ${areaClass}`}>
+                            {visibleTopDisciplineColumnIds.map((columnId) => (
+                              <td
+                                key={`discipline-breakdown-${entry.id}-${columnId}`}
+                                className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
+                              >
+                                {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
+                              </td>
+                            ))}
                           </tr>
-                        </thead>
-                        <tbody>
-                          {topDisciplineCards.map((entry) => {
-                            const areaClass = getDisciplineAreaClass(entry.category);
-                            return (
-                            <tr key={`discipline-breakdown-${entry.id}`} className={`player-drawer-discipline-area-row ${areaClass}`}>
-                              {visibleTopDisciplineColumnIds.map((columnId) => (
-                                <td
-                                  key={`discipline-breakdown-${entry.id}-${columnId}`}
-                                  className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
-                                >
-                                  {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
-                                </td>
-                              ))}
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 title="Einsätze, Fatigue und Verletzungen der aktuellen Saison im Vergleich zur Karriere. Die Top-Disziplinen je Achse stehen jetzt direkt in den Achsen-Karten.">
-                    Saison-Snapshot
-                  </h3>
-                  {!seasonPerformance ? <p className="muted">{noSeasonPerformanceMessage}</p> : null}
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {!isScoutedProfile ? (
                   <aside className="player-drawer-season-snapshot" aria-label="Saison-Snapshot">
+                    <h4 className="player-drawer-season-snapshot-heading">Saison-Snapshot</h4>
                     <div className="player-drawer-season-snapshot-grid">
                       {renderSeasonSnapshotMetricPair({
                         label: "Einsätze",
@@ -2563,8 +2512,8 @@ export default function PlayerDetailDrawer({
                       </div>
                     ) : null}
                   </aside>
-                </>
-              )}
+                ) : null}
+              </div>
             </section>
 
           <section className="player-drawer-section player-drawer-panel">
