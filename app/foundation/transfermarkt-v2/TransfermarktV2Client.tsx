@@ -966,7 +966,6 @@ function getCandidateFocusAxes(item: TransfermarktFreeAgentItem) {
 
 function formatNegotiationSignalLabel(value: string) {
   const labels: Record<string, string> = {
-    contract_length_override_in_effect: "Laufzeit weicht vom Standarddeal ab.",
     insufficient_cash: "Cash reicht für Kauf oder Gesamtpaket noch nicht.",
     low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
     local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
@@ -985,6 +984,13 @@ function formatNegotiationSignalLabel(value: string) {
   };
 
   return labels[value] ?? value.replaceAll("_", " ");
+}
+
+/** Auf Wunsch entfernter Hinweis — Laufzeit-Abweichung ist kein eigener UI-Hinweis mehr. */
+const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set(["contract_length_override_in_effect"]);
+
+function filterVisibleNegotiationWarnings(warnings: string[] | null | undefined): string[] {
+  return (warnings ?? []).filter((code) => !SUPPRESSED_NEGOTIATION_WARNING_CODES.has(code));
 }
 
 function getNegotiationOutcomeToneClass(tone: MarketBuyNegotiationOutcome["tone"]) {
@@ -1938,11 +1944,12 @@ export default function TransfermarktV2Client({
       selectedPlayer.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(selectedPlayer.scoutingLevel);
     return computeDisciplineTopSixImpact(
       selectedTeamRosterRows,
-      selectedPlayer.topDisciplineScores.slice(0, 3).map((entry) => ({
+      selectedPlayer.topDisciplineScores.slice(0, 5).map((entry) => ({
         disciplineId: entry.disciplineId,
         disciplineName: entry.disciplineName,
         displayedScore: entry.displayedScore ?? null,
         tierWindow: getScoutingTierWindow(entry.scoreTier, confidence),
+        playerCount: entry.playerCount ?? null,
       })),
       topSixCount,
     );
@@ -2953,7 +2960,7 @@ export default function TransfermarktV2Client({
         previewMarketValueBefore={previewMarketValueBefore}
         previewMarketValueAfter={previewMarketValueAfter}
         buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
-        buyWarnings={(buyPreview?.warnings ?? []).map(formatNegotiationSignalLabel)}
+        buyWarnings={filterVisibleNegotiationWarnings(buyPreview?.warnings).map(formatNegotiationSignalLabel)}
         topSixCount={topSixCount}
         topSixAxisImpact={topSixAxisImpact}
         topSixCompositeBefore={topSixCompositeBefore}
@@ -4059,10 +4066,10 @@ export default function TransfermarktV2Client({
               <p>{buyPreview.blockingReasons.map(formatNegotiationSignalLabel).join(" · ")}</p>
             </div>
           ) : null}
-          {buyPreview?.warnings?.length ? (
+          {filterVisibleNegotiationWarnings(buyPreview?.warnings).length ? (
             <div className="market-v2-warning-box is-muted">
               <strong>Hinweise</strong>
-              <p>{buyPreview.warnings.slice(0, 3).map(formatNegotiationSignalLabel).join(" · ")}</p>
+              <p>{filterVisibleNegotiationWarnings(buyPreview?.warnings).slice(0, 3).map(formatNegotiationSignalLabel).join(" · ")}</p>
             </div>
           ) : null}
         </aside>

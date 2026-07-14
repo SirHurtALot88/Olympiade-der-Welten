@@ -909,39 +909,43 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </div>
                 </div>
 
-                {/* #68 — Achsen-Radar statt vier linearer Balken. Werte fog-gated (scoutedPow/…). */}
-                <div className="nl-market-focus-radar" aria-label="Kandidaten-Achsen">
-                  <NlRadar
-                    axes={NL_MARKET_AXES.flatMap((axis) => {
-                      const value = selectedPlayer[axis];
-                      return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
-                    })}
-                    max={100}
-                    showValues
-                    aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
-                    className="nl-market-axis-radar"
-                  />
-                </div>
+                {/* #68 — Achsen-Radar statt vier linearer Balken. Werte fog-gated (scoutedPow/…).
+                    Radar + Tier-Chips laufen kompakt nebeneinander, damit die Top-Disziplinen
+                    darunter ohne großes Scrollen sichtbar bleiben. */}
+                <div className="nl-market-radar-row">
+                  <div className="nl-market-focus-radar" aria-label="Kandidaten-Achsen">
+                    <NlRadar
+                      axes={NL_MARKET_AXES.flatMap((axis) => {
+                        const value = selectedPlayer[axis];
+                        return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
+                      })}
+                      max={100}
+                      showValues
+                      aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
+                      className="nl-market-axis-radar"
+                    />
+                  </div>
 
-                {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
-                <div className="nl-market-attr-chips" aria-label="Attribut-Tiers">
-                  {NL_MARKET_AXES.flatMap((axis) => {
-                    const value = selectedPlayer[axis];
-                    if (typeof value !== "number" || !Number.isFinite(value)) {
-                      return [];
-                    }
-                    const tier = getTransfermarktTierFromPoints(value);
-                    return [
-                      <span
-                        key={`nl-attr-chip-${axis}`}
-                        className={`nl-market-attr-chip ${getAttributeTierClass(tier)}`}
-                      >
-                        <b>{NL_AXIS_LABELS[axis]}</b>
-                        <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
-                        {tier ? <em>{tier}</em> : null}
-                      </span>,
-                    ];
-                  })}
+                  {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
+                  <div className="nl-market-attr-chips" aria-label="Attribut-Tiers">
+                    {NL_MARKET_AXES.flatMap((axis) => {
+                      const value = selectedPlayer[axis];
+                      if (typeof value !== "number" || !Number.isFinite(value)) {
+                        return [];
+                      }
+                      const tier = getTransfermarktTierFromPoints(value);
+                      return [
+                        <span
+                          key={`nl-attr-chip-${axis}`}
+                          className={`nl-market-attr-chip ${getAttributeTierClass(tier)}`}
+                        >
+                          <b>{NL_AXIS_LABELS[axis]}</b>
+                          <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
+                          {tier ? <em>{tier}</em> : null}
+                        </span>,
+                      ];
+                    })}
+                  </div>
                 </div>
 
                 {/* Feinattribute (12) — nur wirklich freigeschaltete Werte (buildTransfermarktScoutedAttributeRows
@@ -1280,7 +1284,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     <span className="nl-market-eyebrow">Größte Diszi-Sprünge (Top-{topSixCount} Ø)</span>
                     {disciplineImpact.map((row) => (
                       <div className="nl-market-impact-discipline-row" key={`nl-diszi-${row.disciplineId}`}>
-                        <strong>{row.disciplineName}</strong>
+                        <strong>
+                          {row.disciplineName}
+                          {typeof row.playerCount === "number" && Number.isFinite(row.playerCount)
+                            ? ` (${row.playerCount})`
+                            : ""}
+                        </strong>
                         <span className="nl-tnum">
                           {formatNlNumber(row.beforeTopSixAvg, 1)} → {formatNlNumber(row.afterTopSixAvg, 1)}
                         </span>
