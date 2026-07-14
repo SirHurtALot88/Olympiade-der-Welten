@@ -31,6 +31,7 @@ function buildGameState(overrides?: Partial<GameState>): GameState {
       slot: index,
     })),
     players: [],
+    disciplines: [],
     transferHistory: [],
     ...overrides,
   } as GameState;
