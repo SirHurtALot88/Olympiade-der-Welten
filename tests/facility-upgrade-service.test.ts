@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GameState, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
@@ -284,7 +285,7 @@ describe("facility upgrade service", () => {
   it("keeps service source free from Prisma write paths", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/facilities/facility-upgrade-service.ts",
+        path.join(process.cwd(), "lib/facilities/facility-upgrade-service.ts"),
         "utf8",
       ),
     );

@@ -1,10 +1,11 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("transfermarkt audit script", () => {
   it("loads env config and only logs presence flags for database urls", async () => {
     const moduleText = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/audit-transfermarkt-state.ts",
+        path.join(process.cwd(), "scripts/audit-transfermarkt-state.ts"),
         "utf8",
       ),
     );

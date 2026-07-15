@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const defaultRoot = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const defaultRoot = process.cwd();
 
 export async function readFoundationOrchestratorSource(root = defaultRoot): Promise<string> {
   const parent = await fs.readFile(path.join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
