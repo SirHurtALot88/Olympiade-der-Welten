@@ -2,6 +2,7 @@ import type {
   GameState,
   Team,
   TeamBoardConfidenceRecord,
+  TeamControlSettings,
   TeamGeneralManagerArchetype,
   TeamGeneralManagerAssignment,
   TeamGeneralManagerProfile,
@@ -10,6 +11,7 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import { DEFAULT_ACTIVE_OWNER_ID, FRANKY_OWNER_ID } from "@/lib/foundation/team-control-settings";
 
 export const GM_INFLUENCE_PCT = 30;
 export const GM_WILDCARD_ASSIGNMENT_CHANCE_PCT = 7;
@@ -543,9 +545,9 @@ function buildProfile(seed: GmSeed, variantIndex: number): TeamGeneralManagerPro
   const tilt = variantTilt[variantIndex];
   const name =
     seed.archetype === "systems_tinkerer" && variantIndex === 0
-      ? "Chris Falk"
+      ? "Chris"
       : seed.archetype === "risk_gambler" && variantIndex === 1
-        ? "Frankie"
+        ? "Franky"
         : `${variantNames[variantIndex]} ${seed.nameRoot}`;
   const gmId = `gm-${slug(seed.archetype)}-${String(variantIndex + 1).padStart(2, "0")}`;
   return {
@@ -582,6 +584,43 @@ export const TEAM_GENERAL_MANAGER_PROFILES: TeamGeneralManagerProfile[] = archet
 
 const profileById = new Map(TEAM_GENERAL_MANAGER_PROFILES.map((profile) => [profile.gmId, profile] as const));
 
+/** GM-Profile, die fest den menschlichen Spielern vorbehalten sind (Chris = local user, Franky = 2. Spieler). */
+const CHRIS_GM_PROFILE_ID = "gm-systems-tinkerer-01";
+const FRANKY_GM_PROFILE_ID = "gm-risk-gambler-02";
+const HUMAN_RESERVED_GM_PROFILE_IDS = new Set<string>([CHRIS_GM_PROFILE_ID, FRANKY_GM_PROFILE_ID]);
+
+/** Pool, aus dem AI-Teams GMs ziehen dürfen – ohne die menschlich reservierten Profile. */
+const AI_ASSIGNABLE_PROFILES: TeamGeneralManagerProfile[] = TEAM_GENERAL_MANAGER_PROFILES.filter(
+  (profile) => !HUMAN_RESERVED_GM_PROFILE_IDS.has(profile.gmId),
+);
+
+/**
+ * Liefert das menschlich reservierte GM-Profil für ein human-kontrolliertes Team, nach OWNERSHIP
+ * (aus TeamControlSettings, NICHT nach positionalem Index):
+ * - ownerId === FRANKY_OWNER_ID → "Franky"-Profil (gm-risk-gambler-02)
+ * - ownerId === DEFAULT_ACTIVE_OWNER_ID (Chris) sowie fehlende/unbekannte ownerId → "Chris"-Profil
+ *   (sicherer Default: ein Human-Team bekommt nie einen AI-GM).
+ * Gibt null zurück, wenn das Team nicht human-kontrolliert ist.
+ */
+function getHumanReservedProfile(
+  humanControlled: boolean,
+  ownerId: string | null | undefined,
+): TeamGeneralManagerProfile | null {
+  if (!humanControlled) {
+    return null;
+  }
+  const chrisProfile = profileById.get(CHRIS_GM_PROFILE_ID) ?? TEAM_GENERAL_MANAGER_PROFILES[0];
+  if (ownerId === FRANKY_OWNER_ID) {
+    return profileById.get(FRANKY_GM_PROFILE_ID) ?? chrisProfile;
+  }
+  // DEFAULT_ACTIVE_OWNER_ID (Chris) sowie fehlende/unbekannte ownerId → Chris-Profil als sicherer
+  // Fallback, damit ein Human-Team niemals einen AI-GM erhält.
+  if (ownerId === DEFAULT_ACTIVE_OWNER_ID || !ownerId) {
+    return chrisProfile;
+  }
+  return chrisProfile;
+}
+
 function hashString(value: string) {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -590,15 +629,16 @@ function hashString(value: string) {
   return hash;
 }
 
-function chooseProfileForTeam(team: Team, seasonId: string, index: number) {
-  if (team.humanControlled && index === 0) {
-    return profileById.get("gm-systems-tinkerer-01") ?? TEAM_GENERAL_MANAGER_PROFILES[0];
+function chooseProfileForTeam(team: Team, seasonId: string, ownerId: string | null | undefined) {
+  // Human-Teams: GM nach OWNERSHIP (Chris/Franky), nicht nach positionalem Index.
+  const humanProfile = getHumanReservedProfile(team.humanControlled, ownerId);
+  if (humanProfile) {
+    return humanProfile;
   }
-  if (team.humanControlled && index === 1) {
-    return profileById.get("gm-risk-gambler-02") ?? TEAM_GENERAL_MANAGER_PROFILES[1];
-  }
-  const profileIndex = hashString(`${seasonId}:${team.teamId}:${team.shortCode}`) % TEAM_GENERAL_MANAGER_PROFILES.length;
-  return TEAM_GENERAL_MANAGER_PROFILES[profileIndex];
+  // AI-Teams: deterministisch aus dem Pool OHNE die menschlich reservierten Profile.
+  const aiPool = AI_ASSIGNABLE_PROFILES.length > 0 ? AI_ASSIGNABLE_PROFILES : TEAM_GENERAL_MANAGER_PROFILES;
+  const profileIndex = hashString(`${seasonId}:${team.teamId}:${team.shortCode}`) % aiPool.length;
+  return aiPool[profileIndex];
 }
 
 function getArchetypeDiversityMalus(
@@ -782,6 +822,7 @@ function getTeamSeasonTransferStats(transferHistory: TransferHistoryEntry[] | nu
 function pickBestUnusedGeneralManager(input: {
   team: Team;
   teamIndex: number;
+  ownerId?: string | null;
   seasonId: string;
   identity: TeamIdentity | null;
   usedGmIds: Set<string>;
@@ -790,19 +831,17 @@ function pickBestUnusedGeneralManager(input: {
   seedSalt?: string | null;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
-    const preferred =
-      input.teamIndex === 0
-        ? profileById.get("gm-systems-tinkerer-01")
-        : input.teamIndex === 1
-          ? profileById.get("gm-risk-gambler-02")
-          : null;
+    // Human-GM nach OWNERSHIP zuweisen (Chris/Franky), nicht nach positionalem teamIndex.
+    const preferred = getHumanReservedProfile(input.team.humanControlled, input.ownerId);
     if (preferred && !input.usedGmIds.has(preferred.gmId)) {
       return { profile: preferred, source: "human_slot" };
     }
   }
 
   const excludedArchetypeSet = new Set(input.excludedArchetypes ?? []);
-  const availableProfiles = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  // AI-Zuweisung zieht nur aus dem Pool ohne die menschlich reservierten Profile,
+  // damit kein AI-Team "Chris"/"Franky" als GM erhält.
+  const availableProfiles = AI_ASSIGNABLE_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
   const candidates =
     excludedArchetypeSet.size > 0
       ? availableProfiles.filter((profile) => !excludedArchetypeSet.has(profile.archetype))
@@ -827,7 +866,7 @@ function pickBestUnusedGeneralManager(input: {
     });
   const best = scoredCandidates[0];
   if (!best) {
-    return { profile: chooseProfileForTeam(input.team, input.seasonId, input.teamIndex), source: "auto_generated" };
+    return { profile: chooseProfileForTeam(input.team, input.seasonId, input.ownerId), source: "auto_generated" };
   }
 
   // Seed-Salt (Audit-Varianz): wähle fit-nah aus dem Top-Band, damit verschiedene Läufe
@@ -880,10 +919,16 @@ export function buildTeamGeneralManagerAssignments(
   boardConfidenceByTeamId?: Record<string, TeamBoardConfidenceRecord> | null,
   transferHistory?: TransferHistoryEntry[] | null,
   seedSalt?: string | null,
+  teamControlSettings?: Record<string, TeamControlSettings> | null,
 ) {
   const effectiveSeedSalt =
     seedSalt && seedSalt.trim().length > 0 ? seedSalt.trim() : gmAssignmentSeedSalt;
   const identityByTeamId = new Map((teamIdentities ?? []).map((identity) => [identity.teamId, identity] as const));
+  // Owner-Zuordnung stammt aus den TeamControlSettings (Team selbst trägt keine ownerId).
+  // Sie entscheidet, welches menschliche GM-Profil (Chris/Franky) ein Human-Team erhält.
+  const ownerIdByTeamId = new Map<string, string | null | undefined>(
+    Object.entries(teamControlSettings ?? {}).map(([teamId, settings]) => [teamId, settings?.ownerId]),
+  );
   const usedGmIds = new Set<string>();
   const assignedArchetypeCounts = new Map<TeamGeneralManagerArchetype, number>();
   const assignments: Record<string, TeamGeneralManagerAssignment> = {};
@@ -957,6 +1002,7 @@ export function buildTeamGeneralManagerAssignments(
     const picked = pickBestUnusedGeneralManager({
       team,
       teamIndex: index,
+      ownerId: ownerIdByTeamId.get(team.teamId),
       seasonId,
       identity,
       usedGmIds,
@@ -1086,6 +1132,7 @@ export function withNormalizedTeamGeneralManagers(
     gameState.seasonState.boardConfidence,
     gameState.transferHistory,
     resolveGmAssignmentSeedSalt(gameState, options),
+    gameState.seasonState.teamControlSettings,
   );
 
   return {
