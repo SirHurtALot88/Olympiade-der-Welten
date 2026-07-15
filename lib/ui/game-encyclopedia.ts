@@ -31,19 +31,19 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
   {
     id: "pps",
     term: "PPs",
-    aliases: ["pps", "player points", "season points", "punkte beitrag", "punktebeitrag"],
+    aliases: ["pps", "pps vs pps", "player points", "season points", "punkte beitrag", "punktebeitrag", "d1 pps", "d2 pps", "total pps", "punkte pro spieltag"],
     category: "Kennzahl",
-    short: "Echter Punktebeitrag aus gespielten Wettbewerben.",
+    short: "Echter Punktebeitrag aus gespielten Wettbewerben; Team-PPs = Summe der Spieler-PPs.",
     meaning:
-      "PPs zeigen, wie viel ein Spieler oder Team in echten Spieltagswertungen beigetragen hat. Das ist rueckblickend aussagekraeftiger als reine Vorschauwerte.",
+      "PPs sind die pro Disziplin über die Rank-to-Points-Logik vergebenen Punkte. Sie werden dem Team gutgeschrieben, lassen sich aber genauso auf die einzelnen Spieler herunterbrechen — die Summe der Spieler-PPs eines Teams ergibt exakt die Team-PPs. Es gibt keine getrennte 'PPS'-Kennzahl: PPS und PPs meinen dasselbe.",
     factors: [
-      "Platzierung in D1 und D2",
-      "gespeicherte Matchday-Ergebnisse",
-      "Score nach Slots, Rollen, Form, Push, Captain, Powers und Mutatoren",
-      "Rank-to-Points-Logik der Disziplin",
+      "PPs = Rang→Punkte einer Disziplin (dem Team gutgeschrieben)",
+      "erscheinen als D1 PPs, D2 PPs und Total PPs",
+      "Summe aller Spieler-PPs eines Teams = die Team-PPs",
+      "über die Saison akkumulieren sich die PPs zum Saison-Punktebeitrag",
     ],
-    usage: "Nutze PPs, um echte Leistung und Saisonimpact zu lesen. Besonders stark fuer Season Review, Training und Vertragsfragen.",
-    caveat: "PPs haengen auch davon ab, wie oft und wo ein Spieler eingesetzt wurde.",
+    usage: "Nutze PPs sowohl für einen einzelnen Spieltag als auch — aufsummiert — für Saisonimpact und Value.",
+    caveat: "PPs hängen auch davon ab, wie oft und wo ein Spieler eingesetzt wurde — früher als 'PPS vs PPs' getrennt geschrieben, ist es dieselbe Kennzahl.",
   },
   {
     id: "mvs",
@@ -486,23 +486,6 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
       "Bonuspunkte können zusätzlich einfließen",
     ],
     usage: "Denk in Tagespunkten, wenn du einen Spieltag planst, und in Saisonpunkten, wenn du den Rang absichern willst.",
-  },
-  {
-    id: "pps-vs-pps",
-    term: "PPs",
-    aliases: ["pps", "pps vs pps", "player points", "d1 pps", "d2 pps", "total pps", "punkte pro spieltag"],
-    category: "Kennzahl",
-    short: "PPs = die über Rang→Punkte vergebenen Punkte; Team-PPs = Summe der Spieler-PPs.",
-    meaning:
-      "PPs sind die pro Disziplin über die Rank-to-Points-Logik vergebenen Punkte. Sie werden dem Team gutgeschrieben, lassen sich aber genauso auf die einzelnen Spieler herunterbrechen — die Summe der Spieler-PPs eines Teams ergibt exakt die Team-PPs. Es gibt keine getrennte 'PPS'-Kennzahl: PPS und PPs meinen dasselbe.",
-    factors: [
-      "PPs = Rang→Punkte einer Disziplin (dem Team gutgeschrieben)",
-      "erscheinen als D1 PPs, D2 PPs und Total PPs",
-      "Summe aller Spieler-PPs eines Teams = die Team-PPs",
-      "über die Saison akkumulieren sich die PPs zum Saison-Punktebeitrag",
-    ],
-    usage: "Nutze PPs sowohl für einen einzelnen Spieltag als auch — aufsummiert — für Saisonimpact und Value.",
-    caveat: "Früher als 'PPS vs PPs' getrennt geschrieben — das war irreführend: es ist dieselbe Kennzahl, einheitlich PPs.",
   },
   {
     id: "intensitaet",
