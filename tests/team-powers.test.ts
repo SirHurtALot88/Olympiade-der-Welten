@@ -57,4 +57,18 @@ describe("team powers", () => {
     expect(result.teamPowerAttributeFitPct).toBeLessThan(0);
     expect(result.teamPowerImpact).toBeLessThan(6);
   });
+
+  it("treats an explicitly selected passive power as no active power (never double-applied)", () => {
+    const result = calculateTeamPowerModifierForSide({
+      modifiers: { d1: { teamPowerId: "passive-1" }, d2: { teamPowerId: null } },
+      disciplineSide: "d1",
+      disciplineId: "mini-dm",
+      disciplineCategory: "power",
+      teamPowers: [createPower({ id: "passive-1", isPassive: true })],
+    });
+
+    expect(result.teamPowerSelected).toBe(0);
+    expect(result.teamPowerImpact).toBe(0);
+    expect(result.teamPowerLabel).toBeNull();
+  });
 });
