@@ -20481,6 +20481,20 @@ a {
     0 0 0 3px rgba(255, 127, 122, 0.1);
 }
 
+.legacy-lineup-form-card-chip.is-debuff {
+  color: #ffb37a;
+  border-color: rgba(255, 179, 122, 0.32);
+  background: rgba(158, 92, 27, 0.22);
+}
+
+.legacy-lineup-power-debuff-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ffb37a;
+}
+
 .legacy-lineup-side-draft-status {
   display: grid;
   gap: 8px;

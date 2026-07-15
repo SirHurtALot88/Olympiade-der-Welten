@@ -610,6 +610,43 @@ export function calculatePassiveTeamPowerBonus(
   return Math.min(bonus, 3);
 }
 
+const TEAM_POWER_DEBUFF_TARGET_LABELS: Record<TeamPowerTargetMode, string> = {
+  self: "—",
+  single_top: "Top-Gegner",
+  single_rival: "Rivalen",
+  single_rank_neighbor: "Rank-Nachbarn",
+  rank_band: "Rank-Band",
+};
+
+/** True for effect types that hurt opponents at matchday resolution rather than boosting the own score. */
+export function isTeamPowerDebuffEffect(effectType: TeamPowerEffectType | null | undefined): boolean {
+  return effectType === "field_debuff" || effectType === "snipe_debuff" || effectType === "rivalry_debuff";
+}
+
+/**
+ * Human-readable summary of what a selected debuff power does at real matchday resolution
+ * (see `applyTeamPowerDebuffs` in legacy-matchday-resolve-engine.ts). Used purely for UI display —
+ * does not affect scoring math. Returns null for self/support powers or when there is nothing
+ * meaningful to show (no impact %).
+ */
+export function describeTeamPowerDebuffEffect(input: {
+  effectType: TeamPowerEffectType | null | undefined;
+  targetMode: TeamPowerTargetMode | null | undefined;
+  targetLimit?: number | null;
+  impactPct: number | null | undefined;
+}): string | null {
+  if (!isTeamPowerDebuffEffect(input.effectType)) {
+    return null;
+  }
+  const targetMode = input.targetMode ?? "single_top";
+  const targetLabel = TEAM_POWER_DEBUFF_TARGET_LABELS[targetMode] ?? "Gegner";
+  const bandNote = targetMode === "rank_band" && (input.targetLimit ?? 0) > 1 ? ` (${input.targetLimit})` : "";
+  const impactPct = input.impactPct ?? 0;
+  const impactNote = impactPct > 0 ? ` · ~${impactPct}% bei Auflösung` : "";
+  const spreadNote = input.effectType === "field_debuff" ? " · Streuung ×0.65 pro Ziel" : "";
+  return `Debuff · trifft ${targetLabel}${bandNote}${impactNote}${spreadNote}`;
+}
+
 export function calculateTeamPowerModifierForSide(input: {
   modifiers: LineupDraftModifiers | undefined | null;
   disciplineSide: LineupDisciplineSide;
