@@ -6188,6 +6188,18 @@ a {
   justify-content: space-between;
 }
 
+.save-summary-select {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2px;
+}
+
+.save-summary-select input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #74a2ea;
+}
+
 .save-summary-flags {
   margin-top: 2px;
 }

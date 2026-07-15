@@ -36,6 +36,8 @@ function countingPersistence(base: PersistenceService): { p: PersistenceService;
     createScenarioSnapshot: (i) => base.createScenarioSnapshot(i),
     activateSave: (id) => base.activateSave(id),
     listSaves: () => base.listSaves(),
+    deleteSave: (id) => base.deleteSave(id),
+    deleteSaves: (ids) => base.deleteSaves(ids),
   };
   return { p, writes: () => writes };
 }

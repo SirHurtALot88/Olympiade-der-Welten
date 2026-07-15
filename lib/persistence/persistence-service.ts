@@ -169,5 +169,11 @@ export function createPersistenceService(): PersistenceService {
     listSaves() {
       return saveRepository.listSaves();
     },
+    deleteSave(saveId) {
+      return saveRepository.deleteSave(saveId);
+    },
+    deleteSaves(saveIds) {
+      return saveRepository.deleteSaves(saveIds);
+    },
   };
 }

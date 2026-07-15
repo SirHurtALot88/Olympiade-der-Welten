@@ -252,6 +252,12 @@ function createInMemoryPersistenceService(initialSave: PersistedSaveGame): Persi
         },
       ];
     },
+    deleteSave() {
+      throw new Error("Whole season dryrun does not delete saves through persistence.");
+    },
+    deleteSaves() {
+      throw new Error("Whole season dryrun does not delete saves through persistence.");
+    },
   };
 }
 

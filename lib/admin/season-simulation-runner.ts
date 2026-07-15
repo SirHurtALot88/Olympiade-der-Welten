@@ -421,6 +421,12 @@ function createSingleSavePersistenceHarness(initialSave: PersistedSaveGame) {
       };
       return currentSave.gameState.scenarioMeta ? [{ ...summary, scenarioMeta: currentSave.gameState.scenarioMeta }] : [summary];
     },
+    deleteSave() {
+      throw new Error("Admin simulation dry-run deletes no saves.");
+    },
+    deleteSaves() {
+      throw new Error("Admin simulation dry-run deletes no saves.");
+    },
   };
   return {
     persistence,

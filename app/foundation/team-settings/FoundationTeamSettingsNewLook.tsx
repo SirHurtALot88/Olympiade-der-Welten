@@ -206,6 +206,50 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   } = props;
 
   const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>("saves");
+  const [multiSelectSaves, setMultiSelectSaves] = useState(false);
+  const [selectedSaveIdsForDeletion, setSelectedSaveIdsForDeletion] = useState<Set<string>>(new Set());
+  const [saveDeleteMessage, setSaveDeleteMessage] = useState<string | null>(null);
+
+  /** Umschalten der Mehrfachauswahl für Save-Löschung; verwirft eine laufende Auswahl. */
+  function toggleMultiSelectSaves() {
+    setMultiSelectSaves((current) => !current);
+    setSelectedSaveIdsForDeletion(new Set());
+    setSaveDeleteMessage(null);
+  }
+
+  function toggleSaveSelectedForDeletion(saveId: string) {
+    setSelectedSaveIdsForDeletion((current) => {
+      const next = new Set(current);
+      if (next.has(saveId)) {
+        next.delete(saveId);
+      } else {
+        next.add(saveId);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Löscht einen oder mehrere Spielstände nach Bestätigung. Der aktive Save wird von der
+   * Auswahl-UI bereits ausgeschlossen (Checkbox/Button deaktiviert) — der Server blockt ihn
+   * zusätzlich als letzte Sicherung.
+   */
+  async function deleteSaves(saveIds: string[]) {
+    if (saveIds.length === 0 || isSaveBusy || readMeta.readOnly) {
+      return;
+    }
+    const confirmMessage =
+      saveIds.length === 1
+        ? "Spielstand wirklich löschen? Das kann nicht rückgängig gemacht werden."
+        : `${saveIds.length} Spielstände wirklich löschen? Das kann nicht rückgängig gemacht werden.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    setSaveDeleteMessage(null);
+    await runSaveAction({ action: "delete", saveIds });
+    setSelectedSaveIdsForDeletion(new Set());
+    setSaveDeleteMessage(saveIds.length === 1 ? "Spielstand gelöscht." : `${saveIds.length} Spielstände gelöscht.`);
+  }
 
   // Single-player-first: das New-Game-Setup ist eine freie Team-Auswahl (1-4 Teams
   // für die Chris-Seat), nicht mehr an einen vorab gewählten Spielmodus-Preset
@@ -854,6 +898,40 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           {freshSeasonStartMessage ? <p className="nl-teamsettings-msg is-good">{freshSeasonStartMessage}</p> : null}
           {renderSeasonStartResetFeed()}
 
+          <div className="nl-teamsettings-actions is-compact">
+            <button
+              type="button"
+              className="nl-teamsettings-btn is-small"
+              disabled={isSaveBusy || readMeta.readOnly || saveSummaries.length === 0}
+              title={
+                readMeta.readOnly
+                  ? getReadOnlyActionReason("die Mehrfachauswahl")
+                  : "Wählt mehrere Spielstände aus, um sie gemeinsam zu löschen."
+              }
+              onClick={toggleMultiSelectSaves}
+            >
+              {multiSelectSaves ? "Mehrfachauswahl beenden" : "Mehrere auswählen"}
+            </button>
+            {multiSelectSaves ? (
+              <button
+                type="button"
+                className="nl-teamsettings-btn is-small is-danger"
+                disabled={selectedSaveIdsForDeletion.size === 0 || isSaveBusy || readMeta.readOnly}
+                title={
+                  readMeta.readOnly
+                    ? getReadOnlyActionReason("Spielstände")
+                    : selectedSaveIdsForDeletion.size === 0
+                      ? "Wähle zuerst mindestens einen Spielstand aus."
+                      : "Löscht alle ausgewählten Spielstände unwiderruflich."
+                }
+                onClick={() => void deleteSaves([...selectedSaveIdsForDeletion])}
+              >
+                Ausgewählte löschen ({selectedSaveIdsForDeletion.size})
+              </button>
+            ) : null}
+          </div>
+          {saveDeleteMessage ? <p className="nl-teamsettings-msg is-good">{saveDeleteMessage}</p> : null}
+
           <div className="nl-teamsettings-savelist">
             {saveSummaries.length === 0 ? (
               <p className="nl-teamsettings-msg is-warn">
@@ -871,6 +949,24 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                   className={`nl-teamsettings-save-card${save.saveId === activeSaveId ? " is-active" : ""}`}
                 >
                   <header className="nl-teamsettings-save-card-head">
+                    {multiSelectSaves ? (
+                      <label
+                        className="nl-teamsettings-check is-small"
+                        title={
+                          save.saveId === activeSaveId
+                            ? "Der aktive Spielstand kann nicht gelöscht werden — lade zuerst einen anderen."
+                            : "Für Mehrfachlöschung auswählen."
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSaveIdsForDeletion.has(save.saveId)}
+                          disabled={save.saveId === activeSaveId || isSaveBusy || readMeta.readOnly}
+                          onChange={() => toggleSaveSelectedForDeletion(save.saveId)}
+                        />
+                        <span className="sr-only">{save.name} auswählen</span>
+                      </label>
+                    ) : null}
                     <strong>{save.name}</strong>
                     <span className="nl-teamsettings-hint">{formatScenarioTypeLabel(meta?.scenarioType)}</span>
                   </header>
@@ -945,6 +1041,25 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     >
                       Snapshot erstellen
                     </button>
+                    {!multiSelectSaves ? (
+                      <button
+                        type="button"
+                        className="nl-teamsettings-btn is-small is-danger"
+                        disabled={isSaveBusy || readMeta.readOnly || save.saveId === activeSaveId}
+                        title={
+                          save.saveId === activeSaveId
+                            ? "Der aktive Spielstand kann nicht gelöscht werden — lade zuerst einen anderen."
+                            : readMeta.readOnly
+                              ? getReadOnlyActionReason("diesen Save")
+                              : isSaveBusy
+                                ? getBusyActionReason("Die Save-Aktion")
+                                : "Löscht diesen Spielstand unwiderruflich."
+                        }
+                        onClick={() => void deleteSaves([save.saveId])}
+                      >
+                        Löschen
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               );
