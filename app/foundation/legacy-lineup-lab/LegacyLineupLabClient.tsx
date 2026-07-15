@@ -70,6 +70,7 @@ import type {
   LegacyLineupPreviewResult,
 } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import { describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
 
 // Perf/DX (#57): these three sub-views are each only rendered behind a single
@@ -1771,16 +1772,16 @@ function getTeamPowerCategoryLabel(category: LegacyTeamPowerOption["category"]) 
 
 function getTeamPowerEffectLabel(power: Pick<LegacyTeamPowerOption, "effectType" | "targetMode" | "targetLimit">) {
   if (power.effectType === "snipe_debuff") {
-    return power.targetMode === "single_rival" ? "Snipe Rival" : "Snipe Top";
+    return power.targetMode === "single_rival" ? "Debuff · Snipe Rival" : "Debuff · Snipe Top";
   }
   if (power.effectType === "field_debuff") {
-    return `Field x${Math.max(power.targetLimit, 1)}`;
+    return `Debuff · Field x${Math.max(power.targetLimit, 1)}`;
   }
   if (power.effectType === "rivalry_debuff") {
-    return "Rivalry";
+    return "Debuff · Rivalry";
   }
   if (power.effectType === "support_boost") {
-    return "Support";
+    return "Boost · Support";
   }
   return "Boost";
 }
@@ -1854,8 +1855,10 @@ function formatTeamPowerOptionLabel(
   const effectiveExtra = conditionalActive ? Number((power.conditionalBonusPct * fitMultiplier).toFixed(1)) : 0;
   const attributeFit = calculateTeamPowerAttributeFitPctForUi(power, disciplineId, disciplineWeights, fitMultiplier);
   const source = power.source === "facility" ? "Facility" : "Team";
-  const sign = power.effectType === "self_boost" || power.effectType === "support_boost" ? "+" : "-";
-  return `${power.label} · ${getTeamPowerEffectLabel(power)} · ${getTeamPowerCategoryLabel(power.category)} · ${sign}${formatDecimalScore(effectiveModifier, 1)}%${effectiveExtra ? ` +${formatDecimalScore(effectiveExtra, 1)}% Extra` : ""}${attributeFit ? ` · Fit ${attributeFit > 0 ? "+" : ""}${formatDecimalScore(attributeFit, 1)}% (${formatTeamPowerAttributeTags(power)})` : ` · Tags ${formatTeamPowerAttributeTags(power)}`} · ${power.chargesRemaining}/${power.chargesTotal} · ${source}${isFit ? "" : " · Off-Fit"}`;
+  const isDebuffEffect = isTeamPowerDebuffEffect(power.effectType);
+  const sign = isDebuffEffect ? "-" : "+";
+  const debuffHint = isDebuffEffect ? " · wirkt gegen Gegner, nicht auf deinen Score" : "";
+  return `${power.label} · ${getTeamPowerEffectLabel(power)} · ${getTeamPowerCategoryLabel(power.category)} · ${sign}${formatDecimalScore(effectiveModifier, 1)}%${effectiveExtra ? ` +${formatDecimalScore(effectiveExtra, 1)}% Extra` : ""}${attributeFit ? ` · Fit ${attributeFit > 0 ? "+" : ""}${formatDecimalScore(attributeFit, 1)}% (${formatTeamPowerAttributeTags(power)})` : ` · Tags ${formatTeamPowerAttributeTags(power)}`} · ${power.chargesRemaining}/${power.chargesTotal} · ${source}${isFit ? "" : " · Off-Fit"}${debuffHint}`;
 }
 
 function getDisciplineToneClass(category: string | null | undefined) {
@@ -6548,28 +6551,41 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return null;
     }
     const breakdown = getTeamPowerProjectedBreakdown(power, disciplineSide, disciplineId, disciplineCategory);
-    const isPositiveEffect = power.effectType === "self_boost" || power.effectType === "support_boost";
+    const isDebuffEffect = isTeamPowerDebuffEffect(power.effectType);
+    const isPositiveEffect = !isDebuffEffect;
     const sign = isPositiveEffect ? "+" : "-";
     const pointPrefix = isPositiveEffect ? "+" : "ca -";
     const fitPointPrefix = (breakdown.attributeFitPoints ?? 0) >= 0 ? pointPrefix : isPositiveEffect ? "-" : "ca +";
+    const totalImpactPct = Number((breakdown.basePct + breakdown.extraPct + breakdown.attributeFitPct).toFixed(1));
+    const debuffSummary = describeTeamPowerDebuffEffect({
+      effectType: power.effectType,
+      targetMode: power.targetMode,
+      targetLimit: power.targetLimit,
+      impactPct: totalImpactPct,
+    });
 
     return (
       <span
-        className={`legacy-lineup-form-card-chip is-${breakdown.conditional.active ? "red is-power-window-active" : breakdown.isFit ? "blue" : "yellow"}`}
+        className={`legacy-lineup-form-card-chip is-${isDebuffEffect ? "debuff" : breakdown.conditional.active ? "red is-power-window-active" : breakdown.isFit ? "blue" : "yellow"}`}
         title={[
           power.description,
+          debuffSummary ? `${debuffSummary} — wirkt bei der Spieltag-Auflösung gegen Gegner, nicht auf deinen eigenen Score.` : null,
           breakdown.conditional.active
             ? `Zusatzeffekt aktiv: ${breakdown.conditional.label} (${breakdown.conditional.sourceLabel})`
             : power.conditionalDescription,
           `Tags: ${formatTeamPowerAttributeTags(power)}`,
-          breakdown.basePoints != null ? `${formatDecimalScore(breakdown.basePct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)} Punkte` : null,
-          breakdown.extraPoints ? `Extra ${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.extraPoints, 1)} Punkte` : null,
+          !isDebuffEffect && breakdown.basePoints != null ? `${formatDecimalScore(breakdown.basePct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)} Punkte` : null,
+          !isDebuffEffect && breakdown.extraPoints ? `Extra ${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.extraPoints, 1)} Punkte` : null,
           breakdown.attributeFitPct ? `Attribut-Fit ${breakdown.attributeFitPct > 0 ? "+" : ""}${formatDecimalScore(breakdown.attributeFitPct, 1)}% ≈ ${fitPointPrefix}${formatDecimalScore(Math.abs(breakdown.attributeFitPoints ?? 0), 1)} Punkte` : null,
         ].filter(Boolean).join("\n")}
       >
-        {getTeamPowerEffectLabel(power)} · {power.label} {sign}{formatDecimalScore(breakdown.basePct, 1)}%
-        {breakdown.basePoints != null ? ` ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)}P` : ""}
-        {breakdown.extraPct ? ` · Extra +${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${formatDecimalScore(breakdown.extraPoints ?? 0, 1)}P` : ""}
+        {isDebuffEffect ? "Debuff" : "Boost"} · {power.label}
+        {isDebuffEffect
+          ? debuffSummary
+            ? ` · ${debuffSummary.replace(/^Debuff · /, "")}`
+            : ""
+          : ` ${sign}${formatDecimalScore(breakdown.basePct, 1)}%${breakdown.basePoints != null ? ` ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)}P` : ""}`}
+        {!isDebuffEffect && breakdown.extraPct ? ` · Extra +${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${formatDecimalScore(breakdown.extraPoints ?? 0, 1)}P` : ""}
         {breakdown.attributeFitPct ? ` · Fit ${breakdown.attributeFitPct > 0 ? "+" : ""}${formatDecimalScore(breakdown.attributeFitPct, 1)}%` : ""}
         {breakdown.conditional.active ? ` · ${breakdown.conditional.label}` : ""}
         {` · ${power.chargesRemaining}/${power.chargesTotal}`}
@@ -8010,6 +8026,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         </option>
                       ))}
                     </select>
+                    {renderSelectedTeamPowerChip(
+                      modifiers[disciplineSide].teamPowerId,
+                      disciplineSide,
+                      discipline?.disciplineId ?? null,
+                      discipline?.category ?? null,
+                    )}
                   </section>
                 );
               })}
@@ -8239,6 +8261,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               </option>
                             ))}
                           </select>
+                          {renderSelectedTeamPowerChip(
+                            modifiers[disciplineSide].teamPowerId,
+                            disciplineSide,
+                            discipline?.disciplineId ?? null,
+                            discipline?.category ?? null,
+                          )}
                         </label>
                       </section>
                     );
@@ -10647,6 +10675,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     <div>
                       <span className="muted">Power</span>
                       <strong>{side.teamPowerLabel ?? "—"}</strong>
+                      {isTeamPowerDebuffEffect(side.teamPowerEffectType) ? (
+                        <span
+                          className="legacy-lineup-power-debuff-note"
+                          title="Debuffs zeigen hier bewusst 0, weil sie bei der Spieltag-Auflösung den Score der Gegner senken statt den eigenen Score zu erhöhen."
+                        >
+                          {describeTeamPowerDebuffEffect({
+                            effectType: side.teamPowerEffectType,
+                            targetMode: side.teamPowerTargetMode,
+                            targetLimit: side.teamPowerTargetLimit,
+                            impactPct: side.teamPowerImpact,
+                          })}
+                        </span>
+                      ) : null}
                     </div>
                     <div>
                       <span className="muted">Total</span>

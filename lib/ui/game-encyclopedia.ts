@@ -388,6 +388,8 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
       "optionaler Conditional-Bonus bei Top-8-Trigger",
     ],
     usage: "Plane Powers wie Captain: dort einsetzen, wo ein Rang wirklich zu drehen ist oder ein Rivale gezielt gebremst werden soll.",
+    caveat:
+      "Ein ausgewählter Debuff zeigt in der Ein-Team-Vorschau bewusst 0 Punkte auf den eigenen Score — er wirkt erst bei der echten Spieltag-Auflösung und senkt dort den Score der Gegner (Snipe/Rivalry direkt, Field mit ×0.65-Streuung).",
   },
   {
     id: "cash",
