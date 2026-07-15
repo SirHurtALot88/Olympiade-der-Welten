@@ -4,6 +4,7 @@ import type { DragEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import { NlDeltaChip } from "@/components/foundation/new-look";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import type { FormCardPlanRecord, LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import type { LegacyFormCardOption, LegacyLineupDraft, LegacyLineupLoadedContext, LegacyModifierSourceSummary } from "@/lib/lineups/legacy-lineup-types";
@@ -31,6 +32,7 @@ export type FormBoardPanelProps = {
   };
   formPlanOpenCells: number;
   formDeckCards: FormDeckCard[];
+  formCardCounts: { positiveAvailable: number; negativeAvailable: number };
   activeFormPickCell: FormBoardPickCell | null;
   formCardPlanByKey: Map<string, FormCardPlanRecord>;
   formCardPlanPendingKey: string | null;
@@ -88,6 +90,7 @@ export default function FormBoardPanel({
   draftIntensityPreview,
   formPlanOpenCells,
   formDeckCards,
+  formCardCounts,
   activeFormPickCell,
   formCardPlanByKey,
   formCardPlanPendingKey,
@@ -214,6 +217,16 @@ export default function FormBoardPanel({
           <span className="pill">{formPlanOpenCells} offen</span>
           <span className="pill">{formDeckCards.filter((card) => !card.isUsed && !card.isReserved).length} frei</span>
           <span className="pill">Form {formatModifierSourceLabel(context?.formCardSource)}</span>
+          <NlDeltaChip
+            value={formCardCounts.positiveAvailable}
+            format={(n) => `${n} positiv`}
+            title="Verfügbare positive Formkarten"
+          />
+          <NlDeltaChip
+            value={formCardCounts.negativeAvailable > 0 ? -formCardCounts.negativeAvailable : 0}
+            format={(n) => `${Math.abs(n)} negativ`}
+            title="Verfügbare negative Formkarten"
+          />
         </div>
       </div>
       <div className="legacy-lineup-form-board-sync-banner" aria-label="Heute-Status">

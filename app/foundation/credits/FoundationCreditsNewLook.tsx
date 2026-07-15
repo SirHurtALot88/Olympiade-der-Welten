@@ -4,7 +4,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
-import { NL_TONE_VAR, NlCard, StatChip, formatNlMoney, type NlTone } from "@/components/foundation/new-look";
+import {
+  NL_TONE_VAR,
+  NlCard,
+  NlEmptyState,
+  NlTable,
+  StatChip,
+  StatChipRow,
+  formatNlMoney,
+  useCountUp,
+  type NlTableColumn,
+  type NlTone,
+} from "@/components/foundation/new-look";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildLoanOffers, computeLoanTerms, type LoanOffer } from "@/lib/finance/loan-service";
@@ -40,6 +51,50 @@ function formatRateRange(minRate: number, maxRate: number): string {
   const low = Math.min(minRate, maxRate);
   const high = Math.max(minRate, maxRate);
   return `${formatRate(low)} – ${formatRate(high)}`;
+}
+
+/** Eine Zeile der Aktive-Kredite-Tabelle — `index` wird für das "Kredit N"-Label gebraucht. */
+type NlCreditsLoanRow = { loan: ActiveLoan; index: number };
+
+/** Spaltenkatalog der Aktive-Kredite-Tabelle (`NlTable`-Migrationsbeleg, siehe FOUNDATION-Audit). */
+const NL_CREDITS_LOAN_COLUMNS: NlTableColumn<NlCreditsLoanRow>[] = [
+  { key: "kredit", label: "Kredit" },
+  { key: "lender", label: "Verleiher" },
+  { key: "principal", label: "Aufgenommen", align: "right" },
+  { key: "outstanding", label: "Restschuld", align: "right" },
+  { key: "rate", label: "Zinssatz", align: "right" },
+  { key: "term", label: "Restlaufzeit", align: "right" },
+  { key: "instalment", label: "Jahresrate", align: "right" },
+  { key: "action", label: "Aktion" },
+];
+
+function renderCreditsLoanCell(
+  row: NlCreditsLoanRow,
+  column: NlTableColumn<NlCreditsLoanRow>,
+  canEarlyPayoff: boolean,
+  onEarlyPayoff: (loanId: string) => Promise<LoanEarlyPayoffOutcome>,
+) {
+  const { loan, index } = row;
+  switch (column.key) {
+    case "kredit":
+      return `Kredit ${index + 1}`;
+    case "lender":
+      return loan.lenderName;
+    case "principal":
+      return formatNlMoney(loan.principal);
+    case "outstanding":
+      return formatNlMoney(loan.outstanding);
+    case "rate":
+      return formatRate(loan.interestRate);
+    case "term":
+      return `${loan.remainingSeasons} / ${loan.termSeasons} Saisons`;
+    case "instalment":
+      return formatNlMoney(loan.nextInstalment);
+    case "action":
+      return <LoanEarlyPayoffAction loan={loan} canEarlyPayoff={canEarlyPayoff} onEarlyPayoff={onEarlyPayoff} />;
+    default:
+      return null;
+  }
 }
 
 /** Grün/Amber/Rot-Ton nach Anteil (0..1) — geteilte Schwelle für Gauge, Slider und Belastungs-Badge. */
@@ -173,7 +228,7 @@ function LoanBurdenChart({
   // Nie ein All-Null/NaN-Chart rendern (z. B. Team ohne Kredit, Gehälter UND
   // Gebäude) — stattdessen ein knapper Fallback statt eines leeren SVGs.
   if (total <= 0) {
-    return <p className="nl-credits-burden-empty muted">Keine laufenden Ausgaben bekannt.</p>;
+    return <NlEmptyState className="nl-credits-burden-empty" title="Keine laufenden Ausgaben bekannt." />;
   }
 
   const hasIncome = safeRevenue > 0;
@@ -801,9 +856,46 @@ export default function FoundationCreditsNewLook({
   const amountFraction = maxAmount > 0 ? Math.max(0, Math.min(1, amount / maxAmount)) : 0;
   const amountTone = riskTone(amountFraction);
 
+  // KPI-Hero (Header-Karte): Cash, Ausstehend, Kapazität, Ø-Zins — Ø-Zins als
+  // nach Restschuld gewichteter Durchschnitt der bereits aufgenommenen
+  // aktiven Kredite (keine neue Berechnung im Service nötig).
+  const avgInterestRate = useMemo(() => {
+    if (!team || team.activeLoans.length === 0) return null;
+    const totalOutstanding = team.activeLoans.reduce((sum, loan) => sum + loan.outstanding, 0);
+    if (totalOutstanding <= 0) return null;
+    const weightedSum = team.activeLoans.reduce((sum, loan) => sum + loan.outstanding * loan.interestRate, 0);
+    return weightedSum / totalOutstanding;
+  }, [team]);
+  const animatedKpiCash = useCountUp(team?.cash ?? null);
+  const animatedKpiOutstanding = useCountUp(team?.outstandingDebt ?? null);
+  const animatedKpiCapacity = useCountUp(team?.creditCapacityTotal ?? null);
+  const animatedKpiAvgRate = useCountUp(avgInterestRate);
+
   return (
     <div className="nl-credits" data-testid="foundation-credits" data-new-look="true">
-      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName} />
+      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName}>
+        {team ? (
+          <StatChipRow className="nl-credits-kpi-hero" aria-label="Kredit-Kennzahlen">
+            <StatChip label="Cash" value={formatNlMoney(animatedKpiCash ?? team.cash)} tone="neutral" />
+            <StatChip
+              label="Ausstehend"
+              value={formatNlMoney(animatedKpiOutstanding ?? team.outstandingDebt)}
+              tone={riskTone(team.creditUtilizationRatio)}
+            />
+            <StatChip
+              label="Kapazität"
+              value={formatNlMoney(animatedKpiCapacity ?? team.creditCapacityTotal)}
+              tone="neutral"
+            />
+            <StatChip
+              label="Ø-Zins"
+              value={avgInterestRate != null ? formatRate(animatedKpiAvgRate ?? avgInterestRate) : "—"}
+              sub={team.activeLoans.length > 0 ? `${team.activeLoans.length} aktive Kredite` : "keine aktiven Kredite"}
+              tone="neutral"
+            />
+          </StatChipRow>
+        ) : null}
+      </NlCard>
 
       {model.status === "not_ready" ? (
         <EmptyState
@@ -909,7 +1001,7 @@ export default function FoundationCreditsNewLook({
                 ))}
               </div>
             ) : (
-              <p className="nl-credits-empty-text muted">Keine Angebote verfügbar.</p>
+              <NlEmptyState title="Keine Angebote verfügbar." />
             )}
           </NlCard>
         </>
@@ -931,13 +1023,15 @@ export default function FoundationCreditsNewLook({
           eyebrow="Neuer Kredit"
           title={isSeasonOneBlocked ? "Season 1: noch keine Kredite" : "Kreditaufnahme aktuell nicht möglich"}
         >
-          <p className="nl-credits-empty-text muted">
-            {isSeasonOneBlocked
-              ? "Ab Season 2 verfügbar."
-              : team.borrowBlockedReason === "not_preseason"
-                ? "Neue Kredite könnt ihr nur in der Vorbereitung (Preseason) aufnehmen."
-                : "Euer Kreditrahmen ist aktuell ausgeschöpft."}
-          </p>
+          <NlEmptyState
+            title={
+              isSeasonOneBlocked
+                ? "Ab Season 2 verfügbar."
+                : team.borrowBlockedReason === "not_preseason"
+                  ? "Neue Kredite könnt ihr nur in der Vorbereitung (Preseason) aufnehmen."
+                  : "Euer Kreditrahmen ist aktuell ausgeschöpft."
+            }
+          />
         </NlCard>
       ) : null}
 
@@ -945,50 +1039,20 @@ export default function FoundationCreditsNewLook({
         <NlCard className="nl-credits-active-card" eyebrow="Kredite" title="Aktive Kredite">
           {team && team.activeLoans.length > 0 ? (
             <>
-              <div className="nl-credits-table-shell">
-                <table className="nl-credits-table" data-testid="nl-credits-active-loans-table">
-                  <thead>
-                    <tr>
-                      <th>Kredit</th>
-                      <th>Verleiher</th>
-                      <th>Aufgenommen</th>
-                      <th>Restschuld</th>
-                      <th>Zinssatz</th>
-                      <th>Restlaufzeit</th>
-                      <th>Jahresrate</th>
-                      <th>Aktion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {team.activeLoans.map((loan, index) => (
-                      <tr key={loan.id}>
-                        <td>Kredit {index + 1}</td>
-                        <td>{loan.lenderName}</td>
-                        <td className="nl-tnum">{formatNlMoney(loan.principal)}</td>
-                        <td className="nl-tnum">{formatNlMoney(loan.outstanding)}</td>
-                        <td className="nl-tnum">{formatRate(loan.interestRate)}</td>
-                        <td className="nl-tnum">
-                          {loan.remainingSeasons} / {loan.termSeasons} Saisons
-                        </td>
-                        <td className="nl-tnum">{formatNlMoney(loan.nextInstalment)}</td>
-                        <td>
-                          <LoanEarlyPayoffAction
-                            loan={loan}
-                            canEarlyPayoff={team.canEarlyPayoff}
-                            onEarlyPayoff={onEarlyPayoff}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <NlTable
+                columns={NL_CREDITS_LOAN_COLUMNS}
+                rows={team.activeLoans.map((loan, index) => ({ loan, index }))}
+                rowKey={(row) => row.loan.id}
+                renderCell={(row, column) => renderCreditsLoanCell(row, column, team.canEarlyPayoff, onEarlyPayoff)}
+                data-testid="nl-credits-active-loans-table"
+                aria-label="Aktive Kredite"
+              />
               <p className="nl-credits-empty-text muted">
                 Die Jahresrate wird am Saisonabschluss automatisch von eurem Cash abgebucht — keine manuelle Tilgung nötig.
               </p>
             </>
           ) : (
-            <p className="nl-credits-empty-text muted">Keine aktiven Kredite.</p>
+            <NlEmptyState title="Keine aktiven Kredite." />
           )}
         </NlCard>
       )}

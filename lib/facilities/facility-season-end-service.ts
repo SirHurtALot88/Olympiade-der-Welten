@@ -210,6 +210,25 @@ export function previewFacilitySeasonEndFinance(
   };
 }
 
+/**
+ * Season-scoped idempotency guard: true once `applyFacilitySeasonEndFinance` has already
+ * recorded a facility event for this team in this season (upkeep paid/unpaid or income
+ * collected). Mirrors the ad-hoc check scripts already used (see
+ * scripts/season-transition-s1-s2-run.ts) so the real season-completion pipeline and the
+ * standalone scripts agree on what "already applied" means and never double-credit income
+ * or double-charge upkeep on retried/dry runs.
+ */
+export function hasFacilitySeasonEndFinanceApplied(gameState: GameState, seasonId: string, teamId: string): boolean {
+  return (gameState.seasonState.facilityEvents ?? []).some(
+    (event) =>
+      event.seasonId === seasonId &&
+      event.teamId === teamId &&
+      (event.source === "facility_upkeep_paid" ||
+        event.source === "facility_upkeep_unpaid" ||
+        event.source === "facility_income_collected"),
+  );
+}
+
 export function applyFacilitySeasonEndFinance(
   save: PersistedSaveGame,
   teamId: string,

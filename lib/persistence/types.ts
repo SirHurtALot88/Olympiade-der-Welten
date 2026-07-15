@@ -68,6 +68,13 @@ export type SaveRepository = {
     status?: SaveStatus;
     gameState: GameState;
   }): PersistedSaveGame;
+  /** Deletes a single save (and all child rows). Returns false if the save is the active save or doesn't exist. */
+  deleteSave(saveId: string): boolean;
+  /**
+   * Deletes multiple saves in one transaction. The active save is always skipped (never
+   * deleted). Returns the saveIds that were actually deleted (a subset of the input).
+   */
+  deleteSaves(saveIds: string[]): string[];
 };
 
 export type PersistenceService = {
@@ -87,4 +94,11 @@ export type PersistenceService = {
   }): PersistedSaveGame;
   activateSave(saveId: string): PersistedSaveGame | null;
   listSaves(): SaveSummary[];
+  /** Deletes a single save (and all child rows). Returns false if the save is the active save or doesn't exist. */
+  deleteSave(saveId: string): boolean;
+  /**
+   * Deletes multiple saves in one transaction. The active save is always skipped (never
+   * deleted). Returns the saveIds that were actually deleted (a subset of the input).
+   */
+  deleteSaves(saveIds: string[]): string[];
 };

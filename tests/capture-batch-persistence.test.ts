@@ -38,6 +38,8 @@ function makeFakeDelegate(initial: PersistedSaveGame) {
     createScenarioSnapshot: () => store,
     activateSave: () => store,
     listSaves: () => [],
+    deleteSave: () => false,
+    deleteSaves: () => [],
   };
   return { delegate, writes: () => writes, current: () => store };
 }

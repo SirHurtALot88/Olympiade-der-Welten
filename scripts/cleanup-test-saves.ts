@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { getDatabase } from "@/lib/persistence/sqlite";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { SAVE_CHILD_TABLES } from "@/lib/persistence/save-repository";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
@@ -127,24 +128,8 @@ function main() {
   const deleteStatement = database.prepare("DELETE FROM saves WHERE save_id = ?");
   const deleteChildFallback = (table: string) =>
     database.prepare(`DELETE FROM ${table} WHERE save_id = ?`);
-  const childTables = [
-    "seasons",
-    "season_states",
-    "matchday_states",
-    "game_metadata",
-    "teams",
-    "team_identities",
-    "players",
-    "player_baselines",
-    "disciplines",
-    "rosters",
-    "contracts",
-    "transfer_listings",
-    "transfer_history",
-    "game_logs",
-    "mapping_reports",
-  ];
-  const childStatements = childTables.map((table) => deleteChildFallback(table));
+  // Shared with lib/persistence/save-repository.ts (deleteSaves) so both call sites stay in sync.
+  const childStatements = SAVE_CHILD_TABLES.map((table) => deleteChildFallback(table));
 
   const transaction = database.transaction(() => {
     for (const row of toDelete) {

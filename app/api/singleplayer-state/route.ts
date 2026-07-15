@@ -49,6 +49,7 @@ type SaveActionBody =
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }
   | { action: "fresh-season-1"; name?: string }
+  | { action: "delete"; saveIds: string[] }
   | {
       action: "assign-team-captain";
       saveId: string;
@@ -466,6 +467,45 @@ export async function POST(request: Request) {
         }
       }
     })();
+  } else if (body.action === "delete") {
+    if (!Array.isArray(body.saveIds) || body.saveIds.length === 0) {
+      return NextResponse.json({ error: "saveIds ist erforderlich und darf nicht leer sein." }, { status: 400 });
+    }
+
+    const activeSave = persistence.getActiveSave();
+    const blockedSaveIds: Array<{ saveId: string; reason: string }> = [];
+    const deletionCandidates: string[] = [];
+    for (const saveId of body.saveIds) {
+      if (activeSave && saveId === activeSave.saveId) {
+        blockedSaveIds.push({
+          saveId,
+          reason: "Der aktive Spielstand kann nicht gelöscht werden — lade zuerst einen anderen.",
+        });
+        continue;
+      }
+      const activeRoom = getActiveRoomBySaveId(saveId);
+      if (activeRoom) {
+        blockedSaveIds.push({
+          saveId,
+          reason: `Save wird gerade in Online-Room ${activeRoom.roomCode} verwendet.`,
+        });
+        continue;
+      }
+      deletionCandidates.push(saveId);
+    }
+
+    const deletedSaveIds = persistence.deleteSaves(deletionCandidates);
+    const stillMissingSaveIds = deletionCandidates.filter((saveId) => !deletedSaveIds.includes(saveId));
+    for (const saveId of stillMissingSaveIds) {
+      blockedSaveIds.push({ saveId, reason: "Spielstand wurde nicht gefunden." });
+    }
+
+    return NextResponse.json({
+      save: null,
+      saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
+      deletedSaveIds,
+      blockedSaveIds,
+    });
   } else if (body.action === "assign-team-captain") {
     if (!body.saveId || !body.teamId || !body.playerId) {
       return NextResponse.json({ error: "saveId, teamId and playerId are required." }, { status: 400 });

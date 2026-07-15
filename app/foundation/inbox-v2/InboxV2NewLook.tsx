@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent } from "react";
 
 import type { InboxV2ClientProps, InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
-import { NlCard, NlSubTabs, nlToneClass, type NlTone } from "@/components/foundation/new-look";
+import { NlCard, NlSubTabs, formatNlNumber, nlToneClass, useCountUp, type NlTone } from "@/components/foundation/new-look";
 import { getInboxItemCadence, isAutoResolvingInboxItemId } from "@/lib/foundation/game-inbox-service";
 
 /**
@@ -248,6 +248,12 @@ export default function InboxV2NewLook({
   // reagieren.
   const activateItem = (itemId: string) => (onOpenItem ?? onSelectItem)(itemId);
 
+  // Hero-/KPI-Zähler (#Wave2): die Header-Zähler ("offen"/"kritisch") zählen
+  // hoch — die Liste/Magazin-Karten selbst bleiben unverändert. Respektiert
+  // prefers-reduced-motion via `useCountUp`.
+  const animatedOpenCount = useCountUp(openCount);
+  const animatedCriticalCount = useCountUp(criticalCount);
+
   // Kategorie-Filter als klickbare Portale (#3). Der Mount reicht aktuell
   // keinen `onCategoryFilterChange`-Handler durch (Host setzt
   // `hideCategoryFilters`), daher filtert der Neue Look die Liste lokal —
@@ -466,7 +472,7 @@ export default function InboxV2NewLook({
           {teamLabel ? <p className="nl-inbox-team">{teamLabel}</p> : null}
         </div>
         <div className="nl-inbox-header-meta">
-          <span className="nl-inbox-open-pill nl-tnum">{openCount} offen</span>
+          <span className="nl-inbox-open-pill nl-tnum">{formatNlNumber(animatedOpenCount ?? openCount, 0)} offen</span>
           {criticalCount > 0 ? (
             <button
               type="button"
@@ -476,7 +482,7 @@ export default function InboxV2NewLook({
               title={firstCriticalItem ? "Zum ersten kritischen Eintrag springen" : "Kritische Einträge sind ausgefiltert"}
             >
               <IconWarningTriangle />
-              <span className="nl-tnum">{criticalCount} kritisch</span>
+              <span className="nl-tnum">{formatNlNumber(animatedCriticalCount ?? criticalCount, 0)} kritisch</span>
             </button>
           ) : null}
         </div>
@@ -539,7 +545,7 @@ export default function InboxV2NewLook({
         renderChronicleMagazine()
       ) : (
         <ul className="nl-inbox-list" aria-label="Inbox Einträge">
-          {displayedItems.map((item) => {
+          {displayedItems.map((item, index) => {
             const meta = getCategoryMeta(item.category);
             const CategoryIcon = meta.icon;
             const severityTone = getSeverityTone(item.severity);
@@ -553,7 +559,12 @@ export default function InboxV2NewLook({
             const cadenceLabel = getCadenceLabel(item);
             const showManualActions = item.status === "open" && !isAutoResolving && (onMarkDone || onDismiss);
             return (
-              <li key={item.id} id={getInboxItemDomId(item.id)} className="nl-inbox-list-row">
+              <li
+                key={item.id}
+                id={getInboxItemDomId(item.id)}
+                className="nl-inbox-list-row nl-reveal"
+                style={{ "--nl-reveal-i": Math.min(index, 14) } as CSSProperties}
+              >
                 <NlCard
                   interactive
                   onClick={() => activateItem(item.id)}

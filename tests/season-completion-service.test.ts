@@ -205,5 +205,68 @@ describe("runLocalSeasonCompletion", () => {
     expect((saved.seasonReviewState as { seasonConsequences?: Record<string, unknown> }).seasonConsequences?.[gameState.season.id]).toBeDefined();
     expect(result.seasonReview.objectiveSettlement.rows.length).toBeGreaterThan(0);
     expect(result.aiSeasonAudit.seasonId).toBe(gameState.season.id);
+    // No facilities built by default in a fresh season -> nothing to settle.
+    expect(result.steps.find((step) => step.key === "facility_finance")?.status).toBe("skipped");
+  });
+
+  it("applies facility season-end income/upkeep to Team.cash exactly once (idempotent on retry)", async () => {
+    const gameState = createCompletedSeasonState();
+    const team = gameState.teams[0]!;
+    const cashBefore = team.cash;
+    gameState.seasonState.teamFacilities = {
+      [team.teamId]: {
+        facilities: {
+          fan_shop: { level: 2, enabled: true },
+          arena_upgrade: { level: 1, enabled: true },
+        },
+      },
+    };
+    const persistence = createPersistence(gameState);
+
+    const runOnce = () =>
+      runLocalSeasonCompletion(
+        {
+          saveId: "season-completion-test-save",
+          seasonId: gameState.season.id,
+          source: "sqlite",
+          execute: true,
+          dryRun: false,
+          confirmToken: SEASON_COMPLETION_CONFIRM_TOKEN,
+        },
+        persistence,
+      );
+
+    const firstResult = await runOnce();
+    const firstSaved = persistence.getState();
+    const firstFacilityStep = firstResult.steps.find((step) => step.key === "facility_finance");
+
+    expect(firstResult.ok).toBe(true);
+    expect(firstResult.applied).toBe(true);
+    expect(firstFacilityStep?.status).toBe("applied");
+    const cashAfterFirstRun = firstSaved.teams.find((entry) => entry.teamId === team.teamId)!.cash;
+    expect(cashAfterFirstRun).toBeGreaterThan(cashBefore);
+    const facilityIncomeEvents = (firstSaved.seasonState.facilityEvents ?? []).filter(
+      (event) => event.teamId === team.teamId && event.seasonId === gameState.season.id,
+    );
+    expect(facilityIncomeEvents.some((event) => event.source === "facility_income_collected")).toBe(true);
+    // Exactly one upkeep charge per built facility with upkeep > 0 (never doubled).
+    const upkeepEvents = facilityIncomeEvents.filter(
+      (event) => event.source === "facility_upkeep_paid" || event.source === "facility_upkeep_unpaid",
+    );
+    expect(upkeepEvents.length).toBe(new Set(upkeepEvents.map((event) => event.facilityId)).size);
+
+    // Re-run the pipeline for the same season: facility income/upkeep must not double-apply.
+    const secondResult = await runOnce();
+    const secondSaved = persistence.getState();
+    const secondFacilityStep = secondResult.steps.find((step) => step.key === "facility_finance");
+
+    expect(secondFacilityStep?.status).toBe("already_done");
+    const cashAfterSecondRun = secondSaved.teams.find((entry) => entry.teamId === team.teamId)!.cash;
+    expect(cashAfterSecondRun).toBe(cashAfterFirstRun);
+    const facilityIncomeEventsAfterSecondRun = (secondSaved.seasonState.facilityEvents ?? []).filter(
+      (event) =>
+        event.teamId === team.teamId && event.seasonId === gameState.season.id && event.source === "facility_income_collected",
+    );
+    expect(facilityIncomeEventsAfterSecondRun.length).toBe(1);
   });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   FOUNDATION_SAVE_MODE_OPTIONS,
@@ -283,6 +285,51 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
     updatedAt,
     withSynchronizedStrategyAliases
   } = props;
+
+  const [multiSelectSaves, setMultiSelectSaves] = useState(false);
+  const [selectedSaveIdsForDeletion, setSelectedSaveIdsForDeletion] = useState<Set<string>>(new Set());
+  const [saveDeleteMessage, setSaveDeleteMessage] = useState<string | null>(null);
+
+  /** Umschalten der Mehrfachauswahl für Save-Löschung; verwirft eine laufende Auswahl. */
+  function toggleMultiSelectSaves() {
+    setMultiSelectSaves((current) => !current);
+    setSelectedSaveIdsForDeletion(new Set());
+    setSaveDeleteMessage(null);
+  }
+
+  function toggleSaveSelectedForDeletion(saveId: string) {
+    setSelectedSaveIdsForDeletion((current) => {
+      const next = new Set(current);
+      if (next.has(saveId)) {
+        next.delete(saveId);
+      } else {
+        next.add(saveId);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Löscht einen oder mehrere Spielstände nach Bestätigung. Der aktive Save wird von der
+   * Auswahl-UI bereits ausgeschlossen (Checkbox/Button deaktiviert) — der Server blockt ihn
+   * zusätzlich als letzte Sicherung.
+   */
+  async function deleteSaves(saveIds: string[]) {
+    if (saveIds.length === 0 || isSaveBusy || readMeta.readOnly) {
+      return;
+    }
+    const confirmMessage =
+      saveIds.length === 1
+        ? "Spielstand wirklich löschen? Das kann nicht rückgängig gemacht werden."
+        : `${saveIds.length} Spielstände wirklich löschen? Das kann nicht rückgängig gemacht werden.`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    setSaveDeleteMessage(null);
+    await runSaveAction({ action: "delete", saveIds });
+    setSelectedSaveIdsForDeletion(new Set());
+    setSaveDeleteMessage(saveIds.length === 1 ? "Spielstand gelöscht." : `${saveIds.length} Spielstände gelöscht.`);
+  }
 
   return (
     <section className="panel foundation-team-settings-panel" data-testid="foundation-team-settings" id="foundation-team-settings">
@@ -952,6 +999,40 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                     </section>
                   ) : null}
 
+                  <div className="foundation-save-actions">
+                    <button
+                      type="button"
+                      className="secondary-button inline-button"
+                      disabled={isSaveBusy || readMeta.readOnly || saveSummaries.length === 0}
+                      title={
+                        readMeta.readOnly
+                          ? getReadOnlyActionReason("die Mehrfachauswahl")
+                          : "Wählt mehrere Spielstände aus, um sie gemeinsam zu löschen."
+                      }
+                      onClick={toggleMultiSelectSaves}
+                    >
+                      {multiSelectSaves ? "Mehrfachauswahl beenden" : "Mehrere auswählen"}
+                    </button>
+                    {multiSelectSaves ? (
+                      <button
+                        type="button"
+                        className="danger-button inline-button"
+                        disabled={selectedSaveIdsForDeletion.size === 0 || isSaveBusy || readMeta.readOnly}
+                        title={
+                          readMeta.readOnly
+                            ? getReadOnlyActionReason("Spielstände")
+                            : selectedSaveIdsForDeletion.size === 0
+                              ? "Wähle zuerst mindestens einen Spielstand aus."
+                              : "Löscht alle ausgewählten Spielstände unwiderruflich."
+                        }
+                        onClick={() => void deleteSaves([...selectedSaveIdsForDeletion])}
+                      >
+                        Ausgewählte löschen ({selectedSaveIdsForDeletion.size})
+                      </button>
+                    ) : null}
+                  </div>
+                  {saveDeleteMessage ? <p className="text-positive">{saveDeleteMessage}</p> : null}
+
                   <div className="save-summary-list">
                     {saveSummaries.length === 0 ? (
                       <div className="transfer-callout">
@@ -969,6 +1050,24 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                           className={`save-summary-card${save.saveId === activeSaveId ? " is-active" : ""}`}
                         >
                           <div className="save-summary-card-head">
+                            {multiSelectSaves ? (
+                              <label
+                                className="save-summary-select"
+                                title={
+                                  save.saveId === activeSaveId
+                                    ? "Der aktive Spielstand kann nicht gelöscht werden — lade zuerst einen anderen."
+                                    : "Für Mehrfachlöschung auswählen."
+                                }
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSaveIdsForDeletion.has(save.saveId)}
+                                  disabled={save.saveId === activeSaveId || isSaveBusy || readMeta.readOnly}
+                                  onChange={() => toggleSaveSelectedForDeletion(save.saveId)}
+                                />
+                                <span className="sr-only">{save.name} auswählen</span>
+                              </label>
+                            ) : null}
                             <strong>{save.name}</strong>
                             <span className="pill">{formatScenarioTypeLabel(meta?.scenarioType)}</span>
                           </div>
@@ -1043,6 +1142,25 @@ export default function FoundationTeamSettingsPanel(props: FoundationTeamSetting
                             >
                               Snapshot erstellen
                             </button>
+                            {!multiSelectSaves ? (
+                              <button
+                                className="danger-button inline-button"
+                                type="button"
+                                disabled={isSaveBusy || readMeta.readOnly || save.saveId === activeSaveId}
+                                title={
+                                  save.saveId === activeSaveId
+                                    ? "Der aktive Spielstand kann nicht gelöscht werden — lade zuerst einen anderen."
+                                    : readMeta.readOnly
+                                      ? getReadOnlyActionReason("diesen Save")
+                                      : isSaveBusy
+                                        ? getBusyActionReason("Die Save-Aktion")
+                                        : "Löscht diesen Spielstand unwiderruflich."
+                                }
+                                onClick={() => void deleteSaves([save.saveId])}
+                              >
+                                Löschen
+                              </button>
+                            ) : null}
                           </div>
                         </article>
                       );
