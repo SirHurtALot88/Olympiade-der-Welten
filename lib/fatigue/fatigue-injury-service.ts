@@ -22,6 +22,7 @@ import {
 } from "@/lib/fatigue/fatigue-calibration";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
 
 export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
 export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as const;
@@ -66,6 +67,16 @@ function clampFatigue(value: number | null | undefined) {
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+/**
+ * Per-matchday fatigue load for a specific player: the flat
+ * `MATCHDAY_FATIGUE_LOAD` nudged by a small trait-driven multiplier (see
+ * lib/traits/cosmetic-trait-soft-effects.ts). This is the single choke
+ * point where cosmetic traits touch fatigue accrual.
+ */
+function getPlayerMatchdayFatigueLoad(player: Player) {
+  return round(MATCHDAY_FATIGUE_LOAD * getPlayerFatigueLoadMultiplier(player));
 }
 
 function stableHash(input: string) {
@@ -349,7 +360,7 @@ export function buildMatchdayInjuryRollMap(input: {
     const player = input.gameState.players.find((entry) => entry.id === use.playerId);
     if (!player) continue;
 
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + MATCHDAY_FATIGUE_LOAD);
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
     const allowInjury = !injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries;
     const roll = resolveMatchdayInjuryRoll({
       saveId: input.saveId,
@@ -511,7 +522,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     if (availabilityView.isUnavailable) continue;
 
     const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + MATCHDAY_FATIGUE_LOAD);
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({
