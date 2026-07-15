@@ -2334,6 +2334,53 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
+  /**
+   * Player-Generator Phase 2 — "Als Free Agent übernehmen". Mirrors
+   * `chooseTeamSponsor`'s fetch-then-`loadSave` pattern 1:1: POST the
+   * mutation to the guarded route (which loads/writes the save directly via
+   * persistence, independent of this client's in-memory `gameState`), then
+   * refetch so `gameState.players` picks up the newly inserted free agent.
+   * The committed draft is intentionally left in the saved-drafts list
+   * (the user can delete it manually) — re-committing it is harmless, it
+   * just mints another free agent with a fresh id rather than erroring.
+   */
+  async function commitPlayerGeneratorDraft(
+    draft: PlayerGeneratorDraft,
+  ): Promise<{ success: boolean; error?: string; playerId?: string; playerName?: string }> {
+    if (readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { success: false, error: "read_only" };
+    }
+    try {
+      const response = await fetch("/api/player-generator/commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          draft,
+          dryRun: false,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        summary?: { playerId?: string; playerName?: string } | null;
+      };
+      if (!response.ok || !payload.success) {
+        return { success: false, error: payload.error ?? "player_generator_commit_failed" };
+      }
+      await loadSave(activeSaveId);
+      return {
+        success: true,
+        playerId: payload.summary?.playerId,
+        playerName: payload.summary?.playerName ?? draft.generated.name,
+      };
+    } catch {
+      return { success: false, error: "player_generator_commit_failed" };
+    }
+  }
+
   function saveContractNegotiationDrafts(nextDrafts: ContractNegotiationDraft[]) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -5330,6 +5377,14 @@ export function useFoundationShellRouterBodyScope({
       }),
     );
   };
+  // Friction fix (Generalprobe #2): "Dein Team wählen" lives under Team-Settings
+  // → "Spielmodus & KI", not the default tab, and nothing routed a fresh player
+  // there. Deep-links straight into that sub-tab via `?view=teamSettings&tab=control`
+  // (read on mount by FoundationTeamSettingsNewLook), used by the HQ CTA below.
+  const navigateToTeamPicker = () => {
+    setFoundationView("teamSettings", setActiveView, { push: true });
+    syncFoundationViewInUrl("teamSettings", "control", null, { push: false });
+  };
   const updateNewGameFlowStepStatus = (stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) => {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -8070,6 +8125,84 @@ export function useFoundationShellRouterBodyScope({
     readMeta.source,
     reloadAfterMarketRosterApply,
   ]);
+  // Generalprobe #1: a fresh Season 1 auto-fills all 32 AI rosters in the
+  // BACKGROUND on the server (~40s), flagged via `seasonState.leagueSetupStatus`
+  // ("in_progress" | "ready" | "failed"). Poll every 5s while "in_progress" so
+  // the "Liga wird erstellt…" banner (see FoundationShellRouterBody) clears
+  // itself without a manual reload.
+  const leagueSetupStatus = gameState.seasonState.leagueSetupStatus ?? null;
+  const [leagueSetupRetryBusy, setLeagueSetupRetryBusy] = useState(false);
+  const [leagueSetupRetryError, setLeagueSetupRetryError] = useState<string | null>(null);
+  useEffect(() => {
+    if (
+      readMeta.source !== "sqlite" ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      leagueSetupStatus !== "in_progress"
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const pollLeagueSetupStatus = async () => {
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (!cancelled && nextGameState) {
+        setGameState(nextGameState);
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollLeagueSetupStatus();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSaveId, foundationSaveMode, leagueSetupStatus, loadSave, readMeta.source, setGameState]);
+  const retryLeagueSetup = async () => {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    setLeagueSetupRetryBusy(true);
+    setLeagueSetupRetryError(null);
+    try {
+      const params = new URLSearchParams({
+        saveId: activeSaveId,
+        seasonId: gameState.season.id,
+        source: readMeta.source,
+      });
+      const response = await fetch(`/api/ai/roster-fill?${params.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: false, confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; executed?: boolean } | null;
+      if (!response.ok || !payload || payload.error) {
+        setLeagueSetupRetryError(payload?.error ?? "Liga-Setup konnte nicht erneut gestartet werden.");
+        setGameState((current) => ({
+          ...current,
+          seasonState: { ...current.seasonState, leagueSetupStatus: "failed" },
+        }));
+        return;
+      }
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      setGameState((current) => {
+        const base = nextGameState ?? current;
+        return { ...base, seasonState: { ...base.seasonState, leagueSetupStatus: "ready" } };
+      });
+    } catch (error) {
+      setLeagueSetupRetryError(error instanceof Error ? error.message : "Netzwerkfehler beim erneuten Liga-Setup.");
+      setGameState((current) => ({
+        ...current,
+        seasonState: { ...current.seasonState, leagueSetupStatus: "failed" },
+      }));
+    } finally {
+      setLeagueSetupRetryBusy(false);
+    }
+  };
   const closeSeasonBriefing = (markCompleted = true) => {
     const briefingKey = buildSeasonBriefingDismissKey(activeSaveId, gameState.season.id);
     const shouldPersistIntroStep = markCompleted && seasonBriefingStepStatus === "open";
@@ -10137,6 +10270,10 @@ export function useFoundationShellRouterBodyScope({
     isTransferMarketViewActive,
     isViewingArchivedSeason,
     leaguePlayerHeatPools,
+    leagueSetupStatus,
+    leagueSetupRetryBusy,
+    leagueSetupRetryError,
+    retryLeagueSetup,
     lineupDraftBoardView,
     lineupDraftBoardViewRequest,
     lineupFocusRequestKey,
@@ -10173,6 +10310,7 @@ export function useFoundationShellRouterBodyScope({
     navigateToGameFlowStep,
     navigateToInboxItem,
     navigateToPrizeFinanceViewFromRouting,
+    navigateToTeamPicker,
     newGameBusy,
     newGameChrisTeamIds,
     newGameError,
@@ -10254,6 +10392,7 @@ export function useFoundationShellRouterBodyScope({
     runSaveAction,
     runSeasonStartReset,
     savePlayerGeneratorDrafts,
+    commitPlayerGeneratorDraft,
     saveSummaries,
     saveSyncError,
     saveTeamSettings,

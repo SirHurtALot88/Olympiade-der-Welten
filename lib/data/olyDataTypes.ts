@@ -585,7 +585,7 @@ export type PlayerGeneratorSalaryEngineStatus = "ready_if_market_value_input_pre
 
 export type PlayerGeneratorClassEngineStatus = "ready" | "heuristic" | "blocked_missing_class_factors";
 
-export type PlayerGeneratorMarketValueStatus = "ready" | "missing_market_value_engine";
+export type PlayerGeneratorMarketValueStatus = "ready" | "missing_market_value_engine" | "heuristic_estimate";
 
 export type PlayerGeneratorSalaryStatus = "ready" | "missing_salary_engine" | "missing_market_value_input";
 
@@ -601,10 +601,10 @@ export type PlayerGeneratorFormulaStatusSnapshot = {
 };
 
 export type PlayerGeneratorEngineStatusView = {
-  marketValueEngine: "ready" | "blocked" | "incomplete_source";
+  marketValueEngine: "ready" | "blocked" | "incomplete_source" | "heuristic";
   salaryEngine: "ready" | "missing_market_value_input" | "blocked";
   classEngine: "ready" | "heuristic" | "blocked";
-  potentialEngine: "missing_progression_source";
+  potentialEngine: "ready" | "missing_progression_source";
 };
 
 export type PlayerGeneratorDraftStatusView = {
@@ -614,8 +614,19 @@ export type PlayerGeneratorDraftStatusView = {
 
 export type PlayerGeneratorSaveStatusView = {
   save: "draft_only";
-  commit: "disabled";
-  commitReasons: Array<"market_value_engine_blocked" | "salary_engine_blocked" | "salary_engine_waits_for_market_value" | "commit_path_not_ready">;
+  // Phase 2: "enabled" when `commitReasons` is empty, i.e. the draft has a
+  // real ovr/marketValue/salary and no hard validation block. Prior to
+  // Phase 2 this was hardcoded "disabled" (the commit path did not exist
+  // yet) — `commit_path_not_ready` below is kept only so old persisted
+  // drafts/fixtures created before Phase 2 still satisfy the type.
+  commit: "enabled" | "disabled";
+  commitReasons: Array<
+    | "market_value_engine_blocked"
+    | "salary_engine_blocked"
+    | "salary_engine_waits_for_market_value"
+    | "draft_validation_blocked"
+    | "commit_path_not_ready"
+  >;
 };
 
 export type PlayerGeneratorQualityWarningCode =
@@ -705,6 +716,14 @@ export type PlayerGeneratorDraft = {
         men: PlayerGeneratorAxisSource;
         soc: PlayerGeneratorAxisSource;
       };
+      /**
+       * The steering target `buildAxisTargets()` aimed for (post role/archetype
+       * bias + randomness jitter, pre attribute-silhouette shaping), so the
+       * requested-vs-achieved drift against `generated.axes` is legible. Null
+       * when the draft's attributes were recalculated from a manual edit and no
+       * fresh target was generated for this pass (see recalculatePlayerGeneratorDraft).
+       */
+      axisTargets: { pow: number; spe: number; men: number; soc: number } | null;
       peakAttributes: PlayerGeneratorAttributeName[];
       weakAttributes: PlayerGeneratorAttributeName[];
       archetypeSummary: string[];
@@ -1028,6 +1047,7 @@ export type TeamPowerRecord = {
   negativeAttributeTag?: TeamPowerAttributeTag | null;
   chargesTotal: number;
   selectedForSeason: boolean;
+  isPassive?: boolean;
   createdAt: string;
 };
 
@@ -2208,6 +2228,14 @@ export type SeasonState = {
   schedule: Fixture[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[];
   seasonEconomyFactors?: SeasonEconomyFactorRecord[];
+  /**
+   * Fresh-Season-1 league setup: the AI teams' rosters are auto-filled in the background right after the
+   * save is created (the fill takes ~40s). "in_progress" while it runs, "ready" once every team has a roster,
+   * "failed" if the background fill errored (the human can retry the fill from the Cockpit). Absent = no
+   * background setup pending (e.g. an already-populated save). The UI shows a "Liga wird erstellt…" state and
+   * polls until "ready" before letting the human start matchdays.
+   */
+  leagueSetupStatus?: "in_progress" | "ready" | "failed";
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { NlEmptyState } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 
 export type ScoutingQueueRow = {
@@ -27,6 +28,8 @@ type ScoutingPriorityQueueProps = {
   onRemove: (playerId: string) => void;
   onSelectReport?: (playerId: string) => void;
   onOpenMarket?: () => void;
+  /** Neuer Look: NL-Leerzustand (NlEmptyState) statt Legacy-Placeholder-Text. */
+  newLook?: boolean;
 };
 
 function getInitials(name: string) {
@@ -50,11 +53,23 @@ export default function ScoutingPriorityQueue({
   onRemove,
   onSelectReport,
   onOpenMarket,
+  newLook = false,
 }: ScoutingPriorityQueueProps) {
   const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   if (entries.length === 0) {
+    if (newLook) {
+      return (
+        <NlEmptyState
+          icon="🔍"
+          title="Wishlist ist leer"
+          message="Im Transfermarkt Spieler auf die Wishlist setzen — sie erscheinen hier als Scouting-Warteschlange, per Drag & Drop sortierbar."
+          action={onOpenMarket ? { label: "Transfermarkt öffnen", onClick: onOpenMarket } : undefined}
+          data-testid="scouting-queue-empty"
+        />
+      );
+    }
     return (
       <div className="scouting-queue-empty" data-testid="scouting-queue-empty">
         <p className="muted">

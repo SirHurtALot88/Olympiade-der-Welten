@@ -5,7 +5,7 @@ import {
   normalizeLineupDraftModifiers,
   buildMatchdayMutatorTraitsBySide,
 } from "@/lib/lineups/legacy-lineup-modifiers";
-import { calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
+import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
 import { SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
@@ -165,8 +165,18 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
     const effectiveMutatorBonuses =
       context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
+    // Always-on passive team bonus: applies to every discipline side every matchday, needs no
+    // charge, and stacks additively on top of any manually selected team power.
+    const passiveTeamPowerBonus =
+      context.teamPowerSource?.effectStatus === "ready"
+        ? calculatePassiveTeamPowerBonus(context.teamPowers ?? [], disciplineMeta?.category)
+        : 0;
     const effectiveTeamPowerModifier =
       context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null;
+    const teamPowerLabelWithPassive =
+      passiveTeamPowerBonus > 0
+        ? `${teamPowerResult.teamPowerLabel ? `${teamPowerResult.teamPowerLabel} ` : ""}(+${passiveTeamPowerBonus}% Identität)`
+        : teamPowerResult.teamPowerLabel;
     return {
       score: scoreLegacyLineupDisciplineSide({
         disciplineId,
@@ -192,8 +202,9 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         mutatorBonusByPlayerId: effectiveMutatorBonuses,
         teamPowerSelected: teamPowerResult.teamPowerSelected,
         teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
-        teamPowerLabel: teamPowerResult.teamPowerLabel,
+        teamPowerLabel: teamPowerLabelWithPassive,
         teamPowerModifier: effectiveTeamPowerModifier,
+        passiveTeamPowerImpactPct: passiveTeamPowerBonus,
         teamPowerImpact: teamPowerResult.teamPowerImpact,
         teamPowerBasePct: teamPowerResult.teamPowerBasePct,
         teamPowerConditionalPct: teamPowerResult.teamPowerConditionalPct,

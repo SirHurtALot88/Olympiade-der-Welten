@@ -9230,6 +9230,22 @@ a {
   box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
 }
 
+/* Row-State-Tints der Vertragstabelle im neuen NlTable-Gerüst zuverlässig
+   über die Basis-/Hover-Regeln heben (NlTable rendert dieselben State-
+   Klassen via rowClassName). Zebra ist auf dieser Tabelle bewusst aus. */
+.is-new-look .nl-table.team-contracts-table tbody tr.is-contract-expiring td {
+  background: rgba(251, 191, 36, 0.08);
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-contract-expiring td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.55);
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-preview-row td {
+  opacity: 0.82;
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-sell-marked td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
+}
+
 .team-contracts-layout {
   display: grid;
   gap: 14px;
@@ -12104,6 +12120,50 @@ a {
   justify-content: flex-end;
   gap: 10px;
   padding: 0 20px 20px;
+}
+
+/* Generalprobe #3 — make the two-step buy flow (erst verhandeln, dann
+   abschließen) visually explicit above the action buttons. */
+.transfer-buy-step-hint {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 20px 0;
+}
+
+.transfer-buy-step-hint > b {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.1rem;
+}
+
+.transfer-buy-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 220px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.transfer-buy-step > strong {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.transfer-buy-step.is-active {
+  border-color: rgba(120, 168, 255, 0.4);
+  background: rgba(38, 56, 88, 0.55);
+}
+
+.transfer-buy-step.is-done {
+  border-color: rgba(110, 196, 128, 0.4);
+  background: rgba(34, 73, 46, 0.5);
 }
 
 .transfer-buy-modal {
@@ -41955,6 +42015,14 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-table tbody tr:last-child td {
   border-bottom: 0;
 }
+/* Aktive/ausgewählte Zeile (via rowClassName="is-active-row") — hebt sich
+   über Zebra und Basis, bleibt unter Hover. Für Steckbrief-/Report-Auswahl. */
+.is-new-look .nl-table tbody tr.is-active-row td {
+  background: var(--nl-accent-soft);
+}
+.is-new-look .nl-table tbody tr.is-active-row td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-accent);
+}
 /* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
 .is-new-look .nl-table-sort-th {
   display: inline-flex;
@@ -42113,6 +42181,19 @@ button.foundation-team-portrait-card {
   transition: width var(--nl-t-fast) var(--nl-ease);
 }
 
+/* Player-Drawer: kompakte NlProgressBar-Instanzen in Tabellen-/Karten-
+   Kontexten — ersetzen die vormals handgerollten `style={{width:%}}`-Balken
+   (Top-Disziplinen-Tabelle, Achsen-Kombikarte, Mini-Diszi-Zeilen). */
+.is-new-look .player-drawer-disc-table-progress,
+.is-new-look .player-drawer-category-progress,
+.is-new-look .player-drawer-axis-discipline-progress {
+  width: 100%;
+}
+.is-new-look .player-drawer-disc-table-progress .nl-progress-track,
+.is-new-look .player-drawer-axis-discipline-progress .nl-progress-track {
+  height: 4px;
+}
+
 /* --- NlGauge ------------------------------------------------------ */
 .is-new-look .nl-gauge {
   position: relative;
@@ -42154,7 +42235,9 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--nl-mut-2);
+  /* Kontrast: --nl-mut-2 (~3.7:1) fiel unter AA für diese kleine Beschriftung;
+     --nl-mut hebt auf ~6.8:1 gegen die dunklen Panels (Colorblind-/Kontrast-Audit). */
+  color: var(--nl-mut);
 }
 /* Fatigue-/Intensitaets-Gauges: kompakter, damit sie in Detail-/Briefing-
    Kontexte (Player-Drawer, Arena-Briefing) passen. */
@@ -42174,6 +42257,79 @@ button.foundation-team-portrait-card {
   display: flex;
   justify-content: flex-start;
   margin-top: var(--nl-s2);
+}
+
+/* Attribut-Grid: Balken-Übersicht (#61) über der Karten-Detailansicht. */
+.is-new-look .player-drawer-attribute-barchart-wrap {
+  padding: var(--nl-s3) var(--nl-s3) 0;
+  margin-bottom: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  overflow-x: auto;
+}
+.is-new-look .player-drawer-attribute-barchart {
+  min-width: max-content;
+}
+
+/* --- Player-Drawer Chrome-Retokenisierung -------------------------
+   Die restliche Drawer-Fläche (Panels/Sektionen, `metric-card`,
+   KPI-Hero-Karten, Chips, Header-Metric-Pills, Tab-Leiste) bleibt aus
+   Aufwandsgründen strukturell `player-drawer-*`/`metric-card`-Markup
+   (siehe NlTable/NlProgressBar/NlSubTabs-Konvertierungen oben für die
+   höchstwertigen Einzelstücke), zieht aber innerhalb `.is-new-look`
+   ihre Farben/Radien/Schatten aus den `--nl-*`-Tokens statt den alten
+   festen `rgba(255,255,255,…)`-Werten — dadurch wirkt der Drawer wie
+   ein Teil des neuen Look-Systems statt wie ein Fremdkörper. */
+.is-new-look .player-drawer-dashboard .player-drawer-panel,
+.is-new-look .player-drawer-dashboard .player-drawer-hero-surface {
+  background: var(--nl-panel);
+  border-color: var(--nl-line);
+  border-radius: var(--nl-r-md);
+  box-shadow: var(--nl-e1);
+}
+.is-new-look .player-drawer-dashboard .metric-card {
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  box-shadow: none;
+}
+.is-new-look .player-drawer-kpi-hero-card {
+  background: var(--nl-panel-2);
+  border-color: var(--nl-line);
+  border-radius: var(--nl-r-md);
+}
+.is-new-look .player-drawer-kpi-hero-card.is-interactive:hover,
+.is-new-look .player-drawer-kpi-hero-card.is-interactive:focus-visible {
+  border-color: var(--nl-accent);
+}
+.is-new-look .player-drawer-header-metric {
+  background: var(--nl-panel-2);
+  border-color: var(--nl-line);
+  color: var(--nl-ink);
+}
+.is-new-look .player-drawer-header-metric small {
+  color: var(--nl-mut);
+}
+.is-new-look .player-drawer-header-metric strong {
+  color: var(--nl-ink);
+}
+.is-new-look .player-drawer-scout-meta span {
+  background: var(--nl-panel-2);
+  border-color: var(--nl-line);
+  color: var(--nl-mut);
+}
+.is-new-look .player-drawer-dashboard .table-shell {
+  border-color: var(--nl-line);
+  background: var(--nl-panel);
+}
+.is-new-look .player-drawer-dashboard .team-table th,
+.is-new-look .player-drawer-dashboard .team-table td {
+  border-bottom-color: var(--nl-line);
+}
+.is-new-look .player-drawer-dashboard .team-table thead th {
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
 }
 
 /* --- Chart-Primitives (Sparkline / BarChart / Radar) -------------- */
@@ -42431,6 +42587,24 @@ button.foundation-team-portrait-card {
   font-size: 12px;
   line-height: 1.35;
   color: color-mix(in srgb, var(--nl-tone) 78%, var(--nl-ink));
+}
+
+/* Generalprobe #2 — prominent "Wähle dein Team" CTA on a fresh save. */
+.is-new-look .nl-home-team-picker-cta {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface, transparent));
+}
+
+.home-v2-team-picker-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(120, 168, 255, 0.4);
+  background: linear-gradient(180deg, rgba(38, 56, 88, 0.6), rgba(29, 41, 64, 0.6));
 }
 
 .is-new-look .nl-home-warning-row {
@@ -43548,6 +43722,132 @@ button.foundation-team-portrait-card {
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
   opacity: 0.6;
+}
+
+/* ============================================================
+   NL Skeleton — gemeinsames Lade-Platzhalter-Primitive
+   ------------------------------------------------------------
+   EIN kanonisches Vokabular (`.nl-skeleton*`) mit einem geteilten
+   Shimmer (`@keyframes nl-skeleton-shimmer`). Token-korrekt (`--nl-*`),
+   themekonsistent, und respektiert `prefers-reduced-motion` (statische,
+   gedämpfte Füllung ohne Bewegung). Die älteren Ad-hoc-Skeletons
+   (arena/season/panel) bleiben bewusst bestehen — dies ist additiv.
+   ============================================================ */
+.is-new-look .nl-skeleton {
+  display: block;
+  border-radius: var(--nl-r-sm);
+  background-color: var(--nl-panel-2);
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--nl-panel-2) 85%, transparent) 0%,
+    color-mix(in srgb, var(--nl-line-2) 60%, var(--nl-panel-2)) 45%,
+    color-mix(in srgb, var(--nl-panel-2) 85%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: nl-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.is-new-look .nl-skeleton--text,
+.is-new-look .nl-skeleton--line {
+  height: 12px;
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton--block {
+  height: 72px;
+  width: 100%;
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .nl-skeleton--circle {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .nl-skeleton--card {
+  height: 120px;
+  width: 100%;
+  border-radius: var(--nl-r-lg);
+}
+
+.is-new-look .nl-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton-table-row {
+  display: grid;
+  grid-template-columns: repeat(var(--nl-skeleton-cols, 4), minmax(0, 1fr));
+  gap: var(--nl-s3);
+  align-items: center;
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-skeleton-table-row--head {
+  opacity: 0.75;
+}
+
+.is-new-look .nl-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-skeleton-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-skeleton-card-head-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-loading-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+@keyframes nl-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--nl-panel-2);
+    opacity: 0.7;
+  }
 }
 
 .is-new-look .nl-standings-empty-text {
@@ -45490,10 +45790,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-candidate {
-  display: grid;
-  grid-template-columns: 48px 1fr auto;
-  gap: var(--nl-s3);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   padding: var(--nl-s2) var(--nl-s3);
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
@@ -45502,6 +45800,14 @@ button.foundation-team-portrait-card {
   text-align: left;
   cursor: pointer;
   transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+/* Kopfzeile der Kachel (kompakter Ruhezustand): Portrait · Copy · Zahlen · Toggle. */
+.is-new-look .nl-market-candidate-head {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  gap: var(--nl-s3);
+  align-items: center;
 }
 
 .is-new-look .nl-market-candidate:hover {
@@ -45628,6 +45934,124 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-market-candidate-numbers strong {
   font-size: 13px;
   color: var(--nl-ink);
+}
+
+/* ============================================================
+   FM26-Style Progressive Disclosure — Kandidaten-Kachel
+   Kompakter Ruhezustand (nl-market-candidate-head) + Detail-Layer
+   (nl-market-candidate-detail: Achsen POW/SPE/MEN/SOC, Talent-Sterne,
+   Entwicklungs-Trend, Eignung). Der Detail-Layer ist immer im DOM
+   (Screenreader-erreichbar) und via max-height kollabiert; enthüllt
+   on :hover / :focus-within (Pointer + Tastaturfokus in der Kachel)
+   UND wenn die Kachel per Toggle .is-expanded trägt (Touch/Tastatur).
+   Fog-of-war bleibt gewahrt — es werden ausschließlich bereits
+   freigegebene Werte gerendert (siehe TSX). Overlay-frei, damit nichts
+   horizontal überläuft; der Reveal schiebt Geschwister sanft.
+   ============================================================ */
+.is-new-look .nl-market-candidate-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-candidate-expand:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-market-candidate-expand:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-market-candidate-expand-caret {
+  display: inline-block;
+  transition: transform 200ms var(--nl-ease);
+}
+
+/* Detail-Layer: default kollabiert (max-height Reveal, kein Layout-Sprung). */
+.is-new-look .nl-market-candidate-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 1px solid transparent;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 220ms var(--nl-ease), opacity var(--nl-t-fast) var(--nl-ease),
+    margin-top 220ms var(--nl-ease), padding-top 220ms var(--nl-ease);
+}
+
+/* Reveal: Hover/Fokus (Pointer) ODER expliziter Toggle (is-expanded). */
+.is-new-look .nl-market-candidate:hover .nl-market-candidate-detail,
+.is-new-look .nl-market-candidate:focus-within .nl-market-candidate-detail,
+.is-new-look .nl-market-candidate.is-expanded .nl-market-candidate-detail {
+  max-height: 360px;
+  margin-top: var(--nl-s2);
+  padding-top: var(--nl-s2);
+  border-top-color: var(--nl-line);
+  opacity: 1;
+}
+
+.is-new-look .nl-market-candidate.is-expanded .nl-market-candidate-expand-caret {
+  transform: rotate(90deg);
+}
+
+.is-new-look .nl-market-detail-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-detail-axis-chip {
+  --nl-tone: var(--nl-mut);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 12%, transparent);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-market-detail-axis-chip b {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-market-detail-hint {
+  margin: 0;
+}
+
+/* Reduced Motion: kein Reveal-Übergang, nur sofortiges Zeigen/Verbergen. */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-market-candidate-detail,
+  .is-new-look .nl-market-candidate-expand-caret {
+    transition: none;
+  }
 }
 
 /* Fokus-Panel */
@@ -47349,6 +47773,17 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+
+/* Hover-Steckbrief-Anchor (Portrait + Name teilen dieselbe
+   `FoundationPlayerPortraitPreview`-Instanz) — Namens-Anchor muss die volle
+   Breite der Spalte annehmen, sonst greift die Ellipsis auf dem
+   `.nl-training-player-name-button` nicht (identisches Muster zu
+   `.nl-players-td-name .foundation-player-portrait-preview-anchor`). */
+.is-new-look .nl-training-player-copy .foundation-player-portrait-preview-anchor {
+  display: flex;
+  width: 100%;
   min-width: 0;
 }
 
@@ -52976,6 +53411,146 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* ========================================================================
+   Neuer Look — Einsatzliste Drag & Drop + Formation-Board (nl-lineup)
+   ------------------------------------------------------------------------
+   Additive Schicht über den bestehenden .nl-lineup-* Regeln:
+   - Formation-Feel: leichte Pitch-/Positions-Tönung je D1/D2-Seite
+     (nutzt die vorhandene --nl-lineup-side-tone-Bereichstönung).
+   - DnD-Affordances: Kandidat ziehen → Slot (Zuweisung), belegter Slot →
+     Kader-Panel (Leeren). Nur --nl-* Tokens, keine harten Farben.
+   Diese Sektion benennt/entfernt keine bestehenden Klassen.
+   ======================================================================== */
+
+/* --- Formation-Feel: Pitch-Tönung je Seite ------------------------------ */
+.is-new-look .nl-lineup-side {
+  position: relative;
+  isolation: isolate;
+}
+
+.is-new-look .nl-lineup-side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-lineup-side-tone) 9%, transparent), transparent 45%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 46px,
+      color-mix(in srgb, var(--nl-lineup-side-tone) 5%, transparent) 46px 47px
+    );
+}
+
+.is-new-look .nl-lineup-side > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Positions-Token-Feel: Slot-Kürzel als Pill, damit die Karten wie
+   Formations-Positionen lesen (Daten der Karte bleiben unverändert). */
+.is-new-look .nl-lineup-slot-index {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-lineup-side-tone) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-lineup-side-tone) 40%, transparent);
+}
+
+/* --- DnD: Kandidatenkarte als Zieh-Quelle ------------------------------- */
+.is-new-look .nl-lineup-candidate[draggable="true"] {
+  cursor: grab;
+}
+
+.is-new-look .nl-lineup-candidate[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.is-new-look .nl-lineup-candidate.is-dragging {
+  opacity: 0.5;
+  border-style: dashed;
+  border-color: var(--nl-accent);
+  transform: none;
+}
+
+/* --- DnD: belegter Slot als Zieh-Quelle --------------------------------- */
+.is-new-look .nl-lineup-slot.is-filled[draggable="true"] {
+  cursor: grab;
+}
+
+.is-new-look .nl-lineup-slot.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+/* --- DnD: Slot als Drop-Ziel (nur bei aktivem Kandidaten-Drag) ---------- */
+.is-new-look .nl-lineup-slot.is-drop-target {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--nl-lineup-side-tone) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-lineup-side-tone) 22%, transparent);
+}
+
+/* Belegtes Ziel = Ersetzen-Hinweis (warnende Tönung statt Seiten-Ton). */
+.is-new-look .nl-lineup-slot.is-drop-target.is-filled {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 22%, transparent);
+}
+
+.is-new-look .nl-lineup-slot.is-drag-over {
+  border-style: solid;
+  border-color: var(--nl-lineup-side-tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nl-lineup-side-tone) 34%, transparent), var(--nl-e2);
+  transform: translateY(-2px);
+}
+
+.is-new-look .nl-lineup-slot.is-drag-over.is-filled {
+  border-color: var(--nl-warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nl-warn) 34%, transparent), var(--nl-e2);
+}
+
+/* --- DnD: Kader-Panel als Ablage-Zone zum Leeren ------------------------ */
+.is-new-look .nl-lineup-candidates {
+  position: relative;
+}
+
+.is-new-look .nl-lineup-candidates.is-removal-active {
+  outline: 1px dashed color-mix(in srgb, var(--nl-risk) 45%, transparent);
+  outline-offset: 3px;
+}
+
+.is-new-look .nl-lineup-removal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--nl-s4);
+  border-radius: var(--nl-r-lg);
+  border: 2px dashed color-mix(in srgb, var(--nl-risk) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 14%, var(--nl-panel));
+  color: var(--nl-risk);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.is-new-look .nl-lineup-candidates.is-removal-hover .nl-lineup-removal-overlay {
+  background: color-mix(in srgb, var(--nl-risk) 26%, var(--nl-panel));
+  border-color: var(--nl-risk);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-lineup-slot.is-drag-over {
+    transform: none;
+  }
+}
+
 /* --- Daten-Ansicht: kompakte klassische Tabelle (POW/SPE/MEN/SOC) + Aufklapp-Disziplinen --- */
 .is-new-look .nl-standings-table.is-compact {
   min-width: 720px;
@@ -53757,11 +54332,6 @@ button.foundation-team-portrait-card {
   justify-self: center;
   font-size: 12px;
   color: var(--nl-mut);
-}
-
-.is-new-look .nl-compare-discipline-table-shell {
-  max-width: 100%;
-  overflow-x: auto;
 }
 
 .is-new-look .nl-compare-discipline-table th,
@@ -58767,6 +59337,164 @@ button.nl-players-axis:focus-visible {
   gap: 4px;
 }
 
+/* --- Trophäenschrank (Season-für-Season-Meister) --------------------- */
+.is-new-look .nl-records-trophy-hint {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-records-trophy-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.is-new-look .nl-records-trophy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-records-trophy-season {
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 72px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-records-trophy-podium {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  flex: 1;
+}
+
+.is-new-look .nl-records-trophy-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.is-new-look .nl-records-trophy-slot.is-gold strong,
+.is-new-look .nl-records-trophy-slot.is-gold {
+  font-weight: 700;
+}
+
+.is-new-look .nl-records-trophy-slot.is-silver,
+.is-new-look .nl-records-trophy-slot.is-bronze {
+  color: var(--nl-mut);
+}
+
+/* ===================================================================
+   "Neuer Look" — Legendäre Spieler (Hall-of-Fame-Sub-Tab, Karriere-Podium
+   + sortierbare Karriere-Bestenliste). Namespacing: `.nl-legends-*`.
+   =================================================================== */
+
+.is-new-look .nl-legends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-legends-podium {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nl-s3);
+  margin: var(--nl-s3) 0;
+}
+
+.is-new-look .nl-legends-podium-card-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--nl-s3);
+  border-radius: 14px;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-bg-2);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.is-new-look .nl-legends-podium-card-item:hover,
+.is-new-look .nl-legends-podium-card-item:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-legends-podium-card-item.is-rank-1 {
+  border-color: color-mix(in srgb, gold 55%, var(--nl-line));
+  background: color-mix(in srgb, gold 10%, var(--nl-bg-2));
+}
+
+.is-new-look .nl-legends-podium-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-bg-2);
+  font-weight: 700;
+}
+
+.is-new-look .nl-legends-podium-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.is-new-look .nl-legends-podium-teams {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-legends-podium-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.is-new-look .nl-legends-podium-sub {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-legends-table-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.is-new-look .nl-legends-table-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-bg-2);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 /* ===================================================================
    "Neuer Look" — Scouting-Center Wave 2 (Erkenntnis-Ladder + Shortlist-Board)
    Scratch file — merge under `.is-new-look` in app/globals.css.
@@ -60806,6 +61534,96 @@ button.nl-players-axis:focus-visible {
 }
 
 /* ============================================================
+   "Neuer Look" — Home V2 "Bento"-Dashboard (.nl-home-bento)
+   FM26-inspiriertes, dichtes Bento-Raster für das Manager-Cockpit.
+   Rein additiv & flag-gated (`.is-new-look`); ordnet die bestehenden
+   `.nl-home-*` Kacheln in variabel großen Feldern eines 12-Spalten-
+   Grids an (große Hero-Kachel, hohe Radar-Feature-Kachel über zwei
+   Zeilen, breite/kompakte Nebenkacheln). Nutzt ausschließlich die
+   `--nl-*` Tokens. Kollabiert responsiv auf 6 bzw. 1 Spalte — kein
+   horizontales Scrollen. Betrifft nur HomeV2NewLook.tsx; bestehende
+   `.nl-home-*` Klassen bleiben unverändert.
+   ============================================================ */
+.is-new-look .nl-home-bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  grid-auto-flow: row dense;
+  gap: var(--nl-s4);
+  align-items: stretch;
+}
+
+/* Kachel-Basis: keine Eigenmargen, kein Overflow, volle Zellhöhe, damit
+   Kacheln derselben Rasterzeile optisch gleich hoch wirken. */
+.is-new-look .nl-home-bento > .nl-bento-item {
+  min-width: 0;
+  margin: 0;
+}
+.is-new-look .nl-home-bento > .nl-bento-item.nl-card {
+  height: 100%;
+}
+/* Reveal-Wrapper (Heute-wichtig-Karten): als Flex-Zelle strecken, damit
+   die innere NlCard die Kachel füllt — Reveal-Stagger bleibt erhalten. */
+.is-new-look .nl-home-bento > .nl-reveal.nl-bento-item {
+  display: flex;
+}
+.is-new-look .nl-home-bento > .nl-reveal.nl-bento-item > .nl-card {
+  flex: 1 1 auto;
+}
+
+/* Spaltenspannen (Desktop, 12er-Raster) */
+.is-new-look .nl-home-bento > .nl-bento-span-3 { grid-column: span 3; }
+.is-new-look .nl-home-bento > .nl-bento-span-4 { grid-column: span 4; }
+.is-new-look .nl-home-bento > .nl-bento-span-5 { grid-column: span 5; }
+.is-new-look .nl-home-bento > .nl-bento-span-6 { grid-column: span 6; }
+.is-new-look .nl-home-bento > .nl-bento-span-7 { grid-column: span 7; }
+.is-new-look .nl-home-bento > .nl-bento-span-8 { grid-column: span 8; }
+.is-new-look .nl-home-bento > .nl-bento-span-12 { grid-column: 1 / -1; }
+
+/* Hohe Feature-Kachel: erstreckt sich über zwei Rasterzeilen (2x2-Feld). */
+.is-new-look .nl-home-bento > .nl-bento-tall { grid-row: span 2; }
+
+/* Sektions-Köpfe als volle Bento-Breite (rahmenlos, geben dem Raster
+   Rhythmus); erster Kopf ohne zusätzlichen Abstand. */
+.is-new-look .nl-home-bento > .nl-bento-head {
+  align-content: center;
+  min-height: 0;
+  margin-top: var(--nl-s2);
+}
+.is-new-look .nl-home-bento > .nl-bento-head:first-child {
+  margin-top: 0;
+}
+
+/* Hero-Kachel: dezenter, token-basierter Akzent-Verlauf in der Kopfzeile. */
+.is-new-look .nl-home-bento > .nl-bento-hero {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--nl-accent) 12%, transparent), transparent 55%),
+    var(--nl-panel);
+}
+
+/* Responsiver Zusammenbruch: mittlere Breiten → 6 Spalten, große →
+   volle Breite; darunter komplett einspaltig, Feature-Kachel normal. */
+@media (max-width: 1100px) {
+  .is-new-look .nl-home-bento > .nl-bento-span-3,
+  .is-new-look .nl-home-bento > .nl-bento-span-4,
+  .is-new-look .nl-home-bento > .nl-bento-span-5 { grid-column: span 6; }
+  .is-new-look .nl-home-bento > .nl-bento-span-6,
+  .is-new-look .nl-home-bento > .nl-bento-span-7,
+  .is-new-look .nl-home-bento > .nl-bento-span-8 { grid-column: 1 / -1; }
+  .is-new-look .nl-home-bento > .nl-bento-tall { grid-row: auto; }
+}
+@media (max-width: 720px) {
+  .is-new-look .nl-home-bento {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .is-new-look .nl-home-bento > [class*="nl-bento-span-"] {
+    grid-column: 1 / -1;
+  }
+  .is-new-look .nl-home-bento > .nl-bento-tall { grid-row: auto; }
+}
+
+/* ============================================================
    Wave 5 — Inbox rework (#43 auto-resolve, #44 categorization)
    Namespace: .is-new-look .nl-inbox-* (matches existing inbox-v2
    "Neuer Look" block in app/globals.css — merge alongside it).
@@ -62823,11 +63641,20 @@ button.nl-players-axis:focus-visible {
 }
 
 .is-new-look .nl-pcompare-legend-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--nl-tone, var(--nl-accent));
+  /* Linien-Swatch statt Farbpunkt: zeigt das echte Serien-Linienmuster
+     (solid/dash/dot/dash-dot), damit Legende→Radar-Polygon nicht nur über
+     die Farbe zugeordnet werden muss (Colorblind-Audit P2). */
+  width: 22px;
+  height: 8px;
   flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+.is-new-look .nl-pcompare-legend-swatch svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 .is-new-look .nl-pcompare-legend-name {
@@ -63556,4 +64383,691 @@ button.nl-players-axis:focus-visible {
   width: 9px;
   height: 9px;
   border-radius: 3px;
+}
+
+/* ============================================================
+   "Neuer Look" — Seite: Player Generator (.nl-gen)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   Phase 3 der Generator-Überarbeitung: Kontroll-/Vorschau-Layout
+   (Spielgefühl statt Formular-Wall) für PlayerGeneratorPanelNewLook.tsx.
+   ============================================================ */
+.is-new-look .nl-gen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-gen-header-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-pill {
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-gen-pill.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, var(--nl-line-2));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-gen-quality-badge {
+  padding: 4px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-gen-quality-badge.is-compact {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* --- Aktionsleiste ------------------------------------------------------ */
+
+.is-new-look .nl-gen-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-primary-action {
+  padding: 8px 16px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-primary-action:hover:not(:disabled) {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-gen-primary-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-gen-secondary-action,
+.is-new-look .nl-gen-inline-action,
+.is-new-look .nl-gen-icon-btn {
+  padding: 6px 13px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-inline-action {
+  padding: 4px 11px;
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-gen-icon-btn {
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-new-look .nl-gen-icon-btn.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-secondary-action:hover:not(:disabled),
+.is-new-look .nl-gen-inline-action:hover:not(:disabled),
+.is-new-look .nl-gen-icon-btn:hover:not(:disabled) {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-secondary-action:disabled,
+.is-new-look .nl-gen-inline-action:disabled,
+.is-new-look .nl-gen-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-gen-file-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.is-new-look .nl-gen-file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.is-new-look .nl-gen-message {
+  font-size: 12px;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-gen-muted {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-gen-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Layout: Regler links, Vorschau rechts ------------------------------ */
+
+.is-new-look .nl-gen-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-gen-controls,
+.is-new-look .nl-gen-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .is-new-look .nl-gen-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Formularfelder ------------------------------------------------------ */
+
+.is-new-look .nl-gen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.is-new-look .nl-gen-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-input,
+.is-new-look .nl-gen-select {
+  padding: 7px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-family: inherit;
+  max-width: 100%;
+}
+
+.is-new-look .nl-gen-input:focus-visible,
+.is-new-look .nl-gen-select:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-gen-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-seed-row .nl-gen-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Chip-Regler (Rolle/Stärke/Varianz/Vertrag/Archetyp/Achsen) --------- */
+
+.is-new-look .nl-gen-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-chip {
+  padding: 5px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-chip:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-chip.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-axis-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 4px 0;
+}
+
+.is-new-look .nl-gen-axis-chip-row:not(:last-child) {
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-gen-axis-chip-label {
+  flex: 0 0 32px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-gen-axis-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-axis-source-pill {
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Hero-Karte (Portrait/Identität) ------------------------------------ */
+
+.is-new-look .nl-gen-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-gen-portrait-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 128px;
+  height: 128px;
+  flex: 0 0 128px;
+  border-radius: var(--nl-r-md);
+  border: 1.5px dashed var(--nl-line-2);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+  text-align: center;
+  padding: 6px;
+}
+
+.is-new-look .nl-gen-portrait-drop.is-dragging {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-gen-portrait-drop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), transparent);
+  padding: 4px 6px 6px;
+}
+
+.is-new-look .nl-gen-portrait-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-family: var(--nl-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-gen-portrait-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--nl-mut);
+  line-height: 1.2;
+}
+
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy strong,
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy span {
+  color: #fff;
+}
+
+.is-new-look .nl-gen-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.is-new-look .nl-gen-hero-copy h3 {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 18px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-gen-status-pill {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-gen-portrait-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-portrait-controls .nl-gen-input {
+  flex: 1 1 180px;
+  min-width: 120px;
+}
+
+.is-new-look .nl-gen-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+/* --- Stat-Zeile + Sub-Tabs ----------------------------------------------- */
+
+.is-new-look .nl-gen-stats {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-gen-subtabs {
+  margin-top: -4px;
+}
+
+/* --- Radar / Diszi-Karten -------------------------------------------------- */
+
+.is-new-look .nl-gen-radar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-gen-radar-row .nl-radar {
+  width: 200px;
+  height: 200px;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-gen-mini-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Diagnose-Schublade (progressive disclosure) ------------------------ */
+
+.is-new-look .nl-gen-diagnostics {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+  padding: var(--nl-s3) var(--nl-s4);
+}
+
+.is-new-look .nl-gen-diagnostics > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  list-style: none;
+}
+
+.is-new-look .nl-gen-diagnostics > summary::-webkit-details-marker {
+  display: none;
+}
+
+.is-new-look .nl-gen-diagnostics > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--nl-mut);
+  transition: transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-diagnostics[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.is-new-look .nl-gen-diagnostics-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-diag-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-diag-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-status-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 11px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, var(--nl-panel-2));
+  min-width: 140px;
+}
+
+.is-new-look .nl-gen-status-card span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-status-card strong {
+  font-size: 12px;
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+.is-new-look .nl-gen-axis-target-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-gen-axis-target-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+  padding: 3px 0;
+}
+
+.is-new-look .nl-gen-axis-target-row > span:first-child {
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-gen-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+}
+
+/* --- Bearbeiten-Tab: Identität + Attribute -------------------------------- */
+
+.is-new-look .nl-gen-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-attr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-attr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.is-new-look .nl-gen-attr-field > span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-attr-field .nl-gen-input {
+  padding: 5px 7px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Batch-Tab ------------------------------------------------------------ */
+
+.is-new-look .nl-gen-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-batch-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-gen-batch-item.is-active {
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-accent) 45%, transparent);
+}
+
+.is-new-look .nl-gen-batch-item header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-batch-item header strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-gen-batch-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Gespeicherte Drafts --------------------------------------------------- */
+
+.is-new-look .nl-gen-saved-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-saved-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-gen-saved-item.is-active {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-saved-item strong {
+  font-size: 13px;
+  color: var(--nl-ink);
 }

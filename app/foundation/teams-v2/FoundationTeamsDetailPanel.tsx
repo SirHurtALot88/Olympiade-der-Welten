@@ -17,6 +17,15 @@ import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDraw
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import { useNewLook } from "@/lib/ui/new-look-preference";
+import {
+  NlCard,
+  NlEmptyState,
+  NlTable,
+  StatChip,
+  StatChipRow,
+  formatNlMoney,
+} from "@/components/foundation/new-look";
 
 const TEAM_ROSTER_PORTRAIT_LOADING = {
   loading: "lazy",
@@ -513,6 +522,13 @@ function FoundationTeamsDetailPanel({
   const showLeagueLogos = teamsHydrationPhase === "full";
   const showSecondaryPanels = teamsHydrationPhase === "full";
   const [showDeferredTeamLogos, setShowDeferredTeamLogos] = useState(false);
+  // "Neuer Look" (flag-gated): Verträge/Transfer laufen weiter über dieses
+  // Panel (der Host routet nur roster/portraits zum NL-Kader). Mit Flag AN
+  // rendern die Vertrags-/Transfer-Blöcke das NL-Kit (StatChip/NlTable/
+  // NlEmptyState), mit Flag AUS exakt die bisherige Struktur — reine
+  // Hüllen-Umschaltung, keine Datenänderung.
+  const [newLook] = useNewLook();
+  const [nlContractSort, setNlContractSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   useEffect(() => {
     if (!showLeagueLogos) {
@@ -967,27 +983,81 @@ function FoundationTeamsDetailPanel({
                   </>
                 ) : selectedTeamDetailTab === "transfer" ? (
                   <div className="teams-v2-transfer-tab" data-testid="teams-v2-transfer-tab">
-                    <div className="teams-v2-finance-role-cards">
-                      <article className="metric-card teams-v2-role-card">
-                        <span>Cash</span>
-                        <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
-                      </article>
-                      <article className="metric-card teams-v2-role-card">
-                        <span>Gehalt</span>
-                        <strong>{selectedStandingRow?.salaryTotal != null ? formatLocalePoints(selectedStandingRow.salaryTotal, 2) : "—"}</strong>
-                      </article>
-                      <article className="metric-card teams-v2-role-card">
-                        <span>GuV</span>
-                        <strong className={selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "text-negative" : "text-positive"}>
-                          {selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
-                        </strong>
-                      </article>
-                    </div>
+                    {newLook ? (
+                      <StatChipRow className="teams-v2-finance-role-cards" aria-label="Team-Finanzen">
+                        <StatChip
+                          label="Cash"
+                          value={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
+                        />
+                        <StatChip
+                          label="Gehalt"
+                          value={selectedStandingRow?.salaryTotal != null ? formatNlMoney(selectedStandingRow.salaryTotal) : "—"}
+                        />
+                        <StatChip
+                          label="GuV"
+                          tone={selectedStandingRow?.guv != null ? (selectedStandingRow.guv < 0 ? "risk" : "good") : "neutral"}
+                          value={selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
+                        />
+                      </StatChipRow>
+                    ) : (
+                      <div className="teams-v2-finance-role-cards">
+                        <article className="metric-card teams-v2-role-card">
+                          <span>Cash</span>
+                          <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
+                        </article>
+                        <article className="metric-card teams-v2-role-card">
+                          <span>Gehalt</span>
+                          <strong>{selectedStandingRow?.salaryTotal != null ? formatLocalePoints(selectedStandingRow.salaryTotal, 2) : "—"}</strong>
+                        </article>
+                        <article className="metric-card teams-v2-role-card">
+                          <span>GuV</span>
+                          <strong className={selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "text-negative" : "text-positive"}>
+                            {selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
+                          </strong>
+                        </article>
+                      </div>
+                    )}
                     {(() => {
                       const liveHistory = selectedTeamsHistoryData?.history?.find((row) => row.isLive) ?? selectedTeamsHistoryData?.history?.[0] ?? null;
                       const duelRival = sortedTeamsViewRows?.find(
                         (row) => row.teamId !== selectedTeam.teamId && row.rank != null && selectedStandingRow?.rank != null && Math.abs(row.rank - selectedStandingRow.rank) <= 2,
                       ) ?? null;
+                      if (newLook) {
+                        return (
+                          <>
+                            {duelRival ? (
+                              <StatChip
+                                className="teams-v2-duel-card"
+                                label="Duell"
+                                value={`#${selectedStandingRow?.rank ?? "—"} ${selectedTeam.shortCode} vs #${duelRival.rank ?? "—"} ${duelRival.shortCode}`}
+                                sub={`${formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs ${formatLocalePoints(duelRival.points ?? 0, 1)} Punkte`}
+                              />
+                            ) : null}
+                            <div className="teams-v2-transfer-cards">
+                              <NlCard eyebrow="Top-Kauf">
+                                {liveHistory?.topBuyPlayer ? (
+                                  <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topBuyPlayerId && void openPlayerDrawerById(liveHistory.topBuyPlayerId)}>
+                                    <span className="nl-teams-playername">{liveHistory.topBuyPlayer}</span>
+                                    <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topBuyAmount)}</span>
+                                  </button>
+                                ) : (
+                                  <span className="nl-teams-playermeta">Kein Zugang gebucht</span>
+                                )}
+                              </NlCard>
+                              <NlCard eyebrow="Top-Verkauf">
+                                {liveHistory?.topSellPlayer ? (
+                                  <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topSellPlayerId && void openPlayerDrawerById(liveHistory.topSellPlayerId)}>
+                                    <span className="nl-teams-playername">{liveHistory.topSellPlayer}</span>
+                                    <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topSellAmount)}</span>
+                                  </button>
+                                ) : (
+                                  <span className="nl-teams-playermeta">Kein Abgang gebucht</span>
+                                )}
+                              </NlCard>
+                            </div>
+                          </>
+                        );
+                      }
                       return (
                         <>
                           {duelRival ? (
@@ -1033,29 +1103,48 @@ function FoundationTeamsDetailPanel({
                   </div>
                 ) : (
                   <div className="team-contracts-layout">
-                    <div className="team-contracts-summary-grid">
-                      <article className="metric-card">
-                        <span>Aktive Verträge</span>
-                        <strong>{selectedRoster.length}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Laufen aus</span>
-                        <strong>{contractExpiringCount}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Preview-Drafts</span>
-                        <strong>{selectedTeamContractPreviewRowCount}</strong>
-                      </article>
-                      {selectedTeamContractShapeMix ? (
+                    {newLook ? (
+                      <StatChipRow className="team-contracts-summary-grid" aria-label="Vertragsübersicht">
+                        <StatChip label="Aktive Verträge" value={selectedRoster.length} />
+                        <StatChip
+                          label="Laufen aus"
+                          value={contractExpiringCount}
+                          tone={contractExpiringCount > 0 ? "warn" : "neutral"}
+                        />
+                        <StatChip label="Preview-Drafts" value={selectedTeamContractPreviewRowCount} />
+                        {selectedTeamContractShapeMix ? (
+                          <StatChip
+                            label="Strukturiert"
+                            value={`${selectedTeamContractShapeMix.nonBalancedCount}/${selectedTeamContractShapeMix.totalCount}`}
+                            sub={`Δ jetzt ${formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}`}
+                          />
+                        ) : null}
+                      </StatChipRow>
+                    ) : (
+                      <div className="team-contracts-summary-grid">
                         <article className="metric-card">
-                          <span>Strukturiert</span>
-                          <strong>
-                            {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount}
-                          </strong>
-                          <small>Δ jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}</small>
+                          <span>Aktive Verträge</span>
+                          <strong>{selectedRoster.length}</strong>
                         </article>
-                      ) : null}
-                    </div>
+                        <article className="metric-card">
+                          <span>Laufen aus</span>
+                          <strong>{contractExpiringCount}</strong>
+                        </article>
+                        <article className="metric-card">
+                          <span>Preview-Drafts</span>
+                          <strong>{selectedTeamContractPreviewRowCount}</strong>
+                        </article>
+                        {selectedTeamContractShapeMix ? (
+                          <article className="metric-card">
+                            <span>Strukturiert</span>
+                            <strong>
+                              {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount}
+                            </strong>
+                            <small>Δ jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}</small>
+                          </article>
+                        ) : null}
+                      </div>
+                    )}
                     {contractRenewalMessage ? (
                       <div className="status-banner is-success">{contractRenewalMessage}</div>
                     ) : null}
@@ -1293,6 +1382,298 @@ function FoundationTeamsDetailPanel({
                         </button>
                       ) : null}
                     </div>
+                    {newLook ? (
+                      (() => {
+                        const nlContractRows = (() => {
+                          const base = visibleSelectedTeamContractRows ?? [];
+                          if (!nlContractSort) {
+                            return base;
+                          }
+                          const dir = nlContractSort.direction === "asc" ? 1 : -1;
+                          const readSortValue = (row) => {
+                            switch (nlContractSort.key) {
+                              case "player":
+                                return row.playerName;
+                              case "lz":
+                                return row.contractLength;
+                              case "morale":
+                                return row.morale;
+                              case "buyout":
+                                return row.buyoutCost;
+                              case "exit":
+                                return row.exitValue;
+                              default:
+                                return null;
+                            }
+                          };
+                          return [...base].sort((left, right) => {
+                            const leftValue = readSortValue(left);
+                            const rightValue = readSortValue(right);
+                            if (leftValue == null && rightValue == null) return 0;
+                            if (leftValue == null) return 1;
+                            if (rightValue == null) return -1;
+                            if (typeof leftValue === "string") {
+                              return leftValue.localeCompare(String(rightValue), "de-DE") * dir;
+                            }
+                            return (leftValue - rightValue) * dir;
+                          });
+                        })();
+                        const handleNlContractSort = (key: string) =>
+                          setNlContractSort((prev) =>
+                            prev?.key === key
+                              ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
+                              : { key, direction: "asc" },
+                          );
+                        const nlContractColumns = [
+                          { key: "player", label: "Spieler", sortable: true },
+                          { key: "status", label: "Status" },
+                          { key: "shape", label: "Form" },
+                          { key: "lz", label: "LZ", align: "center", sortable: true },
+                          { key: "morale", label: "Moral", align: "center", sortable: true },
+                          { key: "intent", label: "Intent" },
+                          { key: "buyout", label: "Buyout", align: "right", sortable: true },
+                          { key: "exit", label: "VK", align: "right", sortable: true },
+                          { key: "salary", label: "Gehaltsverlauf" },
+                          { key: "actions", label: "Aktionen", align: "right" },
+                        ];
+                        const renderNlContractCell = (row, column) => {
+                          const isSellMarked =
+                            row.status === "active" &&
+                            selectedTeam != null &&
+                            transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
+                          const shapeClass = (row.contractShape ?? "balanced").replace("_", "-");
+                          switch (column.key) {
+                            case "player":
+                              return (
+                                <div className="table-player-cell">
+                                  <button
+                                    type="button"
+                                    className="nl-teams-playerlink"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void openPlayerDrawerById(row.playerId);
+                                    }}
+                                  >
+                                    <span className="nl-teams-playername">{row.playerName}</span>
+                                    <span className="nl-teams-playermeta">{row.roleTag ?? "Kader"}</span>
+                                  </button>
+                                  {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
+                                </div>
+                              );
+                            case "status":
+                              return (
+                                <span className={`team-status-chip is-${row.status === "preview" ? "preview" : "active"}`}>
+                                  {row.status === "preview" ? "Preview" : "Aktiv"}
+                                </span>
+                              );
+                            case "shape":
+                              return (
+                                <span className={`team-contract-shape is-${shapeClass}`}>
+                                  {formatContractShapeLabel(row.contractShape)}
+                                </span>
+                              );
+                            case "lz":
+                              return (
+                                <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
+                                  {formatWholeNumber(row.contractLength)}
+                                </span>
+                              );
+                            case "morale":
+                              return row.morale != null ? (
+                                <span title={row.moraleMood ?? "Moral"}>
+                                  {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
+                                  {row.moraleSalaryModifier != null ? ` · x${formatLocalePoints(row.moraleSalaryModifier, 2)}` : ""}
+                                </span>
+                              ) : (
+                                "—"
+                              );
+                            case "intent":
+                              return row.moraleContractIntent ? (
+                                <span
+                                  className={`team-contract-intent-chip ${getContractIntentToneClass(row.moraleContractIntent)}`}
+                                  title={
+                                    row.moraleRenewalRisk != null
+                                      ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%`
+                                      : undefined
+                                  }
+                                >
+                                  {formatMoraleContractIntentLabel(row.moraleContractIntent)}
+                                </span>
+                              ) : (
+                                "—"
+                              );
+                            case "buyout":
+                              return row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—";
+                            case "exit":
+                              return row.exitValue != null ? formatNlMoney(row.exitValue) : "—";
+                            case "salary": {
+                              const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
+                              return (
+                                <div className={`team-contract-salary-cell is-${shapeClass}`}>
+                                  <div
+                                    className="team-contract-salary-steps"
+                                    role="img"
+                                    aria-label={`Gehaltsverlauf ${row.playerName}: ${staircase.steps
+                                      .map((step) => `${step.label} ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`)
+                                      .join(", ")}`}
+                                  >
+                                    {staircase.steps.map((step) => (
+                                      <span
+                                        key={`${row.rowId}-${step.label}`}
+                                        className={joinClassNames(
+                                          "team-contract-salary-step",
+                                          step.isEmpty && "is-empty",
+                                          step.isLast && !step.isEmpty && "is-last",
+                                        )}
+                                        style={{ height: `${step.heightPct}%` }}
+                                        title={`${step.label} · ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className="team-contract-salary-cell-value nl-tnum">
+                                    {staircase.lastActiveSalary != null ? formatDisplayMoney(staircase.lastActiveSalary) : "—"}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            case "actions":
+                              return row.status === "active" && selectedTeamRosterActionsAvailable ? (
+                                <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
+                                  {selectedTeam ? (
+                                    <button
+                                      className="nl-teams-action"
+                                      type="button"
+                                      onClick={() =>
+                                        toggleTransferSellMarker({
+                                          teamId: selectedTeam.teamId,
+                                          playerId: row.playerId,
+                                          playerName: row.playerName,
+                                          contractLength: row.contractLength,
+                                          buyoutCost: row.buyoutCost,
+                                          marketValueAtExit: row.marketValueAtExit,
+                                          morale: row.morale,
+                                        })
+                                      }
+                                    >
+                                      {isSellMarked ? "VK gemerkt" : "VK vormerken"}
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    className="nl-teams-action"
+                                    type="button"
+                                    disabled={marketSellBusy}
+                                    onClick={() =>
+                                      void openMarketSellModal(
+                                        {
+                                          activePlayerId: row.rowId,
+                                          playerId: row.playerId,
+                                          playerName: row.playerName,
+                                          className:
+                                            gameState.players.find((candidate) => candidate.id === row.playerId)?.className ?? "—",
+                                          race: gameState.players.find((candidate) => candidate.id === row.playerId)?.race ?? "—",
+                                          portraitUrl:
+                                            gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ?? null,
+                                        },
+                                        selectedTeam?.teamId,
+                                      )
+                                    }
+                                  >
+                                    Verkaufen
+                                  </button>
+                                  {row.contractLength <= 1 && selectedTeam ? (
+                                    <button
+                                      className="nl-teams-action"
+                                      type="button"
+                                      disabled={contractRenewalBusy != null}
+                                      onClick={() =>
+                                        void openContractRenewalNegotiation({
+                                          teamId: selectedTeam.teamId,
+                                          playerId: row.playerId,
+                                          playerName: row.playerName,
+                                        })
+                                      }
+                                    >
+                                      Verlängern
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                "—"
+                              );
+                            default:
+                              return "—";
+                          }
+                        };
+                        if (!nlContractRows.length) {
+                          return (
+                            <NlEmptyState
+                              icon="📄"
+                              title={selectedTeamContractTable?.rows.length ? "Nur Preview-Zeilen vorhanden" : "Noch keine Vertragsdaten"}
+                              message={
+                                selectedTeamContractTable?.rows.length
+                                  ? "Schalte Preview ein, um die Draft-Zeilen zu sehen."
+                                  : "In diesem Scope liegen noch keine Verträge vor."
+                              }
+                              action={
+                                selectedTeamContractTable?.rows.length && selectedTeamContractPreviewRowCount > 0
+                                  ? { label: "Preview einblenden", onClick: () => setShowTeamContractPreviewRows(true) }
+                                  : undefined
+                              }
+                            />
+                          );
+                        }
+                        const totalCommitted = (selectedTeamContractTable?.totalsCommitted ?? []).reduce(
+                          (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
+                          0,
+                        );
+                        const totalWithPreview = (selectedTeamContractTable?.totalsWithPreview ?? []).reduce(
+                          (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
+                          0,
+                        );
+                        return (
+                          <div className="team-contracts-nl-table">
+                            <NlTable
+                              aria-label="Vertragsübersicht"
+                              data-testid="teams-v2-contracts-table"
+                              className="team-contracts-table"
+                              zebra={false}
+                              columns={nlContractColumns}
+                              rows={nlContractRows}
+                              rowKey={(row) => row.rowId}
+                              rowClassName={(row) => {
+                                const isSellMarked =
+                                  row.status === "active" &&
+                                  selectedTeam != null &&
+                                  transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
+                                return (
+                                  [
+                                    row.status === "preview" && "is-preview-row",
+                                    row.contractLength <= 1 && "is-contract-expiring",
+                                    isSellMarked && "is-sell-marked",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ") || undefined
+                                );
+                              }}
+                              sortState={nlContractSort}
+                              onSort={handleNlContractSort}
+                              renderCell={renderNlContractCell}
+                            />
+                            {selectedTeamContractTable ? (
+                              <StatChipRow aria-label="Gehaltssumme je Saison">
+                                <StatChip label="Summe aktiv" value={formatDisplayMoney(totalCommitted)} sub="Team-Gehaltslast" />
+                                <StatChip
+                                  label="Summe mit Preview"
+                                  value={formatDisplayMoney(totalWithPreview)}
+                                  sub="inkl. Kaufdialog-Drafts"
+                                  tone={Math.abs(totalWithPreview - totalCommitted) >= 0.01 ? "warn" : "neutral"}
+                                />
+                              </StatChipRow>
+                            ) : null}
+                          </div>
+                        );
+                      })()
+                    ) : (
                     <div className="table-shell team-focus-table-shell team-contracts-table-shell">
                       <table className="team-table team-contracts-table">
                         <thead>
@@ -1575,6 +1956,7 @@ function FoundationTeamsDetailPanel({
                         ) : null}
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
               </section>

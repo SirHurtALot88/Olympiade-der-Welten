@@ -1,5 +1,6 @@
 import type {
   Discipline,
+  GameState,
   Player,
   PlayerGeneratorAxisIntentValue,
   PlayerGeneratorAxisSource,
@@ -9,6 +10,7 @@ import type {
   PlayerGeneratorClassSuggestion,
   PlayerGeneratorDraft,
   PlayerGeneratorInput,
+  PlayerGeneratorMarketValueStatus,
   PlayerGeneratorMatchState,
   PlayerGeneratorRandomness,
   PlayerGeneratorResolvedAxisIntent,
@@ -19,7 +21,6 @@ import type {
   TeamGeneralManagerProfile,
   TeamIdentity,
 } from "@/lib/data/olyDataTypes";
-import { normalizePlayerOvr } from "@/lib/data/player-ovr-scale";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { resolveSlotRolesForDiscipline, type MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
@@ -33,6 +34,10 @@ import {
   type PlayerGeneratorAxisKey,
   type PlayerGeneratorRoleProfile,
 } from "@/lib/player-generator/player-generator-role-profiles";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
+import { mapAxisPoStarsToNumericCeiling } from "@/lib/scouting/player-attribute-ceiling-service";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildPlayerPotentialCeilingProfile } from "@/lib/scouting/player-potential-ceiling-service";
 
 type PlayerGeneratorCatalog = {
   classes: string[];
@@ -76,6 +81,22 @@ export type PlayerGeneratorTeamContext = {
   rosterCount: number;
   averageSalary: number | null;
 };
+
+/**
+ * Phase 2 — result shape for the "Als Free Agent übernehmen" commit call.
+ * Shared by both generator panels (`PlayerGeneratorPanel.tsx` and
+ * `PlayerGeneratorPanelNewLook.tsx`) so the host page's
+ * `commitPlayerGeneratorDraft` (see `use-foundation-shell-router-body-scope.tsx`)
+ * has one type to satisfy.
+ */
+export type PlayerGeneratorCommitResult = {
+  success: boolean;
+  error?: string;
+  playerId?: string;
+  playerName?: string;
+};
+
+export type PlayerGeneratorCommitHandler = (draft: PlayerGeneratorDraft) => Promise<PlayerGeneratorCommitResult>;
 
 const defaultInput: PlayerGeneratorInput = {
   name: "",
@@ -742,8 +763,137 @@ function derivePps(disciplineRatings: Record<string, number>) {
   return roundValue(ratings.reduce((sum, value) => sum + value, 0) / ratings.length, 1);
 }
 
+/**
+ * Ability/CA basis for the generator's `generated.ovr` field.
+ *
+ * SCALE DECISION (Phase 1 consistency fix): this used to be a flat 4-axis
+ * mean run through `normalizePlayerOvr`. That was wrong on two counts:
+ *   1. A flat mean drowns out specialist/chaos builds that carry one or two
+ *      very strong axes but are otherwise average — exactly the kind of
+ *      draft this generator is meant to produce — while every other ability
+ *      read in the game (profile, scouting stars) uses the peak-weighted
+ *      `computeCurrentAbilityScore` (50/27/15/8 over descending axes; see
+ *      lib/scouting/current-ability-score.ts) specifically to avoid that.
+ *   2. `normalizePlayerOvr` produces a LEAGUE-RELATIVE rank/percentile figure
+ *      (a league's #1 player always reads ~100 there) — a different
+ *      question ("how does this draft compare to the current league") from
+ *      "how strong is this draft in absolute terms", which is the number a
+ *      user actually reasons about while shaping a draft.
+ *
+ * The draft type only exposes a single ability field (`generated.ovr`), and
+ * leaving a flat-mean/league-relative number and a peak-weighted/absolute
+ * number both floating around under the "ability" umbrella would just be a
+ * second, more confusing version of the same conflation this fix removes.
+ * So `generated.ovr` is standardized on the ABSOLUTE, peak-weighted CA score
+ * — identical formula and scale to scouting/profile CA — and is
+ * deliberately NOT run through `normalizePlayerOvr` anymore. If a
+ * league-relative comparison is needed on the draft in the future, it
+ * belongs in an explicitly-named separate field (e.g. `ovrLeagueRelative`),
+ * not blended back into this one.
+ */
 function deriveGeneratorOvr(axes: Record<PlayerGeneratorAxisKey, number>) {
-  return normalizePlayerOvr(roundValue((axes.pow + axes.spe + axes.men + axes.soc) / 4, 2));
+  return computeCurrentAbilityScore({ pow: axes.pow, spe: axes.spe, men: axes.men, soc: axes.soc });
+}
+
+// player-axis-star-rating.ts caches its O(n)-over-the-league work (axis
+// value sort, discipline ranks, specialist-score spread) per GameState
+// object IDENTITY via WeakMap. buildDraftPotential is called once per
+// candidate attempt (selectBestCandidate tries several per draft), so a
+// fresh `{ players, disciplines }` object literal on every call would defeat
+// that cache and re-pay the O(n) league scan every single attempt. Instead
+// we hand out one stable wrapper per distinct (players, disciplines)
+// reference pair so repeated calls within (and across) a generation session
+// reuse the same cached league context.
+const draftPotentialLeagueContextCache = new WeakMap<Player[], WeakMap<Discipline[], GameState>>();
+
+function getDraftPotentialLeagueContext(players: Player[], disciplines: Discipline[]): GameState {
+  let byDisciplines = draftPotentialLeagueContextCache.get(players);
+  if (!byDisciplines) {
+    byDisciplines = new WeakMap<Discipline[], GameState>();
+    draftPotentialLeagueContextCache.set(players, byDisciplines);
+  }
+  let context = byDisciplines.get(disciplines);
+  if (!context) {
+    // Minimal GameState-shaped wrapper: buildPlayerAxisStarProfile only
+    // reads `.players` / `.disciplines` off the object it is given.
+    context = { players, disciplines } as unknown as GameState;
+    byDisciplines.set(disciplines, context);
+  }
+  return context;
+}
+
+/**
+ * Wires `generated.potential` to the game's real CA/PO potential model
+ * (`player-axis-star-rating.ts` + `player-potential-ceiling-service.ts`)
+ * instead of the previous hardcoded `null`. This is the exact machinery
+ * that backs scouting/profile CA/PO stars for real players, so a generated
+ * draft's potential reads on the same scale and methodology as a scouted
+ * free agent's, rather than a separate one-off number.
+ *
+ * SELF-INFLATION DECISION: `buildPlayerAxisStarProfile` ranks a player's
+ * axes by PERCENTILE against the players on the `GameState` it is given.
+ * The draft is a hypothetical player that is not part of the league yet, so
+ * the percentile context here is built from `leaguePlayers` (the real
+ * catalog passed into the generator) WITHOUT inserting the draft into that
+ * list. Including the draft in its own percentile denominator would let a
+ * user nudge a draft's stars upward simply by generating it (self-inflation)
+ * and would make the star profile shift depending on how many other drafts
+ * happen to be in the comparison set. Excluding it scores the draft exactly
+ * like sizing up a scouted free agent against the CURRENT league — stable
+ * and not self-referential.
+ *
+ * Returns the potential ceiling's overall PO stars mapped back onto the
+ * same 1–99 numeric scale used by `player.potential` for real players (via
+ * `mapAxisPoStarsToNumericCeiling`, the same helper the attribute-ceiling
+ * service uses), so it stays directly comparable to `generated.ovr` (CA).
+ */
+function buildDraftPotential(input: {
+  leaguePlayers: Player[];
+  disciplines: Discipline[];
+  attributes: PlayerGeneratorAttributes;
+  axes: Record<PlayerGeneratorAxisKey, number>;
+  disciplineRatings: Record<string, number>;
+  traitsPositive: string[];
+  traitsNegative: string[];
+  className: string;
+  seed: string;
+}): number | null {
+  if (input.leaguePlayers.length === 0) {
+    // No league context to percentile-rank against — stay honest and leave
+    // potential unset rather than inventing a number from nothing.
+    return null;
+  }
+
+  const template = input.leaguePlayers[0]!;
+  const draftPlayer: Player = {
+    ...template,
+    id: DRAFT_DISCIPLINE_PLAYER_ID,
+    className: input.className,
+    traitsPositive: input.traitsPositive,
+    traitsNegative: input.traitsNegative,
+    coreStats: { pow: input.axes.pow, spe: input.axes.spe, men: input.axes.men, soc: input.axes.soc },
+    attributeSheetStats: { ...(template.attributeSheetStats ?? {}), ...input.attributes },
+    disciplineRatings: input.disciplineRatings,
+  };
+
+  // The draft is intentionally excluded from the league context's `players`
+  // — see the self-inflation decision above. See getDraftPotentialLeagueContext
+  // for why this wrapper is cached/stable rather than built fresh here.
+  const leagueContext = getDraftPotentialLeagueContext(input.leaguePlayers, input.disciplines);
+
+  const currentStars = buildPlayerAxisStarProfile({
+    gameState: leagueContext,
+    player: draftPlayer,
+  });
+
+  const ceiling = buildPlayerPotentialCeilingProfile({
+    saveId: input.seed,
+    player: draftPlayer,
+    currentStars,
+    hiddenPotentialScore: null,
+  });
+
+  return mapAxisPoStarsToNumericCeiling(ceiling.overall);
 }
 
 function estimateDraftMarketValue(input: {
@@ -1008,11 +1158,18 @@ function deriveGeneratedEconomy(input: {
   traitsNegative: string[];
 }): Pick<PlayerGeneratorDraft["generated"], "marketValue" | "salary" | "marketValueStatus" | "salaryStatus" | "formulaStatus"> {
   const formulaStatus = buildFormulaStatusSnapshot();
-  const marketValue =
-    formulaStatus.marketValueEngineStatus === "ready"
-      ? null
-      : null;
-  const marketValueStatus = marketValue != null ? "ready" : "missing_market_value_engine";
+  // The real rank-based MV engine (calculateMarketValueFromRankTable) ranks a
+  // player's discipline scores against the whole league — it has no notion
+  // of a single not-yet-inserted draft. We do NOT fabricate a rank for the
+  // draft here (that path is genuinely unreachable pre-commit), so this
+  // function never returns an engine-backed market value. The number the
+  // draft actually shows comes from the heuristic estimator
+  // (estimateDraftMarketValue) further down the pipeline; `marketValueStatus`
+  // below exists purely so callers can tell "engine-verified" apart from
+  // "heuristic guess" instead of the previous code reporting "ready" for a
+  // value that was never engine-backed.
+  const marketValue: number | null = null;
+  const marketValueStatus: PlayerGeneratorMarketValueStatus = "missing_market_value_engine";
 
   const canCalculateSalary =
     formulaStatus.attributeSalaryModifiersStatus === "ready" &&
@@ -1370,17 +1527,20 @@ function validateGeneratedPlayerDraft(input: {
   disciplineWarnings: string[];
   resolvedAxisIntent: PlayerGeneratorResolvedAxisIntent;
   axisIntentSources: Record<PlayerGeneratorAxisKey, PlayerGeneratorAxisSource>;
+  axisTargets: { pow: number; spe: number; men: number; soc: number } | null;
 }) {
-  const { generatorInput, generated, catalog, roleProfile, archetypeConstraint, disciplineWarnings, resolvedAxisIntent, axisIntentSources } = input;
+  const { generatorInput, generated, catalog, roleProfile, archetypeConstraint, disciplineWarnings, resolvedAxisIntent, axisIntentSources, axisTargets } = input;
   const warnings = [...disciplineWarnings];
   const qualityWarnings: ValidationDiagnostics["qualityWarnings"] = [];
   const engineStatus: ValidationDiagnostics["engineStatus"] = {
     marketValueEngine:
-      generated.marketValueStatus === "ready"
-        ? "ready"
-        : playerFormulaSources.rankMarketValueStatus === "incomplete_source"
-          ? "incomplete_source"
-          : "blocked",
+      generated.marketValueStatus === "heuristic_estimate"
+        ? "heuristic"
+        : generated.marketValueStatus === "ready"
+          ? "ready"
+          : playerFormulaSources.rankMarketValueStatus === "incomplete_source"
+            ? "incomplete_source"
+            : "blocked",
     salaryEngine:
       generated.salaryStatus === "ready"
         ? "ready"
@@ -1393,7 +1553,11 @@ function validateGeneratedPlayerDraft(input: {
         : playerFormulaSources.classEngineStatus === "heuristic"
           ? "heuristic"
           : "blocked",
-    potentialEngine: "missing_progression_source",
+    // Wired to the real CA/PO potential model in buildDraftPotential(); see
+    // its doc comment for the self-inflation decision. "ready" here means
+    // generated.potential was actually derived from that model, not that a
+    // free-agent-commit progression source exists (out of scope for Phase 1).
+    potentialEngine: generated.potential != null ? "ready" : "missing_progression_source",
   };
   const draftStatus: ValidationDiagnostics["draftStatus"] = {
     ovr: "draft_preview",
@@ -1424,10 +1588,14 @@ function validateGeneratedPlayerDraft(input: {
     pushUnique(warnings, "salary_engine_source_missing");
     pushUnique(saveStatus.commitReasons, "salary_engine_blocked");
   }
-  if (generated.marketValueStatus !== "ready") {
+  // Phase 2 fix: `marketValueStatus` is "heuristic_estimate" for essentially
+  // every draft by design (see the doc comment on `deriveGeneratedEconomy` —
+  // the real rank-based MV engine can never run pre-commit), so gating the
+  // commit path on `!== "ready"` blocked every draft unconditionally. The
+  // honest signal is whether the draft actually produced a usable number.
+  if (generated.marketValue == null) {
     pushUnique(saveStatus.commitReasons, "market_value_engine_blocked");
   }
-  pushUnique(saveStatus.commitReasons, "commit_path_not_ready");
 
   const archetypeValidation = buildArchetypeValidation(generatorInput, generated, archetypeConstraint);
   const roleValidation = buildRoleValidation(generatorInput, generated, roleProfile);
@@ -1509,6 +1677,20 @@ function validateGeneratedPlayerDraft(input: {
     validationStatus = "needs_edit";
   }
 
+  // Phase 2: a hard validation block (archetype conflict / missing engine)
+  // is a genuine reason the free-agent commit path should stay disabled —
+  // "needs_edit" (advisory warnings only) is deliberately NOT treated as a
+  // blocker here, so a draft with minor quality warnings can still be
+  // committed. Checked as "anything other than the two non-blocking
+  // statuses" (rather than naming "blocked_archetype_conflict" explicitly)
+  // so this stays correct if `validationStatus` ever gains a
+  // "blocked_missing_engine" assignment above, which today's branches never
+  // actually produce.
+  if (validationStatus !== "ready_for_review" && validationStatus !== "needs_edit") {
+    pushUnique(saveStatus.commitReasons, "draft_validation_blocked");
+  }
+  saveStatus.commit = saveStatus.commitReasons.length === 0 ? "enabled" : "disabled";
+
   const diagnostics: ValidationDiagnostics = {
     archetypeMatch: archetypeValidation.state,
     roleMatch: roleValidation.state,
@@ -1528,6 +1710,7 @@ function validateGeneratedPlayerDraft(input: {
     flatAttributeCount,
     resolvedAxisIntent,
     axisIntentSources,
+    axisTargets,
     peakAttributes: entries.slice(0, 3).map(([attribute]) => attribute),
     weakAttributes: entries.slice(-3).map(([attribute]) => attribute),
       archetypeSummary: archetypeValidation.summary,
@@ -1579,6 +1762,17 @@ function buildCandidate(input: {
   const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, input.players, disciplineWarnings);
   const pps = derivePps(disciplineRatings);
   const ovr = deriveGeneratorOvr(axes);
+  const potential = buildDraftPotential({
+    leaguePlayers: input.players,
+    disciplines: input.disciplines,
+    attributes,
+    axes,
+    disciplineRatings,
+    traitsPositive: traits.traitsPositive,
+    traitsNegative: traits.traitsNegative,
+    className: classSuggestion.className,
+    seed: input.seedVariant,
+  });
   const generatedEconomy = deriveGeneratedEconomy({
     attributes,
     traitsPositive: traits.traitsPositive,
@@ -1627,14 +1821,14 @@ function buildCandidate(input: {
     disciplineOutlook,
     ovr,
     pps,
-    potential: null,
+    potential,
     projectedRole,
     captaincyScore,
     teamFit,
     economyProjection,
     marketValue: economyProjection.marketValueEstimate,
     salary: economyProjection.salaryEstimate,
-    marketValueStatus: economyProjection.marketValueEstimate != null ? "ready" : generatedEconomy.marketValueStatus,
+    marketValueStatus: economyProjection.marketValueEstimate != null ? "heuristic_estimate" : generatedEconomy.marketValueStatus,
     salaryStatus: economyProjection.salaryEstimate != null ? "ready" : generatedEconomy.salaryStatus,
     formulaStatus: generatedEconomy.formulaStatus,
     diagnostics: {
@@ -1656,11 +1850,12 @@ function buildCandidate(input: {
       saveStatus: {
         save: "draft_only",
         commit: "disabled",
-        commitReasons: ["market_value_engine_blocked", "commit_path_not_ready"],
+        commitReasons: ["market_value_engine_blocked"],
       },
       qualityWarnings: [],
       resolvedAxisIntent: axisResolution.resolvedAxisIntent,
       axisIntentSources: axisResolution.axisIntentSources,
+      axisTargets: null,
       peakAttributes: [],
       weakAttributes: [],
       archetypeSummary: [],
@@ -1677,6 +1872,12 @@ function buildCandidate(input: {
     disciplineWarnings,
     resolvedAxisIntent: axisResolution.resolvedAxisIntent,
     axisIntentSources: axisResolution.axisIntentSources,
+    axisTargets: {
+      pow: roundValue(axisTargets.pow, 1),
+      spe: roundValue(axisTargets.spe, 1),
+      men: roundValue(axisTargets.men, 1),
+      soc: roundValue(axisTargets.soc, 1),
+    },
   });
 
   return {
@@ -1814,6 +2015,20 @@ export function recalculatePlayerGeneratorDraft(input: {
   const disciplineRatings = deriveDisciplineRatings(input.disciplines, attributes, input.players, disciplineWarnings);
   const pps = derivePps(disciplineRatings);
   const ovr = deriveGeneratorOvr(axes);
+  // Recompute potential too: recalculate can be called after a manual attribute
+  // edit (see tests), and leaving the old potential in place would let it go
+  // stale against attributes/axes that no longer match it.
+  const potential = buildDraftPotential({
+    leaguePlayers: input.players,
+    disciplines: input.disciplines,
+    attributes,
+    axes,
+    disciplineRatings,
+    traitsPositive: input.draft.generated.traitsPositive,
+    traitsNegative: input.draft.generated.traitsNegative,
+    className: input.draft.generated.className,
+    seed: input.draft.input.seed?.trim() || input.draft.draftId,
+  });
   const generatedEconomy = deriveGeneratedEconomy({
     attributes,
     traitsPositive: input.draft.generated.traitsPositive,
@@ -1855,13 +2070,14 @@ export function recalculatePlayerGeneratorDraft(input: {
     disciplineOutlook,
     ovr,
     pps,
+    potential,
     projectedRole,
     captaincyScore,
     teamFit,
     economyProjection,
     marketValue: economyProjection.marketValueEstimate,
     salary: economyProjection.salaryEstimate,
-    marketValueStatus: economyProjection.marketValueEstimate != null ? "ready" : generatedEconomy.marketValueStatus,
+    marketValueStatus: economyProjection.marketValueEstimate != null ? "heuristic_estimate" : generatedEconomy.marketValueStatus,
     salaryStatus: economyProjection.salaryEstimate != null ? "ready" : generatedEconomy.salaryStatus,
     formulaStatus: generatedEconomy.formulaStatus,
   } satisfies PlayerGeneratorDraft["generated"];
@@ -1875,6 +2091,11 @@ export function recalculatePlayerGeneratorDraft(input: {
     disciplineWarnings,
     resolvedAxisIntent: axisResolution.resolvedAxisIntent,
     axisIntentSources: axisResolution.axisIntentSources,
+    // Attribute-level manual edits don't re-derive a fresh axis target (there
+    // is nothing to re-target — the attributes are the input here), so keep
+    // whatever target the draft was originally generated with rather than
+    // silently discarding it.
+    axisTargets: input.draft.generated.diagnostics.axisTargets ?? null,
   });
 
   return {

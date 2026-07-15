@@ -328,6 +328,49 @@ describe("player generator service", () => {
     expect(draft.generated.diagnostics.axisIntentSources.men).toBe("user");
   });
 
+  it("exposes the requested axis target alongside the achieved axes so drift is legible", () => {
+    const draft = generatePlayerDraft({
+      generatorInput: {
+        ...createDefaultPlayerGeneratorInput(),
+        preferredArchetype: "beast",
+        roleIntent: "offense",
+        seed: "axis-target-transparency",
+      },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+
+    const { axisTargets } = draft.generated.diagnostics;
+    expect(axisTargets).not.toBeNull();
+    expect(axisTargets).toEqual(
+      expect.objectContaining({
+        pow: expect.any(Number),
+        spe: expect.any(Number),
+        men: expect.any(Number),
+        soc: expect.any(Number),
+      }),
+    );
+    // buildAxisTargets() steers generation; deriveAxesFromAttributes()
+    // recomputes the shown axes independently afterwards via the attribute
+    // silhouette shaping — so target and achieved are legitimately allowed
+    // to drift from each other. Both should be sane 0-100-scale numbers.
+    for (const axis of ["pow", "spe", "men", "soc"] as const) {
+      expect(axisTargets![axis]).toBeGreaterThanOrEqual(0);
+      expect(axisTargets![axis]).toBeLessThanOrEqual(100);
+      expect(draft.generated.axes[axis]).toBeGreaterThanOrEqual(0);
+      expect(draft.generated.axes[axis]).toBeLessThanOrEqual(100);
+    }
+
+    // A manual-edit recalculate pass has nothing fresh to target against, so
+    // it preserves the draft's original target rather than discarding it.
+    const recalculated = recalculatePlayerGeneratorDraft({
+      draft,
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+    expect(recalculated.generated.diagnostics.axisTargets).toEqual(axisTargets);
+  });
+
   it("keeps normal and strong profiles above the minimum spread floor", () => {
     const normal = generatePlayerDraft({
       generatorInput: {
@@ -432,7 +475,7 @@ describe("player generator service", () => {
     expect(broken.generated.diagnostics.statSilhouette).toBe("failed");
   });
 
-  it("shows draft economy projections while keeping the real commit path disabled", () => {
+  it("shows draft economy projections and now leaves the free-agent commit path enabled once market value/salary are present", () => {
     const draft = generatePlayerDraft({
       generatorInput: {
         ...createDefaultPlayerGeneratorInput(),
@@ -446,7 +489,13 @@ describe("player generator service", () => {
 
     expect(draft.generated.marketValue).toBeGreaterThan(0);
     expect(draft.generated.salary).toBeGreaterThan(0);
-    expect(draft.generated.marketValueStatus).toBe("ready");
+    // Phase 1 fix: the draft's market value has only ever come from the
+    // heuristic estimator (estimateDraftMarketValue), never from the real
+    // rank-based MV engine (which needs the draft ranked against the whole
+    // league to work at all). marketValueStatus/engineStatus now say so
+    // honestly instead of misreporting "ready" for an engine that was never
+    // actually consulted.
+    expect(draft.generated.marketValueStatus).toBe("heuristic_estimate");
     expect(draft.generated.salaryStatus).toBe("ready");
     expect(draft.generated.economyProjection?.contractMode).toBe("front_loaded");
     expect(draft.generated.economyProjection?.salarySchedule.length).toBeGreaterThan(0);
@@ -460,15 +509,24 @@ describe("player generator service", () => {
     expect(draft.generated.formulaStatus.marketValueEngineStatus).toBe("ready");
     expect(draft.generated.formulaStatus.classEngineStatus).toBe("heuristic");
     expect(draft.generated.formulaStatus.salaryEngineStatus).toBe("ready_if_market_value_input_present");
-    expect(draft.generated.diagnostics.engineStatus.marketValueEngine).toBe("ready");
+    expect(draft.generated.diagnostics.engineStatus.marketValueEngine).toBe("heuristic");
     expect(draft.generated.diagnostics.engineStatus.salaryEngine).toBe("ready");
     expect(draft.generated.diagnostics.engineStatus.classEngine).toBe("heuristic");
-    expect(draft.generated.diagnostics.engineStatus.potentialEngine).toBe("missing_progression_source");
+    // Phase 1 fix: potential is now wired to the real CA/PO star model
+    // instead of being hardcoded null/missing.
+    expect(draft.generated.diagnostics.engineStatus.potentialEngine).toBe("ready");
+    expect(draft.generated.potential).not.toBeNull();
     expect(draft.generated.diagnostics.draftStatus.ovr).toBe("draft_preview");
     expect(draft.generated.diagnostics.draftStatus.pps).toBe("draft_preview");
     expect(draft.generated.diagnostics.saveStatus.save).toBe("draft_only");
-    expect(draft.generated.diagnostics.saveStatus.commit).toBe("disabled");
-    expect(draft.generated.diagnostics.saveStatus.commitReasons).toContain("commit_path_not_ready");
+    // Phase 2 fix: `commit_path_not_ready` was an unconditional sentinel
+    // that blocked every draft regardless of data completeness. This draft
+    // has a real ovr/marketValue/salary and no hard validation block
+    // (`ready_for_review`/`needs_edit` are not blockers), so the commit
+    // path is genuinely open now.
+    expect(draft.validationStatus).not.toBe("blocked_archetype_conflict");
+    expect(draft.generated.diagnostics.saveStatus.commitReasons).toEqual([]);
+    expect(draft.generated.diagnostics.saveStatus.commit).toBe("enabled");
     expect(draft.warnings.filter((warning) => warning.includes("rank_to_discipline_market_value_source_incomplete"))).toHaveLength(0);
     expect(draft.warnings.filter((warning) => warning.includes("class_factors_source_missing"))).toHaveLength(1);
     expect(draft.warnings.filter((warning) => warning.includes("salary_engine_waits_for_market_value_input"))).toHaveLength(0);
@@ -497,5 +555,66 @@ describe("player generator service", () => {
     expect(draft.generated.diagnostics.qualityWarnings).toContain("unknown_trait");
     expect(draft.warnings.some((warning) => warning.includes("OVR ist im Generator"))).toBe(false);
     expect(draft.warnings.some((warning) => warning.includes("Potential bleibt offen"))).toBe(false);
+  });
+
+  it("derives generated.ovr from the peak-weighted absolute CA formula instead of a flat axis mean", () => {
+    const specialist = generatePlayerDraft({
+      generatorInput: {
+        ...createDefaultPlayerGeneratorInput(),
+        preferredArchetype: "ninja",
+        roleIntent: "specialist",
+        seed: "ca-peak-weighted-specialist",
+      },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+
+    const { pow, spe, men, soc } = specialist.generated.axes;
+    const flatMean = (pow + spe + men + soc) / 4;
+    const sortedDesc = [pow, spe, men, soc].sort((left, right) => right - left);
+    const peakWeighted = sortedDesc[0] * 0.5 + sortedDesc[1] * 0.27 + sortedDesc[2] * 0.15 + sortedDesc[3] * 0.08;
+
+    expect(specialist.generated.ovr).not.toBeNull();
+    // Matches lib/scouting/current-ability-score.ts exactly (same formula,
+    // same absolute/league-independent scale as scouting/profile CA).
+    expect(specialist.generated.ovr!).toBeCloseTo(peakWeighted, 1);
+    // Rearrangement inequality: peak-weighting a spiky specialist axis
+    // profile always scores at least as high as a flat mean of the same
+    // values, and strictly higher whenever the axes aren't all equal. This
+    // is the whole point of the Phase 1 fix — specialists no longer get
+    // flattened toward mediocrity by a plain average.
+    expect(specialist.generated.ovr!).toBeGreaterThan(flatMean);
+  });
+
+  it("wires generated.potential to the real CA/PO star model instead of leaving it null", () => {
+    const draft = generatePlayerDraft({
+      generatorInput: {
+        ...createDefaultPlayerGeneratorInput(),
+        preferredArchetype: "warrior",
+        roleIntent: "offense",
+        seed: "potential-wiring",
+      },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+
+    expect(draft.generated.potential).not.toBeNull();
+    expect(draft.generated.potential!).toBeGreaterThanOrEqual(1);
+    expect(draft.generated.potential!).toBeLessThanOrEqual(99);
+    expect(draft.generated.diagnostics.engineStatus.potentialEngine).toBe("ready");
+
+    // Same seed -> same deterministic potential (mirrors the existing
+    // reproducibility guarantee for attributes/axes/discipline ratings).
+    const second = generatePlayerDraft({
+      generatorInput: {
+        ...createDefaultPlayerGeneratorInput(),
+        preferredArchetype: "warrior",
+        roleIntent: "offense",
+        seed: "potential-wiring",
+      },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+    expect(second.generated.potential).toBe(draft.generated.potential);
   });
 });

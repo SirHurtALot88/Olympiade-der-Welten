@@ -246,6 +246,7 @@ export type LegacyTeamPowerOption = {
   chargesRemaining: number;
   selectedForSeason: boolean;
   isUsedUp: boolean;
+  isPassive: boolean;
 };
 
 export type LegacyMutatorTraitOption = {

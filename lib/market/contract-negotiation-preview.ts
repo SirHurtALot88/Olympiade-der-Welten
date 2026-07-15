@@ -388,7 +388,7 @@ export function buildPlayerContractPreference(
     shortScore += 3;
     reasons.push("Flexibilitaets- oder Geldmotiv bevorzugt kuerzere Bindung.");
   }
-  if (hasToken(tokens, ["diva", "egomaniac", "scandalous", "chaotic", "relaxed", "coldblooded"])) {
+  if (hasToken(tokens, ["diva", "egomaniac", "scandalous", "relaxed", "coldblooded"])) {
     shortScore += 2;
     warnings.push("Volatile Persoenlichkeit verlangt bei langer Bindung eher Premium.");
   }
@@ -821,7 +821,7 @@ function deriveTraitCultureSignals(player: Player, identity: TeamIdentity | null
   const reasons: string[] = [];
   const demandEntries: NegotiationDemandBreakdownEntry[] = [];
 
-  if (hasAnyTrait(player, ["scandalous", "cruel", "toxic", "chaotic"]) && (manners >= 8 || harmony >= 8)) {
+  if (hasAnyTrait(player, ["scandalous", "cruel"]) && (manners >= 8 || harmony >= 8)) {
     const intensity = Math.max(manners, harmony) >= 10 ? 0.18 : 0.12;
     salaryMultiplier += intensity;
     score -= intensity >= 0.18 ? 14 : 9;

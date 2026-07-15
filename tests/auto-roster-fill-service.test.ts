@@ -7,6 +7,15 @@ const listLocalTransfermarktFreeAgents = vi.fn();
 const listLocalTransferHistory = vi.fn();
 const previewLocalTransfermarktBuy = vi.fn();
 const executeLocalTransfermarktBuy = vi.fn();
+// The service now buys against a per-team run context and flushes once (batch persist). The mock buy above
+// mutates persistenceState.save directly, so the context is a thin wrapper and flush is a no-op here.
+const createLocalTransfermarktRunContext = vi.fn(({ save }: { save: unknown }) => ({
+  save,
+  persistence: persistenceState,
+  deferredWrites: 0,
+  pendingDerivationPlayerIds: [],
+}));
+const flushLocalTransfermarktRunContext = vi.fn((context: { save: unknown }) => context.save);
 
 const persistenceState = {
   save: {
@@ -22,6 +31,8 @@ vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   listLocalTransferHistory,
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
+  createLocalTransfermarktRunContext,
+  flushLocalTransfermarktRunContext,
 }));
 
 vi.mock("@/lib/ai/aiNeedsEngine", () => ({

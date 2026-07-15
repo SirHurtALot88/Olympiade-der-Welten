@@ -11,6 +11,7 @@ import {
   NlDeltaChip,
   NlProgressBar,
   NlRadar,
+  NlSkeletonCard,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -521,6 +522,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
   const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
 
+  // FM26-Style Progressive Disclosure — Kandidaten-Kachel: welcher Kandidat ist
+  // per explizitem Toggle (Touch/Tastatur) dauerhaft aufgeklappt. Hover/Fokus
+  // enthüllt den Detail-Layer zusätzlich rein via CSS (kein State nötig).
+  const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+
   // F4 — Team-Stärke: Ø POW/SPE/MEN/SOC über den ganzen Kader UND über die
   // besten `topSixCount` Werte je Achse (gleiche Top-6-Semantik wie der
   // Team-Impact via computeTopSixAxisAverage — keine erfundenen Werte).
@@ -757,77 +763,180 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               const fitTone = getNlFitTone(item.fit);
               const ratioTone = getNlRatioTone(item.marketValueSalaryRatio);
               const needTone = getNlNeedTone(item.needMatchScore);
+              const isExpanded = expandedCandidateId === item.playerId;
+              const detailId = `nl-market-candidate-detail-${item.playerId}`;
+              // Fog-of-war: nur bereits freigegebene Achswerte (item[axis] === null bei
+              // ungescouteten Spielern → Chip entfällt), kein Leak verdeckter Werte.
+              const detailAxisChips = NL_MARKET_AXES.flatMap((axis) => {
+                const value = item[axis];
+                if (typeof value !== "number" || !Number.isFinite(value)) {
+                  return [];
+                }
+                const tier = getTransfermarktTierFromPoints(value);
+                return [
+                  <span
+                    key={`nl-cand-axis-${item.playerId}-${axis}`}
+                    className={`nl-market-detail-axis-chip ${getAttributeTierClass(tier)}`}
+                  >
+                    <b>{NL_AXIS_LABELS[axis]}</b>
+                    <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
+                  </span>,
+                ];
+              });
+              const detailHasTalent = Boolean(item.axisStarsDisplay || item.potentialStarsDisplay);
+              const detailHasTrend = Boolean(item.developmentTrend);
+              const detailHasNeed = Boolean(item.needMatchLabel);
+              const detailHasContent =
+                detailAxisChips.length > 0 || detailHasTalent || detailHasTrend || detailHasNeed;
               return (
                 <div
                   key={item.playerId}
                   role="button"
                   tabIndex={0}
                   data-testid="transfer-candidate-card"
-                  className={`nl-market-candidate${isSelected ? " is-selected" : ""}`}
+                  className={`nl-market-candidate${isSelected ? " is-selected" : ""}${isExpanded ? " is-expanded" : ""}`}
                   aria-selected={isSelected}
                   onClick={() => onSelectCandidate(item.playerId)}
                   onKeyDown={(event) => handleNlSelectKeyDown(event, () => onSelectCandidate(item.playerId))}
                 >
-                  <span className="nl-market-candidate-portrait" aria-hidden="true">
-                    {portraitSrc ? (
-                      <OptimizedMediaImage src={portraitSrc} alt="" width={48} height={48} className="nl-market-portrait-img" />
-                    ) : (
-                      <span className="nl-market-portrait-initials">{portrait.initials}</span>
-                    )}
-                  </span>
-                  <span className="nl-market-candidate-copy">
-                    {onOpenPlayerDetails ? (
-                      <button
-                        type="button"
-                        className="nl-market-candidate-name"
-                        title={`${item.name} — Profil öffnen`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenPlayerDetails({ playerId: item.playerId });
-                        }}
-                      >
-                        {item.name}
-                      </button>
-                    ) : (
-                      <strong>{item.name}</strong>
-                    )}
-                    <small>
-                      {item.className} · {item.race}
-                    </small>
-                    {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
-                    <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
-                      <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`} title={getGameTermShort("Fit") ?? undefined}>Fit {item.fitDisplay}</span>
-                      <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`} title={getGameTermShort("Value") ?? undefined}>
-                        Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}
-                      </span>
-                      {item.needMatchScore != null ? (
-                        <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`} title={getGameTermShort("Bedarf") ?? undefined}>
-                          Bedarf {formatNlNumber(item.needMatchScore, 0)}
-                        </span>
-                      ) : null}
-                      {/* Rohdiamant-/Potenzial-Signal — nur wenn Scouting den Sterne-Gap real freigibt. */}
-                      {item.potentialGapStars != null && Number.isFinite(item.potentialGapStars) && item.potentialGapStars > 0 ? (
-                        <span
-                          className={`nl-market-signal-chip ${nlToneClass(item.potentialGapStars >= 2 ? "good" : "accent")}`}
-                          title={item.potentialStarsDisplay ?? "Sterne-Abstand aktuell → Potenzial"}
-                        >
-                          {item.potentialGapStars >= 2 ? "Rohdiamant" : "Potenzial"} +{item.potentialGapStars}★
-                        </span>
-                      ) : null}
+                  <div className="nl-market-candidate-head">
+                    <span className="nl-market-candidate-portrait" aria-hidden="true">
+                      {portraitSrc ? (
+                        <OptimizedMediaImage src={portraitSrc} alt="" width={48} height={48} className="nl-market-portrait-img" />
+                      ) : (
+                        <span className="nl-market-portrait-initials">{portrait.initials}</span>
+                      )}
                     </span>
-                  </span>
-                  <span className="nl-market-candidate-numbers nl-tnum">
-                    <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
-                    <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
-                    <small>OVR {formatNlNumber(item.ovr, 0)}</small>
-                  </span>
+                    <span className="nl-market-candidate-copy">
+                      {onOpenPlayerDetails ? (
+                        <button
+                          type="button"
+                          className="nl-market-candidate-name"
+                          title={`${item.name} — Profil öffnen`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenPlayerDetails({ playerId: item.playerId });
+                          }}
+                        >
+                          {item.name}
+                        </button>
+                      ) : (
+                        <strong>{item.name}</strong>
+                      )}
+                      <small>
+                        {item.className} · {item.race}
+                      </small>
+                      {/* Persistentes Deal-Signal: Fit/Value-Ton immer sichtbar, nicht nur bei Auswahl. */}
+                      <span className="nl-market-candidate-signals" aria-label={`${item.name} Deal-Signal`}>
+                        <span className={`nl-market-signal-chip ${nlToneClass(fitTone)}`} title={getGameTermShort("Fit") ?? undefined}>Fit {item.fitDisplay}</span>
+                        <span className={`nl-market-signal-chip ${nlToneClass(ratioTone)}`} title={getGameTermShort("Value") ?? undefined}>
+                          Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}
+                        </span>
+                        {item.needMatchScore != null ? (
+                          <span className={`nl-market-signal-chip ${nlToneClass(needTone)}`} title={getGameTermShort("Bedarf") ?? undefined}>
+                            Bedarf {formatNlNumber(item.needMatchScore, 0)}
+                          </span>
+                        ) : null}
+                        {/* Rohdiamant-/Potenzial-Signal — nur wenn Scouting den Sterne-Gap real freigibt. */}
+                        {item.potentialGapStars != null && Number.isFinite(item.potentialGapStars) && item.potentialGapStars > 0 ? (
+                          <span
+                            className={`nl-market-signal-chip ${nlToneClass(item.potentialGapStars >= 2 ? "good" : "accent")}`}
+                            title={item.potentialStarsDisplay ?? "Sterne-Abstand aktuell → Potenzial"}
+                          >
+                            {item.potentialGapStars >= 2 ? "Rohdiamant" : "Potenzial"} +{item.potentialGapStars}★
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className="nl-market-candidate-numbers nl-tnum">
+                      <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
+                      <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
+                      <small>OVR {formatNlNumber(item.ovr, 0)}</small>
+                    </span>
+                    {/* Expliziter Expand-Toggle (Touch/Tastatur). stopPropagation, damit
+                        Klick/Enter/Space nicht zusätzlich die Kachel-Auswahl auslöst. */}
+                    <button
+                      type="button"
+                      className="nl-market-candidate-expand"
+                      aria-expanded={isExpanded}
+                      aria-controls={detailId}
+                      title={isExpanded ? `${item.name} Detail einklappen` : `${item.name} Detail ausklappen`}
+                      aria-label={isExpanded ? `${item.name} Detail einklappen` : `${item.name} Detail ausklappen`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setExpandedCandidateId((current) => (current === item.playerId ? null : item.playerId));
+                      }}
+                      onKeyDown={(event) => {
+                        // Verhindert, dass Enter/Space zur Kachel (role=button) durchschlägt.
+                        event.stopPropagation();
+                      }}
+                    >
+                      <span className="nl-market-candidate-expand-caret" aria-hidden="true">
+                        ▸
+                      </span>
+                    </button>
+                  </div>
+                  {/* Detail-Layer (Progressive Disclosure): immer im DOM (für Screenreader
+                      erreichbar), via CSS kollabiert; Reveal on :hover/:focus-within und
+                      wenn is-expanded. Zeigt ausschließlich bereits freigegebene Daten. */}
+                  <div className="nl-market-candidate-detail" id={detailId}>
+                    {detailAxisChips.length > 0 ? (
+                      <div className="nl-market-detail-axes" aria-label={`${item.name} Achsen POW/SPE/MEN/SOC`}>
+                        {detailAxisChips}
+                      </div>
+                    ) : null}
+                    {detailHasTalent || detailHasTrend || detailHasNeed ? (
+                      <div className="nl-market-detail-meta">
+                        {detailHasTalent ? (
+                          <NlAbilityStars
+                            caStars={item.axisStarsOverall ?? item.axisStarsDisplay}
+                            poStarRange={
+                              item.potentialStarsMin != null && item.potentialStarsMax != null
+                                ? { min: item.potentialStarsMin, max: item.potentialStarsMax }
+                                : null
+                            }
+                            poScoreRange={item.potentialRange}
+                            poStars={item.potentialStarsMax ?? item.potentialStarsDisplay}
+                            known={false}
+                            label="Talent"
+                          />
+                        ) : null}
+                        {item.developmentTrend ? (
+                          <span
+                            className={`nl-market-signal-chip ${nlToneClass(
+                              NL_DEV_TREND_TONE[item.developmentTrend] ?? "neutral",
+                            )}`}
+                            title="Entwicklungs-Trend aus dem Trainings-Forecast"
+                          >
+                            Trend {NL_DEV_TREND_LABEL[item.developmentTrend] ?? "—"}
+                          </span>
+                        ) : null}
+                        {item.needMatchLabel ? (
+                          <span
+                            className={`nl-market-signal-chip ${nlToneClass(needTone)}`}
+                            title="Eignung für deinen Kader"
+                          >
+                            {item.needMatchLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {!detailHasContent ? (
+                      <p className="nl-market-muted nl-market-detail-hint">
+                        Werte noch verdeckt — Kandidat wählen und weiter scouten.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
             {marketBusy && candidates.length === 0 ? (
-              <p className="nl-market-muted" aria-busy="true">
-                Kandidaten laden…
-              </p>
+              <div className="nl-market-loading-skeletons" role="status" aria-busy="true">
+                <span className="sr-only">Kandidaten laden…</span>
+                {Array.from({ length: 4 }, (_, index) => (
+                  <NlSkeletonCard key={`nl-market-skeleton-${index}`} lines={2} withAvatar />
+                ))}
+              </div>
             ) : null}
             {!marketBusy && !marketError && candidates.length === 0 ? (
               <p className="nl-market-muted">Keine Kandidaten im aktuellen Filter — Suche oder Limits weiter stellen.</p>

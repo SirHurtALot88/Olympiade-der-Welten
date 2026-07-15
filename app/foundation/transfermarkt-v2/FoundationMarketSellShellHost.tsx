@@ -98,6 +98,37 @@ export default function FoundationMarketSellShellHost({
     playerSeasonPerformanceMap,
   });
 
+  // Friction fix (Generalprobe #4): the confirm button was disabled with no
+  // on-screen explanation. Surface the concrete reason near the button instead
+  // of relying on a title/tooltip only, and always flag a minimum-roster caution
+  // (a warning that makes selling unsafe even when technically still allowed).
+  const rosterAtMinimum =
+    (marketSellPreview?.warnings ?? []).some((warning) =>
+      warning === "team_would_fall_under_7" ||
+      warning === "team_would_fall_under_player_min",
+    );
+  const strongAckPending =
+    (marketSellPreview?.coaching?.boardReaction.requiresStrongAcknowledgment ||
+      (marketSellPreview?.coaching?.gmSoftBlockStarSell && (marketSellPreview?.coaching?.keepIntentScore ?? 0) >= 55)) &&
+    !marketSellRiskAcknowledged;
+  const sellDisabled =
+    readMetaSource === "prisma" || !marketSellPreview?.canSell || marketSellBusy || strongAckPending;
+  const sellDisabledReason = !sellDisabled
+    ? null
+    : readMetaSource === "prisma"
+      ? "Im Referenzmodus bleibt der Verkauf gesperrt."
+      : !marketSellPreview
+        ? "Verkaufsvorschau wird noch geladen."
+        : !marketSellPreview.canSell
+          ? rosterAtMinimum
+            ? "Kader ist am Minimum — verkaufen würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz, bevor du hier verkaufst."
+            : (marketSellPreview.blockingReasons?.[0] ?? "Dieser Verkauf ist gerade noch blockiert.")
+          : marketSellBusy
+            ? "Der Verkauf wird gerade vorbereitet."
+            : strongAckPending
+              ? "Bitte bestätige zuerst die Board-/GM-Warnung oben, dann kannst du final verkaufen."
+              : null;
+
   return (
     <section className="foundation-drilldown-page transfer-sell-page" data-testid="transfer-sell-page" aria-label="Verkaufsdialog">
       <header className="foundation-drilldown-header">
@@ -635,6 +666,12 @@ export default function FoundationMarketSellShellHost({
         )}
       </div>
 
+      {rosterAtMinimum ? (
+        <p className="foundation-screen-action-reason" data-testid="transfer-sell-roster-min-note">
+          Kader ist am Minimum — ein weiterer Verkauf würde die Aufstellung unmöglich machen. Kaufe zuerst Ersatz.
+        </p>
+      ) : null}
+
       <div className="foundation-modal-actions">
         <button className="secondary-button" type="button" onClick={closeMarketSellModal}>
           Abbrechen
@@ -643,23 +680,8 @@ export default function FoundationMarketSellShellHost({
           className="primary-button"
           type="button"
           data-testid="transfer-sell-confirm-button"
-          disabled={
-            readMetaSource === "prisma" ||
-            !marketSellPreview?.canSell ||
-            marketSellBusy ||
-            ((marketSellPreview?.coaching?.boardReaction.requiresStrongAcknowledgment ||
-              (marketSellPreview?.coaching?.gmSoftBlockStarSell && (marketSellPreview?.coaching?.keepIntentScore ?? 0) >= 55)) &&
-              !marketSellRiskAcknowledged)
-          }
-          title={
-            readMetaSource === "prisma"
-              ? "Im Referenzmodus bleibt der Verkauf gesperrt."
-              : !marketSellPreview?.canSell
-                ? (marketSellPreview?.blockingReasons?.[0] ?? "Dieser Verkauf ist gerade noch blockiert.")
-                : marketSellBusy
-                  ? "Der Verkauf wird gerade vorbereitet."
-                  : "Verkauf jetzt final bestätigen."
-          }
+          disabled={sellDisabled}
+          title={sellDisabledReason ?? "Verkauf jetzt final bestätigen."}
           onClick={() => {
             void confirmTransfermarktSell();
           }}
@@ -667,6 +689,11 @@ export default function FoundationMarketSellShellHost({
           {marketSellBusy ? "Verkauf läuft..." : "Verkauf bestätigen"}
         </button>
       </div>
+      {sellDisabledReason ? (
+        <p className="foundation-screen-action-reason" data-testid="transfer-sell-disabled-reason">
+          Warum nicht: {sellDisabledReason}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -53,8 +53,14 @@ const RADAR_AXIS_DEFS: NlRadarAxisDef[] = RADAR_AXIS_ORDER.map((key) => ({ key, 
 
 /** Bis zu 4 unterscheidbare Serienfarben — bestehende Ton-Tokens statt neu erfundener Hex-Werte. */
 const COMPARE_SERIES_TONES: NlTone[] = ["accent", "good", "warn", "risk"];
-/** Solid für die erste Serie, danach abwechselnd gestrichelt — Serien dürfen sich nicht nur über Farbe unterscheiden. */
-const COMPARE_SERIES_DASHED = [false, true, false, true];
+/**
+ * Je Serie ein EIGENES Linienmuster (solid / dash / dot / dash-dot) statt nur
+ * "solid vs. gestrichelt". Vorher trugen Serie 2 (good=grün) und Serie 4
+ * (risk=rot) dasselbe Dash — genau das Rot-Grün-Paar, das Farbenblinde am
+ * ehesten verwechseln, war so nur über die Farbe trennbar (Colorblind-Audit).
+ * Distinkte Muster machen die Serien auch ohne Hue unterscheidbar.
+ */
+const COMPARE_SERIES_DASH = ["none", "6 4", "2 3", "10 4 2 4"];
 
 type CompareStatKey =
   | "ovr"
@@ -235,7 +241,7 @@ export default function FoundationPlayersCompareOverlay({
         id: row.player.id,
         label: row.player.name,
         tone,
-        dashed: COMPARE_SERIES_DASHED[index] ?? false,
+        dashPattern: COMPARE_SERIES_DASH[index] ?? "none",
         values: {
           pow: row.player.coreStats.pow ?? null,
           spe: row.player.coreStats.spe ?? null,
@@ -309,9 +315,26 @@ export default function FoundationPlayersCompareOverlay({
         </header>
 
         <ul className="nl-pcompare-legend" aria-label="Verglichene Spieler">
-          {series.map(({ row, tone }) => (
+          {series.map(({ row, tone }, index) => (
             <li key={row.player.id} className={`nl-pcompare-legend-item ${nlToneClass(tone)}`}>
-              <span className="nl-pcompare-legend-swatch" aria-hidden="true" />
+              <span className="nl-pcompare-legend-swatch" aria-hidden="true">
+                <svg viewBox="0 0 22 8" preserveAspectRatio="none">
+                  <line
+                    x1="1"
+                    y1="4"
+                    x2="21"
+                    y2="4"
+                    stroke="var(--nl-tone, var(--nl-accent))"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeDasharray={
+                      COMPARE_SERIES_DASH[index] && COMPARE_SERIES_DASH[index] !== "none"
+                        ? COMPARE_SERIES_DASH[index]
+                        : undefined
+                    }
+                  />
+                </svg>
+              </span>
               <button
                 type="button"
                 className="nl-pcompare-legend-name"

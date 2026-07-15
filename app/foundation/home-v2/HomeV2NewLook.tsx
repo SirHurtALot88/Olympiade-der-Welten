@@ -276,6 +276,8 @@ export default function HomeV2NewLook({
   nextStepDetail,
   nextStepBlocked = false,
   warnings,
+  showTeamPickerCta = false,
+  onOpenTeamPicker,
   topPlayers,
   leagueHeatPools,
   facilities,
@@ -376,9 +378,14 @@ export default function HomeV2NewLook({
 
   return (
     <div className="nl-home" data-testid="foundation-home-v2" id="foundation-home-v2" data-new-look="true">
-      {/* --- Hero: NlCard-Kopfkarte, KPIs als StatChip-Portale --- */}
+      {/* FM26-inspiriertes Bento-Raster: variabel große Kacheln statt
+          gleichförmig gestapelter Karten. Rein visuelle Reorganisation —
+          alle Daten, Zähler, Reveal-Stagger und Interaktionen bleiben
+          identisch; nur der äußere Container ist jetzt ein Grid. */}
+      <div className="nl-home-bento">
+      {/* --- Hero: NlCard-Kopfkarte (große Bento-Kachel, volle Breite) --- */}
       <NlCard
-        className="nl-home-hero-card"
+        className="nl-home-hero-card nl-bento-item nl-bento-span-12 nl-bento-hero"
         data-testid="nl-home-hero"
         actions={
           <div className="nl-home-hero-next">
@@ -478,8 +485,27 @@ export default function HomeV2NewLook({
         </div>
       </NlCard>
 
+      {showTeamPickerCta ? (
+        <NlCard
+          className="nl-home-team-picker-cta"
+          data-testid="home-team-picker-cta"
+          eyebrow="Erster Schritt"
+          title="Wähle dein Team"
+          actions={
+            <button type="button" className="primary-button" onClick={onOpenTeamPicker}>
+              Team wählen
+            </button>
+          }
+        >
+          <p>
+            Noch steuert kein Team dieses Save. Wähle dein Team in den Team-Einstellungen, um Kader,
+            Transfers und Aufstellung selbst zu übernehmen.
+          </p>
+        </NlCard>
+      ) : null}
+
       {relevantWarnings.length > 0 ? (
-        <div className="nl-home-warning-row" aria-label="Hinweise">
+        <div className="nl-home-warning-row nl-bento-item nl-bento-span-12" aria-label="Hinweise">
           {relevantWarnings.slice(0, 3).map((warning) => (
             <span key={warning} className={`nl-home-warning-chip ${nlToneClass("warn")}`}>{warning}</span>
           ))}
@@ -488,7 +514,7 @@ export default function HomeV2NewLook({
 
       {/* --- Spieltag-Rail: Saisonpfad (vergangen · aktuell · kommend) --- */}
       {scheduleItems.length > 0 ? (
-        <nav className="nl-home-schedule-rail" aria-label="Saisonpfad">
+        <nav className="nl-home-schedule-rail nl-bento-item nl-bento-span-12" aria-label="Saisonpfad">
           <ol className="nl-home-schedule-track">
             {scheduleItems.map((item) => {
               const state = item.isCurrent ? "is-current" : item.isPast ? "is-past" : "is-upcoming";
@@ -510,15 +536,18 @@ export default function HomeV2NewLook({
         </nav>
       ) : null}
 
-      {/* --- Heute wichtig: 3 klickbare Entscheidungs-Karten --------- */}
-      <section className="nl-home-section" aria-label="Heute wichtig">
-        <div className="nl-home-section-head">
-          <span className="nl-home-section-icon"><IconBolt /></span>
-          <h3 className="nl-home-section-title">Heute wichtig</h3>
-        </div>
-        <div className="nl-home-today-grid">
-          {visibleTodayCards.map((card, index) => (
-            <div key={card.key} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+      {/* --- Heute wichtig: klickbare Entscheidungs-Karten als Bento-
+          Kacheln (erste Karte breiter/„primär", die übrigen kompakt) --- */}
+      <div className="nl-home-section-head nl-bento-item nl-bento-span-12 nl-bento-head" aria-label="Heute wichtig">
+        <span className="nl-home-section-icon"><IconBolt /></span>
+        <h3 className="nl-home-section-title">Heute wichtig</h3>
+      </div>
+      {visibleTodayCards.map((card, index) => (
+        <div
+          key={card.key}
+          className={`nl-reveal nl-bento-item ${index === 0 ? "nl-bento-span-6" : "nl-bento-span-3"}`}
+          style={{ "--nl-reveal-i": index } as CSSProperties}
+        >
               <NlCard
                 interactive
                 onClick={() => handleTodayCardClick(card.key)}
@@ -536,11 +565,9 @@ export default function HomeV2NewLook({
               </NlCard>
             </div>
           ))}
-        </div>
-      </section>
 
-      {/* --- Top-Kader: Top-6 Portraitkarten (wie im bestehenden Home) --- */}
-      <section className="nl-home-section" aria-label="Top-Kader">
+      {/* --- Top-Kader: Top-6 Portraitkarten (volle Bento-Breite) --- */}
+      <section className="nl-home-section nl-bento-item nl-bento-span-12" aria-label="Top-Kader">
         <div className="nl-home-section-head">
           <span className="nl-home-section-icon"><IconUsers /></span>
           <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
@@ -593,17 +620,18 @@ export default function HomeV2NewLook({
         )}
       </section>
 
-      {/* --- Team-Profil (#50) & Entwicklung (#51) ------------------- */}
+      {/* --- Team-Profil (#50) & Entwicklung (#51) — als Bento-Kacheln:
+          Radar als hohe Feature-Kachel (2 Rasterzeilen), Aufsteiger/
+          Risiken als breitere Nebenkachel. --------------------------- */}
       {teamAxisProfile.length > 0 || hasDevelopmentHighlights ? (
-        <section className="nl-home-section" aria-label="Team-Profil und Entwicklung">
-          <div className="nl-home-section-head">
+        <>
+          <div className="nl-home-section-head nl-bento-item nl-bento-span-12 nl-bento-head" aria-label="Team-Profil und Entwicklung">
             <span className="nl-home-section-icon"><IconTarget /></span>
             <h3 className="nl-home-section-title">Team-Profil &amp; Entwicklung</h3>
           </div>
-          <div className="nl-home-profile-grid nl-home-profile-grid-hero">
             {teamAxisProfile.length > 0 ? (
               <NlCard
-                className="nl-home-radar-card nl-home-radar-card-hero"
+                className="nl-home-radar-card nl-home-radar-card-hero nl-bento-item nl-bento-span-5 nl-bento-tall"
                 eyebrow={<span className="nl-home-card-eyebrow-icon"><IconUsers /> Achsen-Profil</span>}
                 title="Team-Stärke"
                 data-testid="nl-home-team-radar"
@@ -617,7 +645,7 @@ export default function HomeV2NewLook({
 
             {hasDevelopmentHighlights ? (
               <NlCard
-                className="nl-home-development-card"
+                className="nl-home-development-card nl-bento-item nl-bento-span-7"
                 eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBolt /> Entwicklung</span>}
                 title="Aufsteiger &amp; Risiken"
                 data-testid="nl-home-development"
@@ -646,14 +674,12 @@ export default function HomeV2NewLook({
                 </div>
               </NlCard>
             ) : null}
-          </div>
-        </section>
+        </>
       ) : null}
 
-      <div className="nl-home-grid">
         {/* --- Board-Ziele: echte current/target als ProgressBar ----- */}
         <NlCard
-          className="nl-home-board-card"
+          className="nl-home-board-card nl-bento-item nl-bento-span-5"
           eyebrow={<span className="nl-home-card-eyebrow-icon"><IconTarget /> Front Office</span>}
           title="Board-Ziele"
           actions={
@@ -707,7 +733,7 @@ export default function HomeV2NewLook({
 
         {/* --- Liga-Kurzkarte: Rang + Punkte, klick -> Saisonstand ---- */}
         <NlCard
-          className="nl-home-league-card"
+          className="nl-home-league-card nl-bento-item nl-bento-span-3"
           interactive
           onClick={onOpenSeason}
           eyebrow={<span className="nl-home-card-eyebrow-icon"><IconTrophy /> Liga</span>}
@@ -737,7 +763,7 @@ export default function HomeV2NewLook({
 
         {/* --- Entscheidungen: offene Inbox-Items mit Checkoff -------- */}
         <NlCard
-          className="nl-home-inbox-card"
+          className="nl-home-inbox-card nl-bento-item nl-bento-span-4"
           eyebrow={<span className="nl-home-card-eyebrow-icon"><IconInboxTray /> Entscheidungen</span>}
           title={
             <span className="nl-home-inbox-title">
@@ -790,7 +816,7 @@ export default function HomeV2NewLook({
         {/* --- Infrastruktur: reale Facility-Level -------------------- */}
         {facilities.length > 0 ? (
           <NlCard
-            className="nl-home-facility-card"
+            className="nl-home-facility-card nl-bento-item nl-bento-span-12"
             eyebrow={<span className="nl-home-card-eyebrow-icon"><IconBuilding /> Gebäude</span>}
             title="Infrastruktur"
             onClick={onOpenFacilities}

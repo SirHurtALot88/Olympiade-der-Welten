@@ -321,6 +321,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   cockpitBusyKey,
   commandSearch,
   commandSearchInputRef,
+  commitPlayerGeneratorDraft,
   completeSeasonBriefingAndContinue,
   confirmContractRenewalNegotiation,
   confirmFacilityMaintenance,
@@ -425,6 +426,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   isTransferMarketViewActive,
   isViewingArchivedSeason,
   leaguePlayerHeatPools,
+  leagueSetupStatus,
+  leagueSetupRetryBusy,
+  leagueSetupRetryError,
+  retryLeagueSetup,
   lineupDraftBoardView,
   lineupDraftBoardViewRequest,
   lineupFocusRequestKey,
@@ -461,6 +466,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   navigateToGameFlowStep,
   navigateToInboxItem,
   navigateToPrizeFinanceViewFromRouting,
+  navigateToTeamPicker,
   newGameBusy,
   newGameChrisTeamIds,
   newGameError,
@@ -895,6 +901,39 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       {persistenceError || saveSyncError ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{persistenceError ?? saveSyncError}</strong>
+        </div>
+      ) : null}
+      {leagueSetupStatus === "in_progress" ? (
+        <div
+          className="foundation-persistence-banner transfer-callout is-info"
+          role="status"
+          aria-live="polite"
+          data-testid="foundation-league-setup-banner"
+          data-league-setup-status="in_progress"
+        >
+          <strong>Liga wird erstellt … (KI-Teams werden befüllt)</strong>
+          <span>Das dauert rund eine Minute. Du kannst schon andere Ansichten öffnen — wir aktualisieren automatisch.</span>
+        </div>
+      ) : leagueSetupStatus === "failed" ? (
+        <div
+          className="foundation-persistence-banner transfer-callout is-warning"
+          role="alert"
+          data-testid="foundation-league-setup-banner"
+          data-league-setup-status="failed"
+        >
+          <strong>Liga-Setup fehlgeschlagen</strong>
+          <span>
+            {leagueSetupRetryError ?? "Die KI-Team-Kader konnten nicht automatisch befüllt werden."} Ohne KI-Kader kann Matchday 1 nicht gespielt werden.
+          </span>
+          <button
+            className="secondary-button inline-button"
+            type="button"
+            data-testid="foundation-league-setup-retry-button"
+            onClick={() => void retryLeagueSetup()}
+            disabled={leagueSetupRetryBusy}
+          >
+            {leagueSetupRetryBusy ? "Wird erneut versucht …" : "Erneut versuchen"}
+          </button>
         </div>
       ) : null}
       <FoundationShell
@@ -1750,6 +1789,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     ? formatCockpitReason(gameFlowActionStep.warnings[0])
                     : "Flow bereit — weiter zum nächsten Schritt.",
               warnings: homeWarnings.map(formatHomeWarningLabel),
+              // Friction fix (Generalprobe #2): a fresh save starts with no
+              // human-controlled team and no flow-blocker routes there — surface
+              // a dedicated CTA instead of the silently-hidden `no_active_team` chip.
+              showTeamPickerCta: manualTeams.length === 0,
+              onOpenTeamPicker: navigateToTeamPicker,
               topPlayers: homeV2TopPlayers,
               leagueHeatPools: leaguePlayerHeatPools,
               facilities: homeV2Facilities,
@@ -2329,6 +2373,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               readOnly={readMeta.readOnly}
               readSourceLabel={readSourceLabel}
               onSaveDrafts={savePlayerGeneratorDrafts}
+              onCommitDraft={commitPlayerGeneratorDraft}
             />
           </section>
 

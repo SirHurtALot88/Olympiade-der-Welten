@@ -137,6 +137,7 @@ export type TeamWriteAction =
   | "sponsor_choice"
   | "credit_borrow"
   | "credit_early_payoff"
+  | "player_generator_commit"
   | "team_identity_update"
   | "team_control_update";
 
