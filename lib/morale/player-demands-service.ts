@@ -419,8 +419,11 @@ function buildAppearanceDemand(input: {
     teamId: input.context.teamId,
     playerId: input.player.id,
     type: "appearances",
-    label: `${target} Einsätze`,
-    detail: `${input.player.name} will diese Season sichtbar eingebunden werden.`,
+    // Headline zeigt die SAISON-Einsätze (0 zu Saisonstart / MD1), das Ziel bleibt als
+    // Fortschritt sichtbar — nicht die All-Time-`appearances`. So liest sich der Chip am
+    // MD1 als "0/5 Einsätze" statt fälschlich "5 Einsätze".
+    label: `${current}/${target} Einsätze`,
+    detail: `${input.player.name} will diese Season sichtbar eingebunden werden (${current}/${target} Einsätze).`,
     targetValue: target,
     currentValue: current,
     status: current >= target ? "fulfilled" : current >= target - 1 ? "at_risk" : "open",

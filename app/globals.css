@@ -37059,8 +37059,99 @@ button.market-v2-bucket-card.is-selected {
 .foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-submeta {
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
+}
+
+/* NL roster portrait cards (Team-Profil "Kader / Portraits"): re-proportion so the
+   portrait image is the dominant element (well over half the card) and the whole stat
+   stack folds into a compact strip clearly under ~45% of the card height. Achieved by
+   (a) a taller hero, (b) a shorter opaque gradient so the top of the image stays clear,
+   and (c) tighter chips/rows. All data (OVR/PPs/MVS, CA/PO stars, MW/Gehalt/LZ,
+   POW/SPE/MEN/SOC, submeta, footer) stays visible — just condensed. */
+.foundation-player-portrait-card.is-full-art.is-team-layout {
+  --nl-portrait-stack-gap: 4px;
+  --nl-portrait-chip-pad-y: 2px;
+  --nl-portrait-chip-pad-x: 4px;
+  --nl-portrait-label-fs: 0.52rem;
+  --nl-portrait-value-fs: 0.68rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-hero {
+  aspect-ratio: 2 / 3;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-overlay-bottom {
+  gap: var(--nl-portrait-stack-gap);
+  padding: 12px 8px 8px;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 10, 18, 0) 0%,
+    rgba(6, 10, 18, 0.55) 42%,
+    rgba(6, 10, 18, 0.92) 72%,
+    rgba(6, 10, 18, 0.98) 100%
+  );
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-name {
+  font-size: 0.84rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-submeta {
+  font-size: 0.6rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat {
+  padding: var(--nl-portrait-chip-pad-y) var(--nl-portrait-chip-pad-x);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat small {
+  font-size: var(--nl-portrait-label-fs);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-stat strong {
+  font-size: var(--nl-portrait-value-fs);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .nl-portrait-ability-stars {
+  margin-top: 0;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-economy {
+  gap: 3px;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-economy-stat {
+  padding: var(--nl-portrait-chip-pad-y) var(--nl-portrait-chip-pad-x);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-economy-stat small {
+  font-size: var(--nl-portrait-label-fs);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-economy-stat strong {
+  font-size: var(--nl-portrait-value-fs);
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .foundation-player-portrait-economy-stat em {
+  font-size: 0.5rem;
+}
+
+/* Axis row folded into a slim strip: smaller chips, no vertical padding to spare. */
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay {
+  gap: 3px;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip {
+  padding: 2px 2px;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip small {
+  font-size: 0.5rem;
+}
+
+.foundation-player-portrait-card.is-full-art.is-team-layout .home-v2-player-orbit.is-overlay .velo-stat-orbit-chip strong {
+  font-size: 0.66rem;
 }
 
 .foundation-player-portrait-economy {
