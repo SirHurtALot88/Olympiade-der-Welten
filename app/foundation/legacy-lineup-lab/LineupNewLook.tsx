@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
 import { NlDeltaChip, NlRadar, formatNlNumber, type NlAxisKey } from "@/components/foundation/new-look";
@@ -791,6 +791,90 @@ export default function LineupNewLook({
   const verdictTimeoutRef = useRef<number | null>(null);
   const prevAssignPulseRef = useRef<number | undefined>(undefined);
 
+  /* --- Drag & Drop (progressive Enhancement der Klick-Zuweisung) ---------
+   * Kandidatenkarte → Formation-Slot (Drop ⇒ onAssignPlayer), sowie belegter
+   * Slot → Kader-Panel (Drop ⇒ onClearSlot). Klick-Pfad bleibt vollständig
+   * erhalten; DnD ist rein additiv und wird bei isReadOnly/isBusy deaktiviert.
+   */
+  const [dragCandidateId, setDragCandidateId] = useState<string | null>(null);
+  const [dragSourceSlotKey, setDragSourceSlotKey] = useState<string | null>(null);
+  const [dragOverSlotKey, setDragOverSlotKey] = useState<string | null>(null);
+  const [isRemovalHover, setIsRemovalHover] = useState(false);
+  const dndEnabled = !isReadOnly && !isBusy;
+
+  const clearDragState = () => {
+    setDragCandidateId(null);
+    setDragSourceSlotKey(null);
+    setDragOverSlotKey(null);
+    setIsRemovalHover(false);
+  };
+
+  // Kandidat aufnehmen (aus dem Kader) — Payload = activePlayerId.
+  const handleCandidateDragStart = (event: ReactDragEvent<HTMLElement>, candidateId: string | null | undefined) => {
+    if (!dndEnabled || !candidateId) {
+      event.preventDefault();
+      return;
+    }
+    setDragSourceSlotKey(null);
+    setDragCandidateId(candidateId);
+    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.setData("text/plain", candidateId);
+    event.dataTransfer.setData("application/x-nl-candidate", candidateId);
+  };
+
+  // Belegten Slot aufnehmen — Payload = Slot-Key (Drop im Kader ⇒ leeren).
+  const handleSlotDragStart = (event: ReactDragEvent<HTMLElement>, slotKey: string, playerId: string) => {
+    if (!dndEnabled || !playerId) {
+      event.preventDefault();
+      return;
+    }
+    setDragCandidateId(null);
+    setDragSourceSlotKey(slotKey);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", playerId);
+    event.dataTransfer.setData("application/x-nl-slot", slotKey);
+  };
+
+  // Slots akzeptieren nur Kandidaten-Drags (Zuweisung), keine Slot→Slot-Moves.
+  const handleSlotDragOver = (event: ReactDragEvent<HTMLElement>, slotKey: string) => {
+    if (!dndEnabled || !dragCandidateId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    if (dragOverSlotKey !== slotKey) setDragOverSlotKey(slotKey);
+  };
+
+  const handleSlotDragLeave = (slotKey: string) => {
+    if (dragOverSlotKey === slotKey) setDragOverSlotKey(null);
+  };
+
+  const handleSlotDrop = (event: ReactDragEvent<HTMLElement>, slotKey: string) => {
+    if (!dndEnabled) return;
+    const candidateId =
+      dragCandidateId ||
+      event.dataTransfer.getData("application/x-nl-candidate") ||
+      event.dataTransfer.getData("text/plain");
+    clearDragState();
+    if (!candidateId) return;
+    event.preventDefault();
+    onAssignPlayer(slotKey, candidateId);
+  };
+
+  // Kader-Panel ist Ablage-Zone zum Entfernen — nur für Slot-Drags aktiv.
+  const handleRemovalDragOver = (event: ReactDragEvent<HTMLElement>) => {
+    if (!dndEnabled || !dragSourceSlotKey) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (!isRemovalHover) setIsRemovalHover(true);
+  };
+
+  const handleRemovalDrop = (event: ReactDragEvent<HTMLElement>) => {
+    if (!dndEnabled || !dragSourceSlotKey) return;
+    event.preventDefault();
+    const slotKey = dragSourceSlotKey;
+    clearDragState();
+    onClearSlot(slotKey);
+  };
+
   // Verdikt-HUD: feuert auf jede echte Zuweisung (assignPulse aus updateSelection).
   // Der Vergleichswert ist die beste *verbleibende* Alternative für den Slot —
   // beantwortet direkt "Ist dieser Spieler klar der Beste für den Slot?".
@@ -1033,7 +1117,15 @@ export default function LineupNewLook({
               <article
                 key={`nl-lineup-slot-${slot.key}`}
                 id={`lineup-slot-${slot.key}`}
-                className={`nl-lineup-slot${player ? " is-filled" : " is-open"}${isActive ? " is-active" : ""}${isNextTarget ? " is-next" : ""}${isJustAssigned ? " is-just-assigned" : ""}`}
+                className={`nl-lineup-slot${player ? " is-filled" : " is-open"}${isActive ? " is-active" : ""}${isNextTarget ? " is-next" : ""}${isJustAssigned ? " is-just-assigned" : ""}${
+                  dndEnabled && dragCandidateId ? " is-drop-target" : ""
+                }${dragOverSlotKey === slot.key ? " is-drag-over" : ""}${dragSourceSlotKey === slot.key ? " is-dragging" : ""}`}
+                draggable={player && dndEnabled ? true : undefined}
+                onDragStart={player ? (event) => handleSlotDragStart(event, slot.key, selectedId) : undefined}
+                onDragEnd={player ? clearDragState : undefined}
+                onDragOver={(event) => handleSlotDragOver(event, slot.key)}
+                onDragLeave={() => handleSlotDragLeave(slot.key)}
+                onDrop={(event) => handleSlotDrop(event, slot.key)}
               >
                 <button type="button" className="nl-lineup-slot-hit" onClick={() => onActiveSlotChange(slot.key)}>
                   <span className="nl-lineup-slot-top">
@@ -1370,7 +1462,20 @@ export default function LineupNewLook({
             </div>
           </section>
 
-          <section className="nl-lineup-candidates" aria-label="Kader">
+          <section
+            className={`nl-lineup-candidates${dndEnabled && dragSourceSlotKey ? " is-removal-active" : ""}${
+              isRemovalHover ? " is-removal-hover" : ""
+            }`}
+            aria-label="Kader"
+            onDragOver={handleRemovalDragOver}
+            onDragLeave={() => setIsRemovalHover(false)}
+            onDrop={handleRemovalDrop}
+          >
+            {dndEnabled && dragSourceSlotKey ? (
+              <div className="nl-lineup-removal-overlay" aria-hidden="true">
+                Spieler hier ablegen, um den Slot zu leeren
+              </div>
+            ) : null}
             <header className="nl-lineup-candidates-head">
               <div className="nl-lineup-candidate-tabs" role="tablist">
                 {(
@@ -1426,9 +1531,20 @@ export default function LineupNewLook({
                     <button
                       key={`nl-candidate-${candidate.id}-${entry.groupKey}`}
                       type="button"
-                      className={`nl-lineup-candidate${isAssignedHere ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}`}
-                      disabled={isReadOnly || isBlocked || !candidateId || !activeSlot}
-                      title={isBlocked ? entry.detail : activeSlot ? `In ${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1} einsetzen` : entry.detail}
+                      className={`nl-lineup-candidate${isAssignedHere ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}${
+                        dragCandidateId === candidateId && candidateId ? " is-dragging" : ""
+                      }`}
+                      disabled={isReadOnly || isBlocked || !candidateId}
+                      draggable={dndEnabled && !isBlocked && Boolean(candidateId) ? true : undefined}
+                      title={
+                        isBlocked
+                          ? entry.detail
+                          : activeSlot
+                            ? `In ${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1} einsetzen (Klick) oder auf einen Slot ziehen`
+                            : "Auf einen Slot ziehen, um einzusetzen (oder Slot wählen und klicken)"
+                      }
+                      onDragStart={(event) => handleCandidateDragStart(event, candidateId)}
+                      onDragEnd={clearDragState}
                       onMouseEnter={() => setHoveredCandidateId(candidateId ?? null)}
                       onFocus={() => setHoveredCandidateId(candidateId ?? null)}
                       onClick={() => candidateId && activeSlot && onAssignPlayer(activeSlot.key, candidateId)}

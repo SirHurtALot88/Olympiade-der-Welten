@@ -89,4 +89,5 @@ export {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look/nl-tones";
+export { NlWhatIfSlider, type NlWhatIfSliderProps } from "@/components/foundation/new-look/NlWhatIfSlider";
 export { formatNlMoney } from "@/components/foundation/new-look/nl-format";

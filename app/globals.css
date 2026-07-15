@@ -53127,6 +53127,146 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* ========================================================================
+   Neuer Look — Einsatzliste Drag & Drop + Formation-Board (nl-lineup)
+   ------------------------------------------------------------------------
+   Additive Schicht über den bestehenden .nl-lineup-* Regeln:
+   - Formation-Feel: leichte Pitch-/Positions-Tönung je D1/D2-Seite
+     (nutzt die vorhandene --nl-lineup-side-tone-Bereichstönung).
+   - DnD-Affordances: Kandidat ziehen → Slot (Zuweisung), belegter Slot →
+     Kader-Panel (Leeren). Nur --nl-* Tokens, keine harten Farben.
+   Diese Sektion benennt/entfernt keine bestehenden Klassen.
+   ======================================================================== */
+
+/* --- Formation-Feel: Pitch-Tönung je Seite ------------------------------ */
+.is-new-look .nl-lineup-side {
+  position: relative;
+  isolation: isolate;
+}
+
+.is-new-look .nl-lineup-side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-lineup-side-tone) 9%, transparent), transparent 45%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 46px,
+      color-mix(in srgb, var(--nl-lineup-side-tone) 5%, transparent) 46px 47px
+    );
+}
+
+.is-new-look .nl-lineup-side > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Positions-Token-Feel: Slot-Kürzel als Pill, damit die Karten wie
+   Formations-Positionen lesen (Daten der Karte bleiben unverändert). */
+.is-new-look .nl-lineup-slot-index {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--nl-r-pill);
+  background: color-mix(in srgb, var(--nl-lineup-side-tone) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nl-lineup-side-tone) 40%, transparent);
+}
+
+/* --- DnD: Kandidatenkarte als Zieh-Quelle ------------------------------- */
+.is-new-look .nl-lineup-candidate[draggable="true"] {
+  cursor: grab;
+}
+
+.is-new-look .nl-lineup-candidate[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.is-new-look .nl-lineup-candidate.is-dragging {
+  opacity: 0.5;
+  border-style: dashed;
+  border-color: var(--nl-accent);
+  transform: none;
+}
+
+/* --- DnD: belegter Slot als Zieh-Quelle --------------------------------- */
+.is-new-look .nl-lineup-slot.is-filled[draggable="true"] {
+  cursor: grab;
+}
+
+.is-new-look .nl-lineup-slot.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+/* --- DnD: Slot als Drop-Ziel (nur bei aktivem Kandidaten-Drag) ---------- */
+.is-new-look .nl-lineup-slot.is-drop-target {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--nl-lineup-side-tone) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-lineup-side-tone) 22%, transparent);
+}
+
+/* Belegtes Ziel = Ersetzen-Hinweis (warnende Tönung statt Seiten-Ton). */
+.is-new-look .nl-lineup-slot.is-drop-target.is-filled {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 22%, transparent);
+}
+
+.is-new-look .nl-lineup-slot.is-drag-over {
+  border-style: solid;
+  border-color: var(--nl-lineup-side-tone);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nl-lineup-side-tone) 34%, transparent), var(--nl-e2);
+  transform: translateY(-2px);
+}
+
+.is-new-look .nl-lineup-slot.is-drag-over.is-filled {
+  border-color: var(--nl-warn);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nl-warn) 34%, transparent), var(--nl-e2);
+}
+
+/* --- DnD: Kader-Panel als Ablage-Zone zum Leeren ------------------------ */
+.is-new-look .nl-lineup-candidates {
+  position: relative;
+}
+
+.is-new-look .nl-lineup-candidates.is-removal-active {
+  outline: 1px dashed color-mix(in srgb, var(--nl-risk) 45%, transparent);
+  outline-offset: 3px;
+}
+
+.is-new-look .nl-lineup-removal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--nl-s4);
+  border-radius: var(--nl-r-lg);
+  border: 2px dashed color-mix(in srgb, var(--nl-risk) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-risk) 14%, var(--nl-panel));
+  color: var(--nl-risk);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.is-new-look .nl-lineup-candidates.is-removal-hover .nl-lineup-removal-overlay {
+  background: color-mix(in srgb, var(--nl-risk) 26%, var(--nl-panel));
+  border-color: var(--nl-risk);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-lineup-slot.is-drag-over {
+    transform: none;
+  }
+}
+
 /* --- Daten-Ansicht: kompakte klassische Tabelle (POW/SPE/MEN/SOC) + Aufklapp-Disziplinen --- */
 .is-new-look .nl-standings-table.is-compact {
   min-width: 720px;

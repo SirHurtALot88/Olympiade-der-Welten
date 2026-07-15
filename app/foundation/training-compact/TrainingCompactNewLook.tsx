@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/foundation/EmptyState";
 import FoundationPlayerPortraitPreview, {
   type FoundationPlayerPortraitPreviewProps,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber, useCountUp } from "@/components/foundation/new-look";
+import { NlCard, NlDeltaChip, NlWhatIfSlider, StatChip, StatChipRow, formatNlNumber, useCountUp } from "@/components/foundation/new-look";
 import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
@@ -759,6 +759,111 @@ function NlTrainingPlayerCard({
   );
 }
 
+/**
+ * What-if-Vorschau (FM26-Stil): der Manager zieht die Team-Intensität über die
+ * diskreten Stufen (Leicht/Mittel/Hart) und sieht LIVE, wie sich der projizierte
+ * Team-Trainings-Zuwachs, das Netto-SP und die Belastung verschieben würden —
+ * OHNE zu committen. Es ruft KEINE Handler auf; erst die echte Intensitäts-Rail
+ * darüber schreibt einen Modus.
+ *
+ * Datenquelle (keine neue Spielmathematik):
+ *  - `teamProjectionByMode` = bereits im View berechnete, potentialgewichtete
+ *    Summe der pro-Spieler-`buildTrainingIntensityProjection` (trainingGain + net).
+ *  - Baseline (`baselineNet`) = aktueller echter Team-Netto-Forecast (`teamKpis.net`).
+ *  - `baselineTrainingBudget` = aktuelle echte Summe `organicForecast.trainingSetpoints`.
+ *  - `regressionTotal` = konstanter Team-Regressions-Drag (intensitätsunabhängig,
+ *    siehe `buildTrainingIntensityProjection`) — bewusst als Kontext gezeigt.
+ */
+function NlTrainingWhatIf({
+  trainingModeOptions,
+  teamProjectionByMode,
+  squadSize,
+  baselineNet,
+  baselineTrainingBudget,
+  regressionTotal,
+  disabled,
+}: {
+  trainingModeOptions: TrainingCompactClientProps["trainingModeOptions"];
+  teamProjectionByMode: Map<PlayerTrainingMode, { trainingGain: number; net: number }>;
+  squadSize: number;
+  baselineNet: number;
+  baselineTrainingBudget: number;
+  regressionTotal: number;
+  disabled: boolean;
+}) {
+  const [modeIndex, setModeIndex] = useState<number>(() => {
+    const mid = trainingModeOptions.findIndex((option) => option.value === "mittel");
+    return mid >= 0 ? mid : 0;
+  });
+
+  if (trainingModeOptions.length === 0 || squadSize === 0) return null;
+
+  const clampedIndex = Math.min(Math.max(0, modeIndex), trainingModeOptions.length - 1);
+  const option = trainingModeOptions[clampedIndex];
+  const projected =
+    teamProjectionByMode.get(option.value) ?? { trainingGain: option.trainingSetpoints * squadSize, net: baselineNet };
+  const netDelta = projected.net - baselineNet;
+  const trainingDelta = projected.trainingGain - baselineTrainingBudget;
+  const fatigue = option.fatigueLoad * squadSize;
+  const valueText = `${option.label}: projizierter Trainings-Zuwachs +${formatVeloNumber(
+    projected.trainingGain,
+    1,
+  )} SP (${formatVeloSignedNumber(trainingDelta, 1)} SP), Netto ${formatVeloSignedNumber(
+    projected.net,
+    1,
+  )} SP (${formatVeloSignedNumber(netDelta, 1)} SP gegenüber aktuell)`;
+
+  return (
+    <NlWhatIfSlider
+      label="What-if: Team auf einen Modus ziehen"
+      value={clampedIndex}
+      min={0}
+      max={trainingModeOptions.length - 1}
+      step={1}
+      onChange={setModeIndex}
+      disabled={disabled}
+      formatValue={() => option.label}
+      valueText={valueText}
+      stops={trainingModeOptions.map((entry) => entry.label)}
+      hint="Live-Vorschau — verändert nichts. Zum Übernehmen die Intensitäts-Leiste oben nutzen."
+    >
+      <StatChipRow aria-label="What-if-Prognose: projizierter Trainings-Zuwachs, Netto, Belastung">
+        <StatChip
+          label="Trainings-Zuwachs"
+          value={`+${formatVeloNumber(projected.trainingGain, 1)} SP`}
+          sub={`${formatVeloSignedNumber(trainingDelta, 1)} SP ggü. aktuell`}
+          tone="accent"
+          title="Projizierter Team-Trainings-Zuwachs, wenn alle Spieler auf diesen Modus trainierten (Summe der pro-Spieler-Prognose, potentialgewichtet)."
+        />
+        <StatChip
+          label="Netto"
+          value={`${formatVeloSignedNumber(projected.net, 1)} SP`}
+          sub="Performance + Training − Regression"
+          tone={projected.net >= 0 ? "good" : "risk"}
+          title="Projizierter Team-Netto-Forecast bei diesem Modus. Positiv = Kader wächst im Schnitt."
+        />
+        <StatChip
+          label="Belastung"
+          value={formatVeloNumber(fatigue, 0)}
+          sub="Fatigue-Last (Verletzungsrisiko)"
+          tone="risk"
+          title="Aufsummierte Fatigue-Last dieses Modus über den Kader — höhere Intensität kostet mehr Regeneration."
+        />
+      </StatChipRow>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+        <NlDeltaChip
+          value={netDelta}
+          format={(n) => `${formatVeloSignedNumber(n, 1)} SP Netto`}
+          title="Veränderung des Team-Netto-Forecasts gegenüber der aktuellen Aufstellung."
+        />
+        <small className="nl-tnum" style={{ color: "var(--nl-mut)" }}>
+          Regression konstant {formatVeloSignedNumber(regressionTotal, 1)} SP (intensitätsunabhängig)
+        </small>
+      </div>
+    </NlWhatIfSlider>
+  );
+}
+
 export default function TrainingCompactNewLook({
   selectedTeam,
   selectedTeamControlMode,
@@ -860,6 +965,14 @@ export default function TrainingCompactNewLook({
     }
     return { performance, training, regression, net };
   }, [playerRows]);
+
+  // What-if-Baseline: aktuelles echtes Team-Trainingsbudget (Summe der bereits
+  // angewendeten `organicForecast.trainingSetpoints`) — Vergleichswert für die
+  // Live-Vorschau, keine neue Berechnung.
+  const currentTeamTrainingBudget = useMemo(
+    () => playerRows.reduce((sum, row) => sum + row.organicForecast.trainingSetpoints, 0),
+    [playerRows],
+  );
 
   // Hero-Zähler (#Wave2) für die 4 Header-Kacheln — reine Zähl-Animation,
   // keine neue Berechnung (identische Summen wie `teamKpis`).
@@ -985,6 +1098,17 @@ export default function TrainingCompactNewLook({
               </small>
             );
           })}
+        </div>
+        <div className="nl-training-team-preview" style={{ marginTop: "12px" }}>
+          <NlTrainingWhatIf
+            trainingModeOptions={trainingModeOptions}
+            teamProjectionByMode={teamProjectionByMode}
+            squadSize={playerRows.length}
+            baselineNet={teamKpis.net}
+            baselineTrainingBudget={currentTeamTrainingBudget}
+            regressionTotal={teamKpis.regression}
+            disabled={trainingModeReadOnly}
+          />
         </div>
       </NlCard>
 
