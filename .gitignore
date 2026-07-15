@@ -52,3 +52,6 @@ pnpm-debug.log*
 
 # Bulk-import staging for team logos (originals; renamed copies get committed)
 public/team-logos-src/
+
+# Temporary agent worktrees created by Claude Code (isolation: worktree)
+.claude/worktrees/
