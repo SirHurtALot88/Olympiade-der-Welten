@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCaptainRivalryPressureReduction,
   calculateMatchdayProjectedPreview,
   calculateSideSlotRoleModifierTotal,
   getMatchdayIntensityConfig,
@@ -395,6 +396,58 @@ describe("matchday slot roles", () => {
     expect(push.rivalryPressureModifier).toBe(1.5);
     expect(push.additionalFatigue).toBeGreaterThan(normal.additionalFatigue);
     expect(push.warnings).toContain("Rivalitaetsdruck: Push-Streuung +1.5");
+  });
+
+  it("applyCaptainRivalryPressureReduction reduces pressure multiplicatively and clamps at 0", () => {
+    expect(applyCaptainRivalryPressureReduction(1.5, 0)).toBe(1.5);
+    expect(applyCaptainRivalryPressureReduction(1.5, 24)).toBe(1.14);
+    expect(applyCaptainRivalryPressureReduction(1.5, 100)).toBe(0);
+    expect(applyCaptainRivalryPressureReduction(1.5, 250)).toBe(0);
+    expect(applyCaptainRivalryPressureReduction(1.5, null)).toBe(1.5);
+    expect(applyCaptainRivalryPressureReduction(1.5, undefined)).toBe(1.5);
+  });
+
+  it("a strong captain's rivalry pressure reduction lowers push variance and strain vs. no captain", () => {
+    const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
+    const attributeStats = {
+      power: 70,
+      health: 70,
+      stamina: 50,
+      intelligence: 45,
+      awareness: 45,
+      determination: 45,
+      speed: 45,
+      dexterity: 45,
+      charisma: 45,
+      will: 45,
+      spirit: 45,
+      torment: 70,
+    };
+    const rawPressure = 1.5;
+    // e.g. the strongest captains clamp to 24% reduction (team-captain-service.ts)
+    const captainReductionPct = 24;
+    const reducedPressure = applyCaptainRivalryPressureReduction(rawPressure, captainReductionPct);
+
+    const withoutCaptain = calculateMatchdayProjectedPreview({
+      baseScore: 65,
+      role,
+      attributeStats,
+      currentFatigueCount: 5,
+      intensity: "push",
+      rivalryPressure: rawPressure,
+    });
+    const withCaptain = calculateMatchdayProjectedPreview({
+      baseScore: 65,
+      role,
+      attributeStats,
+      currentFatigueCount: 5,
+      intensity: "push",
+      rivalryPressure: reducedPressure,
+    });
+
+    expect(reducedPressure).toBeLessThan(rawPressure);
+    expect(withCaptain.rivalryPressureModifier).toBeLessThan(withoutCaptain.rivalryPressureModifier);
+    expect(withCaptain.additionalFatigue).toBeLessThanOrEqual(withoutCaptain.additionalFatigue);
   });
 
   it("feeds resolve scoring with the same slot role modifier total used in preview", () => {

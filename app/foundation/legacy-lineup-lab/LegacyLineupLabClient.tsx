@@ -38,8 +38,9 @@ import {
   buildLegacyLineupLabSlots,
   findDuplicateActivePlayerSelections,
 } from "@/lib/lineups/legacy-lineup-lab";
-import { buildLineupPlayerDemandMap } from "@/lib/morale/player-demands-service";
+import { buildLineupPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import {
+  applyCaptainRivalryPressureReduction,
   calculateMatchdayProjectedPreview,
   getMatchdayIntensityConfig,
   resolveSlotRolesForDiscipline,
@@ -3095,15 +3096,24 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }, 12000);
   }, [props.focusMissingRequestKey, props.highlightMissingSlots, selections, slots]);
 
+  const activeTeamCaptain = useMemo(() => {
+    const gameStateForCaptain = props.embeddedGameState ?? context?.gameState ?? null;
+    const teamId = context?.teamId ?? params.teamId;
+    if (!gameStateForCaptain || !teamId) return null;
+    return selectTeamCaptain(gameStateForCaptain, teamId);
+  }, [props.embeddedGameState, context?.gameState, context?.teamId, params.teamId]);
+
   const rivalryPressureByDiscipline = useMemo(() => {
+    const rivalryPressureReductionPct = activeTeamCaptain?.effects.rivalryPressureReductionPct ?? 0;
     return Object.fromEntries(
       Object.entries(context?.teamPowerWindows ?? {}).map(([disciplineId, window]) => {
         const topRank = Math.min(...(window?.top8Rivals ?? []).map((rival) => rival.rank));
         const pressure = Number.isFinite(topRank) ? (topRank <= 3 ? 1.5 : 1) : 0;
-        return [disciplineId, pressure] as const;
+        // "Ruhepol" captain effect: a strong captain calms rivalry-driven push strain.
+        return [disciplineId, applyCaptainRivalryPressureReduction(pressure, rivalryPressureReductionPct)] as const;
       }),
     );
-  }, [context?.teamPowerWindows]);
+  }, [context?.teamPowerWindows, activeTeamCaptain]);
   const getRivalryPressureForDiscipline = (disciplineId: string | null | undefined) =>
     disciplineId ? rivalryPressureByDiscipline[disciplineId] ?? 0 : 0;
 
