@@ -1,0 +1,5 @@
+.local-fixtures/
+node_modules/
+.next/
+data/
+*.sqlite
