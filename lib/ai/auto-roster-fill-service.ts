@@ -355,6 +355,9 @@ function buildRosterFillCandidates(input: {
     seasonId: input.seasonId,
     teamId: input.team.teamId,
     limit: input.limit,
+    // Rank the full free-agent pool by THIS team's identity fit before slicing, so a POW+MEN team's
+    // candidates are POW/MEN players (not a generic diversity cross-section that lets it draft speed stars).
+    rankByTeamFit: true,
     localRunContext: input.localRunContext,
   });
 
