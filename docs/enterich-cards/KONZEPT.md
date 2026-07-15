@@ -140,8 +140,8 @@ Nicht-Ziel (v1): kein Warenwirtschafts-Ersatz, keine direkte eBay-/Cardmarket-Sc
 - **Next.js (App Router) + TypeScript**, gleiche Basis wie die Oly → maximale Wiederverwendung
   von Design-Tokens, Chart-Komponenten und Deploy-Pipeline.
 - **Als eigenständige App / eigener Container** (nicht als Route innerhalb der Oly), damit sie
-  „nicht direkt mit der Oly verknüpft" ist. Empfehlung: eigenes Verzeichnis `apps/enterich/`
-  (oder eigenes Repo) mit eigenem Dockerfile.
+  „nicht direkt mit der Oly verknüpft" ist. **Verzeichnis: `apps/LEC/`** (im Oly-Repo, eigenes
+  Dockerfile). **Greenfield-Neubau** – die alte App war nur rudimentär und wird nicht übernommen.
 - **Datenhaltung**: SQLite (wie Oly, `OLY_APP_SQLITE_PATH`-Muster) reicht völlig – kleine
   Datenmengen, Single-User. Prisma-Schema analog.
 
@@ -150,18 +150,17 @@ Der Server nutzt heute Caddy als Reverse-Proxy (`deploy/hetzner/Caddyfile`):
 ```
 {$OLY_DOMAIN} { reverse_proxy oly-app:3000 }
 ```
-**Empfehlung: eigene Subdomain** (z. B. `cockpit.<deine-domain>` oder eine komplett separate
-Domain), damit optisch/URL-seitig keine Verbindung zur Oly besteht:
+**Subdomain: `LEC`** (z. B. `lec.<deine-domain>`) – URL-seitig keine Verbindung zur Oly:
 ```
-{$ENTERICH_DOMAIN} { reverse_proxy enterich-app:3000 }
+{$LEC_DOMAIN} { reverse_proxy lec-app:3000 }
 ```
 + zweiter Service in `docker-compose.yml`:
 ```yaml
-enterich-app:
-  build: { context: ../../apps/enterich, dockerfile: Dockerfile }
+lec-app:
+  build: { context: ../../apps/LEC, dockerfile: Dockerfile }
   restart: unless-stopped
-  environment: { NODE_ENV: production, PORT: "3000", ENTERICH_SQLITE_PATH: /app/data/enterich.sqlite }
-  volumes: [ enterich-data:/app/data ]
+  environment: { NODE_ENV: production, PORT: "3000", LEC_SQLITE_PATH: /app/data/lec.sqlite }
+  volumes: [ lec-data:/app/data ]
   expose: [ "3000" ]
 ```
 - **Zugangsschutz**: gleiches optionale Login-Muster wie Oly (`OLY_AUTH_*`) übernehmen – die
@@ -272,12 +271,14 @@ plus die **Angebotsliste** (Preis × verfügbare Menge je Verkäufer, DE/NM gefi
 Bezugs-Optionen:
 | Option | Beschreibung | Bewertung |
 |--------|--------------|-----------|
-| **A – Offizielle MKM-API** | OAuth-1.0a-API für **gewerbliche** Verkäufer, liefert Produkt-IDs + Preis-Guide (Trend/Low/Avg). | **Ziel-Lösung.** Legal & stabil; Enterich ist Gewerbe → antragsberechtigt. Keys beantragen. |
-| **B – Manueller/halbautomatischer Abgleich** | Chris schickt die Cardmarket-Produkt-URL/-Daten (bzw. Preisliste), App verarbeitet. | **v1-Fallback**, sofort machbar, passt zum „schick-mir-die-Dateien"-Workflow. |
+| **B – Manueller/halbautomatischer Abgleich** | Chris liefert die Cardmarket-Preisdaten (Produkt-URL bzw. kopierte Preisfelder / Preisliste), App verarbeitet & rechnet. | **Der Weg für v1** – Chris hat **keine API**. Passt zum „schick-mir-die-Daten"-Workflow. |
+| **A – Offizielle MKM-API** | OAuth-1.0a-API für gewerbliche Verkäufer, liefert Preis-Guide automatisch. | Später, **nur falls Chris den Zugang doch bekommt** (aktuell nicht vorhanden). |
 | **C – Scraping** | HTML parsen. | **Nicht empfohlen** (ToS-Verstoß, Cloudflare). |
 
 Empfehlung: austauschbarer `MarketPriceProvider` (Interface: `getPrice(setCode, lang=DE) →
-{available, from, trend, avg30, avg7, avg1, offers[]}`). v1 = Provider B, v1.5 = Provider A.
+{available, from, trend, avg30, avg7, avg1, offers[]}`). **v1 = Provider B** (manuelle/übergebene
+Preisdaten). Damit ist die Preis-Engine sofort nutzbar; ein API-Provider ließe sich später ohne
+UI-Änderung hinter dasselbe Interface hängen.
 
 ### 7.2 EK-Ableitung aus Cardmarket (verfügbarkeitsabhängig)
 
@@ -289,6 +290,12 @@ Als Regel für die App: von den DE/NM-Angeboten aufsteigend die günstigsten auf
 benötigte Menge (Pack-Größe, ggf. × Sicherheitsfaktor) gedeckt ist → gewichteter Roh-EK je Karte;
 × Pack-Größe = Pack-EK. `amount`-Parameter der URL entspricht genau dieser „genug verfügbar"-Idee.
 (Das Blatt `EK Calc` macht heute die gewichtete Mischkalkulation `Σ(Anzahl×Preis)/ΣAnzahl` manuell.)
+
+> **Wichtig (von Chris):** Der Cardmarket-Preis ist nur der **Waren-Rohpreis**. **Einkaufs-Versand
+> muss obendrauf** – hinterlegt in `cost_settings` (heute: <5 Stk → 1,15/Menge, sonst 1,30/Menge;
+> beim Pack 1,30/Menge×3). Der so ermittelte EK inkl. Einkaufs-Versand geht dann in den HK-Aufbau
+> (§7.3). Und der **VK trägt die eBay-Gebühren-%** (Provision + Anzeigen, §7.3) – beide dürfen in der
+> Kalkulation nie fehlen.
 
 ### 7.3 VK-Kalkulation – Chris' exakte Formeln (aus `VK Preis Kalkulator`)
 
@@ -367,10 +374,9 @@ ob neu geschnürte Lots aktuell tatsächlich noch drehen (30/90d-Velocity), bevo
 
 ## 10. Roadmap – konkrete Arbeitspakete für Sonnet
 
-**Phase 0 – Setup & Klärung**
-- [ ] Klären: existiert lokal (`Dokumente/codex`) schon App-Code? Wenn ja → in den Branch pushen.
-- [ ] App-Gerüst `apps/enterich/` (Next.js + TS + Prisma/SQLite), Dockerfile, `.env.example`.
-- [ ] Caddy-/compose-Eintrag + Subdomain-Vorschlag (§4.2) dokumentieren (noch nicht live schalten).
+**Phase 0 – Setup**
+- [ ] App-Gerüst `apps/LEC/` (Next.js + TS + Prisma/SQLite), Dockerfile, `.env.example` (greenfield).
+- [ ] Caddy-/compose-Eintrag für Subdomain `LEC` (§4.2) vorbereiten (noch nicht live schalten).
 
 **Phase 1 – Datenfundament**
 - [ ] Prisma-Schema nach §5.4.
@@ -401,14 +407,53 @@ ob neu geschnürte Lots aktuell tatsächlich noch drehen (30/90d-Velocity), bevo
 
 ---
 
-## 11. Offene Entscheidungen (bitte vor Phase 1 bestätigen)
+## 11. Entscheidungen (mit Chris geklärt)
 
-1. **Bestehende App?** Liegt in `Dokumente/codex` schon Code, auf dem aufgebaut werden soll,
-   oder baut Sonnet greenfield? (Aktuell im Repo: kein Code → Annahme greenfield.)
-2. **Sub-Link-Form:** eigene **Subdomain** (empfohlen) vs. Pfad unter bestehender Domain –
-   und welcher Name (z. B. `cockpit.…`)?
-3. **Eigenes Repo vs. `apps/enterich/` im Oly-Repo?** (Empfehlung: gleiches Repo, eigener
-   Ordner + eigener Container – teilt Deploy-Infra, bleibt aber URL-seitig getrennt.)
-4. **Cardmarket:** API-Zugang beantragen (Option A) oder v1 rein über CSV-Import (Option B)?
+- ✅ **Greenfield-Neubau** unter `apps/LEC/` (die alte App war nur rudimentär, wird nicht übernommen).
+- ✅ **Eigene Subdomain `LEC`** (`lec.<domain>`) – URL-seitig getrennt von der Oly, gleicher Server.
+- ✅ **Im Oly-Repo** (`apps/LEC/`), eigener Container – teilt Deploy-Infra, bleibt aber getrennt.
+- ✅ **Cardmarket: keine API vorhanden** → v1 über Provider B (übergebene Preisdaten, §7.1).
+- ✅ **Leitquelle** = Billbee-Exporte (30/90/365d) + eBay-Gebühren, **Matching über Artikelname**
+  (in den Beispieldateien 98 % exakt, §12).
+- ✅ **Privatverkäufe** (Nicht-Karten wie Elektronik/Schmuck über denselben Shop-Account) werden aus
+  der Karten-Analytics **ausgefiltert** – über Billbee-Match/Set-Code, nicht über eBay-Kategorie (§12).
 
-*Geklärt:* Leitquelle = **Billbee-Exporte** (30/90/365d) + eBay-Gebühren, Matching über Artikelname.
+---
+
+## 12. Rohdaten-Referenz (aus echten Beispiel-Exporten)
+
+Chris liefert diese Dateien; die App muss genau diese Formate parsen. (Andere Zeiträume analog –
+Chris kann 30/90/365d-Varianten ergänzen.)
+
+### 12.1 Billbee „Verkäufe nach Artikel" (`salesbyarticle.xlsx`)
+- **Vorspann** Zeilen 0–6: Titel, `Gedruckt am`, **`Zeitraum: 15.06.2026 - 15.07.2026`** (← das
+  Fenster steckt hier drin, daraus 30/90/365d ableiten!), `Preise: Brutto`.
+- **Header in Zeile 7:** `SKU · Artikel · (leer) · (leer) · USt. Index · (leer) · Anzahl · Summe · EK · (leer) · Marge`
+- **Datenzeilen ab 8:** `Artikel` (Kartenname, Spalte 1) · `Anzahl` (verkauft) · `Summe` (Umsatz brutto)
+  · `EK` (Einkaufswert) · `Marge` (= Summe − EK). SKU meist leer.
+- Beispiel: `Yu-Gi-Oh! RA04-… | Anzahl 3 | Summe 89,97 € | EK 25,50 € | Marge 64,47 €`.
+- **Das ist die linke Seite des DB-Modells** (bis DB I); variable Kosten (Versand/Gebühren) kommen aus
+  eBay + `cost_settings`. **Menge-Präfix `3x`** im Namen = Pack-Größe separat erfassen.
+
+### 12.2 eBay „Listings Sales Report" (`eBay…Report….csv`)
+- **Vorspann** Zeilen 0–10: Ausschlussklauseln + **`Bericht vom 1. Jan 2026 bis 15. Jul 2026`** +
+  Hinweis auf **Abonnementgebühren** (hier 665,98 €, kontobasiert – NICHT je Artikel; als Fixkosten
+  behandeln).
+- **Header in Zeile 11 (27 Spalten):** `Angebotstitel · eBay-Artikelnummer · Shop-Kategorie L1 · L2 ·
+  Verkaufte Stückzahl · Gesamtumsatz (inkl. Steuern) · Umsatz ohne Versand · gezahlte Versandkosten ·
+  Verkaufskosten gesamt · Angebotsgebühren · Optionale Gebühren · **Verkaufsprovisionen** · Gebühren
+  Basis-/Premium-/Express-/externe **Anzeigen** · Internationale Gebühren · Sonstige · … ·
+  Gebührengutschriften · Kosten Versandetiketten · Umsatz nach Kosten · Ø Verkaufspreis · …`
+- **Das ist die Gebühren-Seite** je Angebot → liefert die variablen eBay-Kosten für DB II.
+
+### 12.3 Matching & Filter (verifiziert an den Beispieldateien)
+- **Join-Schlüssel = Artikelname** (`Billbee.Artikel` == `eBay.Angebotstitel`), normalisiert
+  (trim, Mehrfach-Leerzeichen, Groß/Klein). In den Beispielen: **167/171 = 98 % exakt** gematcht;
+  die 4 Reste (z. B. „Mystery Pack", 3 Singles) → Review-Liste.
+- **Set-Code als Zweitschlüssel:** 162/171 Billbee-Artikel tragen einen Set-Code im Namen.
+- **Privatverkäufe ausfiltern:** eBay-`Shop-Kategorie` ist unbrauchbar (≈ 80 % der Karten stehen unter
+  „Sonstiges"). Stattdessen als Karte gilt nur, was einen Set-Code/Yu-Gi-Oh-Marker trägt **oder** in
+  Billbee als Artikel existiert. Nicht-Karten (Elektronik, Schmuck, Münzen – Chris' gelegentliche
+  Privatverkäufe, in der Stichprobe 16 Stück) fallen damit automatisch raus.
+- **eBay-Abonnementgebühr** (kontobasiert, ~666 €/Zeitraum) ist keine Artikelgebühr → als Fixkosten
+  in die Betriebsausgaben, nicht je Artikel verteilen.
