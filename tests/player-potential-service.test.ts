@@ -33,18 +33,19 @@ describe("player potential service", () => {
 
     expect(potential.scoutRating).toBe(90);
     expect(potential.potentialRange).toEqual({ min: 82, max: 98 });
-    expect(potential.starRating).toBe("4.5 Sterne");
+    expect(potential.starRating).toBe("5.0 Sterne");
     expect(potential.band).toBe("elite");
     expect(potential.ceilingMode).toBe("soft_range_no_hard_ceiling");
   });
 
   it("maps potential ranges to FM-style min/max star slots", () => {
-    expect(potentialScoreToStars(72)).toBe(3.5);
-    expect(potentialScoreToStars(99)).toBe(5);
-    expect(shouldShowPotentialRangeStars(72, 99)).toBe(true);
+    // Recalibrated percentile-anchored CA/PO star curve: 54 (~p75) → 3.5★, 78+ (~p99) → 5★.
+    expect(potentialScoreToStars(54)).toBe(3.5);
+    expect(potentialScoreToStars(78)).toBe(5);
+    expect(shouldShowPotentialRangeStars(54, 78)).toBe(true);
     expect(shouldShowPotentialRangeStars(88, 93)).toBe(false);
 
-    const slots = buildPotentialRangeStarSlots(72, 99);
+    const slots = buildPotentialRangeStarSlots(54, 78);
     expect(slots[3]).toMatchObject({ minFill: 0.5, maxFill: 1, showUncertain: true });
     expect(slots[4]).toMatchObject({ minFill: 0, maxFill: 1, showUncertain: true });
   });

@@ -153,15 +153,48 @@ export function getPotentialBand(potential: number): PlayerPotentialBand {
   return "low";
 }
 
+/**
+ * PERCENTILE-anchored CA/PO star curve (recalibrated to the MEASURED league).
+ *
+ * The old curve assumed CA/PO scores spanned 35–99 and mapped 35→2.0★, 99→5.0★.
+ * The real catalog (data/generated/oly-player-stats.json, n=2984) is far lower and
+ * denser: computeCurrentAbilityScore + player.potential both cluster ~30–78 with
+ *   p5≈29  p25≈39  p50≈46  p75≈54  p90≈62  p95≈68  p99≈78
+ * so a genuinely above-average CA of 58 rendered only ~2.5★ and could not be told
+ * apart from a mid player. The anchors below track that distribution (same
+ * breakpoints used by the grade/color tiers on the per-axis scale in
+ * arena-stat-visuals.ts), so a mid player looks mid and a strong one looks strong:
+ *   p50 (~46) → ~2.75★ · p75 (~54) → 3.5★ · p90 (~62) → 4.0★ · p95 (~68) → 4.5★ ·
+ *   p99+ (≥78) → 5.0★, low outliers floor at 1.5★.
+ * Monotonic, piecewise-linear, continuous (fine-grained so CA 58 → ~3.75★ reads as
+ * clearly above average). PO uses the same curve on its higher scores → saturates
+ * cleanly at the 5★ ceiling. Signature/return type unchanged.
+ */
+const CA_PO_STAR_ANCHORS: ReadonlyArray<readonly [score: number, stars: number]> = [
+  [30, 1.5],
+  [39, 2.0],
+  [46, 2.75],
+  [54, 3.5],
+  [62, 4.0],
+  [68, 4.5],
+  [78, 5.0],
+];
+
 export function potentialScoreToStars(score: number) {
-  const normalized = clamp(Math.round(score), 35, 99);
-  if (normalized >= 94) return 5.0;
-  if (normalized >= 88) return 4.5;
-  if (normalized >= 80) return 4.0;
-  if (normalized >= 72) return 3.5;
-  if (normalized >= 64) return 3.0;
-  if (normalized >= 56) return 2.5;
-  return 2.0;
+  const value = clamp(score, 0, 99);
+  const first = CA_PO_STAR_ANCHORS[0]!;
+  const last = CA_PO_STAR_ANCHORS[CA_PO_STAR_ANCHORS.length - 1]!;
+  if (value <= first[0]) return first[1];
+  if (value >= last[0]) return last[1];
+  for (let index = 1; index < CA_PO_STAR_ANCHORS.length; index += 1) {
+    const [hiScore, hiStars] = CA_PO_STAR_ANCHORS[index]!;
+    if (value <= hiScore) {
+      const [loScore, loStars] = CA_PO_STAR_ANCHORS[index - 1]!;
+      const t = (value - loScore) / (hiScore - loScore);
+      return roundValue(loStars + t * (hiStars - loStars), 2);
+    }
+  }
+  return last[1];
 }
 
 export type PotentialRangeStarSlot = {
