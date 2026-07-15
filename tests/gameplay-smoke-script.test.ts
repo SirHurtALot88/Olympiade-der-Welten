@@ -1,9 +1,10 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const scriptPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/smoke-gameplay.ts";
-const packagePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/package.json";
+const scriptPath = path.join(process.cwd(), "scripts/smoke-gameplay.ts");
+const packagePath = path.join(process.cwd(), "package.json");
 
 describe("gameplay smoke script contract", () => {
   it("exposes read-only and explicit write gameplay smoke commands", async () => {

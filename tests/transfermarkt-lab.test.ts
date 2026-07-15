@@ -4,7 +4,7 @@ import { getTransfermarktLabMode, getTransfermarktPortraitModel, isBrowserSafePo
 
 describe("transfermarkt lab helpers", () => {
   it("treats filesystem portrait paths as unresolved", () => {
-    expect(isBrowserSafePortrait("/Users/chrisfalk/test.jpg")).toBe(false);
+    expect(isBrowserSafePortrait("/Users/example/test.jpg")).toBe(false);
     expect(isBrowserSafePortrait("https://example.com/test.jpg")).toBe(true);
     expect(isBrowserSafePortrait("/images/test.jpg")).toBe(true);
   });
@@ -27,7 +27,7 @@ describe("transfermarkt lab helpers", () => {
       menTier: "F",
       socTier: "F",
       topDisciplineScores: [],
-      portraitPath: "/Users/chrisfalk/test.jpg",
+      portraitPath: "/Users/example/test.jpg",
       portraitUrl: null,
       imageUrl: null,
       availabilityReason: "free_agent",

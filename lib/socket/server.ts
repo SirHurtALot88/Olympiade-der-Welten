@@ -19,6 +19,10 @@ import {
   startRoom,
 } from "@/lib/room/room-store";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
+// WICHTIG: aus lib/auth/session-cookie importieren, NICHT aus lib/auth/session -
+// letzteres importiert next/headers, was hier (server.ts laedt dieses Modul vor
+// der Next.js-App-Initialisierung) zum Absturz fuehrt. Siehe Kommentar dort.
+import { getSessionUserFromCookieHeader } from "@/lib/auth/session-cookie";
 import type { ClientToServerEvents, EndTurnRequest, MoveTokenRequest, ServerToClientEvents } from "@/types/events";
 import type { CoachRole } from "@/types/game";
 
@@ -75,8 +79,14 @@ export function ensureSocketServer(httpServer: HttpServer) {
   });
 
   io.on("connection", (socket) => {
+    // Phase-1-Login (nur aktiv bei OLY_AUTH_ENABLED=1): die Session kommt aus dem
+    // Cookie des Handshake-Requests, nicht aus dem Client-Payload - so kann sich
+    // niemand per createRoom/joinRoom-Payload als eine andere Person ausgeben.
+    // Bei deaktiviertem Login ist sessionUser immer null (unveraendertes Verhalten).
+    const sessionUser = getSessionUserFromCookieHeader(socket.handshake.headers.cookie);
+
     socket.on("createRoom", (payload) => {
-      const { room, seat } = createRoom(socket.id, payload);
+      const { room, seat } = createRoom(socket.id, payload, sessionUser);
       const participant = room.state.roomParticipants.find((entry) => entry.participantId === seat.participantId)!;
       socket.join(room.roomCode);
       socket.emit("roomJoined", {
@@ -91,7 +101,7 @@ export function ensureSocketServer(httpServer: HttpServer) {
     });
 
     socket.on("joinRoom", ({ roomCode, displayName }) => {
-      const result = joinRoom(roomCode, socket.id, { displayName });
+      const result = joinRoom(roomCode, socket.id, { displayName }, sessionUser);
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;

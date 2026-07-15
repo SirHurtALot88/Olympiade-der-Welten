@@ -1,12 +1,13 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const veloUiPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/components/foundation/velo-ui";
-const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const veloUiPath = path.join(process.cwd(), "components/foundation/velo-ui");
+const globalsPath = path.join(process.cwd(), "app/globals.css");
+const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
 const teamsDetailPanelPath =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx";
+  path.join(process.cwd(), "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx");
 
 describe("velo ui rollout contract", () => {
   it("exports shared velo components", async () => {
@@ -33,9 +34,9 @@ describe("velo ui rollout contract", () => {
 
   it("wires velo rollout across lineup, arena, drawer and facilities", async () => {
     const [lineupText, arenaText, drawerText, cssText] = await Promise.all([
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/PlayerDetailDrawer.tsx", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/PlayerDetailDrawer.tsx"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -53,7 +54,7 @@ describe("velo ui rollout contract", () => {
 
   it("keeps draft intensity preview data for form board while removing duplicate header strip", async () => {
     const lineupText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
       "utf8",
     );
     expect(lineupText).toContain("draftIntensityPreview");

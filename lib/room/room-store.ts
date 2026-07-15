@@ -114,6 +114,11 @@ export function createRoom(
     saveId?: string | null;
     preset?: RoomOwnershipPreset | null;
   },
+  // Phase-1-Login (nur bei OLY_AUTH_ENABLED=1 gesetzt): wenn eine Session
+  // vorliegt, gewinnt die echte Identitaet gegenueber dem frei eingegebenen
+  // Anzeigenamen und der zufaelligen userId. Bei deaktiviertem Login ist dieser
+  // Parameter immer null/undefined und das Verhalten bleibt unveraendert.
+  sessionUser?: { displayName: string; ownerId: string } | null,
 ) {
   let roomCode = createRoomCode();
 
@@ -127,8 +132,8 @@ export function createRoom(
     state: createInitialRoomState(roomCode, {
       saveId: input?.saveId,
       hostParticipantId: participantId,
-      hostUserId: `user-${participantId}`,
-      hostDisplayName: input?.displayName?.trim() || "Chris",
+      hostUserId: sessionUser?.ownerId || `user-${participantId}`,
+      hostDisplayName: sessionUser?.displayName || input?.displayName?.trim() || "Chris",
     }),
     seats: {
       A: buildSeat("A", socketId, participantId),
@@ -149,7 +154,13 @@ export function createRoom(
   };
 }
 
-export function joinRoom(roomCode: string, socketId: string, input?: { displayName?: string | null }) {
+export function joinRoom(
+  roomCode: string,
+  socketId: string,
+  input?: { displayName?: string | null },
+  // Phase-1-Login (nur bei OLY_AUTH_ENABLED=1 gesetzt), siehe createRoom() oben.
+  sessionUser?: { displayName: string; ownerId: string } | null,
+) {
   const normalizedCode = roomCode.trim().toUpperCase();
   const room = runtimeRooms.get(normalizedCode);
 
@@ -161,19 +172,20 @@ export function joinRoom(roomCode: string, socketId: string, input?: { displayNa
     return { ok: false as const, error: "Der Raum hat bereits zwei aktive Coaches." };
   }
 
+  const resolvedDisplayName = sessionUser?.displayName || input?.displayName?.trim() || "Franky";
   const participantId = `participant-${crypto.randomUUID()}`;
   room.seats.B = buildSeat("B", socketId, participantId);
   room.state.roomParticipants = [
     ...room.state.roomParticipants,
     buildParticipant({
       participantId,
-      userId: `user-${participantId}`,
-      displayName: input?.displayName?.trim() || "Franky",
+      userId: sessionUser?.ownerId || `user-${participantId}`,
+      displayName: resolvedDisplayName,
       role: "player",
     }),
   ];
   room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
-  room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: input?.displayName?.trim() || "Franky" });
+  room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: resolvedDisplayName });
   room.state.actionLog.push(
     createActionLogEntry({
       turnNumber: room.state.turnNumber,

@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -6,12 +7,12 @@ describe("season standings v2 ui contract", () => {
   it("opens in data table view with gm board and no cards tab", async () => {
     const [seasonText, shellRouterBodyText, shellRouterBodyScopeText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/season-v2/SeasonStandingsV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsV2Client.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+        path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"),
         "utf8",
       ),
     ]);
@@ -36,10 +37,10 @@ describe("season standings v2 ui contract", () => {
   it("exposes sprint M form curve, mobile cards, prize preview, and pinned sticky team", async () => {
     const [seasonText, cssText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/season-v2/SeasonStandingsV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/season-v2/SeasonStandingsV2Client.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
     ]);
 
     expect(seasonText).toContain("season-v2-form-curve");
@@ -57,10 +58,10 @@ describe("season standings v2 ui contract", () => {
   it("exposes transfer history timeline layout toggle", async () => {
     const [historyText, cssText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfer-history-v2/TransferHistoryV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/transfer-history-v2/TransferHistoryV2Client.tsx"),
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
     ]);
 
     expect(historyText).toContain('data-testid="transfer-history-layout-toggle"');

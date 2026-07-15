@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -573,8 +574,8 @@ describe("legacy lineup validator", () => {
 describe("legacy lineup draft ui contract", () => {
   it("keeps draft workspace as primary with captain strip, progress and quick assign", async () => {
     const fs = await import("node:fs/promises");
-    const lineupPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx";
-    const cssPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+    const lineupPath = path.join(process.cwd(), "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
+    const cssPath = path.join(process.cwd(), "app/globals.css");
     const [lineupText, cssText] = await Promise.all([fs.readFile(lineupPath, "utf8"), fs.readFile(cssPath, "utf8")]);
 
     expect(lineupText).toContain("SHOW_DRAFT_LINEUP_WORKSPACE = true");
@@ -594,7 +595,7 @@ describe("legacy lineup draft ui contract", () => {
     expect(lineupText).toContain('role="tablist"');
     expect(lineupText).toContain("Formplan");
     const formBoardText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/FormBoardPanel.tsx",
+      path.join(process.cwd(), "app/foundation/legacy-lineup-lab/FormBoardPanel.tsx"),
       "utf8",
     );
     expect(formBoardText).toContain("legacy-lineup-form-deck");

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { listTransfermarktFreeAgents } from "@/lib/market/transfermarkt-read-service";
@@ -314,7 +315,7 @@ describe("transfermarkt read service", () => {
   it("stays read-only without write calls", async () => {
     const moduleText = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/market/transfermarkt-read-service.ts",
+        path.join(process.cwd(), "lib/market/transfermarkt-read-service.ts"),
         "utf8",
       ),
     );

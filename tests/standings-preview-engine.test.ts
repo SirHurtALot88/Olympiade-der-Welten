@@ -1,3 +1,4 @@
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
@@ -449,7 +450,7 @@ describe("standings preview engine", () => {
   it("stays read-only and does not write team season state or cash", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/standings/standings-preview-engine.ts",
+        path.join(process.cwd(), "lib/standings/standings-preview-engine.ts"),
         "utf8",
       ),
     );
