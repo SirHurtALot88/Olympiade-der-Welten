@@ -22,7 +22,7 @@ export function calculatePlayerMoralePerformanceSignal(input: {
   contractLength?: number | null;
 }): PlayerMoralePerformanceSignal {
   const morale = clamp(typeof input.morale === "number" && Number.isFinite(input.morale) ? input.morale : 50, 0, 100);
-  const positivePct = morale >= 50 ? ((morale - 50) / 50) * 4 : 0;
+  const positivePct = morale >= 50 ? ((morale - 50) / 50) * 8 : 0;
   const negativePct = morale < 50 ? -((50 - morale) / 50) * 8 : 0;
   const contractDragPct =
     morale < 30 && (input.contractLength ?? 0) >= 4
@@ -30,7 +30,7 @@ export function calculatePlayerMoralePerformanceSignal(input: {
       : morale < 35 && (input.contractLength ?? 0) >= 3
         ? -1
         : 0;
-  const modifierPct = round(clamp(positivePct + negativePct + contractDragPct, -10, 4), 1);
+  const modifierPct = round(clamp(positivePct + negativePct + contractDragPct, -10, 8), 1);
 
   return {
     morale: round(morale, 1),
