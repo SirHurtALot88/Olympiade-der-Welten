@@ -14,7 +14,6 @@ import {
   type FoundationSidebarOrderState,
 } from "@/lib/foundation/foundation-sidebar-order";
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
-import NewLookToggle from "@/components/foundation/werdegang/NewLookToggle";
 import { useNewLook } from "@/lib/ui/new-look-preference";
 
 type FoundationSidebarProps = {
@@ -187,9 +186,6 @@ export default function FoundationSidebar({
             </span>
           )
         ) : null}
-      </div>
-      <div className="foundation-sidebar-newlook">
-        <NewLookToggle className="is-sidebar" />
       </div>
       {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
       {navGroups.map((group) => (
