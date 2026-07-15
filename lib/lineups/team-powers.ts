@@ -43,6 +43,11 @@ export type LegacyTeamPowerOption = {
 const TEAM_IDENTITY_CHARGES = [4, 3, 2] as const;
 const TEAM_IDENTITY_BACKUP_CHARGES = [0, 0, 0] as const;
 const FACILITY_POWER_CHARGES = 2;
+// Per-matchday charge budget for a selected active power. Charges refresh every matchday (see
+// buildTeamPowerUsageMap), and the lineup UI already limits selection to one power per discipline
+// side, so 2 is enough to play a power on both sides in the same matchday without it reading as
+// "used up". This replaces the old scarce season pool ([4,3,2] shared across ~20 matchdays).
+const PER_MATCHDAY_ACTIVE_CHARGES = 2;
 
 type AxisKey = "pow" | "spe" | "men" | "soc";
 
@@ -399,7 +404,7 @@ function buildTeamIdentityPowers(gameState: GameState, saveId: string, seasonId:
   return axisSequence.map((axis, index) => {
     const selectedForSeason = index < TEAM_IDENTITY_CHARGES.length;
     const chargesTotal = selectedForSeason
-      ? TEAM_IDENTITY_CHARGES[index] ?? 0
+      ? PER_MATCHDAY_ACTIVE_CHARGES
       : TEAM_IDENTITY_BACKUP_CHARGES[index - TEAM_IDENTITY_CHARGES.length] ?? 0;
     const modifier = index === 0 ? 8 : index === 1 ? 6 : index === 2 ? 5 : 4;
     const archetype = archetypes[index] ?? archetypes[0];
@@ -535,10 +540,21 @@ function getSelectedPowerIds(modifiers: LineupDraftModifiers | null | undefined)
   return [modifiers?.d1?.teamPowerId, modifiers?.d2?.teamPowerId].filter((value): value is string => Boolean(value));
 }
 
-function buildTeamPowerUsageMap(gameState: GameState, seasonId: string, excludeLineupId?: string | null) {
+function buildTeamPowerUsageMap(
+  gameState: GameState,
+  seasonId: string,
+  excludeLineupId?: string | null,
+  matchdayId?: string | null,
+) {
   const usage = new Map<string, string[]>();
   for (const draft of gameState.seasonState.lineupDrafts ?? []) {
     if (draft.seasonId !== seasonId || (excludeLineupId && draft.lineupId === excludeLineupId)) {
+      continue;
+    }
+    // Charges refresh every matchday: only count power usage from drafts of the same matchday,
+    // so a team's active powers are available again on the next matchday instead of draining a
+    // shared season pool.
+    if (matchdayId && draft.matchdayId !== matchdayId) {
       continue;
     }
     for (const powerId of getSelectedPowerIds(draft.modifiers)) {
@@ -556,7 +572,11 @@ export function getTeamPowerOptions(input: {
   teamId: string;
   lineupId?: string | null;
 }): LegacyTeamPowerOption[] {
-  const usage = buildTeamPowerUsageMap(input.gameState, input.seasonId, input.lineupId ?? null);
+  const currentDraft = input.lineupId
+    ? (input.gameState.seasonState.lineupDrafts ?? []).find((draft) => draft.lineupId === input.lineupId)
+    : null;
+  const activeMatchdayId = currentDraft?.matchdayId ?? input.gameState.matchdayState?.matchdayId ?? null;
+  const usage = buildTeamPowerUsageMap(input.gameState, input.seasonId, input.lineupId ?? null, activeMatchdayId);
   const powers = (input.gameState.seasonState.teamPowers ?? []).filter(
     (power) => power.seasonId === input.seasonId && power.teamId === input.teamId && power.selectedForSeason,
   );
@@ -637,6 +657,11 @@ export function calculateTeamPowerModifierForSide(input: {
   const power = input.teamPowers.find((entry) => entry.id === powerId) ?? null;
   if (!power) {
     warnings.push(`Team-Power für ${input.disciplineSide.toUpperCase()} konnte nicht geladen werden.`);
+    return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
+  }
+  if (power.isPassive) {
+    // The passive identity power is always applied automatically (see calculatePassiveTeamPowerBonus);
+    // treat an explicit selection of it as no active power so it is never counted twice.
     return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
   }
   if (power.isUsedUp) {
