@@ -56,7 +56,9 @@ der Oly:
 - Ist der Login an, aber `LEC_PASSWORD`/`LEC_AUTH_SECRET` fehlen, sperrt sich die App
   komplett (503, fail closed) — kein unsicherer Default.
 - Session: signiertes, `HttpOnly`-Cookie (`lec_session`, HMAC-SHA256 via Web Crypto,
-  7 Tage gueltig). Middleware (`src/middleware.ts`) schuetzt alle Seiten (Redirect zu
+  bewusst langlebig: 365 Tage — einmal pro Gerät einloggen, danach dauerhaft
+  angemeldet bleiben, kein "Angemeldet bleiben"-Häkchen nötig). Middleware
+  (`src/middleware.ts`) schuetzt alle Seiten (Redirect zu
   `/login`) und alle API-Routen (401 JSON) ausser `/login`, `/api/auth/login`,
   `/api/health`.
 - Die App setzt zusaetzlich `X-Robots-Tag: noindex, nofollow` (Header + `public/robots.txt`),

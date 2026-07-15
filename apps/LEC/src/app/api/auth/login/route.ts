@@ -16,14 +16,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_password" }, { status: 401 });
   }
 
-  const token = await createSessionToken(auth.secret!);
+  // Langlebige Session (365 Tage): einmal pro Geraet einloggen, danach
+  // dauerhaft angemeldet bleiben -- kein "Angemeldet bleiben"-Haekchen noetig.
+  const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+  const token = await createSessionToken(auth.secret!, ONE_YEAR_SECONDS);
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: ONE_YEAR_SECONDS,
   });
   return res;
 }

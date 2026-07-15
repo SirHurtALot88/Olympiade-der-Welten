@@ -8,7 +8,9 @@
  */
 
 const COOKIE_NAME = "lec_session";
-const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 Tage
+// Bewusst langlebig: "einmal pro Geraet einloggen, danach dauerhaft angemeldet
+// bleiben" (Chris' Wunsch) -- kein "Angemeldet bleiben"-Haekchen noetig.
+const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 365; // 365 Tage
 
 export interface SessionPayload {
   u: string; // Benutzer (fest: "chris")
