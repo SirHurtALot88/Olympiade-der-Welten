@@ -328,6 +328,15 @@ export default function FoundationTeamsViewHost({
         selectedTeamRosterActionHint={
           panelProps.selectedTeamRosterActionHint as FoundationTeamsNewLookProps["selectedTeamRosterActionHint"]
         }
+        runTeamPicksRefill={
+          panelProps.runTeamPicksRefill as FoundationTeamsNewLookProps["runTeamPicksRefill"]
+        }
+        teamPicksRefillBusyTeamId={
+          panelProps.teamPicksRefillBusyTeamId as FoundationTeamsNewLookProps["teamPicksRefillBusyTeamId"]
+        }
+        teamPicksRefillMessage={
+          panelProps.teamPicksRefillMessage as FoundationTeamsNewLookProps["teamPicksRefillMessage"]
+        }
         marketSellBusy={panelProps.marketSellBusy ?? false}
         contractRenewalBusy={panelProps.contractRenewalBusy as FoundationTeamsNewLookProps["contractRenewalBusy"]}
         openMarketSellModal={panelProps.openMarketSellModal as FoundationTeamsNewLookProps["openMarketSellModal"]}

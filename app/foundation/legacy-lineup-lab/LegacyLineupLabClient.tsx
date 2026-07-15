@@ -37,8 +37,9 @@ import {
   buildLegacyLineupLabSlots,
   findDuplicateActivePlayerSelections,
 } from "@/lib/lineups/legacy-lineup-lab";
-import { buildLineupPlayerDemandMap } from "@/lib/morale/player-demands-service";
+import { buildLineupPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import {
+  applyCaptainRivalryPressureReduction,
   calculateMatchdayProjectedPreview,
   getMatchdayIntensityConfig,
   resolveSlotRolesForDiscipline,
@@ -69,6 +70,7 @@ import type {
   LegacyLineupPreviewResult,
 } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
+import { describeTeamPowerDebuffEffect, isTeamPowerDebuffEffect } from "@/lib/lineups/team-powers";
 import type { AiLegacyLineupPreview } from "@/lib/ai/ai-needs-types";
 
 // Perf/DX (#57): these three sub-views are each only rendered behind a single
@@ -1770,16 +1772,16 @@ function getTeamPowerCategoryLabel(category: LegacyTeamPowerOption["category"]) 
 
 function getTeamPowerEffectLabel(power: Pick<LegacyTeamPowerOption, "effectType" | "targetMode" | "targetLimit">) {
   if (power.effectType === "snipe_debuff") {
-    return power.targetMode === "single_rival" ? "Snipe Rival" : "Snipe Top";
+    return power.targetMode === "single_rival" ? "Debuff · Snipe Rival" : "Debuff · Snipe Top";
   }
   if (power.effectType === "field_debuff") {
-    return `Field x${Math.max(power.targetLimit, 1)}`;
+    return `Debuff · Field x${Math.max(power.targetLimit, 1)}`;
   }
   if (power.effectType === "rivalry_debuff") {
-    return "Rivalry";
+    return "Debuff · Rivalry";
   }
   if (power.effectType === "support_boost") {
-    return "Support";
+    return "Boost · Support";
   }
   return "Boost";
 }
@@ -1853,8 +1855,10 @@ function formatTeamPowerOptionLabel(
   const effectiveExtra = conditionalActive ? Number((power.conditionalBonusPct * fitMultiplier).toFixed(1)) : 0;
   const attributeFit = calculateTeamPowerAttributeFitPctForUi(power, disciplineId, disciplineWeights, fitMultiplier);
   const source = power.source === "facility" ? "Facility" : "Team";
-  const sign = power.effectType === "self_boost" || power.effectType === "support_boost" ? "+" : "-";
-  return `${power.label} · ${getTeamPowerEffectLabel(power)} · ${getTeamPowerCategoryLabel(power.category)} · ${sign}${formatDecimalScore(effectiveModifier, 1)}%${effectiveExtra ? ` +${formatDecimalScore(effectiveExtra, 1)}% Extra` : ""}${attributeFit ? ` · Fit ${attributeFit > 0 ? "+" : ""}${formatDecimalScore(attributeFit, 1)}% (${formatTeamPowerAttributeTags(power)})` : ` · Tags ${formatTeamPowerAttributeTags(power)}`} · ${power.chargesRemaining}/${power.chargesTotal} · ${source}${isFit ? "" : " · Off-Fit"}`;
+  const isDebuffEffect = isTeamPowerDebuffEffect(power.effectType);
+  const sign = isDebuffEffect ? "-" : "+";
+  const debuffHint = isDebuffEffect ? " · wirkt gegen Gegner, nicht auf deinen Score" : "";
+  return `${power.label} · ${getTeamPowerEffectLabel(power)} · ${getTeamPowerCategoryLabel(power.category)} · ${sign}${formatDecimalScore(effectiveModifier, 1)}%${effectiveExtra ? ` +${formatDecimalScore(effectiveExtra, 1)}% Extra` : ""}${attributeFit ? ` · Fit ${attributeFit > 0 ? "+" : ""}${formatDecimalScore(attributeFit, 1)}% (${formatTeamPowerAttributeTags(power)})` : ` · Tags ${formatTeamPowerAttributeTags(power)}`} · ${power.chargesRemaining}/${power.chargesTotal} · ${source}${isFit ? "" : " · Off-Fit"}${debuffHint}`;
 }
 
 function getDisciplineToneClass(category: string | null | undefined) {
@@ -1969,6 +1973,8 @@ function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: 
 
 export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps) {
   const uiVariant = props.uiVariant ?? "classic";
+  // "Neuer Look" Flag (additiv): Hook läuft unverändert vor allen anderen Hooks;
+  // das eigentliche Gate sitzt NACH allen Hooks/Derivations (siehe vor `const inner`).
   const [params, setParams] = useState(() => defaultParamsFromProps(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
   const [options, setOptions] = useState<LabOptions>({
@@ -3088,15 +3094,24 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }, 12000);
   }, [props.focusMissingRequestKey, props.highlightMissingSlots, selections, slots]);
 
+  const activeTeamCaptain = useMemo(() => {
+    const gameStateForCaptain = props.embeddedGameState ?? context?.gameState ?? null;
+    const teamId = context?.teamId ?? params.teamId;
+    if (!gameStateForCaptain || !teamId) return null;
+    return selectTeamCaptain(gameStateForCaptain, teamId);
+  }, [props.embeddedGameState, context?.gameState, context?.teamId, params.teamId]);
+
   const rivalryPressureByDiscipline = useMemo(() => {
+    const rivalryPressureReductionPct = activeTeamCaptain?.effects.rivalryPressureReductionPct ?? 0;
     return Object.fromEntries(
       Object.entries(context?.teamPowerWindows ?? {}).map(([disciplineId, window]) => {
         const topRank = Math.min(...(window?.top8Rivals ?? []).map((rival) => rival.rank));
         const pressure = Number.isFinite(topRank) ? (topRank <= 3 ? 1.5 : 1) : 0;
-        return [disciplineId, pressure] as const;
+        // "Ruhepol" captain effect: a strong captain calms rivalry-driven push strain.
+        return [disciplineId, applyCaptainRivalryPressureReduction(pressure, rivalryPressureReductionPct)] as const;
       }),
     );
-  }, [context?.teamPowerWindows]);
+  }, [context?.teamPowerWindows, activeTeamCaptain]);
   const getRivalryPressureForDiscipline = (disciplineId: string | null | undefined) =>
     disciplineId ? rivalryPressureByDiscipline[disciplineId] ?? 0 : 0;
 
@@ -6544,28 +6559,41 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return null;
     }
     const breakdown = getTeamPowerProjectedBreakdown(power, disciplineSide, disciplineId, disciplineCategory);
-    const isPositiveEffect = power.effectType === "self_boost" || power.effectType === "support_boost";
+    const isDebuffEffect = isTeamPowerDebuffEffect(power.effectType);
+    const isPositiveEffect = !isDebuffEffect;
     const sign = isPositiveEffect ? "+" : "-";
     const pointPrefix = isPositiveEffect ? "+" : "ca -";
     const fitPointPrefix = (breakdown.attributeFitPoints ?? 0) >= 0 ? pointPrefix : isPositiveEffect ? "-" : "ca +";
+    const totalImpactPct = Number((breakdown.basePct + breakdown.extraPct + breakdown.attributeFitPct).toFixed(1));
+    const debuffSummary = describeTeamPowerDebuffEffect({
+      effectType: power.effectType,
+      targetMode: power.targetMode,
+      targetLimit: power.targetLimit,
+      impactPct: totalImpactPct,
+    });
 
     return (
       <span
-        className={`legacy-lineup-form-card-chip is-${breakdown.conditional.active ? "red is-power-window-active" : breakdown.isFit ? "blue" : "yellow"}`}
+        className={`legacy-lineup-form-card-chip is-${isDebuffEffect ? "debuff" : breakdown.conditional.active ? "red is-power-window-active" : breakdown.isFit ? "blue" : "yellow"}`}
         title={[
           power.description,
+          debuffSummary ? `${debuffSummary} — wirkt bei der Spieltag-Auflösung gegen Gegner, nicht auf deinen eigenen Score.` : null,
           breakdown.conditional.active
             ? `Zusatzeffekt aktiv: ${breakdown.conditional.label} (${breakdown.conditional.sourceLabel})`
             : power.conditionalDescription,
           `Tags: ${formatTeamPowerAttributeTags(power)}`,
-          breakdown.basePoints != null ? `${formatDecimalScore(breakdown.basePct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)} Punkte` : null,
-          breakdown.extraPoints ? `Extra ${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.extraPoints, 1)} Punkte` : null,
+          !isDebuffEffect && breakdown.basePoints != null ? `${formatDecimalScore(breakdown.basePct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)} Punkte` : null,
+          !isDebuffEffect && breakdown.extraPoints ? `Extra ${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${pointPrefix}${formatDecimalScore(breakdown.extraPoints, 1)} Punkte` : null,
           breakdown.attributeFitPct ? `Attribut-Fit ${breakdown.attributeFitPct > 0 ? "+" : ""}${formatDecimalScore(breakdown.attributeFitPct, 1)}% ≈ ${fitPointPrefix}${formatDecimalScore(Math.abs(breakdown.attributeFitPoints ?? 0), 1)} Punkte` : null,
         ].filter(Boolean).join("\n")}
       >
-        {getTeamPowerEffectLabel(power)} · {power.label} {sign}{formatDecimalScore(breakdown.basePct, 1)}%
-        {breakdown.basePoints != null ? ` ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)}P` : ""}
-        {breakdown.extraPct ? ` · Extra +${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${formatDecimalScore(breakdown.extraPoints ?? 0, 1)}P` : ""}
+        {isDebuffEffect ? "Debuff" : "Boost"} · {power.label}
+        {isDebuffEffect
+          ? debuffSummary
+            ? ` · ${debuffSummary.replace(/^Debuff · /, "")}`
+            : ""
+          : ` ${sign}${formatDecimalScore(breakdown.basePct, 1)}%${breakdown.basePoints != null ? ` ≈ ${pointPrefix}${formatDecimalScore(breakdown.basePoints, 1)}P` : ""}`}
+        {!isDebuffEffect && breakdown.extraPct ? ` · Extra +${formatDecimalScore(breakdown.extraPct, 1)}% ≈ ${formatDecimalScore(breakdown.extraPoints ?? 0, 1)}P` : ""}
         {breakdown.attributeFitPct ? ` · Fit ${breakdown.attributeFitPct > 0 ? "+" : ""}${formatDecimalScore(breakdown.attributeFitPct, 1)}%` : ""}
         {breakdown.conditional.active ? ` · ${breakdown.conditional.label}` : ""}
         {` · ${power.chargesRemaining}/${power.chargesTotal}`}
@@ -6963,7 +6991,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     );
   }, [isExpertModeEnabled]);
 
-  return (
+  // "Neuer Look" Flag-Gate (additiv): alle Hooks und Derivations sind an dieser
+  // Stelle bereits gelaufen (stabile Hook-Reihenfolge beim Umschalten). Der neue
+  // Squad-Builder konsumiert dieselben abgeleiteten Daten und ruft dieselben
+  // Handler auf wie der focusV2-Pfad; Flag aus => bestehende Ansicht unverändert.
+    return (
       <LineupNewLook
         context={context}
         slots={slots}

@@ -35,10 +35,12 @@ import {
 import { GAME_ENCYCLOPEDIA_ENTRIES, getGameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
+import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
 import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { getMetricBarPercent, getPoolHeatClass } from "@/lib/foundation/player-league-heat";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   FACILITY_CATALOG,
   getFacilityLevelDefinition,
@@ -3427,6 +3429,107 @@ export function useFoundationShellRouterBodyScope({
     reloadTransferRecapFeed,
   ]);
 
+  // Manuelles Neu-Anwerfen der KI-Picks für EIN Team (z. B. ein Team, dessen
+  // Kader nach dem Setup leer geblieben ist). Nutzt denselben scoped picks-run-
+  // Endpoint und dieselbe Reload-Kette wie der Cockpit-Roster-Fill; scope "all"
+  // + teamIds:[teamId] + allowSetupAllTeams begrenzt den Lauf auf genau dieses
+  // Team.
+  const [teamPicksRefillBusyTeamId, setTeamPicksRefillBusyTeamId] = useState<string | null>(null);
+  const [teamPicksRefillMessage, setTeamPicksRefillMessage] = useState<
+    { teamId: string; tone: "success" | "error"; text: string } | null
+  >(null);
+
+  const runTeamPicksRefill = useCallback(
+    async (teamId: string) => {
+      if (!teamId) {
+        return;
+      }
+      if (readMeta.readOnly || readMeta.source === "prisma") {
+        showReadOnlyNotice();
+        return;
+      }
+      if (teamPicksRefillBusyTeamId) {
+        return;
+      }
+
+      setTeamPicksRefillBusyTeamId(teamId);
+      setTeamPicksRefillMessage(null);
+      try {
+        const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            withRoomContextBody(
+              {
+                dryRun: false,
+                confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+                teamScope: "all",
+                teamIds: [teamId],
+                allowSetupAllTeams: true,
+              },
+              roomContext,
+            ),
+          ),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          executed?: boolean;
+          blockingReasons?: string[];
+          teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number; blockingReasons?: string[] }>;
+        };
+
+        if (!response.ok || payload.error) {
+          setTeamPicksRefillMessage({
+            teamId,
+            tone: "error",
+            text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
+          });
+          return;
+        }
+
+        const teamResult = payload.teams?.find((entry) => entry.teamId === teamId) ?? null;
+        const picksApplied =
+          teamResult?.rosterAfter != null && teamResult.rosterBefore != null
+            ? teamResult.rosterAfter - teamResult.rosterBefore
+            : null;
+
+        if (!payload.executed || (picksApplied != null && picksApplied <= 0)) {
+          const teamBlockers = teamResult?.blockingReasons ?? [];
+          const blockers = teamBlockers.length > 0 ? teamBlockers : payload.blockingReasons ?? [];
+          setTeamPicksRefillMessage({
+            teamId,
+            tone: "error",
+            text:
+              blockers.length > 0
+                ? blockers.slice(0, 3).join(" · ")
+                : "Keine neuen Picks angewendet (kein passender Spieler oder Budget).",
+          });
+          return;
+        }
+
+        setTeamPicksRefillMessage({
+          teamId,
+          tone: "success",
+          text: picksApplied != null ? `${picksApplied} Spieler geholt.` : "KI-Picks angewendet.",
+        });
+        await reloadAfterMarketRosterApply();
+      } catch {
+        setTeamPicksRefillMessage({ teamId, tone: "error", text: "KI-Picks konnten nicht angewendet werden." });
+      } finally {
+        setTeamPicksRefillBusyTeamId(null);
+      }
+    },
+    [
+      buildCockpitScopeParams,
+      readMeta.readOnly,
+      readMeta.source,
+      reloadAfterMarketRosterApply,
+      roomContext,
+      showReadOnlyNotice,
+      teamPicksRefillBusyTeamId,
+    ],
+  );
+
   const matchdayArenaApplyHandlers = useMemo(
     () =>
       createCockpitMatchdayApplyHandlers({
@@ -5046,6 +5149,120 @@ export function useFoundationShellRouterBodyScope({
     gameModeOwnershipChrisIds,
     gameModeOwnershipFrankyIds,
   });
+
+  // Bulk-Nachpicken (Ranks-Überblick): alle KI-geführten Teams (controlMode ===
+  // "ai" — menschlich geführte Teams sind über `aiTeams` bereits ausgeschlossen),
+  // deren aktueller Kader unter dem Kader-Minimum liegt. Kader-Zählung wie im Rest
+  // des Shells (`gameState.rosters` je teamId), Minimum via `deriveRosterTargets`.
+  const underFilledAiTeamIds = useMemo(() => {
+    const rosterCountByTeamId = new Map<string, number>();
+    for (const entry of gameState.rosters) {
+      rosterCountByTeamId.set(entry.teamId, (rosterCountByTeamId.get(entry.teamId) ?? 0) + 1);
+    }
+    return aiTeams
+      .filter((team) => {
+        const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId);
+        const { playerMin } = deriveRosterTargets(team, identity);
+        return (rosterCountByTeamId.get(team.teamId) ?? 0) < playerMin;
+      })
+      .map((team) => team.teamId);
+  }, [aiTeams, gameState.rosters, gameState.teamIdentities]);
+
+  // Ein Klick → picks-run für alle unterbesetzten KI-Teams auf einmal. Nutzt
+  // denselben scoped picks-run-Endpoint + dieselbe Reload-Kette wie das Einzel-
+  // Nachpicken (`runTeamPicksRefill`); scope "all" + teamIds + allowSetupAllTeams
+  // begrenzt den Lauf auf genau diese Teams.
+  const [bulkAiPicksRefillBusy, setBulkAiPicksRefillBusy] = useState(false);
+  const [bulkAiPicksRefillMessage, setBulkAiPicksRefillMessage] = useState<
+    { tone: "success" | "error"; text: string } | null
+  >(null);
+
+  const runBulkAiTeamsRefill = useCallback(async () => {
+    if (readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+    if (bulkAiPicksRefillBusy) {
+      return;
+    }
+    const teamIds = underFilledAiTeamIds;
+    if (teamIds.length === 0) {
+      setBulkAiPicksRefillMessage({ tone: "error", text: "Alle KI-Teams sind gefüllt." });
+      return;
+    }
+
+    setBulkAiPicksRefillBusy(true);
+    setBulkAiPicksRefillMessage(null);
+    try {
+      const response = await fetch(`/api/ai/picks-run?${buildCockpitScopeParams().toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: false,
+              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+              teamScope: "all",
+              teamIds,
+              allowSetupAllTeams: true,
+            },
+            roomContext,
+          ),
+        ),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        executed?: boolean;
+        blockingReasons?: string[];
+        teams?: Array<{ teamId: string; rosterBefore?: number; rosterAfter?: number; blockingReasons?: string[] }>;
+      };
+
+      if (!response.ok || payload.error) {
+        setBulkAiPicksRefillMessage({
+          tone: "error",
+          text: payload.error ?? payload.blockingReasons?.join(" · ") ?? "KI-Picks konnten nicht angewendet werden.",
+        });
+        return;
+      }
+
+      const filledTeams = (payload.teams ?? []).filter((entry) => {
+        const applied =
+          entry.rosterAfter != null && entry.rosterBefore != null ? entry.rosterAfter - entry.rosterBefore : 0;
+        return applied > 0;
+      }).length;
+
+      if (!payload.executed || filledTeams <= 0) {
+        const blockers = payload.blockingReasons ?? [];
+        setBulkAiPicksRefillMessage({
+          tone: "error",
+          text:
+            blockers.length > 0
+              ? blockers.slice(0, 3).join(" · ")
+              : "Keine neuen Picks angewendet (kein passender Spieler oder Budget).",
+        });
+        return;
+      }
+
+      setBulkAiPicksRefillMessage({
+        tone: "success",
+        text: `${filledTeams} KI-${filledTeams === 1 ? "Team" : "Teams"} aufgefüllt.`,
+      });
+      await reloadAfterMarketRosterApply();
+    } catch {
+      setBulkAiPicksRefillMessage({ tone: "error", text: "KI-Picks konnten nicht angewendet werden." });
+    } finally {
+      setBulkAiPicksRefillBusy(false);
+    }
+  }, [
+    buildCockpitScopeParams,
+    bulkAiPicksRefillBusy,
+    readMeta.readOnly,
+    readMeta.source,
+    reloadAfterMarketRosterApply,
+    roomContext,
+    showReadOnlyNotice,
+    underFilledAiTeamIds,
+  ]);
 
   useEffect(() => {
     if (activeView !== "playerProfile" || playerProfileTab !== "contract" || !playerProfileData?.playerId) {
@@ -8250,6 +8467,10 @@ export function useFoundationShellRouterBodyScope({
       }
       return;
     }
+    if (!canManageTeamId(selectedTeam.teamId)) {
+      showTeamManagementLockedNotice(getTeamLockedName(selectedTeam.teamId));
+      return;
+    }
 
     setAssignTeamCaptainBusy(true);
     try {
@@ -9737,6 +9958,10 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
+    // Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab).
+    runTeamPicksRefill,
+    teamPicksRefillBusyTeamId,
+    teamPicksRefillMessage,
     // D1 Feld-Form-Strip auf dem Team-Profil (Neuer Look).
     fieldRaceRecentForm: selectedTeamFieldRaceForm,
     fieldRacePlayedMatchdayCount,
@@ -10157,6 +10382,10 @@ export function useFoundationShellRouterBodyScope({
     aiTeams,
     applyNewGamePreset,
     bootstrapError,
+    bulkAiPicksRefillBusy,
+    bulkAiPicksRefillMessage,
+    runBulkAiTeamsRefill,
+    underFilledAiTeamIds,
     buildTeamDetailDrawerData,
     canonicalSeasonLabel,
     cashApplyFeed,

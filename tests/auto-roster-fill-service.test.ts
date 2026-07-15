@@ -510,7 +510,7 @@ describe("auto roster fill service", () => {
     const manualTeam = result.teams.find((team) => team.teamId === "M-M");
     expect(manualTeam?.status).toBe("filled");
     expect(manualTeam?.transferHistoryIds).toEqual(["history-fa-1", "history-fa-3"]);
-    expect(persistenceState.save.gameState.transferHistory[0]?.source).toBe("auto_roster_fill");
+    expect(persistenceState.save.gameState.transferHistory[0]?.source).toBe("ai_roster_fill");
     expect(persistenceState.save.gameState.teams.find((team) => team.teamId === "M-M")?.cash).toBe(148);
   });
 });

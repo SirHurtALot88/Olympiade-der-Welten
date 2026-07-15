@@ -1997,12 +1997,97 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     ? baseItems.filter((item) => !(recentlySoldBySelectedTeam?.has(item.playerId) ?? false)).length
     : baseItems.length;
 
+  // Identity-fit ranking (opt-in via rankByTeamFit): rank the FULL filtered pool by how well each
+  // free agent matches the selected team's identity axes (pow/spe/men/soc) plus cheap trait/subclass
+  // synergy, then take the top-K — instead of the team-agnostic diversity slice. This is what makes a
+  // POW+MEN team draw its candidates from POW/MEN players rather than a generic cross-section. Only the
+  // top-K get the heavy team overlay below, so the full-pool scan stays cheap (axis math + trait fit).
+  const identityFitRankEnabled = Boolean(input.rankByTeamFit) && selectedTeam != null;
+  const identityAxisWeights = (() => {
+    if (!identityFitRankEnabled) return null;
+    const identity = gameState.teamIdentities?.find((entry) => entry.teamId === selectedTeam!.teamId) ?? null;
+    if (!identity) return null;
+    const raw = {
+      pow: Math.max(0, identity.pow ?? 0),
+      spe: Math.max(0, identity.spe ?? 0),
+      men: Math.max(0, identity.men ?? 0),
+      soc: Math.max(0, identity.soc ?? 0),
+    };
+    const sum = raw.pow + raw.spe + raw.men + raw.soc;
+    if (sum <= 0) return null;
+    return { pow: raw.pow / sum, spe: raw.spe / sum, men: raw.men / sum, soc: raw.soc / sum };
+  })();
+  const identityFitScore = (item: TransfermarktFreeAgentItem): number => {
+    const axisScore = identityAxisWeights
+      ? ((item.pow ?? 0) * identityAxisWeights.pow +
+          (item.spe ?? 0) * identityAxisWeights.spe +
+          (item.men ?? 0) * identityAxisWeights.men +
+          (item.soc ?? 0) * identityAxisWeights.soc) /
+        100
+      : ((item.pow ?? 0) + (item.spe ?? 0) + (item.men ?? 0) + (item.soc ?? 0)) / 400;
+    const synergyRaw = calculateTransfermarktFit(
+      {
+        race: item.race,
+        alignment: item.alignment,
+        subclasses: item.subclasses,
+        traitsPositive: item.traitsPositive,
+        traitsNegative: item.traitsNegative,
+      },
+      selectedRosterPlayers,
+      { teamId: selectedTeam!.teamId },
+    ).teamFit;
+    const synergyScore = Math.max(-1, Math.min(1, (synergyRaw ?? 0) / 20));
+    // Affordability: reward cheaper on-axis players so the slice is dominated by AFFORDABLE identity fits.
+    // Without this the ranking front-loads the strongest (= most expensive) identity players and teams
+    // blow their budget on a few stars before reaching their minimum roster. ~cheap(<=8) -> ~1, ~40+ -> 0.
+    const priceScore = item.marketValue == null ? 0.5 : Math.max(0, Math.min(1, 1 - item.marketValue / 40));
+    // Axis identity leads (the meaningful signal at draft time when the roster is still empty); affordability
+    // is weighted heavily so the slice stays fillable within budget; synergy is a light tiebreak.
+    return axisScore * 0.45 + priceScore * 0.4 + synergyScore * 0.15;
+  };
+  const buildIdentityFitRankedSlice = (items: TransfermarktFreeAgentItem[], limit: number) => {
+    const byIdentity = items
+      .map((item) => ({ item, score: identityFitScore(item) }))
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.item);
+    if (byIdentity.length <= limit) {
+      return byIdentity;
+    }
+    const selected: TransfermarktFreeAgentItem[] = [];
+    const seen = new Set<string>();
+    const add = (item: TransfermarktFreeAgentItem | undefined) => {
+      if (!item || seen.has(item.playerId) || selected.length >= limit) return;
+      selected.push(item);
+      seen.add(item.playerId);
+    };
+    // Affordable coverage FROM the identity-fit top pool: the pure identity ranking front-loads premium
+    // stars, which would strand teams below their minimum on budget. Reserve part of the slice for the
+    // CHEAPEST identity-relevant players so every team can always fill, then keep the full identity
+    // ordering for the premium fits.
+    const identityTopPool = byIdentity.slice(0, Math.min(byIdentity.length, Math.max(limit * 3, 120)));
+    const affordableTarget = Math.min(limit, Math.max(12, Math.ceil(limit * 0.55)));
+    const cheapestIdentity = [...identityTopPool].sort(
+      (a, b) => (a.marketValue ?? Number.POSITIVE_INFINITY) - (b.marketValue ?? Number.POSITIVE_INFINITY),
+    );
+    for (const item of cheapestIdentity) {
+      add(item);
+      if (selected.length >= affordableTarget) break;
+    }
+    for (const item of byIdentity) {
+      add(item);
+      if (selected.length >= limit) break;
+    }
+    return selected;
+  };
+
   const orderedItems =
     useUnboundedFilteredPool || (aiPreviewMode && boundedLimit + offset >= filtered.length)
       ? filtered
-      : aiPreviewMode
-        ? buildAiPreviewFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset))
-        : buildDiverseFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset));
+      : identityFitRankEnabled
+        ? buildIdentityFitRankedSlice(filtered, Math.min(filtered.length, boundedLimit + offset))
+        : aiPreviewMode
+          ? buildAiPreviewFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset))
+          : buildDiverseFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset));
   const visibleItems = orderedItems.slice(offset, offset + boundedLimit).map((item) => applyTeamOverlay(item));
 
   return {

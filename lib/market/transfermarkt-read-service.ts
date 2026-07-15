@@ -188,6 +188,13 @@ export type TransfermarktReadParams = {
   mode?: "full" | "ai_preview" | null;
   /** When true (ai_preview), return every filtered free agent — no slice/limit cap. */
   fullPool?: boolean | null;
+  /**
+   * When true, the returned slice is ranked by the SELECTED team's identity-axis fit + trait synergy
+   * over the FULL filtered pool (cheap scoring, then only the top-K get the heavy team overlay), instead
+   * of the team-agnostic diversity slice. Used by the AI roster-fill so e.g. a POW+MEN team draws its
+   * candidates from the players that actually fit its identity, not a generic cross-section.
+   */
+  rankByTeamFit?: boolean | null;
   compactList?: boolean | null;
   scoutingLevel?: number | null;
   localRunContext?: unknown;

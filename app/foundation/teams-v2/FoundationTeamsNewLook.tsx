@@ -174,6 +174,10 @@ export type FoundationTeamsNewLookProps = {
   formatDisplayMoney: (value: number | null | undefined) => string;
   selectedTeamRosterActionsAvailable: boolean;
   selectedTeamRosterActionHint: string | null;
+  /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
+  runTeamPicksRefill?: (teamId: string) => void | Promise<void>;
+  teamPicksRefillBusyTeamId?: string | null;
+  teamPicksRefillMessage?: { teamId: string; tone: "success" | "error"; text: string } | null;
   marketSellBusy: boolean;
   contractRenewalBusy: string | null;
   openMarketSellModal: (
@@ -590,6 +594,9 @@ export default function FoundationTeamsNewLook({
   formatDisplayMoney,
   selectedTeamRosterActionsAvailable,
   selectedTeamRosterActionHint,
+  runTeamPicksRefill,
+  teamPicksRefillBusyTeamId,
+  teamPicksRefillMessage,
   marketSellBusy,
   contractRenewalBusy,
   openMarketSellModal,
@@ -1988,6 +1995,24 @@ export default function FoundationTeamsNewLook({
             <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
             <span>{selectedTeamRosterActionHint}</span>
           </p>
+        ) : null}
+        {selectedTeamRosterActionsAvailable && runTeamPicksRefill ? (
+          <div className="nl-teams-roster-actions">
+            <button
+              type="button"
+              className="nl-teams-action"
+              disabled={teamPicksRefillBusyTeamId != null}
+              title="KI-Picks für dieses Team neu anwerfen"
+              onClick={() => void runTeamPicksRefill(selectedTeam.teamId)}
+            >
+              {teamPicksRefillBusyTeamId === selectedTeam.teamId ? "Wirbt an…" : "Kader auffüllen"}
+            </button>
+            {teamPicksRefillMessage && teamPicksRefillMessage.teamId === selectedTeam.teamId ? (
+              <span className={nlToneClass(teamPicksRefillMessage.tone === "success" ? "good" : "risk")}>
+                {teamPicksRefillMessage.text}
+              </span>
+            ) : null}
+          </div>
         ) : null}
         {rosterMode === "portraits" ? renderRosterGrid() : renderRosterTable()}
       </NlCard>

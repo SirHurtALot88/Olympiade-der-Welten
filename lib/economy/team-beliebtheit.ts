@@ -1,5 +1,6 @@
 import type { GameState, Player, RosterEntry, StandingRecord } from "@/lib/data/olyDataTypes";
 import { computeTopSixAxisAverage } from "@/lib/market/transfermarkt-roster-impact";
+import { computeCosmeticTraitPopularityBonus } from "@/lib/traits/cosmetic-trait-soft-effects";
 
 /**
  * Beliebtheitsfaktor (team popularity) — real game rule, not a cosmetic flag.
@@ -62,6 +63,8 @@ export type BeliebtheitComponents = {
   favShare: number;
   /** STARPOWER-Sub-Score (normalisiert), [0,1]. */
   starpower: number;
+  /** Kleiner additiver Trait-Bonus/-Malus (siehe `TeamAggregate.cosmeticTraitBonus`). */
+  cosmeticTraitBonus: number;
 };
 
 type TeamAggregate = {
@@ -72,6 +75,13 @@ type TeamAggregate = {
   favShareRaw: number;
   /** Top-6-OVR-Schnitt des Teams oder null, wenn keine Ratings vorliegen. */
   starRaw: number | null;
+  /**
+   * Kleiner additiver Bonus/Malus aus kosmetischen Charakter-Traits
+   * (siehe lib/traits/cosmetic-trait-soft-effects.ts), bereits klein genug
+   * um direkt in `raw` einzufließen, ohne die Sub-Score-Gewichtung zu
+   * verzerren.
+   */
+  cosmeticTraitBonus: number;
 };
 
 export type BeliebtheitLeagueContext = {
@@ -115,6 +125,8 @@ function buildTeamAggregate(input: {
     .filter((value): value is number => value != null);
   const starRaw = computeTopSixAxisAverage(strengthValues, BELIEBTHEIT_STARPOWER_TOP_COUNT);
 
+  const cosmeticTraitBonus = computeCosmeticTraitPopularityBonus(rosterPlayers);
+
   const rank =
     typeof input.standing?.rank === "number" && Number.isFinite(input.standing.rank)
       ? input.standing.rank
@@ -124,7 +136,7 @@ function buildTeamAggregate(input: {
       ? input.standing.points
       : null;
 
-  return { teamId: input.teamId, rank, points, favShareRaw, starRaw };
+  return { teamId: input.teamId, rank, points, favShareRaw, starRaw, cosmeticTraitBonus };
 }
 
 /**
@@ -197,7 +209,8 @@ export function buildBeliebtheitLeagueContext(gameState: GameState): Beliebtheit
     const raw =
       BELIEBTHEIT_WEIGHTS.erfolg * erfolg +
       BELIEBTHEIT_WEIGHTS.fanFavorites * favShare +
-      BELIEBTHEIT_WEIGHTS.starpower * starpower;
+      BELIEBTHEIT_WEIGHTS.starpower * starpower +
+      aggregate.cosmeticTraitBonus;
     const value = clamp(BELIEBTHEIT_BASE_OFFSET + raw, BELIEBTHEIT_MIN, BELIEBTHEIT_MAX);
 
     byTeamId.set(aggregate.teamId, {
@@ -205,6 +218,7 @@ export function buildBeliebtheitLeagueContext(gameState: GameState): Beliebtheit
       erfolg: roundValue(erfolg),
       favShare: roundValue(favShare),
       starpower: roundValue(starpower),
+      cosmeticTraitBonus: roundValue(aggregate.cosmeticTraitBonus),
     });
   }
 
@@ -218,6 +232,7 @@ export function neutralBeliebtheit(): BeliebtheitComponents {
     erfolg: BELIEBTHEIT_NEUTRAL_SUBSCORE,
     favShare: BELIEBTHEIT_NEUTRAL_SUBSCORE,
     starpower: BELIEBTHEIT_NEUTRAL_SUBSCORE,
+    cosmeticTraitBonus: 0,
   };
 }
 

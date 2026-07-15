@@ -1,8 +1,10 @@
 /**
- * Temporary admin/dev bypass for Foundation team-management scope.
- * Set FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS to false before production release.
+ * Dev-only bypass for Foundation team-management scope.
+ * This unlocks management of ALL teams (not just the human manager's own
+ * team) and MUST stay false in normal play / production. Flip it to true
+ * only locally while developing/testing, then flip it back before commit.
  */
-export const FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS = true;
+export const FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS = false;
 
 export function resolveFoundationTeamCanManage(canManage: boolean): boolean {
   return FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS || canManage;

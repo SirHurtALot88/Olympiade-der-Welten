@@ -3,7 +3,7 @@ import { TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impac
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 /** Base training budget per mode (season-end organic progression).
- *  Calibrated for peak P90 ~4.5–8 and league Ø Δ within ±0.4. */
+ *  Calibrated for peak P90 ~5–8 and league Ø Δ within ±0.4. */
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
   leicht: 3.6,
   mittel: 4.56,
