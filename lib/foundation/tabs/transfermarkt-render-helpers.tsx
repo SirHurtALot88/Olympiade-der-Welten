@@ -79,7 +79,7 @@ export function formatMarketDevelopmentRoute(value: string | null | undefined) {
     case "depth_growth":
       return "Depth Growth";
     case "prospect_growth":
-      return "Prospect";
+      return "Talent";
     case "maintenance":
       return "Maintenance";
     case "stagnation_watch":

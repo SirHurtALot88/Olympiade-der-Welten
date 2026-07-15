@@ -2989,13 +2989,6 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                               ))}
                               {(seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.bottom20.length ?? 0) === 0 ? <span>—</span> : null}
                             </div>
-                            <div>
-                              <strong>Role-Versprechen</strong>
-                              {(seasonTransitionFeed.seasonReview.promisedRoleSignals ?? []).slice(0, 3).map((entry) => (
-                                <span key={`review-promised-${entry.playerId}`}>{entry.playerName} · {entry.promisedRole}: {entry.appearances}/{entry.expectedAppearances}</span>
-                              ))}
-                              {(seasonTransitionFeed.seasonReview.promisedRoleSignals?.length ?? 0) === 0 ? <span>keine offenen Widersprueche</span> : null}
-                            </div>
                           </div>
                           <button className="primary-button inline-button" type="button" disabled>
                             Weiter zu Finanzen

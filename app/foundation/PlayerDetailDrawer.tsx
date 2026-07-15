@@ -232,7 +232,8 @@ function formatRoleTag(value: string | null | undefined) {
     return "Rotation";
   }
   if (value === "prospect") {
-    return "Prospect";
+    // "Prospect" ist ein vager Auto-Rollen-Tag und wird nicht mehr als Rolle gezeigt.
+    return "";
   }
   return value;
 }
@@ -439,7 +440,7 @@ function formatDevelopmentRoute(value: string | null | undefined) {
     case "depth_growth":
       return "Breite entwickeln";
     case "prospect_growth":
-      return "Prospect-Route";
+      return "Talent-Entwicklung";
     case "maintenance":
       return "Niveau halten";
     case "stagnation_watch":

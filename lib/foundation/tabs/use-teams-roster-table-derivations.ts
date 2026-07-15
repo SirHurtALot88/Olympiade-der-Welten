@@ -216,7 +216,6 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
       { id: "all" as const, label: "Alle", count: counts.all },
       { id: "starter" as const, label: "Starter", count: counts.starter },
       { id: "rotation" as const, label: "Rotation", count: counts.rotation },
-      { id: "prospect" as const, label: "Prospects", count: counts.prospect },
       { id: "bench" as const, label: "Bank", count: counts.bench },
       { id: "other" as const, label: "Sonstige", count: counts.other },
     ].filter((entry) => entry.id === "all" || entry.count > 0);

@@ -1996,7 +1996,7 @@ function FoundationTeamsDetailPanel({
 
                 <section className="panel">
                   <div className="panel-header">
-                    <h2>Bench & Prospects</h2>
+                    <h2>Bench</h2>
                   </div>
                   <div className="roster-grid team-portraits-grid">
                     {bench.map(({ entry, player }) => {

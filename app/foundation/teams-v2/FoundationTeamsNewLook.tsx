@@ -1153,7 +1153,7 @@ export default function FoundationTeamsNewLook({
                       <span className="nl-teams-playermeta">{formatPlayerIdentitySubMeta(player) || "—"}</span>
                     </button>
                   </td>
-                  <td className="nl-teams-td-role">{entry.roleTag ?? "Kader"}</td>
+                  <td className="nl-teams-td-role">{entry.roleTag === "starter" ? "Starter" : entry.roleTag === "bench" ? "Bank" : entry.roleTag === "rotation" ? "Rotation" : "Kader"}</td>
                   <td>{formatNlNumber(row.playerOvr, 0)}</td>
                   <td>{formatNlNumber(row.playerMvs, 1)}</td>
                   <td>{formatNlNumber(row.playerPps, 1)}</td>

@@ -642,9 +642,6 @@ export default function TeamDetailDrawer({
                   className={getClassColorClassName(player.className, "team-drawer-player-class-frame")}
                   subMeta={[
                     getRoleLabel(player.roleTag),
-                    player.promisedRole && getRoleLabel(player.promisedRole)
-                      ? `versprochen ${getRoleLabel(player.promisedRole)}`
-                      : "",
                     player.className ?? "—",
                     player.race ?? "—",
                   ]
