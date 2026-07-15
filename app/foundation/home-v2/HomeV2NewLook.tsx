@@ -276,6 +276,8 @@ export default function HomeV2NewLook({
   nextStepDetail,
   nextStepBlocked = false,
   warnings,
+  showTeamPickerCta = false,
+  onOpenTeamPicker,
   topPlayers,
   leagueHeatPools,
   facilities,
@@ -477,6 +479,25 @@ export default function HomeV2NewLook({
           </StatChipRow>
         </div>
       </NlCard>
+
+      {showTeamPickerCta ? (
+        <NlCard
+          className="nl-home-team-picker-cta"
+          data-testid="home-team-picker-cta"
+          eyebrow="Erster Schritt"
+          title="Wähle dein Team"
+          actions={
+            <button type="button" className="primary-button" onClick={onOpenTeamPicker}>
+              Team wählen
+            </button>
+          }
+        >
+          <p>
+            Noch steuert kein Team dieses Save. Wähle dein Team in den Team-Einstellungen, um Kader,
+            Transfers und Aufstellung selbst zu übernehmen.
+          </p>
+        </NlCard>
+      ) : null}
 
       {relevantWarnings.length > 0 ? (
         <div className="nl-home-warning-row" aria-label="Hinweise">

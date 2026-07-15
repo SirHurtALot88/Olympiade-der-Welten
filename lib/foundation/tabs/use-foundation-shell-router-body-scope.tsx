@@ -5209,6 +5209,14 @@ export function useFoundationShellRouterBodyScope({
       }),
     );
   };
+  // Friction fix (Generalprobe #2): "Dein Team wählen" lives under Team-Settings
+  // → "Spielmodus & KI", not the default tab, and nothing routed a fresh player
+  // there. Deep-links straight into that sub-tab via `?view=teamSettings&tab=control`
+  // (read on mount by FoundationTeamSettingsNewLook), used by the HQ CTA below.
+  const navigateToTeamPicker = () => {
+    setFoundationView("teamSettings", setActiveView, { push: true });
+    syncFoundationViewInUrl("teamSettings", "control", null, { push: false });
+  };
   const updateNewGameFlowStepStatus = (stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) => {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -7949,6 +7957,84 @@ export function useFoundationShellRouterBodyScope({
     readMeta.source,
     reloadAfterMarketRosterApply,
   ]);
+  // Generalprobe #1: a fresh Season 1 auto-fills all 32 AI rosters in the
+  // BACKGROUND on the server (~40s), flagged via `seasonState.leagueSetupStatus`
+  // ("in_progress" | "ready" | "failed"). Poll every 5s while "in_progress" so
+  // the "Liga wird erstellt…" banner (see FoundationShellRouterBody) clears
+  // itself without a manual reload.
+  const leagueSetupStatus = gameState.seasonState.leagueSetupStatus ?? null;
+  const [leagueSetupRetryBusy, setLeagueSetupRetryBusy] = useState(false);
+  const [leagueSetupRetryError, setLeagueSetupRetryError] = useState<string | null>(null);
+  useEffect(() => {
+    if (
+      readMeta.source !== "sqlite" ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      leagueSetupStatus !== "in_progress"
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const pollLeagueSetupStatus = async () => {
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (!cancelled && nextGameState) {
+        setGameState(nextGameState);
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollLeagueSetupStatus();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSaveId, foundationSaveMode, leagueSetupStatus, loadSave, readMeta.source, setGameState]);
+  const retryLeagueSetup = async () => {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    setLeagueSetupRetryBusy(true);
+    setLeagueSetupRetryError(null);
+    try {
+      const params = new URLSearchParams({
+        saveId: activeSaveId,
+        seasonId: gameState.season.id,
+        source: readMeta.source,
+      });
+      const response = await fetch(`/api/ai/roster-fill?${params.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun: false, confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; executed?: boolean } | null;
+      if (!response.ok || !payload || payload.error) {
+        setLeagueSetupRetryError(payload?.error ?? "Liga-Setup konnte nicht erneut gestartet werden.");
+        setGameState((current) => ({
+          ...current,
+          seasonState: { ...current.seasonState, leagueSetupStatus: "failed" },
+        }));
+        return;
+      }
+      const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      setGameState((current) => {
+        const base = nextGameState ?? current;
+        return { ...base, seasonState: { ...base.seasonState, leagueSetupStatus: "ready" } };
+      });
+    } catch (error) {
+      setLeagueSetupRetryError(error instanceof Error ? error.message : "Netzwerkfehler beim erneuten Liga-Setup.");
+      setGameState((current) => ({
+        ...current,
+        seasonState: { ...current.seasonState, leagueSetupStatus: "failed" },
+      }));
+    } finally {
+      setLeagueSetupRetryBusy(false);
+    }
+  };
   const closeSeasonBriefing = (markCompleted = true) => {
     const briefingKey = buildSeasonBriefingDismissKey(activeSaveId, gameState.season.id);
     const shouldPersistIntroStep = markCompleted && seasonBriefingStepStatus === "open";
@@ -10016,6 +10102,10 @@ export function useFoundationShellRouterBodyScope({
     isTransferMarketViewActive,
     isViewingArchivedSeason,
     leaguePlayerHeatPools,
+    leagueSetupStatus,
+    leagueSetupRetryBusy,
+    leagueSetupRetryError,
+    retryLeagueSetup,
     lineupDraftBoardView,
     lineupDraftBoardViewRequest,
     lineupFocusRequestKey,
@@ -10052,6 +10142,7 @@ export function useFoundationShellRouterBodyScope({
     navigateToGameFlowStep,
     navigateToInboxItem,
     navigateToPrizeFinanceViewFromRouting,
+    navigateToTeamPicker,
     newGameBusy,
     newGameChrisTeamIds,
     newGameError,

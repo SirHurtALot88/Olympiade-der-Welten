@@ -120,6 +120,13 @@ export type HomeV2ClientProps = {
   inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
   boardObjectives: HomeV2BoardObjective[];
+  /**
+   * Friction fix (Generalprobe #2): true when no team is human-controlled yet
+   * (fresh save) — surfaces a dedicated CTA instead of silently hiding the
+   * generic `no_active_team` warning chip.
+   */
+  showTeamPickerCta?: boolean;
+  onOpenTeamPicker?: () => void;
   onContinue: () => void;
   onOpenTeams: () => void;
   onOpenLineup: () => void;

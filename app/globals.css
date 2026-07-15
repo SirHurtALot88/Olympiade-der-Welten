@@ -12062,6 +12062,50 @@ a {
   padding: 0 20px 20px;
 }
 
+/* Generalprobe #3 — make the two-step buy flow (erst verhandeln, dann
+   abschließen) visually explicit above the action buttons. */
+.transfer-buy-step-hint {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 20px 0;
+}
+
+.transfer-buy-step-hint > b {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.1rem;
+}
+
+.transfer-buy-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 220px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.transfer-buy-step > strong {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.transfer-buy-step.is-active {
+  border-color: rgba(120, 168, 255, 0.4);
+  background: rgba(38, 56, 88, 0.55);
+}
+
+.transfer-buy-step.is-done {
+  border-color: rgba(110, 196, 128, 0.4);
+  background: rgba(34, 73, 46, 0.5);
+}
+
 .transfer-buy-modal {
   max-width: 920px;
 }
@@ -42212,6 +42256,24 @@ button.foundation-team-portrait-card {
   font-size: 12px;
   line-height: 1.35;
   color: color-mix(in srgb, var(--nl-tone) 78%, var(--nl-ink));
+}
+
+/* Generalprobe #2 — prominent "Wähle dein Team" CTA on a fresh save. */
+.is-new-look .nl-home-team-picker-cta {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface, transparent));
+}
+
+.home-v2-team-picker-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(120, 168, 255, 0.4);
+  background: linear-gradient(180deg, rgba(38, 56, 88, 0.6), rgba(29, 41, 64, 0.6));
 }
 
 .is-new-look .nl-home-warning-row {

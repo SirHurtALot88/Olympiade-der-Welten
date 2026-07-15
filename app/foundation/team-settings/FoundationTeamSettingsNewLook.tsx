@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 
+import { parseFoundationTabFromUrl } from "@/lib/foundation/foundation-url-state";
+
 import {
   NlCard,
   NlSubTabs,
@@ -210,7 +212,16 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     withSynchronizedStrategyAliases,
   } = props;
 
-  const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>("saves");
+  // Friction fix (Generalprobe #2): the HQ "Wähle dein Team" CTA deep-links via
+  // `?view=teamSettings&tab=control`, so honor that tab on mount and open the
+  // "Spielmodus & KI" sub-tab (where `solo-player-team-select` lives) directly.
+  const [activeSection, setActiveSection] = useState<NlTeamSettingsSection>(() => {
+    const tab = typeof window !== "undefined" ? parseFoundationTabFromUrl() : null;
+    if (tab === "control" || tab === "team" || tab === "strategy" || tab === "saves") {
+      return tab;
+    }
+    return "saves";
+  });
 
   const exportDisabledReason = !selectedTeam
     ? "Wähle zuerst ein Team aus."
