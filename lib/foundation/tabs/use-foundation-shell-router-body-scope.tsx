@@ -8250,6 +8250,10 @@ export function useFoundationShellRouterBodyScope({
       }
       return;
     }
+    if (!canManageTeamId(selectedTeam.teamId)) {
+      showTeamManagementLockedNotice(getTeamLockedName(selectedTeam.teamId));
+      return;
+    }
 
     setAssignTeamCaptainBusy(true);
     try {
