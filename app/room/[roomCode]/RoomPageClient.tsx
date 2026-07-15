@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { ONLINE_ROOM_TEAM_IDS } from "@/lib/room/online-room-model";
-import { describeRoomFlowButton, getRoomFlowStep } from "@/lib/room/room-flow-controller";
+import { describeRoomFlowButton, getRoomFlowStep, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
@@ -157,6 +157,15 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
     if (state.multiplayerRoom.status === "lobby") return "Zum Spieltag";
     return "Ins Spiel";
   }, [state]);
+
+  const isLobby = state?.multiplayerRoom.status === "lobby";
+  // A real (non-sandbox) save already bound to the room means "Spiel starten" continues it
+  // rather than creating a fresh one - surface that to the host in the lobby.
+  const hasExistingRealSave = Boolean(state && !isSandboxRoomSave(state.multiplayerRoom.saveId));
+  // In the lobby the host's start action still creates/binds the real save, so relabel the
+  // generic flow CTA ("Room starten") to the clearer "Spiel starten".
+  const roomFlowButtonLabel =
+    isLobby && roomFlowButton?.isHostAction && roomFlowButton?.canClick ? "Spiel starten" : roomFlowButton?.label ?? "Lädt ...";
 
   const teamRosterParticipants = state?.roomParticipants.filter((participant) => participant.controlledTeamIds.length > 0) ?? [];
 
@@ -403,6 +412,13 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                   </span>
                 ) : null}
               </div>
+              {isHost && isLobby ? (
+                <p className="muted">
+                  {hasExistingRealSave
+                    ? "Für diesen Raum existiert bereits ein Spielstand. Mit „Spiel starten“ wird der bestehende Spielstand fortgesetzt."
+                    : "Mit „Spiel starten“ wird ein frischer Spielstand mit genau den gewählten Teams erstellt und beiden Spielern zugewiesen."}
+                </p>
+              ) : null}
               <div className="foundation-flow-actions">
                 <button
                   className={`primary-button foundation-flow-button ${roomFlowButton?.status === "waiting_for_player" ? "is-blocked" : ""}`}
@@ -438,11 +454,25 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                     });
                   }}
                 >
-                  {roomFlowButton?.label ?? "Lädt ..."}
+                  {roomFlowButtonLabel}
                 </button>
-                <Link className="primary-button inline-button oly-primary-cta" href={foundationHref}>
-                  {primaryCtaLabel}
-                </Link>
+                {isLobby ? (
+                  // Do NOT navigate while still in the lobby: the room save is only bound the
+                  // moment the host presses "Spiel starten". Entering now would carry the stale
+                  // sandbox saveId, so keep the CTA inert until status leaves "lobby".
+                  <button
+                    type="button"
+                    className="primary-button inline-button oly-primary-cta"
+                    disabled
+                    title="Erst nach dem Spielstart verfügbar"
+                  >
+                    {primaryCtaLabel}
+                  </button>
+                ) : (
+                  <Link className="primary-button inline-button oly-primary-cta" href={foundationHref}>
+                    {primaryCtaLabel}
+                  </Link>
+                )}
               </div>
             </div>
           </section>

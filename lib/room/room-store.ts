@@ -18,9 +18,13 @@ import {
   canParticipantControlTeam,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
-import { buildRoomFlowState, getNextRoomFlowStepId } from "@/lib/room/room-flow-controller";
+import { buildRoomFlowState, getNextRoomFlowStepId, isSandboxRoomSave } from "@/lib/room/room-flow-controller";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { createSeatToken } from "@/lib/room/seat-tokens";
+import { createRoomCoopSave } from "@/lib/game/new-game-setup-service";
+import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import type { PersistenceService } from "@/lib/persistence/types";
 import type { RoomOwnershipPreset } from "@/types/events";
 import type { CoachRole, RoomRealtimeEventType } from "@/types/game";
 import type { RoomSeat, RuntimeRoom } from "@/types/room";
@@ -541,7 +545,11 @@ export function setParticipantReadyState(roomCode: string, seatToken: string, re
   return { ok: true as const, room };
 }
 
-export function startRoom(roomCode: string, seatToken: string) {
+export function startRoom(
+  roomCode: string,
+  seatToken: string,
+  options?: { persistence?: PersistenceService },
+) {
   const room = getRoom(roomCode);
   if (!room) {
     return { ok: false as const, error: "Der Raum existiert nicht mehr." };
@@ -552,6 +560,67 @@ export function startRoom(roomCode: string, seatToken: string) {
   }
   if (!room.state.turnState.canAdvance) {
     return { ok: false as const, error: "Nicht alle erforderlichen Teilnehmer sind bereit." };
+  }
+
+  // Create + bind the co-op savegame BEFORE the status/step transition. Idempotency guard: only
+  // do this on the lobby -> season_active edge, so a repeated startRoom click can never mint a
+  // second save. Server-authoritative: the split is read from server-owned teamOwnership, never
+  // from a client-supplied saveId.
+  if (room.state.multiplayerRoom.status === "lobby") {
+    const persistence = options?.persistence ?? createPersistenceService();
+    const host =
+      room.state.roomParticipants.find((participant) => participant.role === "host") ??
+      room.state.roomParticipants[0] ??
+      null;
+    const franky =
+      room.state.roomParticipants.find((participant) => /franky/i.test(participant.displayName)) ??
+      room.state.roomParticipants.find((participant) => participant.role === "player") ??
+      null;
+    const chrisTeamIds = host
+      ? room.state.teamOwnership
+          .filter((entry) => entry.controllerType === "human" && entry.participantId === host.participantId)
+          .map((entry) => entry.teamId)
+      : [];
+    const frankyTeamIds = franky
+      ? room.state.teamOwnership
+          .filter((entry) => entry.controllerType === "human" && entry.participantId === franky.participantId)
+          .map((entry) => entry.teamId)
+      : [];
+
+    if (chrisTeamIds.length === 0) {
+      return { ok: false as const, error: "Weise zuerst dir mindestens ein Team zu." };
+    }
+
+    const currentSaveId = room.state.multiplayerRoom.saveId;
+    const existingSave = isSandboxRoomSave(currentSaveId) ? null : persistence.getSaveById(currentSaveId);
+
+    let boundSaveId: string;
+    if (existingSave) {
+      // Continue existing: reuse the real save, re-applying the current lobby split so team
+      // changes made in the lobby take effect without minting a fresh save.
+      const updatedGameState = applyGameModeOwnership(existingSave.gameState, {
+        saveMode: "online_4v4",
+        chrisTeamIds,
+        frankyTeamIds,
+      });
+      persistence.saveSingleplayerState(existingSave.saveId, updatedGameState);
+      boundSaveId = existingSave.saveId;
+    } else {
+      boundSaveId = createRoomCoopSave({ chrisTeamIds, frankyTeamIds, roomCode: room.roomCode }, persistence).saveId;
+    }
+
+    room.state = {
+      ...room.state,
+      multiplayerRoom: {
+        ...room.state.multiplayerRoom,
+        saveId: boundSaveId,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    room.state = appendRoomEvent(room.state, "save_updated", {
+      source: existingSave ? "start_room_continue_existing" : "start_room_fresh_coop_save",
+      saveId: boundSaveId,
+    });
   }
 
   room.state = {

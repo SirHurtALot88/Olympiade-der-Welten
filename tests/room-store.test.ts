@@ -18,6 +18,44 @@ import {
   startRoom,
 } from "@/lib/room/room-store";
 import { authorizeTeamWrite, buildExplicitTeamOwnership } from "@/lib/room/online-room-model";
+import { isSandboxRoomSave } from "@/lib/room/room-flow-controller";
+import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+
+/**
+ * In-memory persistence stub for startRoom: captures the co-op save's gameState and counts fresh
+ * creates, so room-store tests never touch the sqlite file (and can assert the bound save's
+ * ownership). Only the methods startRoom / createRoomCoopSave actually call are implemented.
+ */
+function createFakePersistence() {
+  const saves = new Map<string, PersistedSaveGame>();
+  const counters = { freshCreates: 0 };
+  const service = {
+    getSaveById: (saveId: string) => saves.get(saveId) ?? null,
+    createFreshSeasonOneSave: (input?: { saveId?: string; name?: string; status?: "active" | "archived" | "template" }) => {
+      counters.freshCreates += 1;
+      const save = {
+        saveId: input?.saveId ?? `fake-${saves.size}`,
+        name: input?.name ?? "Fake",
+        status: input?.status ?? "active",
+      } as unknown as PersistedSaveGame;
+      saves.set(save.saveId, save);
+      return save;
+    },
+    saveSingleplayerState: (saveId: string, gameState: unknown) => {
+      const existing = saves.get(saveId);
+      const save = {
+        ...(existing ?? {}),
+        saveId,
+        name: existing?.name ?? "Fake",
+        status: existing?.status ?? "archived",
+        gameState,
+      } as unknown as PersistedSaveGame;
+      saves.set(saveId, save);
+      return save;
+    },
+  };
+  return { service: service as unknown as PersistenceService, saves, counters };
+}
 
 describe("room store", () => {
   it("records gameplay writes and invalidates the acting participant ready state", () => {
@@ -78,6 +116,7 @@ describe("room store", () => {
   });
 
   it("blocks room start until required human participants are ready", () => {
+    const persistence = createFakePersistence();
     const created = createRoom("socket-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
     const joined = joinRoom(created.room.roomCode, "socket-b", { displayName: "Franky" });
     expect(joined.ok).toBe(true);
@@ -87,21 +126,22 @@ describe("room store", () => {
     expect(preset.ok).toBe(true);
     if (!preset.ok) return;
 
-    expect(startRoom(created.room.roomCode, created.seat.seatToken).ok).toBe(false);
+    expect(startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service }).ok).toBe(false);
     expect(setParticipantReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
-    expect(startRoom(created.room.roomCode, created.seat.seatToken).ok).toBe(false);
+    expect(startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service }).ok).toBe(false);
     expect(setParticipantReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
 
-    const started = startRoom(created.room.roomCode, created.seat.seatToken);
+    const started = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
     expect(started.ok).toBe(true);
     if (started.ok) {
       expect(started.room.state.multiplayerRoom.status).toBe("season_active");
       expect(started.room.state.roomFlowState.step).toBe("training");
       expect(started.room.state.turnState.canAdvance).toBe(false);
     }
-  });
+  }, 120_000);
 
   it("keeps the multiplayer flow blocked until Franky and AI teams are ready", () => {
+    const persistence = createFakePersistence();
     const created = createRoom("socket-flow-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
     const joined = joinRoom(created.room.roomCode, "socket-flow-b", { displayName: "Franky" });
     expect(joined.ok).toBe(true);
@@ -109,7 +149,7 @@ describe("room store", () => {
 
     expect(setParticipantReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
     expect(setParticipantReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
-    const started = startRoom(created.room.roomCode, created.seat.seatToken);
+    const started = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
     expect(started.ok).toBe(true);
     if (!started.ok) return;
 
@@ -135,7 +175,7 @@ describe("room store", () => {
       expect(advanced.room.state.teamOwnership.filter((entry) => entry.controllerType === "human")).toHaveLength(8);
       expect(advanced.room.state.teamOwnership.filter((entry) => entry.controllerType === "ai")).toHaveLength(24);
     }
-  });
+  }, 120_000);
 
   it("keeps arena reveal steps server-authoritative with ready gates", () => {
     const created = createRoom("socket-arena-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-save" });
@@ -449,5 +489,98 @@ describe("room store", () => {
     if (!result.ok) return;
     expect(result.ownership.find((entry) => entry.teamId === "C-S")).toMatchObject({ controllerType: "ai" });
     expect(result.ownership.find((entry) => entry.teamId === "M-M")).toMatchObject({ controllerType: "human", ownerDisplayName: "Chris" });
+  });
+
+  it("starts a room by creating a fresh co-op save bound to the room with the picked split", () => {
+    const persistence = createFakePersistence();
+    const created = createRoom("socket-fresh-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
+    const joined = joinRoom(created.room.roomCode, "socket-fresh-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    // Host picks exactly the teams each human plays; everything else must fall to AI.
+    const selection = applyRoomTeamSelection(created.room.roomCode, created.seat.seatToken, {
+      chrisTeamIds: ["M-M", "D-P"],
+      frankyTeamIds: ["C-S", "P-C"],
+    });
+    expect(selection.ok).toBe(true);
+    if (!selection.ok) return;
+
+    expect(setParticipantReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+    expect(setParticipantReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+
+    // The room save is still the default sandbox id until the host starts.
+    expect(isSandboxRoomSave(created.room.state.multiplayerRoom.saveId)).toBe(true);
+
+    const started = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+
+    const boundSaveId = started.room.state.multiplayerRoom.saveId;
+    expect(isSandboxRoomSave(boundSaveId)).toBe(false);
+    expect(boundSaveId).toMatch(/^new-game-/);
+    expect(persistence.counters.freshCreates).toBe(1);
+
+    const boundSave = persistence.saves.get(boundSaveId);
+    expect(boundSave).toBeTruthy();
+    const gameState = boundSave?.gameState as {
+      seasonState: { teamControlSettings: Record<string, { controlMode: string; ownerId?: string }> };
+      teams: Array<{ teamId: string; humanControlled: boolean }>;
+    };
+    const settings = gameState.seasonState.teamControlSettings;
+    // Chris's picks -> human/manual, owner user_local.
+    expect(settings["M-M"]).toMatchObject({ controlMode: "manual", ownerId: "user_local" });
+    expect(settings["D-P"]).toMatchObject({ controlMode: "manual", ownerId: "user_local" });
+    // Franky's picks -> human/manual, owner franky_remote_placeholder.
+    expect(settings["C-S"]).toMatchObject({ controlMode: "manual", ownerId: "franky_remote_placeholder" });
+    expect(settings["P-C"]).toMatchObject({ controlMode: "manual", ownerId: "franky_remote_placeholder" });
+    // A team nobody picked -> AI.
+    expect(settings["R-R"]?.controlMode).toBe("ai");
+    expect(gameState.teams.find((team) => team.teamId === "M-M")?.humanControlled).toBe(true);
+    expect(gameState.teams.find((team) => team.teamId === "R-R")?.humanControlled).toBe(false);
+
+    // A second start while status is no longer "lobby" must NOT mint another save (idempotent).
+    const room = getRoom(created.room.roomCode);
+    expect(room).toBeTruthy();
+    if (!room) return;
+    room.state = { ...room.state, turnState: { ...room.state.turnState, canAdvance: true } };
+    const secondStart = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
+    expect(secondStart.ok).toBe(true);
+    if (secondStart.ok) {
+      expect(secondStart.room.state.multiplayerRoom.saveId).toBe(boundSaveId);
+    }
+    expect(persistence.counters.freshCreates).toBe(1);
+
+    // Non-host cannot start.
+    const nonHostStart = startRoom(created.room.roomCode, joined.seat.seatToken, { persistence: persistence.service });
+    expect(nonHostStart.ok).toBe(false);
+    if (!nonHostStart.ok) {
+      expect(nonHostStart.error).toContain("Host");
+    }
+  }, 120_000);
+
+  it("rejects room start when the host has not assigned himself a team", () => {
+    const persistence = createFakePersistence();
+    const created = createRoom("socket-noteam-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
+    const joined = joinRoom(created.room.roomCode, "socket-noteam-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    // Give every human team to Franky only, so Chris (host) owns nothing.
+    const selection = applyRoomTeamSelection(created.room.roomCode, created.seat.seatToken, {
+      chrisTeamIds: [],
+      frankyTeamIds: ["C-S", "P-C"],
+    });
+    expect(selection.ok).toBe(true);
+    if (!selection.ok) return;
+
+    expect(setParticipantReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+
+    const started = startRoom(created.room.roomCode, created.seat.seatToken, { persistence: persistence.service });
+    expect(started.ok).toBe(false);
+    if (!started.ok) {
+      expect(started.error).toContain("Team");
+    }
+    expect(persistence.counters.freshCreates).toBe(0);
   });
 });

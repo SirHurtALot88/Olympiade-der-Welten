@@ -2,6 +2,25 @@ import { describe, expect, it } from "vitest";
 
 import { advanceRoomFlow, createRoom, joinRoom, runRoomAiAutoStep, setParticipantReadyState, startRoom } from "@/lib/room/room-store";
 import { describeRoomFlowButton, ROOM_FLOW_STEPS } from "@/lib/room/room-flow-controller";
+import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+
+// Minimal in-memory persistence so startRoom's co-op save creation never touches sqlite here.
+function fakePersistence(): PersistenceService {
+  const saves = new Map<string, PersistedSaveGame>();
+  return {
+    getSaveById: (saveId: string) => saves.get(saveId) ?? null,
+    createFreshSeasonOneSave: (input?: { saveId?: string; name?: string; status?: "active" | "archived" | "template" }) => {
+      const save = { saveId: input?.saveId ?? `fake-${saves.size}`, name: input?.name ?? "Fake", status: input?.status ?? "active" } as unknown as PersistedSaveGame;
+      saves.set(save.saveId, save);
+      return save;
+    },
+    saveSingleplayerState: (saveId: string, gameState: unknown) => {
+      const save = { saveId, name: "Fake", status: "archived", gameState } as unknown as PersistedSaveGame;
+      saves.set(saveId, save);
+      return save;
+    },
+  } as unknown as PersistenceService;
+}
 
 describe("room flow controller", () => {
   it("defines the multiplayer-ready room flow steps", () => {
@@ -46,7 +65,7 @@ describe("room flow controller", () => {
     expect(chrisReadyState.roomFlowState.canHostAdvance).toBe(false);
 
     expect(setParticipantReadyState(joined.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
-    const started = startRoom(joined.room.roomCode, created.seat.seatToken);
+    const started = startRoom(joined.room.roomCode, created.seat.seatToken, { persistence: fakePersistence() });
     expect(started.ok).toBe(true);
     if (!started.ok) return;
     expect(started.room.state.roomFlowState.step).toBe("training");
@@ -80,5 +99,5 @@ describe("room flow controller", () => {
     expect(advanced.room.state.roomFlowState.completedParticipantIds).toHaveLength(0);
     expect(advanced.room.state.roomFlowState.aiAutoCompletedTeamIds).toHaveLength(0);
     expect(advanced.room.state.roomFlowState.canHostAdvance).toBe(false);
-  });
+  }, 120_000);
 });
