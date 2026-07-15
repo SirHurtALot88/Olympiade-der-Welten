@@ -1002,7 +1002,13 @@ function buildPreviewRow(input: {
             ? "bad_value_contract"
             : renewalTco.exitTco <= renewalTco.renewTco
               ? "exit_cheaper_than_renew"
-              : "heuristic_release";
+              : // No economic trigger forced this exit (cash was fine, value/TCO were fine) — the player simply
+                // wouldn't stay. Surface morale as the visible reason instead of a generic "heuristic_release",
+                // matching what renewalBlockReason already reports. (Cash-gated/bad-value exits keep their
+                // economic reason as the proximate cause; the player's morale disposition is still on the row.)
+                morale?.contractIntent === "refuses_extension" || morale?.contractIntent === "considering_exit"
+                ? "morale_release"
+                : "heuristic_release";
 
   return {
     rowId: entry.id,

@@ -642,6 +642,34 @@ export default function FoundationMarketBuyShellHost({
               )}
             </div>
 
+            {/* Friction fix (Generalprobe #3): the two-step flow (erst
+                verhandeln, dann abschließen) was non-obvious. Make the sequence
+                explicit and, on a rejection, surface the reason right next to
+                the confirm button instead of only disabling it silently. */}
+            <div className="transfer-buy-step-hint" data-testid="transfer-buy-step-hint">
+              <span className={`transfer-buy-step${buyNegotiationOutcome?.status === "accepted" ? " is-done" : " is-active"}`}>
+                <strong>Schritt 1</strong>
+                <span>Verhandeln — Reaktion der Gegenseite einholen</span>
+              </span>
+              <b aria-hidden="true">→</b>
+              <span className={`transfer-buy-step${buyNegotiationOutcome?.status === "accepted" ? " is-active" : ""}`}>
+                <strong>Schritt 2</strong>
+                <span>Kauf final abschließen (erst nach Annahme möglich)</span>
+              </span>
+            </div>
+
+            {buyNegotiationOutcome?.status === "rejected" ? (
+              <div className="transfer-feedback-banner is-error" data-testid="transfer-buy-rejection-reason">
+                <strong>{buyNegotiationOutcome.title}</strong>
+                <span>{buyNegotiationOutcome.message}</span>
+                {buyPreview?.blockingReasons?.length ? (
+                  <span className="muted">
+                    Grund: {buyPreview.blockingReasons.map(formatNegotiationSignalLabel).join(" · ")}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="foundation-modal-actions">
               <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
                 Abbrechen
@@ -661,7 +689,7 @@ export default function FoundationMarketBuyShellHost({
                         : "Verhandlung starten und Reaktion der Gegenseite prüfen."
                 }
               >
-                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Verhandeln"}
+                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Schritt 1: Verhandeln"}
               </button>
               <button
                 className="primary-button"
@@ -671,10 +699,10 @@ export default function FoundationMarketBuyShellHost({
                 onClick={() => void confirmBuy()}
                 title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}
               >
-                {buyBusy ? "kauft..." : "Kauf final abschließen"}
+                {buyBusy ? "kauft..." : "Schritt 2: Kauf final abschließen"}
               </button>
             </div>
-      {finalBuyDisabledReason ? <p className="foundation-screen-action-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
+      {finalBuyDisabledReason ? <p className="foundation-screen-action-reason" data-testid="transfer-buy-disabled-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
     </section>
   );
 }

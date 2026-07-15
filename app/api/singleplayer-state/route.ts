@@ -40,6 +40,8 @@ import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-ser
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
+import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
+import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -422,9 +424,49 @@ export async function POST(request: Request) {
   } else if (body.action === "activate") {
     save = persistence.activateSave(body.saveId);
   } else if (body.action === "fresh-season-1") {
-    save = persistence.createFreshSeasonOneSave({
-      name: body.name,
+    const created = persistence.createFreshSeasonOneSave({ name: body.name });
+    // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a
+    // roster/lineup. The whole-league roster-fill (~40s) runs in the BACKGROUND (detached) on this long-lived
+    // custom Node server so the "new game" request returns immediately instead of blocking ~40s (which would
+    // time out behind a proxy). We mark the save "in_progress" now; the background fill flips it to "ready"
+    // when every team is populated (or "failed" on error, retryable from the Cockpit). The UI shows a
+    // "Liga wird erstellt…" gate and polls until "ready".
+    const setupSaveId = created.saveId;
+    const setupSeasonId = created.gameState.season.id;
+    save = persistence.saveSingleplayerState(setupSaveId, {
+      ...created.gameState,
+      seasonState: { ...created.gameState.seasonState, leagueSetupStatus: "in_progress" },
     });
+    void (async () => {
+      try {
+        await runAutoRosterFillForMatchdaySetup(
+          {
+            source: "sqlite",
+            saveId: setupSaveId,
+            seasonId: setupSeasonId,
+            dryRun: false,
+            confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+          },
+          persistence,
+        );
+        const filled = persistence.getSaveById(setupSaveId);
+        if (filled) {
+          persistence.saveSingleplayerState(setupSaveId, {
+            ...filled.gameState,
+            seasonState: { ...filled.gameState.seasonState, leagueSetupStatus: "ready" },
+          });
+        }
+      } catch (error) {
+        console.error("[fresh-season-1] background roster-fill failed (retryable from Cockpit):", error);
+        const errored = persistence.getSaveById(setupSaveId);
+        if (errored) {
+          persistence.saveSingleplayerState(setupSaveId, {
+            ...errored.gameState,
+            seasonState: { ...errored.gameState.seasonState, leagueSetupStatus: "failed" },
+          });
+        }
+      }
+    })();
   } else if (body.action === "delete") {
     if (!Array.isArray(body.saveIds) || body.saveIds.length === 0) {
       return NextResponse.json({ error: "saveIds ist erforderlich und darf nicht leer sein." }, { status: 400 });

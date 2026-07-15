@@ -95,6 +95,8 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
     nextStepDetail,
     nextStepBlocked = false,
     warnings,
+    showTeamPickerCta = false,
+    onOpenTeamPicker,
     topPlayers,
     leagueHeatPools,
     facilities,
@@ -198,6 +200,22 @@ export default function HomeV2Client(props: HomeV2ClientProps) {
             shows the next-step label + status. onContinue stays wired for the
             no-players EmptyState fallback. */}
       </header>
+
+      {showTeamPickerCta ? (
+        <FoundationCard className="home-v2-team-picker-cta" data-testid="home-team-picker-cta">
+          <div className="stack">
+            <span className="eyebrow">Erster Schritt</span>
+            <strong>Wähle dein Team</strong>
+            <p className="muted">
+              Noch steuert kein Team dieses Save. Wähle dein Team in den Team-Einstellungen, um Kader,
+              Transfers und Aufstellung selbst zu übernehmen.
+            </p>
+          </div>
+          <FoundationButton variant="primary" onClick={() => onOpenTeamPicker?.()}>
+            Team wählen
+          </FoundationButton>
+        </FoundationCard>
+      ) : null}
 
       <FoundationGameDecisionBoard
         title="Heute wichtig"
