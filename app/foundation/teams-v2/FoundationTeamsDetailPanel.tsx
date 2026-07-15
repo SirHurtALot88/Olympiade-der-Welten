@@ -1455,7 +1455,7 @@ function FoundationTeamsDetailPanel({
                                     }}
                                   >
                                     <span className="nl-teams-playername">{row.playerName}</span>
-                                    <span className="nl-teams-playermeta">{row.roleTag ?? "Kader"}</span>
+                                    <span className="nl-teams-playermeta">{(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}</span>
                                   </button>
                                   {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
                                 </div>
@@ -1711,7 +1711,7 @@ function FoundationTeamsDetailPanel({
                                   <td>
                                     <div className="table-player-cell">
                                       <strong>{row.playerName}</strong>
-                                      <span>{row.roleTag ?? "Kader"}</span>
+                                      <span>{(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}</span>
                                       {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
                                     </div>
                                   </td>

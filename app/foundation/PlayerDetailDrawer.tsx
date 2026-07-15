@@ -251,6 +251,16 @@ function formatRoleTag(value: string | null | undefined) {
   return value;
 }
 
+/**
+ * "Prospect" ist ein auto-abgeleiteter Rausch-Rollen-Tag (#121-Deklutter): er
+ * wird in der UI nicht mehr als sichtbare Rolle gezeigt. Die zugrunde liegenden
+ * Daten/Typen (`roleTag === "prospect"`) bleiben unangetastet — es wird nur die
+ * Anzeige unterdrückt.
+ */
+function isHiddenRoleTag(value: string | null | undefined) {
+  return (value ?? "").toLowerCase() === "prospect";
+}
+
 function getTransferStatusTone(status: string) {
   const normalized = status.toLowerCase();
   if (normalized.includes("free")) {
@@ -1066,16 +1076,15 @@ function formatCompactSeasonLabel(value: string | null | undefined) {
   return match?.[1] ?? canonical;
 }
 
-type TopDisciplineColumnId = "discipline" | "value" | "slot" | "seasonPps" | "mutator" | "allTimePps";
+type TopDisciplineColumnId = "discipline" | "value" | "seasonPps" | "prevSeasonPps" | "allTimePps";
 type TopDisciplineSortDirection = "asc" | "desc";
 type TopDisciplineRow = PlayerDetailDrawerData["disciplineValues"][number];
 
 const TOP_DISCIPLINE_COLUMN_ORDER: TopDisciplineColumnId[] = [
   "discipline",
   "value",
-  "slot",
   "seasonPps",
-  "mutator",
+  "prevSeasonPps",
   "allTimePps",
 ];
 
@@ -1085,12 +1094,10 @@ function getTopDisciplineColumnLabel(columnId: TopDisciplineColumnId, isScoutedP
       return "Disziplin";
     case "value":
       return isScoutedProfile ? "Klasse" : "Stat";
-    case "slot":
-      return "Slot";
     case "seasonPps":
       return "PPs";
-    case "mutator":
-      return "Mutator";
+    case "prevSeasonPps":
+      return "−1 PPs";
     case "allTimePps":
       return "All-Time";
     default:
@@ -1104,12 +1111,10 @@ function getTopDisciplineSortValue(row: TopDisciplineRow, columnId: TopDisciplin
       return row.label;
     case "value":
       return row.value;
-    case "slot":
-      return row.slotLabels.length ? row.slotLabels.join(", ") : null;
     case "seasonPps":
       return row.seasonPoints;
-    case "mutator":
-      return row.currentSeasonMutatorPps;
+    case "prevSeasonPps":
+      return row.lastSeasonPoints;
     case "allTimePps":
       return row.allTimePoints;
     default:
@@ -1225,12 +1230,10 @@ function renderTopDisciplineCell(
         </span>
       );
     }
-    case "slot":
-      return row.slotLabels.length ? row.slotLabels.slice(0, 2).join(", ") : "—";
     case "seasonPps":
       return formatPointsWithRank(row.seasonPoints, row.seasonPointsRank ?? null);
-    case "mutator":
-      return row.currentSeasonMutatorPps != null ? `+${formatValue(row.currentSeasonMutatorPps, 1)}` : "—";
+    case "prevSeasonPps":
+      return formatPointsWithRank(row.lastSeasonPoints, null);
     case "allTimePps":
       return formatPointsWithAppearancesAndRank(
         row.allTimePoints,
@@ -1895,6 +1898,15 @@ export default function PlayerDetailDrawer({
   const transferContext = data.transferContext;
   const isFreeAgent = data.transferStatus.toLowerCase().includes("free");
   const isScoutedProfile = data.attributeVisibility === "scouted";
+  // Fog-of-War: exakte Fähigkeitswerte (Attribut-Zahlen + Diszi-"Stat") sind nur
+  // für eigene, menschlich kontrollierte Teams sichtbar. Für fremde Spieler
+  // (AI-/nicht kontrollierte Teams) werden diese Zahlen verdeckt/als Klasse
+  // geschätzt — unabhängig von den temporären Debug-/Admin-Bypässen. Leistungs-
+  // und Historiendaten (Einsätze, Fatigue, Verletzungen, PPs, −1 PPs, All-Time,
+  // History) bleiben offen sichtbar. `teamHumanControlled` ist derselbe
+  // Besitz-Signalwert, den der Drawer bereits an anderer Stelle nutzt.
+  const abilitiesKnown = data.teamHumanControlled === true;
+  const disciplineStatFogged = isScoutedProfile || !abilitiesKnown;
   const scoutingLevel = data.scoutingLevel ?? 0;
   const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
   const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
@@ -1983,9 +1995,14 @@ export default function PlayerDetailDrawer({
   // Detailansicht — nur exakt sichtbare, numerische Attribute (Fog-of-War
   // bleibt exakt wie im Karten-Grid darunter: verdeckte/Range-Attribute
   // erscheinen dort schlicht nicht).
-  const attributeBarChartBars = data.attributeStats
-    .filter((entry) => entry.value != null && Number.isFinite(entry.value))
-    .map((entry) => ({ label: entry.label.slice(0, 4).toUpperCase(), value: entry.value as number }));
+  // Fog-of-War: exakte Attribut-Balken nur für eigene Spieler. Für fremde
+  // Spieler bleibt der Balken-Chart leer (verdeckt), die Attribut-Karten
+  // darunter zeigen stattdessen nur das grobe Rating-Band.
+  const attributeBarChartBars = abilitiesKnown
+    ? data.attributeStats
+        .filter((entry) => entry.value != null && Number.isFinite(entry.value))
+        .map((entry) => ({ label: entry.label.slice(0, 4).toUpperCase(), value: entry.value as number }))
+    : [];
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
@@ -2098,7 +2115,7 @@ export default function PlayerDetailDrawer({
             <>
               <PlayerHeroNewLook
                 data={data}
-                roleLabel={formatRoleTag(transferContext.roleTag)}
+                roleLabel={isHiddenRoleTag(transferContext.roleTag) ? "" : formatRoleTag(transferContext.roleTag)}
                 caStars={newLookCaPo?.caStars ?? null}
                 poStars={newLookCaPo?.poStars ?? null}
                 isFreeAgent={isFreeAgent}
@@ -2234,10 +2251,12 @@ export default function PlayerDetailDrawer({
                       <small>Scouting</small>
                       <strong>L{data.scoutingLevel ?? 0}</strong>
                     </span>
-                    <span className="player-drawer-header-metric">
-                      <small>Rolle</small>
-                      <strong>{formatRoleTag(transferContext.roleTag)}</strong>
-                    </span>
+                    {isHiddenRoleTag(transferContext.roleTag) ? null : (
+                      <span className="player-drawer-header-metric">
+                        <small>Rolle</small>
+                        <strong>{formatRoleTag(transferContext.roleTag)}</strong>
+                      </span>
+                    )}
                     <span className="player-drawer-header-metric" title={buildFatigueImpactTooltip(data)}>
                       <small>Erschöpfung</small>
                       <strong>{formatValue(data.fatigue, 0)}</strong>
@@ -2288,10 +2307,12 @@ export default function PlayerDetailDrawer({
                     <span className="player-drawer-overline">
                       Scouting{newLookEnabled ? ` L${data.scoutingLevel ?? 0}` : ""}
                     </span>
-                    {!newLookEnabled ? (
+                    {!newLookEnabled && (!isHiddenRoleTag(transferContext.roleTag) || transferContext.promisedRole) ? (
                       <p className="player-drawer-subline player-drawer-role-line">
-                        Rolle {formatRoleTag(transferContext.roleTag)}
-                        {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
+                        {isHiddenRoleTag(transferContext.roleTag) ? "" : `Rolle ${formatRoleTag(transferContext.roleTag)}`}
+                        {transferContext.promisedRole
+                          ? `${isHiddenRoleTag(transferContext.roleTag) ? "" : " · "}Versprochen ${formatRoleTag(transferContext.promisedRole)}`
+                          : ""}
                       </p>
                     ) : null}
                     <PlayerCaPoStarStack data={data} newLook={newLookEnabled} />
@@ -2591,7 +2612,7 @@ export default function PlayerDetailDrawer({
                 title={
                   isScoutedProfile
                     ? "Scouting zeigt nur grobe Klassen der besten Disziplinen. Exakte Diszi-Werte werden nicht gespoilert."
-                    : "Alle Disziplinen des Spielers mit Stat, Slot, PPs, Mutator-Anteil und All-Time-Werten. Sortierbar per Klick auf die Spaltenköpfe."
+                    : "Alle Disziplinen des Spielers mit Stat, PPs, −1 PPs und All-Time-Werten (inkl. Rang). Sortierbar per Klick auf die Spaltenköpfe."
                 }
               >
                 Top-Disziplinen
@@ -2627,7 +2648,7 @@ export default function PlayerDetailDrawer({
                                 type="button"
                                 onClick={() => handleTopDisciplineSort(columnId)}
                               >
-                                <span>{getTopDisciplineColumnLabel(columnId, isScoutedProfile)}</span>
+                                <span>{getTopDisciplineColumnLabel(columnId, disciplineStatFogged)}</span>
                                 <span className="sortable-arrow">{sortArrow}</span>
                               </button>
                             </th>
@@ -2645,7 +2666,7 @@ export default function PlayerDetailDrawer({
                                 key={`discipline-breakdown-${entry.id}-${columnId}`}
                                 className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                               >
-                                {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel, newLookEnabled)}
+                                {renderTopDisciplineCell(entry, columnId, disciplineStatFogged, scoutingLevel, newLookEnabled)}
                               </td>
                             ))}
                           </tr>
@@ -2727,7 +2748,10 @@ export default function PlayerDetailDrawer({
                     : cardAffinity === "weak"
                       ? "Weak-Attribut: -20% organisches Wachstum"
                       : null);
-                const showExactAttribute = entry.value != null;
+                // Fog-of-War: exakte Attribut-Zahlen nur für eigene Spieler.
+                // Für fremde Spieler fällt die Karte auf das grobe Rating-Band
+                // (bzw. "verdeckt") zurück — keine exakte Zahl, keine Sparkline.
+                const showExactAttribute = abilitiesKnown && entry.value != null;
                 const showRangeAttribute = data.attributeVisibility === "scouted" && entry.revealed && entry.rangeLabel;
                 const attributePrimaryLabel = showExactAttribute
                   ? formatValue(entry.value, 0)
