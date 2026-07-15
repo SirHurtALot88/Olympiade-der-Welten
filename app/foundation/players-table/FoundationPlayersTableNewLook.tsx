@@ -796,7 +796,7 @@ export default function FoundationPlayersTableNewLook({
    * nebeneinander benachbarter Achsen und laufen nicht zusammen
    * ("91SPE" statt "91 · SPE"). Jede Achse ist einzeln lesbar.
    *
-   * Bewusst NUR Balken + Wert (kein inline "#Rang" mehr) — PPS/OVR/MVS
+   * Bewusst NUR Balken + Wert (kein inline "#Rang" mehr) — PPs/OVR/MVS
    * tragen bereits eigene Top-%/Rang-Chips, ein zusätzlicher #Rang je
    * Achse war reine Excel-Redundanz ("ein GAME, keine Excel-Tabelle").
    * Der ligaweite Rang bleibt trotzdem einen Hover entfernt: er steckt im

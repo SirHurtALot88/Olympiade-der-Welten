@@ -656,12 +656,12 @@ export default function LegacyResolveLabClient({
                   <th>Status</th>
                   <th>D1 Status</th>
                   <th>D1</th>
-                  <th>D1 PPS</th>
+                  <th>D1 PPs</th>
                   <th>D2 Status</th>
                   <th>D2</th>
-                  <th>D2 PPS</th>
+                  <th>D2 PPs</th>
                   <th>Total</th>
-                  <th>Total PPS</th>
+                  <th>Total PPs</th>
                   <th>Warnings</th>
                   <th>Reason</th>
                   <th>Top Player</th>
@@ -771,7 +771,7 @@ export default function LegacyResolveLabClient({
                       <span>Form: {side.preview?.formModifier == null ? "—" : formatScore(side.preview.formModifier)}</span>
                       <span>Mutator: {side.preview?.mutatorModifier == null ? "—" : formatScore(side.preview.mutatorModifier)}</span>
                       <span>Total: {side.preview ? formatScore(side.preview.finalPreviewScore) : "—"}</span>
-                      <span>PPS: {side.preview?.teamPoints == null ? "—" : formatScore(side.preview.teamPoints)}</span>
+                      <span>PPs: {side.preview?.teamPoints == null ? "—" : formatScore(side.preview.teamPoints)}</span>
                     </div>
                     {side.preview?.warnings.length ? (
                       <ul className="warning-list compact-list">
@@ -799,7 +799,7 @@ export default function LegacyResolveLabClient({
                           <span>Captain {entry.captainBonus == null ? "—" : formatScore(entry.captainBonus)}</span>
                           <span>Mutator {entry.mutatorBonus == null ? "—" : formatScore(entry.mutatorBonus)}</span>
                           <span>Total {entry.finalPlayerScore == null ? "—" : formatScore(entry.finalPlayerScore)}</span>
-                          <span>PPS {entry.pointsAwarded == null ? "—" : formatScore(entry.pointsAwarded)}</span>
+                          <span>PPs {entry.pointsAwarded == null ? "—" : formatScore(entry.pointsAwarded)}</span>
                           <span>{entry.isCaptain ? "Captain" : "—"}</span>
                         </div>
                       ))}
@@ -836,7 +836,7 @@ export default function LegacyResolveLabClient({
                   </button>
                   <span>{player.teamName}</span>
                   <span>{formatScore(player.finalPlayerScore)}</span>
-                  <span>PPS {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>
+                  <span>PPs {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>
                   <span>Slot {player.slotIndex + 1}</span>
                   <span>{player.isMvpCandidate ? "MVP" : "—"}</span>
                 </div>
@@ -865,7 +865,7 @@ export default function LegacyResolveLabClient({
                   </button>
                   <span>{player.teamName}</span>
                   <span>{formatScore(player.finalPlayerScore)}</span>
-                  <span>PPS {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>
+                  <span>PPs {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>
                   <span>Slot {player.slotIndex + 1}</span>
                   <span>{player.isMvpCandidate ? "MVP" : "—"}</span>
                 </div>
