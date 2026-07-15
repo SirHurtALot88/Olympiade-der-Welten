@@ -13,6 +13,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  useCountUp,
 } from "@/components/foundation/new-look";
 import {
   SPONSOR_ARCHETYPE_META,
@@ -368,9 +369,61 @@ export default function FoundationSponsorsNewLook({
     );
   }, [selectedTeamCommercialRating]);
 
+  // KPI-Hero: Kommerz-Score, aktiver Sponsor, Cash/Saison des laufenden
+  // Vertrags und Ø-Angebotswert der offenen Angebote — ausschließlich aus
+  // bereits vorhandenen Daten (kein neuer Fetch/State).
+  const activeContractCashTotal = useMemo(() => {
+    if (!selectedTeamSponsorContract) return null;
+    return selectedTeamSponsorContract.components.reduce(
+      (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
+      0,
+    );
+  }, [selectedTeamSponsorContract]);
+  const avgOfferCashValue = useMemo(() => {
+    if (offerCashSummaries.length === 0) return null;
+    return offerCashSummaries.reduce((sum, entry) => sum + entry.totalCash, 0) / offerCashSummaries.length;
+  }, [offerCashSummaries]);
+
+  const animatedKpiScore = useCountUp(selectedTeamCommercialRating?.score ?? null);
+  const animatedKpiContractCash = useCountUp(activeContractCashTotal);
+  const animatedKpiAvgOfferCash = useCountUp(avgOfferCashValue);
+
   return (
     <div data-testid="foundation-sponsors">
       <section className="nl-sponsor" data-testid="team-sponsor-choice" id="sponsor-choice" data-new-look="true">
+        <StatChipRow className="nl-sponsor-kpi-hero" aria-label="Sponsoren-Kennzahlen">
+          <StatChip
+            label="Kommerz-Score"
+            value={
+              selectedTeamCommercialRating
+                ? formatNlNumber(animatedKpiScore ?? selectedTeamCommercialRating.score, 0)
+                : "—"
+            }
+            sub={selectedTeamCommercialRating ? `Erwartung ★${selectedTeamCommercialRating.tierHint}` : undefined}
+            tone="accent"
+          />
+          <StatChip
+            label="Aktiver Sponsor"
+            value={selectedTeamSponsorContract ? "Ja" : "Nein"}
+            sub={selectedTeamSponsorContract?.name}
+            tone={selectedTeamSponsorContract ? "good" : "neutral"}
+          />
+          <StatChip
+            label="Cash/Saison"
+            value={
+              activeContractCashTotal != null
+                ? formatMoney(animatedKpiContractCash ?? activeContractCashTotal)
+                : "—"
+            }
+            sub={activeContractCashTotal != null ? "aktiver Vertrag" : "kein Vertrag"}
+            tone={activeContractCashTotal != null ? "good" : "neutral"}
+          />
+          <StatChip
+            label="Ø-Angebotswert"
+            value={avgOfferCashValue != null ? formatMoney(animatedKpiAvgOfferCash ?? avgOfferCashValue) : "—"}
+            sub={avgOfferCashValue != null ? `${offerCashSummaries.length} Angebote` : undefined}
+          />
+        </StatChipRow>
         <NlCard
           className="nl-sponsor-header-card"
           eyebrow="Sponsoren"
@@ -397,7 +450,7 @@ export default function FoundationSponsorsNewLook({
                 label="Historie"
                 value={selectedTeamCommercialRating.breakdown.recentPerformance}
                 max={100}
-                tone="men"
+                tone="accent"
                 format={(value) => formatNlNumber(value, 0)}
                 title="Jüngste sportliche Performance"
               />
@@ -405,7 +458,7 @@ export default function FoundationSponsorsNewLook({
                 label="Kader"
                 value={selectedTeamCommercialRating.breakdown.rosterPotential}
                 max={100}
-                tone="spe"
+                tone="accent"
                 format={(value) => formatNlNumber(value, 0)}
                 title="Kader-Potential"
               />
@@ -413,7 +466,7 @@ export default function FoundationSponsorsNewLook({
                 label="Prestige"
                 value={selectedTeamCommercialRating.breakdown.prestige}
                 max={100}
-                tone="soc"
+                tone="accent"
                 format={(value) => formatNlNumber(value, 0)}
                 title="Prestige/Medaillenhistorie"
               />

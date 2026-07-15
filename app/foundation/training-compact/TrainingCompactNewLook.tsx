@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { EmptyState } from "@/components/foundation/EmptyState";
-import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber } from "@/components/foundation/new-look";
+import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber, useCountUp } from "@/components/foundation/new-look";
 import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
@@ -851,6 +851,13 @@ export default function TrainingCompactNewLook({
     return { performance, training, regression, net };
   }, [playerRows]);
 
+  // Hero-Zähler (#Wave2) für die 4 Header-Kacheln — reine Zähl-Animation,
+  // keine neue Berechnung (identische Summen wie `teamKpis`).
+  const animatedTeamPerformance = useCountUp(teamKpis.performance);
+  const animatedTeamTraining = useCountUp(teamKpis.training);
+  const animatedTeamRegression = useCountUp(teamKpis.regression);
+  const animatedTeamNet = useCountUp(teamKpis.net);
+
   return (
     <section
       className="nl-training"
@@ -885,28 +892,28 @@ export default function TrainingCompactNewLook({
         <StatChipRow aria-label="Trainings-Kennzahlen: Performance, Trainings-Zugewinn, Regression, Netto">
           <StatChip
             label="Performance"
-            value={`+${formatNlNumber(teamKpis.performance, 1)} SP`}
+            value={`+${formatNlNumber(animatedTeamPerformance ?? teamKpis.performance, 1)} SP`}
             sub="aus Matchday-Ergebnissen"
             tone="pow"
             title="SP-Zuwachs aus echten Matchday-Ergebnissen (Score, Rang, Beitrag) über den ganzen Kader — unabhängig von der Trainingsintensität."
           />
           <StatChip
             label="Trainings-Zugewinn"
-            value={`+${formatNlNumber(teamKpis.training, 1)} SP`}
+            value={`+${formatNlNumber(animatedTeamTraining ?? teamKpis.training, 1)} SP`}
             sub="aus Trainingsintensität"
             tone="accent"
             title="SP-Zuwachs durch Training über den ganzen Kader — abhängig von Trainingsintensität (Leicht/Mittel/Hart), Potential und Facility-Boni."
           />
           <StatChip
             label="Regression"
-            value={`${formatNlNumber(teamKpis.regression, 1)} SP`}
+            value={`${formatNlNumber(animatedTeamRegression ?? teamKpis.regression, 1)} SP`}
             sub="Alterung & Marktwert-Druck"
             tone="risk"
             title="SP-Verlust, den der Kader automatisch durch Alterung, Marktwert-Druck und Belastung verliert — muss durch Training + Performance ausgeglichen werden."
           />
           <StatChip
             label="Netto"
-            value={`${formatVeloSignedNumber(teamKpis.net, 1)} SP`}
+            value={`${formatVeloSignedNumber(animatedTeamNet ?? teamKpis.net, 1)} SP`}
             sub="Performance + Training − Regression"
             tone={teamKpis.net >= 0 ? "good" : "risk"}
             title="Summe aus Performance + Trainings-Zugewinn − Regression über den ganzen Kader. Positiv = Kader wächst im Schnitt, negativ = Kader baut im Schnitt ab."

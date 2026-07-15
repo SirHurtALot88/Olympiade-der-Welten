@@ -6,11 +6,13 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlEmptyState,
   NlProgressBar,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
+  useCountUp,
 } from "@/components/foundation/new-look";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
@@ -553,6 +555,9 @@ export default function FacilitiesV2NewLook({
   const activeFacility = selectedFacility;
   const primaryAction = activeFacility ? getPrimaryFacilityAction(activeFacility) : "upgrade";
 
+  // Hero-Zähler (#Wave2) für die Portfolio-Cash-Kachel im Header.
+  const animatedPortfolioCash = useCountUp(summary.cashCurrent);
+
   return (
     <section
       className={`nl-facility${facilityDialog ? " is-facility-mode" : ""}`}
@@ -581,7 +586,11 @@ export default function FacilitiesV2NewLook({
       >
         {managementLockedReason ? <p className="nl-facility-locked">{managementLockedReason}</p> : null}
         <StatChipRow aria-label="Gebäude-Kennzahlen">
-          <StatChip label="Cash" value={formatTransfermarktCurrency(summary.cashCurrent)} tone="soc" />
+          <StatChip
+            label="Cash"
+            value={formatTransfermarktCurrency(animatedPortfolioCash ?? summary.cashCurrent)}
+            tone="soc"
+          />
           <StatChip
             label="Einnahmen"
             value={`+${formatTransfermarktCurrency(portfolioFinance.incomeTotal)}`}
@@ -683,7 +692,20 @@ export default function FacilitiesV2NewLook({
 
       {viewMode === "cards" ? (
         <div className="nl-facility-grid" data-testid="facilities-v2-grid">
-          {visibleFacilityRows.map((facility) => {
+          {visibleFacilityRows.length === 0 ? (
+            <NlEmptyState
+              title="Keine Gebäude für diesen Filter."
+              message="Der Zustand-Filter blendet gerade alle Gebäude aus."
+              action={{
+                label: "Filter zurücksetzen",
+                onClick: () => {
+                  setWearFilter("all");
+                  setSort({ key: "default", direction: "desc" });
+                },
+              }}
+            />
+          ) : (
+            visibleFacilityRows.map((facility) => {
             const wearTone = getWearTone(facility);
             const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
             return (
@@ -746,8 +768,9 @@ export default function FacilitiesV2NewLook({
                   </span>
                 </div>
               </button>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       ) : (
         <div className="nl-facility-list-wrap" data-testid="facilities-v2-list">
@@ -772,7 +795,24 @@ export default function FacilitiesV2NewLook({
               </tr>
             </thead>
             <tbody>
-              {visibleFacilityRows.map((facility) => {
+              {visibleFacilityRows.length === 0 ? (
+                <tr>
+                  <td colSpan={FACILITY_LIST_COLUMNS.length}>
+                    <NlEmptyState
+                      title="Keine Gebäude für diesen Filter."
+                      message="Der Zustand-Filter blendet gerade alle Gebäude aus."
+                      action={{
+                        label: "Filter zurücksetzen",
+                        onClick: () => {
+                          setWearFilter("all");
+                          setSort({ key: "default", direction: "desc" });
+                        },
+                      }}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                visibleFacilityRows.map((facility) => {
                 const wearTone = getWearTone(facility);
                 const isSelected = facility.id === (selectedFacilityId ?? facilityRows[0]?.id);
                 return (
@@ -798,8 +838,9 @@ export default function FacilitiesV2NewLook({
                       {formatTransfermarktCurrency(effectiveSeasonIncome(facility, beliebtheit) - facility.currentUpkeep)}
                     </td>
                   </tr>
-                );
-              })}
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

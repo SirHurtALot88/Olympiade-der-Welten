@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useMemo, useState, type KeyboardEvent } from "react";
+import { Fragment, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
   NlProgressBar,
@@ -18,6 +19,7 @@ import {
   formatNlNumber,
   formatNlMoney,
   nlToneClass,
+  useCountUp,
   type NlBarChartBar,
   type NlRankingDrawerRow,
   type NlTone,
@@ -260,6 +262,13 @@ export default function SeasonStandingsNewLook({
     }
     return leaderPoints - selectedTeamSummary.points;
   }, [selectedTeamSummary, leaderPoints]);
+
+  // Hero-/KPI-Zähler (#Wave2): nur die eigenen Team-Kennzahlen zählen hoch —
+  // Board, Podium-Zeilen und Tabelle bleiben unverändert (viele Zeilen, kein
+  // Zähler pro Zeile). Respektiert prefers-reduced-motion via `useCountUp`.
+  const animatedOwnRank = useCountUp(selectedTeamSummary?.rank ?? null);
+  const animatedOwnPoints = useCountUp(selectedTeamSummary?.points ?? null);
+  const animatedOwnMarketValue = useCountUp(selectedTeamSummary?.marketValueTotal ?? null);
 
   /**
    * Daten-Modus-Balkenchart: folgt standardmäßig `points`, schwenkt aber
@@ -557,7 +566,7 @@ export default function SeasonStandingsNewLook({
     );
   }
 
-  function renderBoardRow(row: SeasonV2StandingsRow) {
+  function renderBoardRow(row: SeasonV2StandingsRow, revealIndex: number) {
     const isExpanded = expandedTeamId === row.teamId;
     const isPodium = row.rank != null && row.rank >= 1 && row.rank <= 3;
     const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
@@ -565,8 +574,8 @@ export default function SeasonStandingsNewLook({
     return (
       <li
         key={row.teamId}
-        className={`nl-standings-row${row.isSelected ? " is-selected" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
-        style={getSeasonV2TeamTagStyle(row.teamCode)}
+        className={`nl-standings-row nl-reveal${row.isSelected ? " is-selected" : ""}${isPodium ? " is-podium" : ""}${isExpanded ? " is-expanded" : ""}`}
+        style={{ ...getSeasonV2TeamTagStyle(row.teamCode), "--nl-reveal-i": Math.min(revealIndex, 14) } as CSSProperties}
       >
         <div
           className="nl-standings-rowmain"
@@ -671,14 +680,16 @@ export default function SeasonStandingsNewLook({
       <StatChipRow className="nl-standings-daten-kpis" label="Dein Team" aria-label="Deine Kennzahlen im Datenmodus">
         <StatChip
           label="Dein Rang"
-          value={selectedTeamSummary.rank != null ? `#${selectedTeamSummary.rank}` : "—"}
+          value={
+            selectedTeamSummary.rank != null ? `#${formatNlNumber(animatedOwnRank ?? selectedTeamSummary.rank, 0)}` : "—"
+          }
           tone="accent"
           onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
           title="Punkte-Rangliste"
         />
         <StatChip
           label="Punkte"
-          value={formatNlNumber(selectedTeamSummary.points, 1)}
+          value={formatNlNumber(animatedOwnPoints ?? selectedTeamSummary.points, 1)}
           onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
           title="Punkte-Rangliste"
         />
@@ -690,7 +701,7 @@ export default function SeasonStandingsNewLook({
         />
         <StatChip
           label="MW"
-          value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
+          value={formatNlMoney(animatedOwnMarketValue ?? selectedTeamSummary.marketValueTotal)}
           onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
           title="Marktwert-Rangliste"
         />
@@ -836,7 +847,11 @@ export default function SeasonStandingsNewLook({
               ? row.points - podiumLeaderPoints
               : null;
           return (
-            <li key={row.teamId} className={`nl-standings-podium-card is-${medalKind}`} style={getSeasonV2TeamTagStyle(row.teamCode)}>
+            <li
+              key={row.teamId}
+              className={`nl-standings-podium-card is-${medalKind} nl-reveal`}
+              style={{ ...getSeasonV2TeamTagStyle(row.teamCode), "--nl-reveal-i": index } as CSSProperties}
+            >
               <button
                 type="button"
                 className="nl-standings-podium-btn"
@@ -848,7 +863,9 @@ export default function SeasonStandingsNewLook({
                 </span>
                 <span className="nl-standings-podium-copy">
                   <span className="nl-standings-podium-name">{row.teamName}</span>
-                  <span className="nl-standings-podium-points nl-tnum">{formatNlNumber(row.points, 1)} Pkt</span>
+                  <span className="nl-standings-podium-points nl-tnum">
+                    <NlCountUpValue value={row.points} format={(value) => formatNlNumber(value, 1)} /> Pkt
+                  </span>
                 </span>
                 <span className="nl-standings-podium-gap nl-tnum">
                   {gap == null || gap >= 0 ? "Spitze" : `${formatNlNumber(gap, 1)} zum 1.`}
@@ -868,8 +885,8 @@ export default function SeasonStandingsNewLook({
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Spieler-Highlights" title="Top-Spieler der Saison">
         <ol className="nl-standings-players" aria-label="Top-Spieler der Saison">
-          {topPlayersStrip.map((player) => (
-            <li key={player.playerId}>
+          {topPlayersStrip.map((player, index) => (
+            <li key={player.playerId} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
               <button
                 type="button"
                 className="nl-standings-player"
@@ -955,20 +972,24 @@ export default function SeasonStandingsNewLook({
             <StatChipRow label="Dein Team" className="nl-standings-own-chips" aria-label="Dein Team im Saisonstand">
               <StatChip
                 label="Rang"
-                value={selectedTeamSummary.rank != null ? `#${selectedTeamSummary.rank}` : "—"}
+                value={
+                  selectedTeamSummary.rank != null
+                    ? `#${formatNlNumber(animatedOwnRank ?? selectedTeamSummary.rank, 0)}`
+                    : "—"
+                }
                 tone="accent"
                 onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
                 title="Punkte-Rangliste"
               />
               <StatChip
                 label="Punkte"
-                value={formatNlNumber(selectedTeamSummary.points, 1)}
+                value={formatNlNumber(animatedOwnPoints ?? selectedTeamSummary.points, 1)}
                 onClick={() => openRankingDrawer("points", selectedTeamSummary.teamId)}
                 title="Punkte-Rangliste"
               />
               <StatChip
                 label="MW"
-                value={formatNlMoney(selectedTeamSummary.marketValueTotal)}
+                value={formatNlMoney(animatedOwnMarketValue ?? selectedTeamSummary.marketValueTotal)}
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
                 title="Marktwert-Rangliste"
               />
@@ -993,7 +1014,7 @@ export default function SeasonStandingsNewLook({
           {renderTopPlayersStrip()}
           {renderBoardSortBar()}
           <ol className="nl-standings-board" aria-label="Liga-Board">
-            {displayBoardRows.map((row) => renderBoardRow(row))}
+            {displayBoardRows.map((row, index) => renderBoardRow(row, index))}
           </ol>
         </>
       ) : (
