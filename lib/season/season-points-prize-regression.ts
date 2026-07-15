@@ -157,6 +157,8 @@ function buildStaticPersistence(save: PersistedSaveGame): PersistenceService {
     createScenarioSnapshot: () => save,
     activateSave: () => save,
     listSaves: () => [],
+    deleteSave: () => false,
+    deleteSaves: () => [],
   };
 }
 

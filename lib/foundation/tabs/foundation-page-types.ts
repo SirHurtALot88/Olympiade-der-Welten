@@ -1964,7 +1964,8 @@ export type SaveActionRequest =
   | { action: "clone"; sourceSaveId: string; name: string }
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }
-  | { action: "fresh-season-1"; name?: string };
+  | { action: "fresh-season-1"; name?: string }
+  | { action: "delete"; saveIds: string[] };
 
 export type NewGamePresetId = "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
 export type NewGameTeamPreview = {

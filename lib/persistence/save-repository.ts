@@ -61,6 +61,36 @@ import { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
 
 export { enforceRollingSaveRetention };
 
+/**
+ * Every sqlite table that is keyed by `save_id` and must be purged when a save is deleted.
+ * `player_catalog` / `player_baseline_catalog` are intentionally excluded — they are global
+ * catalogs shared across saves, not per-save data (see sqlite.ts schema).
+ *
+ * All of these tables already declare `FOREIGN KEY (save_id) REFERENCES saves(save_id) ON
+ * DELETE CASCADE` and the database runs with `PRAGMA foreign_keys = ON`, so deleting from
+ * `saves` alone would cascade correctly. We still delete explicitly (belt-and-suspenders) in
+ * case the pragma is ever off for a given connection — this list is the single source of truth
+ * shared by `deleteSaves` below and `scripts/cleanup-test-saves.ts`, so keep it in sync with the
+ * schema in `lib/persistence/sqlite.ts`.
+ */
+export const SAVE_CHILD_TABLES = [
+  "seasons",
+  "season_states",
+  "matchday_states",
+  "game_metadata",
+  "teams",
+  "team_identities",
+  "players",
+  "player_baselines",
+  "disciplines",
+  "rosters",
+  "contracts",
+  "transfer_listings",
+  "transfer_history",
+  "game_logs",
+  "mapping_reports",
+] as const;
+
 type SaveRow = {
   save_id: string;
   name: string;
@@ -1507,6 +1537,57 @@ export function createSaveRepository(): SaveRepository {
       }
 
       return persisted;
+    },
+    deleteSaves(saveIds: string[]) {
+      const requestedIds = [...new Set(saveIds.filter((saveId) => Boolean(saveId)))];
+      if (requestedIds.length === 0) {
+        return [];
+      }
+
+      const database = getDatabase();
+      const activeRow = database.prepare("SELECT save_id FROM saves WHERE status = 'active'").get() as
+        | { save_id: string }
+        | undefined;
+      const activeSaveId = activeRow?.save_id ?? null;
+
+      const existsStatement = database.prepare("SELECT 1 FROM saves WHERE save_id = ?");
+      const deleteSaveStatement = database.prepare("DELETE FROM saves WHERE save_id = ?");
+      const childStatements = SAVE_CHILD_TABLES.map((table) => database.prepare(`DELETE FROM ${table} WHERE save_id = ?`));
+
+      const deletedSaveIds: string[] = [];
+      const transaction = database.transaction(() => {
+        for (const saveId of requestedIds) {
+          // Never delete the currently active save — the UI is expected to prevent this
+          // selection up front, but this is the last line of defense against a broken app state.
+          if (saveId === activeSaveId) {
+            continue;
+          }
+          if (!existsStatement.get(saveId)) {
+            continue;
+          }
+          for (const statement of childStatements) {
+            statement.run(saveId);
+          }
+          deleteSaveStatement.run(saveId);
+          deletedSaveIds.push(saveId);
+        }
+      });
+      transaction();
+
+      for (const saveId of deletedSaveIds) {
+        invalidateSaveSessionCache(saveId);
+        invalidateStandingsOverviewCache(saveId);
+        invalidateSeasonDerivationsCache(saveId);
+        invalidateLegacyLineupLabContextCache(saveId);
+        invalidateStandingsPreviewCache(saveId);
+        invalidateArenaPreviewCache(saveId);
+        deleteSeasonDerivationsSidecar(saveId);
+      }
+
+      return deletedSaveIds;
+    },
+    deleteSave(saveId: string) {
+      return this.deleteSaves([saveId]).includes(saveId);
     },
   };
 }
