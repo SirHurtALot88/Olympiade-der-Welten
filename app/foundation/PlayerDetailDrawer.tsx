@@ -44,12 +44,18 @@ import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/f
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import {
+  NlBarChart,
+  NlCard,
   NlDeltaChip,
   NlFatigueGauge,
+  NlProgressBar,
   NlRadar,
   NlSparkline,
+  NlSubTabs,
+  NlTable,
   formatNlNumber,
   type NlRadarAxis,
+  type NlTableColumn,
 } from "@/components/foundation/new-look";
 import { NlAbilityStars } from "@/components/foundation/velo-ui";
 import PlayerHeroNewLook from "./PlayerHeroNewLook";
@@ -339,6 +345,20 @@ function getAxisToneClass(tone: "power" | "speed" | "mental" | "social") {
       return "is-social";
     default:
       return "";
+  }
+}
+
+function toNlAxisTone(tone: "power" | "speed" | "mental" | "social"): NlRadarAxis["key"] {
+  switch (tone) {
+    case "power":
+      return "pow";
+    case "speed":
+      return "spe";
+    case "mental":
+      return "men";
+    case "social":
+    default:
+      return "soc";
   }
 }
 
@@ -1156,6 +1176,7 @@ function renderTopDisciplineCell(
   columnId: TopDisciplineColumnId,
   isScoutedProfile: boolean,
   scoutingLevel: number,
+  newLookEnabled = false,
 ): ReactNode {
   switch (columnId) {
     case "discipline": {
@@ -1189,9 +1210,18 @@ function renderTopDisciplineCell(
       return (
         <span className="player-drawer-disc-table-stat">
           <span className="player-drawer-disc-table-stat-value">{formatDisciplineValue(row.value, row.upgradeDelta)}</span>
-          <span className="player-drawer-disc-table-stat-bar">
-            <span className="player-drawer-disc-table-stat-bar-fill" style={{ width: `${barPercent}%` }} />
-          </span>
+          {newLookEnabled ? (
+            <NlProgressBar
+              className="player-drawer-disc-table-progress"
+              value={barPercent}
+              showValue={false}
+              title={`${row.label}: ${formatValue(row.value, 0)}`}
+            />
+          ) : (
+            <span className="player-drawer-disc-table-stat-bar">
+              <span className="player-drawer-disc-table-stat-bar-fill" style={{ width: `${barPercent}%` }} />
+            </span>
+          )}
         </span>
       );
     }
@@ -1467,43 +1497,39 @@ function PlayerComparePanel({
               ))}
             </div>
 
-            <div className="table-shell nl-compare-discipline-table-shell">
-              <table className="team-table nl-compare-discipline-table">
-                <thead>
-                  <tr>
-                    <th>Diszi</th>
-                    <th>{dataA.name}</th>
-                    <th>Δ</th>
-                    <th>{dataB.name}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {compareDisciplineRows.map((row) => {
-                    const areaClass = getDisciplineAreaClass(row.category);
-                    return (
-                      <tr key={`compare-discipline-${row.id}`}>
-                        <td className={`player-drawer-discipline-name-cell ${areaClass}`}>
-                          <DisciplineIcon
-                            disciplineId={row.id}
-                            label={row.label}
-                            className={`discipline-icon-chip-inline player-drawer-discipline-area-chip ${areaClass}`}
-                          />
-                        </td>
-                        <td>{renderCompareDisciplineCell(row.entryA, aIsScouted, dataA.scoutingLevel ?? 0)}</td>
-                        <td>
-                          {row.delta != null ? (
-                            <NlDeltaChip value={row.delta} />
-                          ) : (
-                            <span className="nl-compare-metric-gap">—</span>
-                          )}
-                        </td>
-                        <td>{renderCompareDisciplineCell(row.entryB, bIsScouted, dataB.scoutingLevel ?? 0)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <NlTable
+              className="nl-compare-discipline-table"
+              aria-label={`Disziplin-Vergleich: ${dataA.name} vs ${dataB.name}`}
+              rows={compareDisciplineRows}
+              rowKey={(row) => `compare-discipline-${row.id}`}
+              columns={[
+                { key: "discipline", label: "Diszi" },
+                { key: "a", label: dataA.name },
+                { key: "delta", label: "Δ", align: "center" },
+                { key: "b", label: dataB.name },
+              ]}
+              renderCell={(row, column) => {
+                const areaClass = getDisciplineAreaClass(row.category);
+                if (column.key === "discipline") {
+                  return (
+                    <span className={`player-drawer-discipline-name-cell ${areaClass}`}>
+                      <DisciplineIcon
+                        disciplineId={row.id}
+                        label={row.label}
+                        className={`discipline-icon-chip-inline player-drawer-discipline-area-chip ${areaClass}`}
+                      />
+                    </span>
+                  );
+                }
+                if (column.key === "a") {
+                  return renderCompareDisciplineCell(row.entryA, aIsScouted, dataA.scoutingLevel ?? 0);
+                }
+                if (column.key === "delta") {
+                  return row.delta != null ? <NlDeltaChip value={row.delta} /> : <span className="nl-compare-metric-gap">—</span>;
+                }
+                return renderCompareDisciplineCell(row.entryB, bIsScouted, dataB.scoutingLevel ?? 0);
+              }}
+            />
             {bIsScouted ? (
               <p className="nl-compare-fog-note muted">
                 {dataB.name} ist nicht vollständig gescoutet — Diszi-Werte als Klassen-Range (Scouting L
@@ -1520,6 +1546,85 @@ function PlayerComparePanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+type DrawerHistoryColumn = {
+  key: string;
+  label: ReactNode;
+  tooltip?: string;
+  className?: string;
+};
+
+/**
+ * "Neuer Look" (flag-gated): dünner Adapter für die Historie-/Injury-/
+ * Trainings-Tabellen im Drawer. Mit Flag AN rendert `NlTable` (Sticky-Kopf,
+ * Zebra/Hover, `nl-tnum`), mit Flag AUS exakt die bisherige `team-table`-
+ * Handrolled-Struktur — keine Datenänderung, nur die Tabellen-Hülle wechselt.
+ */
+function PlayerDrawerLegacyHistoryTable<Row>({
+  columns,
+  rows,
+  rowKey,
+  renderCell,
+  newLookEnabled,
+  ariaLabel,
+  className,
+  legacyShellClassName = "player-drawer-injury-history-shell",
+}: {
+  columns: DrawerHistoryColumn[];
+  rows: Row[];
+  rowKey: (row: Row, index: number) => string;
+  renderCell: (row: Row, columnKey: string) => ReactNode;
+  newLookEnabled: boolean;
+  ariaLabel: string;
+  className?: string;
+  legacyShellClassName?: string;
+}) {
+  if (newLookEnabled) {
+    const tableColumns: NlTableColumn<Row>[] = columns.map((column) => ({
+      key: column.key,
+      label: column.label,
+      tooltip: column.tooltip,
+      className: column.className,
+    }));
+    return (
+      <NlTable
+        className={className}
+        aria-label={ariaLabel}
+        columns={tableColumns}
+        rows={rows}
+        rowKey={rowKey}
+        renderCell={(row, column) => renderCell(row, column.key)}
+      />
+    );
+  }
+
+  return (
+    <div className={`table-shell ${legacyShellClassName}`}>
+      <table className={`team-table player-drawer-injury-history-table${className ? ` ${className}` : ""}`}>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key} title={column.tooltip} className={column.className}>
+                {column.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={rowKey(row, index)}>
+              {columns.map((column) => (
+                <td key={column.key} className={column.className}>
+                  {renderCell(row, column.key)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1602,6 +1707,17 @@ export default function PlayerDetailDrawer({
   // "Neuer Look" (flag-gated, additive): career series for the Werdegang panel.
   // With the flag OFF this stays null and nothing new is rendered.
   const [newLookEnabled] = useNewLook();
+  // "Neuer Look" (Sub-Tab-Leiste): rein visuelle Aktiv-Markierung für die
+  // In-Page-Anker-Navigation unten — scrollt weiterhin per Element-Id, die
+  // Section-Ids selbst (`#player-drawer-potential` etc.) bleiben unverändert
+  // und bleiben von außen anspringbar.
+  const [activeDrawerTabId, setActiveDrawerTabId] = useState("player-drawer-profile");
+  const handleDrawerTabSelect = (id: string) => {
+    setActiveDrawerTabId(id);
+    if (typeof document !== "undefined") {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
   const foundationState = useFoundationStateOptional();
   const werdegangGameState = foundationState?.gameState ?? null;
   const werdegangPlayerId = data?.playerId ?? null;
@@ -1837,6 +1953,16 @@ export default function PlayerDetailDrawer({
   };
   const baselineAttributeDeltas = data.baselineAttributeDeltas.filter((entry) => entry.delta != null && entry.delta !== 0);
   const developmentLevelup = data.developmentLevelup;
+  const drawerTabItems: { id: string; label: string }[] = [
+    { id: "player-drawer-profile", label: "Profil" },
+    ...(!isScoutedProfile ? [{ id: "player-drawer-axis", label: "Achsen" }] : []),
+    { id: "player-drawer-disciplines", label: "Diszis" },
+    ...(developmentLevelup || (showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast))
+      ? [{ id: "player-drawer-potential", label: "Entwicklung" }]
+      : []),
+    ...(isFreeAgent && onOpenBuyPreview ? [{ id: "player-drawer-market", label: "Transfer" }] : []),
+    { id: "player-drawer-history", label: "Historie" },
+  ];
   const marketValueBenchmark = transferContext.currentValue ?? transferContext.purchasePrice ?? null;
   const marketValueDelta =
     marketValueBenchmark != null && data.marketValue != null && Math.abs(data.marketValue - marketValueBenchmark) >= 0.01
@@ -1853,6 +1979,13 @@ export default function PlayerDetailDrawer({
     (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
   );
   const attributeCeilingByKey = new Map(data.attributeCeilingPreview.map((entry) => [entry.attribute, entry] as const));
+  // "Neuer Look" (#61 Attribut-Grid): Balken-Übersicht über der Karten-
+  // Detailansicht — nur exakt sichtbare, numerische Attribute (Fog-of-War
+  // bleibt exakt wie im Karten-Grid darunter: verdeckte/Range-Attribute
+  // erscheinen dort schlicht nicht).
+  const attributeBarChartBars = data.attributeStats
+    .filter((entry) => entry.value != null && Number.isFinite(entry.value))
+    .map((entry) => ({ label: entry.label.slice(0, 4).toUpperCase(), value: entry.value as number }));
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
@@ -2145,24 +2278,37 @@ export default function PlayerDetailDrawer({
               <div className="player-drawer-top-grid">
                 <div className="player-drawer-profile-stack">
                   <div className={`player-drawer-profile-card${variant === "page" ? " is-compact" : ""}`}>
-                    <span className="player-drawer-overline">Scouting</span>
-                    <p className="player-drawer-subline player-drawer-role-line">
-                      Rolle {formatRoleTag(transferContext.roleTag)}
-                      {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
-                    </p>
+                    {/* #121: die vormals frei schwebenden Streu-Tags ("Rolle …",
+                        "Scouting L…", "Erschöpfung …") sind im Neuen Look
+                        konsolidiert statt dupliziert: Rolle steht bereits in der
+                        Hero-Identitätszeile (`PlayerHeroNewLook`), Scouting-Level
+                        wandert in die Sektions-Überschrift, Erschöpfung lebt nur
+                        noch im Fatigue-Gauge (Wert + Tooltip mit Leistungs-/
+                        Verletzungsrisiko-Detail). Alt-Look bleibt unverändert. */}
+                    <span className="player-drawer-overline">
+                      Scouting{newLookEnabled ? ` L${data.scoutingLevel ?? 0}` : ""}
+                    </span>
+                    {!newLookEnabled ? (
+                      <p className="player-drawer-subline player-drawer-role-line">
+                        Rolle {formatRoleTag(transferContext.roleTag)}
+                        {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
+                      </p>
+                    ) : null}
                     <PlayerCaPoStarStack data={data} newLook={newLookEnabled} />
-                    <div className="player-drawer-scout-meta">
-                      <span>Scouting L{data.scoutingLevel ?? 0}</span>
-                      <span title={buildFatigueImpactTooltip(data)}>
-                        Erschöpfung {formatValue(data.fatigue, 0)}
-                        {data.availability.performancePenaltyPercent > 0
-                          ? ` · −${formatValue(data.availability.performancePenaltyPercent, 1)}%`
-                          : ""}
-                        {data.availability.injuryRiskPercent > 0
-                          ? ` · ${formatValue(data.availability.injuryRiskPercent, 1)}% Verletzungsrisiko`
-                          : ""}
-                      </span>
-                    </div>
+                    {!newLookEnabled ? (
+                      <div className="player-drawer-scout-meta">
+                        <span>Scouting L{data.scoutingLevel ?? 0}</span>
+                        <span title={buildFatigueImpactTooltip(data)}>
+                          Erschöpfung {formatValue(data.fatigue, 0)}
+                          {data.availability.performancePenaltyPercent > 0
+                            ? ` · −${formatValue(data.availability.performancePenaltyPercent, 1)}%`
+                            : ""}
+                          {data.availability.injuryRiskPercent > 0
+                            ? ` · ${formatValue(data.availability.injuryRiskPercent, 1)}% Verletzungsrisiko`
+                            : ""}
+                        </span>
+                      </div>
+                    ) : null}
                     {newLookEnabled ? (
                       <div className="player-drawer-fatigue-gauge-wrap">
                         <NlFatigueGauge value={data.fatigue ?? 0} title={buildFatigueImpactTooltip(data)} />
@@ -2308,12 +2454,22 @@ export default function PlayerDetailDrawer({
                             <em>{formatRankLabel(card.seasonPointsRank)}</em>
                           </span>
                         </div>
-                        <div className="player-drawer-category-meter">
-                          <div
-                            className="player-drawer-category-meter-fill"
-                            style={{ width: `${Math.max(0, Math.min(100, card.value ?? 0))}%` }}
+                        {newLookEnabled ? (
+                          <NlProgressBar
+                            className="player-drawer-category-progress"
+                            value={Math.max(0, Math.min(100, card.value ?? 0))}
+                            tone={toNlAxisTone(card.tone)}
+                            showValue={false}
+                            title={`${card.label}: ${formatValue(card.value, 0)}`}
                           />
-                        </div>
+                        ) : (
+                          <div className="player-drawer-category-meter">
+                            <div
+                              className="player-drawer-category-meter-fill"
+                              style={{ width: `${Math.max(0, Math.min(100, card.value ?? 0))}%` }}
+                            />
+                          </div>
+                        )}
                         <div className="player-drawer-category-meta">
                           <span>Vorsaison PPs</span>
                           <span title="Achsen-Rank aus dem letzten Saison-Snapshot">-1 {formatOptionalRankLabel(card.previousSeasonPointsRank)}</span>
@@ -2337,9 +2493,19 @@ export default function PlayerDetailDrawer({
                                     </span>
                                     <span className="player-drawer-axis-discipline-value">{formatValue(entry.value, 0)}</span>
                                   </div>
-                                  <div className="player-drawer-axis-discipline-meter">
-                                    <div className="player-drawer-axis-discipline-meter-fill" style={{ width: `${barPercent}%` }} />
-                                  </div>
+                                  {newLookEnabled ? (
+                                    <NlProgressBar
+                                      className="player-drawer-axis-discipline-progress"
+                                      value={barPercent}
+                                      tone={toNlAxisTone(card.tone)}
+                                      showValue={false}
+                                      title={`${entry.label}: ${formatValue(entry.value, 0)}`}
+                                    />
+                                  ) : (
+                                    <div className="player-drawer-axis-discipline-meter">
+                                      <div className="player-drawer-axis-discipline-meter-fill" style={{ width: `${barPercent}%` }} />
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })
@@ -2401,16 +2567,23 @@ export default function PlayerDetailDrawer({
           </section>
 
           {variant !== "page" ? (
-          <nav className="player-drawer-tabs" aria-label="Spieler Detailbereich">
-            <a href="#player-drawer-profile">Profil</a>
-            {!isScoutedProfile ? <a href="#player-drawer-axis">Achsen</a> : null}
-            <a href="#player-drawer-disciplines">Diszis</a>
-            {developmentLevelup || (showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast)) ? (
-              <a href="#player-drawer-potential">Entwicklung</a>
-            ) : null}
-            {isFreeAgent && onOpenBuyPreview ? <a href="#player-drawer-market">Transfer</a> : null}
-            <a href="#player-drawer-history">Historie</a>
-          </nav>
+            newLookEnabled ? (
+              <NlSubTabs
+                className="player-drawer-tabs"
+                aria-label="Spieler Detailbereich"
+                activeId={activeDrawerTabId}
+                onSelect={handleDrawerTabSelect}
+                items={drawerTabItems}
+              />
+            ) : (
+              <nav className="player-drawer-tabs" aria-label="Spieler Detailbereich">
+                {drawerTabItems.map((item) => (
+                  <a key={item.id} href={`#${item.id}`}>
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
+            )
           ) : null}
 
           <section className="player-drawer-section player-drawer-panel player-drawer-top-disciplines-panel" id="player-drawer-disciplines">
@@ -2472,7 +2645,7 @@ export default function PlayerDetailDrawer({
                                 key={`discipline-breakdown-${entry.id}-${columnId}`}
                                 className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                               >
-                                {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
+                                {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel, newLookEnabled)}
                               </td>
                             ))}
                           </tr>
@@ -2518,6 +2691,16 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel">
             <h3>Attribute</h3>
+            {newLookEnabled && attributeBarChartBars.length > 0 ? (
+              <div className="player-drawer-attribute-barchart-wrap">
+                <NlBarChart
+                  bars={attributeBarChartBars}
+                  max={99}
+                  aria-label={`Attribut-Übersicht für ${data.name}`}
+                  className="player-drawer-attribute-barchart"
+                />
+              </div>
+            ) : null}
             {scoutedAttributeBuckets ? (
               <div className="player-drawer-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
                 <span className={`velo-scouting-segment is-visible${scoutedAttributeBuckets.visible.length > 0 ? " has-data" : ""}`}>
@@ -3124,103 +3307,124 @@ export default function PlayerDetailDrawer({
                     sind neu sortiert. */}
                 <div className="player-drawer-injury-history" data-testid="player-drawer-history-sport">
                   <h4>Sportliche Historie</h4>
-                  <div className="table-shell player-drawer-injury-history-shell">
-                    <table className="team-table player-drawer-injury-history-table">
-                      <thead>
-                        <tr>
-                          <th>Saison</th>
-                          <th>Team</th>
-                          <th>Eins.</th>
-                          <th title={PLAYER_DRAWER_HISTORY_AVERAGE_FATIGUE_TOOLTIP}>Ø Fatigue</th>
-                          <th>Verl.</th>
-                          <th>Ausfall</th>
-                          <th>PPs</th>
-                          <th>OVR</th>
-                          <th>MVS</th>
-                          <th>POW</th>
-                          <th>SPE</th>
-                          <th>MEN</th>
-                          <th>SOC</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.historyRows.map((row) => (
-                          <tr key={`history-sport-${row.seasonId ?? row.seasonName}-${row.sourceLabel}`}>
-                            <td>
+                  <PlayerDrawerLegacyHistoryTable
+                    newLookEnabled={newLookEnabled}
+                    ariaLabel="Sportliche Historie"
+                    rows={data.historyRows}
+                    rowKey={(row) => `history-sport-${row.seasonId ?? row.seasonName}-${row.sourceLabel}`}
+                    columns={[
+                      { key: "season", label: "Saison" },
+                      { key: "team", label: "Team" },
+                      { key: "appearances", label: "Eins." },
+                      { key: "averageFatigue", label: "Ø Fatigue", tooltip: PLAYER_DRAWER_HISTORY_AVERAGE_FATIGUE_TOOLTIP },
+                      { key: "injuriesCount", label: "Verl." },
+                      { key: "matchdaysMissed", label: "Ausfall" },
+                      { key: "pps", label: "PPs" },
+                      { key: "ovr", label: "OVR" },
+                      { key: "mvs", label: "MVS" },
+                      { key: "pow", label: "POW" },
+                      { key: "spe", label: "SPE" },
+                      { key: "men", label: "MEN" },
+                      { key: "soc", label: "SOC" },
+                    ]}
+                    renderCell={(row, columnKey) => {
+                      switch (columnKey) {
+                        case "season":
+                          return (
+                            <>
                               <strong>{row.seasonName}</strong>
                               {row.isActiveSeason ? <small className="player-drawer-history-tag">live</small> : null}
-                            </td>
-                            <td>{row.teamCode ?? row.teamName ?? "—"}</td>
-                            <td>{formatValue(row.appearances)}</td>
-                            <td>
-                              {row.averageFatigue != null ? (
-                                <span title={PLAYER_DRAWER_HISTORY_AVERAGE_FATIGUE_TOOLTIP}>{formatValue(row.averageFatigue, 1)}</span>
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                            <td>{formatValue(row.injuriesCount)}</td>
-                            <td>{formatValue(row.matchdaysMissed)}</td>
-                            <td>{formatHistoryMetric(row.pps ?? row.totalPoints, row.ppsRank, 1)}</td>
-                            <td>{formatHistoryMetric(row.ovr, row.ovrRank, 1)}</td>
-                            <td>{formatHistoryMetric(row.mvs, row.mvsRank, 1)}</td>
-                            <td>{formatValue(row.pow, 1)}</td>
-                            <td>{formatValue(row.spe, 1)}</td>
-                            <td>{formatValue(row.men, 1)}</td>
-                            <td>{formatValue(row.soc, 1)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            </>
+                          );
+                        case "team":
+                          return row.teamCode ?? row.teamName ?? "—";
+                        case "appearances":
+                          return formatValue(row.appearances);
+                        case "averageFatigue":
+                          return row.averageFatigue != null ? (
+                            <span title={PLAYER_DRAWER_HISTORY_AVERAGE_FATIGUE_TOOLTIP}>{formatValue(row.averageFatigue, 1)}</span>
+                          ) : (
+                            "—"
+                          );
+                        case "injuriesCount":
+                          return formatValue(row.injuriesCount);
+                        case "matchdaysMissed":
+                          return formatValue(row.matchdaysMissed);
+                        case "pps":
+                          return formatHistoryMetric(row.pps ?? row.totalPoints, row.ppsRank, 1);
+                        case "ovr":
+                          return formatHistoryMetric(row.ovr, row.ovrRank, 1);
+                        case "mvs":
+                          return formatHistoryMetric(row.mvs, row.mvsRank, 1);
+                        case "pow":
+                          return formatValue(row.pow, 1);
+                        case "spe":
+                          return formatValue(row.spe, 1);
+                        case "men":
+                          return formatValue(row.men, 1);
+                        case "soc":
+                          return formatValue(row.soc, 1);
+                        default:
+                          return "—";
+                      }
+                    }}
+                  />
                 </div>
                 <div className="player-drawer-injury-history" data-testid="player-drawer-history-finance">
                   <h4>Finanzielle Historie</h4>
-                  <div className="table-shell player-drawer-injury-history-shell">
-                    <table className="team-table player-drawer-injury-history-table">
-                      <thead>
-                        <tr>
-                          <th>Saison</th>
-                          <th>MW</th>
-                          <th>Gehalt</th>
-                          <th>Faktor</th>
-                          <th title={PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP}>Verkaufswert</th>
-                          <th>Delta</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.historyRows.map((row) => (
-                          <tr key={`history-fin-${row.seasonId ?? row.seasonName}-${row.sourceLabel}`}>
-                            <td>
+                  <PlayerDrawerLegacyHistoryTable
+                    newLookEnabled={newLookEnabled}
+                    ariaLabel="Finanzielle Historie"
+                    rows={data.historyRows}
+                    rowKey={(row) => `history-fin-${row.seasonId ?? row.seasonName}-${row.sourceLabel}`}
+                    columns={[
+                      { key: "season", label: "Saison" },
+                      { key: "mw", label: "MW" },
+                      { key: "salary", label: "Gehalt" },
+                      { key: "factor", label: "Faktor" },
+                      { key: "sellValue", label: "Verkaufswert", tooltip: PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP },
+                      { key: "delta", label: "Delta" },
+                    ]}
+                    renderCell={(row, columnKey) => {
+                      switch (columnKey) {
+                        case "season":
+                          return (
+                            <>
                               <strong>{row.seasonName}</strong>
                               {row.isActiveSeason ? <small className="player-drawer-history-tag">live</small> : null}
-                            </td>
-                            <td>{formatMoney(row.marketValue)}</td>
-                            <td>{formatMoney(row.salary)}</td>
-                            <td>
-                              <span title={row.projectedSellSourceLabel ?? undefined}>
-                                {formatMoneyFactor(
-                                  row.projectedSellFactor ?? row.transferMarketValueFactor,
-                                  row.saleFactorRankInBracket,
-                                  row.saleFactorBracketSize,
-                                )}
-                              </span>
-                            </td>
-                            <td>
-                              {row.projectedSellValue != null ? (
-                                <span title={PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP}>{formatMoney(row.projectedSellValue)}</span>
-                              ) : (
-                                "—"
+                            </>
+                          );
+                        case "mw":
+                          return formatMoney(row.marketValue);
+                        case "salary":
+                          return formatMoney(row.salary);
+                        case "factor":
+                          return (
+                            <span title={row.projectedSellSourceLabel ?? undefined}>
+                              {formatMoneyFactor(
+                                row.projectedSellFactor ?? row.transferMarketValueFactor,
+                                row.saleFactorRankInBracket,
+                                row.saleFactorBracketSize,
                               )}
-                            </td>
-                            <td className={getMoneyDeltaToneClass(row.marketValueBaselineDelta, "higher")}>
+                            </span>
+                          );
+                        case "sellValue":
+                          return row.projectedSellValue != null ? (
+                            <span title={PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP}>{formatMoney(row.projectedSellValue)}</span>
+                          ) : (
+                            "—"
+                          );
+                        case "delta":
+                          return (
+                            <span className={getMoneyDeltaToneClass(row.marketValueBaselineDelta, "higher")}>
                               {row.marketValueBaselineDelta != null ? formatSignedMoney(row.marketValueBaselineDelta) : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            </span>
+                          );
+                        default:
+                          return "—";
+                      }
+                    }}
+                  />
                 </div>
                 <p className="muted" style={{ marginTop: 10 }}>
                   Alte Seasons kommen aus gespeicherten Season-Snapshots. Fehlende Felder bedeuten: der damalige Snapshot
@@ -3235,98 +3439,135 @@ export default function PlayerDetailDrawer({
             )}
 
             {data.injuryHistoryRows.length > 0 ? (
-              <div className="player-drawer-injury-history" data-testid="player-drawer-injury-history">
-                <h4>Verletzungshistorie</h4>
-                <div className="table-shell player-drawer-injury-history-shell">
-                  <table className="team-table player-drawer-injury-history-table">
-                    <thead>
-                      <tr>
-                        <th>Saison</th>
-                        <th>Spieltag</th>
-                        <th>Fatigue</th>
-                        <th>Risiko</th>
-                        <th>Ausfall bis</th>
-                        <th>Recovery</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.injuryHistoryRows.map((row) => (
-                        <tr key={row.eventId}>
-                          <td>{row.seasonName ?? row.seasonId}</td>
-                          <td>{row.matchdayLabel ?? row.matchdayId}</td>
-                          <td>{formatValue(row.fatigueBefore, 0)}</td>
-                          <td>{formatValue(row.riskPercent, 0)}%</td>
-                          <td>{row.unavailableUntil ?? "—"}</td>
-                          <td>{formatValue(row.injuryRecoveryPct, 0)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              (() => {
+                const injuryHistoryTable = (
+                  <PlayerDrawerLegacyHistoryTable
+                    newLookEnabled={newLookEnabled}
+                    ariaLabel="Verletzungshistorie"
+                    rows={data.injuryHistoryRows}
+                    rowKey={(row) => row.eventId}
+                    columns={[
+                      { key: "season", label: "Saison" },
+                      { key: "matchday", label: "Spieltag" },
+                      { key: "fatigue", label: "Fatigue" },
+                      { key: "risk", label: "Risiko" },
+                      { key: "unavailableUntil", label: "Ausfall bis" },
+                      { key: "recovery", label: "Recovery" },
+                    ]}
+                    renderCell={(row, columnKey) => {
+                      switch (columnKey) {
+                        case "season":
+                          return row.seasonName ?? row.seasonId;
+                        case "matchday":
+                          return row.matchdayLabel ?? row.matchdayId;
+                        case "fatigue":
+                          return formatValue(row.fatigueBefore, 0);
+                        case "risk":
+                          return `${formatValue(row.riskPercent, 0)}%`;
+                        case "unavailableUntil":
+                          return row.unavailableUntil ?? "—";
+                        case "recovery":
+                          return `${formatValue(row.injuryRecoveryPct, 0)}%`;
+                        default:
+                          return "—";
+                      }
+                    }}
+                  />
+                );
+                // "Neuer Look": Verletzungshistorie steckt jetzt in einer
+                // echten `NlCard` statt einem bare `div` + `h4` — Alt-Look
+                // bleibt strukturell unverändert.
+                return newLookEnabled ? (
+                  <NlCard
+                    className="player-drawer-injury-history"
+                    data-testid="player-drawer-injury-history"
+                    title="Verletzungshistorie"
+                  >
+                    {injuryHistoryTable}
+                  </NlCard>
+                ) : (
+                  <div className="player-drawer-injury-history" data-testid="player-drawer-injury-history">
+                    <h4>Verletzungshistorie</h4>
+                    {injuryHistoryTable}
+                  </div>
+                );
+              })()
             ) : null}
 
             <div className="player-drawer-training-history-block" id="player-drawer-training-history">
               <h4>Trainingshistorie</h4>
               {data.trainingHistoryRows.length > 0 ? (
-                <div className="table-shell player-drawer-training-history-shell">
-                  <table className="team-table player-drawer-training-history-table">
-                    <thead>
-                      <tr>
-                        <th>S</th>
-                        <th>Klasse</th>
-                        <th>Mod.</th>
-                        <th>Tr.</th>
-                        <th>Netto</th>
-                        {trainingAttributeColumns.map((attribute) => (
-                          <th key={`training-attr-${attribute}`} className="is-attribute-col" title={attribute}>
-                            {formatTrainingAttributeLabel(attribute)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.trainingHistoryRows.map((row) => (
-                        <tr key={row.eventId}>
-                          <td>{formatTrainingSeasonLabel(row.seasonId)}</td>
-                          <td>
+                <PlayerDrawerLegacyHistoryTable
+                  newLookEnabled={newLookEnabled}
+                  ariaLabel="Trainingshistorie"
+                  className="player-drawer-training-history-table"
+                  legacyShellClassName="player-drawer-training-history-shell"
+                  rows={data.trainingHistoryRows}
+                  rowKey={(row) => row.eventId}
+                  columns={[
+                    { key: "season", label: "S" },
+                    { key: "class", label: "Klasse" },
+                    { key: "mode", label: "Mod." },
+                    { key: "traitModifier", label: "Tr." },
+                    { key: "net", label: "Netto" },
+                    ...trainingAttributeColumns.map((attribute) => ({
+                      key: `attr-${attribute}`,
+                      label: formatTrainingAttributeLabel(attribute),
+                      tooltip: attribute,
+                      className: "is-attribute-col",
+                    })),
+                  ]}
+                  renderCell={(row, columnKey) => {
+                    switch (columnKey) {
+                      case "season":
+                        return formatTrainingSeasonLabel(row.seasonId);
+                      case "class":
+                        return (
+                          <>
                             {row.trainingClass ?? "—"}
                             {row.classBefore && row.classAfter && row.classBefore !== row.classAfter
                               ? ` (${row.classBefore}→${row.classAfter})`
                               : ""}
-                          </td>
-                          <td title={row.trainingMode ?? undefined}>{formatTrainingModeShort(row.trainingMode)}</td>
-                          <td className={getDeltaToneClass(row.traitModifierPct)}>
+                          </>
+                        );
+                      case "mode":
+                        return <span title={row.trainingMode ?? undefined}>{formatTrainingModeShort(row.trainingMode)}</span>;
+                      case "traitModifier":
+                        return (
+                          <span className={getDeltaToneClass(row.traitModifierPct)}>
                             {row.traitModifierPct != null && Number.isFinite(row.traitModifierPct)
                               ? `${row.traitModifierPct > 0 ? "+" : ""}${formatValue(row.traitModifierPct, 0)}%`
                               : "—"}
-                          </td>
-                          <td className={getDeltaToneClass(row.netSetpoints)}>
+                          </span>
+                        );
+                      case "net":
+                        return (
+                          <span className={getDeltaToneClass(row.netSetpoints)}>
                             {row.netSetpoints != null ? `${row.netSetpoints > 0 ? "+" : ""}${formatValue(row.netSetpoints, 1)}` : "—"}
-                          </td>
-                          {trainingAttributeColumns.map((attribute) => {
-                            const upgrade = row.upgrades.find((entry) => entry.attribute === attribute) ?? null;
-                            return (
-                              <td
-                                key={`${row.eventId}-${attribute}`}
-                                className={`is-attribute-col ${getDeltaToneClass(upgrade?.delta ?? null)}`}
-                                title={
-                                  upgrade
-                                    ? `${attribute}: ${formatValue(upgrade.fromValue, 1)} → ${formatValue(upgrade.toValue, 1)}`
-                                    : undefined
-                                }
-                              >
-                                {upgrade
-                                  ? `${upgrade.delta > 0 ? "+" : ""}${formatValue(upgrade.delta, 1)}`
-                                  : "—"}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </span>
+                        );
+                      default: {
+                        if (!columnKey.startsWith("attr-")) {
+                          return "—";
+                        }
+                        const attribute = columnKey.slice("attr-".length);
+                        const upgrade = row.upgrades.find((entry) => entry.attribute === attribute) ?? null;
+                        return (
+                          <span
+                            className={getDeltaToneClass(upgrade?.delta ?? null)}
+                            title={
+                              upgrade
+                                ? `${attribute}: ${formatValue(upgrade.fromValue, 1)} → ${formatValue(upgrade.toValue, 1)}`
+                                : undefined
+                            }
+                          >
+                            {upgrade ? `${upgrade.delta > 0 ? "+" : ""}${formatValue(upgrade.delta, 1)}` : "—"}
+                          </span>
+                        );
+                      }
+                    }
+                  }}
+                />
               ) : (
                 <p className="muted">
                   Noch keine Trainingshistorie. Nach Saisonabschluss erscheinen hier Trainingsklasse, Modus und Attributänderungen.
