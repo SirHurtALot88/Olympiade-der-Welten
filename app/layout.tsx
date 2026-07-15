@@ -5,8 +5,8 @@ import { AuthStatusBadge } from "@/components/auth/AuthStatusBadge";
 import { isAuthEnabled } from "@/lib/auth/config";
 
 export const metadata: Metadata = {
-  title: "Oly Room v0.1",
-  description: "Turn-based Raumprototyp für Oly Umbau App v2",
+  title: "Olympiade der Welten",
+  description: "Olympiade der Welten – Manager-Spiel, solo oder online zu zweit.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

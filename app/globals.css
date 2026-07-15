@@ -522,8 +522,87 @@ a {
   font-size: 0.95rem;
 }
 
+.pill.is-ready {
+  background: rgba(22, 163, 74, 0.14);
+  color: #14532d;
+}
+
+.pill.is-warning {
+  background: rgba(194, 65, 12, 0.12);
+  color: #7c2d12;
+}
+
 .inline-button {
   width: fit-content;
+}
+
+/* Player-facing entry experience: login, start screen, room lobby. Small,
+ * additive helpers layered on the existing app-shell/hero/panel/pill system
+ * so those screens stay visually consistent with the rest of the app. */
+.oly-session-line {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.oly-solo-card {
+  margin-bottom: 24px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.oly-section-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.oly-section-heading h2 {
+  font-size: 1.4rem;
+}
+
+.oly-login-shell {
+  max-width: 520px;
+}
+
+.oly-login-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.pill-toggle-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill-toggle {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pill-toggle.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.oly-room-code-pill strong {
+  letter-spacing: 0.04em;
+}
+
+.oly-lobby-layout {
+  gap: 20px;
+}
+
+.oly-primary-cta {
+  font-weight: 700;
 }
 
 .foundation-shell .inline-button {
@@ -49135,6 +49214,60 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-arena-header-chips {
   flex-wrap: wrap;
+}
+
+/* --- Co-op "both ready" gate (Room, >1 human participant) ---------- */
+.is-new-look .nl-arena-coop-gate {
+  border-color: var(--nl-accent);
+}
+.is-new-look .nl-arena-coop-gate-status {
+  padding: 4px 10px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 20%, var(--nl-panel-2));
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.is-new-look .nl-arena-coop-gate-status.is-ready {
+  background: color-mix(in srgb, var(--nl-good) 22%, var(--nl-panel-2));
+}
+.is-new-look .nl-arena-coop-gate-hint {
+  margin: 0 0 var(--nl-s3);
+  color: var(--nl-mut-2);
+  font-size: 13px;
+}
+.is-new-look .nl-arena-coop-gate-chips {
+  margin-bottom: var(--nl-s3);
+}
+.is-new-look .nl-arena-coop-gate-waiting {
+  margin: var(--nl-s3) 0 0;
+  color: var(--nl-mut-2);
+  font-size: 13px;
+}
+
+/* --- Co-op status note above the phase controls --------------------- */
+.is-new-look .nl-arena-coop-note {
+  margin: 0 0 var(--nl-s3);
+  color: var(--nl-mut-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Guest (or everyone during the ready gate) sees the reveal controls
+   visually locked — the host drives every step for the shared timeline. */
+.is-new-look .nl-arena-phase-controls.is-locked {
+  opacity: 0.55;
+}
+.is-new-look .nl-arena-phase-controls.is-locked .nl-arena-button:disabled {
+  cursor: not-allowed;
+}
+.is-new-look .nl-arena-phase-controls.is-locked .nl-subtabs {
+  pointer-events: none;
+}
+.is-new-look .nl-arena-side-tabs.is-locked {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* --- Arena-Briefing (spoilerfreie Ausgangslage vor dem Spieltag) ---- */

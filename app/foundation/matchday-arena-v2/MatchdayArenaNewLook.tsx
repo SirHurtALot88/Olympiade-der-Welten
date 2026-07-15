@@ -38,6 +38,8 @@ import {
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
+import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
+import type { RoomArenaState } from "@/types/game";
 
 /**
  * "Neuer Look" Matchday-Arena — 32-Team-Scoreboard mit Phasen-Reveal
@@ -241,6 +243,72 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [speedIndex, setSpeedIndex] = useState(1);
   const [standingsPreview, setStandingsPreview] = useState<ArenaNewLookStandingsPreview | null>(null);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
+
+  // Co-op room sync (shared hook with the classic arena — see
+  // lib/room/use-arena-room-sync.ts). New Look's own reveal state is coarser
+  // than the classic arena's (a single `boardSide` + `phaseIndex`, no
+  // per-discipline slot counter), so the applied step maps 1:1 onto those two
+  // fields and the host always advances with maxSlotRevealCountByDiscipline
+  // {d1:0, d2:0} — that keeps "one host click = one phase step" in lockstep
+  // with how New Look's own Zurück/Weiter buttons already behave locally.
+  const {
+    isRoomHost,
+    isRoomRevealSyncActive,
+    arenaCoopReadyGateActive,
+    arenaReadyParticipantIds,
+    isSelfArenaReady,
+    arenaCoopGateParticipants,
+    arenaCoopWaitingNames,
+    canControlArenaReveal,
+    roomRevealWaitingForHost,
+    roomArenaSyncState,
+    emitHostRoomArenaAdvance: emitHostRoomArenaAdvanceSync,
+    emitArenaCoopReadyToggle,
+    emitStartRoomArena,
+  } = useArenaRoomSync({
+    roomContext: props.roomContext,
+    saveId: params.saveId,
+    seasonId: params.seasonId,
+    matchdayId: params.matchdayId,
+    onApplyRevealSync: (normalized: RoomArenaState) => {
+      setBoardSide(normalized.activeDisciplinePhase);
+      setPhaseIndex(normalized.phaseIndex);
+      setIsAutoPlaying(false);
+    },
+  });
+  const arenaControlsLocked = isRoomRevealSyncActive && !canControlArenaReveal;
+
+  // Host auto-requests the shared arena sync once the board has actually
+  // loaded (mirrors the classic arena's auto-start effect). Whether the
+  // "both ready" gate then blocks the reveal depends purely on the server's
+  // co-op check (>1 required participant) — solo-in-room starts revealing
+  // immediately, exactly like before New Look had any room-sync at all.
+  useEffect(() => {
+    if (!props.roomContext || !isRoomHost || loadState !== "ready") {
+      return;
+    }
+    if ((roomArenaSyncState?.status ?? "idle") !== "idle") {
+      return;
+    }
+    emitStartRoomArena({
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+      disciplineSide: "d1",
+      maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
+    });
+  }, [
+    isRoomHost,
+    loadState,
+    params.matchdayId,
+    params.seasonId,
+    props.roomContext,
+    roomArenaSyncState?.status,
+    emitStartRoomArena,
+  ]);
+
+  function handleHostRoomArenaAdvance() {
+    emitHostRoomArenaAdvanceSync({ d1: 0, d2: 0 });
+  }
 
   useEffect(() => {
     if (!params.saveId || !params.seasonId || !params.matchdayId || !params.teamId) {
@@ -450,7 +518,11 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   // Render — reines setInterval im Effect, das beim Unmount/Wechsel
   // sauber wieder abgeräumt wird.
   useEffect(() => {
-    if (!isAutoPlaying || boardSide === "total") {
+    // Matches the classic arena: inside any Room the shared timeline only
+    // moves on the host's explicit step (`handleHostRoomArenaAdvance`), never
+    // on a local timer — otherwise the guest's mirrored view would jump on a
+    // cadence nobody agreed to.
+    if (!isAutoPlaying || boardSide === "total" || isRoomRevealSyncActive) {
       return;
     }
     if (phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1) {
@@ -462,7 +534,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       setPhaseIndex((index) => Math.min(MATCHDAY_ARENA_PHASES.length - 1, index + 1));
     }, intervalMs);
     return () => clearInterval(interval);
-  }, [isAutoPlaying, boardSide, phaseIndex, speedIndex]);
+  }, [isAutoPlaying, boardSide, phaseIndex, speedIndex, isRoomRevealSyncActive]);
 
   // Wechsel der Disziplin-Seite schließt eine offene Score-Herkunft und
   // stoppt eine laufende Autoplay-Show (die Phasen gelten pro Board-Seite).
@@ -1053,6 +1125,45 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
         </StatChipRow>
       </NlCard>
 
+      {arenaCoopReadyGateActive ? (
+        <NlCard
+          className="nl-arena-coop-gate"
+          data-testid="arena-coop-ready-gate"
+          eyebrow="Gemeinsamer Spieltag"
+          title="Bereit für den Spieltag"
+          actions={
+            <span className={`nl-arena-coop-gate-status${isSelfArenaReady ? " is-ready" : ""}`}>
+              {isSelfArenaReady ? "Du bist bereit" : "Noch nicht bereit"}
+            </span>
+          }
+        >
+          <p className="nl-arena-coop-gate-hint">
+            Der gemeinsame Reveal startet erst, wenn beide Coaches bereit sind.
+          </p>
+          <StatChipRow className="nl-arena-coop-gate-chips" aria-label="Bereitschaft der Coaches">
+            {arenaCoopGateParticipants.map((participant) => {
+              const ready = arenaReadyParticipantIds.includes(participant.participantId);
+              return (
+                <StatChip
+                  key={`nl-arena-coop-ready-${participant.participantId}`}
+                  label={participant.displayName}
+                  value={ready ? "bereit" : "wartet"}
+                  tone={ready ? "good" : "warn"}
+                />
+              );
+            })}
+          </StatChipRow>
+          <div className="nl-arena-actions">
+            <button className="nl-arena-button is-primary" type="button" onClick={emitArenaCoopReadyToggle}>
+              {isSelfArenaReady ? "Bereit zurücknehmen" : "Bereit für den Spieltag"}
+            </button>
+          </div>
+          {isSelfArenaReady && arenaCoopWaitingNames.length > 0 ? (
+            <p className="nl-arena-coop-gate-waiting">Warte auf {arenaCoopWaitingNames.join(", ")} …</p>
+          ) : null}
+        </NlCard>
+      ) : null}
+
       {arenaBriefing ? (
         <NlCard
           className="nl-arena-briefing-card"
@@ -1170,23 +1281,48 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 : `Phase: ${MATCHDAY_ARENA_PHASES.find((phase) => phase.id === activePhase)?.label ?? "Slots"}`
             }
             actions={
-              <NlSubTabs
-                items={sideItems}
-                activeId={boardSide}
-                onSelect={(id) => setBoardSide(id as ArenaNewLookBoardSide)}
-                aria-label="Disziplin wählen"
-              />
+              <div className={`nl-arena-side-tabs${arenaControlsLocked ? " is-locked" : ""}`}>
+                <NlSubTabs
+                  items={sideItems}
+                  activeId={boardSide}
+                  onSelect={(id) => {
+                    // Guests never free-jump the discipline tab while the host
+                    // controls the shared reveal — "Gesamt" shows the fully
+                    // resolved board and would spoil the co-op reveal outright.
+                    // The host can still browse freely, exactly like solo.
+                    if (arenaControlsLocked) {
+                      return;
+                    }
+                    setBoardSide(id as ArenaNewLookBoardSide);
+                  }}
+                  aria-label="Disziplin wählen"
+                />
+              </div>
             }
           >
+            {isRoomRevealSyncActive ? (
+              <p className="nl-arena-coop-note" data-testid="nl-arena-coop-note">
+                {arenaCoopReadyGateActive
+                  ? "Der gemeinsame Reveal startet, sobald beide Coaches bereit sind."
+                  : roomRevealWaitingForHost
+                    ? "Warte auf Host-Start."
+                    : isRoomHost
+                      ? "Du steuerst den Reveal für alle."
+                      : "Der Host steuert den Reveal."}
+              </p>
+            ) : null}
             {boardSide !== "total" ? (
               <>
-                <div className="nl-arena-phase-controls">
+                <div className={`nl-arena-phase-controls${arenaControlsLocked ? " is-locked" : ""}`}>
                   <button
                     className="nl-arena-button"
                     type="button"
-                    disabled={phaseIndex <= 0}
+                    disabled={phaseIndex <= 0 || arenaControlsLocked}
                     title="Eine Phase zurück"
                     onClick={() => {
+                      if (arenaControlsLocked) {
+                        return;
+                      }
                       setIsAutoPlaying(false);
                       setPhaseIndex((index) => Math.max(0, index - 1));
                     }}
@@ -1197,6 +1333,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                     items={phaseItems}
                     activeId={activePhase}
                     onSelect={(id) => {
+                      if (arenaControlsLocked) {
+                        return;
+                      }
                       setIsAutoPlaying(false);
                       setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === id)));
                     }}
@@ -1206,10 +1345,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   <button
                     className="nl-arena-button"
                     type="button"
-                    disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1}
+                    disabled={(phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1 && !isRoomRevealSyncActive) || arenaControlsLocked}
                     title="Eine Phase weiter"
                     onClick={() => {
+                      if (arenaControlsLocked) {
+                        return;
+                      }
                       setIsAutoPlaying(false);
+                      if (isRoomRevealSyncActive && isRoomHost) {
+                        handleHostRoomArenaAdvance();
+                        return;
+                      }
                       setPhaseIndex((index) => Math.min(MATCHDAY_ARENA_PHASES.length - 1, index + 1));
                     }}
                   >
@@ -1219,6 +1365,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                     className="nl-arena-button is-primary nl-arena-autoplay-toggle"
                     type="button"
                     aria-pressed={isAutoPlaying}
+                    disabled={arenaControlsLocked}
                     title={
                       isAutoPlaying
                         ? "Reveal-Show pausieren"
@@ -1227,6 +1374,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                           : "Reveal-Phasen automatisch durchschalten (Auflösungs-Show)"
                     }
                     onClick={() => {
+                      if (arenaControlsLocked) {
+                        return;
+                      }
                       if (isAutoPlaying) {
                         setIsAutoPlaying(false);
                         return;
@@ -1253,9 +1403,20 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   <button
                     className="nl-arena-button"
                     type="button"
-                    disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1}
-                    title="Show überspringen — direkt zur Ergebnis-Phase"
+                    // No host-synced equivalent exists for this shortcut (it
+                    // jumps straight to the result without going through the
+                    // authoritative step-by-step advance), so it stays off in
+                    // any Room — host included — to avoid a silent desync.
+                    disabled={phaseIndex >= MATCHDAY_ARENA_PHASES.length - 1 || isRoomRevealSyncActive}
+                    title={
+                      isRoomRevealSyncActive
+                        ? "Im gemeinsamen Reveal nicht verfügbar — nur Schritt für Schritt"
+                        : "Show überspringen — direkt zur Ergebnis-Phase"
+                    }
                     onClick={() => {
+                      if (isRoomRevealSyncActive) {
+                        return;
+                      }
                       setIsAutoPlaying(false);
                       setPhaseIndex(MATCHDAY_ARENA_PHASES.length - 1);
                     }}

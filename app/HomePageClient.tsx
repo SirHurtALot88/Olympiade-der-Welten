@@ -9,6 +9,13 @@ import { getClientSocket } from "@/lib/socket/client";
 import type { RoomOwnershipPreset } from "@/types/events";
 import type { RoomErrorPayload, RoomJoinedPayload } from "@/types/events";
 
+const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
+  { value: "chris_1_rest_ai", label: "1 Team für mich, Rest KI" },
+  { value: "chris_2_rest_ai", label: "2 Teams für mich, Rest KI" },
+  { value: "chris_4_rest_ai", label: "4 Teams für mich, Rest KI" },
+  { value: "chris_4_franky_4_rest_ai", label: "4 Teams für mich + 4 Teams für Franky, Rest KI" },
+];
+
 function storageKey(roomCode: string) {
   // Runtime rejoin token only. This is not team ownership or write authorization.
   return `oly-seat:${roomCode}`;
@@ -59,7 +66,7 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
 
     function handleConnect() {
       setSocketState("connected");
-      setError((current) => (current === "Room-Server nicht erreichbar. Bitte lokalen Server prüfen." ? null : current));
+      setError((current) => (current === "Verbindung zum Spiel-Server verloren. Bitte erneut versuchen." ? null : current));
     }
 
     function handleDisconnect() {
@@ -70,7 +77,7 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
     function handleConnectError() {
       setSocketState("offline");
       setIsBusy(false);
-      setError("Room-Server nicht erreichbar. Bitte lokalen Server prüfen.");
+      setError("Verbindung zum Spiel-Server verloren. Bitte erneut versuchen.");
     }
 
     function handleJoined(payload: RoomJoinedPayload) {
@@ -107,7 +114,7 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
 
     const timeout = window.setTimeout(() => {
       setIsBusy(false);
-      setError("Keine Antwort vom Room-Server. Bitte erneut versuchen.");
+      setError("Keine Antwort vom Spiel-Server. Bitte erneut versuchen.");
     }, 8000);
 
     return () => window.clearTimeout(timeout);
@@ -135,20 +142,33 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
   return (
     <main className="app-shell">
       <header className="hero">
-        <p>Oly Umbau App v2 · Online Multiplayer Rooms V1</p>
-        <h1>Manager-Room erstellen</h1>
-        <p>
-          Browser verbinden sich mit einem gemeinsamen Server-Room. Participants besitzen Teams,
-          AI bleibt Systemsteuerung, und echte Writes laufen später serverseitig über Services.
-        </p>
+        <p className="eyebrow">Olympiade der Welten</p>
+        <h1>Wie möchtest du spielen?</h1>
+        <p>Übernimm deine Teams allein gegen die KI, oder spiele gemeinsam mit einem Freund in einem Online-Raum.</p>
+        {sessionDisplayName ? <p className="oly-session-line">Angemeldet als {sessionDisplayName}</p> : null}
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
+      <section className="panel oly-solo-card">
+        <div className="panel-header">
+          <h2>Solo spielen</h2>
+        </div>
+        <p className="muted">Du steuerst deine Teams allein, die KI übernimmt den Rest der Liga.</p>
+        <Link className="primary-button inline-button" href="/foundation">
+          Solo spielen
+        </Link>
+      </section>
+
+      <div className="oly-section-heading">
+        <h2>Zu zweit spielen (Online)</h2>
+        <p className="muted">Zwei Browser verbinden sich mit demselben Online-Raum und teilen sich die Liga.</p>
+      </div>
+
       <div className="lobby-grid">
-        <LobbyCard title="Online-Room erstellen">
+        <LobbyCard title="Raum erstellen">
           <div className="form-stack">
-            <p>Host erstellt einen teilbaren Room-Code, z. B. ABCD-1234.</p>
+            <p className="muted">Du erstellst einen Raum-Code, den du mit deinem Mitspieler teilst.</p>
             <label className="filter-field">
               <span>Dein Anzeigename</span>
               <input
@@ -160,12 +180,13 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
               />
             </label>
             <label className="filter-field">
-              <span>Ownership-Preset</span>
+              <span>Team-Verteilung</span>
               <select className="input" value={preset} onChange={(event) => setPreset(event.target.value as RoomOwnershipPreset)}>
-                <option value="chris_1_rest_ai">1 Team Chris, Rest AI</option>
-                <option value="chris_2_rest_ai">2 Teams Chris, Rest AI</option>
-                <option value="chris_4_rest_ai">4 Teams Chris, Rest AI</option>
-                <option value="chris_4_franky_4_rest_ai">4 Teams Chris + 4 Teams Franky + Rest AI</option>
+                {PRESET_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <button
@@ -183,9 +204,9 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
           </div>
         </LobbyCard>
 
-        <LobbyCard title="Room beitreten">
+        <LobbyCard title="Mit Code beitreten">
           <div className="form-stack">
-            <p>Franky oder ein anderer Spieler verbindet sich per Room-Code mit demselben Server-Room.</p>
+            <p className="muted">Hast du einen Raum-Code bekommen? Gib ihn hier ein und leg direkt los.</p>
             <label className="filter-field">
               <span>Anzeigename</span>
               <input
@@ -196,13 +217,16 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
                 title={sessionDisplayName ? "Angemeldet als " + sessionDisplayName : undefined}
               />
             </label>
-            <input
-              className="input"
-              placeholder="z. B. ABCD-1234"
-              value={roomCode}
-              onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
-              maxLength={9}
-            />
+            <label className="filter-field">
+              <span>Raum-Code</span>
+              <input
+                className="input"
+                placeholder="z. B. ABCD-1234"
+                value={roomCode}
+                onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
+                maxLength={9}
+              />
+            </label>
             <button
               className="secondary-button"
               type="button"
@@ -215,25 +239,6 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
             >
               Raum beitreten
             </button>
-          </div>
-        </LobbyCard>
-
-        <LobbyCard title="Server-authoritative Flow">
-          <div className="stack">
-            <p>Vorbereitet für: Buy/Sell, Facilities, XP, Training, Lineup, Formkarten, Resolve und Season Transition.</p>
-            <ul className="foundation-home-news-list">
-              <li>Client sendet Requests, keine Direktwrites.</li>
-              <li>Server validiert Room, Participant, TeamOwnership, Save/Step und Confirm Token.</li>
-              <li>Lokaler Sandbox-Modus bleibt ohne Prisma-Writes.</li>
-            </ul>
-          </div>
-        </LobbyCard>
-
-        <LobbyCard title="Singleplayer Foundation">
-          <div className="stack">
-            <Link className="secondary-button inline-button" href="/foundation">
-              Management Core ansehen
-            </Link>
           </div>
         </LobbyCard>
       </div>

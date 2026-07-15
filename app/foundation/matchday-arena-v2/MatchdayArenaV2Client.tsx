@@ -49,10 +49,8 @@ import type {
 } from "@/lib/season/matchday-mvp-scoring-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import { normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
-import { getClientSocket } from "@/lib/socket/client";
-import type { RoomJoinedPayload } from "@/types/events";
-import type { CoachRole, OlyRoomState, RoomArenaState } from "@/types/game";
+import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
+import type { RoomArenaState } from "@/types/game";
 import {
   buildMatchdayArenaBaseSessionKey,
   buildMatchdayArenaResolveSessionKey,
@@ -901,9 +899,6 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const [revealEventActive, setRevealEventActive] = useState(false);
   const [mvpSpotlightActive, setMvpSpotlightActive] = useState(false);
   const [speed, setSpeed] = useState<ArenaPhaseControlSpeed>(1);
-  const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
-  const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
-  const lastAppliedRoomArenaVersionRef = useRef<number | null>(null);
   const requestSequenceRef = useRef(0);
   const baseRequestAbortRef = useRef<AbortController | null>(null);
   const resolveRequestAbortRef = useRef<AbortController | null>(null);
@@ -1475,82 +1470,35 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const d1Required = context?.matchdayContract?.discipline1?.requiredPlayers ?? 0;
   const d2Required = context?.matchdayContract?.discipline2?.requiredPlayers ?? 0;
 
-  const isRoomHost = roomSyncRole === "A";
-  const isRoomRevealSyncActive = Boolean(props.roomContext);
-  const canControlArenaReveal = !isRoomRevealSyncActive || isRoomHost;
-  const roomRevealWaitingForHost =
-    isRoomRevealSyncActive && !isRoomHost && (roomArenaSyncState?.status ?? "idle") === "idle";
-
-  function applyRoomArenaSync(arenaSync: RoomArenaState | null | undefined) {
-    if (!arenaSync || arenaSync.status === "idle") {
-      return;
-    }
-    if (arenaSync.saveId !== params.saveId) {
-      return;
-    }
-    if (arenaSync.seasonId && arenaSync.seasonId !== params.seasonId) {
-      return;
-    }
-    if (arenaSync.matchdayId && arenaSync.matchdayId !== params.matchdayId) {
-      return;
-    }
-    if (lastAppliedRoomArenaVersionRef.current === arenaSync.version) {
-      return;
-    }
-
-    lastAppliedRoomArenaVersionRef.current = arenaSync.version;
-    const normalized = normalizeRoomArenaState(arenaSync);
-    setActiveDisciplinePhase(normalized.activeDisciplinePhase);
-    setPhaseIndex(normalized.phaseIndex);
-    setRevealedSlotCountByDiscipline({ ...normalized.revealedSlotCountByDiscipline });
-    setCompletedDisciplinePhases({ ...normalized.completedDisciplinePhases });
-    setIsPlaying(false);
-    shouldScrollToActiveTeamAfterStepRef.current = true;
-  }
-
-  useEffect(() => {
-    if (!props.roomContext) {
-      setRoomSyncRole(null);
-      setRoomArenaSyncState(null);
-      lastAppliedRoomArenaVersionRef.current = null;
-      return undefined;
-    }
-
-    const roomContext = props.roomContext;
-    const socket = getClientSocket();
-
-    function handleRoomJoined(payload: RoomJoinedPayload) {
-      if (payload.roomCode !== roomContext.roomCode.toUpperCase()) {
-        return;
-      }
-      if (payload.participantId !== roomContext.participantId) {
-        return;
-      }
-      setRoomSyncRole(payload.role);
-      setRoomArenaSyncState(payload.state.arenaSyncState ?? null);
-      applyRoomArenaSync(payload.state.arenaSyncState);
-    }
-
-    function handleRoomState(nextState: OlyRoomState) {
-      if (nextState.roomCode !== roomContext.roomCode.toUpperCase()) {
-        return;
-      }
-      setRoomArenaSyncState(nextState.arenaSyncState ?? null);
-      applyRoomArenaSync(nextState.arenaSyncState);
-    }
-
-    socket.emit("rejoinRoom", {
-      roomCode: roomContext.roomCode,
-      seatToken: roomContext.seatToken,
-    });
-    socket.on("roomJoined", handleRoomJoined);
-    socket.on("roomState", handleRoomState);
-
-    return () => {
-      socket.off("roomJoined", handleRoomJoined);
-      socket.off("roomState", handleRoomState);
-    };
-  }, [params.matchdayId, params.saveId, params.seasonId, props.roomContext]);
+  const {
+    isRoomHost,
+    isRoomRevealSyncActive,
+    isRoomArenaCoop,
+    arenaCoopReadyGateActive,
+    arenaReadyParticipantIds,
+    isSelfArenaReady,
+    arenaCoopGateParticipants,
+    arenaCoopWaitingNames,
+    canControlArenaReveal,
+    roomRevealWaitingForHost,
+    roomArenaSyncState,
+    emitHostRoomArenaAdvance: emitHostRoomArenaAdvanceSync,
+    emitArenaCoopReadyToggle,
+    emitStartRoomArena,
+  } = useArenaRoomSync({
+    roomContext: props.roomContext,
+    saveId: params.saveId,
+    seasonId: params.seasonId,
+    matchdayId: params.matchdayId,
+    onApplyRevealSync: (normalized: RoomArenaState) => {
+      setActiveDisciplinePhase(normalized.activeDisciplinePhase);
+      setPhaseIndex(normalized.phaseIndex);
+      setRevealedSlotCountByDiscipline({ ...normalized.revealedSlotCountByDiscipline });
+      setCompletedDisciplinePhases({ ...normalized.completedDisciplinePhases });
+      setIsPlaying(false);
+      shouldScrollToActiveTeamAfterStepRef.current = true;
+    },
+  });
 
   const d1ScoreboardView = useMemo<MatchdayArenaScoreboardRowView[]>(
     () => buildMatchdayArenaScoreboardView(scoreFeed?.d1Scoreboard ?? []),
@@ -1845,20 +1793,9 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const maxSlotRevealCount = activeSlotRoles.length;
 
   function emitHostRoomArenaAdvance() {
-    const roomContext = props.roomContext;
-    if (!roomContext) {
-      return;
-    }
-
-    const socket = getClientSocket();
-    socket.emit("advanceRoomArenaStep", {
-      roomCode: roomContext.roomCode,
-      seatToken: roomContext.seatToken,
-      maxSlotRevealCountByDiscipline: {
-        d1: maxD1SlotRevealCount,
-        d2: maxD2SlotRevealCount,
-      },
-      force: true,
+    emitHostRoomArenaAdvanceSync({
+      d1: maxD1SlotRevealCount,
+      d2: maxD2SlotRevealCount,
     });
   }
 
@@ -1873,10 +1810,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       return;
     }
 
-    const socket = getClientSocket();
-    socket.emit("startRoomArena", {
-      roomCode: props.roomContext.roomCode,
-      seatToken: props.roomContext.seatToken,
+    emitStartRoomArena({
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       disciplineSide: "d1",
@@ -1894,6 +1828,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     params.seasonId,
     props.roomContext,
     roomArenaSyncState?.status,
+    emitStartRoomArena,
   ]);
 
   const revealedSlotCount = Math.min(
@@ -3016,6 +2951,54 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             </>
           )}
         </div>
+      ) : null}
+      {arenaCoopReadyGateActive ? (
+        <section
+          className="panel arena-v2-coop-ready-gate"
+          data-testid="arena-coop-ready-gate"
+          aria-live="polite"
+        >
+          <div className="panel-header">
+            <div>
+              <h2>Bereit für den Spieltag</h2>
+              <p className="muted">
+                Der gemeinsame Reveal startet erst, wenn beide Coaches bereit sind.
+              </p>
+            </div>
+            <span className={`pill${isSelfArenaReady ? " is-ready" : " is-warning"}`}>
+              {isSelfArenaReady ? "Du bist bereit" : "Noch nicht bereit"}
+            </span>
+          </div>
+          <div className="stack">
+            <div className="room-meta">
+              {arenaCoopGateParticipants.map((participant) => {
+                const ready = arenaReadyParticipantIds.includes(participant.participantId);
+                return (
+                  <span
+                    key={`arena-coop-ready-${participant.participantId}`}
+                    className={`pill${ready ? " is-ready" : " is-warning"}`}
+                  >
+                    {participant.displayName}: {ready ? "bereit" : "wartet"}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="foundation-flow-actions">
+              <button
+                className="primary-button inline-button"
+                type="button"
+                onClick={emitArenaCoopReadyToggle}
+              >
+                {isSelfArenaReady ? "Bereit zurücknehmen" : "Bereit für den Spieltag"}
+              </button>
+            </div>
+            {isSelfArenaReady && arenaCoopWaitingNames.length > 0 ? (
+              <p className="arena-v2-control-hint">
+                Warte auf {arenaCoopWaitingNames.join(", ")} …
+              </p>
+            ) : null}
+          </div>
+        </section>
       ) : null}
       <section className="panel arena-v2-hero">
         <div className="arena-v2-hero-main">
