@@ -201,6 +201,9 @@ function formatGeneratorValueStatus(status: PlayerGeneratorDraft["generated"]["m
   if (status === "ready") {
     return "ready";
   }
+  if (status === "heuristic_estimate") {
+    return "heuristische Schätzung";
+  }
   if (status === "missing_market_value_input") {
     return "wartet auf marketValueNew";
   }
@@ -268,6 +271,9 @@ function formatGeneratorEngineStatusLabel(
     if (status === "ready") {
       return "MW-Engine bereit";
     }
+    if (status === "heuristic") {
+      return "MW ist eine heuristische Schätzung, keine Engine-verifizierte Ranked-MW.";
+    }
     if (status === "incomplete_source") {
       return "MW-Engine blockiert: Rank→MW-Tabelle ist noch unvollständig.";
     }
@@ -290,6 +296,12 @@ function formatGeneratorEngineStatusLabel(
       return "Class Engine läuft heuristisch.";
     }
     return "Class Engine blockiert.";
+  }
+  if (key === "potentialEngine") {
+    if (status === "ready") {
+      return "Potential nutzt das echte CA/PO-Sternemodell.";
+    }
+    return "Potential fehlt: Es gibt noch keine belastbare Progressionsquelle.";
   }
   return "Potential fehlt: Es gibt noch keine belastbare Progressionsquelle.";
 }
