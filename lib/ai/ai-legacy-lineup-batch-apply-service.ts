@@ -343,8 +343,8 @@ function sideTeamPowerPriority(input: {
 // active team-power charges over the season, so powers don't rot unused. Tunable/reversible
 // via OLY_TEAM_POWER_TARGET_USAGE (0..1); default 0.85 leaves margin above the 80% floor.
 const TEAM_POWER_TARGET_SEASON_USAGE = (() => {
-  const raw = Number(process.env.OLY_TEAM_POWER_TARGET_USAGE ?? 0.85);
-  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.85;
+  const raw = Number(process.env.OLY_TEAM_POWER_TARGET_USAGE ?? 0.9);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.9;
 })();
 
 // Fraction of the season before which no use-it-or-lose-it pressure applies, so early matchdays
