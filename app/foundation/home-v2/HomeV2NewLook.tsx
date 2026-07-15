@@ -571,7 +571,7 @@ export default function HomeV2NewLook({
         <div className="nl-home-section-head">
           <span className="nl-home-section-icon"><IconUsers /></span>
           <h3 className="nl-home-section-title">Top-Kader · Deine besten 6</h3>
-          <span className="nl-home-section-hint" title="Reihenfolge: Rolle (Stammspieler zuerst), dann Saisonleistung (PPS), MVS und OVR">
+          <span className="nl-home-section-hint" title="Reihenfolge: Rolle (Stammspieler zuerst), dann Saisonleistung (PPs), MVS und OVR">
             sortiert nach Rolle &amp; Saisonleistung
           </span>
         </div>
