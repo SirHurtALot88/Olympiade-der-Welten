@@ -249,6 +249,153 @@ export function buildOwnershipForPreset(
   });
 }
 
+export const MAX_TEAMS_PER_HUMAN_PARTICIPANT = 4;
+
+export type ExplicitTeamSelectionInput = {
+  chrisTeamIds: string[];
+  frankyTeamIds: string[];
+};
+
+export type ExplicitTeamOwnershipValidationReason =
+  | "unknown_team_id"
+  | "team_assigned_twice"
+  | "too_many_teams_for_participant";
+
+export type ExplicitTeamOwnershipValidationResult =
+  | { ok: true; ownership: TeamOwnershipRecord[] }
+  | { ok: false; reason: ExplicitTeamOwnershipValidationReason; message: string };
+
+/**
+ * Builds an explicit team-ownership map from host-chosen team-id lists, mirroring
+ * buildOwnershipForPreset's output shape (host = Chris, second joined participant = Franky,
+ * everything else stays AI). Unlike the preset builder this does not pick teams for the
+ * host - the host names the exact team ids he and Franky want to play.
+ */
+export function buildExplicitTeamOwnership(
+  participants: RoomParticipant[],
+  selection: ExplicitTeamSelectionInput,
+  teamIds = ONLINE_ROOM_TEAM_IDS,
+): ExplicitTeamOwnershipValidationResult {
+  const host = participants.find((entry) => entry.role === "host") ?? participants[0] ?? null;
+  const franky =
+    participants.find((entry) => /franky/i.test(entry.displayName)) ??
+    participants.find((entry) => entry.role === "player") ??
+    null;
+
+  const chrisTeamIds = Array.from(new Set(selection.chrisTeamIds ?? []));
+  // Without a joined second human participant there is nobody to own Franky's teams yet -
+  // they simply stay AI-controlled until Franky joins and the host re-assigns.
+  const frankyTeamIds = franky ? Array.from(new Set(selection.frankyTeamIds ?? [])) : [];
+
+  const teamIdSet = new Set(teamIds);
+  const unknownTeamId = [...chrisTeamIds, ...frankyTeamIds].find((teamId) => !teamIdSet.has(teamId));
+  if (unknownTeamId) {
+    return { ok: false, reason: "unknown_team_id", message: `Unbekanntes Team: ${unknownTeamId}.` };
+  }
+
+  const overlap = chrisTeamIds.find((teamId) => frankyTeamIds.includes(teamId));
+  if (overlap) {
+    return {
+      ok: false,
+      reason: "team_assigned_twice",
+      message: `Team ${overlap} kann nicht gleichzeitig zwei Mitspielern zugewiesen werden.`,
+    };
+  }
+
+  if (chrisTeamIds.length > MAX_TEAMS_PER_HUMAN_PARTICIPANT) {
+    return {
+      ok: false,
+      reason: "too_many_teams_for_participant",
+      message: `${host?.displayName ?? "Chris"} kann maximal ${MAX_TEAMS_PER_HUMAN_PARTICIPANT} Teams uebernehmen.`,
+    };
+  }
+  if (frankyTeamIds.length > MAX_TEAMS_PER_HUMAN_PARTICIPANT) {
+    return {
+      ok: false,
+      reason: "too_many_teams_for_participant",
+      message: `${franky?.displayName ?? "Franky"} kann maximal ${MAX_TEAMS_PER_HUMAN_PARTICIPANT} Teams uebernehmen.`,
+    };
+  }
+
+  const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds]);
+
+  const ownership: TeamOwnershipRecord[] = teamIds.map((teamId) => {
+    if (host && chrisTeamIds.includes(teamId)) {
+      return {
+        teamId,
+        controllerType: "human",
+        participantId: host.participantId,
+        userId: host.userId,
+        ownerDisplayName: host.displayName,
+      };
+    }
+
+    if (franky && frankyTeamIds.includes(teamId)) {
+      return {
+        teamId,
+        controllerType: "human",
+        participantId: franky.participantId,
+        userId: franky.userId,
+        ownerDisplayName: franky.displayName,
+      };
+    }
+
+    return {
+      teamId,
+      controllerType: humanTeamIds.has(teamId) ? "passive" : "ai",
+      ownerDisplayName: humanTeamIds.has(teamId) ? "waiting_for_participant" : "AI",
+    };
+  });
+
+  return { ok: true, ownership };
+}
+
+export function applyExplicitTeamOwnershipToState(
+  state: OlyRoomState,
+  selection: ExplicitTeamSelectionInput,
+): { ok: true; state: OlyRoomState } | { ok: false; reason: ExplicitTeamOwnershipValidationReason; message: string } {
+  const validated = buildExplicitTeamOwnership(state.roomParticipants, selection);
+  if (!validated.ok) {
+    return validated;
+  }
+
+  const ownership = validated.ownership;
+  const participants = syncParticipantControlledTeams(state.roomParticipants, ownership);
+  const multiplayerRoom = {
+    ...state.multiplayerRoom,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const nextState: OlyRoomState = {
+    ...state,
+    multiplayerRoom,
+    roomParticipants: participants,
+    teamOwnership: ownership,
+    systemControlledTeamIds: ownership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId),
+    turnState: buildTurnState({
+      roomStatus: multiplayerRoom.status,
+      participants,
+      ownership,
+    }),
+    roomFlowState: buildRoomFlowState({
+      state: {
+        multiplayerRoom,
+        roomParticipants: participants,
+        teamOwnership: ownership,
+        systemControlledTeamIds: ownership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId),
+        turnState: buildTurnState({
+          roomStatus: multiplayerRoom.status,
+          participants,
+          ownership,
+        }),
+      },
+    }),
+    serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
+  };
+
+  return { ok: true, state: nextState };
+}
+
 export function syncParticipantControlledTeams(
   participants: RoomParticipant[],
   ownership: TeamOwnershipRecord[],

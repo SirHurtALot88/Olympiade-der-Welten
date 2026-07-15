@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyRoomOwnershipPreset,
+  applyRoomTeamSelection,
   advanceRoomArenaStep,
   advanceRoomFlow,
   canSeatControlTeam,
   createRoom,
+  getRoom,
   joinRoom,
   recordRoomGameplayWrite,
   rejoinRoom,
@@ -15,7 +17,7 @@ import {
   startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
-import { authorizeTeamWrite } from "@/lib/room/online-room-model";
+import { authorizeTeamWrite, buildExplicitTeamOwnership } from "@/lib/room/online-room-model";
 
 describe("room store", () => {
   it("records gameplay writes and invalidates the acting participant ready state", () => {
@@ -351,5 +353,101 @@ describe("room store", () => {
       allowed: false,
       reason: "participant_has_no_team_ownership",
     });
+  });
+
+  it("lets the host explicitly assign specific team ids to Chris and Franky", () => {
+    const created = createRoom("socket-select-a", { displayName: "Chris", preset: "chris_4_rest_ai" });
+    const joined = joinRoom(created.room.roomCode, "socket-select-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const applied = applyRoomTeamSelection(created.room.roomCode, created.seat.seatToken, {
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: ["C-S", "G-G"],
+    });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+
+    const ownership = applied.room.state.teamOwnership;
+    expect(ownership.find((entry) => entry.teamId === "M-M")).toMatchObject({
+      controllerType: "human",
+      ownerDisplayName: "Chris",
+    });
+    expect(ownership.find((entry) => entry.teamId === "C-S")).toMatchObject({
+      controllerType: "human",
+      ownerDisplayName: "Franky",
+    });
+    // A-A was the alphabetically-first team the old preset always handed Chris - it must now be AI.
+    expect(ownership.find((entry) => entry.teamId === "A-A")).toMatchObject({ controllerType: "ai" });
+    expect(ownership.filter((entry) => entry.controllerType === "human")).toHaveLength(3);
+    expect(ownership.filter((entry) => entry.controllerType === "ai")).toHaveLength(29);
+
+    const chrisParticipant = applied.room.state.roomParticipants.find((participant) => participant.displayName === "Chris");
+    expect(chrisParticipant?.controlledTeamIds).toEqual(["M-M"]);
+  });
+
+  it("rejects team selections from a non-host seat token", () => {
+    const created = createRoom("socket-select-nonhost-a", { displayName: "Chris" });
+    const joined = joinRoom(created.room.roomCode, "socket-select-nonhost-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    // T-T is outside both default "chris_4_franky_4_rest_ai" allotments (auto-applied on join), so it
+    // starts AI-controlled - the assertion below proves the rejected non-host attempt left it untouched.
+    const applied = applyRoomTeamSelection(created.room.roomCode, joined.seat.seatToken, {
+      chrisTeamIds: ["T-T"],
+      frankyTeamIds: [],
+    });
+    expect(applied.ok).toBe(false);
+    if (applied.ok) return;
+    expect(applied.error).toContain("Host");
+
+    const room = getRoom(created.room.roomCode);
+    expect(room?.state.teamOwnership.find((entry) => entry.teamId === "T-T")?.controllerType).toBe("ai");
+  });
+
+  it("rejects explicit selections that exceed the per-human team cap", () => {
+    const participants = [
+      { participantId: "p-host", userId: "u-host", displayName: "Chris", connectionStatus: "online" as const, role: "host" as const, controlledTeamIds: [], readyState: "not_ready" as const, lastSeenAt: "2026-01-01T00:00:00.000Z" },
+      { participantId: "p-franky", userId: "u-franky", displayName: "Franky", connectionStatus: "online" as const, role: "player" as const, controlledTeamIds: [], readyState: "not_ready" as const, lastSeenAt: "2026-01-01T00:00:00.000Z" },
+    ];
+
+    const tooMany = buildExplicitTeamOwnership(participants, {
+      chrisTeamIds: ["A-A", "B-B", "C-C", "D-L", "G-G"],
+      frankyTeamIds: [],
+    });
+    expect(tooMany.ok).toBe(false);
+    if (tooMany.ok) return;
+    expect(tooMany.reason).toBe("too_many_teams_for_participant");
+  });
+
+  it("rejects explicit selections that assign the same team to both humans", () => {
+    const participants = [
+      { participantId: "p-host", userId: "u-host", displayName: "Chris", connectionStatus: "online" as const, role: "host" as const, controlledTeamIds: [], readyState: "not_ready" as const, lastSeenAt: "2026-01-01T00:00:00.000Z" },
+      { participantId: "p-franky", userId: "u-franky", displayName: "Franky", connectionStatus: "online" as const, role: "player" as const, controlledTeamIds: [], readyState: "not_ready" as const, lastSeenAt: "2026-01-01T00:00:00.000Z" },
+    ];
+
+    const overlapping = buildExplicitTeamOwnership(participants, {
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: ["M-M"],
+    });
+    expect(overlapping.ok).toBe(false);
+    if (overlapping.ok) return;
+    expect(overlapping.reason).toBe("team_assigned_twice");
+  });
+
+  it("keeps Franky's requested teams on AI until Franky has joined", () => {
+    const participants = [
+      { participantId: "p-host", userId: "u-host", displayName: "Chris", connectionStatus: "online" as const, role: "host" as const, controlledTeamIds: [], readyState: "not_ready" as const, lastSeenAt: "2026-01-01T00:00:00.000Z" },
+    ];
+
+    const result = buildExplicitTeamOwnership(participants, {
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: ["C-S"],
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ownership.find((entry) => entry.teamId === "C-S")).toMatchObject({ controllerType: "ai" });
+    expect(result.ownership.find((entry) => entry.teamId === "M-M")).toMatchObject({ controllerType: "human", ownerDisplayName: "Chris" });
   });
 });

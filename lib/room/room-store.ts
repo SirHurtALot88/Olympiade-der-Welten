@@ -10,6 +10,7 @@ import {
 } from "@/lib/room/arena-sync-state";
 import { createRoomCode } from "@/lib/room/room-code";
 import {
+  applyExplicitTeamOwnershipToState,
   applyOwnershipPresetToState,
   appendRoomEvent,
   buildParticipant,
@@ -487,6 +488,35 @@ export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, pr
 
   room.state = applyOwnershipPresetToState(room.state, preset);
   room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function applyRoomTeamSelection(
+  roomCode: string,
+  seatToken: string,
+  selection: { chrisTeamIds: string[]; frankyTeamIds: string[] },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf Teams zuweisen." };
+  }
+
+  const result = applyExplicitTeamOwnershipToState(room.state, selection);
+  if (!result.ok) {
+    return { ok: false as const, error: result.message };
+  }
+
+  room.state = result.state;
+  room.state = appendRoomEvent(room.state, "room_state_updated", {
+    source: "team_selection_applied",
+    chrisTeamIds: selection.chrisTeamIds,
+    frankyTeamIds: selection.frankyTeamIds,
+  });
   syncPlayers(room);
   return { ok: true as const, room };
 }
