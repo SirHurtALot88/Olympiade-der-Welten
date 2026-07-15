@@ -2,7 +2,9 @@ import { useMemo } from "react";
 
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import {
+  AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
+  FRANKY_OWNER_ID,
   buildTeamControlSettingsMap,
   buildTeamOwners,
   deriveChrisFrankyTeamIdsFromSettings,
@@ -115,7 +117,24 @@ export function useFoundationCrossTabTeamControl(input: {
       input.teamContextFilter,
       effectiveActiveOwnerId,
     );
-    return filteredTeams.length ? filteredTeams : manualTeams.length ? manualTeams : input.gameState.teams;
+    const base = filteredTeams.length ? filteredTeams : manualTeams.length ? manualTeams : input.gameState.teams;
+    // Reihenfolge im Team-Picker: eigene Teams (lokaler Spieler) zuerst, dann
+    // die des 2. Spielers (Franky), dann KI — so tauchen die selbst gesteuerten
+    // 1–4 Teams immer ganz oben auf (auch in der "Alle Teams"-Ansicht). Rang aus
+    // den Team-Control-Settings, stabiler Tiebreak über den Kürzel-Code.
+    const ownerRank = (teamId: string): number => {
+      const settings = resolvedTeamControlSettings[teamId];
+      if (!settings) return 3;
+      if (settings.controlMode === "ai" || settings.ownerId === AI_OWNER_ID) return 2;
+      if (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID) return 0;
+      if (settings.ownerId === FRANKY_OWNER_ID) return 1;
+      return 1; // sonstige menschliche Owner zwischen "eigen" und KI
+    };
+    return [...base].sort(
+      (left, right) =>
+        ownerRank(left.teamId) - ownerRank(right.teamId) ||
+        (left.shortCode ?? "").localeCompare(right.shortCode ?? ""),
+    );
   }, [
     effectiveActiveOwnerId,
     input.gameState.teams,
