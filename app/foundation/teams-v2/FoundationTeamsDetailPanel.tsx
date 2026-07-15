@@ -385,6 +385,10 @@ export type FoundationTeamsDetailPanelProps = {
   selectedTeamRosterActionHint: unknown;
   contractRenewalMessage: unknown;
   contractRenewalError: unknown;
+  /** Manuelles KI-Pick-Auffüllen für genau dieses Team (Kader-Tab). */
+  runTeamPicksRefill?: (teamId: string) => void | Promise<void>;
+  teamPicksRefillBusyTeamId?: string | null;
+  teamPicksRefillMessage?: { teamId: string; tone: "success" | "error"; text: string } | null;
 };
 
 function FoundationTeamsDetailPanel({
@@ -514,6 +518,9 @@ function FoundationTeamsDetailPanel({
   selectedTeamRosterActionHint,
   contractRenewalMessage,
   contractRenewalError,
+  runTeamPicksRefill,
+  teamPicksRefillBusyTeamId,
+  teamPicksRefillMessage,
 }: FoundationTeamsDetailPanelProps) {
   if (!active) {
     return null;
@@ -654,6 +661,11 @@ function FoundationTeamsDetailPanel({
                       <div className={`team-roster-action-status${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
                         <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
                         <span>{selectedTeamRosterActionHint}</span>
+                      </div>
+                    ) : null}
+                    {teamPicksRefillMessage && selectedTeam && teamPicksRefillMessage.teamId === selectedTeam.teamId ? (
+                      <div className={`status-banner${teamPicksRefillMessage.tone === "success" ? " is-success" : " is-warning"}`}>
+                        {teamPicksRefillMessage.text}
                       </div>
                     ) : null}
                     <div className="team-focus-layout">
@@ -960,6 +972,17 @@ function FoundationTeamsDetailPanel({
                               : "Diszi-Spalten aktuell ausgeblendet"}
                           </span>
                           <div className="team-detail-actions">
+                            {selectedTeamRosterActionsAvailable && selectedTeam && runTeamPicksRefill ? (
+                              <button
+                                className="secondary-button inline-button"
+                                type="button"
+                                disabled={teamPicksRefillBusyTeamId != null}
+                                title="KI-Picks für dieses Team neu anwerfen"
+                                onClick={() => void runTeamPicksRefill(selectedTeam.teamId)}
+                              >
+                                {teamPicksRefillBusyTeamId === selectedTeam.teamId ? "Wirbt an…" : "Kader auffüllen"}
+                              </button>
+                            ) : null}
                             <button
                               className="secondary-button inline-button"
                               type="button"
