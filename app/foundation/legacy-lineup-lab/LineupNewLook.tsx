@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
-import { NlDeltaChip, NlRadar, formatNlNumber, type NlAxisKey } from "@/components/foundation/new-look";
+import { NlDeltaChip, NlRadar, NlSkeletonCard, formatNlNumber, type NlAxisKey } from "@/components/foundation/new-look";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
@@ -1018,7 +1018,10 @@ export default function LineupNewLook({
   if (!context) {
     return (
       <div className="nl-lineup-root" data-testid="lineup-new-look">
-        <div className="nl-lineup-loading">Spieltag-Kontext wird geladen…</div>
+        <div className="nl-lineup-loading" role="status" aria-busy="true">
+          <span className="sr-only">Spieltag-Kontext wird geladen…</span>
+          <NlSkeletonCard lines={4} />
+        </div>
       </div>
     );
   }

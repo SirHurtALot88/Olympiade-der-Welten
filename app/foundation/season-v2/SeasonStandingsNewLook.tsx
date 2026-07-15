@@ -12,6 +12,7 @@ import {
   NlProgressBar,
   NlRadar,
   NlRankingDrawer,
+  NlSkeleton,
   NlSparkline,
   NlSubTabs,
   StatChip,
@@ -999,9 +1000,10 @@ export default function SeasonStandingsNewLook({
       </NlCard>
 
       {isLoading && boardRows.length === 0 ? (
-        <div className="nl-standings-skeleton" aria-hidden="true">
+        <div className="nl-standings-skeleton" role="status" aria-busy="true">
+          <span className="sr-only">Tabellendaten werden geladen …</span>
           {Array.from({ length: 6 }, (_, index) => (
-            <div key={`nl-standings-skeleton-${index}`} className="nl-standings-skeleton-row" />
+            <NlSkeleton key={`nl-standings-skeleton-${index}`} variant="block" height={54} />
           ))}
         </div>
       ) : boardRows.length === 0 ? (
