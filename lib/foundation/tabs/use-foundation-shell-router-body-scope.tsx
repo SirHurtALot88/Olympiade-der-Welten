@@ -33,7 +33,6 @@ import {
   sortTableRows as sortRows,
 } from "@/components/foundation/FoundationTableUi";
 import { GAME_ENCYCLOPEDIA_ENTRIES, getGameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
-import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
@@ -8391,10 +8390,23 @@ export function useFoundationShellRouterBodyScope({
         seasonId: gameState.season.id,
         source: readMeta.source,
       });
-      const response = await fetch(`/api/ai/roster-fill?${params.toString()}`, {
+      // Route the retry through the same ORGANIC draft engine (/api/ai/picks-run) as the fresh-season-1
+      // setup and the manual re-pick buttons, instead of the legacy /api/ai/roster-fill planner — so a
+      // "failed setup" retry doesn't reproduce the bipolar auto-roster-fill bug it's meant to fix.
+      const response = await fetch(`/api/ai/picks-run?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dryRun: false, confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN }),
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: false,
+              confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+              teamScope: "all",
+              allowSetupAllTeams: true,
+            },
+            roomContext,
+          ),
+        ),
       });
       const payload = (await response.json().catch(() => null)) as { error?: string; executed?: boolean } | null;
       if (!response.ok || !payload || payload.error) {
