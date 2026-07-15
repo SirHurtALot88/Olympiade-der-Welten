@@ -70,6 +70,37 @@ der Server automatisch neu. Logs: `tail -f /var/log/oly-deploy.log`.
 Anderen Branch deployen (optional): `OLY_DEPLOY_BRANCH=<branch>` als Env setzen.
 Sofort testen ohne Warten: `deploy/hetzner/auto-deploy.sh` einmal von Hand starten.
 
+## Login aktivieren (Phase 1, optional)
+
+Standardmaessig ist der Login **ausgeschaltet** - die App ist wie bisher ohne
+Anmeldung erreichbar. Erst wenn `OLY_AUTH_ENABLED=1` gesetzt ist, verlangt die
+App eine Anmeldung als Chris oder Franky und weiss, welche Person gerade
+spielt (z. B. damit auf Frankys Geraet seine eigenen Teams angezeigt werden,
+statt immer Chris' Teams).
+
+So wird der Login auf dem Server eingeschaltet:
+
+1. In `deploy/hetzner/.env` (aus `.env.example` erstellt) vier Variablen setzen:
+   ```sh
+   OLY_AUTH_ENABLED=1
+   OLY_AUTH_SECRET=<mit `openssl rand -hex 32` erzeugen>
+   OLY_USER_CHRIS_PASSWORD=<echtes Passwort fuer Chris>
+   OLY_USER_FRANKY_PASSWORD=<echtes Passwort fuer Franky>
+   ```
+2. Neu deployen (Docker Compose liest die vier Variablen automatisch aus der
+   `.env`-Datei und reicht sie an den `oly-app`-Container durch):
+   ```sh
+   docker compose -f deploy/hetzner/docker-compose.yml --env-file deploy/hetzner/.env up -d --build
+   ```
+3. Danach verlangt `https://deine-domain.de/` eine Anmeldung unter `/login`.
+
+Ohne `OLY_AUTH_SECRET` und die beiden Passwoerter startet der Login bewusst
+nicht funktionsfaehig (kein unsicherer Default in Produktion) - die restliche
+App laeuft trotzdem weiter.
+
+Um den Login wieder auszuschalten, `OLY_AUTH_ENABLED` leeren/entfernen und neu
+deployen.
+
 ## Backup-Regel
 
 Die Server-Backups sichern die ganze Maschine. Zusaetzlich muss die Spielstand-Datenbank bewusst geschuetzt werden:

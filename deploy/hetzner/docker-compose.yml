@@ -12,6 +12,11 @@ services:
       # mounted read-only below. Upload the Dropbox subtree to /opt/oly-media on
       # the host, i.e. /opt/oly-media/Chris/Olympiade der Welten/...
       OLY_MEDIA_DROPBOX_ROOT: /app/media/dropbox
+      # Phase-1-Login (optional, standardmaessig AUS). Siehe deploy/hetzner/.env.example.
+      OLY_AUTH_ENABLED: ${OLY_AUTH_ENABLED:-}
+      OLY_AUTH_SECRET: ${OLY_AUTH_SECRET:-}
+      OLY_USER_CHRIS_PASSWORD: ${OLY_USER_CHRIS_PASSWORD:-}
+      OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
     volumes:
       - oly-data:/app/data/persistence
       - /opt/oly-media:/app/media/dropbox:ro

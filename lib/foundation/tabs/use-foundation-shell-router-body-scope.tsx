@@ -975,8 +975,16 @@ export function useFoundationShellRouterBodyScope({
   initialSaveId,
   initialView,
   initialPersistenceState,
+  initialActiveOwnerId,
 }: FoundationPageClientProps): FoundationShellRouterBodyProps {
-  const foundationPageState = useFoundationPageState({ initialReadSource, initialSelectedTeamId, initialSaveId, initialView, initialPersistenceState });
+  const foundationPageState = useFoundationPageState({
+    initialReadSource,
+    initialSelectedTeamId,
+    initialSaveId,
+    initialView,
+    initialPersistenceState,
+    initialActiveOwnerId,
+  });
   const {
     initialPersistedSave, initialClientGameState, initialOwnershipDraft, gameStateRef, commandSearchInputRef, marketValueFilterManualRef, marketCashLimitTeamRef, aiPreseasonRunStartedRef, seasonBriefingAutoOpenedRef, seasonBriefingDismissedRef,
     aiLineupEnsureRunStartedRef, pendingTeamActivationRef, seasonOverviewScopeRef, gameState, setGameState, teamIdentityDraft, setTeamIdentityDraft, teamControlDraft, setTeamControlDraft, gameModeOwnershipChrisIds,

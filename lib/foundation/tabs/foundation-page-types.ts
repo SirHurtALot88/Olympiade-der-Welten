@@ -178,6 +178,14 @@ export type FoundationPageClientProps = {
     saves?: SaveSummary[];
     _meta?: FoundationReadMeta;
   } | null;
+  /**
+   * Owner-ID der eingeloggten Person (Phase-1-Login). Nur gesetzt, wenn
+   * OLY_AUTH_ENABLED aktiv ist und eine gueltige Session vorliegt - seedet
+   * activeOwnerId, damit Franky auf seinem Geraet seine eigenen Teams sieht statt
+   * immer auf Chris' Owner-Scope zurueckzufallen. Bei deaktiviertem Login bleibt
+   * dies null und das bisherige Default-Verhalten ist unveraendert.
+   */
+  initialActiveOwnerId?: string | null;
 };
 
 export type FoundationTransfermarktResponse = {

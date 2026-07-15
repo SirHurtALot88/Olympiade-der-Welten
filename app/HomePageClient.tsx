@@ -14,7 +14,7 @@ function storageKey(roomCode: string) {
   return `oly-seat:${roomCode}`;
 }
 
-export default function HomePage() {
+export default function HomePage({ authEnabled = false }: { authEnabled?: boolean }) {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState("");
   const [displayName, setDisplayName] = useState("Chris");
@@ -24,6 +24,35 @@ export default function HomePage() {
   const [isBusy, setIsBusy] = useState(false);
   const [activeSaveId, setActiveSaveId] = useState<string | null>(null);
   const [socketState, setSocketState] = useState<"connecting" | "connected" | "offline">("connecting");
+  // Phase-1-Login: wenn eine Session existiert, kommt der Anzeigename von dort statt
+  // aus einem frei editierbaren Feld. Ohne Login (isAuthEnabled() aus) liefert
+  // /api/auth/session immer {user: null} und dieser Zustand bleibt leer - keine
+  // Aenderung am bisherigen Verhalten.
+  const [sessionDisplayName, setSessionDisplayName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authEnabled) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : { user: null }))
+      .then((payload: { user: { displayName: string } | null }) => {
+        if (cancelled || !payload.user) {
+          return;
+        }
+        setSessionDisplayName(payload.user.displayName);
+        setDisplayName(payload.user.displayName);
+        setJoinDisplayName(payload.user.displayName);
+      })
+      .catch(() => {
+        /* Login ist optional - ohne Session bleibt der freie Name erhalten. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authEnabled]);
 
   useEffect(() => {
     const socket = getClientSocket();
@@ -122,7 +151,13 @@ export default function HomePage() {
             <p>Host erstellt einen teilbaren Room-Code, z. B. ABCD-1234.</p>
             <label className="filter-field">
               <span>Dein Anzeigename</span>
-              <input className="input" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+              <input
+                className="input"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                readOnly={Boolean(sessionDisplayName)}
+                title={sessionDisplayName ? "Angemeldet als " + sessionDisplayName : undefined}
+              />
             </label>
             <label className="filter-field">
               <span>Ownership-Preset</span>
@@ -153,7 +188,13 @@ export default function HomePage() {
             <p>Franky oder ein anderer Spieler verbindet sich per Room-Code mit demselben Server-Room.</p>
             <label className="filter-field">
               <span>Anzeigename</span>
-              <input className="input" value={joinDisplayName} onChange={(event) => setJoinDisplayName(event.target.value)} />
+              <input
+                className="input"
+                value={joinDisplayName}
+                onChange={(event) => setJoinDisplayName(event.target.value)}
+                readOnly={Boolean(sessionDisplayName)}
+                title={sessionDisplayName ? "Angemeldet als " + sessionDisplayName : undefined}
+              />
             </label>
             <input
               className="input"
