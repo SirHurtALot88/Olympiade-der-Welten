@@ -218,9 +218,11 @@ export default function PlayerHeroNewLook({
               iconClassName="nl-player-hero-class-icon"
             />
             <RaceIcon race={data.race} className="nl-player-hero-race-chip" iconClassName="nl-player-hero-race-icon" />
-            <span className="nl-player-hero-role" title="Kader-Rolle">
-              Rolle {roleLabel}
-            </span>
+            {roleLabel ? (
+              <span className="nl-player-hero-role" title="Kader-Rolle">
+                Rolle {roleLabel}
+              </span>
+            ) : null}
           </div>
           <StatChipRow className="nl-player-hero-chips" aria-label="Spieler-Kennzahlen">
             <StatChip

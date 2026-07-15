@@ -330,7 +330,9 @@ function getRoleLabel(roleTag: string | null | undefined) {
     return "Rotation";
   }
   if (roleTag === "prospect") {
-    return "Prospect";
+    // "Prospect" ist ein auto-abgeleiteter Rausch-Rollen-Tag und wird nicht
+    // mehr als sichtbare Rolle gezeigt (Daten/Typ bleiben erhalten).
+    return "";
   }
   return roleTag ?? "—";
 }
@@ -640,7 +642,16 @@ export default function TeamDetailDrawer({
                   leagueHeatPools={resolvedHeatPools}
                   variant="team"
                   className={getClassColorClassName(player.className, "team-drawer-player-class-frame")}
-                  subMeta={`${getRoleLabel(player.roleTag)}${player.promisedRole ? ` · versprochen ${getRoleLabel(player.promisedRole)}` : ""} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                  subMeta={[
+                    getRoleLabel(player.roleTag),
+                    player.promisedRole && getRoleLabel(player.promisedRole)
+                      ? `versprochen ${getRoleLabel(player.promisedRole)}`
+                      : "",
+                    player.className ?? "—",
+                    player.race ?? "—",
+                  ]
+                    .filter((part) => part.trim().length > 0)
+                    .join(" · ")}
                   ovrRank={player.ovrRank}
                   mvsRank={player.mvsRank}
                   ppsRank={player.ppsRank}

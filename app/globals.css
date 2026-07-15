@@ -3554,6 +3554,373 @@ a {
   background: rgba(245, 158, 11, 0.11);
 }
 
+/* --------------------------------------------------------------------------
+   Season-Einstieg / Briefing — Neuer-Look-Variante.
+   Höhere Spezifität (.is-new-look …) überschreibt die Klassik-Basisregeln
+   oben; ohne Flag (Opt-out) bleibt der klassische Look erhalten.
+   -------------------------------------------------------------------------- */
+.is-new-look .season-briefing-page {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-color: var(--nl-line-2);
+  background: linear-gradient(180deg, var(--nl-panel), var(--nl-panel-2));
+  box-shadow: var(--nl-e3);
+}
+
+.is-new-look .season-briefing-page .season-briefing-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  padding: var(--nl-s5) var(--nl-s5) var(--nl-s4);
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .season-briefing-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .season-briefing-eyebrow {
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nl-accent);
+}
+
+.is-new-look .season-briefing-title {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-weight: 600;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--nl-ink);
+}
+
+.is-new-look .season-briefing-lead {
+  margin: 0;
+  max-width: 62ch;
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-lg);
+  color: var(--nl-mut);
+}
+
+.is-new-look .season-briefing-page .season-briefing-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  padding: var(--nl-s5);
+  overflow: auto;
+}
+
+.is-new-look .season-briefing-loading {
+  margin: 0;
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-lg);
+  color: var(--nl-mut);
+}
+
+/* KPI-Zeile — Hero-Zahlen */
+.is-new-look .season-briefing-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .season-briefing-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--nl-tone, transparent) 55%, transparent), var(--nl-e1);
+}
+
+.is-new-look .season-briefing-kpi-label {
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-mut-2)) 70%, var(--nl-mut-2));
+}
+
+.is-new-look .season-briefing-kpi-value {
+  font-family: var(--nl-display);
+  font-weight: 600;
+  font-size: clamp(1.6rem, 2.6vw, 2.15rem);
+  line-height: 1;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .season-briefing-kpi-sub {
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+/* Abschnitts-Kopf (Spieltags-Reihenfolge) */
+.is-new-look .season-briefing-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.is-new-look .season-briefing-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .season-briefing-section-title {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-weight: 600;
+  font-size: var(--nl-fs-xl);
+  color: var(--nl-ink);
+}
+
+.is-new-look .season-briefing-section-lead {
+  margin: 0;
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+}
+
+.is-new-look .season-briefing-empty,
+.is-new-look .season-briefing-card-lead {
+  margin: 0;
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+}
+
+/* Spieltags-Kacheln als NL-Karten */
+.is-new-look .season-briefing-matchday-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .season-briefing-matchday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+}
+
+.is-new-look .season-briefing-matchday.has-same-color:not(.has-heavy-roster) {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-warn) 8%, var(--nl-panel));
+}
+
+.is-new-look .season-briefing-matchday.has-heavy-roster:not(.has-same-color) {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 8%, var(--nl-panel));
+}
+
+.is-new-look .season-briefing-matchday.has-heavy-roster.has-same-color {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, var(--nl-line-2));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nl-risk) 15%, var(--nl-panel)),
+    color-mix(in srgb, var(--nl-warn) 15%, var(--nl-panel))
+  );
+}
+
+.is-new-look .season-briefing-md-label {
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .season-briefing-discipline-row,
+.is-new-look .season-briefing-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+/* Disziplin-Chips — Name trägt den Chip, Meta bleibt klein/muted */
+.is-new-look .season-briefing-diszi-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 130px;
+  min-width: 120px;
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-line)) 40%, var(--nl-line));
+  border-left: 3px solid var(--nl-tone, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-panel-2)) 12%, var(--nl-panel-2));
+}
+
+.is-new-look .season-briefing-diszi-name {
+  font-family: var(--nl-display);
+  font-weight: 600;
+  font-size: var(--nl-fs-xl);
+  line-height: 1.12;
+  color: var(--nl-ink);
+}
+
+.is-new-look .season-briefing-diszi-chip.is-big .season-briefing-diszi-name {
+  font-size: calc(var(--nl-fs-xl) + 3px);
+}
+
+.is-new-look .season-briefing-diszi-meta {
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Warn-/Risk-Badges */
+.is-new-look .season-briefing-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-line)) 50%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-panel-2)) 16%, transparent);
+  color: color-mix(in srgb, var(--nl-tone, var(--nl-ink)) 82%, var(--nl-ink));
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .season-briefing-badge.is-combo {
+  border-color: color-mix(in srgb, var(--nl-risk) 55%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--nl-risk) 22%, transparent),
+    color-mix(in srgb, var(--nl-warn) 22%, transparent)
+  );
+  color: var(--nl-ink);
+}
+
+/* Zwei-Spalten-Panels + Faktor-Pills */
+.is-new-look .season-briefing-two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--nl-s3);
+  align-items: start;
+}
+
+.is-new-look .season-briefing-factor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s1);
+}
+
+/* NL-Buttons (Header + Aktionen) */
+.is-new-look .season-briefing-page .foundation-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nl-s2);
+  padding: var(--nl-s4) var(--nl-s5);
+  border-top: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-sb-btn {
+  font: inherit;
+  font-family: var(--nl-sans);
+  font-size: var(--nl-fs-lg);
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease),
+    transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-sb-btn:hover,
+.is-new-look .nl-sb-btn:focus-visible {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-sb-btn:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-sb-btn:active {
+  transform: translateY(1px);
+}
+
+.is-new-look .nl-sb-btn.is-ghost {
+  background: transparent;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sb-btn.is-ghost:hover {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-sb-btn.is-primary {
+  background: var(--nl-accent-soft);
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  color: var(--nl-accent);
+  font-weight: 700;
+}
+
+.is-new-look .nl-sb-btn.is-primary:hover,
+.is-new-look .nl-sb-btn.is-primary:focus-visible {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
+}
+
+@media (max-width: 720px) {
+  .is-new-look .season-briefing-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .is-new-look .season-briefing-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .is-new-look .season-briefing-page .season-briefing-header,
+  .is-new-look .season-briefing-page .season-briefing-body {
+    padding-left: var(--nl-s4);
+    padding-right: var(--nl-s4);
+  }
+
+  .is-new-look .season-briefing-page .foundation-modal-actions {
+    padding-left: var(--nl-s4);
+    padding-right: var(--nl-s4);
+  }
+}
+
+@media (max-width: 460px) {
+  .is-new-look .season-briefing-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
 .foundation-home-play-lane {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -50409,6 +50776,87 @@ button.foundation-team-portrait-card {
   grid-column: 1 / -1;
   justify-self: start;
   font-size: 0.66rem;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   View-Breite Switch + Shell-Breiten-Modi
+   ────────────────────────────────────────────────────────────────────
+   Ersetzt funktional den entfernten kosmetischen Neuer-Look-Toggle: ein
+   kleiner, unaufdringlicher Segmented-Control in der Sidebar (Standard /
+   Breit / Cinema) wählt die Renderbreite der App. Die Wahl setzt
+   `data-view-width` auf `<main class="app-shell foundation-shell …">`
+   (siehe FoundationShellRouterBody). Die Basis-Breitenregel
+   (`.foundation-shell.app-shell`, weiter oben) bleibt der Standard —
+   hier werden nur `wide`/`cinema` als breitere Kappen ergänzt. `width:
+   min(…, calc(100vw - 24px))` sorgt weiterhin dafür, dass kleine
+   Viewports korrekt kollabieren (kein horizontaler Overflow).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* standard = unveränderter Default (min(1880px, calc(100vw - 24px))).
+   wide = breitere Kappe, cinema = effektiv volle Viewport-Breite. */
+.foundation-shell.app-shell[data-view-width="wide"] {
+  width: min(2240px, calc(100vw - 24px));
+}
+.foundation-shell.app-shell[data-view-width="cinema"] {
+  width: calc(100vw - 24px);
+}
+
+/* Segmented-Control in der Sidebar (Slot .foundation-sidebar-viewwidth). */
+.foundation-sidebar-viewwidth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 6px;
+}
+.foundation-sidebar-viewwidth-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-ink, #e8ecf5) 55%, transparent);
+}
+.foundation-sidebar-viewwidth-seg {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line, rgba(120, 108, 92, 0.35));
+  background: color-mix(in srgb, var(--nl-line, rgba(255, 255, 255, 0.08)) 30%, transparent);
+}
+.foundation-sidebar-viewwidth-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--nl-ink, #e8ecf5) 70%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.foundation-sidebar-viewwidth-option:hover {
+  opacity: 1;
+}
+.foundation-sidebar-viewwidth-option.is-active {
+  background: var(--nl-accent-soft, rgba(90, 210, 140, 0.18));
+  color: var(--nl-accent, #57d08a);
+  opacity: 1;
+}
+.foundation-sidebar-viewwidth-glyph {
+  font-size: 11px;
+  line-height: 1;
+}
+/* Auf sehr schmaler Sidebar nur die Glyphen zeigen — kein Umbruch/Overflow. */
+@media (max-width: 1200px) {
+  .foundation-sidebar-viewwidth-text {
+    display: none;
+  }
 }
 
 /* ── Batch b1: Home Hero-KPI-Portale (#26), Spieltag-Rail (#4),

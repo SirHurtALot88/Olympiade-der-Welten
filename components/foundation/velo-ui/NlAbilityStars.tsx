@@ -139,27 +139,31 @@ function StarRow({ min, max, uncertain }: { min: number; max: number; uncertain:
         return (
           <span key={slot.index} className={`nl-ability-star${slot.showUncertain ? " has-uncertain" : ""}`}>
             <span className="nl-ability-star-empty">★</span>
-            {slot.minFill > 0 || !uncertain ? (
-              <span
-                className="nl-ability-star-fill"
-                style={{ width: `${(uncertain ? slot.minFill : slot.maxFill) * 100}%` }}
-              >
-                ★
-              </span>
-            ) : null}
+            {/* Alle Fill-/Uncertain-Ebenen sind bei left:0 verankert (CSS inset:0 auto 0 0)
+                und clippen nur über die Breite — so bleiben die Stern-Glyphen deckungs-
+                gleich übereinander. Reihenfolge = Mal-Reihenfolge: erst die unsichere
+                Hollow-Fläche (0..max), dann der solide Fill (0..min) OBEN drauf. Früher
+                bekam die Uncertain-Ebene ein left:min% + Breite (max-min)% — dadurch zeigte
+                ihr Glyph die linke Spitze eines Sterns mitten im Stern (kaputt wirkende PO). */}
             {uncertain && slot.showUncertain ? (
-              // Fog-of-war upper range: HOLLOW outline star (transparent fill + amber
-              // stroke). Deliberately NOT a solid fill so the uncertain part reads as
-              // "possible, not confirmed" and a fogged PO is never misread as ★★★★★.
+              // Fog-of-war-Oberbereich: HOLLOW-Outline-Stern (transparent + amber Stroke),
+              // bewusst KEIN solider Fill, damit unsicher ≠ bestätigt (nie als ★★★★★ lesbar).
               <span
                 className="nl-ability-star-uncertain nl-fog-uncertain"
                 style={{
-                  left: `${slot.minFill * 100}%`,
-                  width: `${(slot.maxFill - slot.minFill) * 100}%`,
+                  width: `${slot.maxFill * 100}%`,
                   color: "transparent",
                   WebkitTextStroke: "1.1px rgba(255, 209, 112, 0.95)",
                   textShadow: "none",
                 }}
+              >
+                ★
+              </span>
+            ) : null}
+            {slot.minFill > 0 || !uncertain ? (
+              <span
+                className="nl-ability-star-fill"
+                style={{ width: `${(uncertain ? slot.minFill : slot.maxFill) * 100}%` }}
               >
                 ★
               </span>
