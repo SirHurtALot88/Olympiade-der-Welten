@@ -8,11 +8,14 @@ import {
   NlMedalBadge,
   NlRankingDrawer,
   NlSubTabs,
+  NlTable,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
   type NlRankingDrawerRow,
+  type NlTableColumn,
+  type NlTableSortDirection,
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
@@ -23,6 +26,7 @@ import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-co
 import {
   buildLeagueRecordsHallOfFame,
   type LeagueRecordsHallOfFame,
+  type PlayerCareerLeaderRow,
 } from "@/lib/foundation/league-records-hall-of-fame";
 import {
   buildLeagueSeasonBests,
@@ -140,11 +144,12 @@ function getCategoryStatDecimals(categoryId: string): number {
   return categoryId === "mvs" || categoryId === "ovr" ? 0 : 1;
 }
 
-type NlLeagueLeadersSubTab = "leaders" | "records" | "achievements";
+type NlLeagueLeadersSubTab = "leaders" | "records" | "legends" | "achievements";
 
 const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = [
   { id: "leaders", label: "Liga-Leaders" },
-  { id: "records", label: "Rekorde & Hall of Fame" },
+  { id: "records", label: "Rekorde" },
+  { id: "legends", label: "🏆 Legendäre Spieler" },
   { id: "achievements", label: "Erfolge" },
 ];
 
@@ -267,6 +272,8 @@ export default function LeagueLeadersNewLook({
 
       {subTab === "records" ? (
         <LeagueRecordsPanel records={records} seasonBests={seasonBests} onOpenPlayer={onOpenPlayer} />
+      ) : subTab === "legends" ? (
+        <LegendaryPlayersPanel records={records} onOpenPlayer={onOpenPlayer} />
       ) : subTab === "achievements" ? (
         <LeagueAchievementsPanel achievements={achievements} onOpenPlayer={onOpenPlayer} />
       ) : (
@@ -444,11 +451,7 @@ function LeagueRecordsPanel({
     .filter((row) => row.gold > 0)
     .slice(0, 6)
     .map((row) => ({ label: row.teamCode, value: row.gold, tone: "warn" as NlTone }));
-  const ppsBars = records.careerLeaderboard.slice(0, 6).map((row) => ({
-    label: getLeaderInitials(row.playerName),
-    value: row.totalPps,
-    tone: "good" as NlTone,
-  }));
+  const recentSeasonChampions = records.seasonChampions.slice(0, 8);
 
   return (
     <div className="nl-records" data-testid="nl-league-records">
@@ -541,72 +544,44 @@ function LeagueRecordsPanel({
         />
       </div>
 
-      <NlCard className="nl-records-career-card" title="Karriere-Bestenliste" eyebrow="Über alle archivierten Saisons">
-        <StatChipRow className="nl-records-career-stats" aria-label="Karriere-Rekordhalter">
-          {records.careerAppearancesLeader ? (
-            <StatChip
-              label="Meiste Auftritte"
-              value={formatNlNumber(records.careerAppearancesLeader.appearances, 0)}
-              sub={records.careerAppearancesLeader.playerName}
-              tone="accent"
-              onClick={() => onOpenPlayer(records.careerAppearancesLeader!.playerId)}
-              title={`${records.careerAppearancesLeader.playerName} öffnen`}
-            />
-          ) : null}
-          {records.careerPpsLeader ? (
-            <StatChip
-              label="Karriere-PPs-Rekord"
-              value={formatNlNumber(records.careerPpsLeader.totalPps, 1)}
-              sub={records.careerPpsLeader.playerName}
-              tone="good"
-              onClick={() => onOpenPlayer(records.careerPpsLeader!.playerId)}
-              title={`${records.careerPpsLeader.playerName} öffnen`}
-            />
-          ) : null}
-          {records.careerMvpLeader ? (
-            <StatChip
-              label="Meiste MVP-Awards"
-              value={formatNlNumber(records.careerMvpLeader.mvpTotal, 0)}
-              sub={records.careerMvpLeader.playerName}
-              tone="warn"
-              onClick={() => onOpenPlayer(records.careerMvpLeader!.playerId)}
-              title={`${records.careerMvpLeader.playerName} öffnen`}
-            />
-          ) : null}
-        </StatChipRow>
-
-        {records.careerLeaderboard.length > 0 ? (
-          <>
-            <NlBarChart
-              bars={ppsBars}
-              format={(value) => formatNlNumber(value, 0)}
-              aria-label="Top Karriere-PPs"
-              className="nl-records-career-chart"
-            />
-            <div className="nl-leaders-list nl-records-career-list">
-              {records.careerLeaderboard.map((row, index) => (
-                <button
-                  key={row.playerId}
-                  type="button"
-                  className="nl-leaders-row"
-                  onClick={() => onOpenPlayer(row.playerId)}
-                  title={`${row.playerName} · Profil öffnen`}
-                >
-                  <span className="nl-leaders-row-rank nl-tnum">{index + 1}</span>
-                  <LeaderAvatar playerId={row.playerId} name={row.playerName} className="nl-leaders-row-avatar" />
-                  <span className="nl-leaders-row-player">
-                    <strong>{row.playerName}</strong>
-                    <small>
-                      {row.teamName ?? "—"} · {formatNlNumber(row.appearances, 0)} Einsätze
-                    </small>
+      <NlCard
+        className="nl-records-trophy-card"
+        title="Trophäenschrank"
+        eyebrow="Meister, Vize und Dritte je Saison"
+        actions={
+          <span className="nl-records-trophy-hint">
+            Karriere-Bestenliste jetzt unter „🏆 Legendäre Spieler“
+          </span>
+        }
+      >
+        {recentSeasonChampions.length > 0 ? (
+          <ol className="nl-records-trophy-list">
+            {recentSeasonChampions.map((entry) => (
+              <li key={entry.seasonId} className="nl-records-trophy-row">
+                <span className="nl-records-trophy-season">{entry.seasonLabel}</span>
+                <span className="nl-records-trophy-podium">
+                  <span className="nl-records-trophy-slot is-gold">
+                    <NlMedalBadge kind="gold" title={`Meister ${entry.seasonLabel}`} />
+                    {entry.goldTeamName}
                   </span>
-                  <span className="nl-leaders-row-value nl-tnum">{formatNlNumber(row.totalPps, 1)}</span>
-                </button>
-              ))}
-            </div>
-          </>
+                  {entry.silverTeamName ? (
+                    <span className="nl-records-trophy-slot is-silver">
+                      <NlMedalBadge kind="silver" title={`Vize ${entry.seasonLabel}`} />
+                      {entry.silverTeamName}
+                    </span>
+                  ) : null}
+                  {entry.bronzeTeamName ? (
+                    <span className="nl-records-trophy-slot is-bronze">
+                      <NlMedalBadge kind="bronze" title={`Dritter ${entry.seasonLabel}`} />
+                      {entry.bronzeTeamName}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ol>
         ) : (
-          <p className="nl-records-empty-text">Noch keine Karrieredaten aus abgeschlossenen Saisons.</p>
+          <p className="nl-records-empty-text">Noch keine abgeschlossene Saison mit Endstand.</p>
         )}
       </NlCard>
     </div>
@@ -655,6 +630,181 @@ function RecordCard({
         <div className="nl-records-card-body">{bodyContent}</div>
       )}
     </article>
+  );
+}
+
+type LegendsSortKey = "totalPps" | "appearances" | "mvpTotal" | "seasonsPlayed";
+
+const LEGENDS_TABLE_COLUMNS: Array<NlTableColumn<PlayerCareerLeaderRow>> = [
+  { key: "rank", label: "#", align: "right", width: "44px" },
+  { key: "playerName", label: "Spieler" },
+  { key: "teams", label: "Team(s)" },
+  { key: "totalPps", label: "PPs", align: "right", sortable: true, tooltip: "Karriere-Punkte über alle archivierten Saisons" },
+  { key: "appearances", label: "Einsätze", align: "right", sortable: true },
+  { key: "mvpTotal", label: "MVP", align: "right", sortable: true },
+  { key: "seasonsPlayed", label: "Saisons", align: "right", sortable: true },
+];
+
+/**
+ * "Legendäre Spieler" — eigenständiger Hall-of-Fame-Sub-Tab (statt einer
+ * bisher versteckten 8-Zeilen-Tabelle unter "Rekorde"): Podium der Top-3
+ * Karriere-PPs-Rekordhalter als Hero-Karten, darunter eine sortierbare
+ * `NlTable` über die Top-25-Karriereliste (`records.legendaryPlayers`).
+ * Rein additiv über `buildLeagueRecordsHallOfFame` — keine neue Berechnung,
+ * nur eine andere Präsentation der bereits vorhandenen Karrieredaten.
+ */
+function LegendaryPlayersPanel({
+  records,
+  onOpenPlayer,
+}: {
+  records: LeagueRecordsHallOfFame | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const [sort, setSort] = useState<{ key: LegendsSortKey; direction: NlTableSortDirection }>({
+    key: "totalPps",
+    direction: "desc",
+  });
+
+  const legends = records?.legendaryPlayers ?? [];
+  const podium = legends.slice(0, 3);
+  const sortedRows = useMemo(() => {
+    const factor = sort.direction === "asc" ? 1 : -1;
+    return [...legends].sort((left, right) => (left[sort.key] - right[sort.key]) * factor);
+  }, [legends, sort]);
+
+  function handleSort(key: string) {
+    setSort((current) => {
+      if (current.key === key) {
+        return { key: key as LegendsSortKey, direction: current.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key: key as LegendsSortKey, direction: "desc" };
+    });
+  }
+
+  if (!records || !records.hasHistory || legends.length === 0) {
+    return (
+      <div className="nl-legends" data-testid="nl-league-legends">
+        <NlCard className="nl-records-empty-card" title="🏆 Legendäre Spieler">
+          <p className="nl-records-empty-text">
+            Noch keine legendären Spieler — sobald die erste Saison archiviert ist, erscheinen hier die Karriere-Bestenlisten
+            über alle Saisons (Punkte, Einsätze, MVP-Awards).
+          </p>
+        </NlCard>
+      </div>
+    );
+  }
+
+  const podiumMedals: Array<"gold" | "silver" | "bronze"> = ["gold", "silver", "bronze"];
+
+  return (
+    <div className="nl-legends" data-testid="nl-league-legends">
+      <NlCard
+        className="nl-legends-podium-card"
+        eyebrow={`${formatNlNumber(records.seasonCount, 0)} Saison${records.seasonCount === 1 ? "" : "en"} Karrieredaten`}
+        title="🏆 Legendäre Spieler"
+      >
+        <p className="nl-leaders-hint">
+          Ligaweite Karriere-Bestenliste über alle archivierten Saisons — Punkte, Einsätze und MVP-Awards.
+        </p>
+        <div className="nl-legends-podium">
+          {podium.map((row, index) => (
+            <button
+              key={row.playerId}
+              type="button"
+              className={`nl-legends-podium-card-item nl-tnum is-rank-${index + 1}`}
+              onClick={() => onOpenPlayer(row.playerId)}
+              title={`${row.playerName} · Profil öffnen`}
+            >
+              <LeaderAvatar playerId={row.playerId} name={row.playerName} className="nl-legends-podium-avatar" />
+              <NlMedalBadge kind={podiumMedals[index]} title={`Rang ${index + 1} · Karriere-PPs`} />
+              <span className="nl-legends-podium-name">{row.playerName}</span>
+              <span className="nl-legends-podium-teams">{row.teams.join(" · ") || row.teamName || "—"}</span>
+              <span className="nl-legends-podium-value">{formatNlNumber(row.totalPps, 1)} PPs</span>
+              <span className="nl-legends-podium-sub">
+                {formatNlNumber(row.appearances, 0)} Einsätze · {formatNlNumber(row.mvpTotal, 0)} MVP ·{" "}
+                {formatNlNumber(row.seasonsPlayed, 0)} Saison{row.seasonsPlayed === 1 ? "" : "en"}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <StatChipRow className="nl-records-career-stats" aria-label="Karriere-Rekordhalter">
+          {records.careerAppearancesLeader ? (
+            <StatChip
+              label="Meiste Auftritte"
+              value={formatNlNumber(records.careerAppearancesLeader.appearances, 0)}
+              sub={records.careerAppearancesLeader.playerName}
+              tone="accent"
+              onClick={() => onOpenPlayer(records.careerAppearancesLeader!.playerId)}
+              title={`${records.careerAppearancesLeader.playerName} öffnen`}
+            />
+          ) : null}
+          {records.careerPpsLeader ? (
+            <StatChip
+              label="Karriere-PPs-Rekord"
+              value={formatNlNumber(records.careerPpsLeader.totalPps, 1)}
+              sub={records.careerPpsLeader.playerName}
+              tone="good"
+              onClick={() => onOpenPlayer(records.careerPpsLeader!.playerId)}
+              title={`${records.careerPpsLeader.playerName} öffnen`}
+            />
+          ) : null}
+          {records.careerMvpLeader ? (
+            <StatChip
+              label="Meiste MVP-Awards"
+              value={formatNlNumber(records.careerMvpLeader.mvpTotal, 0)}
+              sub={records.careerMvpLeader.playerName}
+              tone="warn"
+              onClick={() => onOpenPlayer(records.careerMvpLeader!.playerId)}
+              title={`${records.careerMvpLeader.playerName} öffnen`}
+            />
+          ) : null}
+        </StatChipRow>
+      </NlCard>
+
+      <NlCard className="nl-legends-table-card" title="Karriere-Bestenliste" eyebrow={`Top ${formatNlNumber(legends.length, 0)}`}>
+        <NlTable
+          columns={LEGENDS_TABLE_COLUMNS}
+          rows={sortedRows}
+          rowKey={(row) => row.playerId}
+          sortState={{ key: sort.key, direction: sort.direction }}
+          onSort={handleSort}
+          data-testid="nl-legends-table"
+          aria-label="Karriere-Bestenliste"
+          renderCell={(row, column) => {
+            const rank = sortedRows.indexOf(row) + 1;
+            switch (column.key) {
+              case "rank":
+                return rank;
+              case "playerName":
+                return (
+                  <button
+                    type="button"
+                    className="nl-legends-table-player"
+                    onClick={() => onOpenPlayer(row.playerId)}
+                    title={`${row.playerName} · Profil öffnen`}
+                  >
+                    <LeaderAvatar playerId={row.playerId} name={row.playerName} className="nl-legends-table-avatar" />
+                    <strong>{row.playerName}</strong>
+                  </button>
+                );
+              case "teams":
+                return row.teams.length > 0 ? row.teams.join(", ") : row.teamName ?? "—";
+              case "totalPps":
+                return formatNlNumber(row.totalPps, 1);
+              case "appearances":
+                return formatNlNumber(row.appearances, 0);
+              case "mvpTotal":
+                return row.mvpTotal > 0 ? formatNlNumber(row.mvpTotal, 0) : "—";
+              case "seasonsPlayed":
+                return formatNlNumber(row.seasonsPlayed, 0);
+              default:
+                return null;
+            }
+          }}
+        />
+      </NlCard>
+    </div>
   );
 }
 
