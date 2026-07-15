@@ -585,7 +585,7 @@ export type PlayerGeneratorSalaryEngineStatus = "ready_if_market_value_input_pre
 
 export type PlayerGeneratorClassEngineStatus = "ready" | "heuristic" | "blocked_missing_class_factors";
 
-export type PlayerGeneratorMarketValueStatus = "ready" | "missing_market_value_engine";
+export type PlayerGeneratorMarketValueStatus = "ready" | "missing_market_value_engine" | "heuristic_estimate";
 
 export type PlayerGeneratorSalaryStatus = "ready" | "missing_salary_engine" | "missing_market_value_input";
 
@@ -601,10 +601,10 @@ export type PlayerGeneratorFormulaStatusSnapshot = {
 };
 
 export type PlayerGeneratorEngineStatusView = {
-  marketValueEngine: "ready" | "blocked" | "incomplete_source";
+  marketValueEngine: "ready" | "blocked" | "incomplete_source" | "heuristic";
   salaryEngine: "ready" | "missing_market_value_input" | "blocked";
   classEngine: "ready" | "heuristic" | "blocked";
-  potentialEngine: "missing_progression_source";
+  potentialEngine: "ready" | "missing_progression_source";
 };
 
 export type PlayerGeneratorDraftStatusView = {
@@ -705,6 +705,14 @@ export type PlayerGeneratorDraft = {
         men: PlayerGeneratorAxisSource;
         soc: PlayerGeneratorAxisSource;
       };
+      /**
+       * The steering target `buildAxisTargets()` aimed for (post role/archetype
+       * bias + randomness jitter, pre attribute-silhouette shaping), so the
+       * requested-vs-achieved drift against `generated.axes` is legible. Null
+       * when the draft's attributes were recalculated from a manual edit and no
+       * fresh target was generated for this pass (see recalculatePlayerGeneratorDraft).
+       */
+      axisTargets: { pow: number; spe: number; men: number; soc: number } | null;
       peakAttributes: PlayerGeneratorAttributeName[];
       weakAttributes: PlayerGeneratorAttributeName[];
       archetypeSummary: string[];
