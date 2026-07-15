@@ -1047,6 +1047,7 @@ export type TeamPowerRecord = {
   negativeAttributeTag?: TeamPowerAttributeTag | null;
   chargesTotal: number;
   selectedForSeason: boolean;
+  isPassive?: boolean;
   createdAt: string;
 };
 

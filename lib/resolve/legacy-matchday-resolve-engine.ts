@@ -9,7 +9,7 @@ import {
   buildMatchdayMutatorTraitsBySide,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
-import { calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
+import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
@@ -358,6 +358,15 @@ export function buildLegacyMatchdayResolvePreview(
             teamCaptainPowerModifierPct: teamCaptain?.effects.teamPowerModifierPct ?? null,
             conditionalBonusPct,
           });
+          // Always-on passive team bonus: applies to every discipline side every matchday, needs
+          // no charge, and stacks additively on top of any manually selected team power.
+          const passiveTeamPowerBonus = calculatePassiveTeamPowerBonus(context.teamPowers ?? [], disciplineCategory);
+          const effectiveTeamPowerModifier =
+            context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null;
+          const teamPowerLabelWithPassive =
+            passiveTeamPowerBonus > 0
+              ? `${teamPowerResult.teamPowerLabel ? `${teamPowerResult.teamPowerLabel} ` : ""}(+${passiveTeamPowerBonus}% Identität)`
+              : teamPowerResult.teamPowerLabel;
 
           return {
             formCardsAvailable: formResult.formCardsAvailable,
@@ -373,8 +382,9 @@ export function buildLegacyMatchdayResolvePreview(
             mutatorPpsBonusByPlayerId: effectiveMutatorPpsBonuses,
             teamPowerSelected: teamPowerResult.teamPowerSelected,
             teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
-            teamPowerLabel: teamPowerResult.teamPowerLabel,
-            teamPowerModifier: context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null,
+            teamPowerLabel: teamPowerLabelWithPassive,
+            teamPowerModifier: effectiveTeamPowerModifier,
+            passiveTeamPowerImpactPct: passiveTeamPowerBonus,
             teamPowerImpact: teamPowerResult.teamPowerImpact,
             teamPowerBasePct: teamPowerResult.teamPowerBasePct,
             teamPowerConditionalPct: teamPowerResult.teamPowerConditionalPct,

@@ -37,6 +37,7 @@ export type LegacyTeamPowerOption = {
   chargesRemaining: number;
   selectedForSeason: boolean;
   isUsedUp: boolean;
+  isPassive: boolean;
 };
 
 const TEAM_IDENTITY_CHARGES = [4, 3, 2] as const;
@@ -408,27 +409,35 @@ function buildTeamIdentityPowers(gameState: GameState, saveId: string, seasonId:
     const positiveAttributeTags = override?.positiveAttributeTags ?? [...attributePack.positive];
     const negativeAttributeTag = override?.negativeAttributeTag ?? attributePack.negative;
     const label = override?.label ?? `${archetype.labelPrefix} ${baseLabel}`;
+    const description = override?.description ?? `${team.shortCode}: ${AXIS_LABELS[axis]}-basierte Team-Power; ${archetype.descriptionTone}.`;
+    // Exactly one identity power (the team's strongest/first axis power) is always-on: no charge cost,
+    // no manual selection needed, applies to both discipline sides every matchday. Keep it a small,
+    // clean additive self_boost so it stacks safely with any manually selected power.
+    const isPassive = index === 0;
     return {
       id: `teampower:${seasonId}:${team.teamId}:identity:${index + 1}`,
       saveId,
       seasonId,
       teamId: team.teamId,
-      label,
-      description: override?.description ?? `${team.shortCode}: ${AXIS_LABELS[axis]}-basierte Team-Power; ${archetype.descriptionTone}.`,
+      label: isPassive ? `Identität: ${label}` : label,
+      description: isPassive
+        ? `${description} Immer aktiv, kein Charge-Verbrauch.`
+        : description,
       category: override?.category ?? AXIS_TO_CATEGORY[axis],
-      effectType: override?.effectType ?? archetype.effectType,
-      targetMode: override?.targetMode ?? archetype.targetMode,
-      targetLimit: override?.targetLimit ?? archetype.targetLimit,
+      effectType: isPassive ? "self_boost" : override?.effectType ?? archetype.effectType,
+      targetMode: isPassive ? "self" : override?.targetMode ?? archetype.targetMode,
+      targetLimit: isPassive ? 0 : override?.targetLimit ?? archetype.targetLimit,
       conditionalBonusPct: override?.conditionalBonusPct,
       conditionalTrigger: override?.conditionalTrigger,
       conditionalDescription: override?.conditionalDescription,
       source: "team_identity",
       sourceRank: index + 1,
-      modifier: override?.modifier ?? modifier,
+      modifier: isPassive ? Math.min(override?.modifier ?? modifier, 3) : override?.modifier ?? modifier,
       positiveAttributeTags,
       negativeAttributeTag,
       chargesTotal,
-      selectedForSeason,
+      selectedForSeason: isPassive ? true : selectedForSeason,
+      isPassive,
       createdAt,
     } satisfies TeamPowerRecord;
   });
@@ -575,8 +584,30 @@ export function getTeamPowerOptions(input: {
       chargesRemaining,
       selectedForSeason: power.selectedForSeason,
       isUsedUp: chargesRemaining <= 0,
+      isPassive: power.isPassive ?? false,
     };
   });
+}
+
+/**
+ * Always-on team bonus: exactly one generated identity power per team is marked isPassive.
+ * It needs no charge, is never consumed, and applies to both discipline sides every matchday.
+ * Scales with the same category-fit multiplier used for manually selected powers and is capped
+ * at +3 to keep it a small, additive baseline rather than a replacement for active power choices.
+ */
+export function calculatePassiveTeamPowerBonus(
+  teamPowers: LegacyTeamPowerOption[],
+  disciplineCategory: DisciplineCategory | string | null | undefined,
+): number {
+  const passivePower = teamPowers.find((power) => power.isPassive);
+  if (!passivePower) {
+    return 0;
+  }
+  const normalizedCategory = normalizeCategory(disciplineCategory);
+  const categoryMultiplier =
+    passivePower.category === "flex" || passivePower.category === normalizedCategory ? 1 : 0.6;
+  const bonus = Number((passivePower.modifier * categoryMultiplier).toFixed(1));
+  return Math.min(bonus, 3);
 }
 
 export function calculateTeamPowerModifierForSide(input: {
