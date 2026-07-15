@@ -321,6 +321,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   cockpitBusyKey,
   commandSearch,
   commandSearchInputRef,
+  commitPlayerGeneratorDraft,
   completeSeasonBriefingAndContinue,
   confirmContractRenewalNegotiation,
   confirmFacilityMaintenance,
@@ -2329,6 +2330,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               readOnly={readMeta.readOnly}
               readSourceLabel={readSourceLabel}
               onSaveDrafts={savePlayerGeneratorDrafts}
+              onCommitDraft={commitPlayerGeneratorDraft}
             />
           </section>
 

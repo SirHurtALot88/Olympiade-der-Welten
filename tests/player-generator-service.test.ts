@@ -475,7 +475,7 @@ describe("player generator service", () => {
     expect(broken.generated.diagnostics.statSilhouette).toBe("failed");
   });
 
-  it("shows draft economy projections while keeping the real commit path disabled", () => {
+  it("shows draft economy projections and now leaves the free-agent commit path enabled once market value/salary are present", () => {
     const draft = generatePlayerDraft({
       generatorInput: {
         ...createDefaultPlayerGeneratorInput(),
@@ -519,8 +519,14 @@ describe("player generator service", () => {
     expect(draft.generated.diagnostics.draftStatus.ovr).toBe("draft_preview");
     expect(draft.generated.diagnostics.draftStatus.pps).toBe("draft_preview");
     expect(draft.generated.diagnostics.saveStatus.save).toBe("draft_only");
-    expect(draft.generated.diagnostics.saveStatus.commit).toBe("disabled");
-    expect(draft.generated.diagnostics.saveStatus.commitReasons).toContain("commit_path_not_ready");
+    // Phase 2 fix: `commit_path_not_ready` was an unconditional sentinel
+    // that blocked every draft regardless of data completeness. This draft
+    // has a real ovr/marketValue/salary and no hard validation block
+    // (`ready_for_review`/`needs_edit` are not blockers), so the commit
+    // path is genuinely open now.
+    expect(draft.validationStatus).not.toBe("blocked_archetype_conflict");
+    expect(draft.generated.diagnostics.saveStatus.commitReasons).toEqual([]);
+    expect(draft.generated.diagnostics.saveStatus.commit).toBe("enabled");
     expect(draft.warnings.filter((warning) => warning.includes("rank_to_discipline_market_value_source_incomplete"))).toHaveLength(0);
     expect(draft.warnings.filter((warning) => warning.includes("class_factors_source_missing"))).toHaveLength(1);
     expect(draft.warnings.filter((warning) => warning.includes("salary_engine_waits_for_market_value_input"))).toHaveLength(0);

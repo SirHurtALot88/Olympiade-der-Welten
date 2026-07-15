@@ -20,6 +20,7 @@ import {
   buildPlayerGeneratorCatalog,
   createDefaultPlayerGeneratorInput,
   generatePlayerDraft,
+  type PlayerGeneratorCommitHandler,
   type PlayerGeneratorTeamContext,
   recalculatePlayerGeneratorDraft,
   tightenPlayerGeneratorDraft,
@@ -294,6 +295,8 @@ function formatSaveCommitReason(reason: PlayerGeneratorDraft["generated"]["diagn
       return "Gehaltsengine ist noch nicht vollständig freigegeben.";
     case "salary_engine_waits_for_market_value":
       return "Gehalt wartet noch auf einen echten Marktwert.";
+    case "draft_validation_blocked":
+      return "Draft hat einen harten Validierungs-Block (Archetyp-Konflikt oder fehlende Engine).";
     case "commit_path_not_ready":
       return "Der sichere Free-Agent-Commit-Pfad ist in diesem Block bewusst deaktiviert.";
     default:
@@ -366,6 +369,7 @@ export default function PlayerGeneratorPanelNewLook({
   readOnly,
   readSourceLabel,
   onSaveDrafts,
+  onCommitDraft,
 }: {
   players: Player[];
   disciplines: Discipline[];
@@ -375,6 +379,7 @@ export default function PlayerGeneratorPanelNewLook({
   readOnly: boolean;
   readSourceLabel: string;
   onSaveDrafts: (nextDrafts: PlayerGeneratorDraft[]) => void;
+  onCommitDraft?: PlayerGeneratorCommitHandler;
 }) {
   const catalog = useMemo(() => buildPlayerGeneratorCatalog(players), [players]);
   const [form, setForm] = useState<PlayerGeneratorInput>(() => ({
@@ -387,6 +392,7 @@ export default function PlayerGeneratorPanelNewLook({
   const [message, setMessage] = useState<string | null>(null);
   const [portraitDraftUrl, setPortraitDraftUrl] = useState("");
   const [portraitDragActive, setPortraitDragActive] = useState(false);
+  const [committingDraftId, setCommittingDraftId] = useState<string | null>(null);
   const [seedLocked, setSeedLocked] = useState(false);
   const [previewTab, setPreviewTab] = useState<"overview" | "edit" | "batch">("overview");
   const [batchCandidates, setBatchCandidates] = useState<PlayerGeneratorDraft[]>([]);
@@ -583,6 +589,42 @@ export default function PlayerGeneratorPanelNewLook({
     setMessage("Draft wurde lokal entfernt.");
   }
 
+  /**
+   * "Als Free Agent übernehmen" — Phase 2. Delegates the actual write to
+   * `onCommitDraft` (POST /api/player-generator/commit → `commitDraftAsFreeAgent`,
+   * see `use-foundation-shell-router-body-scope.tsx`'s `commitPlayerGeneratorDraft`),
+   * which reloads the save on success so the new free agent shows up
+   * everywhere (Transfermarkt, player directory, ...) without a page reload.
+   * The draft itself is left in the saved-drafts list on success (see the
+   * doc comment on `commitPlayerGeneratorDraft`).
+   */
+  async function commitCurrentDraft() {
+    if (!currentDraft || !onCommitDraft) {
+      return;
+    }
+    if (readOnly) {
+      setMessage("Prisma / Referenzmodus bleibt read-only. Free-Agent-Commit ist hier nicht möglich.");
+      return;
+    }
+    if (currentDraft.generated.diagnostics.saveStatus.commitReasons.length > 0) {
+      setMessage("Draft hat noch offene Blocker — siehe Diagnose-Schublade.");
+      return;
+    }
+
+    setCommittingDraftId(currentDraft.draftId);
+    setMessage(null);
+    try {
+      const result = await onCommitDraft(currentDraft);
+      if (result.success) {
+        setMessage(`${result.playerName ?? currentDraft.generated.name} wurde als Free Agent übernommen (ID ${result.playerId ?? "?"}).`);
+      } else {
+        setMessage(`Free-Agent-Commit fehlgeschlagen: ${result.error ?? "unbekannter Fehler"}.`);
+      }
+    } finally {
+      setCommittingDraftId(null);
+    }
+  }
+
   function updateDraft(updater: (draft: PlayerGeneratorDraft) => PlayerGeneratorDraft, recalc = false) {
     setCurrentDraft((current) => {
       if (!current) {
@@ -669,6 +711,19 @@ export default function PlayerGeneratorPanelNewLook({
   const teamFit = currentDraft?.generated.teamFit ?? null;
   const coherence = currentDraft ? estimateDraftCoherence(currentDraft) : null;
 
+  const commitBlockers = currentDraft?.generated.diagnostics.saveStatus.commitReasons ?? [];
+  const isCommitting = Boolean(currentDraft) && committingDraftId === currentDraft?.draftId;
+  const commitDisabled = !currentDraft || readOnly || !onCommitDraft || commitBlockers.length > 0 || isCommitting;
+  const commitDisabledTitle = !currentDraft
+    ? "Erst einen Draft erzeugen."
+    : readOnly
+      ? "Prisma / Referenzmodus bleibt read-only."
+      : commitBlockers.length > 0
+        ? commitBlockers.map(formatSaveCommitReason).join(" ")
+        : isCommitting
+          ? "Commit läuft…"
+          : "Draft als neuen Free Agent in den Spielstand übernehmen.";
+
   const radarAxes: NlRadarAxis[] = currentDraft
     ? AXES.map((key) => ({ key, value: currentDraft.generated.axes[key] }))
     : [];
@@ -719,11 +774,12 @@ export default function PlayerGeneratorPanelNewLook({
         </button>
         <button
           type="button"
-          className="nl-gen-secondary-action"
-          disabled
-          title="Noch deaktiviert: Erst sicheren Free-Agent-Insert-Pfad bauen."
+          className="nl-gen-primary-action"
+          onClick={commitCurrentDraft}
+          disabled={commitDisabled}
+          title={commitDisabledTitle}
         >
-          Als Free Agent übernehmen
+          {isCommitting ? "Übernahme läuft…" : "Als Free Agent übernehmen"}
         </button>
         {message ? <span className="nl-gen-message">{message}</span> : null}
       </div>

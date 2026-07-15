@@ -20,6 +20,7 @@ import {
   buildPlayerGeneratorCatalog,
   createDefaultPlayerGeneratorInput,
   generatePlayerDraft,
+  type PlayerGeneratorCommitHandler,
   type PlayerGeneratorTeamContext,
   recalculatePlayerGeneratorDraft,
   tightenPlayerGeneratorDraft,
@@ -339,6 +340,8 @@ function formatSaveCommitReason(reason: PlayerGeneratorDraft["generated"]["diagn
       return "Gehaltsengine ist noch nicht vollständig freigegeben.";
     case "salary_engine_waits_for_market_value":
       return "Gehalt wartet noch auf einen echten Marktwert.";
+    case "draft_validation_blocked":
+      return "Draft hat einen harten Validierungs-Block (Archetyp-Konflikt oder fehlende Engine).";
     case "commit_path_not_ready":
       return "Der sichere Free-Agent-Commit-Pfad ist in diesem Block bewusst deaktiviert.";
     default:
@@ -355,6 +358,7 @@ export default function PlayerGeneratorPanel({
   readOnly,
   readSourceLabel,
   onSaveDrafts,
+  onCommitDraft,
 }: {
   players: Player[];
   disciplines: Discipline[];
@@ -364,6 +368,7 @@ export default function PlayerGeneratorPanel({
   readOnly: boolean;
   readSourceLabel: string;
   onSaveDrafts: (nextDrafts: PlayerGeneratorDraft[]) => void;
+  onCommitDraft?: PlayerGeneratorCommitHandler;
 }) {
   const catalog = useMemo(() => buildPlayerGeneratorCatalog(players), [players]);
   const [form, setForm] = useState<PlayerGeneratorInput>(() => ({
@@ -376,6 +381,7 @@ export default function PlayerGeneratorPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [portraitDraftUrl, setPortraitDraftUrl] = useState("");
   const [portraitDragActive, setPortraitDragActive] = useState(false);
+  const [committingDraftId, setCommittingDraftId] = useState<string | null>(null);
 
   const savedDrafts = useMemo(
     () =>
@@ -547,6 +553,36 @@ export default function PlayerGeneratorPanel({
     setMessage("Draft wurde lokal entfernt.");
   }
 
+  /** "Als Free Agent übernehmen" — see the same-named handler in
+   * `PlayerGeneratorPanelNewLook.tsx` for the full doc comment; this legacy
+   * panel calls the identical `onCommitDraft` prop. */
+  async function commitCurrentDraft() {
+    if (!currentDraft || !onCommitDraft) {
+      return;
+    }
+    if (readOnly) {
+      setMessage("Prisma / Referenzmodus bleibt read-only. Free-Agent-Commit ist hier nicht möglich.");
+      return;
+    }
+    if (currentDraft.generated.diagnostics.saveStatus.commitReasons.length > 0) {
+      setMessage("Draft hat noch offene Blocker — siehe Diagnose-Bereich.");
+      return;
+    }
+
+    setCommittingDraftId(currentDraft.draftId);
+    setMessage(null);
+    try {
+      const result = await onCommitDraft(currentDraft);
+      if (result.success) {
+        setMessage(`${result.playerName ?? currentDraft.generated.name} wurde als Free Agent übernommen (ID ${result.playerId ?? "?"}).`);
+      } else {
+        setMessage(`Free-Agent-Commit fehlgeschlagen: ${result.error ?? "unbekannter Fehler"}.`);
+      }
+    } finally {
+      setCommittingDraftId(null);
+    }
+  }
+
   function updateDraft(
     updater: (draft: PlayerGeneratorDraft) => PlayerGeneratorDraft,
     recalc = false,
@@ -660,6 +696,19 @@ export default function PlayerGeneratorPanel({
   const economyProjection = currentDraft?.generated.economyProjection ?? null;
   const teamFit = currentDraft?.generated.teamFit ?? null;
 
+  const commitBlockers = currentDraft?.generated.diagnostics.saveStatus.commitReasons ?? [];
+  const isCommitting = Boolean(currentDraft) && committingDraftId === currentDraft?.draftId;
+  const commitDisabled = !currentDraft || readOnly || !onCommitDraft || commitBlockers.length > 0 || isCommitting;
+  const commitDisabledTitle = !currentDraft
+    ? "Erst einen Draft erzeugen."
+    : readOnly
+      ? "Prisma / Referenzmodus bleibt read-only."
+      : commitBlockers.length > 0
+        ? commitBlockers.map(formatSaveCommitReason).join(" ")
+        : isCommitting
+          ? "Commit läuft…"
+          : "Draft als neuen Free Agent in den Spielstand übernehmen.";
+
   // "Neuer Look" Gate (additiv): alle Hooks oben sind gelaufen, ab hier nur
   // noch Darstellung. Flag aus => bestehendes Markup unverändert (Fallback).
   if (newLook) {
@@ -673,6 +722,7 @@ export default function PlayerGeneratorPanel({
         readOnly={readOnly}
         readSourceLabel={readSourceLabel}
         onSaveDrafts={onSaveDrafts}
+        onCommitDraft={onCommitDraft}
       />
     );
   }
@@ -908,12 +958,13 @@ export default function PlayerGeneratorPanel({
               Draft speichern
             </button>
             <button
-              className="secondary-button"
+              className="primary-button"
               type="button"
-              disabled
-              title="Noch deaktiviert: Erst sicheren Free-Agent-Insert-Pfad bauen."
+              onClick={commitCurrentDraft}
+              disabled={commitDisabled}
+              title={commitDisabledTitle}
             >
-              Als Free Agent übernehmen
+              {isCommitting ? "Übernahme läuft…" : "Als Free Agent übernehmen"}
             </button>
           </div>
           <p className="muted" style={{ marginTop: 8 }}>

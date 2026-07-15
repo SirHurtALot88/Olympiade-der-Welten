@@ -614,8 +614,19 @@ export type PlayerGeneratorDraftStatusView = {
 
 export type PlayerGeneratorSaveStatusView = {
   save: "draft_only";
-  commit: "disabled";
-  commitReasons: Array<"market_value_engine_blocked" | "salary_engine_blocked" | "salary_engine_waits_for_market_value" | "commit_path_not_ready">;
+  // Phase 2: "enabled" when `commitReasons` is empty, i.e. the draft has a
+  // real ovr/marketValue/salary and no hard validation block. Prior to
+  // Phase 2 this was hardcoded "disabled" (the commit path did not exist
+  // yet) — `commit_path_not_ready` below is kept only so old persisted
+  // drafts/fixtures created before Phase 2 still satisfy the type.
+  commit: "enabled" | "disabled";
+  commitReasons: Array<
+    | "market_value_engine_blocked"
+    | "salary_engine_blocked"
+    | "salary_engine_waits_for_market_value"
+    | "draft_validation_blocked"
+    | "commit_path_not_ready"
+  >;
 };
 
 export type PlayerGeneratorQualityWarningCode =

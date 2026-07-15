@@ -2213,6 +2213,53 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
+  /**
+   * Player-Generator Phase 2 — "Als Free Agent übernehmen". Mirrors
+   * `chooseTeamSponsor`'s fetch-then-`loadSave` pattern 1:1: POST the
+   * mutation to the guarded route (which loads/writes the save directly via
+   * persistence, independent of this client's in-memory `gameState`), then
+   * refetch so `gameState.players` picks up the newly inserted free agent.
+   * The committed draft is intentionally left in the saved-drafts list
+   * (the user can delete it manually) — re-committing it is harmless, it
+   * just mints another free agent with a fresh id rather than erroring.
+   */
+  async function commitPlayerGeneratorDraft(
+    draft: PlayerGeneratorDraft,
+  ): Promise<{ success: boolean; error?: string; playerId?: string; playerName?: string }> {
+    if (readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { success: false, error: "read_only" };
+    }
+    try {
+      const response = await fetch("/api/player-generator/commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          draft,
+          dryRun: false,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        summary?: { playerId?: string; playerName?: string } | null;
+      };
+      if (!response.ok || !payload.success) {
+        return { success: false, error: payload.error ?? "player_generator_commit_failed" };
+      }
+      await loadSave(activeSaveId);
+      return {
+        success: true,
+        playerId: payload.summary?.playerId,
+        playerName: payload.summary?.playerName ?? draft.generated.name,
+      };
+    } catch {
+      return { success: false, error: "player_generator_commit_failed" };
+    }
+  }
+
   function saveContractNegotiationDrafts(nextDrafts: ContractNegotiationDraft[]) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -10133,6 +10180,7 @@ export function useFoundationShellRouterBodyScope({
     runSaveAction,
     runSeasonStartReset,
     savePlayerGeneratorDrafts,
+    commitPlayerGeneratorDraft,
     saveSummaries,
     saveSyncError,
     saveTeamSettings,
