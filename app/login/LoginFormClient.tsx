@@ -46,31 +46,34 @@ export default function LoginFormClient() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell oly-login-shell">
       <header className="hero">
-        <p>Oly Umbau App v2 · Anmeldung</p>
-        <h1>Anmelden</h1>
-        <p>Waehle deinen Benutzer und gib dein Passwort ein, um weiterzuspielen.</p>
+        <p className="eyebrow">Olympiade der Welten</p>
+        <h1>Willkommen zurück</h1>
+        <p>Wähle deinen Namen und gib dein Passwort ein, um weiterzuspielen.</p>
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="lobby-grid">
+      <div className="oly-login-grid">
         <LobbyCard title="Anmelden">
           <form className="form-stack" onSubmit={handleSubmit}>
             <label className="filter-field">
-              <span>Benutzer</span>
-              <select
-                className="input"
-                value={username}
-                onChange={(event) => setUsername(event.target.value as AuthUsername)}
-              >
+              <span>Wer bist du?</span>
+              <div className="pill-toggle-group" role="radiogroup" aria-label="Benutzer">
                 {USER_OPTIONS.map((option) => (
-                  <option key={option.username} value={option.username}>
+                  <button
+                    key={option.username}
+                    type="button"
+                    role="radio"
+                    aria-checked={username === option.username}
+                    className={`pill-toggle${username === option.username ? " is-selected" : ""}`}
+                    onClick={() => setUsername(option.username)}
+                  >
                     {option.label}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             </label>
             <label className="filter-field">
               <span>Passwort</span>

@@ -522,8 +522,87 @@ a {
   font-size: 0.95rem;
 }
 
+.pill.is-ready {
+  background: rgba(22, 163, 74, 0.14);
+  color: #14532d;
+}
+
+.pill.is-warning {
+  background: rgba(194, 65, 12, 0.12);
+  color: #7c2d12;
+}
+
 .inline-button {
   width: fit-content;
+}
+
+/* Player-facing entry experience: login, start screen, room lobby. Small,
+ * additive helpers layered on the existing app-shell/hero/panel/pill system
+ * so those screens stay visually consistent with the rest of the app. */
+.oly-session-line {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.oly-solo-card {
+  margin-bottom: 24px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.oly-section-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.oly-section-heading h2 {
+  font-size: 1.4rem;
+}
+
+.oly-login-shell {
+  max-width: 520px;
+}
+
+.oly-login-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.pill-toggle-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill-toggle {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pill-toggle.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.oly-room-code-pill strong {
+  letter-spacing: 0.04em;
+}
+
+.oly-lobby-layout {
+  gap: 20px;
+}
+
+.oly-primary-cta {
+  font-weight: 700;
 }
 
 .foundation-shell .inline-button {

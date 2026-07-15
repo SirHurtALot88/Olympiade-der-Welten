@@ -4,34 +4,66 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-import { ActionLog } from "@/components/ActionLog";
-import { RelayArenaPhaser } from "@/components/RelayArenaPhaser";
-import { RoomStatusPanel } from "@/components/RoomStatusPanel";
-import { TurnControls } from "@/components/TurnControls";
-import { ROOM_FLOW_STEPS, describeRoomFlowButton, getRoomFlowStep } from "@/lib/room/room-flow-controller";
+import { describeRoomFlowButton, getRoomFlowStep } from "@/lib/room/room-flow-controller";
 import { SocketProvider, useSocket } from "@/lib/socket/socket-context";
 import type { RoomErrorPayload, RoomJoinedPayload, RoomOwnershipPreset } from "@/types/events";
-import type { CoachRole, OlyRoomState } from "@/types/game";
+import type { OlyRoomState } from "@/types/game";
+
+const PRESET_OPTIONS: Array<{ value: RoomOwnershipPreset; label: string }> = [
+  { value: "chris_1_rest_ai", label: "1 Team Chris, Rest KI" },
+  { value: "chris_2_rest_ai", label: "2 Teams Chris, Rest KI" },
+  { value: "chris_4_rest_ai", label: "4 Teams Chris, Rest KI" },
+  { value: "chris_4_franky_4_rest_ai", label: "4 Teams Chris + 4 Teams Franky, Rest KI" },
+];
 
 function roomStorageKey(roomCode: string) {
   return `oly-seat:${roomCode.toUpperCase()}`;
 }
 
+function connectionLabel(connected: boolean) {
+  return connected ? "Verbunden" : "Verbinde ...";
+}
+
+function readyLabel(readyState: string) {
+  if (readyState === "ready") return "Bereit";
+  if (readyState === "waiting") return "Wartet";
+  return "Nicht bereit";
+}
+
+function CopyRoomCodeButton({ roomCode }: { roomCode: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      className="secondary-button inline-button"
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(roomCode);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1800);
+        } catch {
+          /* Clipboard kann in manchen Umgebungen fehlen - kein hartes Fehlverhalten. */
+        }
+      }}
+    >
+      {copied ? "Kopiert!" : "Code kopieren"}
+    </button>
+  );
+}
+
 function RoomScreen({ roomCode }: { roomCode: string }) {
   const socket = useSocket();
   const [state, setState] = useState<OlyRoomState | null>(null);
-  const [role, setRole] = useState<CoachRole | null>(null);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [connectionText, setConnectionText] = useState(() =>
-    socket.connected ? "Verbunden" : "Verbinde...",
-  );
+  const [isConnected, setIsConnected] = useState(() => socket.connected);
 
   useEffect(() => {
     const seatToken = localStorage.getItem(roomStorageKey(roomCode));
 
     function handleConnect() {
-      setConnectionText("Verbunden");
+      setIsConnected(true);
       if (seatToken) {
         socket.emit("rejoinRoom", { roomCode, seatToken });
       } else {
@@ -40,7 +72,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
     }
 
     function handleDisconnect() {
-      setConnectionText("Verbindung getrennt");
+      setIsConnected(false);
     }
 
     function handleJoined(payload: RoomJoinedPayload) {
@@ -49,7 +81,6 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
       }
 
       localStorage.setItem(roomStorageKey(payload.roomCode), payload.seatToken);
-      setRole(payload.role);
       setParticipantId(payload.participantId);
       setState(payload.state);
       setError(null);
@@ -90,8 +121,6 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
     };
   }, [roomCode, socket]);
 
-  const canEndTurn = Boolean(state && role && state.activeRole === role && state.moveCommittedThisTurn);
-  const roleLabel = role ? `Coach ${role}` : "Unbekannt";
   const currentParticipant = state?.roomParticipants.find((participant) => participant.participantId === participantId) ?? null;
   const isHost = currentParticipant?.role === "host";
   const seatToken = typeof window !== "undefined" ? localStorage.getItem(roomStorageKey(roomCode)) : null;
@@ -99,10 +128,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
   const currentFlowStep = state ? getRoomFlowStep(state.roomFlowState.step) : null;
   const aiTeamCount = state?.teamOwnership.filter((entry) => entry.controllerType === "ai").length ?? 0;
   const aiReadyCount = state?.roomFlowState.aiAutoCompletedTeamIds.length ?? 0;
-  const arenaSyncState = state?.arenaSyncState ?? null;
-  const currentParticipantArenaReady = Boolean(
-    currentParticipant && arenaSyncState?.readyParticipantIds.includes(currentParticipant.participantId),
-  );
+
   function buildFoundationHref(view: string, teamId?: string | null) {
     const params = new URLSearchParams({
       view,
@@ -117,394 +143,199 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
     }
     return `/foundation?${params.toString()}`;
   }
+
   const foundationHref = roomFlowButton
     ? buildFoundationHref(roomFlowButton.targetView, roomFlowButton.activeTeamId)
     : buildFoundationHref("home");
 
-  const infoText = useMemo(() => {
-    if (!state || !role) {
-      return "Warte auf gültigen Raumzustand.";
-    }
+  const primaryCtaLabel = useMemo(() => {
+    if (!state) return "Ins Spiel";
+    if (state.multiplayerRoom.status === "lobby") return "Zum Spieltag";
+    return "Ins Spiel";
+  }, [state]);
 
-    if (state.activeRole === role) {
-      return state.moveCommittedThisTurn
-        ? "Dein Move ist gesetzt. Du kannst jetzt den Zug beenden."
-        : "Du bist aktiv. Wähle eines deiner Tokens.";
-    }
-
-    return "Der andere Coach ist gerade am Zug.";
-  }, [role, state]);
+  const teamRosterParticipants = state?.roomParticipants.filter((participant) => participant.controlledTeamIds.length > 0) ?? [];
 
   return (
     <main className="app-shell">
       <header className="hero">
-        <p>Gemeinsamer Multiplayer-Raum</p>
-        <h1>Staffel-Arena v0.1</h1>
-        <p>
-          Zwei Browser sehen denselben autoritativen Zustand. Phaser rendert nur die Arena, die
-          Engine trifft die Entscheidungen.
-        </p>
+        <p className="eyebrow">Olympiade der Welten</p>
+        <h1>Warteraum</h1>
+        <p>Teile den Raum-Code mit deinem Mitspieler. Sobald alle bereit sind, geht es gemeinsam ins Spiel.</p>
       </header>
 
       <div className="room-meta">
-        <span className="pill">Raum {roomCode.toUpperCase()}</span>
-        {state ? <span className="pill">Code {state.multiplayerRoom.roomCode}</span> : null}
-        <span className="pill">{connectionText}</span>
-        {state ? <span className="pill">Phase {state.multiplayerRoom.status}</span> : null}
-        {currentParticipant ? <span className="pill">Participant {currentParticipant.displayName}</span> : null}
+        <span className="pill oly-room-code-pill">
+          Raum-Code <strong>{roomCode.toUpperCase()}</strong>
+        </span>
+        <CopyRoomCodeButton roomCode={roomCode.toUpperCase()} />
+        <span className={`pill${isConnected ? " is-ready" : " is-warning"}`}>{connectionLabel(isConnected)}</span>
         <Link className="pill" href="/">
-          Neue Lobby
+          Zur Startseite
         </Link>
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
-      <div className="info-banner">{infoText}</div>
 
       {state ? (
-        <div className="room-layout">
-          <section className="panel room-arena-panel">
+        <div className="stack oly-lobby-layout">
+          <section className="panel">
             <div className="panel-header">
-              <h2>Arena</h2>
-              <p className="muted">Klicks senden nur `moveToken` an den Server.</p>
+              <h2>Mitspieler</h2>
+              <p className="muted">Wer ist im Raum und wer ist bereit.</p>
             </div>
-            <RelayArenaPhaser
-              state={state}
-              currentRole={role ?? "A"}
-              onTokenSelect={(tokenId) => {
-                const seatToken = localStorage.getItem(roomStorageKey(roomCode));
-                if (!seatToken) {
-                  setError("Kein Sitzplatz für diesen Raum gespeichert.");
-                  return;
-                }
-
-                socket.emit("moveToken", {
+            <div className="table-shell">
+              <table className="data-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Spieler</th>
+                    <th>Rolle</th>
+                    <th>Teams</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.roomParticipants.map((participant) => (
+                    <tr key={participant.participantId}>
+                      <td>{participant.displayName}</td>
+                      <td>{participant.role === "host" ? "Host" : participant.role === "spectator" ? "Zuschauer" : "Mitspieler"}</td>
+                      <td>{participant.controlledTeamIds.join(", ") || "—"}</td>
+                      <td>
+                        <span className={`pill${participant.readyState === "ready" ? " is-ready" : " is-warning"}`}>
+                          {readyLabel(participant.readyState)}
+                          {participant.connectionStatus === "offline" ? " · offline" : ""}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {aiTeamCount > 0 ? (
+              <p className="muted">Die übrigen {aiTeamCount} Teams ({state.teamOwnership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId).join(", ")}) übernimmt die KI.</p>
+            ) : null}
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={!seatToken}
+              onClick={() => {
+                if (!seatToken) return;
+                socket.emit("setReadyState", {
                   roomCode: roomCode.toUpperCase(),
                   seatToken,
-                  tokenId,
+                  ready: currentParticipant?.readyState !== "ready",
                 });
               }}
-            />
+            >
+              {currentParticipant?.readyState === "ready" ? "Bereit ✓" : "Bereit melden"}
+            </button>
           </section>
 
-          <aside className="stack room-sidebar">
-            <RoomStatusPanel roleLabel={roleLabel} state={state} />
-            <section className="panel" data-testid="room-flow-controller">
-              <div className="panel-header">
-                <div>
-                  <h2>Room Flow</h2>
-                  <p className="muted">
-                    {state.roomFlowState.activeSeasonId} · Matchday {state.roomFlowState.activeMatchday} · {state.roomFlowState.phase}
-                  </p>
-                </div>
-                <span className={`pill${state.roomFlowState.canHostAdvance ? " is-ready" : " is-warning"}`}>
-                  {state.roomFlowState.canHostAdvance ? "Host darf weiter" : "Blockiert"}
-                </span>
-              </div>
-              <div className="stack">
-                <div className="room-meta">
-                  {state.roomParticipants
-                    .filter((participant) => participant.controlledTeamIds.length > 0)
-                    .map((participant) => {
-                      const ready = state.roomFlowState.completedParticipantIds.includes(participant.participantId);
-                      return (
-                        <span key={participant.participantId} className={`pill${ready ? " is-ready" : " is-warning"}`}>
-                          {participant.displayName}: {ready ? participant.controlledTeamIds.length : 0}/{participant.controlledTeamIds.length} Teams ready
-                        </span>
-                      );
-                    })}
-                  <span className={`pill${aiReadyCount >= aiTeamCount ? " is-ready" : " is-warning"}`}>
-                    AI: {aiReadyCount}/{aiTeamCount} ready
-                  </span>
-                </div>
-                <div className="info-banner">
-                  <strong>{currentFlowStep?.label ?? "Room Flow"}</strong>
-                  <span className="muted"> · {state.roomFlowState.warnings.join(" · ") || "bereit"}</span>
-                </div>
-                <div className="room-meta">
-                  <span className="pill">Required {state.roomFlowState.requiredParticipantIds.length}</span>
-                  <span className="pill">Completed {state.roomFlowState.completedParticipantIds.length}</span>
-                  <span className="pill">Blocking Teams {state.roomFlowState.blockingTeamIds.length}</span>
-                </div>
-                <div className="room-meta">
-                  {ROOM_FLOW_STEPS.map((entry) => (
-                    <Link
-                      key={entry.stepId}
-                      className={`pill${entry.stepId === state.roomFlowState.step ? " is-ready" : ""}`}
-                      href={buildFoundationHref(entry.targetView)}
-                    >
-                      {entry.label}
-                    </Link>
-                  ))}
-                </div>
-                <div className="foundation-flow-actions">
-                  <button
-                    className={`primary-button foundation-flow-button ${roomFlowButton?.status === "waiting_for_player" ? "is-blocked" : ""}`}
-                    type="button"
-                    disabled={!seatToken || !roomFlowButton?.canClick}
-                    onClick={() => {
-                      if (!seatToken || !roomFlowButton) return;
-                      if (!roomFlowButton.isHostAction) {
-                        socket.emit("setReadyState", {
-                          roomCode: roomCode.toUpperCase(),
-                          seatToken,
-                          ready: currentParticipant?.readyState !== "ready",
-                        });
-                        return;
-                      }
-                      if (roomFlowButton.label === "AI Teams vorbereiten") {
-                        socket.emit("runRoomAiAutoStep", {
-                          roomCode: roomCode.toUpperCase(),
-                          seatToken,
-                        });
-                        return;
-                      }
-                      if (state.multiplayerRoom.status === "lobby") {
-                        socket.emit("startRoom", {
-                          roomCode: roomCode.toUpperCase(),
-                          seatToken,
-                        });
-                        return;
-                      }
-                      socket.emit("advanceRoomFlow", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                      });
-                    }}
-                  >
-                    {roomFlowButton?.label ?? "Room Flow lädt"}
-                  </button>
-                  <Link className="secondary-button inline-button" href={foundationHref}>
-                    Ansicht öffnen
-                  </Link>
-                </div>
-                {state.roomFlowState.warnings.includes("sandbox_override_available") ? (
-                  <p className="muted">
-                    Sandbox sichtbar: Test-Auto-Ready wird als <code>source: sandbox_auto_ready</code> markiert. Echte Multiplayer-Räume bekommen keinen stillen Override.
-                  </p>
-                ) : null}
-              </div>
-            </section>
-            <section className="panel" data-testid="room-arena-sync-controller">
-              <div className="panel-header">
-                <div>
-                  <h2>Arena Sync</h2>
-                  <p className="muted">
-                    Gemeinsamer Reveal-State für Spieltag, Diszi, Phase und Slot-Step.
-                  </p>
-                </div>
-                <span className={`pill${arenaSyncState?.status === "revealing" ? " is-ready" : " is-warning"}`}>
-                  {arenaSyncState?.status ?? "idle"}
-                </span>
-              </div>
-              <div className="stack">
-                {arenaSyncState?.callout === "arena_started" ? (
-                  <div className="info-banner">Arena gestartet: beitreten</div>
-                ) : null}
-                <div className="room-meta">
-                  <span className="pill">Spieltag {arenaSyncState?.matchdayId ?? "—"}</span>
-                  <span className="pill">Diszi {arenaSyncState?.disciplineSide ?? "—"}</span>
-                  <span className="pill">Phase {arenaSyncState?.phaseId ?? "Start"}</span>
-                  <span className="pill">Slot {arenaSyncState?.slotRevealIndex ?? 0}/{arenaSyncState?.maxSlotRevealIndex ?? 0}</span>
-                  <span className="pill">v{arenaSyncState?.version ?? 0}</span>
-                </div>
-                <div className="room-meta">
-                  {state.roomParticipants
-                    .filter((participant) => arenaSyncState?.requiredParticipantIds.includes(participant.participantId))
-                    .map((participant) => (
-                      <span
-                        key={`arena-ready-${participant.participantId}`}
-                        className={`pill${arenaSyncState?.readyParticipantIds.includes(participant.participantId) ? " is-ready" : " is-warning"}`}
-                      >
-                        {participant.displayName}: {arenaSyncState?.readyParticipantIds.includes(participant.participantId) ? "ready" : "wartet"}
-                      </span>
-                    ))}
-                  <span className="pill">AI/Passive auto-ready</span>
-                </div>
-                <div className="foundation-flow-actions">
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    disabled={!seatToken || !isHost}
-                    onClick={() => {
-                      if (!seatToken || !state) return;
-                      socket.emit("startRoomArena", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                        seasonId: state.roomFlowState.activeSeasonId,
-                        matchdayId: String(state.roomFlowState.activeMatchday),
-                        disciplineSide: "d1",
-                        maxSlotRevealIndex: 5,
-                      });
-                    }}
-                  >
-                    Arena starten
-                  </button>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    disabled={!seatToken || !arenaSyncState || arenaSyncState.status === "idle"}
-                    onClick={() => {
-                      if (!seatToken) return;
-                      socket.emit("setRoomArenaReady", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                        ready: !currentParticipantArenaReady,
-                      });
-                    }}
-                  >
-                    {currentParticipantArenaReady ? "Ready gesetzt" : "Ready"}
-                  </button>
-                  <button
-                    className="primary-button inline-button"
-                    type="button"
-                    disabled={!seatToken || !isHost || !arenaSyncState || arenaSyncState.status === "idle"}
-                    onClick={() => {
-                      if (!seatToken || !arenaSyncState) return;
-                      socket.emit("advanceRoomArenaStep", {
-                        roomCode: roomCode.toUpperCase(),
-                        seatToken,
-                        maxSlotRevealIndex: arenaSyncState.maxSlotRevealIndex,
-                      });
-                    }}
-                  >
-                    Next Step
-                  </button>
-                </div>
-              </div>
-            </section>
+          {isHost && state.multiplayerRoom.status === "lobby" ? (
             <section className="panel">
               <div className="panel-header">
-                <h2>Online Lobby</h2>
+                <h2>Teams verteilen</h2>
+                <p className="muted">Als Host legst du fest, wer welche Teams übernimmt. Der Rest läuft über KI.</p>
               </div>
-              <div className="stack">
-                <div className="room-meta">
-                  <span className={`pill${state.turnState.canAdvance ? " is-ready" : " is-warning"}`}>
-                    {state.turnState.canAdvance ? "Alle bereit" : "Wartet"}
+              <div className="form-stack">
+                <label className="filter-field">
+                  <span>Verteilung</span>
+                  <select
+                    className="input"
+                    onChange={(event) => {
+                      if (!seatToken) return;
+                      socket.emit("applyRoomPreset", {
+                        roomCode: roomCode.toUpperCase(),
+                        seatToken,
+                        preset: event.target.value as RoomOwnershipPreset,
+                      });
+                    }}
+                    defaultValue="chris_4_franky_4_rest_ai"
+                  >
+                    {PRESET_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="panel" data-testid="room-flow-controller">
+            <div className="panel-header">
+              <div>
+                <h2>Spielstand</h2>
+                <p className="muted">{currentFlowStep?.label ?? "Room Flow"}</p>
+              </div>
+              <span className={`pill${state.roomFlowState.canHostAdvance ? " is-ready" : " is-warning"}`}>
+                {state.roomFlowState.canHostAdvance ? "Bereit" : "Wartet"}
+              </span>
+            </div>
+            <div className="stack">
+              <div className="room-meta">
+                {teamRosterParticipants.map((participant) => {
+                  const ready = state.roomFlowState.completedParticipantIds.includes(participant.participantId);
+                  return (
+                    <span key={participant.participantId} className={`pill${ready ? " is-ready" : " is-warning"}`}>
+                      {participant.displayName}: {ready ? participant.controlledTeamIds.length : 0}/{participant.controlledTeamIds.length} Teams bereit
+                    </span>
+                  );
+                })}
+                {aiTeamCount > 0 ? (
+                  <span className={`pill${aiReadyCount >= aiTeamCount ? " is-ready" : " is-warning"}`}>
+                    KI: {aiReadyCount}/{aiTeamCount} bereit
                   </span>
-                  <span className="pill">Required {state.turnState.requiredParticipants.length}</span>
-                  <span className="pill">Ready {state.turnState.readyParticipants.length}</span>
-                </div>
-                <div className="table-shell">
-                  <table className="data-table compact-table">
-                    <thead>
-                      <tr>
-                        <th>Spieler</th>
-                        <th>Rolle</th>
-                        <th>Status</th>
-                        <th>Teams</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {state.roomParticipants.map((participant) => (
-                        <tr key={participant.participantId}>
-                          <td>{participant.displayName}</td>
-                          <td>{participant.role}</td>
-                          <td>{participant.connectionStatus} · {participant.readyState}</td>
-                          <td>{participant.controlledTeamIds.join(", ") || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                ) : null}
+              </div>
+              <div className="foundation-flow-actions">
                 <button
-                  className="primary-button"
+                  className={`primary-button foundation-flow-button ${roomFlowButton?.status === "waiting_for_player" ? "is-blocked" : ""}`}
                   type="button"
-                  disabled={!seatToken}
+                  disabled={!seatToken || !roomFlowButton?.canClick}
                   onClick={() => {
-                    if (!seatToken) return;
-                    socket.emit("setReadyState", {
+                    if (!seatToken || !roomFlowButton) return;
+                    if (!roomFlowButton.isHostAction) {
+                      socket.emit("setReadyState", {
+                        roomCode: roomCode.toUpperCase(),
+                        seatToken,
+                        ready: currentParticipant?.readyState !== "ready",
+                      });
+                      return;
+                    }
+                    if (roomFlowButton.label === "AI Teams vorbereiten") {
+                      socket.emit("runRoomAiAutoStep", {
+                        roomCode: roomCode.toUpperCase(),
+                        seatToken,
+                      });
+                      return;
+                    }
+                    if (state.multiplayerRoom.status === "lobby") {
+                      socket.emit("startRoom", {
+                        roomCode: roomCode.toUpperCase(),
+                        seatToken,
+                      });
+                      return;
+                    }
+                    socket.emit("advanceRoomFlow", {
                       roomCode: roomCode.toUpperCase(),
                       seatToken,
-                      ready: currentParticipant?.readyState !== "ready",
                     });
                   }}
                 >
-                  {currentParticipant?.readyState === "ready" ? "Bereits bereit" : "Bereit melden"}
+                  {roomFlowButton?.label ?? "Lädt ..."}
                 </button>
-                {isHost ? (
-                  <>
-                    <label className="filter-field">
-                      <span>Ownership-Preset</span>
-                      <select
-                        className="input"
-                        onChange={(event) => {
-                          if (!seatToken) return;
-                          socket.emit("applyRoomPreset", {
-                            roomCode: roomCode.toUpperCase(),
-                            seatToken,
-                            preset: event.target.value as RoomOwnershipPreset,
-                          });
-                        }}
-                        defaultValue="chris_4_franky_4_rest_ai"
-                      >
-                        <option value="chris_1_rest_ai">1 Team Chris, Rest AI</option>
-                        <option value="chris_2_rest_ai">2 Teams Chris, Rest AI</option>
-                        <option value="chris_4_rest_ai">4 Teams Chris, Rest AI</option>
-                        <option value="chris_4_franky_4_rest_ai">4 Teams Chris + 4 Teams Franky + Rest AI</option>
-                      </select>
-                    </label>
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={!seatToken || !state.turnState.canAdvance}
-                      onClick={() => {
-                        if (!seatToken) return;
-                        socket.emit("startRoom", {
-                          roomCode: roomCode.toUpperCase(),
-                          seatToken,
-                        });
-                      }}
-                    >
-                      Season / Room starten
-                    </button>
-                  </>
-                ) : null}
+                <Link className="primary-button inline-button oly-primary-cta" href={foundationHref}>
+                  {primaryCtaLabel}
+                </Link>
               </div>
-            </section>
-            <section className="panel">
-              <div className="panel-header">
-                <h2>Team Ownership</h2>
-              </div>
-              <div className="room-meta">
-                <span className="pill">Human {state.teamOwnership.filter((entry) => entry.controllerType === "human").length}</span>
-                <span className="pill">AI {state.teamOwnership.filter((entry) => entry.controllerType === "ai").length}</span>
-                <span className="pill">Passive {state.teamOwnership.filter((entry) => entry.controllerType === "passive").length}</span>
-              </div>
-              <p className="muted">
-                Human-Teams sind Participant-gebunden. AI-Teams haben keine Participant-Session und werden später vom Server-AI-System verarbeitet.
-              </p>
-              <div className="room-meta">
-                {state.teamOwnership.slice(0, 12).map((entry) => (
-                  <span key={entry.teamId} className="pill">
-                    {entry.teamId}: {entry.ownerDisplayName ?? entry.controllerType}
-                  </span>
-                ))}
-              </div>
-            </section>
-            <TurnControls
-              canEndTurn={canEndTurn}
-              onEndTurn={() => {
-                const seatToken = localStorage.getItem(roomStorageKey(roomCode));
-                if (!seatToken) {
-                  setError("Kein Sitzplatz für diesen Raum gespeichert.");
-                  return;
-                }
-
-                socket.emit("endTurn", {
-                  roomCode: roomCode.toUpperCase(),
-                  seatToken,
-                });
-              }}
-            />
-          </aside>
-
-          <section className="room-log">
-            <ActionLog entries={state.actionLog} />
+            </div>
           </section>
         </div>
       ) : (
         <section className="panel">
-          <p>Raum wird geladen...</p>
+          <p>Raum wird geladen ...</p>
         </section>
       )}
     </main>

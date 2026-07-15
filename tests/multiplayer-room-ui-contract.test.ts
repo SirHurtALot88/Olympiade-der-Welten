@@ -10,33 +10,39 @@ const flowPath = path.join(process.cwd(), "lib/room/room-flow-controller.ts");
 const arenaSyncPath = path.join(process.cwd(), "lib/room/arena-sync-state.ts");
 
 describe("online multiplayer room UI contract", () => {
-  it("exposes online-room setup instead of local-only runtime sessions", async () => {
+  it("exposes a clean, player-facing online-room setup instead of local-only runtime sessions", async () => {
     const lobbyText = await fs.readFile(lobbyPath, "utf8");
 
-    expect(lobbyText).toContain("Online Multiplayer Rooms V1");
-    expect(lobbyText).toContain("Online-Room erstellen");
-    expect(lobbyText).toContain("Room beitreten");
+    expect(lobbyText).toContain("Zu zweit spielen (Online)");
+    expect(lobbyText).toContain("Raum erstellen");
+    expect(lobbyText).toContain("Raum beitreten");
+    expect(lobbyText).toContain("createRoom");
+    expect(lobbyText).toContain("joinRoom");
     expect(lobbyText).toContain("chris_1_rest_ai");
     expect(lobbyText).toContain("chris_4_franky_4_rest_ai");
-    expect(lobbyText).toContain("Server-authoritative Flow");
-    expect(lobbyText).toContain("Client sendet Requests, keine Direktwrites.");
+    // Developer/internal scaffolding copy must not leak into the player-facing screen.
+    expect(lobbyText).not.toContain("Oly Umbau App v2");
+    expect(lobbyText).not.toContain("Server-authoritative Flow");
+    expect(lobbyText).not.toContain("echte Writes laufen später serverseitig über Services");
   });
 
-  it("renders participants, ownership, ready state and host start controls in room page", async () => {
+  it("renders a clean lobby with participants, ready state and host controls in the room page", async () => {
     const roomText = await fs.readFile(roomPagePath, "utf8");
 
-    expect(roomText).toContain("Online Lobby");
-    expect(roomText).toContain("Team Ownership");
     expect(roomText).toContain("state.roomParticipants");
     expect(roomText).toContain("state.teamOwnership");
     expect(roomText).toContain("setReadyState");
     expect(roomText).toContain("applyRoomPreset");
     expect(roomText).toContain("startRoom");
-    expect(roomText).toContain("Season / Room starten");
-    expect(roomText).toContain("room-arena-sync-controller");
-    expect(roomText).toContain("startRoomArena");
-    expect(roomText).toContain("setRoomArenaReady");
-    expect(roomText).toContain("advanceRoomArenaStep");
+    expect(roomText).toContain("chris_4_franky_4_rest_ai");
+    // The primary CTA into the game reuses the existing foundation-room-context href.
+    expect(roomText).toContain("foundationHref");
+    expect(roomText).toContain("buildFoundationHref");
+    // The debug token-moving harness ("Staffel-Arena", moveToken canvas) is gone.
+    expect(roomText).not.toContain("moveToken");
+    expect(roomText).not.toContain("RelayArenaPhaser");
+    expect(roomText).not.toContain("Staffel-Arena");
+    expect(roomText).not.toContain("Staffel-Testbahn");
   });
 
   it("renders a multiplayer-ready room flow controller with AI and participant gates", async () => {
@@ -47,7 +53,6 @@ describe("online multiplayer room UI contract", () => {
     expect(roomText).toContain("describeRoomFlowButton");
     expect(roomText).toContain("runRoomAiAutoStep");
     expect(roomText).toContain("advanceRoomFlow");
-    expect(roomText).toContain("source: sandbox_auto_ready");
     expect(flowText).toContain("Warten auf");
     expect(flowText).toContain("AI Teams vorbereiten");
     expect(flowText).toContain("host_only");
