@@ -45630,10 +45630,8 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-market-candidate {
-  display: grid;
-  grid-template-columns: 48px 1fr auto;
-  gap: var(--nl-s3);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   padding: var(--nl-s2) var(--nl-s3);
   border-radius: var(--nl-r-md);
   border: 1px solid var(--nl-line);
@@ -45642,6 +45640,14 @@ button.foundation-team-portrait-card {
   text-align: left;
   cursor: pointer;
   transition: border-color var(--nl-t-fast) var(--nl-ease), transform var(--nl-t-fast) var(--nl-ease);
+}
+
+/* Kopfzeile der Kachel (kompakter Ruhezustand): Portrait · Copy · Zahlen · Toggle. */
+.is-new-look .nl-market-candidate-head {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  gap: var(--nl-s3);
+  align-items: center;
 }
 
 .is-new-look .nl-market-candidate:hover {
@@ -45768,6 +45774,124 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-market-candidate-numbers strong {
   font-size: 13px;
   color: var(--nl-ink);
+}
+
+/* ============================================================
+   FM26-Style Progressive Disclosure — Kandidaten-Kachel
+   Kompakter Ruhezustand (nl-market-candidate-head) + Detail-Layer
+   (nl-market-candidate-detail: Achsen POW/SPE/MEN/SOC, Talent-Sterne,
+   Entwicklungs-Trend, Eignung). Der Detail-Layer ist immer im DOM
+   (Screenreader-erreichbar) und via max-height kollabiert; enthüllt
+   on :hover / :focus-within (Pointer + Tastaturfokus in der Kachel)
+   UND wenn die Kachel per Toggle .is-expanded trägt (Touch/Tastatur).
+   Fog-of-war bleibt gewahrt — es werden ausschließlich bereits
+   freigegebene Werte gerendert (siehe TSX). Overlay-frei, damit nichts
+   horizontal überläuft; der Reveal schiebt Geschwister sanft.
+   ============================================================ */
+.is-new-look .nl-market-candidate-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-market-candidate-expand:hover {
+  color: var(--nl-ink);
+  border-color: var(--nl-line-2);
+}
+
+.is-new-look .nl-market-candidate-expand:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-market-candidate-expand-caret {
+  display: inline-block;
+  transition: transform 200ms var(--nl-ease);
+}
+
+/* Detail-Layer: default kollabiert (max-height Reveal, kein Layout-Sprung). */
+.is-new-look .nl-market-candidate-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 1px solid transparent;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 220ms var(--nl-ease), opacity var(--nl-t-fast) var(--nl-ease),
+    margin-top 220ms var(--nl-ease), padding-top 220ms var(--nl-ease);
+}
+
+/* Reveal: Hover/Fokus (Pointer) ODER expliziter Toggle (is-expanded). */
+.is-new-look .nl-market-candidate:hover .nl-market-candidate-detail,
+.is-new-look .nl-market-candidate:focus-within .nl-market-candidate-detail,
+.is-new-look .nl-market-candidate.is-expanded .nl-market-candidate-detail {
+  max-height: 360px;
+  margin-top: var(--nl-s2);
+  padding-top: var(--nl-s2);
+  border-top-color: var(--nl-line);
+  opacity: 1;
+}
+
+.is-new-look .nl-market-candidate.is-expanded .nl-market-candidate-expand-caret {
+  transform: rotate(90deg);
+}
+
+.is-new-look .nl-market-detail-axes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-detail-axis-chip {
+  --nl-tone: var(--nl-mut);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 12%, transparent);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-market-detail-axis-chip b {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-market-detail-hint {
+  margin: 0;
+}
+
+/* Reduced Motion: kein Reveal-Übergang, nur sofortiges Zeigen/Verbergen. */
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-market-candidate-detail,
+  .is-new-look .nl-market-candidate-expand-caret {
+    transition: none;
+  }
 }
 
 /* Fokus-Panel */
