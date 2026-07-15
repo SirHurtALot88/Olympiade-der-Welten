@@ -31,6 +31,7 @@ import {
 } from "@/lib/foundation/team-history-health-metrics";
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -233,7 +234,10 @@ export function useFoundationCrossTabTeamsRoster(input: {
           player,
           saveId,
           known,
-          currentRating: playerRating?.ppsSeason ?? null,
+          // CA = peak-gewichtete Current Ability aus den Corestats (#113), NICHT
+          // die Season-PPS (Liga-Leistung, bei MD1 überall 0/null → sonst kollabiert
+          // die CA für alle Spieler auf denselben Fallback-Wert → alle 2★).
+          currentRating: computeCurrentAbilityScore(player.coreStats),
         });
         return {
           entry,
@@ -525,7 +529,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
             player,
             saveId,
             known: rosterCardsKnown,
-            currentRating: rating?.ppsSeason ?? null,
+            // CA = peak-gewichtete Current Ability aus den Corestats (#113), nicht Season-PPS.
+            currentRating: computeCurrentAbilityScore(player.coreStats),
           });
           const topDisciplines = Object.entries(player.disciplineRatings)
             .sort((left, right) => right[1] - left[1])
