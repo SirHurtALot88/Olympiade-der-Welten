@@ -5,6 +5,9 @@ import { useMemo, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { EmptyState } from "@/components/foundation/EmptyState";
+import FoundationPlayerPortraitPreview, {
+  type FoundationPlayerPortraitPreviewProps,
+} from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { NlCard, NlDeltaChip, StatChip, StatChipRow, formatNlNumber, useCountUp } from "@/components/foundation/new-look";
 import { NlAbilityStars, VeloIntensityRail, buildTrainingModeSegments, formatVeloNumber, formatVeloSignedNumber } from "@/components/foundation/velo-ui";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
@@ -141,41 +144,15 @@ function getToneBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
 }
 
 /**
- * #49 — Angewendete Training-/Performance-/Regressions-Summe direkt aus den
- * echten Attribut-Forecast-Einträgen (dieselbe Rechnung wie
- * `buildTrainingBudgetBreakdown`, hier nur ohne die Schritt-Liste).
+ * #49/Deklutter — Badge-Tooltip erklärt nur noch den Schwellenwert hinter dem
+ * Label; die volle Zahlen-Begründung steht bereits immer sichtbar im
+ * Kern-Takeaway direkt darunter (`getCoreTakeaway`) — keine zweite,
+ * abweichend formulierte Kopie derselben Netto-/Druck-Zahlen mehr im Tooltip.
  */
-function getAppliedTotals(row: TrainingPlayerRowView) {
-  let training = 0;
-  let performance = 0;
-  let regression = 0;
-  for (const entry of row.attributeForecast) {
-    training += entry.training;
-    performance += entry.performance;
-    regression += entry.regression;
-  }
-  return { training, performance, regression };
-}
-
-/**
- * #49 — "kann fallen" self-explanatory machen: WARUM kann das Attribut-Set
- * fallen (Regression übersteigt Training+Performance) und WAS fehlt zum
- * Halten (nötige zusätzliche Performance/Training-SP, damit Netto ≥ 0 wird).
- * Nutzt ausschließlich echte, bereits berechnete Felder — keine neue Formel.
- */
-function getToneBadgeTooltip(row: TrainingPlayerRowView, tone: ReturnType<typeof getDevelopmentTone>): string {
-  if (tone === "growth") {
-    return `Wächst (Upgrade bereit): Netto-Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)} SP ≥ +2 SP — Training + Performance übersteigen die Regression über die Saison deutlich.`;
-  }
-  if (tone === "regression") {
-    const { training, performance, regression } = getAppliedTotals(row);
-    const net = row.organicForecast.netSetpoints;
-    if (net < 0) {
-      return `Kann fallen: Regression ${formatVeloNumber(regression, 1)} SP übersteigt Training (+${formatVeloNumber(training, 1)}) + Performance (+${formatVeloNumber(performance, 1)}). Um zu halten fehlen ca. ${formatVeloNumber(Math.abs(net), 1)} SP mehr aus Training oder Performance.`;
-    }
-    return `Kann fallen: Netto-Forecast noch ${formatVeloSignedNumber(net, 1)} SP im Plus, aber Rückschritt-Risiko hoch (Regressions-Druck ${formatVeloNumber(row.forecast.regressionPressure, 0)}). Steigt der Druck weiter oder sinkt Training/Performance, kippt der Forecast ins Minus.`;
-  }
-  return `Stabil: Netto-Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)} SP zwischen 0 und +2 — Training gleicht die laufende Regression etwa aus.`;
+function getToneBadgeTooltip(tone: ReturnType<typeof getDevelopmentTone>): string {
+  if (tone === "growth") return "Netto-Forecast ≥ +2 SP. Begründung im Kurztext darunter.";
+  if (tone === "regression") return "Netto-Forecast negativ oder Rückschritt-Risiko hoch. Begründung im Kurztext darunter.";
+  return "Netto-Forecast 0 bis +2 SP. Begründung im Kurztext darunter.";
 }
 
 /** Sanftes Scrollen respektiert `prefers-reduced-motion` statt es zu ignorieren. */
@@ -261,13 +238,12 @@ function NlTrainingForecastBar({
   const deltaPct = Math.min(100 - basePct, (Math.abs(to - from) / scaleMax) * 100);
   const capMarker = entry.ceilingState === "capped" || entry.ceilingState === "closing";
   const capPct = Math.min(100, (Math.max(from, to) / scaleMax) * 100);
+  // Ceiling-Hinweis ("Potential erreicht/fast erreicht") steht bewusst NICHT hier —
+  // der Cap-Marker unten trägt exakt diesen Text bereits in seinem eigenen `title`
+  // (Deklutter: keine zweite, identische Tooltip-Kopie für dieselbe Zeile).
   const tooltip = `${entry.attribute}: ${formatVeloNumber(entry.before, 1)} → ${formatVeloNumber(entry.after, 1)} (${formatVeloSignedNumber(entry.delta, 1)}) · T ${formatVeloSignedNumber(entry.training, 1)} · P ${formatVeloSignedNumber(entry.performance, 1)} · R ${formatVeloSignedNumber(entry.regression, 1)}${
-    entry.ceilingState === "capped"
-      ? " · Potential erreicht"
-      : entry.ceilingState === "closing"
-        ? ` · Potential fast erreicht (${entry.headroomLabel ?? "eng"})`
-        : ""
-  }${regression ? ` · kann fallen: fehlen ca. ${formatVeloNumber(Math.abs(entry.delta), 1)} SP (Training+Performance) zum Halten` : ""}`;
+    regression ? ` · kann fallen: fehlen ca. ${formatVeloNumber(Math.abs(entry.delta), 1)} SP zum Halten` : ""
+  }`;
 
   return (
     <div
@@ -379,7 +355,7 @@ function NlTrainingIntensityProjection({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectMode(entry.mode as PlayerTrainingMode)}
-            title={`${entry.label} wählen: +${formatVeloNumber(entry.trainingGain, 1)} durch Training · Regression ${formatVeloSignedNumber(entry.regression, 1)} · Netto ${formatVeloSignedNumber(entry.net, 1)} SP · Fatigue-Last ${formatVeloNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
+            title={`${entry.label} wählen · Fatigue-Last ${formatVeloNumber(entry.fatigueLoad, 0)} · Erholungs-Tempo ${formatSignedPercent(entry.recoveryDeltaPct)} (Erholungs-Rate, nicht Fatigue-Last)`}
           >
             <span className="nl-training-intensity-label">
               {entry.label}
@@ -450,7 +426,10 @@ function NlTrainingClassRanking({
       role="radiogroup"
       aria-label="Trainingsklasse wählen — Top-4 plus deine aktuelle"
     >
-      <span className="nl-training-class-ranking-title">
+      <span
+        className="nl-training-class-ranking-title"
+        title={`Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke, gewichtet nach Signature-/Weak-Attribut-Affinität und Development-Route-Bonus. Reale Werte hängen zusätzlich vom Performance-Anteil ab.`}
+      >
         Beste Klassen + deine aktuelle · SP-Zugewinn{" "}
         {readOnly ? "" : <span className="nl-training-intensity-hint-inline">· tippen zum Wählen</span>}
       </span>
@@ -466,10 +445,8 @@ function NlTrainingClassRanking({
             aria-checked={entry.isCurrent}
             disabled={readOnly}
             onClick={() => onSelectClass(entry.className)}
-            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP geschätzt${
+            title={`${entry.label} als Trainingsklasse wählen: Rang ${entry.rank} · ca. +${formatVeloNumber(entry.estimatedGain, 1)} SP${
               entry.isCurrent ? " · wird aktuell trainiert" : ""
-            } · Schätzung: Trainingsbudget (${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} SP) nach Klassen-Attributgewichtung verteilt, abgeschwächt an Attributen nahe der Potential-Decke und gewichtet nach Signature-/Weak-Attribut-Affinität sowie dem Development-Route-Bonus der Klasse. Reale Werte hängen zusätzlich von Performance-Anteil ab.${
-              entry.hasFocusRouteBonus ? " · +8% Trainingsfokus-Bonus (Achse passt)" : ""
             }`}
           >
             <span className="nl-training-class-ranking-rank nl-tnum">{entry.rank}</span>
@@ -545,6 +522,44 @@ function NlTrainingPlayerCard({
   const hasDemand = demand != null && demand.status !== "fulfilled";
   const hasTraitBoost = row.traitBoosts.length > 0 || row.modifiers.traitModifierPct !== 0;
   const isHighRisk = row.forecast.regressionRisk === "high";
+  const portrait = getPlayerPortraitModel(row.player);
+  // Hover-Steckbrief (#Portrait-Hover): dieselbe `FoundationPlayerPortraitPreview`-Instanz
+  // wie in `FoundationPlayersTableNewLook`/`FoundationPlayersLeaderPodium` — trägt hier den
+  // eigens dafür vorgesehenen `context="training"`-Preset (CA/PO/Forecast, siehe
+  // `buildTrainingOverlayStats`), damit der Popup-Inhalt NICHT dieselben Zahlen doppelt
+  // zeigt, die die Karte selbst schon als Sterne/Chips/Balken darstellt. Diese Trainingsseite
+  // ist ausschließlich der eigene, steuerbare Kader — kein Fog-of-War nötig (identisch zum
+  // bereits bestehenden `known` auf den `NlAbilityStars` weiter unten).
+  const portraitPreviewProps: Omit<FoundationPlayerPortraitPreviewProps, "children"> = {
+    playerId: row.player.id,
+    name: row.player.name,
+    portraitUrl: portrait.previewSrc ?? portrait.src,
+    portraitInitials: portrait.initials || getInitials(row.player.name),
+    playerOvr: null,
+    playerMvs: row.playerMvs,
+    playerPps: row.playerPps,
+    pow: row.player.coreStats.pow ?? null,
+    spe: row.player.coreStats.spe ?? null,
+    men: row.player.coreStats.men ?? null,
+    soc: row.player.coreStats.soc ?? null,
+    variant: "team",
+    context: "training",
+    playerClassName: row.player.className,
+    subMeta:
+      row.organicForecast.classBefore === row.organicForecast.classAfter
+        ? row.player.className
+        : `${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`,
+    contextData: {
+      training: {
+        caRating: row.developmentStars.currentAbilityRating,
+        poDisplay: row.developmentStars.potentialStars ?? formatVeloNumber(row.developmentStars.potentialRating, 0),
+        netSetpoints: row.organicForecast.netSetpoints,
+        regressionRisk: row.forecast.regressionRisk,
+        trainingModeLabel: getTrainingModePresentation(row.mode).label,
+        traitModifierPct: row.modifiers.traitModifierPct,
+      },
+    },
+  };
 
   return (
     <article
@@ -553,32 +568,31 @@ function NlTrainingPlayerCard({
       data-testid="nl-training-player-card"
     >
       <header className="nl-training-player-head">
-        {(() => {
-          const portrait = getPlayerPortraitModel(row.player);
-          return (
-            <span className="nl-training-player-avatar">
-              <OptimizedMediaImage
-                className="nl-training-player-avatar-media"
-                src={portrait.previewSrc ?? portrait.src}
-                alt={`${row.player.name} Portrait`}
-                fallbackLabel={portrait.initials || getInitials(row.player.name)}
-                onErrorClassName="nl-training-player-avatar-media"
-                loading="lazy"
-              />
-            </span>
-          );
-        })()}
+        <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
+          <span className="nl-training-player-avatar">
+            <OptimizedMediaImage
+              className="nl-training-player-avatar-media"
+              src={portrait.previewSrc ?? portrait.src}
+              alt={`${row.player.name} Portrait`}
+              fallbackLabel={portrait.initials || getInitials(row.player.name)}
+              onErrorClassName="nl-training-player-avatar-media"
+              loading="lazy"
+            />
+          </span>
+        </FoundationPlayerPortraitPreview>
         <div className="nl-training-player-copy">
           {onOpenPlayerDetails ? (
-            <button
-              type="button"
-              className="nl-training-player-name-button"
-              data-testid="training-player-profile-button"
-              title={`${row.player.name} Profil öffnen`}
-              onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
-            >
-              {row.player.name}
-            </button>
+            <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
+              <button
+                type="button"
+                className="nl-training-player-name-button"
+                data-testid="training-player-profile-button"
+                title={`${row.player.name} Profil öffnen`}
+                onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
+              >
+                {row.player.name}
+              </button>
+            </FoundationPlayerPortraitPreview>
           ) : (
             <strong className="nl-training-player-name">{row.player.name}</strong>
           )}
@@ -610,7 +624,7 @@ function NlTrainingPlayerCard({
             />
           ) : null}
         </div>
-        <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(row, tone)}>
+        <span className={`nl-training-player-badge is-${tone} nl-training-hint`} title={getToneBadgeTooltip(tone)}>
           {getToneBadgeLabel(tone)}
         </span>
       </header>
@@ -630,7 +644,7 @@ function NlTrainingPlayerCard({
         {formatVeloNumber(row.organicForecast.fatigueLoad, 1)} ·{" "}
         <span
           className="nl-training-hint"
-          title={`Strain-Risiko aus der aktuellen Intensität (${getTrainingModePresentation(row.mode).label}): Fatigue-Last ${formatVeloNumber(row.organicForecast.fatigueLoad, 1)}. ${row.fatigueWarning} Hart erhöht Fatigue und senkt Regeneration, Leicht senkt beides.`}
+          title={`Strain-Risiko bei ${getTrainingModePresentation(row.mode).label}: ${row.fatigueWarning}`}
         >
           Risiko {row.forecast.fatigueStrain.label}
         </span>
@@ -693,11 +707,7 @@ function NlTrainingPlayerCard({
           {isHighRisk ? (
             <span
               className="nl-training-chip is-risk"
-              title={`Rückschritt-Risiko hoch: Regressions-Druck ${formatVeloNumber(row.forecast.regressionPressure, 0)} (Alterung, Marktwert-Druck, Belastung). ${row.fatigueWarning} ${
-                row.organicForecast.netSetpoints < 0
-                  ? `Um zu halten fehlen ca. ${formatVeloNumber(Math.abs(row.organicForecast.netSetpoints), 1)} SP mehr aus Training/Performance.`
-                  : `Aktuell noch +${formatVeloNumber(row.organicForecast.netSetpoints, 1)} SP im Plus, aber wackelig — steigt der Druck weiter, kippt der Forecast ins Minus.`
-              }`}
+              title={`Regressions-Druck ${formatVeloNumber(row.forecast.regressionPressure, 0)} (Alterung, Marktwert-Druck, Belastung) — Begründung im Kurztext oben.`}
             >
               <NlTrainingGlyph kind="risk" /> Rückschritt-Risiko
             </span>
