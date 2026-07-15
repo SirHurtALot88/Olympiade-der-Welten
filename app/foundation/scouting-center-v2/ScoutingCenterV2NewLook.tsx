@@ -407,6 +407,7 @@ export default function ScoutingCenterV2NewLook({
                 setActiveTab("reports");
               }}
               onOpenMarket={onOpenMarket}
+              newLook
             />
           </NlCard>
 

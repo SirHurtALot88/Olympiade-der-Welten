@@ -9198,6 +9198,22 @@ a {
   box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
 }
 
+/* Row-State-Tints der Vertragstabelle im neuen NlTable-Gerüst zuverlässig
+   über die Basis-/Hover-Regeln heben (NlTable rendert dieselben State-
+   Klassen via rowClassName). Zebra ist auf dieser Tabelle bewusst aus. */
+.is-new-look .nl-table.team-contracts-table tbody tr.is-contract-expiring td {
+  background: rgba(251, 191, 36, 0.08);
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-contract-expiring td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.55);
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-preview-row td {
+  opacity: 0.82;
+}
+.is-new-look .nl-table.team-contracts-table tbody tr.is-sell-marked td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
+}
+
 .team-contracts-layout {
   display: grid;
   gap: 14px;
@@ -41967,6 +41983,14 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-table tbody tr:last-child td {
   border-bottom: 0;
 }
+/* Aktive/ausgewählte Zeile (via rowClassName="is-active-row") — hebt sich
+   über Zebra und Basis, bleibt unter Hover. Für Steckbrief-/Report-Auswahl. */
+.is-new-look .nl-table tbody tr.is-active-row td {
+  background: var(--nl-accent-soft);
+}
+.is-new-look .nl-table tbody tr.is-active-row td:first-child {
+  box-shadow: inset 3px 0 0 var(--nl-accent);
+}
 /* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
 .is-new-look .nl-table-sort-th {
   display: inline-flex;
@@ -61083,6 +61107,96 @@ button.nl-players-axis:focus-visible {
   font-size: 10.5px;
   color: var(--nl-mut);
   font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   "Neuer Look" — Home V2 "Bento"-Dashboard (.nl-home-bento)
+   FM26-inspiriertes, dichtes Bento-Raster für das Manager-Cockpit.
+   Rein additiv & flag-gated (`.is-new-look`); ordnet die bestehenden
+   `.nl-home-*` Kacheln in variabel großen Feldern eines 12-Spalten-
+   Grids an (große Hero-Kachel, hohe Radar-Feature-Kachel über zwei
+   Zeilen, breite/kompakte Nebenkacheln). Nutzt ausschließlich die
+   `--nl-*` Tokens. Kollabiert responsiv auf 6 bzw. 1 Spalte — kein
+   horizontales Scrollen. Betrifft nur HomeV2NewLook.tsx; bestehende
+   `.nl-home-*` Klassen bleiben unverändert.
+   ============================================================ */
+.is-new-look .nl-home-bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  grid-auto-flow: row dense;
+  gap: var(--nl-s4);
+  align-items: stretch;
+}
+
+/* Kachel-Basis: keine Eigenmargen, kein Overflow, volle Zellhöhe, damit
+   Kacheln derselben Rasterzeile optisch gleich hoch wirken. */
+.is-new-look .nl-home-bento > .nl-bento-item {
+  min-width: 0;
+  margin: 0;
+}
+.is-new-look .nl-home-bento > .nl-bento-item.nl-card {
+  height: 100%;
+}
+/* Reveal-Wrapper (Heute-wichtig-Karten): als Flex-Zelle strecken, damit
+   die innere NlCard die Kachel füllt — Reveal-Stagger bleibt erhalten. */
+.is-new-look .nl-home-bento > .nl-reveal.nl-bento-item {
+  display: flex;
+}
+.is-new-look .nl-home-bento > .nl-reveal.nl-bento-item > .nl-card {
+  flex: 1 1 auto;
+}
+
+/* Spaltenspannen (Desktop, 12er-Raster) */
+.is-new-look .nl-home-bento > .nl-bento-span-3 { grid-column: span 3; }
+.is-new-look .nl-home-bento > .nl-bento-span-4 { grid-column: span 4; }
+.is-new-look .nl-home-bento > .nl-bento-span-5 { grid-column: span 5; }
+.is-new-look .nl-home-bento > .nl-bento-span-6 { grid-column: span 6; }
+.is-new-look .nl-home-bento > .nl-bento-span-7 { grid-column: span 7; }
+.is-new-look .nl-home-bento > .nl-bento-span-8 { grid-column: span 8; }
+.is-new-look .nl-home-bento > .nl-bento-span-12 { grid-column: 1 / -1; }
+
+/* Hohe Feature-Kachel: erstreckt sich über zwei Rasterzeilen (2x2-Feld). */
+.is-new-look .nl-home-bento > .nl-bento-tall { grid-row: span 2; }
+
+/* Sektions-Köpfe als volle Bento-Breite (rahmenlos, geben dem Raster
+   Rhythmus); erster Kopf ohne zusätzlichen Abstand. */
+.is-new-look .nl-home-bento > .nl-bento-head {
+  align-content: center;
+  min-height: 0;
+  margin-top: var(--nl-s2);
+}
+.is-new-look .nl-home-bento > .nl-bento-head:first-child {
+  margin-top: 0;
+}
+
+/* Hero-Kachel: dezenter, token-basierter Akzent-Verlauf in der Kopfzeile. */
+.is-new-look .nl-home-bento > .nl-bento-hero {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--nl-accent) 12%, transparent), transparent 55%),
+    var(--nl-panel);
+}
+
+/* Responsiver Zusammenbruch: mittlere Breiten → 6 Spalten, große →
+   volle Breite; darunter komplett einspaltig, Feature-Kachel normal. */
+@media (max-width: 1100px) {
+  .is-new-look .nl-home-bento > .nl-bento-span-3,
+  .is-new-look .nl-home-bento > .nl-bento-span-4,
+  .is-new-look .nl-home-bento > .nl-bento-span-5 { grid-column: span 6; }
+  .is-new-look .nl-home-bento > .nl-bento-span-6,
+  .is-new-look .nl-home-bento > .nl-bento-span-7,
+  .is-new-look .nl-home-bento > .nl-bento-span-8 { grid-column: 1 / -1; }
+  .is-new-look .nl-home-bento > .nl-bento-tall { grid-row: auto; }
+}
+@media (max-width: 720px) {
+  .is-new-look .nl-home-bento {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .is-new-look .nl-home-bento > [class*="nl-bento-span-"] {
+    grid-column: 1 / -1;
+  }
+  .is-new-look .nl-home-bento > .nl-bento-tall { grid-row: auto; }
 }
 
 /* ============================================================

@@ -8,6 +8,7 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import { formatScoutedImpactDelta } from "@/lib/market/transfermarkt-scouting";
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 import { NlAbilityStars, VeloPotentialStars, VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { NlEmptyState, StatChip, StatChipRow } from "@/components/foundation/new-look";
 
 type ScoutingReportPanelProps = {
   report: ScoutingReportData | null;
@@ -53,6 +54,16 @@ export default function ScoutingReportPanel({
   newLook = false,
 }: ScoutingReportPanelProps) {
   if (!report) {
+    if (newLook) {
+      return (
+        <NlEmptyState
+          icon="📋"
+          title="Kein Scouting-Ziel gewählt"
+          message="Sobald ein Spieler auf der Wishlist steht, erscheint hier sein Scouting Report."
+          data-testid="scouting-report-empty"
+        />
+      );
+    }
     return (
       <div className="scouting-report-empty" data-testid="scouting-report-empty">
         <p className="muted">
@@ -273,16 +284,23 @@ export default function ScoutingReportPanel({
 
         <article className="scouting-report-card">
           <span className="eyebrow">Markt</span>
-          <div className="scouting-report-market-row">
-            <div>
-              <span>Marktwert</span>
-              <strong>{formatTransfermarktCurrency(report.marketValue)}</strong>
+          {newLook ? (
+            <StatChipRow aria-label="Markt">
+              <StatChip label="Marktwert" value={formatTransfermarktCurrency(report.marketValue)} tone="accent" />
+              <StatChip label="Gehalt" value={formatTransfermarktCurrency(report.salary)} tone="neutral" />
+            </StatChipRow>
+          ) : (
+            <div className="scouting-report-market-row">
+              <div>
+                <span>Marktwert</span>
+                <strong>{formatTransfermarktCurrency(report.marketValue)}</strong>
+              </div>
+              <div>
+                <span>Gehaltsforderung</span>
+                <strong>{formatTransfermarktCurrency(report.salary)}</strong>
+              </div>
             </div>
-            <div>
-              <span>Gehaltsforderung</span>
-              <strong>{formatTransfermarktCurrency(report.salary)}</strong>
-            </div>
-          </div>
+          )}
         </article>
       </section>
     </div>

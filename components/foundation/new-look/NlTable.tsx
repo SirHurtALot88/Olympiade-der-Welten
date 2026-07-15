@@ -27,6 +27,12 @@ export type NlTableProps<Row> = {
   rows: Row[];
   /** React-Key je Zeile — ohne Angabe wird der Zeilenindex genutzt. */
   rowKey?: (row: Row, index: number) => string | number;
+  /**
+   * Optionale CSS-Klasse(n) je Zeile — für Zustands-Tints (z. B. aktive/
+   * ausgewählte/auslaufende Zeile), die das dünne Grundgerüst sonst nicht
+   * abbildet. Rückgabe `undefined`/leer = keine Zusatzklasse.
+   */
+  rowClassName?: (row: Row, index: number) => string | undefined;
   /** Zellinhalt je Zeile/Spalte. Ohne Angabe wird `row[column.key]` gelesen. */
   renderCell?: (row: Row, column: NlTableColumn<Row>) => ReactNode;
   sortState?: NlTableSortState | null;
@@ -69,6 +75,7 @@ export function NlTable<Row>({
   columns,
   rows,
   rowKey,
+  rowClassName,
   renderCell = defaultRenderCell,
   sortState,
   onSort,
@@ -134,8 +141,13 @@ export function NlTable<Row>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowKey ? rowKey(row, rowIndex) : rowIndex}>
+          {rows.map((row, rowIndex) => {
+            const rowExtra = rowClassName?.(row, rowIndex);
+            return (
+            <tr
+              key={rowKey ? rowKey(row, rowIndex) : rowIndex}
+              className={rowExtra || undefined}
+            >
               {columns.map((column) => (
                 <td
                   key={column.key}
@@ -145,7 +157,8 @@ export function NlTable<Row>({
                 </td>
               ))}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
