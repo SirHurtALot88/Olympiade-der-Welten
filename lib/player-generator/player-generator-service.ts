@@ -15,6 +15,7 @@ import type {
   PlayerGeneratorRandomness,
   PlayerGeneratorResolvedAxisIntent,
   PlayerGeneratorRoleIntent,
+  PlayerGeneratorSilhouette,
   PlayerGeneratorStrengthTier,
   PlayerGeneratorValidationStatus,
   Team,
@@ -110,6 +111,7 @@ const defaultInput: PlayerGeneratorInput = {
   },
   randomness: "medium",
   preferredArchetype: null,
+  silhouette: null,
   targetTeamId: null,
   contractMode: "balanced",
   raceHint: null,
@@ -132,6 +134,61 @@ const randomnessProfiles: Record<PlayerGeneratorRandomness, RandomnessProfile> =
   medium: { attributeJitter: 7, axisJitter: 5, shapeJitter: 5 },
   high: { attributeJitter: 13, axisJitter: 9, shapeJitter: 10 },
 };
+
+/**
+ * Peak-weighted CA weights over the DESCENDING-sorted axes — must match
+ * lib/scouting/current-ability-score.ts (CA_PEAK_WEIGHTS). Duplicated here as a
+ * local constant so the axis-silhouette solve can preserve CA analytically
+ * (CA(k·shares) = k·dot(weights, shares)) without importing the scorer's private
+ * constant.
+ */
+const CA_PEAK_WEIGHTS = [0.5, 0.27, 0.15, 0.08] as const;
+
+/**
+ * Silhouette-Shaping (Phase: "Go — geweitet").
+ *
+ * A silhouette redistributes the 4 axis TARGETS onto a descending-axis SHARE
+ * profile (peak = 1.0) while HOLDING the peak-weighted Current Ability constant
+ * — the comparison a user makes is about SHAPE, not power. `widen` grants spiky
+ * silhouettes a wider per-axis clamp band (peak up to max+15, trough down to
+ * min−12) so the spike is not crushed back to the tier band; round silhouettes
+ * stay inside the normal `[strength.min, strength.max]` band.
+ *
+ * Only active when `input.silhouette` is set — with it absent the generator's
+ * axis math is byte-for-byte the legacy path (see buildAxisTargets), so every
+ * existing draft/input is unaffected.
+ */
+type SilhouetteShape = { shares: readonly [number, number, number, number]; widen: boolean };
+const AXIS_CLAMP_WIDEN_UP = 15;
+const AXIS_CLAMP_WIDEN_DOWN = 12;
+
+const silhouetteShapes: Record<PlayerGeneratorSilhouette, SilhouetteShape> = {
+  allrounder: { shares: [1.0, 0.94, 0.89, 0.84], widen: false },
+  duo: { shares: [1.0, 0.9, 0.52, 0.48], widen: true },
+  specialist: { shares: [1.0, 0.52, 0.48, 0.45], widen: true },
+  rohdiamant: { shares: [1.0, 0.44, 0.4, 0.36], widen: true },
+};
+
+function resolveSilhouette(input: PlayerGeneratorInput): PlayerGeneratorSilhouette | null {
+  return input.silhouette ?? null;
+}
+
+/**
+ * Attribute-clamp ceiling/floor for the attribute pipeline. Widened only when a
+ * spiky silhouette is active, so the peak axis's underlying attributes can climb
+ * into the 90s (and thus feed disciplineRatings / potential with real spike)
+ * instead of being flattened to `strength.max`. Legacy path → tier band.
+ */
+function resolveAttrBand(input: PlayerGeneratorInput, strength: StrengthTierProfile) {
+  const silhouette = resolveSilhouette(input);
+  if (silhouette && silhouetteShapes[silhouette].widen) {
+    return {
+      min: Math.max(1, strength.min - AXIS_CLAMP_WIDEN_DOWN),
+      max: Math.min(99, strength.max + AXIS_CLAMP_WIDEN_UP),
+    };
+  }
+  return { min: strength.min, max: strength.max };
+}
 
 const attributeAxisBlend: Record<PlayerGeneratorAttributeKey, Record<PlayerGeneratorAxisKey, number>> = {
   power: { pow: 0.75, spe: 0.08, men: 0.05, soc: 0.12 },
@@ -515,44 +572,75 @@ function buildAxisTargets(
   const strength = strengthProfiles[input.strengthTier];
   const bias = archetypeConstraint?.axisBias;
 
-  return {
-    pow: clamp(
-      strength.center +
-        (resolvedAxisIntent.pow - 3) * 10 +
-        roleProfile.axisBias.pow +
-        (bias?.pow ?? 0) +
-        getRandomnessJitter(input.randomness, rng, "axisJitter"),
-      strength.min,
-      strength.max,
-    ),
-    spe: clamp(
-      strength.center +
-        (resolvedAxisIntent.spe - 3) * 10 +
-        roleProfile.axisBias.spe +
-        (bias?.spe ?? 0) +
-        getRandomnessJitter(input.randomness, rng, "axisJitter"),
-      strength.min,
-      strength.max,
-    ),
-    men: clamp(
-      strength.center +
-        (resolvedAxisIntent.men - 3) * 10 +
-        roleProfile.axisBias.men +
-        (bias?.men ?? 0) +
-        getRandomnessJitter(input.randomness, rng, "axisJitter"),
-      strength.min,
-      strength.max,
-    ),
-    soc: clamp(
-      strength.center +
-        (resolvedAxisIntent.soc - 3) * 10 +
-        roleProfile.axisBias.soc +
-        (bias?.soc ?? 0) +
-        getRandomnessJitter(input.randomness, rng, "axisJitter"),
-      strength.min,
-      strength.max,
-    ),
+  // Raw (unclamped) axis targets. Jitter is drawn in the fixed pow→spe→men→soc
+  // order below to keep the RNG stream identical to the legacy inline version,
+  // so the no-silhouette path stays byte-for-byte unchanged.
+  const raw: Record<PlayerGeneratorAxisKey, number> = {
+    pow:
+      strength.center + (resolvedAxisIntent.pow - 3) * 10 + roleProfile.axisBias.pow + (bias?.pow ?? 0) +
+      getRandomnessJitter(input.randomness, rng, "axisJitter"),
+    spe:
+      strength.center + (resolvedAxisIntent.spe - 3) * 10 + roleProfile.axisBias.spe + (bias?.spe ?? 0) +
+      getRandomnessJitter(input.randomness, rng, "axisJitter"),
+    men:
+      strength.center + (resolvedAxisIntent.men - 3) * 10 + roleProfile.axisBias.men + (bias?.men ?? 0) +
+      getRandomnessJitter(input.randomness, rng, "axisJitter"),
+    soc:
+      strength.center + (resolvedAxisIntent.soc - 3) * 10 + roleProfile.axisBias.soc + (bias?.soc ?? 0) +
+      getRandomnessJitter(input.randomness, rng, "axisJitter"),
   };
+
+  const silhouette = resolveSilhouette(input);
+  if (!silhouette) {
+    // Legacy behaviour: clamp each axis independently to the tier band. This is
+    // exactly the previous expression, so drafts without a silhouette are
+    // identical (values AND RNG consumption) to before.
+    return {
+      pow: clamp(raw.pow, strength.min, strength.max),
+      spe: clamp(raw.spe, strength.min, strength.max),
+      men: clamp(raw.men, strength.min, strength.max),
+      soc: clamp(raw.soc, strength.min, strength.max),
+    };
+  }
+
+  return applyAxisSilhouette(raw, strength, silhouette);
+}
+
+/**
+ * Reskaliert die 4 Achsen-Targets auf den Share-Vektor des Silhouetten-Archetyps,
+ * CA-erhaltend. Der Peak-Anteil landet auf der Achse, die Rolle/Intent ohnehin am
+ * höchsten gezogen haben (die Form kommt vom Archetyp, die Identität WELCHER Achse
+ * peakt aus Rolle/Intent). CA-Anker ist die CA der normal geklammerten Rohachsen,
+ * damit die mittlere CA gegenüber dem Alt-Verhalten unverändert bleibt.
+ */
+function applyAxisSilhouette(
+  raw: Record<PlayerGeneratorAxisKey, number>,
+  strength: StrengthTierProfile,
+  silhouette: PlayerGeneratorSilhouette,
+): Record<PlayerGeneratorAxisKey, number> {
+  const shape = silhouetteShapes[silhouette];
+  const axes: PlayerGeneratorAxisKey[] = ["pow", "spe", "men", "soc"];
+
+  // CA anchor: peak-weighted CA of the normally-clamped raw targets (the CA the
+  // tier/role/intent would otherwise have produced).
+  const normClamped = axes.map((axis) => clamp(raw[axis], strength.min, strength.max));
+  const sortedDesc = [...normClamped].sort((left, right) => right - left);
+  const currentCA = CA_PEAK_WEIGHTS.reduce((sum, weight, index) => sum + weight * sortedDesc[index]!, 0);
+  const shareDot = CA_PEAK_WEIGHTS.reduce((sum, weight, index) => sum + weight * shape.shares[index]!, 0);
+  const k = currentCA / shareDot;
+
+  // Rank axes by their raw pull (desc); stable tie-break on fixed axis order so
+  // the peak identity is deterministic.
+  const ranked = [...axes].sort((left, right) => raw[right] - raw[left] || axes.indexOf(left) - axes.indexOf(right));
+
+  const lo = shape.widen ? Math.max(1, strength.min - AXIS_CLAMP_WIDEN_DOWN) : strength.min;
+  const hi = shape.widen ? Math.min(99, strength.max + AXIS_CLAMP_WIDEN_UP) : strength.max;
+
+  const out = {} as Record<PlayerGeneratorAxisKey, number>;
+  ranked.forEach((axis, index) => {
+    out[axis] = clamp(k * shape.shares[index]!, lo, hi);
+  });
+  return out;
 }
 
 function applyStatSilhouette(
@@ -563,6 +651,10 @@ function applyStatSilhouette(
   rng: () => number,
 ) {
   const strength = strengthProfiles[input.strengthTier];
+  // Widened attribute ceiling when a spiky silhouette is active, so peak
+  // attributes can reach the 90s and propagate the spike into axes /
+  // disciplineRatings / potential. Legacy path → attrMax === strength.max.
+  const attrMax = resolveAttrBand(input, strength).max;
   const peakAttributes = getRolePeakAttributes(input, roleProfile);
   const weakAttributes = getRoleWeakAttributes(input, roleProfile);
   const peakBoost = input.roleIntent === "specialist" ? 13 : input.roleIntent === "chaos" ? 14 : input.roleIntent === "support" ? 9 : 10;
@@ -570,28 +662,28 @@ function applyStatSilhouette(
   const shapeBoost = randomnessProfiles[input.randomness].shapeJitter;
 
   for (const attribute of peakAttributes) {
-    attributes[attribute] = clamp(attributes[attribute] + peakBoost + Math.round(getRandomnessJitter(input.randomness, rng, "shapeJitter")), 1, strength.max);
+    attributes[attribute] = clamp(attributes[attribute] + peakBoost + Math.round(getRandomnessJitter(input.randomness, rng, "shapeJitter")), 1, attrMax);
   }
   for (const attribute of roleProfile.secondaryPeakAttributes) {
-    attributes[attribute] = clamp(attributes[attribute] + Math.round(peakBoost * 0.55), 1, strength.max);
+    attributes[attribute] = clamp(attributes[attribute] + Math.round(peakBoost * 0.55), 1, attrMax);
   }
   for (const attribute of weakAttributes) {
-    attributes[attribute] = clamp(attributes[attribute] - weakPenalty - Math.round(shapeBoost * 0.4), 1, strength.max);
+    attributes[attribute] = clamp(attributes[attribute] - weakPenalty - Math.round(shapeBoost * 0.4), 1, attrMax);
   }
 
   if (input.roleIntent === "chaos") {
     const chaosOrder = [...playerGeneratorAttributeKeys].sort(() => rng() - 0.5);
     chaosOrder.slice(0, 2).forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] + 12 + Math.round(rng() * 6), 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] + 12 + Math.round(rng() * 6), 1, attrMax);
     });
     chaosOrder.slice(-2).forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] - 12 - Math.round(rng() * 6), 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] - 12 - Math.round(rng() * 6), 1, attrMax);
     });
   }
 
   if (archetypeConstraint) {
     for (const [attribute, boost] of Object.entries(archetypeConstraint.attributeBias) as Array<[PlayerGeneratorAttributeName, number]>) {
-      attributes[attribute] = clamp(attributes[attribute] + boost, 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] + boost, 1, attrMax);
     }
   }
 
@@ -599,10 +691,10 @@ function applyStatSilhouette(
     const volatilityPeaks = peakAttributes.slice(0, 2);
     const volatilityWeaks = weakAttributes.slice(0, 2);
     volatilityPeaks.forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] + 4 + Math.round(rng() * 4), 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] + 4 + Math.round(rng() * 4), 1, attrMax);
     });
     volatilityWeaks.forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] - 4 - Math.round(rng() * 4), 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] - 4 - Math.round(rng() * 4), 1, attrMax);
     });
   }
 
@@ -615,8 +707,8 @@ function applyStatSilhouette(
   while (spread < threshold) {
     const highestPeak = peakAttributes[0] ?? roleProfile.peakAttributes[0] ?? "power";
     const lowestWeak = weakAttributes[0] ?? roleProfile.weakAttributes[0] ?? "charisma";
-    attributes[highestPeak] = clamp(attributes[highestPeak] + 3, 1, strength.max);
-    attributes[lowestWeak] = clamp(attributes[lowestWeak] - 3, 1, strength.max);
+    attributes[highestPeak] = clamp(attributes[highestPeak] + 3, 1, attrMax);
+    attributes[lowestWeak] = clamp(attributes[lowestWeak] - 3, 1, attrMax);
     values = getGeneratedAttributeValues();
     spread = Math.max(...values) - Math.min(...values);
   }
@@ -626,18 +718,18 @@ function applyStatSilhouette(
   const flatCount = values.filter((value) => Math.abs(value - center) <= band).length;
   if (flatCount > roleProfile.antiFlatLimit) {
     peakAttributes.slice(0, 2).forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] + 4, 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] + 4, 1, attrMax);
     });
     weakAttributes.slice(0, 2).forEach((attribute) => {
-      attributes[attribute] = clamp(attributes[attribute] - 4, 1, strength.max);
+      attributes[attribute] = clamp(attributes[attribute] - 4, 1, attrMax);
     });
   }
 
   if (input.roleIntent === "allround") {
     const primary = roleProfile.peakAttributes[0] ?? "power";
     const weak = roleProfile.weakAttributes[0] ?? "torment";
-    attributes[primary] = clamp(attributes[primary] + 3, 1, strength.max);
-    attributes[weak] = clamp(attributes[weak] - 2, 1, strength.max);
+    attributes[primary] = clamp(attributes[primary] + 3, 1, attrMax);
+    attributes[weak] = clamp(attributes[weak] - 2, 1, attrMax);
   }
 
   const recenter = () => average(getGeneratedAttributeValues());
@@ -645,7 +737,7 @@ function applyStatSilhouette(
     let center = recenter();
     targets.slice(0, count).forEach((attribute) => {
       if (attributes[attribute] < center + delta) {
-        attributes[attribute] = clamp(Math.round(center + delta), 1, strength.max);
+        attributes[attribute] = clamp(Math.round(center + delta), 1, attrMax);
         center = recenter();
       }
     });
@@ -654,7 +746,7 @@ function applyStatSilhouette(
     let center = recenter();
     targets.slice(0, count).forEach((attribute) => {
       if (attributes[attribute] > center - delta) {
-        attributes[attribute] = clamp(Math.round(center - delta), 1, strength.max);
+        attributes[attribute] = clamp(Math.round(center - delta), 1, attrMax);
         center = recenter();
       }
     });
@@ -685,8 +777,8 @@ function applyStatSilhouette(
   while (spread < minimumSpread) {
     const highestPeak = peakAttributes[0] ?? roleProfile.peakAttributes[0] ?? "power";
     const lowestWeak = weakAttributes[0] ?? roleProfile.weakAttributes[0] ?? "charisma";
-    attributes[highestPeak] = clamp(attributes[highestPeak] + 2, 1, strength.max);
-    attributes[lowestWeak] = clamp(attributes[lowestWeak] - 2, 1, strength.max);
+    attributes[highestPeak] = clamp(attributes[highestPeak] + 2, 1, attrMax);
+    attributes[lowestWeak] = clamp(attributes[lowestWeak] - 2, 1, attrMax);
     values = getGeneratedAttributeValues();
     spread = Math.max(...values) - Math.min(...values);
   }
@@ -700,14 +792,17 @@ function buildAttributeSheetStats(
   rng: () => number,
 ) {
   const strength = strengthProfiles[input.strengthTier];
+  // Widened band for spiky silhouettes (peak attributes into the 90s, trough
+  // attributes below the tier floor). Legacy path → the tier band unchanged.
+  const attrBand = resolveAttrBand(input, strength);
   const values = {} as PlayerGeneratorAttributes;
 
   for (const key of playerGeneratorAttributeKeys) {
     const blended = weightedAxisAverage(attributeAxisBlend[key], axisTargets);
     values[key] = clamp(
       Math.round(blended + getRandomnessJitter(input.randomness, rng, "attributeJitter")),
-      strength.min,
-      strength.max,
+      attrBand.min,
+      attrBand.max,
     );
   }
 

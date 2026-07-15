@@ -507,6 +507,15 @@ export type PlayerGeneratorArchetype =
   | "ninja"
   | "mercenary";
 
+/**
+ * Distribution "silhouette" for the generator's 4 axes (POW/SPE/MEN/SOC).
+ * Orthogonal to `roleIntent`/`preferredArchetype` (which decide flavour and
+ * WHICH axis peaks): a silhouette decides the SHAPE of the descending-axis
+ * distribution while the peak-weighted Current Ability is held constant.
+ * `null`/absent → no distribution shaping (legacy behaviour, unchanged).
+ */
+export type PlayerGeneratorSilhouette = "allrounder" | "duo" | "specialist" | "rohdiamant";
+
 export type PlayerGeneratorAxisIntentValue = 1 | 2 | 3 | 4 | 5 | null | "auto";
 
 export type PlayerGeneratorAxisIntent = {
@@ -536,6 +545,8 @@ export type PlayerGeneratorInput = {
   axisIntent: PlayerGeneratorAxisIntent;
   randomness: PlayerGeneratorRandomness;
   preferredArchetype?: PlayerGeneratorArchetype | null;
+  /** Optional axis-distribution silhouette; `null`/absent → no shaping. */
+  silhouette?: PlayerGeneratorSilhouette | null;
   targetTeamId?: string | null;
   contractMode?: "value" | "balanced" | "front_loaded" | "back_loaded" | "prove_it" | null;
   raceHint?: string | null;

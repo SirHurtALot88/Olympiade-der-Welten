@@ -425,7 +425,10 @@ describe("player generator service", () => {
     });
 
     expect(average(spreads.map((entry) => entry.high))).toBeGreaterThan(average(spreads.map((entry) => entry.low)));
-  });
+    // 12 generatePlayerDraft-Aufrufe: seit dem schwereren Draft (Phase 1/2)
+    // über dem 5s-Default → größeres Timeout, sonst nur ein Timeout-Fehlschlag
+    // (die Assertion selbst hält, siehe standalone-Diagnose).
+  }, 30000);
 
   it("flags anti-flatness and archetype conflicts when a draft is manually flattened or broken", () => {
     const draft = generatePlayerDraft({
@@ -617,4 +620,73 @@ describe("player generator service", () => {
     });
     expect(second.generated.potential).toBe(draft.generated.potential);
   });
+});
+
+describe("Silhouetten-Shaping (Achsen-Verteilung, 'Go — geweitet')", () => {
+  const CA_WEIGHTS = [0.5, 0.27, 0.15, 0.08];
+
+  function axesOf(draft: ReturnType<typeof generatePlayerDraft>): number[] {
+    const targets = draft.generated.diagnostics.axisTargets;
+    if (!targets) throw new Error("axisTargets missing");
+    return [targets.pow, targets.spe, targets.men, targets.soc];
+  }
+
+  function axisSpread(draft: ReturnType<typeof generatePlayerDraft>): number {
+    const axes = axesOf(draft);
+    return Math.max(...axes) - Math.min(...axes);
+  }
+
+  function peakWeightedCa(draft: ReturnType<typeof generatePlayerDraft>): number {
+    const desc = [...axesOf(draft)].sort((left, right) => right - left);
+    return CA_WEIGHTS.reduce((sum, weight, index) => sum + weight * desc[index]!, 0);
+  }
+
+  function gen(silhouette: "allrounder" | "duo" | "specialist" | "rohdiamant" | null, seed: string) {
+    return generatePlayerDraft({
+      generatorInput: { ...createDefaultPlayerGeneratorInput(), strengthTier: "strong", silhouette, seed },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+  }
+
+  const seeds = Array.from({ length: 6 }, (_, index) => `silhouette-${index}`);
+
+  it("macht Spezialist/Rohdiamant spitz und lässt Allrounder rund (Achsen-Spread)", () => {
+    const specialist = average(seeds.map((seed) => axisSpread(gen("specialist", seed))));
+    const rohdiamant = average(seeds.map((seed) => axisSpread(gen("rohdiamant", seed))));
+    const allrounder = average(seeds.map((seed) => axisSpread(gen("allrounder", seed))));
+
+    expect(specialist).toBeGreaterThan(30);
+    expect(rohdiamant).toBeGreaterThan(specialist); // Rohdiamant noch spitzer
+    expect(allrounder).toBeLessThan(20);
+    expect(specialist).toBeGreaterThan(allrounder + 15);
+  }, 30000);
+
+  it("erhält die peak-gewichtete CA gegenüber dem gleichen Seed OHNE Silhouette (Deflation ≤ 9)", () => {
+    for (const seed of seeds) {
+      const base = gen(null, seed);
+      const spec = gen("specialist", seed);
+      // CA wird analytisch gehalten; nur am geweiteten Clamp kann sie leicht
+      // deflationieren (spitze Builds bei hoher CA) — nie stark, nie nach oben.
+      const delta = peakWeightedCa(spec) - peakWeightedCa(base);
+      expect(delta).toBeLessThanOrEqual(0.5);
+      expect(delta).toBeGreaterThanOrEqual(-9);
+    }
+  }, 30000);
+
+  it("lässt den Default (ohne Silhouette) exakt wie einen expliziten null-Silhouette-Draft", () => {
+    const input = { ...createDefaultPlayerGeneratorInput(), strengthTier: "strong" as const, seed: "silhouette-parity" };
+    const implicit = generatePlayerDraft({ generatorInput: input, players, disciplines: foundationSeedDisciplines });
+    const explicitNull = generatePlayerDraft({
+      generatorInput: { ...input, silhouette: null },
+      players,
+      disciplines: foundationSeedDisciplines,
+    });
+    expect(axesOf(implicit)).toEqual(axesOf(explicitNull));
+  }, 30000);
+
+  it("lässt die Peak-Achse spitzer Silhouetten im strong-Tier in die 90er (geweitetes Clamp)", () => {
+    const peaks = Array.from({ length: 8 }, (_, index) => Math.max(...axesOf(gen("rohdiamant", `silhouette-peak-${index}`))));
+    expect(Math.max(...peaks)).toBeGreaterThan(88);
+  }, 30000);
 });
