@@ -3,7 +3,7 @@ import type { GameState, PlayerProgressionSpendEventRecord } from "@/lib/data/ol
 /** Liga-Δ Ø pro Spieler: min −0.4 (max. Regression), max +0.4 (max. Wachstum). */
 export const ORGANIC_LEAGUE_NET_AVG_MIN = -0.4;
 export const ORGANIC_LEAGUE_NET_AVG_MAX = 0.4;
-export const ORGANIC_PEAK_NET_MIN = 4.5;
+export const ORGANIC_PEAK_NET_MIN = 5;
 export const ORGANIC_PEAK_NET_MAX = 8;
 
 export type SeasonOrganicProgressionMetrics = {

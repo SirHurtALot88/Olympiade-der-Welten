@@ -57,7 +57,7 @@ describe("long-run organic progression audit", () => {
 
   it("computes training scale factor toward peak corridor midpoint", () => {
     expect(computeOrganicTrainingScaleFactor(4.4)).toBeGreaterThan(1);
-    expect(computeOrganicTrainingScaleFactor(6.25)).toBe(1);
+    expect(computeOrganicTrainingScaleFactor(6.5)).toBe(1);
     expect(computeOrganicTrainingScaleFactor(10)).toBeLessThan(1);
   });
 
