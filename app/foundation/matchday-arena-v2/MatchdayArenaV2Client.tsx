@@ -52,7 +52,7 @@ import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-c
 import { normalizeRoomArenaState } from "@/lib/room/arena-sync-state";
 import { getClientSocket } from "@/lib/socket/client";
 import type { RoomJoinedPayload } from "@/types/events";
-import type { CoachRole, OlyRoomState, RoomArenaState } from "@/types/game";
+import type { CoachRole, OlyRoomState, RoomArenaState, RoomParticipant } from "@/types/game";
 import {
   buildMatchdayArenaBaseSessionKey,
   buildMatchdayArenaResolveSessionKey,
@@ -903,6 +903,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const [speed, setSpeed] = useState<ArenaPhaseControlSpeed>(1);
   const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
   const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
+  const [roomSyncParticipants, setRoomSyncParticipants] = useState<RoomParticipant[]>([]);
   const lastAppliedRoomArenaVersionRef = useRef<number | null>(null);
   const requestSequenceRef = useRef(0);
   const baseRequestAbortRef = useRef<AbortController | null>(null);
@@ -1477,7 +1478,29 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
   const isRoomHost = roomSyncRole === "A";
   const isRoomRevealSyncActive = Boolean(props.roomContext);
-  const canControlArenaReveal = !isRoomRevealSyncActive || isRoomHost;
+  // Co-op means the arena sync currently requires more than one connected human
+  // participant (host + guest both control at least one team). A room where only the
+  // host is present (solo-in-room) must keep behaving exactly like before: no ready
+  // gate, the reveal auto-starts. Only true co-op gets the "both ready" gate below.
+  const arenaRequiredParticipantIds = roomArenaSyncState?.requiredParticipantIds ?? [];
+  const arenaReadyParticipantIds = roomArenaSyncState?.readyParticipantIds ?? [];
+  const isRoomArenaCoop = isRoomRevealSyncActive && arenaRequiredParticipantIds.length > 1;
+  const arenaCoopReadyGateActive = isRoomArenaCoop && (roomArenaSyncState?.status ?? "idle") === "ready_check";
+  const selfArenaParticipantId = props.roomContext?.participantId ?? null;
+  const isSelfArenaReady = Boolean(
+    selfArenaParticipantId && arenaReadyParticipantIds.includes(selfArenaParticipantId),
+  );
+  const arenaCoopGateParticipants = arenaRequiredParticipantIds
+    .map((participantId) => roomSyncParticipants.find((participant) => participant.participantId === participantId) ?? null)
+    .filter((participant): participant is RoomParticipant => Boolean(participant));
+  const arenaCoopWaitingNames = arenaCoopGateParticipants
+    .filter(
+      (participant) =>
+        participant.participantId !== selfArenaParticipantId &&
+        !arenaReadyParticipantIds.includes(participant.participantId),
+    )
+    .map((participant) => participant.displayName);
+  const canControlArenaReveal = (!isRoomRevealSyncActive || isRoomHost) && !arenaCoopReadyGateActive;
   const roomRevealWaitingForHost =
     isRoomRevealSyncActive && !isRoomHost && (roomArenaSyncState?.status ?? "idle") === "idle";
 
@@ -1512,6 +1535,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     if (!props.roomContext) {
       setRoomSyncRole(null);
       setRoomArenaSyncState(null);
+      setRoomSyncParticipants([]);
       lastAppliedRoomArenaVersionRef.current = null;
       return undefined;
     }
@@ -1528,6 +1552,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       }
       setRoomSyncRole(payload.role);
       setRoomArenaSyncState(payload.state.arenaSyncState ?? null);
+      setRoomSyncParticipants(payload.state.roomParticipants ?? []);
       applyRoomArenaSync(payload.state.arenaSyncState);
     }
 
@@ -1536,6 +1561,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         return;
       }
       setRoomArenaSyncState(nextState.arenaSyncState ?? null);
+      setRoomSyncParticipants(nextState.roomParticipants ?? []);
       applyRoomArenaSync(nextState.arenaSyncState);
     }
 
@@ -1858,7 +1884,25 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         d1: maxD1SlotRevealCount,
         d2: maxD2SlotRevealCount,
       },
-      force: true,
+      // Real co-op (>1 human participant) must respect the server's both-ready gate,
+      // so the default advance no longer force-bypasses it. A room with only the host
+      // present (solo-in-room) keeps the previous unconditional force:true behavior —
+      // there is nobody else to wait for and the ready gate never engages for it.
+      force: !isRoomArenaCoop,
+    });
+  }
+
+  function emitArenaCoopReadyToggle() {
+    const roomContext = props.roomContext;
+    if (!roomContext) {
+      return;
+    }
+
+    const socket = getClientSocket();
+    socket.emit("setRoomArenaReady", {
+      roomCode: roomContext.roomCode,
+      seatToken: roomContext.seatToken,
+      ready: !isSelfArenaReady,
     });
   }
 
@@ -3016,6 +3060,54 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             </>
           )}
         </div>
+      ) : null}
+      {arenaCoopReadyGateActive ? (
+        <section
+          className="panel arena-v2-coop-ready-gate"
+          data-testid="arena-coop-ready-gate"
+          aria-live="polite"
+        >
+          <div className="panel-header">
+            <div>
+              <h2>Bereit für den Spieltag</h2>
+              <p className="muted">
+                Der gemeinsame Reveal startet erst, wenn beide Coaches bereit sind.
+              </p>
+            </div>
+            <span className={`pill${isSelfArenaReady ? " is-ready" : " is-warning"}`}>
+              {isSelfArenaReady ? "Du bist bereit" : "Noch nicht bereit"}
+            </span>
+          </div>
+          <div className="stack">
+            <div className="room-meta">
+              {arenaCoopGateParticipants.map((participant) => {
+                const ready = arenaReadyParticipantIds.includes(participant.participantId);
+                return (
+                  <span
+                    key={`arena-coop-ready-${participant.participantId}`}
+                    className={`pill${ready ? " is-ready" : " is-warning"}`}
+                  >
+                    {participant.displayName}: {ready ? "bereit" : "wartet"}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="foundation-flow-actions">
+              <button
+                className="primary-button inline-button"
+                type="button"
+                onClick={emitArenaCoopReadyToggle}
+              >
+                {isSelfArenaReady ? "Bereit zurücknehmen" : "Bereit für den Spieltag"}
+              </button>
+            </div>
+            {isSelfArenaReady && arenaCoopWaitingNames.length > 0 ? (
+              <p className="arena-v2-control-hint">
+                Warte auf {arenaCoopWaitingNames.join(", ")} …
+              </p>
+            ) : null}
+          </div>
+        </section>
       ) : null}
       <section className="panel arena-v2-hero">
         <div className="arena-v2-hero-main">
