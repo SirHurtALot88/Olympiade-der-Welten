@@ -975,8 +975,16 @@ export function useFoundationShellRouterBodyScope({
   initialSaveId,
   initialView,
   initialPersistenceState,
+  initialActiveOwnerId,
 }: FoundationPageClientProps): FoundationShellRouterBodyProps {
-  const foundationPageState = useFoundationPageState({ initialReadSource, initialSelectedTeamId, initialSaveId, initialView, initialPersistenceState });
+  const foundationPageState = useFoundationPageState({
+    initialReadSource,
+    initialSelectedTeamId,
+    initialSaveId,
+    initialView,
+    initialPersistenceState,
+    initialActiveOwnerId,
+  });
   const {
     initialPersistedSave, initialClientGameState, initialOwnershipDraft, gameStateRef, commandSearchInputRef, marketValueFilterManualRef, marketCashLimitTeamRef, aiPreseasonRunStartedRef, seasonBriefingAutoOpenedRef, seasonBriefingDismissedRef,
     aiLineupEnsureRunStartedRef, pendingTeamActivationRef, seasonOverviewScopeRef, gameState, setGameState, teamIdentityDraft, setTeamIdentityDraft, teamControlDraft, setTeamControlDraft, gameModeOwnershipChrisIds,
@@ -1416,6 +1424,7 @@ export function useFoundationShellRouterBodyScope({
     foundationViewTransitionUntilRef,
     autoPersistPausedRef,
     autoPersistUnpauseTimeoutRef,
+    autoPersistInFlightRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
   } = useFoundationPersistenceActions({
@@ -1614,6 +1623,7 @@ export function useFoundationShellRouterBodyScope({
     seasonFeedReloadersRef,
     autoPersistPausedRef,
     autoPersistUnpauseTimeoutRef,
+    autoPersistInFlightRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
     foundationViewTransitionUntilRef,
@@ -2064,9 +2074,120 @@ export function useFoundationShellRouterBodyScope({
     setActiveManagerTeam(nextTeamId, "manual_select");
   }
 
+  /**
+   * Room-safe path for "Lokal speichern" while an Online-Room is active: the generic whole-state
+   * PUT (`/api/singleplayer-state`) is blocked with 409 `room_save_generic_write_forbidden` for
+   * room saves, so this sends only the per-team identity/control-settings diffs through the new
+   * scoped, room-guarded endpoints (`/api/team-settings/identity`, `/api/team-settings/control`)
+   * instead of one combined whole-save write. Game-mode ownership reassignment (moving a team
+   * between Chris/Franky) and team-strategy-profile edits made on this same screen are NOT sent
+   * while in a Room — those remain a solo/setup-time action for now (see Phase 2 co-op report).
+   */
+  async function saveTeamSettingsInRoom() {
+    const strategyChanged = gameState.teams.some(
+      (team) =>
+        JSON.stringify(teamStrategyDraft[team.teamId] ?? null) !==
+        JSON.stringify(resolvedTeamStrategyProfiles[team.teamId] ?? null),
+    );
+    if (gameModeOwnershipDraftChanged || strategyChanged) {
+      setTeamControlMessage(
+        "Spielmodus-/Team-Zuordnung und Strategy-Profile können in einem laufenden Online-Room aktuell nicht gespeichert werden. Bitte nur Identity- und Admin-Settings speichern oder außerhalb des Rooms anpassen.",
+      );
+      return;
+    }
+
+    const changedTeamIds = new Set<string>();
+    for (const team of gameState.teams) {
+      const currentIdentity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+      if (JSON.stringify(teamIdentityDraft[team.teamId] ?? null) !== JSON.stringify(currentIdentity)) {
+        changedTeamIds.add(team.teamId);
+      }
+      const currentControl = resolvedTeamControlSettings[team.teamId] ?? null;
+      if (JSON.stringify(teamControlDraft[team.teamId] ?? null) !== JSON.stringify(currentControl)) {
+        changedTeamIds.add(team.teamId);
+      }
+    }
+
+    if (changedTeamIds.size === 0) {
+      setTeamIdentityMessage("Keine Änderungen zum Speichern.");
+      setTeamControlMessage("Keine Änderungen zum Speichern.");
+      return;
+    }
+
+    setIsSaveBusy(true);
+    try {
+      for (const teamId of changedTeamIds) {
+        const draftIdentity = teamIdentityDraft[teamId];
+        if (draftIdentity) {
+          const response = await fetch("/api/team-settings/identity", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(withRoomBody({ saveId: activeSaveId, teamId, identity: draftIdentity })),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (await handleStaleRoomSaveWrite(payload)) {
+            return;
+          }
+          if (!response.ok || !payload.success) {
+            setTeamIdentityMessage(payload.error ?? "Team-Identity konnte nicht gespeichert werden.");
+            return;
+          }
+        }
+
+        const draftControl = teamControlDraft[teamId];
+        if (draftControl) {
+          const response = await fetch("/api/team-settings/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              withRoomBody({
+                saveId: activeSaveId,
+                teamId,
+                control: {
+                  notes: draftControl.notes,
+                  strategyLock: draftControl.strategyLock,
+                  displayLabel: draftControl.displayLabel,
+                  aiLineupPreviewEnabled: draftControl.aiLineupPreviewEnabled,
+                  aiLineupApplyEnabled: draftControl.aiLineupApplyEnabled,
+                  aiLineupAutoApplyEnabled: draftControl.aiLineupAutoApplyEnabled,
+                  aiTransferPreviewEnabled: draftControl.aiTransferPreviewEnabled,
+                  aiTransferAutoApplyEnabled: draftControl.aiTransferAutoApplyEnabled,
+                  aiSellPreviewEnabled: draftControl.aiSellPreviewEnabled,
+                  aiSellAutoApplyEnabled: draftControl.aiSellAutoApplyEnabled,
+                },
+              }),
+            ),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (await handleStaleRoomSaveWrite(payload)) {
+            return;
+          }
+          if (!response.ok || !payload.success) {
+            setTeamControlMessage(payload.error ?? "Team-Admin-Settings konnten nicht gespeichert werden.");
+            return;
+          }
+        }
+      }
+
+      setTeamIdentityMessage("Team-Identitäten wurden gespeichert.");
+      setTeamControlMessage("Team-Admin-Settings wurden gespeichert.");
+      await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Team-Settings konnten nicht gespeichert werden.";
+      setTeamControlMessage(message);
+    } finally {
+      setIsSaveBusy(false);
+    }
+  }
+
   async function saveTeamSettings() {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
+      return;
+    }
+
+    if (roomContext) {
+      await saveTeamSettingsInRoom();
       return;
     }
 

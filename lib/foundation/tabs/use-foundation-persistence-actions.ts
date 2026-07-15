@@ -841,6 +841,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     foundationViewTransitionUntilRef,
     autoPersistPausedRef,
     autoPersistUnpauseTimeoutRef,
+    autoPersistInFlightRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
   };

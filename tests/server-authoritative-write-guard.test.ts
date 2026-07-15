@@ -284,4 +284,71 @@ describe("server-authoritative room write guard", () => {
       }).allowed,
     ).toBe(true);
   });
+
+  it("scopes team-settings writes (identity/control) to the owning participant only", () => {
+    const created = createRoom("guard-team-settings-a", {
+      displayName: "Chris",
+      saveId: "team-settings-guard-save",
+      preset: "chris_4_franky_4_rest_ai",
+    });
+    const joined = joinRoom(created.room.roomCode, "guard-team-settings-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const chris = joined.room.state.roomParticipants.find((participant) => participant.displayName === "Chris");
+    const franky = joined.room.state.roomParticipants.find((participant) => participant.displayName === "Franky");
+    expect(chris).toBeTruthy();
+    expect(franky).toBeTruthy();
+    if (!chris || !franky) return;
+
+    // Chris owns P-S under the chris_4_franky_4_rest_ai preset — his own team-identity/control
+    // writes are allowed.
+    for (const action of ["team_identity_update", "team_control_update"] as const) {
+      expect(
+        authorizeServerRoomWrite({
+          roomCode: created.room.roomCode,
+          participantId: chris.participantId,
+          userId: chris.userId,
+          saveId: "team-settings-guard-save",
+          teamId: "P-S",
+          action,
+          source: "sqlite",
+          dryRun: false,
+        }).allowed,
+      ).toBe(true);
+    }
+
+    // Franky owns M-S, not P-S — writing P-S's identity/control must be denied even though he
+    // is a valid, online room participant.
+    for (const action of ["team_identity_update", "team_control_update"] as const) {
+      expect(
+        authorizeServerRoomWrite({
+          roomCode: created.room.roomCode,
+          participantId: franky.participantId,
+          userId: franky.userId,
+          saveId: "team-settings-guard-save",
+          teamId: "P-S",
+          action,
+          source: "sqlite",
+          dryRun: false,
+        }),
+      ).toMatchObject({ allowed: false, status: 403 });
+    }
+
+    // Franky writing his own team (M-S) is allowed.
+    for (const action of ["team_identity_update", "team_control_update"] as const) {
+      expect(
+        authorizeServerRoomWrite({
+          roomCode: created.room.roomCode,
+          participantId: franky.participantId,
+          userId: franky.userId,
+          saveId: "team-settings-guard-save",
+          teamId: "M-S",
+          action,
+          source: "sqlite",
+          dryRun: false,
+        }).allowed,
+      ).toBe(true);
+    }
+  });
 });

@@ -323,6 +323,7 @@ export function useFoundationPageState({
   initialSaveId,
   initialView,
   initialPersistenceState,
+  initialActiveOwnerId,
 }: FoundationPageClientProps) {
   const initialPersistedSave = initialPersistenceState?.save?.gameState ? initialPersistenceState.save : null;
   const initialClientGameState = withNormalizedLocalTeamSettings(initialPersistedSave?.gameState ?? initialGameState);
@@ -378,7 +379,12 @@ export function useFoundationPageState({
   const [activeManagerTeamSource, setActiveManagerTeamSource] = useState<ActiveManagerTeamSource>(() =>
     resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId) ? "route" : "default_human_team",
   );
-  const [activeOwnerId, setActiveOwnerId] = useState<string>(() => readStoredFoundationActiveOwnerId());
+  const [activeOwnerId, setActiveOwnerId] = useState<string>(
+    // Wenn Phase-1-Login aktiv ist und eine Session vorliegt, gewinnt die echte
+    // Identitaet immer gegenueber dem (moeglicherweise veralteten) lokalStorage-
+    // Wert - das ist der eigentliche Fix fuer den "Franky sieht Chris' Teams"-Bug.
+    () => initialActiveOwnerId || readStoredFoundationActiveOwnerId(),
+  );
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<FoundationView>(
