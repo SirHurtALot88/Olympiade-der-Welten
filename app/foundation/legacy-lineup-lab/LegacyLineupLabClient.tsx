@@ -2692,6 +2692,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       })),
     [context?.formCards, plannedFormCardIds],
   );
+  const formCardCounts = useMemo(() => {
+    const cards = context?.formCards ?? [];
+    return {
+      positiveAvailable: cards.filter((card) => card.value > 0 && !card.isUsed).length,
+      negativeAvailable: cards.filter((card) => card.value < 0 && !card.isUsed).length,
+    };
+  }, [context?.formCards]);
   const teamLogoUrl = useMemo(
     () =>
       context?.team
@@ -7867,6 +7874,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               draftIntensityPreview={draftIntensityPreview}
               formPlanOpenCells={formPlanOpenCells}
               formDeckCards={formDeckCards}
+              formCardCounts={formCardCounts}
               activeFormPickCell={activeFormPickCell}
               formCardPlanByKey={formCardPlanByKey}
               formCardPlanPendingKey={formCardPlanPendingKey}
