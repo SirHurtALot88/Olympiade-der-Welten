@@ -339,6 +339,18 @@ function sideTeamPowerPriority(input: {
   return competitivenessRank * 3 + Math.min(input.rivalryCount, 2);
 }
 
+// Use-it-or-lose-it target: the AI aims to spend at least this fraction of a team's
+// active team-power charges over the season, so powers don't rot unused. Tunable/reversible
+// via OLY_TEAM_POWER_TARGET_USAGE (0..1); default 0.85 leaves margin above the 80% floor.
+const TEAM_POWER_TARGET_SEASON_USAGE = (() => {
+  const raw = Number(process.env.OLY_TEAM_POWER_TARGET_USAGE ?? 0.85);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.85;
+})();
+
+// Fraction of the season before which no use-it-or-lose-it pressure applies, so early matchdays
+// keep opportunistic/tactical deployment and forced spend concentrates in the back half.
+const TEAM_POWER_PACE_START_FRACTION = 0.5;
+
 function planTeamPowerSidesForMatchday(input: {
   sidePlans: Array<{
     side: "d1" | "d2";
@@ -346,27 +358,56 @@ function planTeamPowerSidesForMatchday(input: {
     rivalryCount: number;
   }>;
   remainingCharges: number;
+  seasonTotalCharges: number;
   remainingMatchdaysIncludingCurrent: number;
+  totalMatchdays: number;
   matchdayIndex: number;
-}) {
+}): { plannedSides: Set<"d1" | "d2">; forcedSides: Set<"d1" | "d2"> } {
   const plannedSides = new Set<"d1" | "d2">();
+  const forcedSides = new Set<"d1" | "d2">();
   if (input.remainingCharges <= 0 || input.sidePlans.length === 0) {
-    return plannedSides;
+    return { plannedSides, forcedSides };
   }
 
   const remainingSlots = input.remainingMatchdaysIncludingCurrent * 2;
   const slack = remainingSlots - input.remainingCharges;
-  const totalMatchdays = Math.max(1, Math.ceil(remainingSlots / 2));
+  const totalMatchdays = Math.max(1, input.totalMatchdays);
   const lateSeason = input.matchdayIndex >= Math.ceil(totalMatchdays * 0.7);
 
-  let targetUses = 0;
+  // --- Opportunistic uses (original behaviour): arm sides when the matchup warrants it. ---
+  let opportunisticUses = 0;
   if (slack < 0) {
-    targetUses = Math.min(2, Math.max(1, input.remainingCharges - Math.max(0, remainingSlots - 2)));
+    opportunisticUses = Math.min(2, Math.max(1, input.remainingCharges - Math.max(0, remainingSlots - 2)));
   } else if (slack <= 1) {
-    targetUses = 1;
+    opportunisticUses = 1;
   } else if (lateSeason && slack <= 3) {
-    targetUses = 1;
+    opportunisticUses = 1;
   }
+
+  // --- Use-it-or-lose-it pressure: keep cumulative spend on an 85% pace and guarantee the
+  // target is reached before the season ends, so charges are not left unspent. The pace is
+  // back-loaded (no pressure in the first half) so early matchdays keep their tactical/conserve
+  // feel; the concentration of forced spend lands in the back half plus the end-of-season floor. ---
+  const targetTotalToSpend = Math.ceil(input.seasonTotalCharges * TEAM_POWER_TARGET_SEASON_USAGE);
+  const chargesSpent = Math.max(0, input.seasonTotalCharges - input.remainingCharges);
+  const paceProgress = Math.max(
+    0,
+    (input.matchdayIndex / totalMatchdays - TEAM_POWER_PACE_START_FRACTION) /
+      (1 - TEAM_POWER_PACE_START_FRACTION),
+  );
+  const paceTargetByNow = Math.ceil(targetTotalToSpend * Math.min(1, paceProgress));
+  const paceDeficit = Math.max(0, paceTargetByNow - chargesSpent);
+  const remainingMatchdaysAfterThis = Math.max(0, input.remainingMatchdaysIncludingCurrent - 1);
+  const mustStillSpend = Math.max(0, targetTotalToSpend - chargesSpent);
+  // How much MUST land this matchday so the rest can still fit in the remaining slots (2/matchday).
+  const endGameForce = Math.max(0, mustStillSpend - remainingMatchdaysAfterThis * 2);
+  const pressureUses = Math.min(2, Math.max(paceDeficit, endGameForce));
+
+  const targetUses = Math.min(
+    input.sidePlans.length,
+    input.remainingCharges,
+    Math.max(opportunisticUses, pressureUses),
+  );
 
   const orderedSides = [...input.sidePlans].sort(
     (left, right) =>
@@ -384,20 +425,33 @@ function planTeamPowerSidesForMatchday(input: {
     ) {
       plannedSides.add(bestSide.side);
     }
-    return plannedSides;
+    return { plannedSides, forcedSides };
   }
 
   for (const side of orderedSides) {
     if (plannedSides.size >= targetUses) {
       break;
     }
-    if (side.competitiveness === "weak" && !lateSeason && slack > 0) {
+    // Sides beyond the opportunistic quota are pressure-driven: mark them "forced" so the
+    // selector relaxes its score cutoff / eligibility and even low-competitiveness teams deploy.
+    const isPressureDriven = plannedSides.size >= opportunisticUses;
+    if (side.competitiveness === "weak" && !lateSeason && slack > 0 && !isPressureDriven) {
       continue;
     }
     plannedSides.add(side.side);
+    if (isPressureDriven) {
+      forcedSides.add(side.side);
+    }
   }
 
-  return plannedSides;
+  // If the weak-side guard skipped everything but pressure still demands a deployment, force the
+  // top-priority side anyway — this is what makes teams that otherwise never fire hit the target.
+  if (plannedSides.size === 0 && pressureUses > 0 && orderedSides[0]) {
+    plannedSides.add(orderedSides[0].side);
+    forcedSides.add(orderedSides[0].side);
+  }
+
+  return { plannedSides, forcedSides };
 }
 
 function powerAllowedForSide(input: {
@@ -448,10 +502,14 @@ function selectBestTeamPowerForSide(input: {
   competitiveness: DisciplineSideCompetitiveness;
   rivalryCount: number;
   lateSeason: boolean;
+  forced: boolean;
 }) {
   const candidates = (input.context.teamPowers ?? []).filter((power) => {
     if (input.usedPowerIds.has(power.id)) return false;
     if (power.isUsedUp || power.chargesRemaining <= 0) return false;
+    // Pressure-driven ("forced") deployments ignore the eligibility gate so a team that would
+    // otherwise never clear it still spends its charge before the season ends.
+    if (input.forced) return true;
     return powerAllowedForSide({
       power,
       competitiveness: input.competitiveness,
@@ -534,7 +592,9 @@ function selectBestTeamPowerForSide(input: {
     });
 
   const best = ranked[0] ?? null;
-  if (!best || best.score < 5.5) {
+  // Forced deployments take the best available power regardless of the score cutoff, since the
+  // alternative is wasting the charge entirely.
+  if (!best || (!input.forced && best.score < 5.5)) {
     return null;
   }
   return best.power;
@@ -550,6 +610,9 @@ function applyAiTeamPowers(
   if (remainingCharges <= 0) {
     return;
   }
+  const seasonTotalCharges = teamPowers
+    .filter((power) => power.selectedForSeason && power.chargesTotal > 0)
+    .reduce((sum, power) => sum + power.chargesTotal, 0);
 
   const totalSeasonSides = context.matchdayContract?.totalDisciplineSidesInSeason ?? 20;
   const totalMatchdays = Math.max(1, Math.ceil(totalSeasonSides / 2));
@@ -584,14 +647,16 @@ function applyAiTeamPowers(
     },
   ];
 
-  const plannedSides = planTeamPowerSidesForMatchday({
+  const { plannedSides, forcedSides } = planTeamPowerSidesForMatchday({
     sidePlans: sidePlans.map((side) => ({
       side: side.side,
       competitiveness: side.competitiveness,
       rivalryCount: side.rivalryCount,
     })),
     remainingCharges,
+    seasonTotalCharges,
     remainingMatchdaysIncludingCurrent,
+    totalMatchdays,
     matchdayIndex,
   });
 
@@ -610,6 +675,7 @@ function applyAiTeamPowers(
       competitiveness: side.competitiveness,
       rivalryCount: side.rivalryCount,
       lateSeason,
+      forced: forcedSides.has(side.side),
     });
     if (!selected) continue;
     modifiers[side.side].teamPowerId = selected.id;
