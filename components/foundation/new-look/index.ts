@@ -14,6 +14,11 @@
  * - NlProgressBar: beschriftete Fortschritts-/Wear-Bar mit Schwellen-Ton
  * - NlGauge: kleines Bogen-Gauge (CA→PO, Kommerz-Rating, …)
  * - NlSparkline / NlBarChart / NlRadar: handgerollte SVG-Chart-Primitives
+ *   (NlRadar: klassischer POW/SPE/MEN/SOC-Modus ODER generischer Modus mit
+ *   beliebigen Achsen `axisDefs` + mehreren überlagerten Serien `series`)
+ * - NlEmptyState: token-korrekter Leerzustand (icon/title/message/action/tone)
+ * - NlTable: dünne Tabellen-Grundlage (Spalten/Zeilen, sortierbare Köpfe,
+ *   sticky Kopf, Zebra/Hover, `nl-tnum`-Zahlen)
  * - NlMedalBadge: Gold/Silber/Bronze-Abzeichen
  * - NlRankingDrawer: leichtes Rangliste-Panel (#37) — öffnet sich beim Klick
  *   auf einen KPI-Chip (OVR/PPs/MVS/Punkte/MW/…) statt einer vollen
@@ -48,7 +53,22 @@ export {
   type NlFieldRaceFormStripProps,
 } from "@/components/foundation/new-look/NlFieldRaceFormStrip";
 export { NlBarChart, type NlBarChartProps, type NlBarChartBar } from "@/components/foundation/new-look/NlBarChart";
-export { NlRadar, type NlRadarProps, type NlRadarAxis } from "@/components/foundation/new-look/NlRadar";
+export {
+  NlRadar,
+  type NlRadarProps,
+  type NlRadarAxis,
+  type NlRadarAxisDef,
+  type NlRadarSeries,
+} from "@/components/foundation/new-look/NlRadar";
+export { NlEmptyState, type NlEmptyStateProps, type NlEmptyStateAction } from "@/components/foundation/new-look/NlEmptyState";
+export {
+  NlTable,
+  type NlTableProps,
+  type NlTableColumn,
+  type NlTableAlign,
+  type NlTableSortState,
+  type NlTableSortDirection,
+} from "@/components/foundation/new-look/NlTable";
 export { NlMedalBadge, type NlMedalBadgeProps, type NlMedalKind } from "@/components/foundation/new-look/NlMedalBadge";
 export {
   NlRankingDrawer,

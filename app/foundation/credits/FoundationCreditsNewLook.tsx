@@ -4,7 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { EmptyState } from "@/components/foundation/EmptyState";
-import { NL_TONE_VAR, NlCard, StatChip, formatNlMoney, type NlTone } from "@/components/foundation/new-look";
+import {
+  NL_TONE_VAR,
+  NlCard,
+  NlEmptyState,
+  NlTable,
+  StatChip,
+  formatNlMoney,
+  type NlTableColumn,
+  type NlTone,
+} from "@/components/foundation/new-look";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { buildLoanOffers, computeLoanTerms, type LoanOffer } from "@/lib/finance/loan-service";
@@ -40,6 +49,50 @@ function formatRateRange(minRate: number, maxRate: number): string {
   const low = Math.min(minRate, maxRate);
   const high = Math.max(minRate, maxRate);
   return `${formatRate(low)} – ${formatRate(high)}`;
+}
+
+/** Eine Zeile der Aktive-Kredite-Tabelle — `index` wird für das "Kredit N"-Label gebraucht. */
+type NlCreditsLoanRow = { loan: ActiveLoan; index: number };
+
+/** Spaltenkatalog der Aktive-Kredite-Tabelle (`NlTable`-Migrationsbeleg, siehe FOUNDATION-Audit). */
+const NL_CREDITS_LOAN_COLUMNS: NlTableColumn<NlCreditsLoanRow>[] = [
+  { key: "kredit", label: "Kredit" },
+  { key: "lender", label: "Verleiher" },
+  { key: "principal", label: "Aufgenommen", align: "right" },
+  { key: "outstanding", label: "Restschuld", align: "right" },
+  { key: "rate", label: "Zinssatz", align: "right" },
+  { key: "term", label: "Restlaufzeit", align: "right" },
+  { key: "instalment", label: "Jahresrate", align: "right" },
+  { key: "action", label: "Aktion" },
+];
+
+function renderCreditsLoanCell(
+  row: NlCreditsLoanRow,
+  column: NlTableColumn<NlCreditsLoanRow>,
+  canEarlyPayoff: boolean,
+  onEarlyPayoff: (loanId: string) => Promise<LoanEarlyPayoffOutcome>,
+) {
+  const { loan, index } = row;
+  switch (column.key) {
+    case "kredit":
+      return `Kredit ${index + 1}`;
+    case "lender":
+      return loan.lenderName;
+    case "principal":
+      return formatNlMoney(loan.principal);
+    case "outstanding":
+      return formatNlMoney(loan.outstanding);
+    case "rate":
+      return formatRate(loan.interestRate);
+    case "term":
+      return `${loan.remainingSeasons} / ${loan.termSeasons} Saisons`;
+    case "instalment":
+      return formatNlMoney(loan.nextInstalment);
+    case "action":
+      return <LoanEarlyPayoffAction loan={loan} canEarlyPayoff={canEarlyPayoff} onEarlyPayoff={onEarlyPayoff} />;
+    default:
+      return null;
+  }
 }
 
 /** Grün/Amber/Rot-Ton nach Anteil (0..1) — geteilte Schwelle für Gauge, Slider und Belastungs-Badge. */
@@ -909,7 +962,7 @@ export default function FoundationCreditsNewLook({
                 ))}
               </div>
             ) : (
-              <p className="nl-credits-empty-text muted">Keine Angebote verfügbar.</p>
+              <NlEmptyState title="Keine Angebote verfügbar." />
             )}
           </NlCard>
         </>
@@ -945,50 +998,20 @@ export default function FoundationCreditsNewLook({
         <NlCard className="nl-credits-active-card" eyebrow="Kredite" title="Aktive Kredite">
           {team && team.activeLoans.length > 0 ? (
             <>
-              <div className="nl-credits-table-shell">
-                <table className="nl-credits-table" data-testid="nl-credits-active-loans-table">
-                  <thead>
-                    <tr>
-                      <th>Kredit</th>
-                      <th>Verleiher</th>
-                      <th>Aufgenommen</th>
-                      <th>Restschuld</th>
-                      <th>Zinssatz</th>
-                      <th>Restlaufzeit</th>
-                      <th>Jahresrate</th>
-                      <th>Aktion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {team.activeLoans.map((loan, index) => (
-                      <tr key={loan.id}>
-                        <td>Kredit {index + 1}</td>
-                        <td>{loan.lenderName}</td>
-                        <td className="nl-tnum">{formatNlMoney(loan.principal)}</td>
-                        <td className="nl-tnum">{formatNlMoney(loan.outstanding)}</td>
-                        <td className="nl-tnum">{formatRate(loan.interestRate)}</td>
-                        <td className="nl-tnum">
-                          {loan.remainingSeasons} / {loan.termSeasons} Saisons
-                        </td>
-                        <td className="nl-tnum">{formatNlMoney(loan.nextInstalment)}</td>
-                        <td>
-                          <LoanEarlyPayoffAction
-                            loan={loan}
-                            canEarlyPayoff={team.canEarlyPayoff}
-                            onEarlyPayoff={onEarlyPayoff}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <NlTable
+                columns={NL_CREDITS_LOAN_COLUMNS}
+                rows={team.activeLoans.map((loan, index) => ({ loan, index }))}
+                rowKey={(row) => row.loan.id}
+                renderCell={(row, column) => renderCreditsLoanCell(row, column, team.canEarlyPayoff, onEarlyPayoff)}
+                data-testid="nl-credits-active-loans-table"
+                aria-label="Aktive Kredite"
+              />
               <p className="nl-credits-empty-text muted">
                 Die Jahresrate wird am Saisonabschluss automatisch von eurem Cash abgebucht — keine manuelle Tilgung nötig.
               </p>
             </>
           ) : (
-            <p className="nl-credits-empty-text muted">Keine aktiven Kredite.</p>
+            <NlEmptyState title="Keine aktiven Kredite." />
           )}
         </NlCard>
       )}
