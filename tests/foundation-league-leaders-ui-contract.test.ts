@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const root = process.cwd();
 
 describe("foundation league leaders ui contract", () => {
   it("wires league leaders into the ranks view with card grid markup", async () => {

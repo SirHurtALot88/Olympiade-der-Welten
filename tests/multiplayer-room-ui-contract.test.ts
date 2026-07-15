@@ -1,12 +1,13 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const lobbyPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/HomePageClient.tsx";
-const roomPagePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/room/[roomCode]/RoomPageClient.tsx";
-const modelPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/online-room-model.ts";
-const flowPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/room-flow-controller.ts";
-const arenaSyncPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/arena-sync-state.ts";
+const lobbyPath = path.join(process.cwd(), "app/HomePageClient.tsx");
+const roomPagePath = path.join(process.cwd(), "app/room/[roomCode]/RoomPageClient.tsx");
+const modelPath = path.join(process.cwd(), "lib/room/online-room-model.ts");
+const flowPath = path.join(process.cwd(), "lib/room/room-flow-controller.ts");
+const arenaSyncPath = path.join(process.cwd(), "lib/room/arena-sync-state.ts");
 
 describe("online multiplayer room UI contract", () => {
   it("exposes online-room setup instead of local-only runtime sessions", async () => {

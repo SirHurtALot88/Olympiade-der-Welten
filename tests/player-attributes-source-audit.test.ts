@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -64,11 +65,11 @@ describe("player attributes source audit", () => {
   it("documents the current transfermarkt proxy path", async () => {
     const [sheetStatsText, contractText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/market/transfermarkt-sheet-stats.ts",
+        path.join(process.cwd(), "lib/market/transfermarkt-sheet-stats.ts"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/market/transfermarkt-column-contract.ts",
+        path.join(process.cwd(), "lib/market/transfermarkt-column-contract.ts"),
         "utf8",
       ),
     ]);
@@ -84,7 +85,7 @@ describe("player attributes source audit", () => {
 
   it("stays read-only without write operations", async () => {
     const scriptText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/audit-player-attributes-source.ts",
+      path.join(process.cwd(), "scripts/audit-player-attributes-source.ts"),
       "utf8",
     );
 

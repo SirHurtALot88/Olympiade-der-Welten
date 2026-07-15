@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -6,11 +7,11 @@ describe("legacy resolve lab ui contract", () => {
   it("renders selected team preview as separate d1 and d2 blocks", async () => {
     const [fileText, cssText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-resolve-lab/LegacyResolveLabClient.tsx",
+        path.join(process.cwd(), "app/foundation/legacy-resolve-lab/LegacyResolveLabClient.tsx"),
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css",
+        path.join(process.cwd(), "app/globals.css"),
         "utf8",
       ),
     ]);

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { parseArgs } from "@/scripts/compare-golden-master-fixture";
@@ -29,7 +30,7 @@ describe("golden compare script", () => {
   it("stays read-only and does not write fixtures", async () => {
     const moduleText = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/compare-golden-master-fixture.ts",
+        path.join(process.cwd(), "scripts/compare-golden-master-fixture.ts"),
         "utf8",
       ),
     );

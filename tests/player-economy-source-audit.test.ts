@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildEconomyAuditSummary, classifyEconomyComparison, isScaleMismatch } from "@/scripts/audit-player-economy-source";
@@ -78,7 +79,7 @@ describe("player economy source audit helpers", () => {
 
   it("contains distribution outputs for default-value suspicion and locale signals", async () => {
     const fileText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/scripts/audit-player-economy-source.ts",
+      path.join(process.cwd(), "scripts/audit-player-economy-source.ts"),
       "utf8",
     );
 

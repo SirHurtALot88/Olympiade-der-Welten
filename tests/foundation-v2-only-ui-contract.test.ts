@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
-const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const root = process.cwd();
 
 describe("foundation v2-only ui contract", () => {
   it("hides classic transfer market and history tabs from the main shell", async () => {

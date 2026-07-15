@@ -1,21 +1,22 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const shellRouterPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouter.tsx";
+const shellRouterPath = path.join(process.cwd(), "app/foundation/FoundationShellRouter.tsx");
 const shellRouterBodyScopePath =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx";
+  path.join(process.cwd(), "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
 const crossTabTrainingPath =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-cross-tab-training.ts";
+  path.join(process.cwd(), "lib/foundation/tabs/use-foundation-cross-tab-training.ts");
 const trainingPanelDerivationsPath =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-training-panel-derivations.ts";
-const facilityEffectsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/facilities/facility-effects.ts";
-const foundationPageTypesPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-types.ts";
-const moduleHelpersPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-module-helpers.tsx";
-const facilitiesV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-v2/FacilitiesV2Client.tsx";
-const trainingCompactPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-compact/TrainingCompactClient.tsx";
-const trainingViewSharedPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/training-view-shared.tsx";
-const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+  path.join(process.cwd(), "lib/foundation/tabs/use-training-panel-derivations.ts");
+const facilityEffectsPath = path.join(process.cwd(), "lib/facilities/facility-effects.ts");
+const foundationPageTypesPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-types.ts");
+const moduleHelpersPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-module-helpers.tsx");
+const facilitiesV2Path = path.join(process.cwd(), "app/foundation/facilities-v2/FacilitiesV2Client.tsx");
+const trainingCompactPath = path.join(process.cwd(), "app/foundation/training-compact/TrainingCompactClient.tsx");
+const trainingViewSharedPath = path.join(process.cwd(), "app/foundation/training-facilities-v2/training-view-shared.tsx");
+const globalsPath = path.join(process.cwd(), "app/globals.css");
 
 describe("foundation training and facilities ui contract", () => {
   it("routes the main navigation into compact training and facilities v2 grid", async () => {
@@ -25,10 +26,10 @@ describe("foundation training and facilities ui contract", () => {
         fs.readFile(moduleHelpersPath, "utf8"),
         fs.readFile(shellRouterPath, "utf8"),
         fs.readFile(
-          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-compact/FoundationTrainingCompactShellHost.tsx",
+          path.join(process.cwd(), "app/foundation/training-compact/FoundationTrainingCompactShellHost.tsx"),
           "utf8",
         ),
-        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx", "utf8"),
+        fs.readFile(path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
         fs.readFile(facilitiesV2Path, "utf8"),
       ]);
 
@@ -49,7 +50,7 @@ describe("foundation training and facilities ui contract", () => {
     const [fileText, gridText] = await Promise.all([
       fs.readFile(facilitiesV2Path, "utf8"),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-v2/FacilityGridCard.tsx",
+        path.join(process.cwd(), "app/foundation/facilities-v2/FacilityGridCard.tsx"),
         "utf8",
       ),
     ]);
@@ -134,7 +135,7 @@ describe("foundation training and facilities ui contract", () => {
       fs.readFile(trainingCompactPath, "utf8"),
       fs.readFile(trainingViewSharedPath, "utf8"),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx",
+        path.join(process.cwd(), "app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx"),
         "utf8",
       ),
       fs.readFile(globalsPath, "utf8"),

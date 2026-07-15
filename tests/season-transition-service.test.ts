@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -141,7 +142,7 @@ describe("season transition service", () => {
   it("keeps service source free from Prisma write paths", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/season/season-transition-service.ts",
+        path.join(process.cwd(), "lib/season/season-transition-service.ts"),
         "utf8",
       ),
     );

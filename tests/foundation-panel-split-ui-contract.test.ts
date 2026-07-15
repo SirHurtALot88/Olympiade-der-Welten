@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -7,13 +8,13 @@ import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from ".
 describe("foundation panel split ui contract", () => {
   it("routes heavy views through lazy foundation panels", async () => {
     const foundationText = await readFoundationOrchestratorSource(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten",
+      process.cwd(),
     );
     const foundationSurfaceText = await readFoundationSurfaceSource(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten",
+      process.cwd(),
     );
     const pageClientText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+      path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx"),
       "utf8",
     );
 
@@ -28,7 +29,7 @@ describe("foundation panel split ui contract", () => {
     expect(foundationText).toContain("shouldBuildHomeV2Overview");
     expect(foundationText).toContain("shouldBuildPlayerRatings");
     const bodyText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx",
+      path.join(process.cwd(), "app/foundation/FoundationShellRouterBody.tsx"),
       "utf8",
     );
     expect(bodyText).not.toContain("<MatchdayArenaV2Client");

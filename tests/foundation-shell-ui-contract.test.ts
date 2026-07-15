@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
-const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const root = process.cwd();
 
 async function readFoundationSurfaceSourceLocal() {
   return readFoundationSurfaceSource(root);

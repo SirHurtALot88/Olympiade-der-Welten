@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { mapLegacyMatchdayResolvePreviewToResultPayload } from "@/lib/resolve/legacy-matchday-result-mapper";
@@ -234,7 +235,7 @@ describe("legacy matchday result mapper", () => {
   it("stays a pure mapper without prisma client access", async () => {
     const moduleText = await import("node:fs/promises").then((fs) =>
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/resolve/legacy-matchday-result-mapper.ts",
+        path.join(process.cwd(), "lib/resolve/legacy-matchday-result-mapper.ts"),
         "utf8",
       ),
     );

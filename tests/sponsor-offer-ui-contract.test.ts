@@ -1,3 +1,4 @@
+import path from "node:path";
 import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
@@ -5,11 +6,11 @@ import { describe, expect, it } from "vitest";
 describe("sponsor offer ui contract", () => {
   it("renders challenge sponsor cards with axis chips and difficulty badges", async () => {
     const [foundationText, sponsorsText, cardText, cssText, presenterText] = await Promise.all([
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/prize-v2/FoundationPrizeFinanceHost.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/components/foundation/sponsor/SponsorOfferCard.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/sponsor/sponsor-offer-presenter.ts", "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/prize-v2/FoundationPrizeFinanceHost.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "components/foundation/sponsor/SponsorOfferCard.tsx"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/globals.css"), "utf8"),
+      fs.readFile(path.join(process.cwd(), "lib/sponsor/sponsor-offer-presenter.ts"), "utf8"),
     ]);
 
     expect(foundationText).toContain("FoundationSponsorsPanel");

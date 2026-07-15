@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
 
-const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
+const root = process.cwd();
 
 describe("foundation page surfaces contract", () => {
   it("routes player and team identity to full pages instead of global drawers", async () => {
