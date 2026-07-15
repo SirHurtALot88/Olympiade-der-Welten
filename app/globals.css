@@ -63775,3 +63775,690 @@ button.nl-players-axis:focus-visible {
   height: 9px;
   border-radius: 3px;
 }
+
+/* ============================================================
+   "Neuer Look" — Seite: Player Generator (.nl-gen)
+   Nur aktiv unterhalb von `.is-new-look` (Flag-gated, additiv).
+   Phase 3 der Generator-Überarbeitung: Kontroll-/Vorschau-Layout
+   (Spielgefühl statt Formular-Wall) für PlayerGeneratorPanelNewLook.tsx.
+   ============================================================ */
+.is-new-look .nl-gen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-gen-header-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-pill {
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-gen-pill.is-warn {
+  border-color: color-mix(in srgb, var(--nl-warn) 50%, var(--nl-line-2));
+  color: var(--nl-warn);
+}
+
+.is-new-look .nl-gen-quality-badge {
+  padding: 4px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-gen-quality-badge.is-compact {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* --- Aktionsleiste ------------------------------------------------------ */
+
+.is-new-look .nl-gen-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-primary-action {
+  padding: 8px 16px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-primary-action:hover:not(:disabled) {
+  background: var(--nl-accent);
+  color: var(--nl-bg);
+}
+
+.is-new-look .nl-gen-primary-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-gen-secondary-action,
+.is-new-look .nl-gen-inline-action,
+.is-new-look .nl-gen-icon-btn {
+  padding: 6px 13px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-inline-action {
+  padding: 4px 11px;
+  font-size: 11.5px;
+}
+
+.is-new-look .nl-gen-icon-btn {
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-new-look .nl-gen-icon-btn.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-secondary-action:hover:not(:disabled),
+.is-new-look .nl-gen-inline-action:hover:not(:disabled),
+.is-new-look .nl-gen-icon-btn:hover:not(:disabled) {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-secondary-action:disabled,
+.is-new-look .nl-gen-inline-action:disabled,
+.is-new-look .nl-gen-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-gen-file-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.is-new-look .nl-gen-file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.is-new-look .nl-gen-message {
+  font-size: 12px;
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-gen-muted {
+  color: var(--nl-mut);
+  font-size: 12px;
+}
+
+.is-new-look .nl-gen-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+/* --- Layout: Regler links, Vorschau rechts ------------------------------ */
+
+.is-new-look .nl-gen-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-gen-controls,
+.is-new-look .nl-gen-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .is-new-look .nl-gen-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Formularfelder ------------------------------------------------------ */
+
+.is-new-look .nl-gen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.is-new-look .nl-gen-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-input,
+.is-new-look .nl-gen-select {
+  padding: 7px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-family: inherit;
+  max-width: 100%;
+}
+
+.is-new-look .nl-gen-input:focus-visible,
+.is-new-look .nl-gen-select:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-gen-seed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-seed-row .nl-gen-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Chip-Regler (Rolle/Stärke/Varianz/Vertrag/Archetyp/Achsen) --------- */
+
+.is-new-look .nl-gen-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-chip {
+  padding: 5px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease), color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-chip:hover {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-chip.is-active {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-axis-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 4px 0;
+}
+
+.is-new-look .nl-gen-axis-chip-row:not(:last-child) {
+  border-bottom: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-gen-axis-chip-label {
+  flex: 0 0 32px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-gen-axis-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-axis-source-pill {
+  padding: 3px 9px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Hero-Karte (Portrait/Identität) ------------------------------------ */
+
+.is-new-look .nl-gen-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-gen-portrait-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 128px;
+  height: 128px;
+  flex: 0 0 128px;
+  border-radius: var(--nl-r-md);
+  border: 1.5px dashed var(--nl-line-2);
+  background: var(--nl-panel-2);
+  overflow: hidden;
+  text-align: center;
+  padding: 6px;
+}
+
+.is-new-look .nl-gen-portrait-drop.is-dragging {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+
+.is-new-look .nl-gen-portrait-drop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.75), transparent);
+  padding: 4px 6px 6px;
+}
+
+.is-new-look .nl-gen-portrait-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-family: var(--nl-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-gen-portrait-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--nl-mut);
+  line-height: 1.2;
+}
+
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy strong,
+.is-new-look .nl-gen-portrait-drop.has-image .nl-gen-portrait-copy span {
+  color: #fff;
+}
+
+.is-new-look .nl-gen-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.is-new-look .nl-gen-hero-copy h3 {
+  margin: 0;
+  font-family: var(--nl-display);
+  font-size: 18px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-gen-status-pill {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 16%, transparent);
+  color: var(--nl-tone, var(--nl-mut));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.is-new-look .nl-gen-portrait-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-portrait-controls .nl-gen-input {
+  flex: 1 1 180px;
+  min-width: 120px;
+}
+
+.is-new-look .nl-gen-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s3);
+  font-size: 11.5px;
+  color: var(--nl-mut);
+}
+
+/* --- Stat-Zeile + Sub-Tabs ----------------------------------------------- */
+
+.is-new-look .nl-gen-stats {
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-gen-subtabs {
+  margin-top: -4px;
+}
+
+/* --- Radar / Diszi-Karten -------------------------------------------------- */
+
+.is-new-look .nl-gen-radar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-gen-radar-row .nl-radar {
+  width: 200px;
+  height: 200px;
+  flex: 0 0 auto;
+}
+
+.is-new-look .nl-gen-mini-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Diagnose-Schublade (progressive disclosure) ------------------------ */
+
+.is-new-look .nl-gen-diagnostics {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+  padding: var(--nl-s3) var(--nl-s4);
+}
+
+.is-new-look .nl-gen-diagnostics > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  list-style: none;
+}
+
+.is-new-look .nl-gen-diagnostics > summary::-webkit-details-marker {
+  display: none;
+}
+
+.is-new-look .nl-gen-diagnostics > summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--nl-mut);
+  transition: transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-gen-diagnostics[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.is-new-look .nl-gen-diagnostics-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-diag-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-diag-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-status-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 11px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 45%, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-tone, var(--nl-mut)) 10%, var(--nl-panel-2));
+  min-width: 140px;
+}
+
+.is-new-look .nl-gen-status-card span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-status-card strong {
+  font-size: 12px;
+  color: var(--nl-ink);
+  font-weight: 600;
+}
+
+.is-new-look .nl-gen-axis-target-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-gen-axis-target-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr auto;
+  align-items: center;
+  gap: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+  padding: 3px 0;
+}
+
+.is-new-look .nl-gen-axis-target-row > span:first-child {
+  font-weight: 800;
+  color: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-gen-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+}
+
+/* --- Bearbeiten-Tab: Identität + Attribute -------------------------------- */
+
+.is-new-look .nl-gen-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-attr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-attr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.is-new-look .nl-gen-attr-field > span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-gen-attr-field .nl-gen-input {
+  padding: 5px 7px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Batch-Tab ------------------------------------------------------------ */
+
+.is-new-look .nl-gen-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-gen-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-batch-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-gen-batch-item.is-active {
+  border-color: var(--nl-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-accent) 45%, transparent);
+}
+
+.is-new-look .nl-gen-batch-item header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-gen-batch-item header strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-gen-batch-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Gespeicherte Drafts --------------------------------------------------- */
+
+.is-new-look .nl-gen-saved-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-gen-saved-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-gen-saved-item.is-active {
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-gen-saved-item strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}

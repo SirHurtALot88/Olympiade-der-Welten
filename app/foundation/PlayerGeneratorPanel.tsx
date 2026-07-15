@@ -24,6 +24,8 @@ import {
   recalculatePlayerGeneratorDraft,
   tightenPlayerGeneratorDraft,
 } from "@/lib/player-generator/player-generator-service";
+import PlayerGeneratorPanelNewLook from "@/app/foundation/PlayerGeneratorPanelNewLook";
+import { useNewLook } from "@/lib/ui/new-look-preference";
 
 const roleOptions: Array<{ value: PlayerGeneratorRoleIntent; label: string }> = [
   { value: "offense", label: "Offense / Damage" },
@@ -399,6 +401,11 @@ export default function PlayerGeneratorPanel({
     () => new Map(teamOptions.map((entry) => [entry.team.teamId, entry] as const)),
     [teamOptions],
   );
+  // "Neuer Look" Flag (additiv): der Hook läuft immer, das eigentliche Gate
+  // sitzt unten direkt vor dem Haupt-Return — nach ALLEN Hooks, damit die
+  // Hook-Reihenfolge beim Umschalten des Flags stabil bleibt (siehe z. B.
+  // TransfermarktV2Client für dasselbe Muster bei einem hook-reichen Panel).
+  const [newLook] = useNewLook();
 
   useEffect(() => {
     if (!activeTeamId) {
@@ -652,6 +659,23 @@ export default function PlayerGeneratorPanel({
   );
   const economyProjection = currentDraft?.generated.economyProjection ?? null;
   const teamFit = currentDraft?.generated.teamFit ?? null;
+
+  // "Neuer Look" Gate (additiv): alle Hooks oben sind gelaufen, ab hier nur
+  // noch Darstellung. Flag aus => bestehendes Markup unverändert (Fallback).
+  if (newLook) {
+    return (
+      <PlayerGeneratorPanelNewLook
+        players={players}
+        disciplines={disciplines}
+        drafts={drafts}
+        teamContexts={teamContexts}
+        activeTeamId={activeTeamId}
+        readOnly={readOnly}
+        readSourceLabel={readSourceLabel}
+        onSaveDrafts={onSaveDrafts}
+      />
+    );
+  }
 
   return (
     <section className="panel foundation-wide">
