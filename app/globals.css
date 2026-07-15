@@ -58978,6 +58978,318 @@ button.nl-players-axis:focus-visible {
   gap: var(--nl-s1);
 }
 
+/* =========================================================================
+   nl-newgame — komfortabler "Neues Spiel starten" Club-Picker
+   (Summary-Hero, kompakte Optionen, ganze-Karte-Auswahl, Ein-Klick-CTA).
+   Nur --nl-*-Tokens, responsiv (Karten fließen um, kein H-Overflow),
+   Motion respektiert prefers-reduced-motion.
+   ========================================================================= */
+.is-new-look .nl-newgame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+/* --- Summary-Hero -------------------------------------------------------- */
+.is-new-look .nl-newgame-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s4);
+  padding: var(--nl-s4) var(--nl-s5);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--nl-accent) 16%, transparent), transparent 60%),
+    var(--nl-panel);
+  box-shadow: var(--nl-e2);
+}
+
+.is-new-look .nl-newgame-hero-lead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  min-width: 0;
+}
+
+.is-new-look .nl-newgame-hero-eyebrow {
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-newgame-hero-headline {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-newgame-hero-count {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--nl-accent);
+  padding: 0 2px;
+}
+
+.is-new-look .nl-newgame-hero-of {
+  color: var(--nl-mut);
+  font-weight: 500;
+}
+
+.is-new-look .nl-newgame-hero-hint {
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-newgame-hero-chips {
+  flex: 0 1 auto;
+}
+
+/* --- Kompakte Optionen (Save-Name + Sandbox) ----------------------------- */
+.is-new-look .nl-newgame-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--nl-s3) var(--nl-s4);
+}
+
+.is-new-look .nl-newgame-options > .nl-teamsettings-field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.is-new-look .nl-newgame-sandbox {
+  flex: 0 1 auto;
+  padding-bottom: 6px;
+}
+
+/* --- Club-Picker Kopf ---------------------------------------------------- */
+.is-new-look .nl-newgame-pickerhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-pickerhead strong {
+  font-size: var(--nl-fs-lg);
+  color: var(--nl-ink);
+}
+
+/* --- Club-Grid ----------------------------------------------------------- */
+.is-new-look .nl-newgame-clubgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-club {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--nl-r-md);
+}
+
+/* Ganze Karte = Auswahl-Toggle. */
+.is-new-look .nl-newgame-club-select {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+  width: 100%;
+  padding: var(--nl-s3);
+  padding-right: 40px; /* Platz für den Profil-Button oben rechts */
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--nl-t-fast) var(--nl-ease),
+    box-shadow var(--nl-t-fast) var(--nl-ease),
+    transform var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-newgame-club-select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--nl-accent) 60%, var(--nl-line));
+  transform: translateY(-1px);
+}
+
+.is-new-look .nl-newgame-club-select:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-newgame-club-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Ausgewählt: kräftiger Accent-Ring + Glow. */
+.is-new-look .nl-newgame-club.is-picked .nl-newgame-club-select {
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel-2));
+  box-shadow:
+    0 0 0 1px var(--nl-accent),
+    0 0 22px -6px color-mix(in srgb, var(--nl-accent) 70%, transparent);
+}
+
+.is-new-look .nl-newgame-club.is-franky .nl-newgame-club-select {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+}
+
+/* Crest / Logo mit Initialen-Fallback. */
+.is-new-look .nl-newgame-club-crest {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--nl-r-sm);
+  overflow: hidden;
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-newgame-club-crest-img,
+.is-new-look .nl-newgame-club-crest .budgeted-media-image-anchor,
+.is-new-look .nl-newgame-club-crest .optimized-media-image {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+}
+
+.is-new-look .nl-newgame-club-crest-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: var(--nl-fs-lg);
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-newgame-club-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-newgame-club-code {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-newgame-club-name {
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-newgame-club-budget {
+  font-size: var(--nl-fs-sm);
+  color: var(--nl-mut-2);
+}
+
+/* Ausgewählt-Badge. */
+.is-new-look .nl-newgame-club-badge {
+  position: absolute;
+  bottom: var(--nl-s2);
+  right: var(--nl-s3);
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #06101f;
+  background: var(--nl-accent);
+  pointer-events: none;
+}
+
+.is-new-look .nl-newgame-club-badge.is-franky {
+  color: var(--nl-ink);
+  background: color-mix(in srgb, var(--nl-warn) 30%, var(--nl-panel));
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 55%, transparent);
+}
+
+/* Sekundäre Affordanz: Teamprofil öffnen (nicht = Auswahl). */
+.is-new-look .nl-newgame-club-profile {
+  position: absolute;
+  top: var(--nl-s2);
+  right: var(--nl-s2);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel);
+  color: var(--nl-mut);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
+}
+
+.is-new-look .nl-newgame-club-profile:hover {
+  color: var(--nl-accent);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-newgame-club-profile:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- CTA-Zeile ----------------------------------------------------------- */
+.is-new-look .nl-newgame-actions {
+  align-items: center;
+}
+
+.is-new-look .nl-newgame-cta {
+  font-weight: 600;
+}
+
+.is-new-look .nl-newgame-cta:not(:disabled) {
+  animation: nl-newgame-cta-pulse 2.4s var(--nl-ease) infinite;
+}
+
+@keyframes nl-newgame-cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--nl-accent) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-newgame-club-select,
+  .is-new-look .nl-newgame-club-profile {
+    transition: none;
+  }
+  .is-new-look .nl-newgame-club-select:hover:not(:disabled) {
+    transform: none;
+  }
+  .is-new-look .nl-newgame-cta:not(:disabled) {
+    animation: none;
+  }
+}
+
 /* --- Save-Liste ---------------------------------------------------------- */
 .is-new-look .nl-teamsettings-savelist {
   display: grid;
