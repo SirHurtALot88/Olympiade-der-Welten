@@ -639,6 +639,11 @@ export function calculateTeamPowerModifierForSide(input: {
     warnings.push(`Team-Power für ${input.disciplineSide.toUpperCase()} konnte nicht geladen werden.`);
     return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
   }
+  if (power.isPassive) {
+    // The passive identity power is always applied automatically (see calculatePassiveTeamPowerBonus);
+    // treat an explicit selection of it as no active power so its bonus is never counted twice.
+    return { teamPowerSelected: 0, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: null, warnings };
+  }
   if (power.isUsedUp) {
     warnings.push(`${power.label} hat keine Einsätze mehr frei.`);
     return { teamPowerSelected: 1, teamPowerModifier: 0, teamPowerImpact: 0, teamPowerBasePct: 0, teamPowerConditionalPct: 0, teamPowerAttributeFitPct: 0, teamPowerLabel: power.label, warnings };
