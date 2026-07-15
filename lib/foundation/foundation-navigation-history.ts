@@ -75,6 +75,19 @@ export function parseFoundationSaveIdFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get("saveId");
 }
 
+/**
+ * "Neues Spiel"-Absicht vom Startbildschirm: `?newGame=1` signalisiert, dass die
+ * Person direkt in den New-Game-Assistenten (Team-Settings → Saves) will und der
+ * bestehende Save NICHT mit seinem Season-Einstieg-Overlay dazwischenfunken soll.
+ * Der Parameter ist bewusst nicht Teil von FoundationUrlState: Sobald irgendeine
+ * reguläre URL-Synchronisierung läuft (spätestens beim Erstellen des neuen Saves),
+ * fällt er von selbst wieder aus der URL und die Unterdrückung endet.
+ */
+export function parseFoundationNewGameIntentFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  return new URL(window.location.href).searchParams.get("newGame") === "1";
+}
+
 export function parseFoundationUrlStateFromLocation(): FoundationUrlState {
   if (typeof window === "undefined") {
     return {

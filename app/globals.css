@@ -551,6 +551,25 @@ a {
   justify-items: start;
 }
 
+.oly-solo-actions {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.oly-solo-choice {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  align-content: start;
+}
+
+.oly-solo-choice .inline-button {
+  width: 100%;
+  text-align: center;
+}
+
 .oly-section-heading {
   display: grid;
   gap: 4px;
