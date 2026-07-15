@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
@@ -16,11 +16,14 @@ import {
   NlSubTabs,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   nlToneClass,
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
 import type {
   TeamDetailDrawerData,
   TeamDetailDrawerHistoryRow,
@@ -48,6 +51,7 @@ import {
   type BeliebtheitComponents,
 } from "@/lib/economy/team-beliebtheit";
 import type {
+  ContractShape,
   Discipline,
   DisciplineCategory,
   GameState,
@@ -295,6 +299,118 @@ function getMoneyDeltaClass(value: number | null | undefined, positiveDirection:
   return isPositive ? " text-positive" : " text-negative";
 }
 
+/**
+ * Vertragsform → kompaktes Kürzel für die GEHALT-Hover-Zeile.
+ * `front_loaded` → FL, `back_loaded` → BL, `balanced`/unbekannt → STD (normal).
+ * Quelle: `RosterEntry.contractShape` (lib/data/olyDataTypes.ts).
+ */
+function getContractShapeTag(shape: ContractShape | null | undefined): {
+  tag: "FL" | "BL" | "STD";
+  label: string;
+  tone: NlTone;
+} {
+  if (shape === "front_loaded") {
+    return { tag: "FL", label: "front-loaded (jetzt teurer)", tone: "warn" };
+  }
+  if (shape === "back_loaded") {
+    return { tag: "BL", label: "back-loaded (später teurer)", tone: "accent" };
+  }
+  return { tag: "STD", label: "normal (gleichmäßig)", tone: "neutral" };
+}
+
+/** Anzahl der Zeilen, die die MW-/GEHALT-Hover maximal einzeln listen (Rest → "…"). */
+const NL_HEADER_HOVER_MAX_ROWS = 8;
+
+type HeaderKpiHoverAlign = "start" | "end";
+
+/**
+ * Leichtgewichtiges Hover-/Fokus-Popover für die Header-KPI-Chips
+ * (RANG/CASH/MW/GEHALT). Spiegelt das Verhalten des Ranking-Drawers
+ * (`NlRankingDrawer`): öffnet per Maus UND Tastatur-Fokus, schließt bei
+ * Blur/Escape, `role="dialog"` + `aria-label`. Rein additiv — der Chip
+ * selbst bleibt sichtbar, das Popover trägt nur Zusatzinfo (kein
+ * ausschließlich per Pointer erreichbarer Inhalt, da fokusierbar).
+ */
+function HeaderKpiHover({
+  panelId,
+  ariaLabel,
+  chip,
+  align = "start",
+  children,
+}: {
+  panelId: string;
+  ariaLabel: string;
+  chip: ReactNode;
+  align?: HeaderKpiHoverAlign;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function cancelClose() {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function openNow() {
+    cancelClose();
+    setOpen(true);
+  }
+
+  function closeSoon() {
+    cancelClose();
+    // kleine Verzögerung, damit der Zeiger die Lücke zum Panel überbrücken kann
+    closeTimer.current = setTimeout(() => setOpen(false), 90);
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      className="nl-kpipop"
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
+      onFocus={openNow}
+      onBlur={(event) => {
+        if (!wrapRef.current?.contains(event.relatedTarget as Node | null)) {
+          cancelClose();
+          setOpen(false);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open) {
+          event.stopPropagation();
+          cancelClose();
+          setOpen(false);
+          wrapRef.current?.querySelector<HTMLButtonElement>(".nl-kpipop-trigger")?.focus();
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="nl-kpipop-trigger"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={ariaLabel}
+      >
+        {chip}
+      </button>
+      <div
+        id={panelId}
+        role="dialog"
+        aria-label={ariaLabel}
+        className={`nl-kpipop-panel is-${align}${open ? " is-open" : ""}`}
+        hidden={!open}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export type TeamProfileNewLookProps = {
   data: TeamDetailDrawerData;
   onClose: () => void;
@@ -364,6 +480,129 @@ export default function TeamProfileNewLook({
       (player) => rosterPlayerIds.has(player.id) && player.traitsPositive?.includes(FAN_FAVORITE_TRAIT_ID),
     );
   }, [foundationGameState, data.teamId]);
+
+  // Eigentümer-Gate (Fog-of-War): "manual" = vom Spieler geführtes Team
+  // (siehe formatControlModeLabel → "Team geführt"). Nur dann dürfen die
+  // spieler-granularen MW-/GEHALT-Zusammensetzungen sichtbar sein.
+  const isOwnedTeam = data.controlMode === "manual";
+
+  // RANG-Hover: kompakte Ligatabelle. Rang/Punkte aus `seasonState.standings`,
+  // PPs (Disziplin-Performance) + POW/SPE/MEN/SOC aus dem kanonischen
+  // Team-Disziplin-Rang-Engine (dieselbe Quelle wie die Header-Achsen-Ränge).
+  const standingsHoverRows = useMemo(() => {
+    if (!foundationGameState) {
+      return [];
+    }
+    const standings = foundationGameState.seasonState.standings ?? {};
+    const rankRows = buildTeamDisciplineRankRowsFromGameState(foundationGameState, foundationGameState.disciplines);
+    const packByTeamId = new Map(rankRows.map((row) => [row.teamId, row.scorePack] as const));
+    return foundationGameState.teams
+      .map((team) => {
+        const standing = standings[team.teamId];
+        const pack = packByTeamId.get(team.teamId) ?? null;
+        return {
+          teamId: team.teamId,
+          shortCode: team.shortCode ?? team.name.slice(0, 3).toUpperCase(),
+          teamName: team.name,
+          rank: isFiniteNumber(standing?.rank) ? (standing?.rank as number) : null,
+          points: isFiniteNumber(standing?.points) ? (standing?.points as number) : null,
+          pps: pack ? pack.total : null,
+          pow: pack ? pack.pow : null,
+          spe: pack ? pack.spe : null,
+          men: pack ? pack.men : null,
+          soc: pack ? pack.soc : null,
+          isOwn: team.teamId === data.teamId,
+        };
+      })
+      .sort((left, right) => {
+        // Nach Ligarang (fallback: Punkte absteigend, dann Name).
+        if (left.rank != null && right.rank != null && left.rank !== right.rank) {
+          return left.rank - right.rank;
+        }
+        if (left.rank != null && right.rank == null) return -1;
+        if (left.rank == null && right.rank != null) return 1;
+        if ((right.points ?? -Infinity) !== (left.points ?? -Infinity)) {
+          return (right.points ?? -Infinity) - (left.points ?? -Infinity);
+        }
+        return left.teamName.localeCompare(right.teamName, "de");
+      })
+      .map((row, index) => ({ ...row, displayRank: row.rank ?? index + 1 }));
+  }, [foundationGameState, data.teamId]);
+
+  // CASH-Hover: kompakte GuV. Nur reale, bereits berechnete Größen dieses
+  // Teams — Cash & Gehaltsblock aus `data`, Gebäude-Unterhalt/-Einnahmen und
+  // Sponsoren-Basis aus dem GameState. Ohne Foundation-State (kein Liga-
+  // kontext) bleiben nur Cash & Gehälter; die Ökonomiezeilen entfallen dann.
+  const cashBreakdown = useMemo(() => {
+    const cash = isFiniteNumber(data.cash) ? data.cash : null;
+    const salaryTotal = isFiniteNumber(data.salaryTotal) ? data.salaryTotal : null;
+    if (!foundationGameState) {
+      return { cash, salaryTotal, facilityUpkeep: null, facilityIncome: null, sponsorBase: null, projected: null };
+    }
+    const teamFacilities = foundationGameState.seasonState.teamFacilities?.[data.teamId] ?? null;
+    const facilityUpkeep = teamFacilities ? calculateFacilityUpkeep(teamFacilities) : null;
+    const facilityIncome = teamFacilities
+      ? calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: beliebtheit?.value ?? 1 })
+      : null;
+    const sponsorContract = foundationGameState.seasonState.sponsorContractsByTeamId?.[data.teamId] ?? null;
+    const sponsorBase = sponsorContract
+      ? sponsorContract.components
+          .filter((component) => component.kind === "base")
+          .reduce((sum, component) => sum + (isFiniteNumber(component.rewardCash) ? component.rewardCash : 0), 0)
+      : null;
+    // Projiziertes Saison-Ende analog zu projectCashFlow(): Cash − Gehälter
+    // + (Gebäude-Einnahmen − Unterhalt) + Sponsoren-Basis. Prämien fließen
+    // bewusst NICHT ein (benchmark-only, siehe cash-flow-forecast.ts).
+    const projected =
+      cash != null
+        ? cash -
+          (salaryTotal ?? 0) +
+          (facilityIncome ?? 0) -
+          (facilityUpkeep ?? 0) +
+          (sponsorBase ?? 0)
+        : null;
+    return { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected };
+  }, [foundationGameState, data.teamId, data.cash, data.salaryTotal, beliebtheit]);
+
+  // MW-Hover: Zusammensetzung aus den echten Einzel-Marktwerten des Kaders.
+  const mwBreakdown = useMemo(() => {
+    const rows = data.players
+      .map((player) => ({
+        id: player.activePlayerId,
+        playerId: player.playerId,
+        name: player.name,
+        marketValue: isFiniteNumber(player.marketValue) ? player.marketValue : null,
+      }))
+      .filter((row) => row.marketValue != null)
+      .sort((left, right) => (right.marketValue ?? 0) - (left.marketValue ?? 0));
+    const sum = rows.reduce((total, row) => total + (row.marketValue ?? 0), 0);
+    return { rows, sum, total: isFiniteNumber(data.marketValueTotal) ? data.marketValueTotal : sum };
+  }, [data.players, data.marketValueTotal]);
+
+  // GEHALT-Hover: Einzel-Gehälter + Vertragsform (FL/BL/STD). Gehalt aus der
+  // Roster-Karte, Vertragsform aus `RosterEntry.contractShape` (GameState).
+  const salaryBreakdown = useMemo(() => {
+    const shapeByPlayerId = new Map<string, ContractShape | undefined>();
+    if (foundationGameState) {
+      for (const entry of foundationGameState.rosters) {
+        if (entry.teamId === data.teamId) {
+          shapeByPlayerId.set(entry.playerId, entry.contractShape);
+        }
+      }
+    }
+    const rows = data.players
+      .map((player) => ({
+        id: player.activePlayerId,
+        playerId: player.playerId,
+        name: player.name,
+        salary: isFiniteNumber(player.salary) ? player.salary : null,
+        shape: shapeByPlayerId.get(player.playerId),
+      }))
+      .filter((row) => row.salary != null)
+      .sort((left, right) => (right.salary ?? 0) - (left.salary ?? 0));
+    const sum = rows.reduce((total, row) => total + (row.salary ?? 0), 0);
+    return { rows, sum, total: isFiniteNumber(data.salaryTotal) ? data.salaryTotal : sum };
+  }, [data.players, data.salaryTotal, data.teamId, foundationGameState]);
 
   // Board-Vertrauen-Verlauf: echte archivierte Werte pro Saison stecken im
   // GM-Assignment jedes Season-Snapshots (`boardConfidenceValue`) — es gibt
@@ -739,6 +978,190 @@ export default function TeamProfileNewLook({
           ? "good"
           : "neutral";
 
+  function renderRangPanel() {
+    return (
+      <div className="nl-kpipop-inner">
+        <div className="nl-kpipop-head">
+          <div className="nl-kpipop-head-copy">
+            <span className="nl-kpipop-eyebrow">Saisonstand</span>
+            <strong className="nl-kpipop-title">Ligatabelle</strong>
+          </div>
+          {data.history.length > 0 ? (
+            <button
+              type="button"
+              className="nl-kpipop-jump"
+              onClick={() => scrollToSection(historyCardRef)}
+            >
+              Zum Saisonstand springen →
+            </button>
+          ) : null}
+        </div>
+        {standingsHoverRows.length === 0 ? (
+          <p className="nl-kpipop-empty">Kein Ligakontext verfügbar.</p>
+        ) : (
+          <ol className="nl-kpipop-standings nl-tnum">
+            {standingsHoverRows.map((row) => (
+              <li
+                key={row.teamId}
+                className={`nl-kpipop-standrow${row.isOwn ? " is-own" : ""}`}
+              >
+                <span className="nl-kpipop-standrank">#{formatNlNumber(row.displayRank, 0)}</span>
+                <span className="nl-kpipop-standmain">
+                  <span className="nl-kpipop-standtop">
+                    <span className="nl-kpipop-standcode" title={row.teamName}>
+                      {row.shortCode}
+                    </span>
+                    <span className="nl-kpipop-standpts">
+                      {formatNlNumber(row.points, 1)} P · {formatNlNumber(row.pps, 0)} PPs
+                    </span>
+                  </span>
+                  <span className="nl-kpipop-standaxes">
+                    {NL_TEAMPROFILE_AXES.map(({ key, label }) => (
+                      <span key={key} className={`nl-kpipop-axis ${nlToneClass(key)}`}>
+                        {label} {formatNlNumber(row[key], 0)}
+                      </span>
+                    ))}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    );
+  }
+
+  function renderGuvLine(label: string, sign: "" | "−" | "+", value: number | null, tone?: NlTone, isResult?: boolean) {
+    return (
+      <div className={`nl-kpipop-guvrow${isResult ? " is-result" : ""}`}>
+        <span className="nl-kpipop-guvlabel">
+          {sign ? <span className="nl-kpipop-guvsign">{sign}</span> : null}
+          {label}
+        </span>
+        <span className={`nl-kpipop-guvval${tone ? ` ${nlToneClass(tone)}` : ""}`}>{formatNlMoney(value)}</span>
+      </div>
+    );
+  }
+
+  function renderCashPanel() {
+    const { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected } = cashBreakdown;
+    return (
+      <div className="nl-kpipop-inner">
+        <div className="nl-kpipop-head">
+          <div className="nl-kpipop-head-copy">
+            <span className="nl-kpipop-eyebrow">Cash</span>
+            <strong className="nl-kpipop-title">GuV (Projektion)</strong>
+          </div>
+        </div>
+        <div className="nl-kpipop-guv">
+          {renderGuvLine("Cash", "", cash)}
+          {renderGuvLine("Gehälter", "−", salaryTotal, "risk")}
+          {facilityUpkeep != null ? renderGuvLine("Gebäude-Unterhalt", "−", facilityUpkeep, "risk") : null}
+          {facilityIncome != null ? renderGuvLine("Gebäude-Einnahmen", "+", facilityIncome, "good") : null}
+          {sponsorBase != null ? renderGuvLine("Sponsoren (Basis)", "+", sponsorBase, "good") : null}
+          {projected != null
+            ? renderGuvLine("≈ Saison-Ende", "", projected, projected < 0 ? "risk" : "good", true)
+            : null}
+        </div>
+        {facilityUpkeep == null && sponsorBase == null ? (
+          <p className="nl-kpipop-note">Gebäude-/Sponsoren-Zeilen benötigen Liga-Kontext.</p>
+        ) : (
+          <p className="nl-kpipop-note">Prämien fließen nicht ein (benchmark-only).</p>
+        )}
+      </div>
+    );
+  }
+
+  function renderMwPanel() {
+    return (
+      <div className="nl-kpipop-inner">
+        <div className="nl-kpipop-head">
+          <div className="nl-kpipop-head-copy">
+            <span className="nl-kpipop-eyebrow">Marktwert</span>
+            <strong className="nl-kpipop-title">Zusammensetzung</strong>
+          </div>
+          <span className="nl-kpipop-total">{formatNlMoney(mwBreakdown.total)}</span>
+        </div>
+        {!isOwnedTeam ? (
+          <p className="nl-kpipop-note">Einzel-Marktwerte verdeckt (fremdes Team). Nur Kader-Summe sichtbar.</p>
+        ) : mwBreakdown.rows.length === 0 ? (
+          <p className="nl-kpipop-empty">Keine Marktwerte im Kader.</p>
+        ) : (
+          <ol className="nl-kpipop-players nl-tnum">
+            {mwBreakdown.rows.slice(0, NL_HEADER_HOVER_MAX_ROWS).map((row) => (
+              <li key={row.id} className="nl-kpipop-playrow">
+                <button
+                  type="button"
+                  className="nl-kpipop-playbtn"
+                  onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                  title={`${row.name} öffnen`}
+                >
+                  <span className="nl-kpipop-playname">{row.name}</span>
+                  <span className="nl-kpipop-playval">{formatNlMoney(row.marketValue)}</span>
+                </button>
+              </li>
+            ))}
+            {mwBreakdown.rows.length > NL_HEADER_HOVER_MAX_ROWS ? (
+              <li className="nl-kpipop-more">
+                … +{formatNlNumber(mwBreakdown.rows.length - NL_HEADER_HOVER_MAX_ROWS, 0)} weitere ·{" "}
+                {formatNlMoney(mwBreakdown.sum)} Summe
+              </li>
+            ) : null}
+          </ol>
+        )}
+      </div>
+    );
+  }
+
+  function renderGehaltPanel() {
+    return (
+      <div className="nl-kpipop-inner">
+        <div className="nl-kpipop-head">
+          <div className="nl-kpipop-head-copy">
+            <span className="nl-kpipop-eyebrow">Gehalt</span>
+            <strong className="nl-kpipop-title">Gehaltsblock</strong>
+          </div>
+          <span className="nl-kpipop-total">{formatNlMoney(salaryBreakdown.total)}</span>
+        </div>
+        {!isOwnedTeam ? (
+          <p className="nl-kpipop-note">Einzel-Gehälter/Verträge verdeckt (fremdes Team). Nur Kader-Summe sichtbar.</p>
+        ) : salaryBreakdown.rows.length === 0 ? (
+          <p className="nl-kpipop-empty">Keine Gehälter im Kader.</p>
+        ) : (
+          <ol className="nl-kpipop-players nl-tnum">
+            {salaryBreakdown.rows.slice(0, NL_HEADER_HOVER_MAX_ROWS).map((row) => {
+              const shape = getContractShapeTag(row.shape);
+              return (
+                <li key={row.id} className="nl-kpipop-playrow">
+                  <button
+                    type="button"
+                    className="nl-kpipop-playbtn"
+                    onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                    title={`${row.name} öffnen · Vertrag: ${shape.label}`}
+                  >
+                    <span className="nl-kpipop-playname">
+                      {row.name}
+                      <span className={`nl-kpipop-shape ${nlToneClass(shape.tone)}`} title={shape.label}>
+                        {shape.tag}
+                      </span>
+                    </span>
+                    <span className="nl-kpipop-playval">{formatNlMoney(row.salary)}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {salaryBreakdown.rows.length > NL_HEADER_HOVER_MAX_ROWS ? (
+              <li className="nl-kpipop-more">
+                … +{formatNlNumber(salaryBreakdown.rows.length - NL_HEADER_HOVER_MAX_ROWS, 0)} weitere ·{" "}
+                {formatNlMoney(salaryBreakdown.sum)} Summe
+              </li>
+            ) : null}
+          </ol>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="nl-teamprofile" data-testid="foundation-team-profile" data-new-look="true">
       <NlCard className="nl-teamprofile-hero-card" data-testid="nl-teamprofile-hero">
@@ -760,13 +1183,21 @@ export default function TeamProfileNewLook({
               </span>
               <h2 className="nl-teamprofile-hero-name">{data.teamName}</h2>
               <StatChipRow className="nl-teamprofile-hero-chips" aria-label={`Kennzahlen ${data.teamName}`}>
-                <StatChip
-                  label="Rang"
-                  value={liveHistoryRow?.rank != null ? `#${formatNlNumber(liveHistoryRow.rank, 0)}` : "—"}
-                  tone="accent"
-                  onClick={data.history.length > 0 ? () => scrollToSection(historyCardRef) : undefined}
-                  title={data.history.length > 0 ? "Zur Saison-Historie springen" : undefined}
-                />
+                <HeaderKpiHover
+                  panelId="nl-teamprofile-rang-pop"
+                  ariaLabel={`Rang ${data.teamName} — Ligatabelle`}
+                  align="start"
+                  chip={
+                    <StatChip
+                      label="Rang"
+                      value={liveHistoryRow?.rank != null ? `#${formatNlNumber(liveHistoryRow.rank, 0)}` : "—"}
+                      tone="accent"
+                      title="Ligarang — Details im Hover"
+                    />
+                  }
+                >
+                  {renderRangPanel()}
+                </HeaderKpiHover>
                 <StatChip
                   label="Punkte"
                   value={formatNlNumber(liveHistoryRow?.points, 1)}
@@ -780,14 +1211,41 @@ export default function TeamProfileNewLook({
                   onClick={() => scrollToSection(rosterCardRef)}
                   title="Zum Kader springen"
                 />
-                <StatChip
-                  label="Cash"
-                  value={formatNlNumber(data.cash, 1)}
-                  tone={data.cash != null && data.cash < 0 ? "risk" : "neutral"}
-                  title="Liquide Mittel"
-                />
-                <StatChip label="MW" value={formatNlNumber(data.marketValueTotal, 2)} title="Marktwert gesamt" />
-                <StatChip label="Gehalt" value={formatNlNumber(data.salaryTotal, 2)} title="Gehaltsblock des Kaders" />
+                <HeaderKpiHover
+                  panelId="nl-teamprofile-cash-pop"
+                  ariaLabel={`Cash ${data.teamName} — GuV`}
+                  align="start"
+                  chip={
+                    <StatChip
+                      label="Cash"
+                      value={formatNlNumber(data.cash, 1)}
+                      tone={data.cash != null && data.cash < 0 ? "risk" : "neutral"}
+                      title="Liquide Mittel — GuV im Hover"
+                    />
+                  }
+                >
+                  {renderCashPanel()}
+                </HeaderKpiHover>
+                <HeaderKpiHover
+                  panelId="nl-teamprofile-mw-pop"
+                  ariaLabel={`Marktwert ${data.teamName} — Zusammensetzung`}
+                  align="end"
+                  chip={
+                    <StatChip label="MW" value={formatNlNumber(data.marketValueTotal, 2)} title="Marktwert gesamt — Aufschlüsselung im Hover" />
+                  }
+                >
+                  {renderMwPanel()}
+                </HeaderKpiHover>
+                <HeaderKpiHover
+                  panelId="nl-teamprofile-gehalt-pop"
+                  ariaLabel={`Gehalt ${data.teamName} — Aufschlüsselung`}
+                  align="end"
+                  chip={
+                    <StatChip label="Gehalt" value={formatNlNumber(data.salaryTotal, 2)} title="Gehaltsblock des Kaders — Aufschlüsselung im Hover" />
+                  }
+                >
+                  {renderGehaltPanel()}
+                </HeaderKpiHover>
                 {teamSummary.expiringCount > 0 ? (
                   <StatChip
                     label="Auslaufend"
