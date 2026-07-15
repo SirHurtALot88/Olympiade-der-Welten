@@ -7,6 +7,7 @@ import {
   NlCard,
   NlMedalBadge,
   NlRankingDrawer,
+  NlSkeletonCard,
   NlSubTabs,
   NlTable,
   StatChip,
@@ -922,7 +923,10 @@ function LeagueAchievementsPanel({
   if (!achievements.hasData) {
     return (
       <NlCard className="nl-achievements-empty-card" title="Erfolge & Meilensteine">
-        <p className="nl-records-empty-text">Erfolge werden geladen …</p>
+        <div role="status" aria-busy="true">
+          <span className="sr-only">Erfolge werden geladen …</span>
+          <NlSkeletonCard lines={3} />
+        </div>
       </NlCard>
     );
   }

@@ -24,6 +24,10 @@
  *   auf einen KPI-Chip (OVR/PPs/MVS/Punkte/MW/…) statt einer vollen
  *   Seiten-Navigation; Zeilen kommen aus der bereits vorhandenen Rangliste
  *   der jeweiligen Oberfläche.
+ * - NlSkeleton / NlSkeletonTable / NlSkeletonCard: gemeinsames Lade-
+ *   Platzhalter-Primitive (text/line/block/circle/card) mit geteiltem
+ *   Shimmer (`@keyframes nl-skeleton-shimmer`); dekorativ (`aria-hidden`),
+ *   respektiert prefers-reduced-motion (statisch, gedämpft)
  * - useCountUp / NlCountUpValue: Zähler-Animation für Hero-/KPI-Zahlen
  *   (respektiert prefers-reduced-motion); dazu die CSS-only Reveal-Klasse
  *   `.nl-reveal` (+ `--nl-reveal-i` Stagger-Index) für gestaffelten Karten-Einstieg.
@@ -90,4 +94,13 @@ export {
   type NlTone,
 } from "@/components/foundation/new-look/nl-tones";
 export { NlWhatIfSlider, type NlWhatIfSliderProps } from "@/components/foundation/new-look/NlWhatIfSlider";
+export {
+  NlSkeleton,
+  NlSkeletonTable,
+  NlSkeletonCard,
+  type NlSkeletonProps,
+  type NlSkeletonVariant,
+  type NlSkeletonTableProps,
+  type NlSkeletonCardProps,
+} from "@/components/foundation/new-look/NlSkeleton";
 export { formatNlMoney } from "@/components/foundation/new-look/nl-format";

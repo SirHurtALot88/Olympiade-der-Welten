@@ -33,6 +33,13 @@ export type NlRadarSeries = {
   label?: string;
   tone?: NlTone;
   dashed?: boolean;
+  /**
+   * Optionales, explizites SVG-`stroke-dasharray` (z. B. `"6 4"`, `"2 3"`,
+   * `"10 4 2 4"`). Gibt jeder Serie ein UNTERSCHEIDBARES Linienmuster —
+   * nötig, wenn mehrere Serien sonst nur über die Farbe trennbar wären
+   * (Rot-Grün-Colorblind). Überschreibt `dashed`. `"none"`/leer = solide.
+   */
+  dashPattern?: string;
   /** Werte je Achsen-Key aus `axisDefs`; fehlende Achsen werden mit 0 gezeichnet. */
   values: Record<string, number | null | undefined>;
 };
@@ -135,6 +142,7 @@ export function NlRadar({
         label: entry.label ?? entry.id,
         tone: entry.tone ?? ("accent" as NlTone),
         dashed: !!entry.dashed,
+        dashPattern: entry.dashPattern && entry.dashPattern !== "none" ? entry.dashPattern : undefined,
         points,
         polygon: polygonAttr(points),
       };
@@ -233,7 +241,8 @@ export function NlRadar({
           <polygon
             key={entry.id}
             points={entry.polygon}
-            className={`nl-radar-shape nl-radar-shape-series ${nlToneClass(entry.tone)}${entry.dashed ? " is-dashed" : ""}`}
+            className={`nl-radar-shape nl-radar-shape-series ${nlToneClass(entry.tone)}${entry.dashed && !entry.dashPattern ? " is-dashed" : ""}`}
+            style={entry.dashPattern ? { strokeDasharray: entry.dashPattern } : undefined}
           >
             <title>
               {entry.label}: {entry.points.map((point) => `${point.label} ${formatNlNumber(point.value)}`).join(", ")}

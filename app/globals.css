@@ -42203,7 +42203,9 @@ button.foundation-team-portrait-card {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--nl-mut-2);
+  /* Kontrast: --nl-mut-2 (~3.7:1) fiel unter AA für diese kleine Beschriftung;
+     --nl-mut hebt auf ~6.8:1 gegen die dunklen Panels (Colorblind-/Kontrast-Audit). */
+  color: var(--nl-mut);
 }
 /* Fatigue-/Intensitaets-Gauges: kompakter, damit sie in Detail-/Briefing-
    Kontexte (Player-Drawer, Arena-Briefing) passen. */
@@ -43688,6 +43690,132 @@ button.foundation-team-portrait-card {
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
   opacity: 0.6;
+}
+
+/* ============================================================
+   NL Skeleton — gemeinsames Lade-Platzhalter-Primitive
+   ------------------------------------------------------------
+   EIN kanonisches Vokabular (`.nl-skeleton*`) mit einem geteilten
+   Shimmer (`@keyframes nl-skeleton-shimmer`). Token-korrekt (`--nl-*`),
+   themekonsistent, und respektiert `prefers-reduced-motion` (statische,
+   gedämpfte Füllung ohne Bewegung). Die älteren Ad-hoc-Skeletons
+   (arena/season/panel) bleiben bewusst bestehen — dies ist additiv.
+   ============================================================ */
+.is-new-look .nl-skeleton {
+  display: block;
+  border-radius: var(--nl-r-sm);
+  background-color: var(--nl-panel-2);
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--nl-panel-2) 85%, transparent) 0%,
+    color-mix(in srgb, var(--nl-line-2) 60%, var(--nl-panel-2)) 45%,
+    color-mix(in srgb, var(--nl-panel-2) 85%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: nl-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.is-new-look .nl-skeleton--text,
+.is-new-look .nl-skeleton--line {
+  height: 12px;
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton--block {
+  height: 72px;
+  width: 100%;
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .nl-skeleton--circle {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--nl-r-pill);
+}
+
+.is-new-look .nl-skeleton--card {
+  height: 120px;
+  width: 100%;
+  border-radius: var(--nl-r-lg);
+}
+
+.is-new-look .nl-skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+.is-new-look .nl-skeleton-table-row {
+  display: grid;
+  grid-template-columns: repeat(var(--nl-skeleton-cols, 4), minmax(0, 1fr));
+  gap: var(--nl-s3);
+  align-items: center;
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-skeleton-table-row--head {
+  opacity: 0.75;
+}
+
+.is-new-look .nl-skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-lg);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-skeleton-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-skeleton-card-head-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-loading-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  width: 100%;
+}
+
+@keyframes nl-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--nl-panel-2);
+    opacity: 0.7;
+  }
 }
 
 .is-new-look .nl-standings-empty-text {
@@ -63481,11 +63609,20 @@ button.nl-players-axis:focus-visible {
 }
 
 .is-new-look .nl-pcompare-legend-swatch {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--nl-tone, var(--nl-accent));
+  /* Linien-Swatch statt Farbpunkt: zeigt das echte Serien-Linienmuster
+     (solid/dash/dot/dash-dot), damit Legende→Radar-Polygon nicht nur über
+     die Farbe zugeordnet werden muss (Colorblind-Audit P2). */
+  width: 22px;
+  height: 8px;
   flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+.is-new-look .nl-pcompare-legend-swatch svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 .is-new-look .nl-pcompare-legend-name {

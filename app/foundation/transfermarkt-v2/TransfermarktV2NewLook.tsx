@@ -11,6 +11,7 @@ import {
   NlDeltaChip,
   NlProgressBar,
   NlRadar,
+  NlSkeletonCard,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -930,9 +931,12 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               );
             })}
             {marketBusy && candidates.length === 0 ? (
-              <p className="nl-market-muted" aria-busy="true">
-                Kandidaten laden…
-              </p>
+              <div className="nl-market-loading-skeletons" role="status" aria-busy="true">
+                <span className="sr-only">Kandidaten laden…</span>
+                {Array.from({ length: 4 }, (_, index) => (
+                  <NlSkeletonCard key={`nl-market-skeleton-${index}`} lines={2} withAvatar />
+                ))}
+              </div>
             ) : null}
             {!marketBusy && !marketError && candidates.length === 0 ? (
               <p className="nl-market-muted">Keine Kandidaten im aktuellen Filter — Suche oder Limits weiter stellen.</p>
