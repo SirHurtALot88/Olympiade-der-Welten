@@ -58746,6 +58746,164 @@ button.nl-players-axis:focus-visible {
   gap: 4px;
 }
 
+/* --- Trophäenschrank (Season-für-Season-Meister) --------------------- */
+.is-new-look .nl-records-trophy-hint {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-records-trophy-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.is-new-look .nl-records-trophy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--nl-bg-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-records-trophy-season {
+  font-weight: 700;
+  font-size: 12px;
+  min-width: 72px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-records-trophy-podium {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  flex: 1;
+}
+
+.is-new-look .nl-records-trophy-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.is-new-look .nl-records-trophy-slot.is-gold strong,
+.is-new-look .nl-records-trophy-slot.is-gold {
+  font-weight: 700;
+}
+
+.is-new-look .nl-records-trophy-slot.is-silver,
+.is-new-look .nl-records-trophy-slot.is-bronze {
+  color: var(--nl-mut);
+}
+
+/* ===================================================================
+   "Neuer Look" — Legendäre Spieler (Hall-of-Fame-Sub-Tab, Karriere-Podium
+   + sortierbare Karriere-Bestenliste). Namespacing: `.nl-legends-*`.
+   =================================================================== */
+
+.is-new-look .nl-legends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-legends-podium {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nl-s3);
+  margin: var(--nl-s3) 0;
+}
+
+.is-new-look .nl-legends-podium-card-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--nl-s3);
+  border-radius: 14px;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-bg-2);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.is-new-look .nl-legends-podium-card-item:hover,
+.is-new-look .nl-legends-podium-card-item:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-legends-podium-card-item.is-rank-1 {
+  border-color: color-mix(in srgb, gold 55%, var(--nl-line));
+  background: color-mix(in srgb, gold 10%, var(--nl-bg-2));
+}
+
+.is-new-look .nl-legends-podium-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-bg-2);
+  font-weight: 700;
+}
+
+.is-new-look .nl-legends-podium-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.is-new-look .nl-legends-podium-teams {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-legends-podium-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.is-new-look .nl-legends-podium-sub {
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-legends-table-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.is-new-look .nl-legends-table-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--nl-bg-2);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 /* ===================================================================
    "Neuer Look" — Scouting-Center Wave 2 (Erkenntnis-Ladder + Shortlist-Board)
    Scratch file — merge under `.is-new-look` in app/globals.css.
