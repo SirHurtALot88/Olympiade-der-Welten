@@ -1,0 +1,29 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { getAuthConfig } from "@/lib/auth/config";
+import { COOKIE_NAME, createSessionToken } from "@/lib/auth/session";
+
+export async function POST(req: NextRequest) {
+  const auth = getAuthConfig();
+
+  if (!auth.enabled || auth.misconfigured) {
+    return NextResponse.json({ error: "auth_misconfigured" }, { status: 503 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (password.length === 0 || password !== auth.password) {
+    return NextResponse.json({ error: "invalid_password" }, { status: 401 });
+  }
+
+  const token = await createSessionToken(auth.secret!);
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  return res;
+}

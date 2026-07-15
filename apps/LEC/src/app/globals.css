@@ -1,0 +1,131 @@
+/*
+ * Design-Tokens 1:1 aus apps/LEC/design-reference.html uebernommen
+ * (Dark/Light via prefers-color-scheme + data-theme-Override, Semantikfarben,
+ * Dichte). Siehe docs/enterich-cards/KONZEPT.md §9.
+ */
+:root {
+  --bg: #f4f2f8;
+  --panel: #ffffff;
+  --panel2: #faf8fc;
+  --ink: #211c2b;
+  --muted: #665f79;
+  --faint: #9990a6;
+  --border: #e6e1ee;
+  --line: #efeaf5;
+  --accent: #a8791f;
+  --accent-ink: #7d5a12;
+  --accent-soft: #f4e8cf;
+  --good: #1c9860;
+  --good-bg: #e2f3ea;
+  --warn: #96610d;
+  --warn-bg: #f7e6cc;
+  --crit: #c84040;
+  --crit-bg: #fbe3e3;
+  --market: #356bb0;
+  --market-bg: #e6eef9;
+  --shadow: 0 1px 2px rgba(30, 20, 50, 0.04), 0 8px 24px -12px rgba(40, 25, 70, 0.12);
+  --r: 14px;
+  --r-sm: 9px;
+  --fs-mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  --fs-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131019;
+    --panel: #1d1726;
+    --panel2: #241d30;
+    --ink: #ece7f3;
+    --muted: #a79eb7;
+    --faint: #746b86;
+    --border: #2f2540;
+    --line: #271e35;
+    --accent: #d8ab45;
+    --accent-ink: #e7c877;
+    --accent-soft: #372c18;
+    --good: #43c188;
+    --good-bg: #152820;
+    --warn: #e2a13f;
+    --warn-bg: #2b2312;
+    --crit: #e46a6a;
+    --crit-bg: #2c1a1d;
+    --market: #63a0e6;
+    --market-bg: #152234;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f2f8;
+  --panel: #ffffff;
+  --panel2: #faf8fc;
+  --ink: #211c2b;
+  --muted: #665f79;
+  --faint: #9990a6;
+  --border: #e6e1ee;
+  --line: #efeaf5;
+  --accent: #a8791f;
+  --accent-ink: #7d5a12;
+  --accent-soft: #f4e8cf;
+  --good: #1c9860;
+  --good-bg: #e2f3ea;
+  --warn: #96610d;
+  --warn-bg: #f7e6cc;
+  --crit: #c84040;
+  --crit-bg: #fbe3e3;
+  --market: #356bb0;
+  --market-bg: #e6eef9;
+  --shadow: 0 1px 2px rgba(30, 20, 50, 0.04), 0 8px 24px -12px rgba(40, 25, 70, 0.12);
+}
+
+:root[data-theme="dark"] {
+  --bg: #131019;
+  --panel: #1d1726;
+  --panel2: #241d30;
+  --ink: #ece7f3;
+  --muted: #a79eb7;
+  --faint: #746b86;
+  --border: #2f2540;
+  --line: #271e35;
+  --accent: #d8ab45;
+  --accent-ink: #e7c877;
+  --accent-soft: #372c18;
+  --good: #43c188;
+  --good-bg: #152820;
+  --warn: #e2a13f;
+  --warn-bg: #2b2312;
+  --crit: #e46a6a;
+  --crit-bg: #2c1a1d;
+  --market: #63a0e6;
+  --market-bg: #152234;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fs-sans);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--fs-mono);
+}
+
+a {
+  color: inherit;
+}
