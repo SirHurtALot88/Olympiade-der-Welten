@@ -7,53 +7,70 @@ import {
   computeHk,
   computeMargin,
   computePriceCorridor,
-  fixedCostShare,
+  fixedCostPerUnit,
 } from "./costEngine";
 
 describe("buyShippingShare", () => {
   it("nimmt 1,15 EUR fuer Einzelkaeufe unter 5 Stueck", () => {
-    expect(buyShippingShare({ ek: 1, kind: "single", purchaseQty: 3, soldUnits365d: 10 }, DEFAULT_COST_SETTINGS)).toBeCloseTo(1.15);
+    expect(
+      buyShippingShare({ ek: 1, kind: "single", purchaseQty: 3, fixedCostPerUnit: 0 }, DEFAULT_COST_SETTINGS)
+    ).toBeCloseTo(1.15);
   });
 
   it("nimmt 1,30 EUR fuer Einzelkaeufe ab 5 Stueck", () => {
-    expect(buyShippingShare({ ek: 1, kind: "single", purchaseQty: 5, soldUnits365d: 10 }, DEFAULT_COST_SETTINGS)).toBeCloseTo(1.3);
+    expect(
+      buyShippingShare({ ek: 1, kind: "single", purchaseQty: 5, fixedCostPerUnit: 0 }, DEFAULT_COST_SETTINGS)
+    ).toBeCloseTo(1.3);
   });
 
   it("multipliziert 1,30 EUR mit der Packgroesse fuer Packs", () => {
     expect(
-      buyShippingShare({ ek: 1, kind: "pack", packSize: 3, soldUnits365d: 10 }, DEFAULT_COST_SETTINGS)
+      buyShippingShare({ ek: 1, kind: "pack", packSize: 3, fixedCostPerUnit: 0 }, DEFAULT_COST_SETTINGS)
     ).toBeCloseTo(3.9);
   });
 });
 
-describe("fixedCostShare", () => {
-  it("teilt die Jahresfixkosten (95+25+60=180) durch verkaufte Stueck/365T", () => {
-    expect(fixedCostShare(180, DEFAULT_COST_SETTINGS)).toBeCloseTo(1.0);
-    expect(fixedCostShare(360, DEFAULT_COST_SETTINGS)).toBeCloseTo(0.5);
+describe("fixedCostPerUnit (shopweit)", () => {
+  it("teilt die Jahresfixkosten (95+25+60=180) durch die SHOPWEITE verkaufte Stueckzahl/365T", () => {
+    expect(fixedCostPerUnit(180, DEFAULT_COST_SETTINGS)).toBeCloseTo(1.0);
+    expect(fixedCostPerUnit(360, DEFAULT_COST_SETTINGS)).toBeCloseTo(0.5);
   });
 
   it("gibt 0 zurueck ohne verkaufte Stueck (Division durch 0 vermeiden)", () => {
-    expect(fixedCostShare(0, DEFAULT_COST_SETTINGS)).toBe(0);
+    expect(fixedCostPerUnit(0, DEFAULT_COST_SETTINGS)).toBe(0);
   });
 });
 
 describe("computeHk", () => {
   it("baut die Selbstkosten HK fuer eine Einzelkarte auf (KONZEPT §7.3)", () => {
+    const shopFixed = fixedCostPerUnit(180, DEFAULT_COST_SETTINGS); // 1.0 EUR/Stk, shopweit
     const hk = computeHk(
-      { ek: 3.4, kind: "single", purchaseQty: 3, soldUnits365d: 180 },
+      { ek: 3.4, kind: "single", purchaseQty: 3, fixedCostPerUnit: shopFixed },
       DEFAULT_COST_SETTINGS
     );
-    // 3.40 + 1.15 (buyShip <5) + 0.67 (Versand) + 0.15 (Prio) + 0.053 (Verpackung) + 1.0 (Fixkosten 180/180)
+    // 3.40 + 1.15 (buyShip <5) + 0.67 (Versand) + 0.15 (Prio) + 0.053 (Verpackung) + 1.0 (shopweite Fixkosten/Stk)
     expect(hk.total).toBeCloseTo(3.4 + 1.15 + 0.67 + 0.15 + 0.053 + 1.0, 5);
   });
 
   it("baut die Selbstkosten HK fuer einen 3er-Pack auf", () => {
+    const shopFixed = fixedCostPerUnit(360, DEFAULT_COST_SETTINGS); // 0.5 EUR/Stk, shopweit
     const hk = computeHk(
-      { ek: 1.77, kind: "pack", packSize: 3, soldUnits365d: 360 },
+      { ek: 1.77, kind: "pack", packSize: 3, fixedCostPerUnit: shopFixed },
       DEFAULT_COST_SETTINGS
     );
-    // 1.77 + 3.90 (1.30x3) + 0.50 + 0.1875 + 0.062 + 0.5 (Fixkosten 180/360)
+    // 1.77 + 3.90 (1.30x3) + 0.50 + 0.1875 + 0.062 + 0.5 (shopweite Fixkosten/Stk)
     expect(hk.total).toBeCloseTo(1.77 + 3.9 + 0.5 + 0.1875 + 0.062 + 0.5, 5);
+  });
+
+  it("belastet einen Nischen-Artikel mit wenigen eigenen Verkaeufen NICHT mit der vollen Shop-Fixkostenlast", () => {
+    // Regressionstest fuer den Bug: Fixkosten duerfen nicht durch die eigene
+    // (kleine) Artikel-Stueckzahl geteilt werden, sondern durch die shopweite.
+    const shopFixed = fixedCostPerUnit(3000, DEFAULT_COST_SETTINGS); // grosser Shop, viele verkaufte Stueck/Jahr
+    const nicheArticleSoldOnce = computeHk(
+      { ek: 3.4, kind: "single", purchaseQty: 1, fixedCostPerUnit: shopFixed },
+      DEFAULT_COST_SETTINGS
+    );
+    expect(nicheArticleSoldOnce.fixedCostShare).toBeLessThan(1);
   });
 });
 

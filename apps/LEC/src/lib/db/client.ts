@@ -8,7 +8,10 @@ import path from "node:path";
 function resolveSqlitePath(): string {
   const configured = process.env.LEC_SQLITE_PATH;
   if (configured && configured.trim().length > 0) {
-    return configured;
+    // Immer absolut aufloesen (relativ zum cwd) -- siehe scripts/with-db-env.ts:
+    // die Prisma-CLI wuerde eine relative "file:"-URL sonst relativ zum
+    // prisma/-Ordner statt zum cwd aufloesen, was App und CLI auseinanderlaufen liesse.
+    return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
   }
   return path.join(process.cwd(), "data", "lec.sqlite");
 }

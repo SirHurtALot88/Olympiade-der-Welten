@@ -10,8 +10,15 @@ export interface HkInput {
   purchaseQty?: number;
   /** Pack-Groesse (z. B. 3 bei "3x"). Nur fuer "pack" relevant. */
   packSize?: number;
-  /** Verkaufte Stueck in 365 Tagen, fuer die Fixkosten-Umlage. */
-  soldUnits365d: number;
+  /**
+   * Fixkosten-Anteil je verkaufter Einheit (siehe fixedCostPerUnit()) — EIN
+   * shopweiter Wert, nicht pro Artikel! eBay-Shop-/Billbee-/Lexoffice-Gebuehren
+   * sind Gesamt-Fixkosten des Shops, keine Artikel-Fixkosten: sie muessen durch
+   * die shopweite 365-Tage-Stueckzahl geteilt werden, nicht durch die
+   * Verkaufsmenge des einzelnen Artikels (sonst wuerden Nischen-Artikel mit
+   * wenigen Verkaeufen faelschlich die komplette Fixkostenlast allein tragen).
+   */
+  fixedCostPerUnit: number;
 }
 
 /** Einkaufs-Versand-Anteil (KONZEPT §7.3): Einzel <5 Stk -> 1,15/Menge, sonst 1,30/Menge; Pack: 1,30/Menge x Packgroesse. */
@@ -23,12 +30,17 @@ export function buyShippingShare(input: HkInput, settings: CostSettingsValues): 
   return qty < 5 ? settings.buyShippingUnderFive : settings.buyShippingFive;
 }
 
-/** Fixkosten-Anteil je verkaufter Einheit: (eBay-Shop + Billbee + Lexoffice) EUR/Jahr geteilt durch verkaufte Stueck/365T. */
-export function fixedCostShare(soldUnits365d: number, settings: CostSettingsValues): number {
+/**
+ * Fixkosten-Anteil je verkaufter Einheit, SHOPWEIT (KONZEPT §7.3):
+ * (eBay-Shop + Billbee + Lexoffice) EUR/Jahr geteilt durch die INSGESAMT im
+ * Shop verkauften Stueck in 365 Tagen (ueber alle Artikel hinweg) — einmal
+ * pro Import berechnen, dann als Konstante an jeden Artikel weiterreichen.
+ */
+export function fixedCostPerUnit(totalShopUnitsSold365d: number, settings: CostSettingsValues): number {
   const yearlyFixed =
     settings.fixedYearlyEbayShop + settings.fixedYearlyBillbee + settings.fixedYearlyLexoffice;
-  if (soldUnits365d <= 0) return 0;
-  return yearlyFixed / soldUnits365d;
+  if (totalShopUnitsSold365d <= 0) return 0;
+  return yearlyFixed / totalShopUnitsSold365d;
 }
 
 export interface HkBreakdown {
@@ -48,7 +60,7 @@ export function computeHk(input: HkInput, settings: CostSettingsValues): HkBreak
   const shipping = isPack ? settings.shippingPack : settings.shippingSingle;
   const registeredMail = isPack ? settings.registeredPack : settings.registeredSingle;
   const packaging = isPack ? settings.packagingPack : settings.packagingSingle;
-  const fixed = fixedCostShare(input.soldUnits365d, settings);
+  const fixed = input.fixedCostPerUnit;
 
   const total = input.ek + buyShipping + shipping + registeredMail + packaging + fixed;
 
