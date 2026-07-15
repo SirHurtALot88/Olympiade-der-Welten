@@ -61795,6 +61795,362 @@ button.nl-players-axis:focus-visible {
 }
 
 /* ============================================================
+   NEUER LOOK — Team-Header Hover-Popovers (nl-kpipop-*)
+   ------------------------------------------------------------
+   Kompakte Hover-/Fokus-Dropdowns an den Header-KPI-Chips des
+   Team-Profils (RANG/CASH/MW/GEHALT), gerendert von
+   `HeaderKpiHover` in
+   app/foundation/team-profile/TeamProfileNewLook.tsx.
+   Spiegeln die Sprache des Ranking-Drawers (nl-rankdrawer-*):
+   dezente Panel-Fläche, Achsen-Töne (--nl-tone), tabulare Zahlen.
+   Flag-gated, additiv (nur unterhalb `.is-new-look`).
+   ============================================================ */
+.is-new-look .nl-kpipop {
+  /* Lokale Tokens dieses Blocks — nichts Bestehendes wird umbenannt. */
+  --nl-kpipop-bg: var(--nl-panel, #171a21);
+  --nl-kpipop-line: var(--nl-line-2, var(--nl-line, rgba(255, 255, 255, 0.12)));
+  --nl-kpipop-radius: var(--nl-r-md, 12px);
+  --nl-kpipop-shadow: var(--nl-e3, 0 18px 46px rgba(0, 0, 0, 0.44));
+  --nl-kpipop-width: 300px;
+  --nl-kpipop-gap: 6px;
+  --nl-kpipop-pad: var(--nl-s3, 12px);
+  position: relative;
+  display: inline-flex;
+}
+
+/* Trigger: umschließt die StatChip ohne deren Optik zu verändern. */
+.is-new-look .nl-kpipop-trigger {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: help;
+  border-radius: var(--nl-kpipop-radius);
+  display: inline-flex;
+}
+
+.is-new-look .nl-kpipop-trigger:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+/* Panel: absolut unter dem Chip, in der Viewport-Breite geklemmt. */
+.is-new-look .nl-kpipop-panel {
+  position: absolute;
+  top: calc(100% + var(--nl-kpipop-gap));
+  width: max-content;
+  min-width: 220px;
+  max-width: min(var(--nl-kpipop-width), calc(100vw - 24px));
+  z-index: 90;
+  padding: var(--nl-kpipop-pad);
+  background: var(--nl-kpipop-bg);
+  border: 1px solid var(--nl-kpipop-line);
+  border-radius: var(--nl-kpipop-radius);
+  box-shadow: var(--nl-kpipop-shadow);
+  color: var(--nl-ink, #e8edf5);
+  animation: nl-kpipop-in 0.14s ease-out;
+}
+
+.is-new-look .nl-kpipop-panel.is-start {
+  left: 0;
+  right: auto;
+}
+
+.is-new-look .nl-kpipop-panel.is-end {
+  right: 0;
+  left: auto;
+}
+
+.is-new-look .nl-kpipop-panel[hidden] {
+  display: none;
+}
+
+@keyframes nl-kpipop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-kpipop-panel {
+    animation: none;
+  }
+}
+
+.is-new-look .nl-kpipop-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2, 8px);
+}
+
+.is-new-look .nl-kpipop-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nl-s2, 8px);
+}
+
+.is-new-look .nl-kpipop-head-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.is-new-look .nl-kpipop-eyebrow {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-kpipop-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.is-new-look .nl-kpipop-total {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-kpipop-jump {
+  flex: none;
+  border: 1px solid var(--nl-kpipop-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-kpipop-jump:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.is-new-look .nl-kpipop-jump:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.is-new-look .nl-kpipop-note,
+.is-new-look .nl-kpipop-empty {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--nl-mut, #93a3bd);
+}
+
+/* --- RANG: kompakte Ligatabelle ---------------------------------- */
+.is-new-look .nl-kpipop-standings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-kpipop-standrow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.is-new-look .nl-kpipop-standrow.is-own {
+  border-color: var(--nl-accent, #5b9bff);
+  background: rgba(91, 155, 255, 0.12);
+}
+
+.is-new-look .nl-kpipop-standrank {
+  font-size: 0.8rem;
+  color: var(--nl-mut, #93a3bd);
+  min-width: 2.2em;
+}
+
+.is-new-look .nl-kpipop-standmain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.is-new-look .nl-kpipop-standtop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.is-new-look .nl-kpipop-standcode {
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+.is-new-look .nl-kpipop-standpts {
+  font-size: 0.76rem;
+  color: var(--nl-mut, #93a3bd);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-kpipop-standaxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.is-new-look .nl-kpipop-axis {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--nl-tone, var(--nl-mut, #93a3bd));
+  white-space: nowrap;
+}
+
+/* --- CASH: Mini-GuV ---------------------------------------------- */
+.is-new-look .nl-kpipop-guv {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.is-new-look .nl-kpipop-guvrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.is-new-look .nl-kpipop-guvrow.is-result {
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--nl-kpipop-line);
+  font-weight: 700;
+}
+
+.is-new-look .nl-kpipop-guvlabel {
+  color: var(--nl-ink, #e8edf5);
+}
+
+.is-new-look .nl-kpipop-guvsign {
+  display: inline-block;
+  width: 0.9em;
+  color: var(--nl-mut, #93a3bd);
+}
+
+.is-new-look .nl-kpipop-guvval {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-tone, inherit);
+}
+
+/* --- MW / GEHALT: Spieler-Aufschlüsselung ------------------------ */
+.is-new-look .nl-kpipop-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-kpipop-playrow {
+  margin: 0;
+}
+
+.is-new-look .nl-kpipop-playbtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-kpipop-playbtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.is-new-look .nl-kpipop-playbtn:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 1px;
+}
+
+.is-new-look .nl-kpipop-playname {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-kpipop-playval {
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-kpipop-shape {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 5px;
+  color: var(--nl-tone, var(--nl-mut, #93a3bd));
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+
+.is-new-look .nl-kpipop-more {
+  font-size: 0.74rem;
+  color: var(--nl-mut, #93a3bd);
+  padding: 4px 6px;
+}
+
+/* Auf schmalen Screens links verankern + auf Viewport klemmen,
+   damit kein horizontaler Seiten-Overflow entsteht. */
+@media (max-width: 640px) {
+  .is-new-look .nl-kpipop-panel.is-start,
+  .is-new-look .nl-kpipop-panel.is-end {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* ============================================================
    NEUER LOOK — Spieler: Ligaweiter Analyse-/Ranking-Hub (#47)
    Additiv zum bestehenden Spieler-Verzeichnis. Alles unter
    `.is-new-look`, alle NEUEN Klassen mit `nl-phub-*` Präfix
