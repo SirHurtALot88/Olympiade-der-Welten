@@ -50778,6 +50778,87 @@ button.foundation-team-portrait-card {
   font-size: 0.66rem;
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   View-Breite Switch + Shell-Breiten-Modi
+   ────────────────────────────────────────────────────────────────────
+   Ersetzt funktional den entfernten kosmetischen Neuer-Look-Toggle: ein
+   kleiner, unaufdringlicher Segmented-Control in der Sidebar (Standard /
+   Breit / Cinema) wählt die Renderbreite der App. Die Wahl setzt
+   `data-view-width` auf `<main class="app-shell foundation-shell …">`
+   (siehe FoundationShellRouterBody). Die Basis-Breitenregel
+   (`.foundation-shell.app-shell`, weiter oben) bleibt der Standard —
+   hier werden nur `wide`/`cinema` als breitere Kappen ergänzt. `width:
+   min(…, calc(100vw - 24px))` sorgt weiterhin dafür, dass kleine
+   Viewports korrekt kollabieren (kein horizontaler Overflow).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* standard = unveränderter Default (min(1880px, calc(100vw - 24px))).
+   wide = breitere Kappe, cinema = effektiv volle Viewport-Breite. */
+.foundation-shell.app-shell[data-view-width="wide"] {
+  width: min(2240px, calc(100vw - 24px));
+}
+.foundation-shell.app-shell[data-view-width="cinema"] {
+  width: calc(100vw - 24px);
+}
+
+/* Segmented-Control in der Sidebar (Slot .foundation-sidebar-viewwidth). */
+.foundation-sidebar-viewwidth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 6px;
+}
+.foundation-sidebar-viewwidth-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-ink, #e8ecf5) 55%, transparent);
+}
+.foundation-sidebar-viewwidth-seg {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line, rgba(120, 108, 92, 0.35));
+  background: color-mix(in srgb, var(--nl-line, rgba(255, 255, 255, 0.08)) 30%, transparent);
+}
+.foundation-sidebar-viewwidth-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--nl-ink, #e8ecf5) 70%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.foundation-sidebar-viewwidth-option:hover {
+  opacity: 1;
+}
+.foundation-sidebar-viewwidth-option.is-active {
+  background: var(--nl-accent-soft, rgba(90, 210, 140, 0.18));
+  color: var(--nl-accent, #57d08a);
+  opacity: 1;
+}
+.foundation-sidebar-viewwidth-glyph {
+  font-size: 11px;
+  line-height: 1;
+}
+/* Auf sehr schmaler Sidebar nur die Glyphen zeigen — kein Umbruch/Overflow. */
+@media (max-width: 1200px) {
+  .foundation-sidebar-viewwidth-text {
+    display: none;
+  }
+}
+
 /* ── Batch b1: Home Hero-KPI-Portale (#26), Spieltag-Rail (#4),
       Team-Profil-Radar (#50) & Entwicklungs-Highlights (#51) ── */
 
