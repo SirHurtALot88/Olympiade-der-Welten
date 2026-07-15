@@ -39,13 +39,19 @@ describe("player potential service", () => {
   });
 
   it("maps potential ranges to FM-style min/max star slots", () => {
-    // Recalibrated percentile-anchored CA/PO star curve: 54 (~p75) → 3.5★, 78+ (~p99) → 5★.
-    expect(potentialScoreToStars(54)).toBe(3.5);
+    // Recalibrated CA/PO star curve with a real 0.5★ floor: weak players read as weak.
+    expect(potentialScoreToStars(22)).toBe(0.5);
+    expect(potentialScoreToStars(30)).toBe(1);
+    expect(potentialScoreToStars(47)).toBe(2.5);
+    expect(potentialScoreToStars(58)).toBe(3.5);
+    expect(potentialScoreToStars(70)).toBe(4.5);
     expect(potentialScoreToStars(78)).toBe(5);
-    expect(shouldShowPotentialRangeStars(54, 78)).toBe(true);
+    // Sub-floor scores clamp to 0.5★, not the old 1.5★ floor.
+    expect(potentialScoreToStars(10)).toBe(0.5);
+    expect(shouldShowPotentialRangeStars(58, 78)).toBe(true);
     expect(shouldShowPotentialRangeStars(88, 93)).toBe(false);
 
-    const slots = buildPotentialRangeStarSlots(54, 78);
+    const slots = buildPotentialRangeStarSlots(58, 78);
     expect(slots[3]).toMatchObject({ minFill: 0.5, maxFill: 1, showUncertain: true });
     expect(slots[4]).toMatchObject({ minFill: 0, maxFill: 1, showUncertain: true });
   });

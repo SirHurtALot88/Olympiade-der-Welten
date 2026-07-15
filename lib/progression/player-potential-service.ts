@@ -154,29 +154,29 @@ export function getPotentialBand(potential: number): PlayerPotentialBand {
 }
 
 /**
- * PERCENTILE-anchored CA/PO star curve (recalibrated to the MEASURED league).
+ * PERCENTILE-anchored CA/PO star curve (recalibrated to the MEASURED league,
+ * with a REAL 0.5★ floor so weak players read as weak).
  *
- * The old curve assumed CA/PO scores spanned 35–99 and mapped 35→2.0★, 99→5.0★.
- * The real catalog (data/generated/oly-player-stats.json, n=2984) is far lower and
- * denser: computeCurrentAbilityScore + player.potential both cluster ~30–78 with
+ * The real catalog (data/generated/oly-player-stats.json, n=2984) has CA/PO
+ * scores that cluster ~30–78 with
  *   p5≈29  p25≈39  p50≈46  p75≈54  p90≈62  p95≈68  p99≈78
- * so a genuinely above-average CA of 58 rendered only ~2.5★ and could not be told
- * apart from a mid player. The anchors below track that distribution (same
- * breakpoints used by the grade/color tiers on the per-axis scale in
- * arena-stat-visuals.ts), so a mid player looks mid and a strong one looks strong:
- *   p50 (~46) → ~2.75★ · p75 (~54) → 3.5★ · p90 (~62) → 4.0★ · p95 (~68) → 4.5★ ·
- *   p99+ (≥78) → 5.0★, low outliers floor at 1.5★.
- * Monotonic, piecewise-linear, continuous (fine-grained so CA 58 → ~3.75★ reads as
- * clearly above average). PO uses the same curve on its higher scores → saturates
- * cleanly at the 5★ ceiling. Signature/return type unchanged.
+ * An earlier recalibration tracked those percentiles but floored the low end at
+ * 1.5★, so a genuinely weak player (CA ~22, market value ~6 mio) still rendered
+ * ~2★ and could not be told apart from a mid player. The anchors below keep the
+ * same percentile-shaped intent at the top (strong players ~70 → 4.5★, ≥78 → 5★)
+ * but WIDEN the spread at the bottom with a true 0.5★ floor and a steeper low end:
+ *   ~22 (clearly sub-p5) → 0.5★ · ~30 (p5–p10) → 1.0★ · ~47 (median) → 2.5★ ·
+ *   ~58 → 3.5★ · ~70 → 4.5★ · ≥78 → 5.0★.
+ * Scores below the first anchor floor at 0.5★. Monotonic, piecewise-linear,
+ * continuous. PO uses the same curve on its higher scores → saturates cleanly at
+ * the 5★ ceiling. Signature/return type unchanged.
  */
 const CA_PO_STAR_ANCHORS: ReadonlyArray<readonly [score: number, stars: number]> = [
-  [30, 1.5],
-  [39, 2.0],
-  [46, 2.75],
-  [54, 3.5],
-  [62, 4.0],
-  [68, 4.5],
+  [22, 0.5],
+  [30, 1.0],
+  [47, 2.5],
+  [58, 3.5],
+  [70, 4.5],
   [78, 5.0],
 ];
 
