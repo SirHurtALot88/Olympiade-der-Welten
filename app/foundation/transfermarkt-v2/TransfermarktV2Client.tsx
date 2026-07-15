@@ -95,6 +95,8 @@ type MarketFilterSnapshot = {
   maxSalary: number;
   maxRatio: number;
   minFit: number;
+  /** Blendet Kandidaten mit fit < 0 aus (Söldner bleiben sichtbar). Default an. */
+  hidePoorFit: boolean;
 };
 type MarketFilterPreset = {
   id: string;
@@ -202,6 +204,7 @@ function createDefaultMarketFilterSnapshot(): MarketFilterSnapshot {
     maxSalary: DEFAULT_MAX_SALARY,
     maxRatio: DEFAULT_MAX_RATIO,
     minFit: 0,
+    hidePoorFit: true,
   };
 }
 
@@ -254,6 +257,7 @@ function sanitizeMarketFilterSnapshot(value: unknown): MarketFilterSnapshot {
     maxSalary: sanitizeNumber(value.maxSalary, defaults.maxSalary, 0, 250),
     maxRatio: sanitizeNumber(value.maxRatio, defaults.maxRatio, 0, 20),
     minFit: sanitizeNumber(value.minFit, defaults.minFit, 0, 25),
+    hidePoorFit: typeof value.hidePoorFit === "boolean" ? value.hidePoorFit : defaults.hidePoorFit,
   };
 }
 
@@ -373,6 +377,21 @@ function passesMarketMinFitFilter(item: TransfermarktFreeAgentItem, minFit: numb
     return true;
   }
   return (item.fit ?? Number.NEGATIVE_INFINITY) >= minFit;
+}
+
+/**
+ * Fit-Sichtbarkeitsfilter (Default an): blendet Kandidaten mit negativem Fit
+ * aus — AUSSER Söldnern (`mercenary === true`), die immer sichtbar bleiben.
+ * Reduziert die Kandidatenliste auf real passende Optionen.
+ */
+function passesMarketFitVisibilityFilter(item: TransfermarktFreeAgentItem, hidePoorFit: boolean) {
+  if (!hidePoorFit) {
+    return true;
+  }
+  if (item.mercenary === true) {
+    return true;
+  }
+  return (item.fit ?? Number.NEGATIVE_INFINITY) >= 0;
 }
 
 function passesMarketAxisFilters(
@@ -566,6 +585,7 @@ export default function TransfermarktV2Client({
   const [maxSalary, setMaxSalary] = useState(DEFAULT_MAX_SALARY);
   const [maxRatio, setMaxRatio] = useState(DEFAULT_MAX_RATIO);
   const [minFit, setMinFit] = useState(0);
+  const [hidePoorFit, setHidePoorFit] = useState(true);
   const [marketFeed, setMarketFeed] = useState<MarketFeedResponse | null>(null);
   const [marketItems, setMarketItems] = useState<TransfermarktFreeAgentItem[]>([]);
   const [marketBusy, setMarketBusy] = useState(false);
@@ -629,6 +649,7 @@ export default function TransfermarktV2Client({
     setMaxSalary(snapshot.maxSalary);
     setMaxRatio(snapshot.maxRatio);
     setMinFit(snapshot.minFit);
+    setHidePoorFit(snapshot.hidePoorFit);
   }
 
   function resetMarketFilters() {
@@ -650,8 +671,9 @@ export default function TransfermarktV2Client({
       maxSalary,
       maxRatio,
       minFit,
+      hidePoorFit,
     }),
-    [axisMinimums, maxRatio, maxSalary, maxValue, minFit, search, selectedAxes, selectedClassAxes, selectedClassNames, selectedDisciplineLens, selectedRaceNames, sortMode],
+    [axisMinimums, hidePoorFit, maxRatio, maxSalary, maxValue, minFit, search, selectedAxes, selectedClassAxes, selectedClassNames, selectedDisciplineLens, selectedRaceNames, sortMode],
   );
 
   useEffect(() => {
@@ -715,6 +737,9 @@ export default function TransfermarktV2Client({
       if (!passesMarketMinFitFilter(item, minFit)) {
         return false;
       }
+      if (!passesMarketFitVisibilityFilter(item, hidePoorFit)) {
+        return false;
+      }
       if (selectedClassNames.length > 0 && !selectedClassNames.includes(item.className)) {
         return false;
       }
@@ -734,7 +759,7 @@ export default function TransfermarktV2Client({
     });
 
     return sortCandidates(filtered, sortMode);
-  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, marketItems, minFit, selectedAxes, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
+  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedAxes, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
   const selectedPlayer = useMemo(
     () =>
       visibleItems.find((item) => item.playerId === selectedPlayerId) ??
@@ -1183,7 +1208,7 @@ export default function TransfermarktV2Client({
 
   useEffect(() => {
     setRenderedCandidateCount(MARKET_INITIAL_RENDER_COUNT);
-  }, [selectedTeamId, deferredSearch, sortMode, minFit, maxValue, maxSalary, maxRatio, selectedDisciplineLens, selectedClassNames, selectedClassAxes, selectedRaceNames, selectedAxes, axisMinimums]);
+  }, [selectedTeamId, deferredSearch, sortMode, minFit, hidePoorFit, maxValue, maxSalary, maxRatio, selectedDisciplineLens, selectedClassNames, selectedClassAxes, selectedRaceNames, selectedAxes, axisMinimums]);
 
   useEffect(() => {
     if (visibleItems.length <= renderedCandidateCount) {
@@ -1904,6 +1929,10 @@ export default function TransfermarktV2Client({
         axisMinimums={axisMinimums}
         onToggleAxis={(axis) => setSelectedAxes((current) => toggleSelection(current, axis))}
         onAxisMinimumChange={(axis, value) => setAxisMinimums((current) => ({ ...current, [axis]: value }))}
+        hidePoorFit={hidePoorFit}
+        onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
+        minRatioFilter={maxRatio}
+        onMinRatioFilterChange={(value) => setMaxRatio(value)}
         onResetFilters={resetMarketFilters}
         activeFilterCount={selectedClassNames.length + selectedRaceNames.length + selectedAxes.length + selectedClassAxes.length}
         candidates={renderedVisibleItems}

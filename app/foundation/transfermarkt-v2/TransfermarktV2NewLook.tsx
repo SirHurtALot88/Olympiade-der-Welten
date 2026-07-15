@@ -85,8 +85,21 @@ const NL_MARKET_SORT_LABELS: Record<TransfermarktNewLookSortMode, string> = {
   salary: "Niedriges Gehalt",
 };
 
+/** Erklär-Tooltips je Sort-Modus (Value = MW ÷ Gehalt; Potenzial = Markt-Prämie + Scouting-Konfidenz). */
+const NL_MARKET_SORT_TITLES: Record<TransfermarktNewLookSortMode, string> = {
+  need: "Sortiert nach dem Bedarfs-Score deines Kaders (Achsen/Disziplinen, die dir fehlen).",
+  fit: "Sortiert nach Team-Fit — wie gut der Spieler zu deinem Kader passt.",
+  value: "Value = MW ÷ Gehalt. Sortiert nach dem Marktwert-pro-Gehalt-Verhältnis (hoher Wert = viel Gegenwert je Gehalts-Einheit).",
+  potential:
+    "Sortiert nach der markt-bepreisten Potenzial-Prämie (Aufschlag im Marktwert) plus Scouting-Konfidenz — NICHT nach dem exakten, noch verdeckten Potenzial.",
+  cheap: "Sortiert nach dem niedrigsten Marktwert (Ablöse) zuerst.",
+  salary: "Sortiert nach dem niedrigsten Gehalt p.a. zuerst.",
+};
+
 const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = ["need", "fit", "value", "potential", "cheap", "salary"];
 const NL_MARKET_AXES: NlAxisKey[] = ["pow", "spe", "men", "soc"];
+/** Schnell-Stufen für den Mindest-MW/Gehalt-Filter (Value = MW ÷ Gehalt). */
+const NL_MARKET_RATIO_STEPS = [1, 1.5, 2.5, 4] as const;
 
 /** Achse → Vorsaison-Feld (Performance-Punkte + Rang) auf RosterRow.previousSeasonAxis. */
 const NL_PREV_SEASON_AXIS_KEYS: Record<
@@ -252,6 +265,12 @@ export type TransfermarktV2NewLookProps = {
   axisMinimums: Record<NlAxisKey, number>;
   onToggleAxis: (axis: NlAxisKey) => void;
   onAxisMinimumChange: (axis: NlAxisKey, value: number) => void;
+  /** Blendet Kandidaten mit negativem Fit aus (Söldner immer sichtbar); Default an. */
+  hidePoorFit: boolean;
+  onToggleHidePoorFit: () => void;
+  /** Mindest-MW/Gehalt-Ratio (0 = aus). Chips ≥1 / ≥1,5 / ≥2,5 / ≥4. */
+  minRatioFilter: number;
+  onMinRatioFilterChange: (value: number) => void;
   onResetFilters: () => void;
   activeFilterCount: number;
   // Kandidaten-Rail
@@ -323,6 +342,42 @@ export type TransfermarktV2NewLookProps = {
   buyModalOpen: boolean;
   buyModalSlot: ReactNode;
 };
+
+/**
+ * CA/PO-Sterne-Props für einen Markt-Kandidaten (FM26-Fog).
+ * - CA immer aus `ovr` (Current-Ability-Rating, auch bei Scouting 0 vorhanden).
+ * - PO als GESCHÄTZTE Sterne-SPANNE: bevorzugt echte `potentialStarsMin/Max`
+ *   bzw. `potentialRange`; sind die (noch) null, wird ein weites Fog-Band vom
+ *   CA-Boden bis zur ungescouteten Decke (Richtung 5★) aufgespannt. So bleibt
+ *   PO nie leer, ohne einen exakten verdeckten Wert zu verraten (known={false}).
+ */
+function getNlCandidateAbilityStarProps(item: TransfermarktFreeAgentItem): {
+  caScore: number | null;
+  poStarRange: { min: number; max: number } | null;
+  poScoreRange: { min: number; max: number } | null;
+  poStars: number | string | null;
+} {
+  const caScore = typeof item.ovr === "number" && Number.isFinite(item.ovr) ? item.ovr : null;
+  const poStarRange =
+    item.potentialStarsMin != null && item.potentialStarsMax != null
+      ? { min: item.potentialStarsMin, max: item.potentialStarsMax }
+      : null;
+  const poScoreRange = poStarRange
+    ? null
+    : item.potentialRange &&
+        Number.isFinite(item.potentialRange.min) &&
+        Number.isFinite(item.potentialRange.max)
+      ? item.potentialRange
+      : caScore != null
+        ? { min: caScore, max: 99 }
+        : null;
+  return {
+    caScore,
+    poStarRange,
+    poScoreRange,
+    poStars: item.potentialStarsMax ?? item.potentialStarsDisplay,
+  };
+}
 
 function getNlFitTone(fit: number | null | undefined): NlTone {
   const value = fit ?? -99;
@@ -452,6 +507,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     axisMinimums,
     onToggleAxis,
     onAxisMinimumChange,
+    hidePoorFit,
+    onToggleHidePoorFit,
+    minRatioFilter,
+    onMinRatioFilterChange,
     onResetFilters,
     activeFilterCount,
     candidates,
@@ -659,6 +718,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         </StatChipRow>
       </NlCard>
 
+      {/* Body-Wrapper: im Standard transparent (display:contents), in der
+          Breit-/Cinema-Ansicht ein zweispaltiges Raster (Liste links, Filter
+          als sticky Sidebar rechts) — siehe globals.css Task 6. */}
+      <div className="nl-market-body">
       <NlCard className="nl-market-controls-card" eyebrow="Markt-Pool" title="Suche, Sortierung & Filter">
         <div className="nl-market-controls">
           <label className="nl-market-search">
@@ -676,6 +739,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 type="button"
                 className={`nl-market-pill${sortMode === mode ? " is-active" : ""}`}
                 aria-pressed={sortMode === mode}
+                title={NL_MARKET_SORT_TITLES[mode]}
                 onClick={() => onSortModeChange(mode)}
               >
                 {NL_MARKET_SORT_LABELS[mode]}
@@ -732,6 +796,35 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               );
             })}
           </div>
+          <div className="nl-market-filter-extras" role="group" aria-label="Fit- und Value-Filter">
+            <label
+              className="nl-market-fit-toggle"
+              title="Blendet Kandidaten mit negativem Fit aus. Söldner (Mercenary) bleiben immer sichtbar."
+            >
+              <input type="checkbox" checked={hidePoorFit} onChange={onToggleHidePoorFit} />
+              <span>Nur passende (Fit ≥ 0) + Söldner</span>
+            </label>
+            <div className="nl-market-ratio-chips" role="group" aria-label="Mindest-Value (MW ÷ Gehalt)">
+              <span className="nl-market-ratio-chips-label" title="Value = MW ÷ Gehalt">
+                MW ÷ Gehalt ≥
+              </span>
+              {NL_MARKET_RATIO_STEPS.map((step) => {
+                const active = minRatioFilter === step;
+                return (
+                  <button
+                    key={`nl-ratio-${step}`}
+                    type="button"
+                    className={`nl-market-pill${active ? " is-active" : ""}`}
+                    aria-pressed={active}
+                    title={`Nur Kandidaten mit MW ÷ Gehalt ≥ ${formatNlNumber(step, 1)}`}
+                    onClick={() => onMinRatioFilterChange(active ? 0 : step)}
+                  >
+                    ≥ {formatNlNumber(step, 1)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
         {marketError ? (
           <div className="nl-market-error" role="alert">
@@ -783,7 +876,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </span>,
                 ];
               });
-              const detailHasTalent = Boolean(item.axisStarsDisplay || item.potentialStarsDisplay);
+              // CA/PO immer zeigen, sobald das Rating (ovr) vorliegt — nicht mehr an
+              // die (bei ungescouteten Agents null) Sterne-Felder gekoppelt.
+              const detailHasOvr = typeof item.ovr === "number" && Number.isFinite(item.ovr);
+              const detailHasTalent = detailHasOvr || Boolean(item.axisStarsDisplay || item.potentialStarsDisplay);
+              const detailStarProps = getNlCandidateAbilityStarProps(item);
               const detailHasTrend = Boolean(item.developmentTrend);
               const detailHasNeed = Boolean(item.needMatchLabel);
               const detailHasContent =
@@ -851,7 +948,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     <span className="nl-market-candidate-numbers nl-tnum">
                       <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
                       <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
-                      <small>OVR {formatNlNumber(item.ovr, 0)}</small>
+                      {typeof item.ovr === "number" && Number.isFinite(item.ovr) ? (
+                        <NlAbilityStars
+                          caScore={item.ovr}
+                          known
+                          compact
+                          label="Aktuell"
+                          className="nl-market-ca-stars"
+                        />
+                      ) : null}
                     </span>
                     {/* Expliziter Expand-Toggle (Touch/Tastatur). stopPropagation, damit
                         Klick/Enter/Space nicht zusätzlich die Kachel-Auswahl auslöst. */}
@@ -889,14 +994,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       <div className="nl-market-detail-meta">
                         {detailHasTalent ? (
                           <NlAbilityStars
-                            caStars={item.axisStarsOverall ?? item.axisStarsDisplay}
-                            poStarRange={
-                              item.potentialStarsMin != null && item.potentialStarsMax != null
-                                ? { min: item.potentialStarsMin, max: item.potentialStarsMax }
-                                : null
-                            }
-                            poScoreRange={item.potentialRange}
-                            poStars={item.potentialStarsMax ?? item.potentialStarsDisplay}
+                            caScore={detailStarProps.caScore}
+                            poStarRange={detailStarProps.poStarRange}
+                            poScoreRange={detailStarProps.poScoreRange}
+                            poStars={detailStarProps.poStars}
                             known={false}
                             label="Talent"
                           />
@@ -1013,7 +1114,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         tone={getNlFitTone(selectedPlayer.fit)}
                         sub={selectedPlayer.needMatchLabel ?? undefined}
                       />
-                      <StatChip label="OVR" value={formatNlNumber(selectedPlayer.ovr, 0)} tone="neutral" />
+                      {typeof selectedPlayer.ovr === "number" && Number.isFinite(selectedPlayer.ovr) ? (
+                        <NlAbilityStars
+                          caScore={selectedPlayer.ovr}
+                          known
+                          compact
+                          label="Aktuell"
+                          className="nl-market-ca-stars"
+                        />
+                      ) : null}
                     </StatChipRow>
                   </div>
                 </div>
@@ -1090,19 +1199,22 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   );
                 })()}
 
-                {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels). */}
-                {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay || selectedPlayer.developmentTrend ? (
+                {/* #18 — Potenzial-Sterne & Entwicklungs-Trend (fog-gated Anzeige-Labels).
+                    CA/PO immer sichtbar, sobald das Rating (ovr) vorliegt — auch bei
+                    ungescouteten Agents (FM26-Fog-Band statt "CA — PO —"). */}
+                {(() => {
+                  const focusStarProps = getNlCandidateAbilityStarProps(selectedPlayer);
+                  const focusHasStars =
+                    focusStarProps.caScore != null ||
+                    Boolean(selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay);
+                  return focusHasStars || selectedPlayer.developmentTrend ? (
                   <div className="nl-market-talent-row" aria-label="Potenzial & Entwicklung">
-                    {selectedPlayer.axisStarsDisplay || selectedPlayer.potentialStarsDisplay ? (
+                    {focusHasStars ? (
                       <NlAbilityStars
-                        caStars={selectedPlayer.axisStarsOverall ?? selectedPlayer.axisStarsDisplay}
-                        poStarRange={
-                          selectedPlayer.potentialStarsMin != null && selectedPlayer.potentialStarsMax != null
-                            ? { min: selectedPlayer.potentialStarsMin, max: selectedPlayer.potentialStarsMax }
-                            : null
-                        }
-                        poScoreRange={selectedPlayer.potentialRange}
-                        poStars={selectedPlayer.potentialStarsMax ?? selectedPlayer.potentialStarsDisplay}
+                        caScore={focusStarProps.caScore}
+                        poStarRange={focusStarProps.poStarRange}
+                        poScoreRange={focusStarProps.poScoreRange}
+                        poStars={focusStarProps.poStars}
                         known={false}
                         label="Talent"
                       />
@@ -1127,7 +1239,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       </span>
                     ) : null}
                   </div>
-                ) : null}
+                  ) : null;
+                })()}
 
                 {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore).
                     Kurzcode statt abgeschnittenem Namen + Teilnehmerzahl (entry.playerCount, gleiche Quelle
@@ -1424,6 +1537,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
             )}
           </NlCard>
         </div>
+      </div>
       </div>
 
       <div className="nl-market-context-grid">
@@ -1746,7 +1860,15 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                       </span>
                     </button>
                     <StatChipRow className="nl-market-roster-stats" aria-label={`${row.name} Kennzahlen`}>
-                      <StatChip label="OVR" value={formatNlNumber(row.ovr, 0)} tone="neutral" />
+                      {typeof row.ovr === "number" && Number.isFinite(row.ovr) ? (
+                        <NlAbilityStars
+                          caScore={row.ovr}
+                          known
+                          compact
+                          label="Aktuell"
+                          className="nl-market-ca-stars"
+                        />
+                      ) : null}
                       <StatChip label="PPs" value={formatNullablePps(row.pps)} tone="accent" />
                       <StatChip label="MVS" value={formatNullablePps(row.mvs)} tone="neutral" />
                       <StatChip label="MW" value={formatTransfermarktCurrency(row.marketValue)} tone="soc" />
