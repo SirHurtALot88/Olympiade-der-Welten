@@ -90,18 +90,34 @@ die Subdomain (`LEC_DOMAIN=leccards.duckdns.org`) folgt in `deploy/hetzner/`.
 
 ## Status / offene Punkte
 
-**Fertig (Phase 0/1, getestet):**
+**Fertig (Phase 0/1/2, getestet):**
 - Next.js+TS+Prisma/SQLite-Gerüst, Dockerfile, Zugangsschutz, `/api/health`.
 - Zahlen-/Datums-Parser, Set-Code-Extraktor, Namens-Normalisierer, Privatverkauf-Filter.
 - Billbee-/eBay-Importer, Matching-Engine (≈99% exakte Treffer an den echten Fixtures),
   Preis-Engine (HK/eBay-Gebuehren/VK-Korridor), Import-Pipeline mit DB I/II-Neuberechnung.
+- Regelbasiertes KI-Scoring (§8 Stufe 1: Champion/Solide/Beobachten/Fällt ab/
+  Low-Runner/Ladenhüter).
+- Dashboard-UI (`/`) — Port von `design-reference.html` auf echte importierte Daten:
+  KPI-Reihe mit Fenster-Umschalter, "Läuft gut/schlecht"-Panels, Sortiment-Tabelle
+  mit Velocity + Preis-Korridor, Betriebs-Quoten, KI-Empfehlungen. Cardmarket-Check
+  als klar markierter Provider-B-Platzhalter (`MarketPriceProvider`-Interface
+  vorbereitet, keine API, keine erfundenen Zahlen). Per Screenshot gegen echte
+  Fixture-Daten verifiziert.
 
-**Noch offen (Phase 2/3, siehe KONZEPT §10):**
-- Dashboard-UI (Port von `design-reference.html` auf echte importierte Daten).
-- Upload-UI fuer Billbee/eBay-Dateien + Review-Liste-UI fuer Ungematchtes.
-- Cardmarket-`MarketPriceProvider`-Interface (Provider B, manuelle Preiseingabe).
-- Regelbasiertes KI-Scoring (§8 Stufe 1) + LLM-Empfehlungs-Layer (Stufe 2).
+**Noch offen (Phase 3, siehe KONZEPT §10):**
+- Upload-UI fuer Billbee/eBay-Dateien + Review-Liste-UI fuer Ungematchtes (der
+  Import selbst funktioniert bereits, aber nur per CLI-Skript/direktem Prisma-
+  Zugriff, noch keine Web-Oberflaeche dafuer).
+- Manuelle Preiseingabe-UI fuer den `MarketPriceProvider` (Cardmarket-Check zeigt
+  aktuell nur den Platzhalter-Hinweis).
+- LLM-Empfehlungs-Layer (§8 Stufe 2, Klartext-Begründung hinter Feature-Flag).
+- "Totes Kapital" ist aktuell eine Naeherung ueber die Verkaufshistorie (Lebenszeit-
+  Verkaeufe, aber 0 in 365T) statt echtem Lagerbestand -- Billbee "Verkaeufe nach
+  Artikel" liefert keinen Bestand; dafuer waere der separate Billbee-Artikelstamm-
+  Export noetig (siehe KONZEPT §1.3 "Billbee Artikel").
 - Alt-Migrations-Importer aus `Yu Gi Oh Verkäufe.xlsx`.
+- Caddy-/`docker-compose`-Eintrag fuer die Subdomain in `deploy/hetzner/` (folgt
+  laut Chris separat, sobald das Gerüst inkl. Dockerfile steht).
 - Bekannte Vereinfachung: eBay-Gebuehren werden pro Artikel als Gebuehr/Stueck aus dem
   eBay-Report ermittelt und per Stueckzahl auf die Billbee-Fenster verteilt (die
   Berichtszeitraeume sind nicht exakt deckungsgleich) — siehe Kommentar in
