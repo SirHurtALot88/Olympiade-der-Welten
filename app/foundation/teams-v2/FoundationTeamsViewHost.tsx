@@ -9,7 +9,6 @@ import FoundationTeamsDetailPanel, {
 import FoundationTeamsNewLook, {
   type FoundationTeamsNewLookProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsNewLook";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 import type { GameState, Player, RosterEntry, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { FoundationTableSortState } from "@/lib/foundation/foundation-table-sort";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
@@ -140,10 +139,6 @@ export default function FoundationTeamsViewHost({
   onOpenSeason,
   ...panelProps
 }: FoundationTeamsViewHostProps) {
-  // "Neuer Look" Flag (additiv): entscheidet erst ganz unten am Return,
-  // welche Ansicht gerendert wird — alle Hooks laufen unverändert.
-  const [newLook] = useNewLook();
-
   const {
     shouldBuildTeamsOverviewTable,
     teamsHydrationPhase,
@@ -279,7 +274,7 @@ export default function FoundationTeamsViewHost({
   // "Neuer Look" Gate: nur für die Sub-Tabs "roster"/"portraits" — Verträge
   // und Transfer laufen weiterhin über das bestehende Panel. Flag aus =>
   // exakt der bisherige Render-Pfad (Zeilen darunter unverändert).
-  if (newLook && (selectedTeamDetailTab === "roster" || selectedTeamDetailTab === "portraits")) {
+  if (selectedTeamDetailTab === "roster" || selectedTeamDetailTab === "portraits") {
     return (
       <FoundationTeamsNewLook
         selectedTeam={selectedTeam}

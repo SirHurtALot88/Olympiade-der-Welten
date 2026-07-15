@@ -11,7 +11,6 @@ import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/components/foundation/new-look";
 import type { CSSProperties } from "react";
 import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 import { useViewWidth } from "@/lib/ui/view-width-preference";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
@@ -273,7 +272,6 @@ type ContextStatusChip = ReturnType<typeof buildContextStatusChips>[number];
 type MarketSellAreaRow = { key: string; value: number | null; tone: string };
 
 export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps) {
-  const [newLookEnabled] = useNewLook();
   const [viewWidthMode] = useViewWidth();
   const {
   activeContextMeta,
@@ -817,7 +815,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   // #81 — Ansichts-Titel + Breadcrumb (nur Neuer Look). Labels stammen aus der
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
-  const newLookBreadcrumbData = newLookEnabled ? getFoundationBreadcrumb(activeView as FoundationViewId) : null;
+  const newLookBreadcrumbData = getFoundationBreadcrumb(activeView as FoundationViewId);
   const newLookBreadcrumb = newLookBreadcrumbData ? (
     <nav className="foundation-shell-breadcrumb nl-breadcrumb" aria-label="Brotkrumen-Navigation" data-testid="foundation-breadcrumb">
       <span className="foundation-shell-breadcrumb-crumb is-root">{newLookBreadcrumbData.group}</span>
@@ -876,16 +874,16 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
   const inboxAllBadgeCount =
-    newLookEnabled && Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
+    Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
       ? activeTeamOpenInboxItems.length
       : null;
   const teamsRosterBadgeCount =
-    newLookEnabled && Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
+    Array.isArray(selectedRoster) && selectedRoster.length > 0 ? selectedRoster.length : null;
 
   return (
     (
     <FoundationSharedProvider>
-    <main className={`app-shell foundation-shell foundation-app${newLookEnabled ? " is-new-look" : ""}`} data-view-width={viewWidthMode}>
+    <main className="app-shell foundation-shell foundation-app is-new-look" data-view-width={viewWidthMode}>
       {bootstrapError && gameState?.season?.id === "loading" ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
           <strong>{bootstrapError}</strong>
@@ -2641,10 +2639,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
 
           {activeView === "players" ? (
-          // "Neuer Look" Flag-Gate (additiv): Flag an => komplett neu gebaute
-          // Spieler-Ansicht mit denselben Daten/Filtern/Sortierungen; Flag
-          // aus => bestehende Tabelle unverändert.
-          newLookEnabled ? (
             <FoundationPlayersTableNewLook
               rows={sortedPlayersTableRows}
               gameState={gameState}
@@ -2663,313 +2657,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               openPlayerDrawerById={openPlayerDrawerById}
               openTeamProfileById={openTeamProfileById}
             />
-          ) : (
-          <section className={`panel${getViewClass("players")}`} id="players-table">
-            <div className="panel-header">
-              <h2>Players</h2>
-            </div>
-            <div className="players-toolbar players-toolbar-compact">
-              <label className="filter-field">
-                <span>Umfang</span>
-                <select
-                  className="input"
-                  value={playerScope}
-                  onChange={(event) => setPlayerScope(event.target.value as PlayerTableScope)}
-                >
-                  <option value="active">Aktive Spieler</option>
-                  <option value="free_agents">Free Agents anzeigen</option>
-                  <option value="all">Alle Spieler anzeigen</option>
-                </select>
-              </label>
-              <label className="filter-field">
-                <span>Team</span>
-                <select
-                  className="input"
-                  value={playerTeamFilter}
-                  onChange={(event) => setPlayerTeamFilter(event.target.value)}
-                >
-                  <option value="ALL">Alle</option>
-                  {gameState.teams.map((team: Team) => (
-                    <option key={team.teamId} value={team.teamId}>
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="filter-field">
-                <span>Klasse</span>
-                <select
-                  className="input"
-                  value={playerClassFilter}
-                  onChange={(event) => setPlayerClassFilter(event.target.value)}
-                >
-                  <option value="ALL">Alle</option>
-                  {playerClassOptions.map((className: string) => (
-                    <option key={className} value={className}>
-                      {className}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <article className="metric-card players-count-card players-count-card-compact">
-                <span>Anzahl</span>
-                <strong>{playersTableRows.length}</strong>
-              </article>
-            </div>
-            <div className="players-bracket-strip">
-              {(
-                [
-                  { bracket: 1, range: "<12.5M" },
-                  { bracket: 2, range: "12.5–17.5M" },
-                  { bracket: 3, range: "17.5–22.5M" },
-                  { bracket: 4, range: "22.5–30M" },
-                  { bracket: 5, range: "30–37.5M" },
-                  { bracket: 6, range: "37.5–45M" },
-                  { bracket: 7, range: "45–55M" },
-                  { bracket: 8, range: "55–70M" },
-                  { bracket: 9, range: "70M+" },
-                ] as const
-              ).map(({ bracket, range }) => (
-                <span key={bracket} className="bracket-pill">
-                  <strong className="bracket-pill-bracket">B{bracket}</strong>
-                  <span className="bracket-pill-range">{range}</span>
-                  <strong className="bracket-pill-count">{playerBracketCounts[bracket] ?? 0}</strong>
-                </span>
-              ))}
-            </div>
-            <div className="table-shell">
-              <table className="team-table players-table">
-                <colgroup>
-                  {visiblePlayersTableColumns.map((column: FoundationTableColumn) => (
-                    <col key={column.id} style={{ width: `${getTableColumnWidth("playersTable", column)}px` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {visiblePlayersTableColumns.map((column: FoundationTableColumn) => (
-                      <th
-                        key={column.id}
-                        {...getTableHeaderDragProps("playersTable", column, visiblePlayersTableColumns)}
-                        style={{ width: `${getTableColumnWidth("playersTable", column)}px`, minWidth: `${column.minWidth}px` }}
-                      >
-                        <div className="resizable-header-cell">
-                          {column.id === "image" ? (
-                            <span>Bild</span>
-                          ) : (
-                            <SortableHeader label={column.label} tableId="playersTable" columnKey={column.dataKey} sortState={tableSorts.playersTable} onToggle={toggleTableSort} />
-                          )}
-                          <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("playersTable", column, event)} onDoubleClick={() => resetTableColumnWidth("playersTable", column)} />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedPlayersTableRows.slice(0, 160).map((row: FoundationPlayerScopeRow) => (
-                    <tr key={row.player.id} onClick={() => void openPlayerDrawerById(row.player.id, row.roster?.id)}>
-                      {visiblePlayersTableColumns.map((column: FoundationTableColumn) => {
-                        if (column.id === "image") {
-                          const portrait = getPlayerPortraitModel(row.player);
-                          return (
-                            <td key={column.id}>
-                              <FoundationPlayerPortraitPreview
-                                playerId={row.player.id}
-                                name={row.player.name}
-                                portraitUrl={portrait.src}
-                                portraitInitials={portrait.initials}
-                                playerOvr={row.playerOvr}
-                                playerMvs={row.playerMvs}
-                                playerPps={row.playerPps}
-                                pow={row.player.coreStats.pow ?? null}
-                                spe={row.player.coreStats.spe ?? null}
-                                men={row.player.coreStats.men ?? null}
-                                soc={row.player.coreStats.soc ?? null}
-                                leagueHeatPools={leaguePlayerHeatPools}
-                                variant="team"
-                                context="teamGrid"
-                                playerClassName={row.player.className}
-                                subMeta={row.team?.name ?? "Free Agent"}
-                              >
-                                <OptimizedMediaImage
-                                  className="transfermarkt-portrait"
-                                  src={portrait.src}
-                                  alt={row.player.name}
-                                  width={56}
-                                  height={56}
-                                  loading="lazy"
-                                  fetchPriority="low"
-                                  fallback={
-                                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
-                                      {portrait.initials}
-                                    </div>
-                                  }
-                                />
-                              </FoundationPlayerPortraitPreview>
-                            </td>
-                          );
-                        }
-                        if (column.id === "name") {
-                          return (
-                            <td key={column.id}>
-                              <div className="table-player-cell">
-                                <button
-                                  className="table-link-button"
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openPlayerDrawerById(row.player.id, row.roster?.id);
-                                  }}
-                                >
-                                  {row.player.name}
-                                </button>
-                                <span>{row.transferStatus}</span>
-                              </div>
-                            </td>
-                          );
-                        }
-                        if (column.id === "team") {
-                          const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
-                          const teamButton = (
-                            <button
-                              className="players-table-team-cell players-table-team-button"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (row.team) {
-                                  openTeamProfileById(row.team.teamId);
-                                }
-                              }}
-                            >
-                              {teamLogo?.src ? (
-                                <BudgetedMediaImage
-                                  className="players-table-team-logo"
-                                  src={teamLogo.src}
-                                  alt={`${row.team?.name ?? "Team"} Logo`}
-                                  loading="lazy"
-                                  fetchPriority="low"
-                                />
-                              ) : (
-                                <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
-                                  {teamLogo?.initials ?? "FA"}
-                                </span>
-                              )}
-                              <span>{row.team?.name ?? "Free Agent"}</span>
-                            </button>
-                          );
-                          const rowTeamId = row.team?.teamId ?? null;
-                          return (
-                            <td key={column.id}>
-                              {rowTeamId ? (
-                                <FoundationTeamPortraitPreview
-                                  resolveCardData={() => {
-                                    const teamDetail = buildTeamDetailDrawerData(rowTeamId, "full");
-                                    if (!teamDetail) return null;
-                                    return {
-                                      teamId: teamDetail.teamId,
-                                      teamName: teamDetail.teamName,
-                                      shortCode: teamDetail.shortCode,
-                                      logoUrl: teamDetail.logoUrl,
-                                      logoInitials: teamDetail.logoInitials,
-                                      rosterSize: teamDetail.rosterSize,
-                                      cash: teamDetail.cash,
-                                      salaryTotal: teamDetail.salaryTotal,
-                                      marketValueTotal: teamDetail.marketValueTotal,
-                                      powRank: teamDetail.powRank,
-                                      speRank: teamDetail.speRank,
-                                      menRank: teamDetail.menRank,
-                                      socRank: teamDetail.socRank,
-                                      generalManagerName: teamDetail.generalManager?.name ?? null,
-                                      boardConfidence: teamDetail.boardConfidence?.value ?? null,
-                                    };
-                                  }}
-                                >
-                                  {teamButton}
-                                </FoundationTeamPortraitPreview>
-                              ) : (
-                                teamButton
-                              )}
-                            </td>
-                          );
-                        }
-                        if (column.id === "class") {
-                          return (
-                            <td key={column.id}>
-                              <ClassIcon classNameValue={row.player.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
-                            </td>
-                          );
-                        }
-                        if (column.id === "race") {
-                          return (
-                            <td key={column.id}>
-                              <RaceIcon race={row.player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
-                            </td>
-                          );
-                        }
-                        if (column.id === "pps") return <td key={column.id} className={row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""}>{row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</td>;
-                        if (column.id === "ovr") return <td key={column.id} className={row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(row.playerOvr)}</td>;
-                        if (column.id === "mvs") return <td key={column.id} className={row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}>{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</td>;
-                        if (column.id === "mw") {
-                          const marketValue = getPlayerDisplayMarketValue(row.player);
-                          const marketValueDelta = getPlayerDisplayMarketValueDelta(row.player, row.roster, gameState);
-                          return (
-                            <td key={column.id}>
-                              <span className="players-table-money-cell">
-                                <span>{formatLocalePoints(marketValue, 2)}</span>
-                                {renderEconomyDelta(marketValueDelta, "higher", "players-table-money-delta")}
-                              </span>
-                            </td>
-                          );
-                        }
-                        if (column.id === "salary") {
-                          const salary = row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player);
-                          const salaryDelta = getRosterEntrySalaryDelta(row.roster, row.player, gameState);
-                          return (
-                            <td key={column.id}>
-                              <span className="players-table-money-cell">
-                                <span>{formatLocalePoints(salary, 2)}</span>
-                                {renderEconomyDelta(salaryDelta, "lower", "players-table-money-delta")}
-                              </span>
-                            </td>
-                          );
-                        }
-                        if (column.id === "contract") return <td key={column.id}>{row.roster ? row.roster.contractLength : "—"}</td>;
-                        if (column.id === "appearances") return <td key={column.id}>{row.seasonPerformance ? row.seasonPerformance.appearances : "—"}</td>;
-                        if (column.id === "bestDiscipline") {
-                          return (
-                            <td key={column.id}>
-                              <DisciplineIcon label={row.bestDiscipline ?? "—"} showLabel={Boolean(row.bestDiscipline)} />
-                            </td>
-                          );
-                        }
-                        if (column.id === "careerLeague") {
-                          const stats = row.careerLeagueStats;
-                          if (!stats) {
-                            return <td key={column.id}>—</td>;
-                          }
-                          return (
-                            <td key={column.id} title={`Alltime Liga: ${stats.seasonsPlayed} Saison(en) · ${stats.appearances} Einsätze · ${formatLocalePoints(stats.totalPps, 1)} PPs`}>
-                              <span className="players-table-career-stat">
-                                {stats.appearances} / {formatLocalePoints(stats.totalPps, 1)}
-                              </span>
-                            </td>
-                          );
-                        }
-                        const traits = [
-                          ...row.player.traitsPositive,
-                          ...row.player.traitsNegative.map((trait) => `-${trait}`),
-                        ];
-                        return <td key={column.id}>{traits.length > 0 ? traits.join(", ") : "—"}</td>;
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="muted players-footnote">
-              Farben sind liga-relativ: jede Stufe steht für ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
-            </p>
-          </section>
-          )
           ) : null}
 
           {activeView === "ranks" ? (

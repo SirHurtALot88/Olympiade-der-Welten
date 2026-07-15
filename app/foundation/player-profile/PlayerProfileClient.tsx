@@ -11,7 +11,6 @@ import {
   PLAYER_PROFILE_TAB_ANCHORS,
   type PlayerProfileTabId,
 } from "@/lib/foundation/player-profile-service";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 import type {
   TrainingClassOption,
   TrainingModeOption,
@@ -59,7 +58,6 @@ export default function PlayerProfileClient({
   // Ein Sentinel + IntersectionObserver blendet die Leiste erst ein, wenn
   // die Shell-Subnav aus dem Viewport gescrollt ist; ein zweiter Observer
   // hält den aktiven Tab beim Scrollen mit den Anker-Sektionen synchron.
-  const [newLookEnabled] = useNewLook();
   const [subTabsStuck, setSubTabsStuck] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const suppressScrollRef = useRef(false);
@@ -82,7 +80,7 @@ export default function PlayerProfileClient({
   }, [activeTab, data.playerId]);
 
   useEffect(() => {
-    if (!newLookEnabled || typeof IntersectionObserver === "undefined") {
+    if (typeof IntersectionObserver === "undefined") {
       setSubTabsStuck(false);
       return;
     }
@@ -99,10 +97,10 @@ export default function PlayerProfileClient({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [newLookEnabled, data.playerId]);
+  }, [data.playerId]);
 
   useEffect(() => {
-    if (!newLookEnabled || typeof IntersectionObserver === "undefined") {
+    if (typeof IntersectionObserver === "undefined") {
       return;
     }
     const tabByAnchorId = new Map<string, PlayerProfileTabId>(
@@ -151,26 +149,22 @@ export default function PlayerProfileClient({
       observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [newLookEnabled, data.playerId]);
+  }, [data.playerId]);
 
   return (
     <>
-      {newLookEnabled ? (
-        <>
-          <div ref={sentinelRef} className="is-new-look nl-profile-subtabs-sentinel" aria-hidden="true" />
-          <div
-            className={`is-new-look nl-profile-subtabs${subTabsStuck ? " is-stuck" : ""}`}
-            data-testid="player-profile-sticky-subtabs"
-          >
-            <NlSubTabs
-              items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
-              activeId={activeTab}
-              onSelect={(id) => onTabChange(id as PlayerProfileTabId)}
-              aria-label="Profil-Unterbereiche"
-            />
-          </div>
-        </>
-      ) : null}
+      <div ref={sentinelRef} className="is-new-look nl-profile-subtabs-sentinel" aria-hidden="true" />
+      <div
+        className={`is-new-look nl-profile-subtabs${subTabsStuck ? " is-stuck" : ""}`}
+        data-testid="player-profile-sticky-subtabs"
+      >
+        <NlSubTabs
+          items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+          activeId={activeTab}
+          onSelect={(id) => onTabChange(id as PlayerProfileTabId)}
+          aria-label="Profil-Unterbereiche"
+        />
+      </div>
       <PlayerDetailDrawer
         variant="page"
         data={data}

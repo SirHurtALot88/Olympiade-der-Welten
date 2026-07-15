@@ -17,7 +17,6 @@ import {
   sortPlayerProgressHistoryRows,
 } from "@/lib/foundation/player-progress-summary";
 import { NlDeltaChip } from "@/components/foundation/new-look";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 
 type PlayerAttributeProgressChartProps = {
   historyRows: PlayerDrawerHistoryRow[];
@@ -348,7 +347,6 @@ export default function PlayerAttributeProgressChart({
   classHistory = [],
   progressionEvents = [],
 }: PlayerAttributeProgressChartProps) {
-  const [newLookEnabled] = useNewLook();
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
 
   const sortedRows = useMemo(() => sortPlayerProgressHistoryRows(historyRows), [historyRows]);
@@ -372,19 +370,17 @@ export default function PlayerAttributeProgressChart({
   // `progressionEvents`). Ohne Ereignisse in den Daten bleibt die Zeile leer
   // (kein Marker wird erfunden).
   const eventTimelineRows = useMemo(
-    () => (newLookEnabled ? buildCareerEventTimelineRows(attributeHistoryRows, sortedRows) : []),
-    [newLookEnabled, attributeHistoryRows, sortedRows],
+    () => buildCareerEventTimelineRows(attributeHistoryRows, sortedRows),
+    [attributeHistoryRows, sortedRows],
   );
   const eventMarkers = useMemo(
     () =>
-      newLookEnabled
-        ? buildPlayerCareerEventMarkers({
-            historyRows: sortedRows,
-            classHistory,
-            progressionEvents,
-          })
-        : [],
-    [newLookEnabled, sortedRows, classHistory, progressionEvents],
+      buildPlayerCareerEventMarkers({
+        historyRows: sortedRows,
+        classHistory,
+        progressionEvents,
+      }),
+    [sortedRows, classHistory, progressionEvents],
   );
   const eventMarkersBySeasonKey = useMemo(() => {
     const map = new Map<string, PlayerCareerEventMarker[]>();
@@ -452,7 +448,7 @@ export default function PlayerAttributeProgressChart({
         </div>
       </div>
 
-      {newLookEnabled && eventTimelineRows.length > 0 && eventMarkers.length > 0 ? (
+      {eventTimelineRows.length > 0 && eventMarkers.length > 0 ? (
         <div data-testid="player-attribute-progress-event-timeline">
           <ProgressChartCollapsible
             testId="player-attribute-progress-event-timeline"

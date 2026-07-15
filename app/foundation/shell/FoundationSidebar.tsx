@@ -14,7 +14,6 @@ import {
   type FoundationSidebarOrderState,
 } from "@/lib/foundation/foundation-sidebar-order";
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 import { useViewWidth, type ViewWidthMode } from "@/lib/ui/view-width-preference";
 
 type FoundationSidebarProps = {
@@ -52,7 +51,6 @@ export default function FoundationSidebar({
   seasonContextLabel,
   teamPicker,
 }: FoundationSidebarProps) {
-  const [newLookEnabled] = useNewLook();
   const [viewWidthMode, setViewWidthMode] = useViewWidth();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
@@ -62,7 +60,7 @@ export default function FoundationSidebar({
   const contextParts = seasonContextLabel ? seasonContextLabel.split(" · ") : [];
   const seasonPart = contextParts[0] ?? null;
   const matchdayPart = contextParts[1] ?? null;
-  const canSplitContext = Boolean(newLookEnabled && seasonPart && matchdayPart);
+  const canSplitContext = Boolean(seasonPart && matchdayPart);
 
   useEffect(() => {
     const savedOrder = loadFoundationSidebarOrder();
