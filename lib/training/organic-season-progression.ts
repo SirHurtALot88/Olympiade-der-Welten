@@ -126,7 +126,7 @@ export type OrganicRegressionBreakdown = {
 };
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.337;
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.37;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0069;
@@ -157,7 +157,7 @@ function softKneeMarketValueForRegression(marktwertBase: number): number {
 }
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
 /** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
-export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 0.64;
+export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 1.05;
 const PERFORMANCE_SEASON_SOFT_KNEE = 5.5;
 /**
  * 2026-07-04 design correction: growth floors must derive from the player's own
@@ -249,12 +249,16 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
   const record = resolvePlayerPotentialRecordFromGameState({ gameState, playerId: player.id });
   const potential = record?.hiddenPotentialScore ?? null;
   if (potential == null) return 1;
-  if (potential >= 94) return 1.18;
-  if (potential >= 88) return 1.14;
-  if (potential >= 80) return 1.09;
-  if (potential >= 72) return 1.04;
-  if (potential >= 58) return 1;
-  return 0.94;
+  // Monotonic non-decreasing in potential: high-potential players (80+) share an elevated
+  // development plateau so genuine talents grow visibly, while mid/low potential develops
+  // slowly (and sub-58 nets below 1.0 so the league median stays roughly flat). This band
+  // structure is what widens peak-P90 vs the median instead of lifting the whole league.
+  if (potential >= 94) return 1.55;
+  if (potential >= 88) return 1.50;
+  if (potential >= 80) return 1.46;
+  if (potential >= 72) return 1.12;
+  if (potential >= 58) return 0.85;
+  return 0.75;
 }
 
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {

@@ -7,6 +7,7 @@ import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-
 import type {
   ContractNegotiationDraftStatus,
   GameState,
+  LeagueSetupTeamWarning,
   NewGameFlowStepId,
   NewGameFlowStepStatus,
 } from "@/lib/data/olyDataTypes";
@@ -439,7 +440,7 @@ export async function POST(request: Request) {
     });
     void (async () => {
       try {
-        await runAutoRosterFillForMatchdaySetup(
+        const fillResult = await runAutoRosterFillForMatchdaySetup(
           {
             source: "sqlite",
             saveId: setupSaveId,
@@ -449,11 +450,32 @@ export async function POST(request: Request) {
           },
           persistence,
         );
+        // Surface teams the fill could not bring up to their minimum roster (or that ended blocked) so the
+        // "ready" banner can flag them instead of pretending everything worked. The league is still playable
+        // ("ready"); these are "needs attention" markers, not a hard failure.
+        const leagueSetupWarnings: LeagueSetupTeamWarning[] = fillResult.teams
+          .filter((team) => team.rosterAfter < team.targetRosterMin)
+          .map((team) => ({
+            teamId: team.teamId,
+            teamName: team.teamName,
+            rosterAfter: team.rosterAfter,
+            targetMin: team.targetRosterMin,
+            status: team.status,
+          }));
+        if (leagueSetupWarnings.length > 0 || fillResult.summary.blockedTeams > 0) {
+          console.warn(
+            `[fresh-season-1] roster-fill left ${leagueSetupWarnings.length} team(s) below minimum, ${fillResult.summary.blockedTeams} blocked team(s).`,
+          );
+        }
         const filled = persistence.getSaveById(setupSaveId);
         if (filled) {
           persistence.saveSingleplayerState(setupSaveId, {
             ...filled.gameState,
-            seasonState: { ...filled.gameState.seasonState, leagueSetupStatus: "ready" },
+            seasonState: {
+              ...filled.gameState.seasonState,
+              leagueSetupStatus: "ready",
+              leagueSetupWarnings,
+            },
           });
         }
       } catch (error) {

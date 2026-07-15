@@ -2234,6 +2234,15 @@ export type AdminBalancingConfig = {
   updatedAt?: string | null;
 };
 
+/** A team the fresh-Season-1 background roster-fill left below its minimum roster (or otherwise blocked). */
+export type LeagueSetupTeamWarning = {
+  teamId: string;
+  teamName: string;
+  rosterAfter: number;
+  targetMin: number;
+  status: string;
+};
+
 export type SeasonState = {
   seasonId: string;
   schedule: Fixture[];
@@ -2247,6 +2256,13 @@ export type SeasonState = {
    * polls until "ready" before letting the human start matchdays.
    */
   leagueSetupStatus?: "in_progress" | "ready" | "failed";
+  /**
+   * Teams that the fresh-Season-1 background roster-fill could NOT bring up to their minimum roster (or that
+   * ended blocked). Empty/absent = every team reached at least its minimum. `leagueSetupStatus` may still be
+   * "ready" (the league is playable) while this is non-empty — the UI surfaces these as "needs attention"
+   * instead of pretending the fill fully succeeded, so an under-filled team is never silently shipped.
+   */
+  leagueSetupWarnings?: LeagueSetupTeamWarning[];
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
   teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;
