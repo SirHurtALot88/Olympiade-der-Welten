@@ -47320,6 +47320,17 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 
+/* Hover-Steckbrief-Anchor (Portrait + Name teilen dieselbe
+   `FoundationPlayerPortraitPreview`-Instanz) — Namens-Anchor muss die volle
+   Breite der Spalte annehmen, sonst greift die Ellipsis auf dem
+   `.nl-training-player-name-button` nicht (identisches Muster zu
+   `.nl-players-td-name .foundation-player-portrait-preview-anchor`). */
+.is-new-look .nl-training-player-copy .foundation-player-portrait-preview-anchor {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
 .is-new-look .nl-training-player-name {
   font-size: 15px;
   overflow: hidden;
