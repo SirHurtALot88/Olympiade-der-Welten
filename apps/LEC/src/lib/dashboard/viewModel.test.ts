@@ -73,6 +73,28 @@ describe("buildDashboardViewModel", () => {
     expect(vm.moversBad[0].nameRaw).toBe("Verlust");
   });
 
+  it("sortiert die Sortiment-Tabelle nach AKTUELLER Velocity, nicht nach Lebenszeit-Umsatz", () => {
+    // Regressionstest fuer KONZEPT §2: ein eingebrochener Alt-Renner mit hohem
+    // Lebenszeit-/365T-Umsatz darf einen aktuell aktiven Artikel mit kleinerem
+    // Umsatz NICHT verdraengen ("lief mal gut" vs. "läuft gut jetzt").
+    const articles: ArticleAggregate[] = [
+      article("Alter Bundle-Renner", {
+        windows: {
+          "365": agg({ qty: 0, revenue: 2000, ek: 600 }), // hoher Umsatz, aber 0 Verkaeufe in 365T? -> kein 30/90-Eintrag
+        },
+      }),
+      article("Aktueller Renner", {
+        windows: {
+          "30": agg({ qty: 3, revenue: 90 }),
+          "90": agg({ qty: 8, revenue: 240 }),
+          "365": agg({ qty: 20, revenue: 400, ek: 120 }),
+        },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment[0].nameRaw).toBe("Aktueller Renner");
+  });
+
   it("berechnet die Sortiment-Tabelle inkl. Preis-Korridor und Status", () => {
     const articles: ArticleAggregate[] = [
       article("Karte", {

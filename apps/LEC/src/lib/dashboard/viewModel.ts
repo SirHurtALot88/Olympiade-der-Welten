@@ -172,14 +172,23 @@ export function buildDashboardViewModel(
     .slice(0, 4)
     .map((a) => toMoverItem(a, "all"));
 
-  // Sortiment-Tabelle: Top-Artikel nach 365-Tage-Umsatz (Fallback: Lebenszeit).
+  // Sortiment-Tabelle: primär nach AKTUELLER Velocity (90d, dann 30d) sortiert,
+  // Umsatz nur als Tiebreaker -- NICHT nach Lebenszeit-/365T-Umsatz sortieren,
+  // sonst dominieren eingebrochene Alt-Renner ("Bundles waren mal stark,
+  // sind es aktuell aber nicht mehr", KONZEPT §2). "Läuft gut jetzt" statt
+  // "lief mal gut": aktive Artikel zuerst, Ladenhüter fallen ans Ende.
   const sortiment: SortimentRow[] = articles
     .filter((a) => (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0) > 0)
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+      const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
+      if (qty90Diff !== 0) return qty90Diff;
+      const qty30Diff = (b.windows["30"]?.qty ?? 0) - (a.windows["30"]?.qty ?? 0);
+      if (qty30Diff !== 0) return qty30Diff;
+      return (
         (b.windows["365"]?.revenue ?? b.windows.all?.revenue ?? 0) -
         (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
-    )
+      );
+    })
     .slice(0, 20)
     .map((a) => buildSortimentRow(a, classified.find((c) => c.article === a)!.articleClass, costSettings));
 
