@@ -7,12 +7,17 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlMedalBadge,
   NlProgressBar,
+  NlRadar,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
   useCountUp,
+  type NlMedalKind,
+  type NlRadarAxisDef,
+  type NlRadarSeries,
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
@@ -101,6 +106,25 @@ function getBarPercent(value: number | null, max: number): number {
   return Math.max(4, Math.min(100, (value / max) * 100));
 }
 
+/**
+ * Vergleichbare Achsen für das Stärkeprofil-Radar: D1/D2/Tagesscore sind
+ * dieselbe Einheit (Tagesscore = D1 + D2), `totalScore` ist auf dieser
+ * Vorschau-Ebene identisch mit dem Tagesscore und daher bewusst ausgelassen
+ * (keine zweite Achse mit identischem Wert).
+ */
+const SPREVIEW_RADAR_AXES: NlRadarAxisDef[] = [
+  { key: "d1", label: "D1" },
+  { key: "d2", label: "D2" },
+  { key: "matchday", label: "Tag" },
+];
+
+function getMedalKindForRank(rank: number | null): NlMedalKind | null {
+  if (rank === 1) return "gold";
+  if (rank === 2) return "silver";
+  if (rank === 3) return "bronze";
+  return null;
+}
+
 function compareProjectionRows(left: FoundationStandingsPreviewItem, right: FoundationStandingsPreviewItem) {
   const leftRank = left.projectedRank ?? left.currentRank ?? Number.POSITIVE_INFINITY;
   const rightRank = right.projectedRank ?? right.currentRank ?? Number.POSITIVE_INFINITY;
@@ -128,6 +152,10 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
   const hasProjectedPoints = rows.some((row) => row.projectedPoints != null);
   const maxD1 = rows.reduce((max, row) => (row.d1Score != null && row.d1Score > max ? row.d1Score : max), 0);
   const maxD2 = rows.reduce((max, row) => (row.d2Score != null && row.d2Score > max ? row.d2Score : max), 0);
+  const maxMatchday = rows.reduce(
+    (max, row) => (row.matchdayScore != null && row.matchdayScore > max ? row.matchdayScore : max),
+    0,
+  );
 
   const blockedRules = standingsPreviewFeed?.blockedRules ?? [];
   const blockedHint = buildBlockedRulesHint(blockedRules);
@@ -155,6 +183,51 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
   const animatedOwnProjectedRank = useCountUp(ownRow?.projectedRank ?? null);
   const animatedOwnPointsDelta = useCountUp(ownRow?.pointsDelta ?? null);
   const animatedOwnMatchdayRank = useCountUp(ownRow?.matchdayRank ?? null);
+
+  // Hero-Kennzahlen: projizierter (oder ersatzweise aktueller) Rang deines
+  // Teams + Rang-Delta — Grundlage für die Karten-Headline und den
+  // Medaillen-/Delta-Chip im Kopf der Forecast-Karte (#Season-Preview-Deepen).
+  const ownDisplayRank = ownRow?.projectedRank ?? ownRow?.currentRank ?? null;
+  const ownRankDelta =
+    ownRow?.currentRank != null && ownRow?.projectedRank != null
+      ? ownRow.currentRank - ownRow.projectedRank
+      : null;
+  const ownMedalKind = getMedalKindForRank(ownDisplayRank);
+  const animatedOwnDisplayRank = useCountUp(ownDisplayRank);
+
+  // Stärkeprofil-Radar: dein Team gegen den Liga-Schnitt über D1/D2/Tagesscore
+  // (dieselbe Einheit, siehe `SPREVIEW_RADAR_AXES`). Nur wenn dein Team und
+  // mindestens ein weiteres Team gespeicherte Tagesscores tragen.
+  const radarSeries = useMemo<NlRadarSeries[] | null>(() => {
+    if (ownRow?.d1Score == null || ownRow?.d2Score == null || ownRow?.matchdayScore == null) {
+      return null;
+    }
+    const valid = rows.filter((row) => row.d1Score != null && row.d2Score != null && row.matchdayScore != null);
+    if (valid.length === 0) {
+      return null;
+    }
+    const average = {
+      d1: valid.reduce((sum, row) => sum + (row.d1Score as number), 0) / valid.length,
+      d2: valid.reduce((sum, row) => sum + (row.d2Score as number), 0) / valid.length,
+      matchday: valid.reduce((sum, row) => sum + (row.matchdayScore as number), 0) / valid.length,
+    };
+    return [
+      {
+        id: "own",
+        label: ownRow.teamName,
+        tone: "accent",
+        values: { d1: ownRow.d1Score, d2: ownRow.d2Score, matchday: ownRow.matchdayScore },
+      },
+      {
+        id: "avg",
+        label: "Liga-Schnitt",
+        tone: "neutral",
+        dashed: true,
+        values: average,
+      },
+    ];
+  }, [ownRow, rows]);
+  const radarMax = Math.max(maxD1, maxD2, maxMatchday, 1);
 
   // Punkte-Delta je Team aus diesem Spieltag — existiert nur, wenn die Engine
   // wirklich projizierte Punkte liefert (`hasProjectedPoints`); sonst leer.
@@ -239,6 +312,7 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
       tone: "neutral" as NlTone,
     };
     const displayRank = row.projectedRank ?? row.currentRank;
+    const rowMedalKind = getMedalKindForRank(displayRank ?? null);
     const revealStyle = {
       ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
       "--nl-reveal-i": Math.min(revealIndex, 14),
@@ -247,7 +321,11 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
     return (
       <li key={row.teamId} className="nl-spreview-row nl-reveal" style={revealStyle}>
         <span className="nl-spreview-rank nl-tnum" title={hasProjection ? "Projizierter Rang" : "Aktueller Rang"}>
-          {displayRank ?? "—"}
+          {rowMedalKind ? (
+            <NlMedalBadge kind={rowMedalKind} count={displayRank ?? undefined} title={`Rang ${displayRank}`} />
+          ) : (
+            displayRank ?? "—"
+          )}
         </span>
         <button
           type="button"
@@ -374,7 +452,29 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
       </NlCard>
 
       {hasProjectedPoints && ownRow ? (
-        <NlCard className="nl-spreview-own-card" eyebrow="Dein Team" title="Rang- und Punkte-Forecast">
+        <NlCard
+          className="nl-spreview-own-card nl-spreview-hero-card"
+          eyebrow={`Dein Team · ${ownRow.teamName}`}
+          title={ownDisplayRank != null ? `Platz ${formatNlNumber(animatedOwnDisplayRank ?? ownDisplayRank, 0)}` : "Rang- und Punkte-Forecast"}
+          actions={
+            ownMedalKind || (ownRankDelta != null && ownRankDelta !== 0) ? (
+              <>
+                {ownMedalKind ? (
+                  <NlMedalBadge kind={ownMedalKind} title={`Projizierter Rang ${ownDisplayRank}`} />
+                ) : null}
+                {ownRankDelta != null && ownRankDelta !== 0 ? (
+                  <NlDeltaChip
+                    value={ownRankDelta}
+                    format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} Plätze`}
+                    title={
+                      ownRankDelta > 0 ? `Klettert ${ownRankDelta} Plätze` : `Fällt ${Math.abs(ownRankDelta)} Plätze`
+                    }
+                  />
+                ) : null}
+              </>
+            ) : null
+          }
+        >
           <StatChipRow aria-label="Forecast-Eckwerte deines Teams">
             <StatChip
               label="Rang vorher"
@@ -388,10 +488,10 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
               }
               tone="accent"
               sub={
-                ownRow.currentRank != null && ownRow.projectedRank != null && ownRow.currentRank !== ownRow.projectedRank
-                  ? ownRow.currentRank > ownRow.projectedRank
-                    ? `klettert ${ownRow.currentRank - ownRow.projectedRank}`
-                    : `fällt ${ownRow.projectedRank - ownRow.currentRank}`
+                ownRankDelta != null && ownRankDelta !== 0
+                  ? ownRankDelta > 0
+                    ? `klettert ${ownRankDelta}`
+                    : `fällt ${Math.abs(ownRankDelta)}`
                   : undefined
               }
             />
@@ -423,6 +523,26 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
               />
             </div>
           ) : null}
+        </NlCard>
+      ) : null}
+
+      {radarSeries ? (
+        <NlCard
+          className="nl-spreview-radar-card"
+          eyebrow="Stärkeprofil"
+          title="Dein Team im Liga-Vergleich"
+        >
+          <p className="nl-spreview-intro">
+            D1, D2 und Tagesscore dieses Spieltags gegen den Schnitt aller Teams mit gespeichertem Ergebnis.
+          </p>
+          <div className="nl-spreview-delta-chart-scroll">
+            <NlRadar
+              axisDefs={SPREVIEW_RADAR_AXES}
+              series={radarSeries}
+              max={radarMax}
+              aria-label={`Stärkeprofil ${ownRow?.teamName ?? "Dein Team"} gegen Liga-Schnitt über D1, D2 und Tagesscore`}
+            />
+          </div>
         </NlCard>
       ) : null}
 
