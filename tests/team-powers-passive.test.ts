@@ -85,6 +85,8 @@ describe("passive team power score wiring", () => {
     rosterPlayers: [
       {
         id: "p-1",
+        name: "Test Player",
+        coreStats: { pow: 60, spe: 60, men: 60, soc: 60 },
         attributeStats: {
           power: 60, health: 60, stamina: 60, intelligence: 60, awareness: 60, determination: 60,
           speed: 60, dexterity: 60, charisma: 60, will: 60, spirit: 60, torment: 60,
