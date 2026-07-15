@@ -281,12 +281,12 @@ a {
 
 @media (min-width: 1440px) {
   .foundation-shell-layout {
-    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-columns: 320px minmax(0, 1fr);
     gap: 24px;
   }
 
   .foundation-shell-main {
-    max-width: min(1500px, calc(100vw - 380px));
+    max-width: min(1500px, calc(100vw - 400px));
   }
 
   .foundation-shell .table-shell {
@@ -310,12 +310,12 @@ a {
 
 @media (min-width: 1920px) {
   .foundation-shell-layout {
-    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-columns: 360px minmax(0, 1fr);
     gap: 32px;
   }
 
   .foundation-shell-main {
-    max-width: min(1840px, calc(100vw - 440px));
+    max-width: min(1840px, calc(100vw - 460px));
   }
 
   .foundation-shell .team-table,
@@ -741,7 +741,9 @@ a {
 
 .foundation-shell-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  /* Widened from 220px: at 220px the nav labels and the active-team chip
+     ("XX · Team Name") clipped instead of wrapping/ellipsizing. */
+  grid-template-columns: 248px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -805,6 +807,7 @@ a {
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   padding: 8px 10px;
   border-radius: 12px;
   border: 1px solid transparent;
@@ -812,6 +815,16 @@ a {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* Nav label text: ellipsize long labels instead of hard-clipping/overflowing
+   the narrow sidebar column (was previously unconstrained, causing labels
+   to get chopped off — "abgehackt"). */
+.foundation-sidebar-item > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .foundation-sidebar-item.is-dragging {
@@ -50900,10 +50913,59 @@ button.foundation-team-portrait-card {
 /* standard = unveränderter Default (min(1880px, calc(100vw - 24px))).
    wide = breitere Kappe, cinema = effektiv volle Viewport-Breite. */
 .foundation-shell.app-shell[data-view-width="wide"] {
-  width: min(2240px, calc(100vw - 24px));
+  width: min(2600px, calc(100vw - 48px));
 }
 .foundation-shell.app-shell[data-view-width="cinema"] {
   width: calc(100vw - 24px);
+}
+
+/* On very large / 4K-class viewports (32"+ monitors), let "Breit" scale up
+   further instead of staying pinned at the 2600px cap above — otherwise
+   "Breit" still leaves huge empty side margins on a 3840px-wide screen. */
+@media (min-width: 2400px) {
+  .foundation-shell.app-shell[data-view-width="wide"] {
+    width: min(3200px, calc(100vw - 96px));
+  }
+  .foundation-shell.app-shell[data-view-width="cinema"] {
+    width: calc(100vw - 48px);
+  }
+}
+
+/* The shell's own width above only affects the outer frame — the inner
+   content (.foundation-shell-main and the wide table/panel shells) had
+   fixed max-width caps (~1500–1840px) that applied regardless of the
+   shell's width, so widening the shell alone did not make Breit/Cinema
+   actually use the extra space. Relax those caps under wide/cinema only;
+   Standard keeps the original caps from the media queries above untouched. */
+.foundation-shell[data-view-width="wide"] .foundation-shell-main,
+.foundation-shell[data-view-width="cinema"] .foundation-shell-main {
+  max-width: min(2500px, calc(100vw - 420px));
+}
+
+.foundation-shell[data-view-width="wide"] .market-v2-shell,
+.foundation-shell[data-view-width="wide"] .season-v2-shell,
+.foundation-shell[data-view-width="wide"] .training-compact-shell,
+.foundation-shell[data-view-width="wide"] .facilities-v2-shell,
+.foundation-shell[data-view-width="cinema"] .market-v2-shell,
+.foundation-shell[data-view-width="cinema"] .season-v2-shell,
+.foundation-shell[data-view-width="cinema"] .training-compact-shell,
+.foundation-shell[data-view-width="cinema"] .facilities-v2-shell {
+  max-width: min(2500px, calc(100vw - 420px));
+}
+
+@media (min-width: 2400px) {
+  .foundation-shell[data-view-width="wide"] .foundation-shell-main,
+  .foundation-shell[data-view-width="cinema"] .foundation-shell-main,
+  .foundation-shell[data-view-width="wide"] .market-v2-shell,
+  .foundation-shell[data-view-width="wide"] .season-v2-shell,
+  .foundation-shell[data-view-width="wide"] .training-compact-shell,
+  .foundation-shell[data-view-width="wide"] .facilities-v2-shell,
+  .foundation-shell[data-view-width="cinema"] .market-v2-shell,
+  .foundation-shell[data-view-width="cinema"] .season-v2-shell,
+  .foundation-shell[data-view-width="cinema"] .training-compact-shell,
+  .foundation-shell[data-view-width="cinema"] .facilities-v2-shell {
+    max-width: min(3100px, calc(100vw - 480px));
+  }
 }
 
 /* Segmented-Control in der Sidebar (Slot .foundation-sidebar-viewwidth). */
