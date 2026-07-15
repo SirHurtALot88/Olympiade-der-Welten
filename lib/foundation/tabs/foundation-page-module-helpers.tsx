@@ -27,6 +27,7 @@ import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode"
 import { normalizeFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import type { FoundationTableColumn } from "@/lib/foundation/foundation-table-ui-types";
 import {
+  FOUNDATION_VIEW_IDS,
   getDefaultFoundationViewTarget,
   normalizeFoundationViewParam,
   type FoundationViewId,
@@ -199,7 +200,17 @@ export const homeTaskLabelContract = [
 export const foundationViews = [...foundationPrimaryViews, ...foundationAdminViews, ...foundationSecondaryViews, ...foundationInternalViews];
 
 export function normalizeInboxTargetView(view: string | null | undefined): FoundationView {
-  return foundationViews.some((entry) => entry.id === view) ? resolveFoundationViewTarget(view as FoundationView) : "home";
+  // Validate against the full canonical view-id registry (FOUNDATION_VIEW_IDS),
+  // not the narrower `foundationViews` nav-menu/tooltip list. `foundationViews`
+  // only enumerates views that appear in a menu (e.g. "market") and omits
+  // several canonical resolved-target ids such as "marketV2" — an inbox item
+  // whose `targetView` is already the resolved id (as several producers use,
+  // e.g. flow-blocker-routing.ts / season-readiness-checklist.ts) would fail
+  // that membership check and silently fall back to "home" instead of
+  // resolving to the intended view (e.g. the Transfermarkt).
+  return (FOUNDATION_VIEW_IDS as readonly string[]).includes(view ?? "")
+    ? resolveFoundationViewTarget(view as FoundationView)
+    : "home";
 }
 
 export function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | string | null | undefined) {
