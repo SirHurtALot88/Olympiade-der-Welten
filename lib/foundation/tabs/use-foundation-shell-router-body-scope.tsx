@@ -291,7 +291,13 @@ import {
   writeFoundationUrlState,
   type FoundationPanelId,
 } from "@/lib/foundation/foundation-navigation-history";
-import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState, type FoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import {
+  parseFoundationPlayerIdFromUrl,
+  parseFoundationSaveIdFromUrl,
+  parseFoundationTabFromUrl,
+  syncFoundationUrlState,
+  type FoundationUrlState,
+} from "@/lib/foundation/foundation-url-state";
 import { useFoundationKeyboardNavigation } from "@/lib/foundation/use-foundation-keyboard-navigation";
 import { buildFoundationActivities } from "@/lib/foundation/foundation-activity-registry";
 import type { FoundationStateContextValue } from "@/lib/foundation/foundation-state-context";
@@ -584,6 +590,7 @@ import {
   resolvePreferredFoundationTeamId,
   scrollToFoundationTarget,
   seasonBriefingDismissStorageKey,
+  syncFoundationSaveIdInUrl,
   syncFoundationTeamIdInUrl,
   syncFoundationViewInUrl,
   uniqueColumnIds,
@@ -2750,6 +2757,7 @@ export function useFoundationShellRouterBodyScope({
       panel: null,
       facilityId: null,
       facilityAction: null,
+      saveId: parseFoundationSaveIdFromUrl(),
     }, { mode: "push" });
   }
 
@@ -4127,6 +4135,7 @@ export function useFoundationShellRouterBodyScope({
         panel: requestedPanel,
         facilityId: facilityTarget.facilityId,
         facilityAction: facilityTarget.facilityAction,
+        saveId: parseFoundationSaveIdFromUrl(),
       },
       "replace",
     );
@@ -5000,6 +5009,10 @@ export function useFoundationShellRouterBodyScope({
         const nextSaveMode = normalizeFoundationSaveMode(payload.result.preview.presetId);
         setFoundationSaveMode(nextSaveMode);
         await loadSave(payload.result.save.saveId, nextSaveMode);
+        // Pin the freshly created + activated save into the URL so a reload,
+        // new tab, or the homepage "Solo spielen" link loads exactly this
+        // save instead of falling back to the global active save row.
+        syncFoundationSaveIdInUrl(payload.result.save.saveId);
         const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
         if (firstTeamId) {
           setActiveManagerTeam(firstTeamId, "manual_select");

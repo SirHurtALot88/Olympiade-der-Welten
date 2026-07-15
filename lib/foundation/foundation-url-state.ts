@@ -16,6 +16,11 @@ export function parseFoundationPlayerIdFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get("playerId");
 }
 
+export function parseFoundationSaveIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URL(window.location.href).searchParams.get("saveId");
+}
+
 export type { FoundationPanelId, FoundationUrlState };
 
 export function syncFoundationUrlState(

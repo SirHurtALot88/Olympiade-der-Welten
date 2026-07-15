@@ -38,4 +38,37 @@ describe("foundation navigation history", () => {
     expect(buildFoundationHref(state)).toContain("facilityId=gym");
     expect(buildFoundationHref(state)).toContain("facilityAction=upgrade");
   });
+
+  it("includes saveId in the querystring when present so a reload pins the exact save", () => {
+    const state: FoundationUrlState = {
+      view: "homeV2",
+      team: "P-S",
+      tab: null,
+      playerId: null,
+      panel: null,
+      facilityId: null,
+      facilityAction: null,
+      saveId: "save-new-game-1",
+    };
+
+    const href = buildFoundationHref(state);
+    expect(href).toContain("saveId=save-new-game-1");
+    expect(buildFoundationSearchParams(state).get("saveId")).toBe("save-new-game-1");
+  });
+
+  it("omits saveId from the querystring when null or absent", () => {
+    const withoutSaveId: FoundationUrlState = {
+      view: "homeV2",
+      team: "P-S",
+      tab: null,
+      playerId: null,
+      panel: null,
+      facilityId: null,
+      facilityAction: null,
+    };
+    expect(buildFoundationHref(withoutSaveId)).not.toContain("saveId=");
+
+    const withNullSaveId: FoundationUrlState = { ...withoutSaveId, saveId: null };
+    expect(buildFoundationHref(withNullSaveId)).not.toContain("saveId=");
+  });
 });
