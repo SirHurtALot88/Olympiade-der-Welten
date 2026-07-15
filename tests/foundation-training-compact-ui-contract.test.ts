@@ -30,8 +30,9 @@ describe("foundation training compact UI contract", () => {
     expect(foundationSource).toContain("seasonReadinessChecklist");
     expect(trainingShared).toContain('data-testid="training-ai-recommendation"');
     expect(officeSource).toContain('data-testid="foundation-season-readiness-checklist"');
-    expect(readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8")).toContain(
-      'data-testid="inbox-v2-quick-actions"',
-    );
+    expect(
+      readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8") +
+        readFileSync(join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx"), "utf8"),
+    ).toContain('data-testid="inbox-v2-quick-actions"');
   });
 });

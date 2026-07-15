@@ -557,10 +557,6 @@ export default function FoundationMarketBuyShellHost({
                         <span>MW vorher / nachher</span>
                         <strong>{formatTransfermarktCurrency(buyPreview.marketValueBefore)} / {formatTransfermarktCurrency(buyPreview.marketValueAfter)}</strong>
                       </article>
-                      <article className="metric-card">
-                        <span>Rolle</span>
-                        <strong>{buyPreview.promisedRole ?? "offen"}</strong>
-                      </article>
                     </div>
                   </div>
 

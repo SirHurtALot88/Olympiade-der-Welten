@@ -17,7 +17,6 @@ import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDraw
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 import {
   NlCard,
   NlEmptyState,
@@ -534,7 +533,6 @@ function FoundationTeamsDetailPanel({
   // rendern die Vertrags-/Transfer-Blöcke das NL-Kit (StatChip/NlTable/
   // NlEmptyState), mit Flag AUS exakt die bisherige Struktur — reine
   // Hüllen-Umschaltung, keine Datenänderung.
-  const [newLook] = useNewLook();
   const [nlContractSort, setNlContractSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   useEffect(() => {
@@ -1006,119 +1004,57 @@ function FoundationTeamsDetailPanel({
                   </>
                 ) : selectedTeamDetailTab === "transfer" ? (
                   <div className="teams-v2-transfer-tab" data-testid="teams-v2-transfer-tab">
-                    {newLook ? (
-                      <StatChipRow className="teams-v2-finance-role-cards" aria-label="Team-Finanzen">
-                        <StatChip
-                          label="Cash"
-                          value={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
-                        />
-                        <StatChip
-                          label="Gehalt"
-                          value={selectedStandingRow?.salaryTotal != null ? formatNlMoney(selectedStandingRow.salaryTotal) : "—"}
-                        />
-                        <StatChip
-                          label="GuV"
-                          tone={selectedStandingRow?.guv != null ? (selectedStandingRow.guv < 0 ? "risk" : "good") : "neutral"}
-                          value={selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
-                        />
-                      </StatChipRow>
-                    ) : (
-                      <div className="teams-v2-finance-role-cards">
-                        <article className="metric-card teams-v2-role-card">
-                          <span>Cash</span>
-                          <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
-                        </article>
-                        <article className="metric-card teams-v2-role-card">
-                          <span>Gehalt</span>
-                          <strong>{selectedStandingRow?.salaryTotal != null ? formatLocalePoints(selectedStandingRow.salaryTotal, 2) : "—"}</strong>
-                        </article>
-                        <article className="metric-card teams-v2-role-card">
-                          <span>GuV</span>
-                          <strong className={selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "text-negative" : "text-positive"}>
-                            {selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
-                          </strong>
-                        </article>
-                      </div>
-                    )}
+                    <StatChipRow className="teams-v2-finance-role-cards" aria-label="Team-Finanzen">
+                      <StatChip
+                        label="Cash"
+                        value={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
+                      />
+                      <StatChip
+                        label="Gehalt"
+                        value={selectedStandingRow?.salaryTotal != null ? formatNlMoney(selectedStandingRow.salaryTotal) : "—"}
+                      />
+                      <StatChip
+                        label="GuV"
+                        tone={selectedStandingRow?.guv != null ? (selectedStandingRow.guv < 0 ? "risk" : "good") : "neutral"}
+                        value={selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
+                      />
+                    </StatChipRow>
                     {(() => {
                       const liveHistory = selectedTeamsHistoryData?.history?.find((row) => row.isLive) ?? selectedTeamsHistoryData?.history?.[0] ?? null;
                       const duelRival = sortedTeamsViewRows?.find(
                         (row) => row.teamId !== selectedTeam.teamId && row.rank != null && selectedStandingRow?.rank != null && Math.abs(row.rank - selectedStandingRow.rank) <= 2,
                       ) ?? null;
-                      if (newLook) {
-                        return (
-                          <>
-                            {duelRival ? (
-                              <StatChip
-                                className="teams-v2-duel-card"
-                                label="Duell"
-                                value={`#${selectedStandingRow?.rank ?? "—"} ${selectedTeam.shortCode} vs #${duelRival.rank ?? "—"} ${duelRival.shortCode}`}
-                                sub={`${formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs ${formatLocalePoints(duelRival.points ?? 0, 1)} Punkte`}
-                              />
-                            ) : null}
-                            <div className="teams-v2-transfer-cards">
-                              <NlCard eyebrow="Top-Kauf">
-                                {liveHistory?.topBuyPlayer ? (
-                                  <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topBuyPlayerId && void openPlayerDrawerById(liveHistory.topBuyPlayerId)}>
-                                    <span className="nl-teams-playername">{liveHistory.topBuyPlayer}</span>
-                                    <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topBuyAmount)}</span>
-                                  </button>
-                                ) : (
-                                  <span className="nl-teams-playermeta">Kein Zugang gebucht</span>
-                                )}
-                              </NlCard>
-                              <NlCard eyebrow="Top-Verkauf">
-                                {liveHistory?.topSellPlayer ? (
-                                  <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topSellPlayerId && void openPlayerDrawerById(liveHistory.topSellPlayerId)}>
-                                    <span className="nl-teams-playername">{liveHistory.topSellPlayer}</span>
-                                    <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topSellAmount)}</span>
-                                  </button>
-                                ) : (
-                                  <span className="nl-teams-playermeta">Kein Abgang gebucht</span>
-                                )}
-                              </NlCard>
-                            </div>
-                          </>
-                        );
-                      }
                       return (
                         <>
                           {duelRival ? (
-                            <article className="teams-v2-duel-card" data-testid="teams-v2-duel-card">
-                              <span className="eyebrow">Duell</span>
-                              <strong>
-                                #{selectedStandingRow?.rank ?? "—"} {selectedTeam.shortCode} vs #{duelRival.rank ?? "—"} {duelRival.shortCode}
-                              </strong>
-                              <small className="muted">
-                                {formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs {formatLocalePoints(duelRival.points ?? 0, 1)} Punkte
-                              </small>
-                            </article>
+                            <StatChip
+                              className="teams-v2-duel-card"
+                              label="Duell"
+                              value={`#${selectedStandingRow?.rank ?? "—"} ${selectedTeam.shortCode} vs #${duelRival.rank ?? "—"} ${duelRival.shortCode}`}
+                              sub={`${formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs ${formatLocalePoints(duelRival.points ?? 0, 1)} Punkte`}
+                            />
                           ) : null}
                           <div className="teams-v2-transfer-cards">
-                            <article className="teams-v2-transfer-card">
-                              <span>Top-Kauf</span>
-                              <strong>
-                                {liveHistory?.topBuyPlayer ? (
-                                  <button type="button" className="table-link-button" onClick={() => liveHistory.topBuyPlayerId && void openPlayerDrawerById(liveHistory.topBuyPlayerId)}>
-                                    {liveHistory.topBuyPlayer} · {formatNullableMoney(liveHistory.topBuyAmount)}
-                                  </button>
-                                ) : (
-                                  "—"
-                                )}
-                              </strong>
-                            </article>
-                            <article className="teams-v2-transfer-card">
-                              <span>Top-Verkauf</span>
-                              <strong>
-                                {liveHistory?.topSellPlayer ? (
-                                  <button type="button" className="table-link-button" onClick={() => liveHistory.topSellPlayerId && void openPlayerDrawerById(liveHistory.topSellPlayerId)}>
-                                    {liveHistory.topSellPlayer} · {formatNullableMoney(liveHistory.topSellAmount)}
-                                  </button>
-                                ) : (
-                                  "—"
-                                )}
-                              </strong>
-                            </article>
+                            <NlCard eyebrow="Top-Kauf">
+                              {liveHistory?.topBuyPlayer ? (
+                                <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topBuyPlayerId && void openPlayerDrawerById(liveHistory.topBuyPlayerId)}>
+                                  <span className="nl-teams-playername">{liveHistory.topBuyPlayer}</span>
+                                  <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topBuyAmount)}</span>
+                                </button>
+                              ) : (
+                                <span className="nl-teams-playermeta">Kein Zugang gebucht</span>
+                              )}
+                            </NlCard>
+                            <NlCard eyebrow="Top-Verkauf">
+                              {liveHistory?.topSellPlayer ? (
+                                <button type="button" className="nl-teams-playerlink" onClick={() => liveHistory.topSellPlayerId && void openPlayerDrawerById(liveHistory.topSellPlayerId)}>
+                                  <span className="nl-teams-playername">{liveHistory.topSellPlayer}</span>
+                                  <span className="nl-teams-playermeta">{formatNlMoney(liveHistory.topSellAmount)}</span>
+                                </button>
+                              ) : (
+                                <span className="nl-teams-playermeta">Kein Abgang gebucht</span>
+                              )}
+                            </NlCard>
                           </div>
                         </>
                       );
@@ -1126,48 +1062,22 @@ function FoundationTeamsDetailPanel({
                   </div>
                 ) : (
                   <div className="team-contracts-layout">
-                    {newLook ? (
-                      <StatChipRow className="team-contracts-summary-grid" aria-label="Vertragsübersicht">
-                        <StatChip label="Aktive Verträge" value={selectedRoster.length} />
+                    <StatChipRow className="team-contracts-summary-grid" aria-label="Vertragsübersicht">
+                      <StatChip label="Aktive Verträge" value={selectedRoster.length} />
+                      <StatChip
+                        label="Laufen aus"
+                        value={contractExpiringCount}
+                        tone={contractExpiringCount > 0 ? "warn" : "neutral"}
+                      />
+                      <StatChip label="Preview-Drafts" value={selectedTeamContractPreviewRowCount} />
+                      {selectedTeamContractShapeMix ? (
                         <StatChip
-                          label="Laufen aus"
-                          value={contractExpiringCount}
-                          tone={contractExpiringCount > 0 ? "warn" : "neutral"}
+                          label="Strukturiert"
+                          value={`${selectedTeamContractShapeMix.nonBalancedCount}/${selectedTeamContractShapeMix.totalCount}`}
+                          sub={`Δ jetzt ${formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}`}
                         />
-                        <StatChip label="Preview-Drafts" value={selectedTeamContractPreviewRowCount} />
-                        {selectedTeamContractShapeMix ? (
-                          <StatChip
-                            label="Strukturiert"
-                            value={`${selectedTeamContractShapeMix.nonBalancedCount}/${selectedTeamContractShapeMix.totalCount}`}
-                            sub={`Δ jetzt ${formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}`}
-                          />
-                        ) : null}
-                      </StatChipRow>
-                    ) : (
-                      <div className="team-contracts-summary-grid">
-                        <article className="metric-card">
-                          <span>Aktive Verträge</span>
-                          <strong>{selectedRoster.length}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Laufen aus</span>
-                          <strong>{contractExpiringCount}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Preview-Drafts</span>
-                          <strong>{selectedTeamContractPreviewRowCount}</strong>
-                        </article>
-                        {selectedTeamContractShapeMix ? (
-                          <article className="metric-card">
-                            <span>Strukturiert</span>
-                            <strong>
-                              {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount}
-                            </strong>
-                            <small>Δ jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}</small>
-                          </article>
-                        ) : null}
-                      </div>
-                    )}
+                      ) : null}
+                    </StatChipRow>
                     {contractRenewalMessage ? (
                       <div className="status-banner is-success">{contractRenewalMessage}</div>
                     ) : null}
@@ -1405,8 +1315,7 @@ function FoundationTeamsDetailPanel({
                         </button>
                       ) : null}
                     </div>
-                    {newLook ? (
-                      (() => {
+                    {(() => {
                         const nlContractRows = (() => {
                           const base = visibleSelectedTeamContractRows ?? [];
                           if (!nlContractSort) {
@@ -1695,291 +1604,7 @@ function FoundationTeamsDetailPanel({
                             ) : null}
                           </div>
                         );
-                      })()
-                    ) : (
-                    <div className="table-shell team-focus-table-shell team-contracts-table-shell">
-                      <table className="team-table team-contracts-table">
-                        <thead>
-                          <tr>
-                            <th>Spieler</th>
-                            <th>Status</th>
-                            <th>Form</th>
-                            <th>LZ</th>
-                            <th>Moral</th>
-                            <th>Intent</th>
-                            <th>Buyout</th>
-                            <th>VK</th>
-                            <th>Gehaltsverlauf</th>
-                            <th>Aktionen</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {visibleSelectedTeamContractRows.length ? (
-                            visibleSelectedTeamContractRows.map((row) => {
-                              const isSellMarked =
-                                row.status === "active" &&
-                                selectedTeam != null &&
-                                transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
-                              const shapeClass = (row.contractShape ?? "balanced").replace("_", "-");
-                              return (
-                                <tr
-                                  key={row.rowId}
-                                  className={joinClassNames(
-                                    row.status === "preview" && "is-preview-row",
-                                    row.contractLength <= 1 && "is-contract-expiring",
-                                    isSellMarked && "is-sell-marked",
-                                  )}
-                                  onClick={() => void openPlayerDrawerById(row.playerId)}
-                                >
-                                  <td>
-                                    <div className="table-player-cell">
-                                      <strong>{row.playerName}</strong>
-                                      <span>{(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}</span>
-                                      {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <span className={`team-status-chip is-${row.status === "preview" ? "preview" : "active"}`}>
-                                      {row.status === "preview" ? "Preview" : "Aktiv"}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <span className={`team-contract-shape is-${shapeClass}`}>
-                                      {formatContractShapeLabel(row.contractShape)}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
-                                      {formatWholeNumber(row.contractLength)}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    {row.morale != null ? (
-                                      <span title={row.moraleMood ?? "Moral"}>
-                                        {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
-                                        {row.moraleSalaryModifier != null ? ` · x${formatLocalePoints(row.moraleSalaryModifier, 2)}` : ""}
-                                      </span>
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </td>
-                                  <td>
-                                    {row.moraleContractIntent ? (
-                                      <span
-                                        className={`team-contract-intent-chip ${getContractIntentToneClass(row.moraleContractIntent)}`}
-                                        title={
-                                          row.moraleRenewalRisk != null
-                                            ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%`
-                                            : undefined
-                                        }
-                                      >
-                                        {formatMoraleContractIntentLabel(row.moraleContractIntent)}
-                                      </span>
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </td>
-                                  <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
-                                  <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
-                                  <td>
-                                    {(() => {
-                                      const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
-                                      return (
-                                        <div className={`team-contract-salary-cell is-${shapeClass}`}>
-                                          <div
-                                            className="team-contract-salary-steps"
-                                            role="img"
-                                            aria-label={`Gehaltsverlauf ${row.playerName}: ${staircase.steps
-                                              .map((step) => `${step.label} ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`)
-                                              .join(", ")}`}
-                                          >
-                                            {staircase.steps.map((step) => (
-                                              <span
-                                                key={`${row.rowId}-${step.label}`}
-                                                className={joinClassNames(
-                                                  "team-contract-salary-step",
-                                                  step.isEmpty && "is-empty",
-                                                  step.isLast && !step.isEmpty && "is-last",
-                                                )}
-                                                style={{ height: `${step.heightPct}%` }}
-                                                title={`${step.label} · ${step.salary != null ? formatDisplayMoney(step.salary) : "kein Vertrag"}`}
-                                              />
-                                            ))}
-                                          </div>
-                                          <span className="team-contract-salary-cell-value nl-tnum">
-                                            {staircase.lastActiveSalary != null ? formatDisplayMoney(staircase.lastActiveSalary) : "—"}
-                                          </span>
-                                        </div>
-                                      );
-                                    })()}
-                                  </td>
-                                  <td>
-                                    {row.status === "active" && selectedTeamRosterActionsAvailable ? (
-                                      <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
-                                        {selectedTeam ? (
-                                          <button
-                                            className="secondary-button inline-button"
-                                            type="button"
-                                            onClick={() =>
-                                              toggleTransferSellMarker({
-                                                teamId: selectedTeam.teamId,
-                                                playerId: row.playerId,
-                                                playerName: row.playerName,
-                                                contractLength: row.contractLength,
-                                                buyoutCost: row.buyoutCost,
-                                                marketValueAtExit: row.marketValueAtExit,
-                                                morale: row.morale,
-                                              })
-                                            }
-                                          >
-                                            {isSellMarked ? "VK gemerkt" : "VK vormerken"}
-                                          </button>
-                                        ) : null}
-                                        <button
-                                          className="secondary-button inline-button"
-                                          type="button"
-                                          disabled={marketSellBusy}
-                                          onClick={() =>
-                                            void openMarketSellModal(
-                                              {
-                                                activePlayerId: row.rowId,
-                                                playerId: row.playerId,
-                                                playerName: row.playerName,
-                                                className:
-                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.className ??
-                                                  "—",
-                                                race:
-                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.race ?? "—",
-                                                portraitUrl:
-                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ??
-                                                  null,
-                                              },
-                                              selectedTeam?.teamId,
-                                            )
-                                          }
-                                        >
-                                          Verkaufen
-                                        </button>
-                                        {row.contractLength <= 1 && selectedTeam ? (
-                                          <button
-                                            className="secondary-button inline-button"
-                                            type="button"
-                                            disabled={contractRenewalBusy != null}
-                                            onClick={() =>
-                                              void openContractRenewalNegotiation({
-                                                teamId: selectedTeam.teamId,
-                                                playerId: row.playerId,
-                                                playerName: row.playerName,
-                                              })
-                                            }
-                                          >
-                                            Verlängern
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          ) : (
-                            <tr>
-                              <td colSpan={8 + 1 + 1} className="muted">
-                                {selectedTeamContractTable?.rows.length
-                                  ? "Aktuell sind nur Preview-Zeilen vorhanden. Schalte Preview ein, um sie zu sehen."
-                                  : "Noch keine Vertragsdaten im aktuellen Scope."}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                        {selectedTeamContractTable ? (
-                          (() => {
-                            const footerSteps = buildContractFooterSteps(
-                              selectedTeamContractTable.totalsCommitted,
-                              selectedTeamContractTable.totalsWithPreview,
-                            );
-                            const totalCommitted = selectedTeamContractTable.totalsCommitted.reduce(
-                              (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
-                              0,
-                            );
-                            const totalWithPreview = selectedTeamContractTable.totalsWithPreview.reduce(
-                              (sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0),
-                              0,
-                            );
-                            return (
-                              <tfoot>
-                                <tr className="team-contracts-footer-row is-committed">
-                                  <td colSpan={8}>
-                                    <strong>Summe aktiv</strong>
-                                    <span className="muted">Team-Gehaltslast pro Saison</span>
-                                  </td>
-                                  <td>
-                                    <div className="team-contracts-footer-strip">
-                                      <div
-                                        className="team-contracts-footer-bars"
-                                        role="img"
-                                        aria-label={`Summe aktiv je Saison: ${footerSteps
-                                          .map((step) => `${step.label} ${formatDisplayMoney(step.committedValue)}`)
-                                          .join(", ")}`}
-                                      >
-                                        {footerSteps.map((step) => (
-                                          <span
-                                            key={`committed-${step.label}`}
-                                            className="team-contracts-footer-bar is-committed"
-                                            style={{ height: `${step.committedPct}%` }}
-                                            title={`${step.label} · ${formatDisplayMoney(step.committedValue)}`}
-                                          />
-                                        ))}
-                                      </div>
-                                      <strong className="team-contracts-footer-total nl-tnum">
-                                        {formatDisplayMoney(totalCommitted)}
-                                      </strong>
-                                    </div>
-                                  </td>
-                                  <td />
-                                </tr>
-                                <tr className="team-contracts-footer-row is-preview">
-                                  <td colSpan={8}>
-                                    <strong>Summe mit Preview</strong>
-                                    <span className="muted">inkl. Kaufdialog-Drafts</span>
-                                  </td>
-                                  <td>
-                                    <div className="team-contracts-footer-strip">
-                                      <div
-                                        className="team-contracts-footer-bars"
-                                        role="img"
-                                        aria-label={`Summe mit Preview je Saison: ${footerSteps
-                                          .map((step) => `${step.label} ${formatDisplayMoney(step.previewValue)}`)
-                                          .join(", ")}`}
-                                      >
-                                        {footerSteps.map((step) => (
-                                          <span
-                                            key={`preview-${step.label}`}
-                                            className={joinClassNames(
-                                              "team-contracts-footer-bar is-preview",
-                                              !step.hasPreviewDelta && "is-flat",
-                                            )}
-                                            style={{ height: `${step.previewPct}%` }}
-                                            title={`${step.label} · Preview ${formatDisplayMoney(step.previewValue)}`}
-                                          />
-                                        ))}
-                                      </div>
-                                      <strong className="team-contracts-footer-total nl-tnum">
-                                        {formatDisplayMoney(totalWithPreview)}
-                                      </strong>
-                                    </div>
-                                  </td>
-                                  <td />
-                                </tr>
-                              </tfoot>
-                            );
-                          })()
-                        ) : null}
-                      </table>
-                    </div>
-                    )}
+                      })()}
                   </div>
                 )}
               </section>
@@ -2371,7 +1996,7 @@ function FoundationTeamsDetailPanel({
 
                 <section className="panel">
                   <div className="panel-header">
-                    <h2>Bench & Prospects</h2>
+                    <h2>Bench</h2>
                   </div>
                   <div className="roster-grid team-portraits-grid">
                     {bench.map(({ entry, player }) => {

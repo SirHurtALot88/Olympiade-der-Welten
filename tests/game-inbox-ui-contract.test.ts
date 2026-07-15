@@ -55,7 +55,10 @@ describe("game inbox UI contract", () => {
     expect(officeSource).toContain('data-testid="foundation-hq-gm-story"');
     expect(source).toContain("resolveFoundationPanelScrollTarget");
     expect(source).toContain("FoundationSponsorsPanel");
-    expect(readFileSync(join(root, "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8")).toContain("team-sponsor-choice");
+    expect(
+      readFileSync(join(root, "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8") +
+        readFileSync(join(root, "app/foundation/sponsors-v2/FoundationSponsorsNewLook.tsx"), "utf8"),
+    ).toContain("team-sponsor-choice");
     expect(pageModuleHelpersSource).toContain("team-board-objectives");
     expect(source).toContain("marketFocusPlayerId");
     expect(source).toContain("exactLabelMatch");
@@ -76,8 +79,14 @@ describe("game inbox UI contract", () => {
     expect(
       readFileSync(join(root, "app/foundation/home-v2/FoundationHomeV2Host.tsx"), "utf8"),
     ).toContain("inboxCriticalCount");
-    expect(readFileSync(join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8")).toContain("Alle Aufgaben");
-    expect(readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8")).toContain('data-inbox-mode={mode}');
+    expect(
+      readFileSync(join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8") +
+        readFileSync(join(root, "app/foundation/home-v2/HomeV2NewLook.tsx"), "utf8"),
+    ).toContain("Alle Aufgaben");
+    expect(
+      readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8") +
+        readFileSync(join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx"), "utf8"),
+    ).toContain('data-inbox-mode={mode}');
     expect(readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8")).toContain("Entscheidungen öffnen");
     expect(inboxHostSource).toContain("applyInboxQuickAction");
     expect(

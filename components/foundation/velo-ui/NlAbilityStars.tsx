@@ -7,7 +7,8 @@
  * absolute scale so a given ability value always renders the same number of
  * stars everywhere (drawer, transfermarkt, roster cards, hover previews …).
  *
- * Scale: `potentialScoreToStars` (score 35–99 → 2.0–5.0★) is used for BOTH CA and
+ * Scale: `potentialScoreToStars` (percentile-anchored to the measured league:
+ * ~p50→2.75★ … ~p99+→5★, low outliers floor at 1.5★) is used for BOTH CA and
  * PO. CA stars are derived from the absolute current rating (`caScore`), NOT from
  * the league-percentile axis profile — that percentile→stars mapping is what made
  * "5★ = 58" on one player and "5★ = 94" on another. Passing an absolute `caScore`

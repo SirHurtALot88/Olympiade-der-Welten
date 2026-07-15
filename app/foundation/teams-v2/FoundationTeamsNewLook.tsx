@@ -32,6 +32,8 @@ import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-me
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { calculateFacilityIncome, calculateFacilityUpkeep } from "@/lib/facilities/facility-effects";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib/foundation/tabs/teams-ui-helpers";
 import type { TeamsViewRow } from "@/lib/foundation/tabs/teams-view-derivations";
 import type {
@@ -220,6 +222,9 @@ function defaultRosterModeForTab(_tab: "roster" | "portraits"): NlTeamsRosterMod
   return "portraits";
 }
 
+/** Max. Spielerzeilen in den Hero-Hover-Portalen (MW/Gehalt), Rest als "…+N". */
+const NL_TEAMS_HERO_HOVER_MAX_ROWS = 6;
+
 const NL_TEAMS_AXES: Array<{ key: NlAxisKey; label: "POW" | "SPE" | "MEN" | "SOC" }> = [
   { key: "pow", label: "POW" },
   { key: "spe", label: "SPE" },
@@ -235,16 +240,6 @@ function getAxisRank(row: TeamsViewRow | null, key: NlAxisKey): number | null {
   if (key === "spe") return row.currentSpeRank;
   if (key === "men") return row.currentMenRank;
   return row.currentSocRank;
-}
-
-function getAxisPoints(row: TeamsViewRow | null, key: NlAxisKey): number | null {
-  if (!row) {
-    return null;
-  }
-  if (key === "pow") return row.ppsPow;
-  if (key === "spe") return row.ppsSpe;
-  if (key === "men") return row.ppsMen;
-  return row.ppsSoc;
 }
 
 function getBoardRank(row: TeamsViewRow): number | null {
@@ -635,6 +630,36 @@ export default function FoundationTeamsNewLook({
     [selectedTeam.teamId, sortedTeamsViewRows],
   );
 
+  // Team-Achsen-STÄRKE (POW/SPE/MEN/SOC) je Team: die kanonische Aggregat-
+  // Stärke des Kaders aus derselben Engine wie die Bereichsränge und das
+  // Disziplin-Profil (`scorePack`, Top-6-Spieler-Summe je Achse). Ab
+  // Saisonstart sichtbar und ligaweit vergleichbar wie der MW — im Gegensatz
+  // zu den Bereichs-PUNKTEN (`ppsPow`…), die bis zu den ersten Spieltagen 0
+  // sind und deshalb "—" ergaben.
+  const teamAxisStrengthById = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.scorePack] as const));
+  }, [gameState]);
+
+  function getAxisStrengthValue(teamId: string | null | undefined, key: NlAxisKey): number | null {
+    if (!teamId) {
+      return null;
+    }
+    const pack = teamAxisStrengthById.get(teamId);
+    if (!pack) {
+      return null;
+    }
+    const value = key === "pow" ? pack.pow : key === "spe" ? pack.spe : key === "men" ? pack.men : pack.soc;
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function getBoardSortValueLocal(row: TeamsViewRow, key: NlTeamsBoardSortKey): number | null {
+    if (isNlAxisSortKey(key)) {
+      return getAxisStrengthValue(row.team.teamId, key);
+    }
+    return getBoardSortValue(row, key);
+  }
+
   const boardRows = useMemo(() => {
     const base = [...sortedTeamsViewRows].sort(compareBoardRows);
     if (boardSort.key === "rank" && boardSort.dir === "asc") {
@@ -642,8 +667,8 @@ export default function FoundationTeamsNewLook({
     }
     const factor = boardSort.dir === "asc" ? 1 : -1;
     return base.sort((left, right) => {
-      const leftValue = getBoardSortValue(left, boardSort.key);
-      const rightValue = getBoardSortValue(right, boardSort.key);
+      const leftValue = getBoardSortValueLocal(left, boardSort.key);
+      const rightValue = getBoardSortValueLocal(right, boardSort.key);
       if (leftValue == null && rightValue == null) {
         return compareBoardRows(left, right);
       }
@@ -658,7 +683,8 @@ export default function FoundationTeamsNewLook({
       }
       return compareBoardRows(left, right);
     });
-  }, [boardSort, sortedTeamsViewRows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardSort, sortedTeamsViewRows, teamAxisStrengthById]);
 
   // Mini-Tabellen-Vorschau der Rang-Kachel: echte Nachbar-Zeilen um das
   // eigene Team herum (Rang · Team · Punkte), immer nach Gesamtrang geordnet
@@ -676,6 +702,75 @@ export default function FoundationTeamsNewLook({
     const start = Math.max(0, Math.min(selfIndex - 2, ordered.length - windowSize));
     return ordered.slice(start, start + windowSize);
   }, [selectedTeam.teamId, sortedTeamsViewRows]);
+
+  // Fog-of-War-Gate: nur beim eigenen (vom Menschen geführten) Team dürfen die
+  // spieler-granularen MW-/Gehalt-Zusammensetzungen sichtbar sein — genau wie
+  // `TeamProfileNewLook` (`data.controlMode === "manual"`), hier über den
+  // kanonischen `team.humanControlled`-Marker (Ligavergleich zeigt jedes Team).
+  const heroIsOwnTeam = selectedTeam.humanControlled;
+
+  // CASH-Hover (alle Teams): kompakte GuV-Projektion. Cash & Gehaltsblock aus
+  // der Team-Zeile, Gebäude-Unterhalt/-Einnahmen und Sponsoren-Basis aus dem
+  // GameState — dieselben Helfer wie die CASH-GuV in `TeamProfileNewLook`.
+  const heroCashBreakdown = useMemo(() => {
+    const teamId = selectedTeam.teamId;
+    const cash = isFiniteNumber(heroRow?.cash) ? (heroRow?.cash as number) : null;
+    const salaryTotal = isFiniteNumber(heroRow?.salaryTotal) ? (heroRow?.salaryTotal as number) : null;
+    const teamFacilities = gameState.seasonState.teamFacilities?.[teamId] ?? null;
+    const facilityUpkeep = teamFacilities ? calculateFacilityUpkeep(teamFacilities) : null;
+    const popularity = computeTeamBeliebtheitFromGameState(gameState, teamId);
+    const facilityIncome = teamFacilities
+      ? calculateFacilityIncome(teamFacilities, { arenaPopularityFactor: popularity?.value ?? 1 })
+      : null;
+    const sponsorContract = gameState.seasonState.sponsorContractsByTeamId?.[teamId] ?? null;
+    const sponsorBase = sponsorContract
+      ? sponsorContract.components
+          .filter((component) => component.kind === "base")
+          .reduce((sum, component) => sum + (isFiniteNumber(component.rewardCash) ? component.rewardCash : 0), 0)
+      : null;
+    // Projiziertes Saison-Ende: Cash − Gehälter + (Einnahmen − Unterhalt) +
+    // Sponsoren-Basis. Prämien fließen bewusst nicht ein (benchmark-only).
+    const projected =
+      cash != null
+        ? cash - (salaryTotal ?? 0) + (facilityIncome ?? 0) - (facilityUpkeep ?? 0) + (sponsorBase ?? 0)
+        : null;
+    return { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected };
+  }, [gameState, selectedTeam.teamId, heroRow]);
+
+  // MW-Hover (nur eigenes Team): Kaderspieler nach Marktwert absteigend.
+  // Reuse der Kadertabellen-Daten dieses Files (`getRosterEntryDisplayMarketValue`).
+  const heroMarketValueRows = useMemo(() => {
+    if (!heroIsOwnTeam) {
+      return [];
+    }
+    return filteredSelectedRosterTableRows
+      .map((row) => ({
+        id: row.entry.id,
+        playerId: row.player.id,
+        name: row.player.name,
+        marketValue: getRosterEntryDisplayMarketValue(row.entry, row.player),
+      }))
+      .filter((row) => isFiniteNumber(row.marketValue))
+      .sort((left, right) => (right.marketValue ?? 0) - (left.marketValue ?? 0));
+  }, [heroIsOwnTeam, filteredSelectedRosterTableRows, getRosterEntryDisplayMarketValue]);
+
+  // GEHALT-Hover (nur eigenes Team): Kaderspieler nach Gehalt absteigend, mit
+  // Vertragsform-Tag (FL/BL/STD) über `formatContractShapeShortLabel`.
+  const heroSalaryRows = useMemo(() => {
+    if (!heroIsOwnTeam) {
+      return [];
+    }
+    return filteredSelectedRosterTableRows
+      .map((row) => ({
+        id: row.entry.id,
+        playerId: row.player.id,
+        name: row.player.name,
+        salary: getRosterEntryDisplaySalary(row.entry, row.player),
+        shapeShort: formatContractShapeShortLabel(row.entry.contractShape),
+      }))
+      .filter((row) => isFiniteNumber(row.salary))
+      .sort((left, right) => (right.salary ?? 0) - (left.salary ?? 0));
+  }, [heroIsOwnTeam, filteredSelectedRosterTableRows, getRosterEntryDisplaySalary]);
 
   // Team-Entwicklung: Host liefert [Live, jüngste Saison, …] — für die
   // Verlaufs-Charts chronologisch drehen (älteste zuerst, Live zuletzt).
@@ -773,7 +868,8 @@ export default function FoundationTeamsNewLook({
   }
 
   function handleHeroAxisSortSelect(key: NlAxisKey) {
-    setBoardSort({ key, dir: "asc" });
+    // Team-Stärke: stärkstes Team zuerst (absteigend), analog zum MW.
+    setBoardSort({ key, dir: "desc" });
     scrollToSection(leagueCardRef);
   }
 
@@ -849,6 +945,7 @@ export default function FoundationTeamsNewLook({
 
   function renderAxisRankBadges(
     row: TeamsViewRow | null,
+    teamId: string,
     teamName: string,
     compact: boolean,
     onSelectAxis?: (key: NlAxisKey) => void,
@@ -857,15 +954,17 @@ export default function FoundationTeamsNewLook({
       <div
         className={`nl-teams-axes${compact ? " is-compact" : ""}`}
         role="group"
-        aria-label={`Bereichs-Ränge ${teamName}`}
+        aria-label={`Team-Stärke ${teamName}`}
       >
         {NL_TEAMS_AXES.map(({ key, label }) => {
           const rank = getAxisRank(row, key);
-          const points = getAxisPoints(row, key);
+          // TEAM-STÄRKE (Aggregat-Achsenwert des Kaders) statt Bereichs-PUNKTE:
+          // ab Saisonstart sichtbar, ligaweit vergleichbar wie der MW.
+          const strength = getAxisStrengthValue(teamId, key);
           const title =
-            rank != null
-              ? `${getTeamAxisRankTooltip(label)}${points != null ? ` · ${formatNlNumber(points, 1)} Bereichspunkte` : ""}`
-              : getTeamAxisRankTooltip(label);
+            `${getTeamAxisRankTooltip(label)}` +
+            `${strength != null ? ` · Team-Stärke ${formatNlNumber(strength, 0)}` : ""}` +
+            `${rank != null ? ` · Liga-Rang #${formatNlNumber(rank, 0)}` : ""}`;
           const isSortAxis = boardSort.key === key;
           const axisClassName = `nl-teams-axis ${nlToneClass(key)}${isSortAxis ? " is-sorted" : ""}`;
           const body = (
@@ -873,16 +972,16 @@ export default function FoundationTeamsNewLook({
               <span className="nl-teams-axis-label">{label}</span>
               {compact ? (
                 <span className="nl-teams-axis-rank nl-tnum">
-                  {rank != null ? `#${formatNlNumber(rank, 0)}` : "—"}
+                  {strength != null ? formatNlNumber(strength, 0) : "—"}
                 </span>
               ) : (
-                // Wert (Bereichspunkte) UND Liga-Rang klar nebeneinander: "58 · #14".
-                // Fehlt ein echter Rang, bleibt nur der Wert stehen — kein Fake.
+                // Team-Stärke UND (falls vorhanden) Liga-Rang nebeneinander: "71 · #14".
+                // Fehlt ein echter Rang, bleibt nur die Stärke stehen — kein Fake.
                 <span className="nl-teams-axis-figures nl-tnum">
-                  {points != null ? (
-                    <span className="nl-teams-axis-value">{formatNlNumber(points, 1)}</span>
+                  {strength != null ? (
+                    <span className="nl-teams-axis-value">{formatNlNumber(strength, 0)}</span>
                   ) : null}
-                  {points != null && rank != null ? (
+                  {strength != null && rank != null ? (
                     <span className="nl-teams-axis-sep" aria-hidden="true">
                       ·
                     </span>
@@ -890,7 +989,7 @@ export default function FoundationTeamsNewLook({
                   {rank != null ? (
                     <span className="nl-teams-axis-rank">#{formatNlNumber(rank, 0)}</span>
                   ) : null}
-                  {points == null && rank == null ? <span className="nl-teams-axis-rank">—</span> : null}
+                  {strength == null && rank == null ? <span className="nl-teams-axis-rank">—</span> : null}
                 </span>
               )}
             </>
@@ -1054,7 +1153,7 @@ export default function FoundationTeamsNewLook({
                       <span className="nl-teams-playermeta">{formatPlayerIdentitySubMeta(player) || "—"}</span>
                     </button>
                   </td>
-                  <td className="nl-teams-td-role">{entry.roleTag ?? "Kader"}</td>
+                  <td className="nl-teams-td-role">{entry.roleTag === "starter" ? "Starter" : entry.roleTag === "bench" ? "Bank" : entry.roleTag === "rotation" ? "Rotation" : "Kader"}</td>
                   <td>{formatNlNumber(row.playerOvr, 0)}</td>
                   <td>{formatNlNumber(row.playerMvs, 1)}</td>
                   <td>{formatNlNumber(row.playerPps, 1)}</td>
@@ -1317,7 +1416,7 @@ export default function FoundationTeamsNewLook({
               title={`Punkte relativ zum Spitzenreiter (${formatNlNumber(leaderPoints, 1)})`}
             />
           </span>
-          {renderAxisRankBadges(row, row.teamName, true)}
+          {renderAxisRankBadges(row, row.team.teamId, row.teamName, true)}
           <span className="nl-teams-board-meta">
             {renderBoardSortValue(row)}
             {row.goldCount > 0 ? <NlMedalBadge kind="gold" count={row.goldCount} /> : null}
@@ -1329,6 +1428,134 @@ export default function FoundationTeamsNewLook({
           </span>
         </button>
       </li>
+    );
+  }
+
+  // Hover-Portal für die CASH-Kachel: kompakte GuV-Projektion (alle Teams).
+  // Reuse der generischen RANG-Hover-Klassen (rein CSS, additiv zum onClick).
+  function renderCashPreview() {
+    const { cash, salaryTotal, facilityUpkeep, facilityIncome, sponsorBase, projected } = heroCashBreakdown;
+    if (cash == null && salaryTotal == null) {
+      return null;
+    }
+    const guvLine = (
+      lineKey: string,
+      sign: "" | "−" | "+",
+      label: string,
+      value: number | null,
+      isResult?: boolean,
+    ) => (
+      <li key={lineKey} className={`nl-teams-rank-preview-row${isResult ? " is-self" : ""}`}>
+        <span className="nl-teams-rank-preview-rank" aria-hidden="true">
+          {sign}
+        </span>
+        <span className="nl-teams-rank-preview-team">{label}</span>
+        <span className="nl-teams-rank-preview-points">{formatNlMoney(value)}</span>
+      </li>
+    );
+    return (
+      <div className="nl-teams-rank-preview" aria-hidden="true">
+        <span className="nl-teams-rank-preview-title">Cash · GuV (Projektion)</span>
+        <ol className="nl-teams-rank-preview-list nl-tnum">
+          {cash != null ? guvLine("cash", "", "Cash", cash) : null}
+          {salaryTotal != null ? guvLine("salary", "−", "Gehälter", salaryTotal) : null}
+          {facilityUpkeep != null ? guvLine("upkeep", "−", "Gebäude-Unterhalt", facilityUpkeep) : null}
+          {facilityIncome != null ? guvLine("income", "+", "Gebäude-Einnahmen", facilityIncome) : null}
+          {sponsorBase != null ? guvLine("sponsor", "+", "Sponsoren (Basis)", sponsorBase) : null}
+          {projected != null ? guvLine("projected", "", "≈ Saison-Ende", projected, true) : null}
+        </ol>
+      </div>
+    );
+  }
+
+  // Hover-Portal für die MW-Kachel: Kaderspieler nach Marktwert (eigenes Team)
+  // bzw. nur die Kader-Summe (fremdes Team, Fog-of-War).
+  function renderMwPreview() {
+    const total = isFiniteNumber(heroRow?.marketValueTotal) ? (heroRow?.marketValueTotal as number) : null;
+    if (total == null && heroMarketValueRows.length === 0) {
+      return null;
+    }
+    const shown = heroMarketValueRows.slice(0, NL_TEAMS_HERO_HOVER_MAX_ROWS);
+    const rest = heroMarketValueRows.length - shown.length;
+    return (
+      <div className="nl-teams-rank-preview" aria-hidden="true">
+        <span className="nl-teams-rank-preview-title">Marktwert · Kader</span>
+        <ol className="nl-teams-rank-preview-list nl-tnum">
+          {shown.map((row, index) => (
+            <li key={row.id} className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank">{index + 1}</span>
+              <span className="nl-teams-rank-preview-team">{row.name}</span>
+              <span className="nl-teams-rank-preview-points">{formatNlMoney(row.marketValue)}</span>
+            </li>
+          ))}
+          {rest > 0 ? (
+            <li className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank" aria-hidden="true" />
+              <span className="nl-teams-rank-preview-team">… +{formatNlNumber(rest, 0)} weitere</span>
+              <span className="nl-teams-rank-preview-points" aria-hidden="true" />
+            </li>
+          ) : null}
+          {total != null ? (
+            <li className="nl-teams-rank-preview-row is-self">
+              <span className="nl-teams-rank-preview-rank" aria-hidden="true">
+                Σ
+              </span>
+              <span className="nl-teams-rank-preview-team">Kadersumme</span>
+              <span className="nl-teams-rank-preview-points">{formatNlMoney(total)}</span>
+            </li>
+          ) : null}
+        </ol>
+        {!heroIsOwnTeam ? (
+          <span className="nl-teams-rank-preview-title">Einzel-Marktwerte verdeckt (fremdes Team)</span>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Hover-Portal für die GEHALT-Kachel: Kaderspieler nach Gehalt + Vertragsform
+  // (eigenes Team) bzw. nur der Gehaltsblock (fremdes Team, Fog-of-War).
+  function renderGehaltPreview() {
+    const total = isFiniteNumber(heroRow?.salaryTotal) ? (heroRow?.salaryTotal as number) : null;
+    if (total == null && heroSalaryRows.length === 0) {
+      return null;
+    }
+    const shown = heroSalaryRows.slice(0, NL_TEAMS_HERO_HOVER_MAX_ROWS);
+    const rest = heroSalaryRows.length - shown.length;
+    return (
+      <div className="nl-teams-rank-preview" aria-hidden="true">
+        <span className="nl-teams-rank-preview-title">Gehalt · Kader</span>
+        <ol className="nl-teams-rank-preview-list nl-tnum">
+          {shown.map((row, index) => (
+            <li key={row.id} className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank">{index + 1}</span>
+              <span className="nl-teams-rank-preview-team">
+                {row.name}
+                {row.shapeShort ? <small> · {row.shapeShort}</small> : null}
+              </span>
+              <span className="nl-teams-rank-preview-points">{formatNlMoney(row.salary)}</span>
+            </li>
+          ))}
+          {rest > 0 ? (
+            <li className="nl-teams-rank-preview-row">
+              <span className="nl-teams-rank-preview-rank" aria-hidden="true" />
+              <span className="nl-teams-rank-preview-team">… +{formatNlNumber(rest, 0)} weitere</span>
+              <span className="nl-teams-rank-preview-points" aria-hidden="true" />
+            </li>
+          ) : null}
+          {total != null ? (
+            <li className="nl-teams-rank-preview-row is-self">
+              <span className="nl-teams-rank-preview-rank" aria-hidden="true">
+                Σ
+              </span>
+              <span className="nl-teams-rank-preview-team">Gehaltsblock</span>
+              <span className="nl-teams-rank-preview-points">{formatNlMoney(total)}</span>
+            </li>
+          ) : null}
+        </ol>
+        {!heroIsOwnTeam ? (
+          <span className="nl-teams-rank-preview-title">Einzel-Gehälter verdeckt (fremdes Team)</span>
+        ) : null}
+      </div>
     );
   }
 
@@ -1399,28 +1626,37 @@ export default function FoundationTeamsNewLook({
                   }}
                   title="Zur Kadertabelle springen"
                 />
-                <StatChip
-                  label="Cash"
-                  value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
-                  tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
-                  title="Cash — sortiert die Teamtabelle nach Cash"
-                  onClick={() => handleHeroBoardSortSelect("cash", "desc")}
-                />
-                <StatChip
-                  label="MW"
-                  value={formatNlMoney(heroRow?.marketValueTotal)}
-                  title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
-                  onClick={() => handleHeroBoardSortSelect("mw", "desc")}
-                />
-                <StatChip
-                  label="Gehalt"
-                  value={heroRow != null ? formatNlMoney(heroRow.salaryTotal) : "—"}
-                  title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
-                  onClick={() => {
-                    setRosterMode("tabelle");
-                    scrollToSection(rosterCardRef);
-                  }}
-                />
+                <span className="nl-teams-rank-portal">
+                  <StatChip
+                    label="Cash"
+                    value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
+                    tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
+                    title="Cash — sortiert die Teamtabelle nach Cash"
+                    onClick={() => handleHeroBoardSortSelect("cash", "desc")}
+                  />
+                  {renderCashPreview()}
+                </span>
+                <span className="nl-teams-rank-portal">
+                  <StatChip
+                    label="MW"
+                    value={formatNlMoney(heroRow?.marketValueTotal)}
+                    title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
+                    onClick={() => handleHeroBoardSortSelect("mw", "desc")}
+                  />
+                  {renderMwPreview()}
+                </span>
+                <span className="nl-teams-rank-portal">
+                  <StatChip
+                    label="Gehalt"
+                    value={heroRow != null ? formatNlMoney(heroRow.salaryTotal) : "—"}
+                    title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
+                    onClick={() => {
+                      setRosterMode("tabelle");
+                      scrollToSection(rosterCardRef);
+                    }}
+                  />
+                  {renderGehaltPreview()}
+                </span>
                 {heroRow?.needScore != null ? (
                   <StatChip
                     label="Transferbedarf"
@@ -1479,7 +1715,7 @@ export default function FoundationTeamsNewLook({
             </div>
           </div>
           <div className="nl-teams-hero-axes">
-            {renderAxisRankBadges(heroRow, selectedTeam.name, false, handleHeroAxisSortSelect)}
+            {renderAxisRankBadges(heroRow, selectedTeam.teamId, selectedTeam.name, false, handleHeroAxisSortSelect)}
             {heroRadarAxes.length > 0 ? (
               <figure className="nl-teams-hero-radar-figure">
                 <NlRadar
@@ -1815,8 +2051,8 @@ export default function FoundationTeamsNewLook({
                     key={`nl-teams-sort-${key}`}
                     type="button"
                     className={`nl-teams-sort nl-teams-sort-axis ${nlToneClass(key)}${isActive ? " is-active" : ""}`}
-                    onClick={() => handleBoardSortToggle(key, "asc")}
-                    title={`Liga nach ${label}-Bereichsrang sortieren`}
+                    onClick={() => handleBoardSortToggle(key, "desc")}
+                    title={`Liga nach ${label}-Team-Stärke sortieren`}
                     aria-pressed={isActive}
                   >
                     {label}

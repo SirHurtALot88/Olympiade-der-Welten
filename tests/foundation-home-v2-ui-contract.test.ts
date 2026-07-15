@@ -19,6 +19,23 @@ const scoutingHubV2Path = path.join(root, "app/foundation/scouting-center-v2/Sco
 const inboxV2Path = path.join(root, "app/foundation/inbox-v2/InboxV2Client.tsx");
 const globalsPath = path.join(root, "app/globals.css");
 
+// Neuer Look: the *Client.tsx surfaces are thin data/logic wrappers that render
+// their *NewLook.tsx sibling (the actual UI/markup). Contract assertions read the
+// wrapper + NewLook concatenated so a token is found wherever it now lives.
+const homeV2NewLookPath = path.join(root, "app/foundation/home-v2/HomeV2NewLook.tsx");
+const facilitiesOverviewV2NewLookPath = path.join(
+  root,
+  "app/foundation/facilities-overview-v2/FacilitiesOverviewV2NewLook.tsx",
+);
+const scoutingHubV2NewLookPath = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2NewLook.tsx");
+const inboxV2NewLookPath = path.join(root, "app/foundation/inbox-v2/InboxV2NewLook.tsx");
+
+async function readConcat(...paths: string[]) {
+  const parts = await Promise.all(paths.map((p) => fs.readFile(p, "utf8")));
+  return parts.join("\n");
+}
+const readHomeV2Source = () => readConcat(homeV2Path, homeV2NewLookPath);
+
 describe("foundation home v2 ui contract", () => {
   it("merges home and office into one home v2 view with sub navigation", async () => {
     const [shellText, navText, routingText, panelText, officeText, hostText] = await Promise.all([
@@ -49,22 +66,22 @@ describe("foundation home v2 ui contract", () => {
   });
 
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
-    const fileText = await fs.readFile(homeV2Path, "utf8");
+    const fileText = await readHomeV2Source();
 
-    expect(fileText).toContain("Top 6 Spieler");
+    expect(fileText).toContain("Top-Kader · Deine besten 6");
     expect(fileText).toContain("HOME_V2_TOP_PLAYER_COUNT");
-    expect(fileText).toContain("home-v2-player-grid");
-    expect(fileText).toContain("home-v2-hero-stats");
-    expect(fileText).toContain("home-v2-signal-strip");
+    expect(fileText).toContain("nl-home-portrait-grid");
+    expect(fileText).toContain("nl-home-hero-kpis");
+    expect(fileText).toContain("nl-home-warning-row");
     expect(fileText).not.toContain("home-v2-quick-nav");
     expect(fileText).toContain("onContinue");
     expect(fileText).toContain("onOpenBoardObjectives");
-    expect(fileText).toContain("home-v2-objective-card");
-    expect(fileText).toContain("home-v2-development-panel");
+    expect(fileText).toContain("nl-home-board-card");
+    expect(fileText).toContain("nl-home-development-card");
     expect(fileText).not.toContain("Manager Overview V2");
     expect(fileText).not.toContain("HQ öffnen");
-    expect(fileText).toContain("FoundationGameDecisionBoard");
-    expect(fileText).toContain('testId="home-v2-today-board"');
+    expect(fileText).toContain("Heute wichtig");
+    expect(fileText).toContain("nl-home-today-card");
     expect(fileText).toContain("Gebäude");
     expect(fileText).toContain("Entscheidungen");
     expect(fileText).toContain('data-testid="foundation-home-v2"');
@@ -72,7 +89,7 @@ describe("foundation home v2 ui contract", () => {
 
   it("shows core axis stats and absolute CA/PO range on top player cards", async () => {
     const [homeText, typesText, hostText, scopeText, overviewDerivationsText] = await Promise.all([
-      fs.readFile(homeV2Path, "utf8"),
+      readHomeV2Source(),
       fs.readFile(
         path.join(process.cwd(), "app/foundation/home-v2/home-v2-types.ts"),
         "utf8",
@@ -165,16 +182,16 @@ describe("foundation ui v2 roadmap contract", () => {
   });
 
   it("keeps facilities overview v2 read-only without classic training jump links", async () => {
-    const fileText = await fs.readFile(facilitiesOverviewV2Path, "utf8");
+    const fileText = await readConcat(facilitiesOverviewV2Path, facilitiesOverviewV2NewLookPath);
 
     expect(fileText).toContain("Gebäude");
     expect(fileText).not.toContain("onOpenClassicTraining");
-    expect(fileText).toContain("facilities-overview-v2-grid");
+    expect(fileText).toContain("nl-facility-overview-grid");
     expect(fileText).toContain('data-testid="foundation-facilities-overview-v2"');
   });
 
   it("keeps scouting hub v2 as transfermarkt summary, not standalone center", async () => {
-    const fileText = await fs.readFile(scoutingHubV2Path, "utf8");
+    const fileText = await readConcat(scoutingHubV2Path, scoutingHubV2NewLookPath);
 
     expect(fileText).toContain("Scouting");
     expect(fileText).toContain("Transfermarkt öffnen");
@@ -184,17 +201,17 @@ describe("foundation ui v2 roadmap contract", () => {
   });
 
   it("keeps inbox v2 as the canonical compact inbox", async () => {
-    const fileText = await fs.readFile(inboxV2Path, "utf8");
+    const fileText = await readConcat(inboxV2Path, inboxV2NewLookPath);
 
     expect(fileText).toContain('data-testid="foundation-inbox-v2"');
-    expect(fileText).toContain("inbox-v2-layout");
+    expect(fileText).toContain('className="nl-inbox"');
     expect(fileText).toContain("Entscheidungen");
     expect(fileText).not.toContain("Inbox Classic");
   });
 
   it("exposes sprint N urgency sort, inbox checkoffs, compact save menu, and quieter mobile nav", async () => {
     const [homeText, shellText, overviewDerivationsText, auditText, cssText, crossTabFlowText] = await Promise.all([
-      fs.readFile(homeV2Path, "utf8"),
+      readHomeV2Source(),
       fs.readFile(shellRouterBodyPath, "utf8"),
       fs.readFile(path.join(root, "lib/foundation/tabs/use-home-v2-overview-derivations.ts"), "utf8"),
       fs.readFile(path.join(root, "scripts/tmp-ux-audit-play.ts"), "utf8"),

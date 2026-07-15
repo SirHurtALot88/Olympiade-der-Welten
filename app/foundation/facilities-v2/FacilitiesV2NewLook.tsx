@@ -15,12 +15,13 @@ import {
   useCountUp,
 } from "@/components/foundation/new-look";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
-import { getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
+import { FACILITY_CATALOG_BY_ID, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import {
   FACILITY_CONDITION_WARNING,
   FACILITY_SEASON_DECAY_PAID,
   FACILITY_SEASON_DECAY_UNPAID,
 } from "@/lib/facilities/facility-condition";
+import { getRecoveryFlatBonusAtLevel } from "@/lib/facilities/facility-effects";
 
 import type { FacilitiesV2ClientProps, FacilityDialogState, FacilityRowView } from "@/app/foundation/facilities-v2/facilities-v2-types";
 import { FacilityDecisionModal, formatFacilityActionReason } from "@/app/foundation/facilities-v2/facility-ui-shared";
@@ -251,6 +252,122 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
       })}
     </div>
   );
+}
+
+/**
+ * Kurze deutsche Effekt-Namen für den Footer-Chip — die Nutz-Wirkung, die ein
+ * Upgrade konkret bringt (statt nur „± € Einnahmen"). Deckt jede Facility ab,
+ * damit auch nicht-monetäre Gebäude (Scouting, Analytics, Training, …) ihren
+ * Effekt zeigen. Die Zahlen selbst kommen ausschließlich aus dem Facility-Katalog
+ * (`getFacilityLevelDefinition`) bzw. der realen Recovery-Kurve — dieselbe Quelle
+ * wie die Karten und der reale Upgrade-Service.
+ */
+const FACILITY_EFFECT_CHIP_LABEL: Record<FacilityId, string> = {
+  training_center: "Base Training XP",
+  recovery_center: "Recovery",
+  scouting_office: "Scouting Confidence",
+  analytics_room: "Forecast Quality",
+  fan_shop: "Season Cash",
+  arena_upgrade: "Arena-Einnahme",
+  academy: "F/E/D Upgrade-Rabatt",
+  specialist_wing: "Specialist-Attribut-Rabatt",
+};
+
+/**
+ * Effekt-Delta-Chip für die Aktions-Leiste: zeigt statisch (schon bei Auswahl,
+ * ohne Klick) den Nutzen, den das nächste Level dieser Facility bringt — die
+ * Differenz „aktuell → nächste Stufe". Reine Präsentation; die Werte stammen aus
+ * dem Katalog (`getFacilityLevelDefinition` / `getRecoveryFlatBonusAtLevel`),
+ * genau wie die Karten. Gerendert als `NlDeltaChip` (identisches Styling wie die
+ * Einnahmen-/Unterhalt-Chips), bei Max-Level graceful „Max-Level".
+ */
+function FacilityEffectDeltaChip({
+  facility,
+  beliebtheit,
+}: {
+  facility: FacilityRowView;
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"];
+}) {
+  const catalog = FACILITY_CATALOG_BY_ID[facility.id];
+  const label = FACILITY_EFFECT_CHIP_LABEL[facility.id];
+
+  // Max-Level: kein weiterer Ausbau — Effekt bleibt, graceful anzeigen.
+  if (facility.upgradeCost == null) {
+    return (
+      <NlDeltaChip
+        value={0}
+        format={() => `${label} · Max-Level`}
+        title={`${catalog.effectDescription}: aktuell ${facility.currentEffect} · Max-Level erreicht`}
+      />
+    );
+  }
+
+  const currentDef = getFacilityLevelDefinition(facility.id, facility.level);
+  const nextDef = getFacilityLevelDefinition(facility.id, facility.nextLevel);
+  const effectTitle = `${catalog.effectDescription}: ${facility.currentEffect} → ${facility.nextLevelEffect} (nächste Stufe)`;
+
+  switch (catalog.effectType) {
+    case "training_xp": {
+      const delta = (nextDef?.modifierPct ?? 0) - (currentDef?.modifierPct ?? 0);
+      return (
+        <NlDeltaChip
+          value={delta}
+          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}% ${label}`}
+          title={effectTitle}
+        />
+      );
+    }
+    case "recovery": {
+      // Reale Recovery-Kurve (RECOVERY_FLAT_BONUS_BY_LEVEL) — dieselbe Quelle wie
+      // der Recovery-KPI im Header, bei 100% Zustand.
+      const delta = getRecoveryFlatBonusAtLevel(facility.nextLevel) - getRecoveryFlatBonusAtLevel(facility.level);
+      return (
+        <NlDeltaChip
+          value={delta}
+          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} ${label}`}
+          title={`${catalog.effectDescription}: nächste Stufe bringt zusätzliche Erholung (bei 100% Zustand)`}
+        />
+      );
+    }
+    case "season_income": {
+      // Effektive Saison-Einnahme der nächsten Stufe minus heute — Arena inkl.
+      // Beliebtheit (Basis × Beliebtheit), exakt wie der Einnahmen-Chip.
+      const delta =
+        effectiveIncomeFor(facility.id, facility.nextIncome, beliebtheit) -
+        effectiveSeasonIncome(facility, beliebtheit);
+      return (
+        <NlDeltaChip
+          value={delta}
+          format={(n) => `${n > 0 ? "+" : ""}${formatTransfermarktCurrency(n)} ${label}`}
+          title={
+            facility.id === "arena_upgrade" && beliebtheit
+              ? `${catalog.effectDescription}: zusätzliches Saison-Cash der nächsten Stufe (Basis × ${formatNlNumber(beliebtheit.value, 2)} Beliebtheit)`
+              : `${catalog.effectDescription}: zusätzliches Saison-Cash der nächsten Stufe`
+          }
+        />
+      );
+    }
+    case "low_tier_upgrade_discount":
+    case "specialist_upgrade_discount": {
+      const delta = (nextDef?.discountPct ?? 0) - (currentDef?.discountPct ?? 0);
+      return (
+        <NlDeltaChip
+          value={delta}
+          format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)}% ${label}`}
+          title={effectTitle}
+        />
+      );
+    }
+    case "scouting":
+    case "analytics":
+    default: {
+      // Qualitativer Effekt (keine numerische Stufe) — nächste Stufe als Klartext,
+      // value=1 erzwingt den grünen „Verbesserung"-Ton (die 1 wird nie gezeigt).
+      return (
+        <NlDeltaChip value={1} format={() => `${label}: ${facility.nextLevelEffect}`} title={effectTitle} />
+      );
+    }
+  }
 }
 
 function getWearTone(facility: FacilityRowView) {
@@ -931,6 +1048,9 @@ export default function FacilitiesV2NewLook({
             </small>
             {activeFacility.upgradeCost != null ? (
               <div className="nl-facility-action-consequence" aria-label="Konsequenz-Vorschau nach Upgrade">
+                {/* Was das Upgrade konkret BRINGT — Effekt-Delta der nächsten Stufe,
+                    statisch bei Auswahl sichtbar (kein Klick nötig). */}
+                <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
                 <NlDeltaChip
                   value={
                     effectiveIncomeFor(activeFacility.id, activeFacility.nextIncome, beliebtheit) -
@@ -950,7 +1070,12 @@ export default function FacilitiesV2NewLook({
                   title="Unterhalts-Änderung nach Upgrade auf die nächste Stufe"
                 />
               </div>
-            ) : null}
+            ) : (
+              /* Max-Level: kein Delta mehr — Effekt trotzdem benennen (graceful). */
+              <div className="nl-facility-action-consequence" aria-label="Effekt bei Max-Level">
+                <FacilityEffectDeltaChip facility={activeFacility} beliebtheit={beliebtheit} />
+              </div>
+            )}
           </div>
           <div className="nl-facility-action-buttons">
             <button

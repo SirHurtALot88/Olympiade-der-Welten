@@ -1,9 +1,8 @@
 "use client";
 
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import TeamDetailDrawer, { type TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import TeamProfileNewLook from "@/app/foundation/team-profile/TeamProfileNewLook";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 
 export type TeamProfileClientProps = {
   data: TeamDetailDrawerData;
@@ -20,25 +19,8 @@ export default function TeamProfileClient({
   onOpenContracts,
   leagueHeatPools,
 }: TeamProfileClientProps) {
-  // "Neuer Look" (flag-gated, additiv): mit aktivem Runtime-Flag rendert die
-  // Team-Profil-Seite die NewLook-Variante — ohne Flag bleibt alles wie bisher.
-  const [newLook] = useNewLook();
-
-  if (newLook) {
-    return (
-      <TeamProfileNewLook
-        data={data}
-        onClose={onClose}
-        onOpenPlayer={onOpenPlayer}
-        onOpenContracts={onOpenContracts}
-        leagueHeatPools={leagueHeatPools}
-      />
-    );
-  }
-
   return (
-    <TeamDetailDrawer
-      variant="page"
+    <TeamProfileNewLook
       data={data}
       onClose={onClose}
       onOpenPlayer={onOpenPlayer}

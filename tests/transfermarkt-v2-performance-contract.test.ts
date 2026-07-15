@@ -7,10 +7,24 @@ const transfermarktV2ClientPath = path.join(
   process.cwd(),
   "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx",
 );
+const transfermarktV2NewLookPath = path.join(
+  process.cwd(),
+  "app/foundation/transfermarkt-v2/TransfermarktV2NewLook.tsx",
+);
+
+// Neuer Look: TransfermarktV2Client.tsx is the data/logic wrapper; the markup lives
+// in TransfermarktV2NewLook.tsx. Read both so a contract token is found wherever it now lives.
+function readMarketSource() {
+  return (
+    fs.readFileSync(transfermarktV2ClientPath, "utf8") +
+    "\n" +
+    fs.readFileSync(transfermarktV2NewLookPath, "utf8")
+  );
+}
 
 describe("transfermarkt v2 performance contract", () => {
   it("loads the full market automatically in small pages", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
     expect(source).not.toContain("FULL_MARKET_LIMIT");
     expect(source).not.toContain("loadCompleteMarket");
@@ -18,24 +32,28 @@ describe("transfermarkt v2 performance contract", () => {
     expect(source).toContain("limit: String(MARKET_PAGE_LIMIT)");
     expect(source).toContain("loadFullMarketInPages");
     expect(source).toContain("while (hasMore)");
-    expect(source).toContain("Weitere Kandidaten werden automatisch geladen.");
+    // The auto-load hint copy was dropped; pagination keeps going while the server
+    // reports more pages (setMarketHasMore(hasMore)) — that is the small-page auto-load.
+    expect(source).toContain("setMarketHasMore(hasMore)");
   });
 
   it("renders all loaded visible candidates without a manual load-more gate", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
     expect(source).not.toContain("VISIBLE_CANDIDATE_RENDER_LIMIT");
     expect(source).not.toContain("Mehr laden");
     expect(source).not.toContain("loadNextMarketPage");
-    expect(source).toContain("renderedVisibleItems.map");
-    expect(source).toContain("visibleItems.length} sichtbar");
+    expect(source).toContain("candidates={renderedVisibleItems}");
+    expect(source).toContain("candidates.map((item)");
+    expect(source).toContain("totalVisibleCount={visibleItems.length}");
+    expect(source).toContain("${totalVisibleCount} sichtbar");
   });
 
   it("supports keyboard navigation through the visible candidate list", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
     expect(source).toContain("candidateButtonRefs");
-    expect(source).toContain("handleCandidateKeyDown");
+    expect(source).toContain("handleNlSelectKeyDown");
     expect(source).toContain("onGlobalCandidateKeyDown");
     expect(source).toContain("ArrowDown");
     expect(source).toContain("ArrowUp");
@@ -45,7 +63,7 @@ describe("transfermarkt v2 performance contract", () => {
   });
 
   it("keeps internal feed buckets out of the player-facing filter UI", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
     expect(source).not.toContain("bucketFilter");
     expect(source).not.toContain("setBucketFilter");
@@ -57,37 +75,38 @@ describe("transfermarkt v2 performance contract", () => {
   });
 
   it("starts the player-facing market sorted by potential", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
     expect(source).toContain('useState<MarketSortMode>("potential")');
-    expect(source).toContain('<option value="potential">Meistes Potenzial</option>');
+    expect(source).toContain('sortMode: "potential"');
+    expect(source).toContain('potential: "Meistes Potenzial"');
   });
 
-  it("shows class attribute training impact instead of legacy development route language", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+  it("shows class attribute tier display instead of legacy development route language", () => {
+    const source = readMarketSource();
 
-    expect(source).toContain("Attribut-Wirkung");
-    expect(source).toContain("getClassTrainingImpact");
-    expect(source).toContain("TRAINING_ATTRIBUTE_LABELS");
+    expect(source).toContain("getAttributeTierClass");
+    expect(source).toContain("buildTransfermarktScoutedAttributeRows");
+    expect(source).toContain('aria-label="Attribut-Tiers"');
+    expect(source).toContain('aria-label="Feinattribute"');
     expect(source).not.toContain("<span>Entwicklungspfad</span>");
     expect(source).not.toContain("Route {formatDevelopmentRouteLabel(selectedPlayer.developmentRoute)}");
     expect(source).not.toContain("Training {formatToneLabel(selectedPlayer.trainingFormTier)}");
   });
 
-  it("shows team rank and slot size next to top disciplines", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+  it("shows discipline abbreviations and slot size next to top disciplines", () => {
+    const source = readMarketSource();
 
-    expect(source).toContain("formatDisciplineContextLabel");
-    expect(source).toContain("entry.teamRank");
+    expect(source).toContain("getNlDisciplineAbbreviation");
     expect(source).toContain("entry.playerCount");
-    expect(source).toContain("Teamrank");
-    expect(source).toContain("Slots");
+    expect(source).toContain("Top-Disziplinen (gescoutet)");
+    expect(source).toContain("${entry.abbr} (${entry.playerCount})");
   });
 
   it("opens the player profile from a candidate name click", () => {
-    const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
+    const source = readMarketSource();
 
-    expect(source).toContain("table-link-button");
-    expect(source).toContain("onOpenPlayerDetails?.({ playerId: item.playerId })");
+    expect(source).toContain("nl-market-candidate-name");
+    expect(source).toContain("onOpenPlayerDetails({ playerId: item.playerId })");
   });
 });

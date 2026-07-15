@@ -1017,7 +1017,7 @@ describe("player detail drawer", () => {
 
     expect(data?.potential).toBe(86);
     expect(data?.scoutPotential?.potentialRange).toEqual({ min: 70, max: 99 });
-    expect(data?.scoutPotential?.starRating).toBe("4.0 Sterne");
+    expect(data?.scoutPotential?.starRating).toBe("5.0 Sterne");
     expect(data?.scoutPotential?.trainingSpeedMultiplier).toBe(1.09);
   });
 

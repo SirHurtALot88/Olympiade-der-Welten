@@ -216,7 +216,7 @@ describe("player progression forecast", () => {
 
     expect(forecast.baseTrainingXP).toBe(80);
     expect(forecast.potentialTrainingMultiplier).toBe(1.14);
-    expect(forecast.scoutPotential?.starRating).toBe("4.0 Sterne");
+    expect(forecast.scoutPotential?.starRating).toBe("5.0 Sterne");
     expect(forecast.performanceXP).toBe(95);
   });
 

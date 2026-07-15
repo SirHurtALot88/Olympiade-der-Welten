@@ -14,7 +14,6 @@ import type { PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTy
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import { buildTeamCareerSeries } from "@/lib/foundation/career-series";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
-import { useNewLook } from "@/lib/ui/new-look-preference";
 
 import { getClassColorClassName } from "./ClassColorChip";
 import OptimizedMediaImage from "./OptimizedMediaImage";
@@ -414,16 +413,15 @@ export default function TeamDetailDrawer({
 
   // "Neuer Look" (flag-gated, additive): season-over-season career series for
   // the Werdegang panel. With the flag OFF this stays null and nothing changes.
-  const [newLookEnabled] = useNewLook();
   const foundationState = useFoundationStateOptional();
   const werdegangGameState = foundationState?.gameState ?? null;
   const werdegangTeamId = data?.teamId ?? null;
   const werdegangSeries = useMemo(
     () =>
-      newLookEnabled && werdegangGameState && werdegangTeamId
+      werdegangGameState && werdegangTeamId
         ? buildTeamCareerSeries(werdegangGameState, werdegangTeamId)
         : null,
-    [newLookEnabled, werdegangGameState, werdegangTeamId],
+    [werdegangGameState, werdegangTeamId],
   );
 
   if (!data) {
@@ -644,9 +642,6 @@ export default function TeamDetailDrawer({
                   className={getClassColorClassName(player.className, "team-drawer-player-class-frame")}
                   subMeta={[
                     getRoleLabel(player.roleTag),
-                    player.promisedRole && getRoleLabel(player.promisedRole)
-                      ? `versprochen ${getRoleLabel(player.promisedRole)}`
-                      : "",
                     player.className ?? "—",
                     player.race ?? "—",
                   ]

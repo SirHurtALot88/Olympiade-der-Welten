@@ -33,18 +33,25 @@ describe("player potential service", () => {
 
     expect(potential.scoutRating).toBe(90);
     expect(potential.potentialRange).toEqual({ min: 82, max: 98 });
-    expect(potential.starRating).toBe("4.5 Sterne");
+    expect(potential.starRating).toBe("5.0 Sterne");
     expect(potential.band).toBe("elite");
     expect(potential.ceilingMode).toBe("soft_range_no_hard_ceiling");
   });
 
   it("maps potential ranges to FM-style min/max star slots", () => {
-    expect(potentialScoreToStars(72)).toBe(3.5);
-    expect(potentialScoreToStars(99)).toBe(5);
-    expect(shouldShowPotentialRangeStars(72, 99)).toBe(true);
+    // Recalibrated CA/PO star curve with a real 0.5★ floor: weak players read as weak.
+    expect(potentialScoreToStars(22)).toBe(0.5);
+    expect(potentialScoreToStars(30)).toBe(1);
+    expect(potentialScoreToStars(47)).toBe(2.5);
+    expect(potentialScoreToStars(58)).toBe(3.5);
+    expect(potentialScoreToStars(70)).toBe(4.5);
+    expect(potentialScoreToStars(78)).toBe(5);
+    // Sub-floor scores clamp to 0.5★, not the old 1.5★ floor.
+    expect(potentialScoreToStars(10)).toBe(0.5);
+    expect(shouldShowPotentialRangeStars(58, 78)).toBe(true);
     expect(shouldShowPotentialRangeStars(88, 93)).toBe(false);
 
-    const slots = buildPotentialRangeStarSlots(72, 99);
+    const slots = buildPotentialRangeStarSlots(58, 78);
     expect(slots[3]).toMatchObject({ minFill: 0.5, maxFill: 1, showUncertain: true });
     expect(slots[4]).toMatchObject({ minFill: 0, maxFill: 1, showUncertain: true });
   });
