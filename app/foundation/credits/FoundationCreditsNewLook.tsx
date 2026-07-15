@@ -10,7 +10,9 @@ import {
   NlEmptyState,
   NlTable,
   StatChip,
+  StatChipRow,
   formatNlMoney,
+  useCountUp,
   type NlTableColumn,
   type NlTone,
 } from "@/components/foundation/new-look";
@@ -226,7 +228,7 @@ function LoanBurdenChart({
   // Nie ein All-Null/NaN-Chart rendern (z. B. Team ohne Kredit, Gehälter UND
   // Gebäude) — stattdessen ein knapper Fallback statt eines leeren SVGs.
   if (total <= 0) {
-    return <p className="nl-credits-burden-empty muted">Keine laufenden Ausgaben bekannt.</p>;
+    return <NlEmptyState className="nl-credits-burden-empty" title="Keine laufenden Ausgaben bekannt." />;
   }
 
   const hasIncome = safeRevenue > 0;
@@ -854,9 +856,46 @@ export default function FoundationCreditsNewLook({
   const amountFraction = maxAmount > 0 ? Math.max(0, Math.min(1, amount / maxAmount)) : 0;
   const amountTone = riskTone(amountFraction);
 
+  // KPI-Hero (Header-Karte): Cash, Ausstehend, Kapazität, Ø-Zins — Ø-Zins als
+  // nach Restschuld gewichteter Durchschnitt der bereits aufgenommenen
+  // aktiven Kredite (keine neue Berechnung im Service nötig).
+  const avgInterestRate = useMemo(() => {
+    if (!team || team.activeLoans.length === 0) return null;
+    const totalOutstanding = team.activeLoans.reduce((sum, loan) => sum + loan.outstanding, 0);
+    if (totalOutstanding <= 0) return null;
+    const weightedSum = team.activeLoans.reduce((sum, loan) => sum + loan.outstanding * loan.interestRate, 0);
+    return weightedSum / totalOutstanding;
+  }, [team]);
+  const animatedKpiCash = useCountUp(team?.cash ?? null);
+  const animatedKpiOutstanding = useCountUp(team?.outstandingDebt ?? null);
+  const animatedKpiCapacity = useCountUp(team?.creditCapacityTotal ?? null);
+  const animatedKpiAvgRate = useCountUp(avgInterestRate);
+
   return (
     <div className="nl-credits" data-testid="foundation-credits" data-new-look="true">
-      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName} />
+      <NlCard className="nl-credits-header-card" eyebrow="Kredite" title={teamName}>
+        {team ? (
+          <StatChipRow className="nl-credits-kpi-hero" aria-label="Kredit-Kennzahlen">
+            <StatChip label="Cash" value={formatNlMoney(animatedKpiCash ?? team.cash)} tone="neutral" />
+            <StatChip
+              label="Ausstehend"
+              value={formatNlMoney(animatedKpiOutstanding ?? team.outstandingDebt)}
+              tone={riskTone(team.creditUtilizationRatio)}
+            />
+            <StatChip
+              label="Kapazität"
+              value={formatNlMoney(animatedKpiCapacity ?? team.creditCapacityTotal)}
+              tone="neutral"
+            />
+            <StatChip
+              label="Ø-Zins"
+              value={avgInterestRate != null ? formatRate(animatedKpiAvgRate ?? avgInterestRate) : "—"}
+              sub={team.activeLoans.length > 0 ? `${team.activeLoans.length} aktive Kredite` : "keine aktiven Kredite"}
+              tone="neutral"
+            />
+          </StatChipRow>
+        ) : null}
+      </NlCard>
 
       {model.status === "not_ready" ? (
         <EmptyState
@@ -984,13 +1023,15 @@ export default function FoundationCreditsNewLook({
           eyebrow="Neuer Kredit"
           title={isSeasonOneBlocked ? "Season 1: noch keine Kredite" : "Kreditaufnahme aktuell nicht möglich"}
         >
-          <p className="nl-credits-empty-text muted">
-            {isSeasonOneBlocked
-              ? "Ab Season 2 verfügbar."
-              : team.borrowBlockedReason === "not_preseason"
-                ? "Neue Kredite könnt ihr nur in der Vorbereitung (Preseason) aufnehmen."
-                : "Euer Kreditrahmen ist aktuell ausgeschöpft."}
-          </p>
+          <NlEmptyState
+            title={
+              isSeasonOneBlocked
+                ? "Ab Season 2 verfügbar."
+                : team.borrowBlockedReason === "not_preseason"
+                  ? "Neue Kredite könnt ihr nur in der Vorbereitung (Preseason) aufnehmen."
+                  : "Euer Kreditrahmen ist aktuell ausgeschöpft."
+            }
+          />
         </NlCard>
       ) : null}
 

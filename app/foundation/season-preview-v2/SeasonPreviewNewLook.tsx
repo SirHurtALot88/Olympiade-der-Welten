@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
@@ -12,6 +12,7 @@ import {
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
@@ -145,6 +146,16 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
     [ownTeamId, rows],
   );
 
+  // Hero-/KPI-Zähler (#Wave2): nur die Headline-Zahlen zählen hoch — das
+  // Projektions-Board (viele Zeilen) bleibt unverändert. Respektiert
+  // prefers-reduced-motion via `useCountUp`.
+  const animatedReadyTeams = useCountUp(summary?.readyTeams ?? null);
+  const animatedBlockedRulesCount = useCountUp(blockedRules.length);
+  const animatedOwnCurrentRank = useCountUp(ownRow?.currentRank ?? null);
+  const animatedOwnProjectedRank = useCountUp(ownRow?.projectedRank ?? null);
+  const animatedOwnPointsDelta = useCountUp(ownRow?.pointsDelta ?? null);
+  const animatedOwnMatchdayRank = useCountUp(ownRow?.matchdayRank ?? null);
+
   // Punkte-Delta je Team aus diesem Spieltag — existiert nur, wenn die Engine
   // wirklich projizierte Punkte liefert (`hasProjectedPoints`); sonst leer.
   const pointsDeltaBars = useMemo(() => {
@@ -219,7 +230,7 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
     );
   }
 
-  function renderRow(row: FoundationStandingsPreviewItem) {
+  function renderRow(row: FoundationStandingsPreviewItem, revealIndex: number) {
     const team = teamById.get(row.teamId) ?? null;
     const logo = team ? getTeamLogoModel(team, { variant: "thumb" }) : null;
     const readiness = getReadinessBadge(row.readinessStatus);
@@ -228,13 +239,13 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
       tone: "neutral" as NlTone,
     };
     const displayRank = row.projectedRank ?? row.currentRank;
+    const revealStyle = {
+      ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
+      "--nl-reveal-i": Math.min(revealIndex, 14),
+    } as CSSProperties;
 
     return (
-      <li
-        key={row.teamId}
-        className="nl-spreview-row"
-        style={team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined}
-      >
+      <li key={row.teamId} className="nl-spreview-row nl-reveal" style={revealStyle}>
         <span className="nl-spreview-rank nl-tnum" title={hasProjection ? "Projizierter Rang" : "Aktueller Rang"}>
           {displayRank ?? "—"}
         </span>
@@ -325,13 +336,13 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
               />
               <StatChip
                 label="Bereit"
-                value={`${summary.readyTeams}/${summary.totalTeams}`}
+                value={`${formatNlNumber(animatedReadyTeams ?? summary.readyTeams, 0)}/${summary.totalTeams}`}
                 tone={summary.readyTeams >= summary.totalTeams && summary.totalTeams > 0 ? "good" : "warn"}
                 title="Teams mit vollständiger Wertung"
               />
               <StatChip
                 label="Blocker"
-                value={blockedRules.length}
+                value={formatNlNumber(animatedBlockedRulesCount ?? blockedRules.length, 0)}
                 tone={blockedRules.length > 0 ? "warn" : "good"}
                 title={blockedRules.length ? `Technische Rule-IDs: ${blockedRules.join(", ")}` : "Keine offenen Blocker"}
               />
@@ -365,10 +376,16 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
       {hasProjectedPoints && ownRow ? (
         <NlCard className="nl-spreview-own-card" eyebrow="Dein Team" title="Rang- und Punkte-Forecast">
           <StatChipRow aria-label="Forecast-Eckwerte deines Teams">
-            <StatChip label="Rang vorher" value={ownRow.currentRank ?? "—"} tone="neutral" />
+            <StatChip
+              label="Rang vorher"
+              value={ownRow.currentRank != null ? formatNlNumber(animatedOwnCurrentRank ?? ownRow.currentRank, 0) : "—"}
+              tone="neutral"
+            />
             <StatChip
               label="Rang projiziert"
-              value={ownRow.projectedRank ?? "—"}
+              value={
+                ownRow.projectedRank != null ? formatNlNumber(animatedOwnProjectedRank ?? ownRow.projectedRank, 0) : "—"
+              }
               tone="accent"
               sub={
                 ownRow.currentRank != null && ownRow.projectedRank != null && ownRow.currentRank !== ownRow.projectedRank
@@ -382,7 +399,7 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
               label="Punkte-Delta"
               value={
                 ownRow.pointsDelta != null
-                  ? `${ownRow.pointsDelta > 0 ? "+" : ""}${formatNlNumber(ownRow.pointsDelta, 1)}`
+                  ? `${ownRow.pointsDelta > 0 ? "+" : ""}${formatNlNumber(animatedOwnPointsDelta ?? ownRow.pointsDelta, 1)}`
                   : "—"
               }
               tone={ownRow.pointsDelta == null ? "neutral" : ownRow.pointsDelta >= 0 ? "good" : "risk"}
@@ -390,7 +407,9 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
             />
             <StatChip
               label="Tagesrang"
-              value={ownRow.matchdayRank != null ? `#${ownRow.matchdayRank}` : "—"}
+              value={
+                ownRow.matchdayRank != null ? `#${formatNlNumber(animatedOwnMatchdayRank ?? ownRow.matchdayRank, 0)}` : "—"
+              }
               tone="neutral"
             />
           </StatChipRow>
@@ -416,7 +435,7 @@ export default function SeasonPreviewNewLook(props: FoundationSeasonPreviewShell
         </NlCard>
       ) : (
         <ol className="nl-spreview-board" aria-label="Projektions-Board">
-          {rows.map((row) => renderRow(row))}
+          {rows.map((row, index) => renderRow(row, index))}
         </ol>
       )}
 
