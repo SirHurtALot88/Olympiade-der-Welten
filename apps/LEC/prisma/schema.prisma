@@ -1,0 +1,200 @@
+// LEC Cockpit — Prisma-Schema
+// Datenmodell nach docs/enterich-cards/KONZEPT.md §5.4.
+// Laufzeit-DB-Pfad kommt aus LEC_SQLITE_PATH (siehe src/lib/db/client.ts).
+// DATABASE_URL wird nur für die Prisma-CLI (generate/migrate) lokal gebraucht.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Ein Artikel (Karte, Bundle, Set …) — Match-Key ist nameNormalized.
+model Article {
+  id             String   @id @default(cuid())
+  nameNormalized String   @unique
+  nameRaw        String
+  setCode        String?
+  packQty        Int      @default(1)
+  rarity         String?
+  condition      String?
+  edition        String?
+  stock          Int      @default(0)
+  /// false = herausgefiltert (Privatverkauf/Nicht-Karte)
+  isCard         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  aliases      ArticleAlias[]
+  saleWindows  SaleWindow[]
+  purchases    Purchase[]
+  marketPrices MarketPrice[]
+  ebayFacts    EbayListingFact[]
+
+  @@index([setCode])
+}
+
+/// Gelernte Namensvarianten → Artikel (persistente Zuordnung aus der Review-Liste).
+model ArticleAlias {
+  id          String   @id @default(cuid())
+  nameVariant String   @unique
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id])
+  source      String // "billbee" | "ebay" | "manual"
+  createdAt   DateTime @default(now())
+}
+
+/// Billbee-Fenster-Snapshot je Artikel (30/90/365/all) inkl. serverseitig
+/// neu berechnetem DB I / DB II.
+model SaleWindow {
+  id           String   @id @default(cuid())
+  articleId    String
+  article      Article  @relation(fields: [articleId], references: [id])
+  /// "30" | "90" | "365" | "all"
+  window       String
+  windowFrom   DateTime
+  windowTo     DateTime
+  snapshotDate DateTime @default(now())
+  qty          Int
+  revenue      Float
+  ek           Float
+  margeBillbee Float
+  ebayFeeTotal Float    @default(0)
+  shippingCost Float    @default(0)
+  fixedCostShare Float  @default(0)
+  dbI          Float
+  dbII         Float
+  avgPrice     Float
+  rank         Int?
+
+  @@unique([articleId, window, windowFrom, windowTo])
+  @@index([window])
+}
+
+/// Roh-Zeile aus dem eBay „Listings Sales Report" — Gebühren-Seite je Angebot.
+model EbayListingFact {
+  id                  String   @id @default(cuid())
+  articleId           String?
+  article             Article? @relation(fields: [articleId], references: [id])
+  ebayItemId          String
+  titleRaw            String
+  titleNormalized     String
+  shopCategoryL1      String?
+  shopCategoryL2      String?
+  qtySold             Int
+  totalRevenueGross   Float
+  revenueNetShipping  Float
+  shippingPaidByBuyer Float
+  totalSellingCosts   Float
+  listingFees         Float
+  optionalFees        Float
+  salesCommission     Float
+  adFeesBasic         Float
+  adFeesPremium       Float
+  adFeesExpress       Float
+  adFeesExternal      Float
+  internationalFees   Float
+  otherFees           Float
+  depositFees         Float
+  feeCredits          Float
+  shippingLabelCost   Float
+  revenueAfterCosts   Float
+  avgSellingPrice     Float
+  reportFrom          DateTime
+  reportTo            DateTime
+  importBatchId       String
+  matched             Boolean  @default(false)
+  /// false = kein Kartenartikel (Privatverkauf), siehe KONZEPT §12.3
+  isCard              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  @@index([titleNormalized])
+  @@index([ebayItemId])
+}
+
+/// Einkauf (Cardmarket/Billbee) je Artikel.
+model Purchase {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id])
+  date        DateTime
+  qty         Int
+  unitEk      Float
+  buyShipping Float    @default(0)
+  source      String // "Cardmarket" | "Billbee"
+  createdAt   DateTime @default(now())
+}
+
+/// Marktpreis je Artikel — Provider B (manuell/halbautomatisch übergeben, v1 = kein API-Call).
+model MarketPrice {
+  id         String   @id @default(cuid())
+  articleId  String
+  article    Article  @relation(fields: [articleId], references: [id])
+  source     String // "cardmarket-manual"
+  priceFrom  Float?
+  priceTrend Float?
+  priceAvg30 Float?
+  priceAvg7  Float?
+  priceAvg1  Float?
+  available  Int?
+  fetchedAt  DateTime @default(now())
+  raw        String? // JSON-Blob (Angebotsliste etc.)
+}
+
+/// Konfigurierbare Kostensätze für die VK-Kalkulation (KONZEPT §7.3), versioniert.
+model CostSettings {
+  id                   String   @id @default(cuid())
+  version              Int      @default(1)
+  active               Boolean  @default(true)
+  buyShippingUnderFive Float    @default(1.15)
+  buyShippingFive      Float    @default(1.30)
+  shippingSingle       Float    @default(0.67)
+  shippingPack         Float    @default(0.50)
+  registeredSingle     Float    @default(0.15)
+  registeredPack       Float    @default(0.1875)
+  packagingSingle      Float    @default(0.053)
+  packagingPack        Float    @default(0.062)
+  fixedYearlyEbayShop  Float    @default(95)
+  fixedYearlyBillbee   Float    @default(25)
+  fixedYearlyLexoffice Float    @default(60)
+  ebayCommissionRate   Float    @default(0.11)
+  ebayCommissionVat    Float    @default(0.19)
+  ebayCommissionFixed  Float    @default(0.35)
+  adFeeRateSingle      Float    @default(0.09)
+  adFeeRateMin         Float    @default(0.09)
+  adFeeRateGood        Float    @default(0.10)
+  marginMinMultiplier  Float    @default(1.33)
+  marginGoodMultiplier Float    @default(1.66)
+  createdAt            DateTime @default(now())
+}
+
+/// Protokoll je Import-Lauf (Billbee-Fenster oder eBay-Report).
+model ImportBatch {
+  id             String    @id @default(cuid())
+  kind           String // "billbee" | "ebay"
+  window         String?
+  windowFrom     DateTime?
+  windowTo       DateTime?
+  fileName       String?
+  rowCount       Int
+  matchedCount   Int       @default(0)
+  unmatchedCount Int       @default(0)
+  createdAt      DateTime  @default(now())
+}
+
+/// Ungematchte Zeilen aus dem Namens-Matching — manuelle Zuordnung erzeugt einen ArticleAlias.
+model ReviewItem {
+  id                String   @id @default(cuid())
+  source            String // "billbee" | "ebay"
+  nameRaw           String
+  nameNormalized    String
+  setCode           String?
+  qty               Int?
+  revenue           Float?
+  status            String   @default("open") // open | resolved | ignored
+  resolvedArticleId String?
+  createdAt         DateTime @default(now())
+}
