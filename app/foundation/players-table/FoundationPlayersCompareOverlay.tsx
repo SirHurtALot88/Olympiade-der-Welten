@@ -15,12 +15,15 @@
  * Overlay-Mechanik (ESC/Backdrop/Fokus-Falle) spiegelt `NlRankingDrawer`
  * (`components/foundation/new-look/NlRankingDrawer.tsx`) — nur als
  * zentriertes Panel statt Seiten-Drawer, weil hier deutlich mehr Breite
- * für Radar + Tabelle nebeneinander gebraucht wird. Handgerolltes SVG-Radar
- * (gleiche Geometrie-Schule wie `NlRadar`), weil `NlRadar` selbst nur ein
- * Haupt- + ein Ghost-Polygon zeichnet — hier werden bis zu vier Polygone
- * gleichzeitig mit eigener Tonfarbe gebraucht.
+ * für Radar + Tabelle nebeneinander gebraucht wird. Der Radar selbst nutzt
+ * den generischen Mehrserien-Modus von `NlRadar` (`axisDefs` + `series`,
+ * bis zu vier überlagerte Polygone mit eigener Tonfarbe + solid/dashed) —
+ * ersetzt das vormals hier handgerollte SVG (gleiche Geometrie-Schule wie
+ * `NlRadar`, jetzt aber im Kit selbst).
  *
- * Styles: `app/globals.css` unter `.is-new-look .nl-pcompare-*`.
+ * Styles: `app/globals.css` unter `.is-new-look .nl-pcompare-*` (Panel/
+ * Legende/Tabelle) sowie `.nl-radar*`/`.nl-radar-*-series` (Radar, geteilt
+ * mit dem Kit).
  */
 
 import { Fragment, useEffect, useMemo, useRef } from "react";
@@ -30,27 +33,28 @@ import {
   getPlayerDisplaySalary,
   getRosterEntryDisplaySalary,
 } from "@/app/foundation/foundation-page-client-exports";
-import { formatNlMoney, formatNlNumber, nlToneClass, NL_AXIS_LABELS, type NlAxisKey, type NlTone } from "@/components/foundation/new-look";
+import {
+  formatNlMoney,
+  formatNlNumber,
+  nlToneClass,
+  NL_AXIS_LABELS,
+  NlRadar,
+  type NlAxisKey,
+  type NlRadarAxisDef,
+  type NlRadarSeries,
+  type NlTone,
+} from "@/components/foundation/new-look";
 import { useFocusTrap } from "@/lib/foundation/use-focus-trap";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 const RADAR_AXIS_ORDER: NlAxisKey[] = ["pow", "spe", "men", "soc"];
-const RADAR_SIZE = 240;
-const RADAR_CENTER = RADAR_SIZE / 2;
-const RADAR_RADIUS = 84;
-const RADAR_RINGS = [0.25, 0.5, 0.75, 1];
-
-function radarPoint(axisIndex: number, ratio: number) {
-  const angle = (axisIndex / RADAR_AXIS_ORDER.length) * Math.PI * 2 - Math.PI / 2;
-  return {
-    x: RADAR_CENTER + Math.cos(angle) * RADAR_RADIUS * ratio,
-    y: RADAR_CENTER + Math.sin(angle) * RADAR_RADIUS * ratio,
-  };
-}
+const RADAR_AXIS_DEFS: NlRadarAxisDef[] = RADAR_AXIS_ORDER.map((key) => ({ key, label: NL_AXIS_LABELS[key] }));
 
 /** Bis zu 4 unterscheidbare Serienfarben — bestehende Ton-Tokens statt neu erfundener Hex-Werte. */
 const COMPARE_SERIES_TONES: NlTone[] = ["accent", "good", "warn", "risk"];
+/** Solid für die erste Serie, danach abwechselnd gestrichelt — Serien dürfen sich nicht nur über Farbe unterscheiden. */
+const COMPARE_SERIES_DASHED = [false, true, false, true];
 
 type CompareStatKey =
   | "ovr"
@@ -224,22 +228,21 @@ export default function FoundationPlayersCompareOverlay({
     [compareRows],
   );
 
-  const radarGeometry = useMemo(
+  /** `NlRadar`-Mehrserien-Input: eine Serie je verglichenem Spieler. */
+  const radarSeries = useMemo<NlRadarSeries[]>(
     () =>
-      series.map(({ row, tone }) => {
-        const points = RADAR_AXIS_ORDER.map((key, index) => {
-          const raw = row.player.coreStats[key] ?? null;
-          const value = raw != null && Number.isFinite(raw) ? raw : 0;
-          const ratio = Math.max(0, Math.min(value / 100, 1));
-          return { key, value: raw, ...radarPoint(index, ratio) };
-        });
-        return {
-          row,
-          tone,
-          polygon: points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
-          points,
-        };
-      }),
+      series.map(({ row, tone }, index) => ({
+        id: row.player.id,
+        label: row.player.name,
+        tone,
+        dashed: COMPARE_SERIES_DASHED[index] ?? false,
+        values: {
+          pow: row.player.coreStats.pow ?? null,
+          spe: row.player.coreStats.spe ?? null,
+          men: row.player.coreStats.men ?? null,
+          soc: row.player.coreStats.soc ?? null,
+        },
+      })),
     [series],
   );
 
@@ -334,78 +337,19 @@ export default function FoundationPlayersCompareOverlay({
         </ul>
 
         <div className="nl-pcompare-body">
-          <svg
+          <NlRadar
             className="nl-pcompare-radar"
-            viewBox={`0 0 ${RADAR_SIZE} ${RADAR_SIZE}`}
-            preserveAspectRatio="xMidYMid meet"
-            role="img"
-            aria-label={`Achsen-Radar POW/SPE/MEN/SOC: ${radarGeometry
+            axisDefs={RADAR_AXIS_DEFS}
+            series={radarSeries}
+            aria-label={`Achsen-Radar POW/SPE/MEN/SOC: ${series
               .map(
-                ({ row, points }) =>
-                  `${row.player.name} — ${points
-                    .map((point) => `${NL_AXIS_LABELS[point.key]} ${formatNlNumber(point.value, 0)}`)
-                    .join(", ")}`,
+                ({ row }) =>
+                  `${row.player.name} — ${RADAR_AXIS_ORDER.map(
+                    (key) => `${NL_AXIS_LABELS[key]} ${formatNlNumber(row.player.coreStats[key] ?? null, 0)}`,
+                  ).join(", ")}`,
               )
               .join(" · ")}`}
-          >
-            {RADAR_RINGS.map((ring) => (
-              <polygon
-                key={`nl-pcompare-ring-${ring}`}
-                points={RADAR_AXIS_ORDER.map((_, index) => {
-                  const point = radarPoint(index, ring);
-                  return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
-                }).join(" ")}
-                className="nl-pcompare-radar-ring"
-                fill="none"
-              />
-            ))}
-            {RADAR_AXIS_ORDER.map((key, index) => {
-              const outer = radarPoint(index, 1);
-              return (
-                <line
-                  key={`nl-pcompare-spoke-${key}`}
-                  x1={RADAR_CENTER}
-                  y1={RADAR_CENTER}
-                  x2={outer.x}
-                  y2={outer.y}
-                  className="nl-pcompare-radar-spoke"
-                />
-              );
-            })}
-            {radarGeometry.map(({ row, tone, polygon }) => (
-              <polygon key={row.player.id} points={polygon} className={`nl-pcompare-radar-shape ${nlToneClass(tone)}`} />
-            ))}
-            {radarGeometry.map(({ row, tone, points }) =>
-              points.map((point) => (
-                <circle
-                  key={`${row.player.id}-${point.key}`}
-                  cx={point.x}
-                  cy={point.y}
-                  r={3}
-                  className={`nl-pcompare-radar-dot ${nlToneClass(tone)}`}
-                >
-                  <title>
-                    {row.player.name} · {NL_AXIS_LABELS[point.key]}: {formatNlNumber(point.value, 0)}
-                  </title>
-                </circle>
-              )),
-            )}
-            {RADAR_AXIS_ORDER.map((key, index) => {
-              const label = radarPoint(index, 1.28);
-              return (
-                <text
-                  key={`nl-pcompare-label-${key}`}
-                  x={label.x}
-                  y={label.y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="nl-pcompare-radar-label"
-                >
-                  {NL_AXIS_LABELS[key]}
-                </text>
-              );
-            })}
-          </svg>
+          />
 
           <div className="nl-pcompare-table-wrap">
             <table className="nl-pcompare-table nl-tnum">

@@ -40980,6 +40980,15 @@ button.foundation-team-portrait-card {
 }
 .foundation-empty-state-title { color: var(--ink); }
 
+/* Token-korrekte Überschreibung für den (gemeinsam mit dem alten Look
+   genutzten) `EmptyState` innerhalb des neuen Looks — die Basis-Regeln oben
+   bleiben für Screens ohne `.is-new-look` unverändert (`--ink`/`--muted`). */
+.is-new-look .foundation-empty-state {
+  border-color: var(--nl-line-2);
+  color: var(--nl-mut);
+}
+.is-new-look .foundation-empty-state-title { color: var(--nl-ink); }
+
 .foundation-bootstrap-overlay {
   position: fixed;
   inset: 0;
@@ -41785,6 +41794,153 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 
+/* --- NlEmptyState: token-korrekter Leerzustand -------------------
+   Kompakter Ersatz für die bislang wild gestreuten bespoke Leerzustände
+   (bare `<p class="…-empty muted">`-Zeilen). Icon/Message/Aktion optional. */
+.is-new-look .nl-empty-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s3);
+  padding: var(--nl-s4);
+  border: 1px dashed var(--nl-line-2);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-family: var(--nl-sans);
+}
+.is-new-look .nl-empty-state-icon {
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--nl-tone, var(--nl-mut-2));
+}
+.is-new-look .nl-empty-state-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.is-new-look .nl-empty-state-title {
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-lg);
+  font-weight: 600;
+}
+.is-new-look .nl-empty-state-message {
+  margin: 0;
+  font-size: var(--nl-fs-md);
+  color: var(--nl-mut);
+}
+.is-new-look .nl-empty-state-action {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--nl-t-fast) var(--nl-ease), background var(--nl-t-fast) var(--nl-ease);
+}
+.is-new-look .nl-empty-state-action:hover,
+.is-new-look .nl-empty-state-action:focus-visible {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+}
+.is-new-look .nl-empty-state-action:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- NlTable: dünne Tabellen-Grundlage ----------------------------
+   Ersetzt handgerollte tokenisierte `<table>`s (Kredite, Historie,
+   Team-Settings, Prize, Team-Profil, Season-Preview, …) durch EIN
+   gemeinsames Gerüst: sticky Kopf, Zebra/Hover, `nl-tnum`-Zahlen,
+   sortierbare Köpfe im selben Muster wie die bisherigen bespoke
+   Sort-Header (season-v2/players-table). */
+.is-new-look .nl-table-shell {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+}
+.is-new-look .nl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--nl-fs-md);
+  font-family: var(--nl-sans);
+  color: var(--nl-ink);
+}
+.is-new-look .nl-table th,
+.is-new-look .nl-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--nl-line);
+  white-space: nowrap;
+  text-align: left;
+  vertical-align: middle;
+}
+.is-new-look .nl-table thead th {
+  background: var(--nl-panel-2);
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.is-new-look .nl-table.is-sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.is-new-look .nl-table th.is-align-right,
+.is-new-look .nl-table td.is-align-right {
+  text-align: right;
+}
+.is-new-look .nl-table th.is-align-center,
+.is-new-look .nl-table td.is-align-center {
+  text-align: center;
+}
+.is-new-look .nl-table.is-zebra tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--nl-panel-2) 55%, transparent);
+}
+.is-new-look .nl-table.is-hoverable tbody tr:hover td {
+  background: var(--nl-accent-soft);
+}
+.is-new-look .nl-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* Sortierbare Köpfe: echter Button, Pfeil zeigt Zustand. */
+.is-new-look .nl-table-sort-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.is-new-look .nl-table-sort-th b {
+  font-size: var(--nl-fs-xs);
+  opacity: 0.6;
+}
+.is-new-look .nl-table-sort-th.is-active {
+  color: var(--nl-accent);
+}
+.is-new-look .nl-table-sort-th.is-active b {
+  opacity: 1;
+}
+.is-new-look .nl-table-sort-th:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--nl-r-sm);
+}
+
 /* --- NlSubTabs: Sub-Tabs oben ------------------------------------ */
 .is-new-look .nl-subtabs {
   display: flex;
@@ -42058,6 +42214,25 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-radar-label-value {
   font-size: var(--nl-fs-lg);
   font-weight: 800;
+}
+
+/* --- NlRadar: generischer Mehrachsen-/Mehrserien-Modus -------------
+   Jede Serie unterscheidet sich per Ton (`--nl-tone`, siehe `.nl-tone-*`)
+   UND Linienstil (`is-dashed`) — Serien dürfen sich nicht ausschließlich
+   über Farbe unterscheiden lassen (Accessibility). */
+.is-new-look .nl-radar-shape-series {
+  fill: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 16%, transparent);
+  stroke: var(--nl-tone, var(--nl-accent));
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.is-new-look .nl-radar-shape-series.is-dashed {
+  stroke-dasharray: 5 4;
+}
+.is-new-look .nl-radar-dot-series {
+  fill: var(--nl-tone, var(--nl-accent));
+  stroke: var(--nl-panel);
+  stroke-width: 1;
 }
 
 /* --- NlMedalBadge ------------------------------------------------- */
@@ -48341,12 +48516,6 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-sponsor-choose {
   margin-top: auto;
-}
-
-.is-new-look .nl-sponsor-empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--nl-mut);
 }
 
 /* --- Aktiver Vertrag (Hero) --------------------------------------- */
@@ -54938,33 +55107,6 @@ button.is-new-look .nl-thist-season-pill,
   gap: var(--nl-s4);
   color: var(--nl-ink);
   font-family: var(--nl-sans);
-}
-
-.is-new-look .nl-credits-table-shell {
-  overflow-x: auto;
-}
-
-.is-new-look .nl-credits-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.is-new-look .nl-credits-table th {
-  text-align: left;
-  padding: 6px 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-  border-bottom: 1px solid var(--nl-line-2);
-}
-
-.is-new-look .nl-credits-table td {
-  padding: 7px 8px;
-  border-bottom: 1px solid var(--nl-line);
-  vertical-align: middle;
 }
 
 .is-new-look .nl-credits-offer-grid {
@@ -62693,34 +62835,6 @@ button.nl-players-axis:focus-visible {
   width: 220px;
   height: 220px;
   flex: none;
-}
-
-.is-new-look .nl-pcompare-radar-ring {
-  stroke: var(--nl-line-2);
-  stroke-width: 1;
-}
-
-.is-new-look .nl-pcompare-radar-spoke {
-  stroke: var(--nl-line-2);
-  stroke-width: 1;
-}
-
-.is-new-look .nl-pcompare-radar-shape {
-  stroke: var(--nl-tone, var(--nl-accent));
-  stroke-width: 2;
-  fill: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 16%, transparent);
-}
-
-.is-new-look .nl-pcompare-radar-dot {
-  fill: var(--nl-tone, var(--nl-accent));
-  stroke: var(--nl-panel);
-  stroke-width: 1;
-}
-
-.is-new-look .nl-pcompare-radar-label {
-  font-size: 10px;
-  font-weight: 700;
-  fill: var(--nl-mut);
 }
 
 .is-new-look .nl-pcompare-table-wrap {

@@ -1,0 +1,155 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+export type NlTableAlign = "left" | "right" | "center";
+
+export type NlTableColumn<Row> = {
+  key: string;
+  label: ReactNode;
+  align?: NlTableAlign;
+  /** CSS-Breite der Spalte, z. B. "80px" oder "12%". */
+  width?: string | number;
+  sortable?: boolean;
+  tooltip?: string;
+  className?: string;
+};
+
+export type NlTableSortDirection = "asc" | "desc";
+
+export type NlTableSortState = {
+  key: string;
+  direction: NlTableSortDirection;
+};
+
+export type NlTableProps<Row> = {
+  columns: NlTableColumn<Row>[];
+  rows: Row[];
+  /** React-Key je Zeile — ohne Angabe wird der Zeilenindex genutzt. */
+  rowKey?: (row: Row, index: number) => string | number;
+  /** Zellinhalt je Zeile/Spalte. Ohne Angabe wird `row[column.key]` gelesen. */
+  renderCell?: (row: Row, column: NlTableColumn<Row>) => ReactNode;
+  sortState?: NlTableSortState | null;
+  onSort?: (key: string) => void;
+  /** Zebra-Streifen (Standard: an). */
+  zebra?: boolean;
+  /** Hover-Hervorhebung der Zeile (Standard: an). */
+  hoverable?: boolean;
+  /** Sticky Tabellenkopf (Standard: an). */
+  stickyHeader?: boolean;
+  className?: string;
+  "aria-label"?: string;
+  "data-testid"?: string;
+};
+
+function defaultRenderCell<Row>(row: Row, column: NlTableColumn<Row>): ReactNode {
+  const value = (row as Record<string, unknown>)[column.key];
+  if (value == null) {
+    return "—";
+  }
+  return String(value);
+}
+
+function alignClass(align: NlTableAlign | undefined): string {
+  if (align === "right") return "is-align-right";
+  if (align === "center") return "is-align-center";
+  return "";
+}
+
+/**
+ * Dünne Tabellen-Grundlage des neuen Looks — ersetzt handgerollte
+ * `<table>`s (Kredite, Historie, Team-Settings, Prize, Team-Profil,
+ * Season-Preview, …) durch EIN token-gestyltes Gerüst: sticky Kopf,
+ * Zebra/Hover, `nl-tnum`-Zahlen, gemeinsames sortierbares-Header-Muster
+ * (gleiche Optik/Verhalten wie die bisherigen bespoke Sort-Header in
+ * `season-v2`/`players-table`: Button mit Pfeil ↑/↓/↕, `aria-sort` je
+ * Spalte).
+ */
+export function NlTable<Row>({
+  columns,
+  rows,
+  rowKey,
+  renderCell = defaultRenderCell,
+  sortState,
+  onSort,
+  zebra = true,
+  hoverable = true,
+  stickyHeader = true,
+  className,
+  "aria-label": ariaLabel,
+  "data-testid": dataTestId,
+}: NlTableProps<Row>) {
+  const classes = [
+    "nl-table",
+    "nl-tnum",
+    zebra ? "is-zebra" : "",
+    hoverable ? "is-hoverable" : "",
+    stickyHeader ? "is-sticky-head" : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  function ariaSortFor(column: NlTableColumn<Row>): "ascending" | "descending" | "none" | undefined {
+    if (!column.sortable) {
+      return undefined;
+    }
+    if (sortState?.key !== column.key) {
+      return "none";
+    }
+    return sortState.direction === "asc" ? "ascending" : "descending";
+  }
+
+  return (
+    <div className="nl-table-shell">
+      <table className={classes} aria-label={ariaLabel} data-testid={dataTestId}>
+        <thead>
+          <tr>
+            {columns.map((column) => {
+              const isActive = column.sortable && sortState?.key === column.key;
+              return (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={[alignClass(column.align), column.className ?? ""].filter(Boolean).join(" ")}
+                  style={column.width != null ? { width: column.width } : undefined}
+                  aria-sort={ariaSortFor(column)}
+                >
+                  {column.sortable ? (
+                    <button
+                      type="button"
+                      className={`nl-table-sort-th${isActive ? " is-active" : ""}`}
+                      onClick={() => onSort?.(column.key)}
+                      title={column.tooltip}
+                    >
+                      <span>{column.label}</span>
+                      <b aria-hidden="true">{!isActive ? "↕" : sortState?.direction === "asc" ? "↑" : "↓"}</b>
+                    </button>
+                  ) : (
+                    <span title={column.tooltip}>{column.label}</span>
+                  )}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowKey ? rowKey(row, rowIndex) : rowIndex}>
+              {columns.map((column) => (
+                <td
+                  key={column.key}
+                  className={[alignClass(column.align), column.className ?? ""].filter(Boolean).join(" ")}
+                >
+                  {renderCell(row, column)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default NlTable;

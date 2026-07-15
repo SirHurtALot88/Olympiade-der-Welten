@@ -6,6 +6,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlEmptyState,
   NlGauge,
   NlProgressBar,
   NlSubTabs,
@@ -511,7 +512,7 @@ export default function FoundationSponsorsNewLook({
                   ))}
                 </div>
               ) : (
-                <p className="nl-sponsor-empty">Noch keine Sponsor-Events diese Saison.</p>
+                <NlEmptyState title="Noch keine Sponsor-Events diese Saison." />
               )}
             </NlCard>
           </>
@@ -567,7 +568,7 @@ export default function FoundationSponsorsNewLook({
             </div>
           </>
         ) : (
-          <p className="nl-sponsor-empty">Noch keine Sponsor-Angebote für diese Saison geladen.</p>
+          <NlEmptyState title="Noch keine Sponsor-Angebote für diese Saison geladen." />
         )}
 
         {/* #78: Liga-Sponsorenübersicht — wer hat wen, sortierbar */}
