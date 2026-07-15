@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { ScoutingHubV2WatchTarget } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import type { ScoutingQueueRow } from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
-import { NlDeltaChip } from "@/components/foundation/new-look";
+import { NlDeltaChip, NlEmptyState, NlTable, type NlTableColumn } from "@/components/foundation/new-look";
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 
 /**
@@ -87,6 +87,32 @@ function nullsLastCompare(left: number | null, right: number | null, dir: NlScou
   if (right == null) return -1;
   return dir === "asc" ? left - right : right - left;
 }
+
+type ShortlistTableRow = {
+  entry: ScoutingQueueRow;
+  target: ScoutingHubV2WatchTarget | null;
+  rank: number;
+  status: { label: string; rank: number; toneClass: string };
+  caSortValue: number | null;
+  poSortValue: number | null;
+  potentialRank: number | null;
+  feeSortValue: number | null;
+  impactDelta: number | null;
+  isLoadedReport: boolean;
+};
+
+const SHORTLIST_COLUMNS: NlTableColumn<ShortlistTableRow>[] = [
+  { key: "rank", label: "#", align: "right", width: "44px", sortable: true },
+  { key: "name", label: "Spieler", sortable: true },
+  { key: "status", label: "Status", sortable: true },
+  { key: "intel", label: "Intel", align: "right", sortable: true },
+  { key: "level", label: "Stufe", align: "right", sortable: true },
+  { key: "ca", label: "CA", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
+  { key: "po", label: "PO-Decke", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
+  { key: "potential", label: "Potenzial", sortable: true },
+  { key: "fee", label: "Fee", align: "right", sortable: true, className: "nl-scout-shortlist-nowrap" },
+  { key: "impact", label: "Top-6-Impact", align: "right", sortable: true, tooltip: "Top-6-Achsen-Schnitt Δ mit Kauf" },
+];
 
 export default function ScoutingShortlistBoard({
   entries,
@@ -175,132 +201,85 @@ export default function ScoutingShortlistBoard({
     }
   };
 
-  const sortIndicator = (key: NlScoutSortKey) => (key === sortKey ? (sortDir === "asc" ? " ▲" : " ▼") : "");
-
   if (entries.length === 0) {
     return (
-      <p className="nl-scout-muted" data-testid="scouting-shortlist-empty">
-        Noch niemand auf der Shortlist — Spieler im Transfermarkt zur Wishlist hinzufügen, damit sie hier vergleichbar
-        werden.
-      </p>
+      <NlEmptyState
+        icon="🔍"
+        title="Shortlist ist leer"
+        message="Spieler im Transfermarkt zur Wishlist hinzufügen, damit sie hier vergleichbar werden."
+        data-testid="scouting-shortlist-empty"
+      />
     );
   }
 
+  const renderCell = (row: ShortlistTableRow, column: NlTableColumn<ShortlistTableRow>) => {
+    switch (column.key) {
+      case "rank":
+        return row.rank;
+      case "name":
+        return (
+          <button
+            type="button"
+            className="nl-scout-shortlist-name"
+            onClick={() => onOpenPlayer(row.entry.playerId)}
+            title="Spielerprofil öffnen"
+          >
+            <strong>{row.entry.playerName}</strong>
+            <small>
+              {row.entry.className} · {row.entry.race}
+            </small>
+          </button>
+        );
+      case "status":
+        return <span className={`nl-scout-shortlist-status-pill ${row.status.toneClass}`}>{row.status.label}</span>;
+      case "intel":
+        return `${row.entry.certainty}%`;
+      case "level":
+        return `L${row.entry.effectiveScoutingLevel}/5`;
+      case "ca":
+        return row.target?.caDisplay ?? "—";
+      case "po":
+        return row.target?.poDisplay ?? "—";
+      case "potential":
+        return row.target?.potentialBand ? (
+          <span className={`nl-scout-shortlist-potential-pill is-${row.target.potentialBand}`}>
+            {POTENTIAL_BAND_LABEL[row.target.potentialBand] ?? row.target.potentialBand}
+          </span>
+        ) : (
+          "—"
+        );
+      case "fee":
+        return row.target?.marketValue ?? "—";
+      case "impact":
+        return row.impactDelta != null ? (
+          <NlDeltaChip value={row.impactDelta} format={(n) => n.toFixed(1)} title="Top-6-Achsen-Schnitt Δ mit Kauf" />
+        ) : (
+          <button
+            type="button"
+            className="nl-scout-shortlist-compare"
+            onClick={() => onSelectReportPlayer?.(row.entry.playerId)}
+            disabled={!onSelectReportPlayer}
+            title="Scouting Report laden, um den Team-Impact zu sehen"
+          >
+            Vergleichen
+          </button>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="nl-scout-shortlist-shell">
-      <table className="nl-scout-shortlist-table nl-tnum" data-testid="scouting-shortlist-board">
-        <thead>
-          <tr>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("rank")}>
-                #{sortIndicator("rank")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("name")}>
-                Spieler{sortIndicator("name")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("status")}>
-                Status{sortIndicator("status")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("intel")}>
-                Intel{sortIndicator("intel")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("level")}>
-                Stufe{sortIndicator("level")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("ca")}>
-                CA{sortIndicator("ca")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("po")}>
-                PO-Decke{sortIndicator("po")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("potential")}>
-                Potenzial{sortIndicator("potential")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("fee")}>
-                Fee{sortIndicator("fee")}
-              </button>
-            </th>
-            <th>
-              <button type="button" className="nl-scout-shortlist-sort-th" onClick={() => toggleSort("impact")}>
-                Top-6-Impact{sortIndicator("impact")}
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRows.map((row) => (
-            <tr
-              key={row.entry.playerId}
-              className={`nl-scout-shortlist-row${row.isLoadedReport ? " is-loaded" : ""}${
-                row.entry.playerId === selectedReportPlayerId ? " is-selected" : ""
-              }`}
-            >
-              <td>{row.rank}</td>
-              <td>
-                <button
-                  type="button"
-                  className="nl-scout-shortlist-name"
-                  onClick={() => onOpenPlayer(row.entry.playerId)}
-                  title="Spielerprofil öffnen"
-                >
-                  <strong>{row.entry.playerName}</strong>
-                  <small>
-                    {row.entry.className} · {row.entry.race}
-                  </small>
-                </button>
-              </td>
-              <td>
-                <span className={`nl-scout-shortlist-status-pill ${row.status.toneClass}`}>{row.status.label}</span>
-              </td>
-              <td>{row.entry.certainty}%</td>
-              <td>L{row.entry.effectiveScoutingLevel}/5</td>
-              <td className="nl-scout-shortlist-nowrap">{row.target?.caDisplay ?? "—"}</td>
-              <td className="nl-scout-shortlist-nowrap">{row.target?.poDisplay ?? "—"}</td>
-              <td>
-                {row.target?.potentialBand ? (
-                  <span className={`nl-scout-shortlist-potential-pill is-${row.target.potentialBand}`}>
-                    {POTENTIAL_BAND_LABEL[row.target.potentialBand] ?? row.target.potentialBand}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </td>
-              <td className="nl-scout-shortlist-nowrap">{row.target?.marketValue ?? "—"}</td>
-              <td>
-                {row.impactDelta != null ? (
-                  <NlDeltaChip value={row.impactDelta} format={(n) => n.toFixed(1)} title="Top-6-Achsen-Schnitt Δ mit Kauf" />
-                ) : (
-                  <button
-                    type="button"
-                    className="nl-scout-shortlist-compare"
-                    onClick={() => onSelectReportPlayer?.(row.entry.playerId)}
-                    disabled={!onSelectReportPlayer}
-                    title="Scouting Report laden, um den Team-Impact zu sehen"
-                  >
-                    Vergleichen
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <NlTable
+      columns={SHORTLIST_COLUMNS}
+      rows={sortedRows}
+      rowKey={(row) => row.entry.playerId}
+      rowClassName={(row) => (row.entry.playerId === selectedReportPlayerId ? "is-active-row" : undefined)}
+      renderCell={renderCell}
+      sortState={{ key: sortKey, direction: sortDir }}
+      onSort={(key) => toggleSort(key as NlScoutSortKey)}
+      aria-label="Shortlist-Vergleich"
+      data-testid="scouting-shortlist-board"
+    />
   );
 }

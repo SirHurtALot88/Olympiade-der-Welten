@@ -114,7 +114,7 @@ export default function ScoutingKnowledgeLadder({ report }: ScoutingKnowledgeLad
           </div>
         ))}
       </div>
-      <p className="nl-scout-ladder-meta muted">
+      <p className="nl-scout-ladder-meta nl-scout-muted">
         {report.isFullyScouted ? "Vollständig gescoutet — nichts mehr verdeckt." : `${report.certainty}% Intel · ${report.milestone}`}
       </p>
 
