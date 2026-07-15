@@ -24,6 +24,7 @@ function createPower(partial?: Partial<LegacyTeamPowerOption>): LegacyTeamPowerO
     chargesRemaining: partial?.chargesRemaining ?? 4,
     selectedForSeason: partial?.selectedForSeason ?? true,
     isUsedUp: partial?.isUsedUp ?? false,
+    isPassive: partial?.isPassive ?? false,
   };
 }
 

@@ -320,6 +320,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 4,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
       {
         id: "redline",
@@ -342,6 +343,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 4,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
     ];
     context.teamPowerWindows = {
@@ -382,6 +384,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 4,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
       {
         id: "power-3",
@@ -404,6 +407,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 3,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
       {
         id: "power-2",
@@ -426,6 +430,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 2,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
     ];
     context.teamDisciplineRanks = {
@@ -477,6 +482,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 4,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
       {
         id: "teampower:season-1:A-A:identity:3",
@@ -499,6 +505,7 @@ describe("AI legacy lineup form-card planning", () => {
         chargesRemaining: 2,
         selectedForSeason: true,
         isUsedUp: false,
+        isPassive: false,
       },
     ];
     context.teamDisciplineRanks = {

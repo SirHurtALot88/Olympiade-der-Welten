@@ -63,6 +63,7 @@ type ScoreSideInput = {
   teamPowerLabel?: string | null;
   teamPowerModifier?: number | null;
   teamPowerImpact?: number | null;
+  passiveTeamPowerImpactPct?: number | null;
   teamPowerBasePct?: number | null;
   teamPowerConditionalPct?: number | null;
   teamPowerAttributeFitPct?: number | null;
@@ -257,12 +258,25 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
       mutatorTeamOnlyAdjustment,
   );
   const isSelfTeamPower = input.teamPowerEffectType === "self_boost" || input.teamPowerEffectType === "support_boost";
-  const teamPowerModifier =
+  const selectedTeamPowerModifier =
     input.teamPowerStatus === "ready" && isSelfTeamPower
       ? roundPreviewScore((prePowerScore * (input.teamPowerImpact ?? 0)) / 100)
       : input.teamPowerStatus === "ready"
         ? 0
         : null;
+  // Always-on passive identity bonus: applies whenever the team-power source is ready,
+  // independent of whether a power is manually selected or whether that power is a self/debuff
+  // effect. Folded into the reported teamPowerModifier so the total and the display stay in sync.
+  const passiveTeamPowerModifier =
+    input.teamPowerStatus === "ready"
+      ? roundPreviewScore((prePowerScore * (input.passiveTeamPowerImpactPct ?? 0)) / 100)
+      : 0;
+  const teamPowerModifier =
+    selectedTeamPowerModifier == null
+      ? passiveTeamPowerModifier > 0
+        ? passiveTeamPowerModifier
+        : null
+      : roundPreviewScore(selectedTeamPowerModifier + passiveTeamPowerModifier);
   const totalScore = roundPreviewScore(prePowerScore + (teamPowerModifier ?? 0));
 
   return {
