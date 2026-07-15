@@ -240,7 +240,7 @@ async function openFoundationArenaPage(
     }),
     { waitUntil: "networkidle" },
   );
-  await page.getByTestId("arena-reveal-timeline").waitFor({ timeout: 90_000 });
+  await page.getByTestId("nl-matchday-arena").waitFor({ timeout: 90_000 });
 }
 
 async function screenshot(page: Page, name: keyof typeof SCREENSHOTS) {
@@ -498,44 +498,48 @@ async function main() {
         seatToken: joined.seatToken,
       });
 
-      state = await emitAndWait(
-        socketA,
-        "setRoomArenaReady",
-        { roomCode, seatToken: created.seatToken, ready: true },
-        (next) => next.arenaSyncState?.readyParticipantIds.includes(chris.participantId) ?? false,
-        "arena-ready-chris",
-      );
-      state = await emitAndWait(
-        socketA,
-        "setRoomArenaReady",
-        { roomCode, seatToken: joined.seatToken, ready: true },
-        (next) => isRoomArenaReady(next.arenaSyncState),
-        "arena-ready-franky",
-      );
+      // New-Look co-op ready gate: both real participants control teams, so
+      // the shared reveal must NOT start until both click ready — verified
+      // via the actual UI (not raw socket emits) to exercise the real
+      // MatchdayArenaNewLook + useArenaRoomSync wiring end-to-end.
+      await pageA.getByTestId("arena-coop-ready-gate").waitFor({ timeout: 30_000 });
+      await pageB.getByTestId("arena-coop-ready-gate").waitFor({ timeout: 30_000 });
+      screenshots.foundationArenaSync = await screenshot(pageA, "foundationArenaSync");
 
-      const beforeReveal = state.arenaSyncState?.revealedSlotCountByDiscipline?.d1 ?? 0;
-      state = await emitAndWait(
-        socketA,
-        "advanceRoomArenaStep",
-        {
-          roomCode,
-          seatToken: created.seatToken,
-          force: true,
-          maxSlotRevealCountByDiscipline: { d1: 3, d2: 3 },
-        },
-        (next) => (next.arenaSyncState?.revealedSlotCountByDiscipline?.d1 ?? 0) > beforeReveal,
-        "foundation-arena-advance",
-      );
+      await pageA.getByRole("button", { name: "Bereit für den Spieltag" }).click();
+      await pageA.getByText("Warte auf Franky").waitFor({ timeout: 20_000 });
+      await pageB.getByRole("button", { name: "Bereit für den Spieltag" }).click();
 
-      await pageA.getByText(/Slots\s+1\//).waitFor({ timeout: 30_000 });
-      await pageB.getByText(/Slots\s+1\//).waitFor({ timeout: 30_000 });
-      await pageB.getByText("Der Host steuert").waitFor({ timeout: 20_000 });
-      screenshots.foundationArenaSync = await screenshot(pageB, "foundationArenaSync");
+      // Once both are ready the gate disappears on both screens and the
+      // host-controlled note appears.
+      await pageA.getByTestId("arena-coop-ready-gate").waitFor({ state: "detached", timeout: 20_000 });
+      await pageB.getByTestId("arena-coop-ready-gate").waitFor({ state: "detached", timeout: 20_000 });
+      await pageA.getByText("Du steuerst den Reveal für alle.").waitFor({ timeout: 20_000 });
+      await pageB.getByText("Der Host steuert den Reveal.").waitFor({ timeout: 20_000 });
+
+      // Guest controls must be locked: the "Weiter" button reflects the
+      // gate/host-only rule via the disabled attribute.
+      const guestWeiter = pageB.getByRole("button", { name: "Weiter" });
+      const guestWeiterDisabled = await guestWeiter.isDisabled();
+
+      await pageA.getByText(/Phase\s+1\/7/).waitFor({ timeout: 20_000 });
+      await pageB.getByText(/Phase\s+1\/7/).waitFor({ timeout: 20_000 });
+
+      // Host advances via the real "Weiter" button — this is the
+      // lockstep-reveal path (`handleHostRoomArenaAdvance` ->
+      // `useArenaRoomSync().emitHostRoomArenaAdvance` -> socket ->
+      // server -> `roomState` -> `onApplyRevealSync` on both screens).
+      await pageA.getByRole("button", { name: "Weiter" }).click();
+
+      await pageA.getByText(/Phase\s+2\/7/).waitFor({ timeout: 20_000 });
+      await pageB.getByText(/Phase\s+2\/7/).waitFor({ timeout: 20_000 });
+      screenshots.resultSync = await screenshot(pageB, "resultSync");
+
       foundationArenaSync = {
         ok: true,
-        reason: "host_advance_synced_to_guest",
-        hostSlotRevealIndex: state.arenaSyncState?.slotRevealIndex ?? null,
-        guestSawHostControlledCopy: true,
+        reason: "new_look_coop_gate_and_host_advance_synced_to_guest",
+        hostSlotRevealIndex: null,
+        guestSawHostControlledCopy: guestWeiterDisabled,
       };
     }
 
