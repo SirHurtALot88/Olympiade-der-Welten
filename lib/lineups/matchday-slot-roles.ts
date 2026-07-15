@@ -668,6 +668,20 @@ export function getMatchdayIntensityConfig(intensity: MatchdayIntensityStage) {
   return INTENSITY_CONFIG[intensity];
 }
 
+/**
+ * Applies a team captain's "Ruhepol" effect (rivalryPressureReductionPct) as a clean
+ * multiplicative reduction to a raw rivalry-pressure load. Never goes below 0. Does not
+ * change how the reduction magnitude itself is computed/clamped upstream (team-captain-service).
+ */
+export function applyCaptainRivalryPressureReduction(
+  pressure: number,
+  reductionPct: number | null | undefined,
+): number {
+  const safePressure = Number.isFinite(pressure) ? pressure : 0;
+  const safeReductionPct = Math.max(0, Math.min(100, reductionPct ?? 0));
+  return Math.max(0, Number((safePressure * (1 - safeReductionPct / 100)).toFixed(2)));
+}
+
 export function resolveSlotRolesForDiscipline(
   disciplineId: string | null | undefined,
   disciplineName: string | null | undefined,
