@@ -14,6 +14,7 @@ import type {
   PlayerGeneratorMatchState,
   PlayerGeneratorRandomness,
   PlayerGeneratorRoleIntent,
+  PlayerGeneratorSilhouette,
   PlayerGeneratorStrengthTier,
 } from "@/lib/data/olyDataTypes";
 import {
@@ -104,6 +105,13 @@ const archetypeOptions: Array<{ value: PlayerGeneratorArchetype; label: string }
   { value: "pirate", label: "Pirate" },
   { value: "ninja", label: "Ninja" },
   { value: "mercenary", label: "Mercenary" },
+];
+
+const silhouetteOptions: Array<{ value: PlayerGeneratorSilhouette; label: string; hint: string }> = [
+  { value: "allrounder", label: "Allrounder", hint: "rund — alle Achsen ähnlich" },
+  { value: "duo", label: "Duo", hint: "zwei Achsen hoch, zwei tief" },
+  { value: "specialist", label: "Spezialist", hint: "eine Achse dominant" },
+  { value: "rohdiamant", label: "Rohdiamant", hint: "eine Elite-Achse, sonst roh" },
 ];
 
 const axisChipOptions: Array<{ value: string; label: string }> = [
@@ -847,6 +855,37 @@ export default function PlayerGeneratorPanelNewLook({
                 </button>
               ))}
             </div>
+          </NlCard>
+
+          <NlCard className="nl-gen-card" eyebrow="Build" title="Silhouette">
+            <div className="nl-gen-chip-group" role="group" aria-label="Achsen-Silhouette (Verteilungsform)">
+              <button
+                type="button"
+                className={`nl-gen-chip${!form.silhouette ? " is-active" : ""}`}
+                aria-pressed={!form.silhouette}
+                onClick={() => updateFormLive("silhouette", null)}
+                title="Keine Form-Vorgabe — Achsen wie bisher"
+              >
+                Frei
+              </button>
+              {silhouetteOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`nl-gen-chip${form.silhouette === option.value ? " is-active" : ""}`}
+                  aria-pressed={form.silhouette === option.value}
+                  onClick={() => updateFormLive("silhouette", option.value)}
+                  title={option.hint}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="nl-gen-muted">
+              {form.silhouette
+                ? silhouetteOptions.find((option) => option.value === form.silhouette)?.hint
+                : "Formt die Achsen-Verteilung bei gleicher Current Ability — welche Achse dominiert, bestimmt Rolle/Archetyp."}
+            </p>
           </NlCard>
 
           <NlCard className="nl-gen-card" eyebrow="Build" title="Achsen-Bias">
