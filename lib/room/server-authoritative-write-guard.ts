@@ -57,6 +57,12 @@ const HOST_LEVEL_ACTIONS = new Set<TeamWriteAction>([
   "season_completion",
   "cash_prize_apply",
   "standings_apply",
+  // Player-Generator commit inserts a brand-new free agent into the shared
+  // save — it isn't a team-owned write (no roster/team is touched), so it
+  // has no natural `teamId` to authorize against. Treating it as host-level
+  // means: unrestricted in local singleplayer (no active room), host-only
+  // in a room, exactly like the other save-wide admin actions above.
+  "player_generator_commit",
 ]);
 
 function resolveParticipant(room: RuntimeRoom, input: ServerRoomWriteContext): RoomParticipant | null {

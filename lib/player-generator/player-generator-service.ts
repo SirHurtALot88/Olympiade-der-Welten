@@ -82,6 +82,22 @@ export type PlayerGeneratorTeamContext = {
   averageSalary: number | null;
 };
 
+/**
+ * Phase 2 — result shape for the "Als Free Agent übernehmen" commit call.
+ * Shared by both generator panels (`PlayerGeneratorPanel.tsx` and
+ * `PlayerGeneratorPanelNewLook.tsx`) so the host page's
+ * `commitPlayerGeneratorDraft` (see `use-foundation-shell-router-body-scope.tsx`)
+ * has one type to satisfy.
+ */
+export type PlayerGeneratorCommitResult = {
+  success: boolean;
+  error?: string;
+  playerId?: string;
+  playerName?: string;
+};
+
+export type PlayerGeneratorCommitHandler = (draft: PlayerGeneratorDraft) => Promise<PlayerGeneratorCommitResult>;
+
 const defaultInput: PlayerGeneratorInput = {
   name: "",
   roleIntent: "allround",
@@ -1572,10 +1588,14 @@ function validateGeneratedPlayerDraft(input: {
     pushUnique(warnings, "salary_engine_source_missing");
     pushUnique(saveStatus.commitReasons, "salary_engine_blocked");
   }
-  if (generated.marketValueStatus !== "ready") {
+  // Phase 2 fix: `marketValueStatus` is "heuristic_estimate" for essentially
+  // every draft by design (see the doc comment on `deriveGeneratedEconomy` —
+  // the real rank-based MV engine can never run pre-commit), so gating the
+  // commit path on `!== "ready"` blocked every draft unconditionally. The
+  // honest signal is whether the draft actually produced a usable number.
+  if (generated.marketValue == null) {
     pushUnique(saveStatus.commitReasons, "market_value_engine_blocked");
   }
-  pushUnique(saveStatus.commitReasons, "commit_path_not_ready");
 
   const archetypeValidation = buildArchetypeValidation(generatorInput, generated, archetypeConstraint);
   const roleValidation = buildRoleValidation(generatorInput, generated, roleProfile);
@@ -1656,6 +1676,20 @@ function validateGeneratedPlayerDraft(input: {
   } else if (archetypeValidation.state === "warning" || roleValidation.state === "warning") {
     validationStatus = "needs_edit";
   }
+
+  // Phase 2: a hard validation block (archetype conflict / missing engine)
+  // is a genuine reason the free-agent commit path should stay disabled —
+  // "needs_edit" (advisory warnings only) is deliberately NOT treated as a
+  // blocker here, so a draft with minor quality warnings can still be
+  // committed. Checked as "anything other than the two non-blocking
+  // statuses" (rather than naming "blocked_archetype_conflict" explicitly)
+  // so this stays correct if `validationStatus` ever gains a
+  // "blocked_missing_engine" assignment above, which today's branches never
+  // actually produce.
+  if (validationStatus !== "ready_for_review" && validationStatus !== "needs_edit") {
+    pushUnique(saveStatus.commitReasons, "draft_validation_blocked");
+  }
+  saveStatus.commit = saveStatus.commitReasons.length === 0 ? "enabled" : "disabled";
 
   const diagnostics: ValidationDiagnostics = {
     archetypeMatch: archetypeValidation.state,
@@ -1816,7 +1850,7 @@ function buildCandidate(input: {
       saveStatus: {
         save: "draft_only",
         commit: "disabled",
-        commitReasons: ["market_value_engine_blocked", "commit_path_not_ready"],
+        commitReasons: ["market_value_engine_blocked"],
       },
       qualityWarnings: [],
       resolvedAxisIntent: axisResolution.resolvedAxisIntent,
