@@ -70,6 +70,24 @@ export const API_WRITE_ROUTE_ALLOWLIST: ApiWriteRoutePolicyEntry[] = [
     policy: "allowlisted",
     reason: "Delegates POST to ai/market-plan-apply which enforces the write guard.",
   },
+  {
+    routePath: "auth/login",
+    methods: ["POST"],
+    policy: "allowlisted",
+    reason: "Session login — writes an auth session cookie, not save/gameplay state.",
+  },
+  {
+    routePath: "auth/logout",
+    methods: ["POST"],
+    policy: "allowlisted",
+    reason: "Session logout — clears an auth session cookie, not save/gameplay state.",
+  },
+  {
+    routePath: "season/warmup-derivations",
+    methods: ["POST"],
+    policy: "allowlisted",
+    reason: "Derived/cache-only season stats warmup; no teamId, no client-controlled gameplay fields.",
+  },
 ];
 
 export const API_WRITE_ROUTE_GUARD_REQUIRED: ApiWriteRoutePolicyEntry[] = [
@@ -104,10 +122,16 @@ export const API_WRITE_ROUTE_GUARD_REQUIRED: ApiWriteRoutePolicyEntry[] = [
     reason: "Auto roster fill execute mutates roster state.",
   },
   {
-    routePath: "progression/ai-xp-spend",
+    routePath: "team-settings/identity",
     methods: ["POST"],
     policy: "require_room_write_guard",
-    reason: "AI XP spend apply mutates player progression.",
+    reason: "Team identity override write mutates seasonState.teamIdentityOverrides for one team.",
+  },
+  {
+    routePath: "team-settings/control",
+    methods: ["POST"],
+    policy: "require_room_write_guard",
+    reason: "Team control settings write mutates seasonState.teamControlSettings for one team.",
   },
 ];
 

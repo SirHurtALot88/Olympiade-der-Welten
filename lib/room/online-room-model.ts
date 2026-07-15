@@ -136,7 +136,9 @@ export type TeamWriteAction =
   | "standings_apply"
   | "sponsor_choice"
   | "credit_borrow"
-  | "credit_early_payoff";
+  | "credit_early_payoff"
+  | "team_identity_update"
+  | "team_control_update";
 
 export type TeamWriteAuthorizationReason =
   | "ok"

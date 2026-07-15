@@ -59,6 +59,7 @@ export type UseFoundationLiveSyncInput = {
   seasonFeedReloadersRef: MutableRefObject<FoundationSeasonFeedReloaders>;
   autoPersistPausedRef: MutableRefObject<boolean>;
   autoPersistUnpauseTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  autoPersistInFlightRef: MutableRefObject<boolean>;
   liveSaveRefreshInFlightRef: MutableRefObject<boolean>;
   liveSaveVersionSignatureRef: MutableRefObject<string | null>;
   foundationViewTransitionUntilRef: MutableRefObject<number>;
@@ -90,6 +91,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     seasonFeedReloadersRef,
     autoPersistPausedRef,
     autoPersistUnpauseTimeoutRef,
+    autoPersistInFlightRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
     foundationViewTransitionUntilRef,
@@ -261,6 +263,14 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
         return;
       }
 
+      // Never let a version-check reload race a local write: `autoPersistPausedRef` is held
+      // while a just-applied reload is settling, and `autoPersistInFlightRef` is held for the
+      // duration of an outgoing autosave PUT. Skipping here just means the next trigger (the
+      // room-poll interval a few seconds later, or the next tab refocus) retries.
+      if (autoPersistPausedRef.current || autoPersistInFlightRef.current) {
+        return;
+      }
+
       if (Date.now() < foundationViewTransitionUntilRef.current) {
         return;
       }
@@ -314,17 +324,46 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     }
 
     void pollLocalSaveVersion();
+
+    // Continuous co-op sync: while a Room is active, keep polling for external changes on an
+    // interval instead of relying solely on mount + tab-refocus. This is the only place this
+    // hook starts a recurring timer — it is intentionally gated on `roomContext` so solo /
+    // no-room saves keep the exact previous behaviour (mount-once + refocus-once, no interval).
+    let roomPollIntervalId: ReturnType<typeof setInterval> | null = null;
+    function stopRoomPollInterval() {
+      if (roomPollIntervalId != null) {
+        clearInterval(roomPollIntervalId);
+        roomPollIntervalId = null;
+      }
+    }
+    function startRoomPollInterval() {
+      if (!roomContext || roomPollIntervalId != null || cancelled) {
+        return;
+      }
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      roomPollIntervalId = setInterval(() => {
+        void pollLocalSaveVersion();
+      }, 4000);
+    }
+    startRoomPollInterval();
+
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         void pollLocalSaveVersion();
+        startRoomPollInterval();
+      } else {
+        stopRoomPollInterval();
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
+      stopRoomPollInterval();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [activeSaveId, readMeta.source]);
+  }, [activeSaveId, readMeta.source, roomContext]);
 
   useEffect(() => {
     markFoundationNavigationQuiet(foundationViewTransitionUntilRef, undefined, {
