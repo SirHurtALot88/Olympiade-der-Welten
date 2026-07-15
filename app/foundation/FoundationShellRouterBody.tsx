@@ -305,6 +305,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   aiTeams,
   applyNewGamePreset,
   bootstrapError,
+  bulkAiPicksRefillBusy,
+  bulkAiPicksRefillMessage,
+  runBulkAiTeamsRefill,
+  underFilledAiTeamIds,
   buildTeamDetailDrawerData,
   canonicalSeasonLabel,
   cashApplyFeed,
@@ -2942,6 +2946,33 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <span className="pill is-warning">Rank-Archiv fehlt · Live-Fallback</span>
                   ) : null}
                   <span className="muted ranks-season-source">{seasonOverviewSourceLabel}</span>
+                  {!readMeta.readOnly && readMeta.source !== "prisma" && runBulkAiTeamsRefill ? (
+                    <button
+                      type="button"
+                      className="secondary-button inline-button"
+                      disabled={bulkAiPicksRefillBusy || (underFilledAiTeamIds?.length ?? 0) === 0}
+                      title={
+                        (underFilledAiTeamIds?.length ?? 0) === 0
+                          ? "Alle KI-Teams sind gefüllt"
+                          : "Alle nicht befüllten KI-Teams automatisch nachpicken"
+                      }
+                      onClick={() => void runBulkAiTeamsRefill()}
+                    >
+                      {bulkAiPicksRefillBusy
+                        ? "Wirbt an…"
+                        : (underFilledAiTeamIds?.length ?? 0) === 0
+                          ? "KI-Teams gefüllt"
+                          : `KI-Teams nachpicken (${underFilledAiTeamIds?.length ?? 0})`}
+                    </button>
+                  ) : null}
+                  {bulkAiPicksRefillMessage ? (
+                    <span
+                      className={`pill ${bulkAiPicksRefillMessage.tone === "success" ? "is-ready" : "is-warning"}`}
+                      title={bulkAiPicksRefillMessage.text}
+                    >
+                      {bulkAiPicksRefillMessage.text}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <ColumnVisibilityManager
