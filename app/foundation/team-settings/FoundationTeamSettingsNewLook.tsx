@@ -6,11 +6,14 @@ import { parseFoundationTabFromUrl } from "@/lib/foundation/foundation-url-state
 
 import {
   NlCard,
+  NlCountUpValue,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
 } from "@/components/foundation/new-look";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
+import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import type { FoundationTeamSettingsPanelProps } from "@/app/foundation/team-settings/FoundationTeamSettingsPanel";
 import { FOUNDATION_SAVE_MODE_OPTIONS } from "@/app/foundation/foundation-page-client-exports";
 import type { TeamStrategyProfile } from "@/app/foundation/foundation-page-client-exports";
@@ -221,6 +224,42 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   const [selectedSaveIdsForDeletion, setSelectedSaveIdsForDeletion] = useState<Set<string>>(new Set());
   const [saveDeleteMessage, setSaveDeleteMessage] = useState<string | null>(null);
 
+  // One-click "Neues Spiel erstellen": `runNewGameSetup(false)` verlangt einen
+  // bereits validierten Preview. Um den bequemen Ein-Klick-Flow zu erreichen,
+  // ohne die Service-Semantik zu ändern, merken wir uns die Erstell-Absicht und
+  // ketten Preview → Create über einen Effect: Nach einem Preview-Lauf (busy
+  // fällt wieder auf false) wird bei fehlerfreiem, blockerfreiem Preview
+  // automatisch der echte Create-Lauf angestoßen. Blocker/Fehler stoppen die
+  // Kette und werden wie gehabt inline gezeigt.
+  const [pendingNewGameCreate, setPendingNewGameCreate] = useState(false);
+
+  async function handleCreateNewGame() {
+    if (newGameBusy || readMeta.readOnly || pendingNewGameCreate) {
+      return;
+    }
+    if (newGamePreview && newGamePreview.blockers.length === 0) {
+      await runNewGameSetup(false);
+      return;
+    }
+    setPendingNewGameCreate(true);
+    await runNewGameSetup(true);
+  }
+
+  useEffect(() => {
+    if (!pendingNewGameCreate || newGameBusy) {
+      return;
+    }
+    // Preview-Lauf ist fertig — entscheide, ob wir weiter zum Create dürfen.
+    if (newGamePreview && newGamePreview.blockers.length === 0) {
+      setPendingNewGameCreate(false);
+      void runNewGameSetup(false);
+      return;
+    }
+    // Blocker oder Fehler: Kette beenden, Inline-Anzeige übernimmt.
+    setPendingNewGameCreate(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingNewGameCreate, newGameBusy, newGamePreview, newGameError]);
+
   /** Umschalten der Mehrfachauswahl für Save-Löschung; verwirft eine laufende Auswahl. */
   function toggleMultiSelectSaves() {
     setMultiSelectSaves((current) => !current);
@@ -311,16 +350,51 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
   function renderNewGameWizard() {
     return (
-      <section className="nl-teamsettings-subpanel" data-testid="new-game-setup-wizard">
+      <section className="nl-teamsettings-subpanel nl-newgame" data-testid="new-game-setup-wizard">
         <header className="nl-teamsettings-subhead">
           <h4>Neues Spiel starten</h4>
           <span className="nl-teamsettings-hint">Single-Player · Baseline · Startbudget</span>
         </header>
-        <p className="nl-teamsettings-note">
-          Erst prüfen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save
-          aktiv.
-        </p>
-        <div className="nl-teamsettings-field-grid">
+
+        {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. */}
+        <div className="nl-newgame-hero">
+          <div className="nl-newgame-hero-lead">
+            <span className="nl-newgame-hero-eyebrow">Dein Klub-Portfolio</span>
+            <p className="nl-newgame-hero-headline">
+              Du steuerst{" "}
+              <NlCountUpValue
+                className="nl-newgame-hero-count nl-tnum"
+                value={newGameChrisTeamIds.length}
+                format={(value) => String(Math.round(value))}
+              />{" "}
+              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
+            </p>
+            <span className="nl-newgame-hero-hint">
+              {newGameChrisTeamIds.length === 0
+                ? "Wähle 1 bis 4 Klubs, die du selbst managst — alle übrigen laufen unter KI-Kontrolle."
+                : `${newGameChrisTeamIds.length === 1 ? "1 Klub" : `${newGameChrisTeamIds.length} Klubs`} unter deiner Kontrolle · bis zu 4 möglich`}
+            </span>
+          </div>
+          <StatChipRow className="nl-newgame-hero-chips" aria-label="Setup-Übersicht">
+            <StatChip
+              label="Deine Teams"
+              value={`${newGameChrisTeamIds.length}/4`}
+              tone={newGameChrisTeamIds.length > 0 ? "good" : "neutral"}
+              sub="du steuerst"
+            />
+            <StatChip
+              label="KI-Teams"
+              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+              sub="automatisch"
+            />
+            {newGameFrankyTeamIds.length > 0 ? (
+              <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
+            ) : null}
+          </StatChipRow>
+        </div>
+
+        {/* Kompakte Optionen: Save-Name + Sandbox (Bindings/Titel unverändert). */}
+        <div className="nl-newgame-options">
           <NlField label="Save-Name">
             <input
               value={newGameSaveName}
@@ -339,7 +413,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               }}
             />
           </NlField>
-          <label className="nl-teamsettings-check">
+          <label className="nl-teamsettings-check nl-newgame-sandbox">
             <input
               type="checkbox"
               checked={newGameSandbox}
@@ -360,76 +434,73 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </label>
         </div>
 
-        <div className="nl-teamsettings-metric-grid">
-          <NlMetric
-            label="Deine Teams"
-            value={`${newGameChrisTeamIds.length}/4`}
-            sub={newGameChrisTeamIds.join(" · ") || "noch kein Team gewählt"}
-          />
-          <NlMetric
-            label="KI-Teams (Rest)"
-            value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
-            sub="automatisch gesteuert"
-          />
-          {newGameFrankyTeamIds.length > 0 ? (
-            <NlMetric
-              label="2. Spieler"
-              value={`${newGameFrankyTeamIds.length}/4`}
-              sub={newGameFrankyTeamIds.join(" · ")}
-            />
-          ) : null}
+        {/* Club-Picker: die ganze Karte ist der Auswahl-Toggle. */}
+        <div className="nl-newgame-pickerhead">
+          <strong>Wähle deine Klubs</strong>
+          <span className="nl-teamsettings-hint">Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI</span>
         </div>
-
-        <NlField label="Deine Teams — 1 bis 4 wählen">
-          <p className="nl-teamsettings-note">
-            Tippe auf „Auswählen“, um ein Team selbst zu übernehmen. Alle nicht gewählten Teams laufen automatisch
-            unter KI-Kontrolle.
-          </p>
-        </NlField>
-        <div className="nl-teamsettings-team-grid" data-testid="new-game-ownership-picker">
+        <div className="nl-newgame-clubgrid" data-testid="new-game-ownership-picker">
           {[...gameState.teams]
             .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
             .map((team) => {
               const isChris = newGameChrisTeamIds.includes(team.teamId);
               const isFranky = newGameFrankyTeamIds.includes(team.teamId);
-              const ownerLabel = isChris ? "Du steuerst" : isFranky ? "2. Spieler" : "KI-Team";
+              const logo = getTeamLogoModel(team, { variant: "thumb" });
+              const selectDisabled = newGameBusy || readMeta.readOnly || isFranky;
               return (
                 <article
                   key={`new-game-team-${team.teamId}`}
-                  className={`nl-teamsettings-team-card${isChris ? " is-owned-chris" : ""}${isFranky ? " is-owned-franky" : ""}`}
+                  className={`nl-newgame-club${isChris ? " is-picked" : ""}${isFranky ? " is-franky" : ""}`}
                 >
                   <button
                     type="button"
-                    className="nl-teamsettings-team-card-main"
-                    onClick={() => openTeamProfileById(team.teamId)}
-                    title="Teamprofil öffnen"
+                    className="nl-newgame-club-select"
+                    aria-pressed={isChris}
+                    disabled={selectDisabled}
+                    title={
+                      isFranky
+                        ? "Dieses Team ist bereits dem 2. Spieler zugeordnet."
+                        : readMeta.readOnly
+                          ? getReadOnlyActionReason("die Team-Zuordnung")
+                          : newGameBusy
+                            ? getBusyActionReason("Das New-Game-Setup")
+                            : isChris
+                              ? "Team wieder freigeben — die KI übernimmt."
+                              : "Dieses Team steuerst du selbst (bis zu 4 Teams)."
+                    }
+                    onClick={() => toggleNewGameTeam("chris", team.teamId)}
                   >
-                    <strong>{team.shortCode}</strong>
-                    <span>{team.name}</span>
-                    <small className="nl-tnum">Budget {formatMoney(team.budget)}</small>
-                    <small>{ownerLabel}</small>
+                    <span className="nl-newgame-club-crest">
+                      <BudgetedMediaImage
+                        src={logo.src}
+                        alt={`${team.name} Logo`}
+                        className="nl-newgame-club-crest-img"
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        fallback={<span className="nl-newgame-club-crest-fallback">{logo.initials}</span>}
+                      />
+                    </span>
+                    <span className="nl-newgame-club-body">
+                      <span className="nl-newgame-club-code">{team.shortCode}</span>
+                      <span className="nl-newgame-club-name">{team.name}</span>
+                      <span className="nl-newgame-club-budget nl-tnum">Budget {formatMoney(team.budget)}</span>
+                    </span>
+                    {isChris ? (
+                      <span className="nl-newgame-club-badge">DEIN TEAM ✓</span>
+                    ) : isFranky ? (
+                      <span className="nl-newgame-club-badge is-franky">2. Spieler</span>
+                    ) : null}
                   </button>
-                  <div className="nl-teamsettings-team-card-actions">
-                    <button
-                      type="button"
-                      className={`nl-teamsettings-btn is-small${isChris ? " is-primary" : ""}`}
-                      disabled={newGameBusy || readMeta.readOnly || isFranky}
-                      title={
-                        isFranky
-                          ? "Dieses Team ist bereits dem 2. Spieler zugeordnet."
-                          : readMeta.readOnly
-                            ? getReadOnlyActionReason("die Team-Zuordnung")
-                            : newGameBusy
-                              ? getBusyActionReason("Das New-Game-Setup")
-                              : isChris
-                                ? "Team wieder freigeben — die KI übernimmt."
-                                : "Dieses Team steuerst du selbst (bis zu 4 Teams)."
-                      }
-                      onClick={() => toggleNewGameTeam("chris", team.teamId)}
-                    >
-                      {isChris ? "Dein Team ✓" : "Auswählen"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="nl-newgame-club-profile"
+                    aria-label={`${team.name} Teamprofil öffnen`}
+                    title="Teamprofil öffnen"
+                    onClick={() => openTeamProfileById(team.teamId)}
+                  >
+                    <span aria-hidden="true">ⓘ</span>
+                  </button>
                 </article>
               );
             })}
@@ -489,40 +560,38 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </div>
         </details>
 
-        <div className="nl-teamsettings-actions">
+        <div className="nl-teamsettings-actions nl-newgame-actions">
           <button
             type="button"
             className="nl-teamsettings-btn"
-            disabled={newGameBusy || readMeta.readOnly}
+            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate}
             title={
               readMeta.readOnly
                 ? getReadOnlyActionReason("das New-Game-Setup")
                 : newGameBusy
                   ? getBusyActionReason("Das New-Game-Setup")
-                  : "Prüft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
+                  : "Trockenlauf: prüft Baseline, Ownership und Season-Setup, ohne den Spielstand zu bauen."
             }
             onClick={() => void runNewGameSetup(true)}
           >
-            {newGameBusy ? "Prüft..." : "Setup prüfen"}
+            {newGameBusy && !pendingNewGameCreate ? "Prüft..." : "Setup prüfen"}
           </button>
           <button
             type="button"
-            className="nl-teamsettings-btn is-primary"
-            disabled={newGameBusy || readMeta.readOnly || !newGamePreview || newGamePreview.blockers.length > 0}
+            className="nl-teamsettings-btn is-primary nl-newgame-cta"
+            disabled={newGameBusy || readMeta.readOnly || pendingNewGameCreate}
             title={
               readMeta.readOnly
                 ? getReadOnlyActionReason("ein neues Spiel")
-                : newGameBusy
+                : newGameBusy || pendingNewGameCreate
                   ? getBusyActionReason("Das New-Game-Setup")
-                  : !newGamePreview
-                    ? "Bitte zuerst das Setup prüfen."
-                    : newGamePreview.blockers.length > 0
-                      ? `Noch offen: ${newGamePreview.blockers.map((reason: string) => formatCockpitReason(reason)).join(" · ")}`
-                      : "Erstellt den neuen lokalen Spielstand mit dem geprüften Setup."
+                  : newGamePreview && newGamePreview.blockers.length > 0
+                    ? `Noch offen: ${newGamePreview.blockers.map((reason: string) => formatCockpitReason(reason)).join(" · ")}`
+                    : "Prüft das Setup und erstellt anschließend direkt den neuen lokalen Spielstand."
             }
-            onClick={() => void runNewGameSetup(false)}
+            onClick={() => void handleCreateNewGame()}
           >
-            Neues Spiel erstellen
+            {pendingNewGameCreate ? "Prüft & erstellt..." : newGameBusy ? "Arbeitet..." : "Neues Spiel erstellen"}
           </button>
         </div>
 
