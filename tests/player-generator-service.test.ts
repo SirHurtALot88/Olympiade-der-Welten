@@ -425,7 +425,10 @@ describe("player generator service", () => {
     });
 
     expect(average(spreads.map((entry) => entry.high))).toBeGreaterThan(average(spreads.map((entry) => entry.low)));
-  });
+    // 12 generatePlayerDraft-Aufrufe: seit dem schwereren Draft (Phase 1/2)
+    // über dem 5s-Default → größeres Timeout, sonst nur ein Timeout-Fehlschlag
+    // (die Assertion selbst hält, siehe standalone-Diagnose).
+  }, 30000);
 
   it("flags anti-flatness and archetype conflicts when a draft is manually flattened or broken", () => {
     const draft = generatePlayerDraft({
