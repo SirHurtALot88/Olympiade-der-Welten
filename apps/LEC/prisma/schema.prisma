@@ -181,7 +181,7 @@ model CostSettings {
 /// Protokoll je Import-Lauf (Billbee-Fenster oder eBay-Report).
 model ImportBatch {
   id             String    @id @default(cuid())
-  kind           String // "billbee" | "ebay"
+  kind           String // "billbee" | "ebay" | "billbee_artikel"
   window         String?
   windowFrom     DateTime?
   windowTo       DateTime?

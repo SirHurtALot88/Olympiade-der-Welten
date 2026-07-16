@@ -112,6 +112,45 @@ export async function runImport(prisma: PrismaClient, input: ImportInput): Promi
     };
   }
 
+  // Protokoll je Import-Lauf (KONZEPT ImportBatch) -- Basis fuer die
+  // Datenstand-Karte auf /einstellungen.
+  for (const w of windows) {
+    await prisma.importBatch.create({
+      data: {
+        kind: "billbee",
+        window: w.window,
+        windowFrom: new Date(w.windowFrom),
+        windowTo: new Date(w.windowTo),
+        fileName: w.fileName,
+        rowCount: w.rowCount,
+        matchedCount: plan.stats.matchedArticles,
+        unmatchedCount: plan.stats.unmatchedBillbeeArticles,
+      },
+    });
+  }
+  if (ebayInfo) {
+    await prisma.importBatch.create({
+      data: {
+        kind: "ebay",
+        fileName: ebayInfo.fileName,
+        rowCount: ebayInfo.rowCount,
+        matchedCount: plan.stats.matchedArticles,
+        unmatchedCount: plan.stats.unmatchedEbayListings,
+      },
+    });
+  }
+  if (billbeeArtikelInfo) {
+    await prisma.importBatch.create({
+      data: {
+        kind: "billbee_artikel",
+        fileName: billbeeArtikelInfo.fileName,
+        rowCount: billbeeArtikelInfo.rowCount,
+        matchedCount: billbeeArtikelInfo.activeCount,
+        unmatchedCount: 0,
+      },
+    });
+  }
+
   const reviewItemsOpen = await prisma.reviewItem.count({ where: { status: "open" } });
   const cardArticleCount = plan.articles.filter((a) => a.isCard).length;
 

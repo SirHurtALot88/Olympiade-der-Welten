@@ -117,6 +117,43 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
   return { aggregates, costSettings };
 }
 
+/**
+ * Speichert eine NEUE Kostensaetze-Version (KONZEPT §7.3/PAGES_CONCEPT §5):
+ * kein Ueberschreiben -- die vorherige aktive Version wird deaktiviert
+ * (`active=false`), die neue wird `active=true` mit hochgezaehlter `version`.
+ */
+export async function saveCostSettings(
+  prisma: PrismaClient,
+  values: CostSettingsValues
+): Promise<CostSettingsValues & { id: string; version: number; createdAt: Date }> {
+  const maxVersion = await prisma.costSettings.aggregate({ _max: { version: true } });
+  const nextVersion = (maxVersion._max.version ?? 0) + 1;
+
+  await prisma.costSettings.updateMany({ where: { active: true }, data: { active: false } });
+  return prisma.costSettings.create({ data: { ...values, version: nextVersion, active: true } });
+}
+
+export interface ImportBatchInfo {
+  id: string;
+  kind: string;
+  window: string | null;
+  windowFrom: Date | null;
+  windowTo: Date | null;
+  fileName: string | null;
+  rowCount: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  createdAt: Date;
+}
+
+/** Letzte Import-Laeufe (Billbee-Fenster/eBay/Artikelstamm) fuer die Datenstand-Karte auf /einstellungen. */
+export async function listRecentImportBatches(prisma: PrismaClient, limit = 20): Promise<ImportBatchInfo[]> {
+  return prisma.importBatch.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
 /** Laedt alle Artikel + Fenster-Snapshots aus der DB und baut das Dashboard-View-Model. */
 export async function loadDashboardViewModel(prisma: PrismaClient): Promise<DashboardViewModel> {
   const { aggregates, costSettings } = await loadArticleAggregates(prisma);
