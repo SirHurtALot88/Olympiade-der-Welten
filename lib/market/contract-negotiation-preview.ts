@@ -504,6 +504,10 @@ export function recommendContractOfferForPlayer(input: {
   teamRosterOpt?: number | null;
   isFirstSeason?: boolean | null;
   boardPressure?: number | null;
+  /** GM archetype for direct identity hooks (culture_keeper binds good players longer). */
+  gmArchetype?: string | null;
+  /** Good/core player signal (e.g. rank <= 40 or high market value) — drives the culture_keeper floor. */
+  highValue?: boolean | null;
 }): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
@@ -763,6 +767,13 @@ export function recommendContractOfferForPlayer(input: {
     }
 
     contractLength = Math.min(contractLength, seasonOneCap);
+  }
+
+  // Culture keeper binds good players longer: direct archetype floor of 3 seasons (4 when cash is
+  // comfortable) for high-value players, independent of the diluted blended long/loyalty bias.
+  if (input.gmArchetype === "culture_keeper" && input.highValue) {
+    contractLength = Math.max(contractLength, cashComfortable ? 4 : 3);
+    reasons.push("Culture Keeper: guter Spieler wird langfristig gebunden.");
   }
 
   return {

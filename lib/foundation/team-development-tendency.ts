@@ -1,5 +1,6 @@
 import type { GameState, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 
 export type TeamDevelopmentTendency = {
   /** 0–1, soft weighting — no hard team allowlists */
@@ -44,11 +45,20 @@ export function getTeamDevelopmentTendency(input: {
   team: Team;
   identity?: TeamIdentity | null;
   profile?: TeamStrategyProfile | null;
+  /** GM archetype for a direct identity hook — talent_builder lifts the per-player development weighting. */
+  gmArchetype?: string | null;
 }): TeamDevelopmentTendency {
   const profile = input.profile ?? null;
   const identity = input.identity ?? null;
   const reasons: string[] = [];
   let score = 0;
+
+  // Direct archetype hook: a talent_builder GM raises the (per-player) development weighting regardless
+  // of whether the blended strategy bias ever clears its own soft gates. Additive, capped at 1 below.
+  if (input.gmArchetype === "talent_builder") {
+    score += 0.25;
+    reasons.push("talent_builder_archetype");
+  }
 
   const archetypeHits = countArchetypeMatches(profile, DEVELOPMENT_ARCHETYPES);
   if (archetypeHits > 0) {
@@ -142,5 +152,6 @@ export function getTeamDevelopmentTrainingBonusPct(gameState: GameState, teamId:
   if (!team) return 0;
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
   const profile = getTeamStrategyProfile(gameState, teamId);
-  return getTeamDevelopmentTendency({ team, identity, profile }).trainingCenterBonusPct;
+  const gmArchetype = getTeamGeneralManager(gameState, teamId)?.profile?.archetype ?? null;
+  return getTeamDevelopmentTendency({ team, identity, profile, gmArchetype }).trainingCenterBonusPct;
 }
