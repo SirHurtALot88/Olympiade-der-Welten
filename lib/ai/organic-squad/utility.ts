@@ -160,26 +160,16 @@ const COMPOSITION_OVERAGE_PENALTY = 8;
 const COMPOSITION_OVERAGE_FLOOR = -16;
 /** Fade of the fill bonus from band target to ceiling, so the cheaper end of a band wins (budget stretches). */
 const COMPOSITION_TOPBAND_FADE = 0.5;
-/** Malus applied to Superstar-tier (65+) buys: they aren't worth the premium over a Star at ~10 matchdays. */
-const SUPERSTAR_MALUS = -30;
 
 function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
   const comp = state.composition;
   if (!comp) return 0;
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
-  // Premium (Star/Superstar) is left ENTIRELY to the base economy: it already buys stars only when
-  // affordable and still reaches opt (REF ≈ 8.7 Star / 0.3 Superstar). Nudging premium up made teams
-  // over-reach on a star, drain budget and fall below opt — the whole below-opt/star-inflation problem.
-  // COMPOSE only shapes the body tiers (Core/Depth/Backup) + discourages a Reserve tail.
-  // Star (45–65) is left to the base economy (neutral). Superstar (65+) is actively discouraged: with
-  // only ~10 matchdays over 20 disciplines a body can be fielded a handful of times, so a Superstar's
-  // breadth barely pays back its premium over a Star — Stars are the better early buy. This nudge steers
-  // a marquee pick from the 65+ tier down into the Star tier without a hard cap.
-  if (lane === "star") return 0;
-  if (lane === "superstar") return SUPERSTAR_MALUS;
-  // Reserve is now a legitimately PLANNED tier for poorer teams (rotation/cheap cards), so it takes the
-  // same deficit path as the other body tiers: a bonus while under its planned count (so the team fills
-  // its planned Reserve rotation bodies), a malus once over (so over-plan Reserve scrap is still avoided).
+  // ALL tiers (incl. Star/Superstar and Reserve) take the normal deficit path so the plan's allocation is
+  // actually realized. The ~5 highest-appetite teams plan one Superstar (65+) and get nudged to buy it
+  // (target 2–3, max ~5 league-wide); Stars fill more broadly; poorer teams fill their planned Reserve
+  // rotation bodies; and over-plan buys in any tier are discouraged. The affordability waterfall already
+  // costs the premium slots into the plan, so a marquee buy no longer starves the roster (below-opt safe).
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
   // deficit <= 0: tier already at/over target ⇒ gentle floored malus (never blocks a below-opt fill).
   if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
