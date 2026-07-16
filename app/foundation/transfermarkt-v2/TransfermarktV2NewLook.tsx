@@ -434,6 +434,148 @@ const NL_DEV_TREND_TONE: Record<string, NlTone> = {
   strong_negative: "risk",
 };
 
+/* Phase 3 — Regressions-Risiko (PlayerRegressionRisk = none|low|medium|high, bereits am
+   Item aus dem Trainings-Forecast). Ton steigt mit der Stufe, Suffix nur an den Rändern. */
+const NL_REGRESSION_RISK_SUFFIX: Record<string, string> = {
+  low: " gering",
+  medium: "",
+  high: " hoch",
+};
+const NL_REGRESSION_RISK_TONE: Record<string, NlTone> = {
+  low: "warn",
+  medium: "warn",
+  high: "risk",
+};
+
+/**
+ * Phase 3 — tonfarbige Risiko-Chips (Doppelbelastung, Regressions-Risiko).
+ * Rendert ausschließlich real vorhandene, nicht-leere Werte — keine erfundenen
+ * Risiken, und keine Fog-Leaks (beide Felder liefert der Server bereits gegatet).
+ */
+function buildNlRiskChips(item: TransfermarktFreeAgentItem, keyPrefix: string): ReactNode[] {
+  const chips: ReactNode[] = [];
+  const doubleLoad = item.doubleLoadWarnings ?? [];
+  if (doubleLoad.length > 0) {
+    chips.push(
+      <span
+        key={`${keyPrefix}-doubleload`}
+        className={`nl-market-risk-chip ${nlToneClass("risk")}`}
+        title={doubleLoad.map((warning) => warning.tooltip).join("\n")}
+      >
+        Doppelbelastung{doubleLoad.length > 1 ? ` ×${doubleLoad.length}` : ""}
+      </span>,
+    );
+  }
+  const risk = item.regressionRisk;
+  if (risk != null && risk !== "none") {
+    chips.push(
+      <span
+        key={`${keyPrefix}-regression`}
+        className={`nl-market-risk-chip ${nlToneClass(NL_REGRESSION_RISK_TONE[risk] ?? "warn")}`}
+        title={`Regressions-Risiko aus dem Trainings-Forecast: ${risk}`}
+      >
+        Regressions-Risiko{NL_REGRESSION_RISK_SUFFIX[risk] ?? ""}
+      </span>,
+    );
+  }
+  return chips;
+}
+
+/**
+ * Phase 3 — "Ähnliche Spieler": clientseitiger Nearest-Neighbor über die vier
+ * sichtbaren Achsen (POW/SPE/MEN/SOC) des bereits geladenen Kandidaten-Pools.
+ * Fog-sicher — nutzt ausschließlich freigegebene Achswerte, className und MW
+ * (alles bereits in der Liste sichtbar); niemals PO/Potenzial fremder Spieler.
+ * Achsen werden über den Pool normiert (unterschiedliche Skalen), Distanz ist
+ * die mittlere quadratische Achsabweichung + kleiner MW-Term, mit leichtem
+ * Klassen-Bonus. Rein clientseitig über schon geladene Daten.
+ */
+function computeNlSimilarCandidates(
+  pool: TransfermarktFreeAgentItem[],
+  base: TransfermarktFreeAgentItem,
+  limit = 5,
+): TransfermarktFreeAgentItem[] {
+  // Min/Max je Achse über den Pool → Normalisierung auf 0..1.
+  const axisRange: Record<NlAxisKey, { min: number; max: number } | null> = {
+    pow: null,
+    spe: null,
+    men: null,
+    soc: null,
+  };
+  for (const axis of NL_MARKET_AXES) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const item of pool) {
+      const value = item[axis];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+    }
+    axisRange[axis] = Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
+  }
+  // Markt-Wert-Spanne für den kleinen MW-Ähnlichkeits-Term.
+  let mvMin = Infinity;
+  let mvMax = -Infinity;
+  for (const item of pool) {
+    const mv = item.marketValue;
+    if (typeof mv === "number" && Number.isFinite(mv)) {
+      if (mv < mvMin) mvMin = mv;
+      if (mv > mvMax) mvMax = mv;
+    }
+  }
+  const mvSpan = Number.isFinite(mvMin) && Number.isFinite(mvMax) && mvMax > mvMin ? mvMax - mvMin : null;
+
+  const normAxis = (axis: NlAxisKey, value: number): number => {
+    const range = axisRange[axis];
+    if (!range) return 0.5;
+    const span = range.max - range.min;
+    return span > 0 ? (value - range.min) / span : 0.5;
+  };
+
+  const scored = pool.flatMap((item) => {
+    if (item.playerId === base.playerId) return [];
+    let sumSq = 0;
+    let shared = 0;
+    for (const axis of NL_MARKET_AXES) {
+      const baseValue = base[axis];
+      const candValue = item[axis];
+      if (
+        typeof baseValue === "number" &&
+        Number.isFinite(baseValue) &&
+        typeof candValue === "number" &&
+        Number.isFinite(candValue)
+      ) {
+        const diff = normAxis(axis, baseValue) - normAxis(axis, candValue);
+        sumSq += diff * diff;
+        shared += 1;
+      }
+    }
+    // Mindestens zwei gemeinsame sichtbare Achsen, sonst kein sinnvoller Vergleich.
+    if (shared < 2) return [];
+    // Mittlere quadratische Abweichung → vergleichbar über verschieden viele Achsen.
+    let distance = Math.sqrt(sumSq / shared);
+    // Kleiner MW-Term (gewichtet), nur wenn beide einen MW haben.
+    if (
+      mvSpan != null &&
+      typeof base.marketValue === "number" &&
+      Number.isFinite(base.marketValue) &&
+      typeof item.marketValue === "number" &&
+      Number.isFinite(item.marketValue)
+    ) {
+      distance += 0.25 * Math.abs((base.marketValue - item.marketValue) / mvSpan);
+    }
+    // Kleiner Bonus für gleiche Klasse (Distanz sinkt → rankt höher).
+    if (item.className && base.className && item.className === base.className) {
+      distance *= 0.85;
+    }
+    return [{ item, distance }];
+  });
+
+  scored.sort((a, b) => a.distance - b.distance);
+  return scored.slice(0, limit).map((entry) => entry.item);
+}
+
 /**
  * In-Page-Portal: scrollt sanft zur passenden Markt-Sektion (Board-Kachel →
  * Deal-Desk/Kader/Wishlist). Respektiert prefers-reduced-motion, läuft nur im
@@ -747,6 +889,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   );
   const hasSquadSummary = rosterRows.length > 0 && squadAxisSummaries.some((entry) => entry.squadAvg != null);
 
+  // Phase 3 — "Ähnliche Spieler": clientseitige Nearest-Neighbor-Empfehlung über
+  // den bereits geladenen Kandidaten-Pool (nur sichtbare Achsen/MW/Klasse, fog-sicher).
+  const similarCandidates = useMemo(
+    () => (selectedPlayer ? computeNlSimilarCandidates(candidates, selectedPlayer) : []),
+    [candidates, selectedPlayer],
+  );
+
   // F2/F3 — Kader-Zähler im Kopf kohärent zur sichtbaren Liste: wenn ein
   // Kader gelistet ist, zählt genau diese Liste; sonst der Server-Wert.
   const effectiveRosterCount = rosterRows.length > 0 ? rosterRows.length : rosterCount;
@@ -1053,7 +1202,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               // (Talent-Row), Fit/Bedarf im persistenten Signal-Chip der Kachel. Der
               // Detail-Layer zeigt daher nur noch Achsen-Chips + Entwicklungs-Trend.
               const detailHasTrend = Boolean(item.developmentTrend);
-              const detailHasContent = detailAxisChips.length > 0 || detailHasTrend;
+              // Phase 3 — Risiko-Chips (Doppelbelastung / Regressions-Risiko) auch in der Kachel.
+              const detailRiskChips = buildNlRiskChips(item, `nl-cand-risk-${item.playerId}`);
+              const detailHasMeta = detailHasTrend || detailRiskChips.length > 0;
+              const detailHasContent = detailAxisChips.length > 0 || detailHasMeta;
               return (
                 <div
                   key={item.playerId}
@@ -1153,7 +1305,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     ) : null}
                     {/* Talent-Sterne (CA/PO) und Bedarf-Chip hier entfernt — CA/PO steht
                         kanonisch in der Fokus-Karte, Fit/Bedarf im Signal-Chip oben. */}
-                    {detailHasTrend ? (
+                    {detailHasMeta ? (
                       <div className="nl-market-detail-meta">
                         {item.developmentTrend ? (
                           <span
@@ -1165,6 +1317,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                             Trend {NL_DEV_TREND_LABEL[item.developmentTrend] ?? "—"}
                           </span>
                         ) : null}
+                        {detailRiskChips}
                       </div>
                     ) : null}
                     {!detailHasContent ? (
@@ -1394,6 +1547,17 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   ) : null;
                 })()}
 
+                {/* Phase 3 — Risiko-Chips (Doppelbelastung / Regressions-Risiko).
+                    Nur gerendert, wenn real vorhanden; Werte kommen bereits gegatet vom Server. */}
+                {(() => {
+                  const riskChips = buildNlRiskChips(selectedPlayer, `nl-focus-risk-${selectedPlayer.playerId}`);
+                  return riskChips.length > 0 ? (
+                    <div className="nl-market-risk-row" aria-label="Risiko-Hinweise">
+                      {riskChips}
+                    </div>
+                  ) : null;
+                })()}
+
                 {/* F3 — Trait/Subclass-Chips mit Fog: bekannte Traits tonfarbig
                     (positiv = good, negativ = risk), verdeckte Zahl als Fog-Chip.
                     Fog-sicher — der Server hat visible/hidden bereits gegatet, hier
@@ -1551,6 +1715,51 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 ) : null}
                 {dealOpenDisabledReason ? (
                   <p className="nl-market-action-reason">Warum nicht: {dealOpenDisabledReason}</p>
+                ) : null}
+
+                {/* Phase 3 — "Ähnliche Spieler": kompakte Mini-Karten unter der Fokus-Karte.
+                    Nearest-Neighbor über den geladenen Pool (fog-sicher: Achsen/MW/Klasse).
+                    Klick wählt den Kandidaten über den bestehenden Select-Handler aus. */}
+                {similarCandidates.length > 0 ? (
+                  <div className="nl-market-similar" aria-label="Ähnliche Spieler">
+                    <span className="nl-market-eyebrow">Ähnliche Spieler</span>
+                    <div className="nl-market-similar-chips">
+                      {similarCandidates.map((sim) => {
+                        const simPortrait = getTransfermarktPortraitModel(sim);
+                        const simSrc = appendMediaImageVariant(simPortrait.src, "preview") ?? simPortrait.src;
+                        return (
+                          <button
+                            key={`nl-similar-${sim.playerId}`}
+                            type="button"
+                            className="nl-market-similar-chip"
+                            data-testid="transfer-similar-player"
+                            title={`${sim.name} — ${sim.className} · MW ${formatTransfermarktCurrency(sim.marketValue)}`}
+                            onClick={() => onSelectCandidate(sim.playerId)}
+                          >
+                            <span className="nl-market-similar-portrait" aria-hidden="true">
+                              {simSrc ? (
+                                <OptimizedMediaImage
+                                  src={simSrc}
+                                  alt=""
+                                  width={28}
+                                  height={28}
+                                  className="nl-market-portrait-img"
+                                />
+                              ) : (
+                                <span className="nl-market-portrait-initials">{simPortrait.initials}</span>
+                              )}
+                            </span>
+                            <span className="nl-market-similar-copy">
+                              <b>{sim.name}</b>
+                              <small>
+                                {sim.className} · {formatTransfermarktCurrency(sim.marketValue)}
+                              </small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : null}
               </>
             ) : (

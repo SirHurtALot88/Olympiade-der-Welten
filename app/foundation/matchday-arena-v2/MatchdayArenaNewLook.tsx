@@ -263,6 +263,13 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [standingsPreview, setStandingsPreview] = useState<ArenaNewLookStandingsPreview | null>(null);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
 
+  // Phase 3 (Teilen): Zustand der Kopier-Bestätigung am eigenen Ergebnis-Recap.
+  // "copied" wird nach fester Verzögerung zurückgesetzt (kein Date.now()/Math.random(),
+  // reiner setTimeout mit konstanter Dauer, siehe Effect unten). "error" bleibt stehen,
+  // damit der markierbare Fallback-Text zum manuellen Kopieren sichtbar bleibt.
+  const [recapCopyState, setRecapCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const recapCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Co-op room sync (shared hook with the classic arena — see
   // lib/room/use-arena-room-sync.ts). New Look's own reveal state is coarser
   // than the classic arena's (a single `boardSide` + `phaseIndex`, no
@@ -562,6 +569,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     setIsAutoPlaying(false);
   }, [boardSide]);
 
+  // Phase 3 (Teilen): laufenden Reset-Timer der Kopier-Bestätigung beim Unmount
+  // abräumen, damit kein setState auf einer entfernten Komponente feuert.
+  useEffect(
+    () => () => {
+      if (recapCopyTimerRef.current) {
+        clearTimeout(recapCopyTimerRef.current);
+      }
+    },
+    [],
+  );
+
   function scrollToTeam(teamId: string) {
     const node = rowNodesRef.current.get(teamId);
     if (!node) {
@@ -714,8 +732,74 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       finalRank: row.rank,
       rankDelta: row.rankDelta,
       total: activeView.length,
+      // Phase 3 (Teilen): Tagespunkte der eigenen Zeile für den Recap-Text —
+      // exakt der Wert, der in der Ergebnis-Phase auf dem Board steht.
+      points: row.points,
     };
   }, [activeView, params.teamId, boardSide]);
+
+  // Phase 3 (Teilen): Tages-MVP für den Recap — bester Einzelscore über beide
+  // Disziplin-Top-Listen (im Finale/Ergebnis bereits enthüllt, siehe MVP-Karte).
+  // Reine Auswahl aus schon berechneten Daten, keine eigene Wertung.
+  const resultMvpName = useMemo<string | null>(() => {
+    const pool = [...(scoreFeed?.d1TopPlayers ?? []), ...(scoreFeed?.d2TopPlayers ?? [])];
+    if (pool.length === 0) {
+      return null;
+    }
+    const best = pool.reduce((top, player) =>
+      player.finalPlayerScore > top.finalPlayerScore ? player : top,
+    );
+    return best.playerName || null;
+  }, [scoreFeed?.d1TopPlayers, scoreFeed?.d2TopPlayers]);
+
+  // Phase 3 (Teilen): kompakter Klartext-Recap NUR aus in der Ergebnis-Phase
+  // sichtbaren Daten (Rang, PPs, MVP, Rang-Bewegung aus baseRank/rankDelta).
+  // Fehlende Felder werden weggelassen (degradiert), statt Platzhalter zu zeigen.
+  const ownRecap = useMemo<string | null>(() => {
+    if (!isResultPhase || !ownExpectation) {
+      return null;
+    }
+    const matchdayLabel = scoreFeed?.targetMatchday.label?.trim() || "Spieltag";
+    const movement =
+      ownExpectation.rankDelta > 0
+        ? `▲${ownExpectation.rankDelta}`
+        : ownExpectation.rankDelta < 0
+          ? `▼${Math.abs(ownExpectation.rankDelta)}`
+          : "±0";
+    let text = `${matchdayLabel} — ${ownExpectation.teamName}: Platz #${ownExpectation.finalRank}`;
+    if (ownExpectation.points != null) {
+      text += `, ${formatNlNumber(ownExpectation.points, 1)} PPs`;
+    }
+    text += ".";
+    if (resultMvpName) {
+      text += ` MVP: ${resultMvpName}.`;
+    }
+    text += ` ${movement}`;
+    return text;
+  }, [isResultPhase, ownExpectation, scoreFeed?.targetMatchday.label, resultMvpName]);
+
+  // Phase 3 (Teilen): Recap in die Zwischenablage kopieren. Erst den offenen
+  // Reset-Timer stoppen, dann per navigator.clipboard.writeText kopieren. Bei
+  // Erfolg kurze "kopiert ✓"-Bestätigung mit fester Reset-Verzögerung; bei
+  // Fehlschlag "error" (markierbarer Fallback-Text bleibt im Render sichtbar).
+  async function handleCopyRecap(text: string) {
+    if (recapCopyTimerRef.current) {
+      clearTimeout(recapCopyTimerRef.current);
+      recapCopyTimerRef.current = null;
+    }
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("clipboard-unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      setRecapCopyState("copied");
+      recapCopyTimerRef.current = setTimeout(() => setRecapCopyState("idle"), 2400);
+    } catch {
+      // Fallback: Fehler anzeigen und den Text markierbar rendern, damit der
+      // Nutzer manuell kopieren kann. Kein Auto-Reset, solange der Fallback zählt.
+      setRecapCopyState("error");
+    }
+  }
 
   // Feature 2 (Schlüsselmomente): Rang-Karten je Phase für ALLE Teams — dieselben
   // Presenter-Rankings wie das Board, nur je Phase eingefroren. Basis für die
@@ -1875,6 +1959,33 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                         title={`End-Rang ${ownExpectation.finalRank} von ${ownExpectation.total}`}
                       />
                     </div>
+                    {/* Phase 3 (Teilen): Kopier-Affordance für den Ergebnis-Recap.
+                        Klartext-Only (kein Bild/Canvas); bei Erfolg "kopiert ✓",
+                        bei Fehlschlag markierbarer Fallback-Text zum manuellen Kopieren. */}
+                    {ownRecap ? (
+                      <div className="nl-arena-share" role="group" aria-label="Spieltag-Recap teilen">
+                        <button
+                          type="button"
+                          className="nl-arena-button nl-arena-share-btn"
+                          data-testid="nl-arena-share"
+                          aria-live="polite"
+                          title="Spieltag-Recap als Text in die Zwischenablage kopieren"
+                          onClick={() => void handleCopyRecap(ownRecap)}
+                        >
+                          {recapCopyState === "copied"
+                            ? "kopiert ✓"
+                            : recapCopyState === "error"
+                              ? "Kopieren fehlgeschlagen"
+                              : "Teilen · Kopieren"}
+                        </button>
+                        {recapCopyState === "error" ? (
+                          <span className="nl-arena-share-fallback">
+                            Text markieren und kopieren:{" "}
+                            <span className="nl-arena-share-fallback-text">{ownRecap}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {/* Feature 3: Head-to-Head-Duell — eigenes Team gegen den direkten

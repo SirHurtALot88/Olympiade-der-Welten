@@ -52846,6 +52846,32 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s1);
 }
 
+/* --- Phase 3 · Teilen: Kopier-Affordance am eigenen Ergebnis-Recap --------- */
+.is-new-look .nl-arena-share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-share-btn {
+  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line-2));
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-arena-share-fallback {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+/* Der Fallback-Text ist zum manuellen Kopieren gedacht — daher explizit markierbar. */
+.is-new-look .nl-arena-share-fallback-text {
+  user-select: all;
+  font-family: var(--nl-mono, var(--nl-sans));
+  color: var(--nl-ink);
+}
+
 /* --- Phase 2 · Feature 3: Head-to-Head-Duell (Timing-Tower-Battle) ------ */
 .is-new-look .nl-arena-duel {
   display: flex;
@@ -56773,6 +56799,100 @@ span.nl-facility-ampel-chip {
 }
 .is-new-look .nl-market-talent-line strong {
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Phase 3: tonfarbige Risiko-Chips (Doppelbelastung / Regressions-Risiko) --- */
+.is-new-look .nl-market-risk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: var(--nl-s2) 0;
+}
+.is-new-look .nl-market-risk-chip {
+  --nl-tone: var(--nl-risk);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 16%, transparent);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* --- Phase 3: "Ähnliche Spieler" — kompakte Mini-Karten unter der Fokus-Karte --- */
+.is-new-look .nl-market-similar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--nl-s2) 0;
+}
+.is-new-look .nl-market-similar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.is-new-look .nl-market-similar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 10px 4px 4px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: color-mix(in srgb, var(--nl-accent) 6%, transparent);
+  color: var(--nl-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.is-new-look .nl-market-similar-chip:hover,
+.is-new-look .nl-market-similar-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 12%, transparent);
+}
+.is-new-look .nl-market-similar-portrait {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--nl-mut) 18%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-market-similar-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.is-new-look .nl-market-similar-copy b {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-new-look .nl-market-similar-copy small {
+  font-size: 10px;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-market-similar-chip {
+    transition: none;
+  }
 }
 
 /* --- Transfermarkt: farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) --- */
