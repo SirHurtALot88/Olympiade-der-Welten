@@ -85,9 +85,9 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".market-v2-scout-certainty-bar");
     expect(fileText).toContain("nl-market-focus-card");
     expect(fileText).toContain("scoutingLevel");
-    expect(fileText).toContain("filterTransfermarktFreeAgentsByBracket");
-    expect(fileText).toContain("poolBracketPanel");
-    expect(fileText).toContain("setPoolBracketPanel");
+    // Phase 0: der tote Pool-Bracket-Drilldown (poolBracketPanel + Paging-Effekt,
+    // nie von einer gerenderten UI ausgelöst) wurde entfernt — daher hier keine
+    // Assertion mehr auf filterTransfermarktFreeAgentsByBracket/poolBracketPanel.
     expect(fileText).toContain("nl-market-board");
     expect(fileText).toContain('data-testid="transfer-deal-open-button"');
     expect(buyHostText).toContain("Kauf final abschließen");
@@ -224,7 +224,10 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("getTransfermarktPortraitModel");
     expect(fileText).toContain("playerRatingsById");
     expect(fileText).toContain("nl-market-candidate-portrait");
-    expect(fileText).toContain("caScore={item.ovr}");
+    // Phase 0: CA-Sterne im Fokus-Card auf EINE kanonische Stelle reduziert
+    // (Kandidaten-Kopf-Duplikat `caScore={item.ovr}` entfernt); die Sterne
+    // leben jetzt am Fokus-„Talent"-Row via focusStarProps.
+    expect(fileText).toContain("caScore={focusStarProps.caScore}");
     expect(fileText).toContain("NlAbilityStars");
     expect(fileText).toContain('data-testid="transfer-candidate-card"');
     expect(fileText).toContain("OptimizedMediaImage");

@@ -10,7 +10,6 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
-import { filterTransfermarktFreeAgentsByBracket, type TransfermarktPoolBracketBucket } from "@/lib/market/transfermarkt-pool-audit";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import { getScoutingTierWindow, resolveScoutingConfidenceFromLevel } from "@/lib/market/transfermarkt-scouting";
 import { computeCompositeTopSixAverage, computeDisciplineTopSixImpact, computeTopSixAxisImpact, computeCandidateAxisTeamRankEstimates } from "@/lib/market/transfermarkt-roster-impact";
@@ -534,7 +533,6 @@ export default function TransfermarktV2Client({
     >(),
   );
   const marketAbortRef = useRef<AbortController | null>(null);
-  const poolBracketAbortRef = useRef<AbortController | null>(null);
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewVersionRef = useRef(0);
@@ -624,9 +622,8 @@ export default function TransfermarktV2Client({
   const [filterPresetMessage, setFilterPresetMessage] = useState<string | null>(null);
   const [selectedDisciplineLens, setSelectedDisciplineLens] = useState<OfficialDisciplineWeightId | "">("");
   const [wishlistSort, setWishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
-  const [poolBracketPanel, setPoolBracketPanel] = useState<TransfermarktPoolBracketBucket | null>(null);
-  const [poolBracketItems, setPoolBracketItems] = useState<TransfermarktFreeAgentItem[]>([]);
-  const [poolBracketBusy, setPoolBracketBusy] = useState(false);
+  // Phase-0-Cleanup: Pool-Bracket-Drilldown (State + Paging-Effekt) entfernt — kein
+  // Renderpfad im Neuen Look setzt jemals poolBracketPanel, der Effekt lief nie.
 
   useEffect(() => () => {
     if (wishlistClickTimerRef.current != null) {
@@ -1448,109 +1445,6 @@ export default function TransfermarktV2Client({
     };
   }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
 
-  useEffect(() => {
-    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSaveId === "loading-save" || defaultSeasonId === "loading") {
-      setPoolBracketItems([]);
-      setPoolBracketBusy(false);
-      return;
-    }
-    const activePoolBracketPanel = poolBracketPanel;
-
-    let cancelled = false;
-    const controller = new AbortController();
-    poolBracketAbortRef.current?.abort();
-    poolBracketAbortRef.current = controller;
-
-    async function loadPoolBracketPlayers() {
-      setPoolBracketBusy(true);
-      try {
-        if (deferredSearch.trim().length === 0 && !marketHasMore && marketItems.length > 0) {
-          const filtered = filterTransfermarktFreeAgentsByBracket(marketItems, activePoolBracketPanel.bracket);
-          if (!cancelled) {
-            setPoolBracketItems(filtered);
-          }
-          return;
-        }
-
-        const mergedItems: TransfermarktFreeAgentItem[] = [];
-        const seen = new Set<string>();
-        let nextOffset = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const params = appendRoomContextToParams(
-            new URLSearchParams({
-              saveId: defaultSaveId,
-              seasonId: defaultSeasonId,
-              source,
-              teamId: selectedTeamId,
-              limit: String(MARKET_PAGE_LIMIT),
-              offset: String(nextOffset),
-            }),
-            roomContextRef.current,
-          );
-          const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const payload = (await response.json()) as MarketFeedResponse;
-          if (cancelled || controller.signal.aborted) {
-            return;
-          }
-          if (!response.ok || payload.error) {
-            if (!cancelled) {
-              setPoolBracketItems([]);
-            }
-            return;
-          }
-
-          payload.items.forEach((item) => {
-            if (!seen.has(item.playerId)) {
-              mergedItems.push(item);
-              seen.add(item.playerId);
-            }
-          });
-          nextOffset += payload.returned;
-          hasMore = Boolean(payload.hasMore && payload.returned > 0);
-        }
-
-        if (!cancelled) {
-          setPoolBracketItems(filterTransfermarktFreeAgentsByBracket(mergedItems, activePoolBracketPanel.bracket));
-        }
-      } catch (error) {
-        if (cancelled || controller.signal.aborted || isAbortError(error)) {
-          return;
-        }
-        if (!cancelled) {
-          setPoolBracketItems([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setPoolBracketBusy(false);
-        }
-      }
-    }
-
-    void loadPoolBracketPlayers();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (poolBracketAbortRef.current === controller) {
-        poolBracketAbortRef.current = null;
-      }
-    };
-  }, [
-    bootstrapReady,
-    defaultSaveId,
-    defaultSeasonId,
-    deferredSearch,
-    marketHasMore,
-    marketItems,
-    poolBracketPanel,
-    selectedTeamId,
-    source,
-  ]);
 
   useEffect(() => {
     let cancelled = false;

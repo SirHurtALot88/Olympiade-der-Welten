@@ -49848,6 +49848,24 @@ button.foundation-team-portrait-card {
   flex-wrap: wrap;
 }
 
+/* --- Glass-Oberflächen: Header, Co-op-Gate und Board-Stage bekommen eine
+   dezente Milchglas-Behandlung (Blur + transluzenter Panel-Ton + Haarlinien-
+   Rand) im Vokabular der Legacy-Glass-Flächen (season-v2 pinned-team ~41541).
+   Bewusst zurückhaltend — nur die drei zuvor flachen Panels. */
+.is-new-look .nl-arena-header-card,
+.is-new-look .nl-arena-coop-gate,
+.is-new-look .nl-arena-board-card {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--nl-panel) 78%, transparent),
+      color-mix(in srgb, var(--nl-panel-2) 82%, transparent)
+    );
+  border-color: var(--nl-line-2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 /* --- Co-op "both ready" gate (Room, >1 human participant) ---------- */
 .is-new-look .nl-arena-coop-gate {
   border-color: var(--nl-accent);
@@ -52102,6 +52120,29 @@ button.foundation-team-portrait-card {
   }
 }
 
+/* --- Gold-Glow der Führung ab Finale-/Ergebnis-Phase ----------------
+   Die führende Zeile (Disziplin-Board rank 1 ab "final"/"result", Gesamt-
+   Board die Tagesführung) bekommt einen goldenen Schimmer. Sanfter Puls
+   nur ohne Reduced Motion — dort bleibt der statische Grund-Shadow (siehe
+   Reduced-Motion-Block weiter unten). Gold-Ton wie die Legacy-Arena
+   (rgba(250,204,21,…), vgl. .arena-v2-slot-card.is-slot-winner). */
+.is-new-look .nl-arena-row.is-leader,
+.is-new-look .nl-arena-totalrow.is-leader {
+  border-left-color: rgba(250, 204, 21, 0.75);
+  box-shadow: 0 0 22px -6px rgba(250, 204, 21, 0.55);
+  animation: nl-arena-leader-glow 2600ms var(--nl-ease) infinite;
+}
+
+@keyframes nl-arena-leader-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 18px -8px rgba(250, 204, 21, 0.42);
+  }
+  50% {
+    box-shadow: 0 0 26px -4px rgba(250, 204, 21, 0.68);
+  }
+}
+
 /* --- Bühnen-Spotlight der aktiven Phase ------------------------------ */
 .is-new-look .nl-arena-stage {
   display: flex;
@@ -52115,6 +52156,9 @@ button.foundation-team-portrait-card {
   border-left: 3px solid var(--nl-accent);
   border-radius: var(--nl-r-md);
   background: linear-gradient(135deg, var(--nl-accent-soft), var(--nl-panel) 62%);
+  /* Dezenter Akzent-Glow auf der aktiven ("live") Phase — statisch, damit er
+     auch unter Reduced Motion unverändert bleibt. */
+  box-shadow: 0 0 26px -10px color-mix(in srgb, var(--nl-accent) 60%, transparent);
   animation: nl-arena-stage-in 420ms var(--nl-ease) 1;
 }
 
@@ -52666,6 +52710,8 @@ button.foundation-team-portrait-card {
   .is-new-look .nl-arena-row-pulse.is-down,
   .is-new-look .nl-arena-score-toggle .nl-arena-score,
   .is-new-look .nl-arena-stage,
+  .is-new-look .nl-arena-row.is-leader,
+  .is-new-look .nl-arena-totalrow.is-leader,
   .is-new-look .nl-result-podium-step,
   .is-new-look .nl-result-mvp-hero {
     animation: none;

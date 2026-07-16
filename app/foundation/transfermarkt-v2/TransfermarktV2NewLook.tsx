@@ -867,15 +867,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </span>,
                 ];
               });
-              // CA/PO immer zeigen, sobald das Rating (ovr) vorliegt — nicht mehr an
-              // die (bei ungescouteten Agents null) Sterne-Felder gekoppelt.
-              const detailHasOvr = typeof item.ovr === "number" && Number.isFinite(item.ovr);
-              const detailHasTalent = detailHasOvr || Boolean(item.axisStarsDisplay || item.potentialStarsDisplay);
-              const detailStarProps = getNlCandidateAbilityStarProps(item);
+              // Phase-0-Deduplizierung: CA/PO liegt kanonisch nur noch in der Fokus-Karte
+              // (Talent-Row), Fit/Bedarf im persistenten Signal-Chip der Kachel. Der
+              // Detail-Layer zeigt daher nur noch Achsen-Chips + Entwicklungs-Trend.
               const detailHasTrend = Boolean(item.developmentTrend);
-              const detailHasNeed = Boolean(item.needMatchLabel);
-              const detailHasContent =
-                detailAxisChips.length > 0 || detailHasTalent || detailHasTrend || detailHasNeed;
+              const detailHasContent = detailAxisChips.length > 0 || detailHasTrend;
               return (
                 <div
                   key={item.playerId}
@@ -939,15 +935,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     <span className="nl-market-candidate-numbers nl-tnum">
                       <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
                       <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
-                      {typeof item.ovr === "number" && Number.isFinite(item.ovr) ? (
-                        <NlAbilityStars
-                          caScore={item.ovr}
-                          known
-                          compact
-                          label="Aktuell"
-                          className="nl-market-ca-stars"
-                        />
-                      ) : null}
+                      {/* CA/PO-Sterne entfernt — kanonisch nur in der Fokus-Karte (Phase-0-Dedup). */}
                     </span>
                     {/* Expliziter Expand-Toggle (Touch/Tastatur). stopPropagation, damit
                         Klick/Enter/Space nicht zusätzlich die Kachel-Auswahl auslöst. */}
@@ -981,18 +969,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         {detailAxisChips}
                       </div>
                     ) : null}
-                    {detailHasTalent || detailHasTrend || detailHasNeed ? (
+                    {/* Talent-Sterne (CA/PO) und Bedarf-Chip hier entfernt — CA/PO steht
+                        kanonisch in der Fokus-Karte, Fit/Bedarf im Signal-Chip oben. */}
+                    {detailHasTrend ? (
                       <div className="nl-market-detail-meta">
-                        {detailHasTalent ? (
-                          <NlAbilityStars
-                            caScore={detailStarProps.caScore}
-                            poStarRange={detailStarProps.poStarRange}
-                            poScoreRange={detailStarProps.poScoreRange}
-                            poStars={detailStarProps.poStars}
-                            known={false}
-                            label="Talent"
-                          />
-                        ) : null}
                         {item.developmentTrend ? (
                           <span
                             className={`nl-market-signal-chip ${nlToneClass(
@@ -1001,14 +981,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                             title="Entwicklungs-Trend aus dem Trainings-Forecast"
                           >
                             Trend {NL_DEV_TREND_LABEL[item.developmentTrend] ?? "—"}
-                          </span>
-                        ) : null}
-                        {item.needMatchLabel ? (
-                          <span
-                            className={`nl-market-signal-chip ${nlToneClass(needTone)}`}
-                            title="Eignung für deinen Kader"
-                          >
-                            {item.needMatchLabel}
                           </span>
                         ) : null}
                       </div>
@@ -1099,28 +1071,22 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         value={formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio)}
                         tone={getNlRatioTone(selectedPlayer.marketValueSalaryRatio)}
                       />
+                      {/* Fit ohne needMatchLabel-Sub und ohne CA-Sterne — Bedarf steht im
+                          Kachel-Signal, CA/PO in der Talent-Row darunter (Phase-0-Dedup). */}
                       <StatChip
                         label="Fit"
                         value={selectedPlayer.fitDisplay}
                         tone={getNlFitTone(selectedPlayer.fit)}
-                        sub={selectedPlayer.needMatchLabel ?? undefined}
                       />
-                      {typeof selectedPlayer.ovr === "number" && Number.isFinite(selectedPlayer.ovr) ? (
-                        <NlAbilityStars
-                          caScore={selectedPlayer.ovr}
-                          known
-                          compact
-                          label="Aktuell"
-                          className="nl-market-ca-stars"
-                        />
-                      ) : null}
                     </StatChipRow>
                   </div>
                 </div>
 
                 {/* #68 — Achsen-Radar statt vier linearer Balken. Werte fog-gated (scoutedPow/…).
                     Radar + Tier-Chips laufen kompakt nebeneinander, damit die Top-Disziplinen
-                    darunter ohne großes Scrollen sichtbar bleiben. */}
+                    darunter ohne großes Scrollen sichtbar bleiben.
+                    Phase-0-Dedup: showValues entfernt — die vier Zahlen stehen kanonisch auf
+                    den Tier-Chips rechts, der Radar bleibt sauber. */}
                 <div className="nl-market-radar-row">
                   <div className="nl-market-focus-radar" aria-label="Kandidaten-Achsen">
                     <NlRadar
@@ -1129,7 +1095,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
                       })}
                       max={100}
-                      showValues
                       aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
                       className="nl-market-axis-radar"
                     />
@@ -1443,11 +1408,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </>
                   ) : null}
                 </p>
-                {impactIsEstimate ? (
-                  <small className="nl-market-estimate-note">
-                    Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
-                  </small>
-                ) : null}
+                {/* Inline "geschätzt"-Note entfernt (Phase-0-Dedup) — der Header-Pill "geschätzt"
+                    und die title-Tooltips auf den Delta-Chips tragen den Hinweis bereits. */}
                 <div className="nl-market-impact-axes">
                   {topSixAxisImpact.map((row) => {
                     const rankEstimate = topSixAxisRankEstimates.find((entry) => entry.axis === row.axis);
