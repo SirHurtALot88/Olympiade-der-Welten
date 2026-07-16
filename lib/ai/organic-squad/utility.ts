@@ -189,10 +189,10 @@ function identityFitFactor(
  * from off-identity ones. Emptiness-scaled so it only bites in the draft/rebuild regime (empty→sparse
  * roster) and fades to a pure no-op by EMPTINESS_REF players — a filled follow-season roster is untouched.
  */
-const IDENTITY_TILT_STRENGTH = 1.2;
+const IDENTITY_TILT_STRENGTH = 1.8;
 const IDENTITY_TILT_EMPTINESS_REF = 8;
-const IDENTITY_TILT_MIN = 0.6;
-const IDENTITY_TILT_MAX = 1.45;
+const IDENTITY_TILT_MIN = 0.5;
+const IDENTITY_TILT_MAX = 1.75;
 
 function identityAxisTilt(player: OrganicPlayerView, state: OrganicTeamState): number {
   if (!IDFIT_ENABLED) return 1;
