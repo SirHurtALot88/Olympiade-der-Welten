@@ -40,7 +40,12 @@ import {
   readFoundationHistoryState,
   type FoundationPanelId,
 } from "@/lib/foundation/foundation-navigation-history";
-import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import {
+  parseFoundationPlayerIdFromUrl,
+  parseFoundationSaveIdFromUrl,
+  parseFoundationTabFromUrl,
+  syncFoundationUrlState,
+} from "@/lib/foundation/foundation-url-state";
 import {
   getDefaultGlobalTableWidths,
   normalizeGlobalTablePreferenceEntry,
@@ -391,6 +396,7 @@ export function syncFoundationViewInUrl(
     facilityId?: string | null;
     facilityAction?: string | null;
     team?: string | null;
+    saveId?: string | null;
   },
 ) {
   if (typeof window === "undefined") {
@@ -400,6 +406,10 @@ export function syncFoundationViewInUrl(
   const team =
     options?.team ??
     (typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("team") : null);
+  // Preserve whatever save the URL is currently pinned to unless the caller
+  // is explicitly switching saves -- otherwise every in-app navigation would
+  // silently drop the saveId param and fall back to the global active save.
+  const saveId = options?.saveId ?? parseFoundationSaveIdFromUrl();
 
   syncFoundationUrlState(
     {
@@ -410,6 +420,7 @@ export function syncFoundationViewInUrl(
       panel: options?.panel ?? null,
       facilityId: options?.facilityId ?? null,
       facilityAction: options?.facilityAction ?? null,
+      saveId,
     },
     { mode: options?.push ? "push" : "replace" },
   );
@@ -676,6 +687,32 @@ export function syncFoundationTeamIdInUrl(teamId: string) {
     panel: current?.panel ?? parseFoundationPanelFromUrl(),
     facilityId: current?.facilityId ?? parseFoundationFacilityFromUrl().facilityId,
     facilityAction: current?.facilityAction ?? parseFoundationFacilityFromUrl().facilityAction,
+    saveId: current?.saveId ?? parseFoundationSaveIdFromUrl(),
+  });
+}
+
+/**
+ * Pins the given saveId into the Foundation URL so a reload / new tab of
+ * this URL deterministically loads this exact save instead of falling back
+ * to the single global "active" save row. Preserves all other URL state
+ * (view/tab/player/team/panel/facility) the same way syncFoundationTeamIdInUrl
+ * does.
+ */
+export function syncFoundationSaveIdInUrl(saveId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const current = readFoundationHistoryState();
+  syncFoundationUrlState({
+    view: (current?.view ?? parseFoundationViewFromUrl() ?? "homeV2") as FoundationViewId,
+    tab: current?.tab ?? parseFoundationTabFromUrl(),
+    playerId: current?.playerId ?? parseFoundationPlayerIdFromUrl(),
+    team: current?.team ?? getRawFoundationTeamParam(),
+    panel: current?.panel ?? parseFoundationPanelFromUrl(),
+    facilityId: current?.facilityId ?? parseFoundationFacilityFromUrl().facilityId,
+    facilityAction: current?.facilityAction ?? parseFoundationFacilityFromUrl().facilityAction,
+    saveId,
   });
 }
 

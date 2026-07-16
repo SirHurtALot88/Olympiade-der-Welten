@@ -5,6 +5,7 @@ import { endTurn } from "@/lib/game/apply-end-turn";
 import { applyMoveToken } from "@/lib/game/apply-move-token";
 import {
   applyRoomOwnershipPreset,
+  applyRoomTeamSelection,
   advanceRoomArenaStep,
   advanceRoomFlow,
   createRoom,
@@ -142,6 +143,16 @@ export function ensureSocketServer(httpServer: HttpServer) {
 
     socket.on("applyRoomPreset", ({ roomCode, seatToken, preset }) => {
       const result = applyRoomOwnershipPreset(roomCode, seatToken, preset);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("setTeamSelection", ({ roomCode, seatToken, chrisTeamIds, frankyTeamIds }) => {
+      const result = applyRoomTeamSelection(roomCode, seatToken, { chrisTeamIds, frankyTeamIds });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;

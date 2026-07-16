@@ -551,6 +551,25 @@ a {
   justify-items: start;
 }
 
+.oly-solo-actions {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.oly-solo-choice {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  align-content: start;
+}
+
+.oly-solo-choice .inline-button {
+  width: 100%;
+  text-align: center;
+}
+
 .oly-section-heading {
   display: grid;
   gap: 4px;
@@ -2800,6 +2819,45 @@ a {
 
 .foundation-context-banner.is-compact .foundation-ai-preseason-copy strong,
 .foundation-context-banner.is-compact .foundation-ai-preseason-copy span {
+  font-size: 0.78rem;
+}
+
+/* Kompakter Multiplayer-Room-Chip: schlanke Pill-Zeile am rechten Rand des
+   Kontext-Banners statt großem, zentralem Block. `order` schiebt den Chip an
+   das Ende der Flex-Zeile, `margin-left: auto` hält ihn bündig an der Kante. */
+.foundation-room-chip {
+  order: 5;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  max-width: 100%;
+  padding: 3px 5px 3px 4px;
+  border: 1px solid rgba(93, 143, 214, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.foundation-room-chip .pill {
+  padding: 3px 9px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.foundation-room-chip-code {
+  font-weight: 600;
+}
+
+.foundation-room-chip-participant {
+  overflow: hidden;
+  max-width: 12ch;
+  text-overflow: ellipsis;
+}
+
+.foundation-room-chip-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-size: 0.78rem;
 }
 

@@ -33,6 +33,7 @@ import {
   persistFoundationSaveMode,
   resolveFoundationTeamId,
   resolvePreferredFoundationTeamContext,
+  syncFoundationSaveIdInUrl,
   syncFoundationTeamIdInUrl,
   withNormalizedLocalTeamSettings,
   type syncFoundationViewInUrl,
@@ -586,6 +587,10 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
           if (requestVersion !== saveActionRequestVersion.current) {
             return;
           }
+          // Pin the save this action just switched us to into the URL so a
+          // reload / new tab deterministically loads it instead of falling
+          // back to the global active save row.
+          syncFoundationSaveIdInUrl(payload.save.saveId);
           if (body.action === "fresh-season-1") {
             setActiveView("season");
             syncFoundationViewInUrl("season");

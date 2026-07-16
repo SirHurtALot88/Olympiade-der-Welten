@@ -30,6 +30,11 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [activeSaveId, setActiveSaveId] = useState<string | null>(null);
+  // Getrennt vom activeSaveId-Wert: erst wenn der Save-Check wirklich beantwortet
+  // ist, wissen wir, ob "Weiterspielen" angeboten werden darf. Ohne dieses Flag
+  // würde die Karte beim ersten Render (activeSaveId noch null) fälschlich nur
+  // "Neues Spiel" zeigen und "Weiterspielen" erst nachträglich einblenden.
+  const [soloSaveChecked, setSoloSaveChecked] = useState(false);
   const [socketState, setSocketState] = useState<"connecting" | "connected" | "offline">("connecting");
   // Phase-1-Login: wenn eine Session existiert, kommt der Anzeigename von dort statt
   // aus einem frei editierbaren Feld. Ohne Login (isAuthEnabled() aus) liefert
@@ -127,11 +132,13 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
       .then((payload: { save?: { saveId?: string } } | null) => {
         if (!cancelled) {
           setActiveSaveId(payload?.save?.saveId ?? null);
+          setSoloSaveChecked(true);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setActiveSaveId(null);
+          setSoloSaveChecked(true);
         }
       });
     return () => {
@@ -155,9 +162,28 @@ export default function HomePage({ authEnabled = false }: { authEnabled?: boolea
           <h2>Solo spielen</h2>
         </div>
         <p className="muted">Du steuerst deine Teams allein, die KI übernimmt den Rest der Liga.</p>
-        <Link className="primary-button inline-button" href="/foundation">
-          Solo spielen
-        </Link>
+        <div className="oly-solo-actions">
+          {soloSaveChecked && activeSaveId ? (
+            <div className="oly-solo-choice">
+              <Link className="primary-button inline-button" href="/foundation" data-testid="solo-continue">
+                Weiterspielen
+              </Link>
+              <span className="muted">Lädt deinen aktiven Spielstand und macht dort weiter, wo du aufgehört hast.</span>
+            </div>
+          ) : null}
+          <div className="oly-solo-choice">
+            <Link
+              className={`${activeSaveId ? "secondary-button" : "primary-button"} inline-button`}
+              href="/foundation?view=teamSettings&tab=saves&newGame=1"
+              data-testid="solo-new-game"
+            >
+              Neues Spiel
+            </Link>
+            <span className="muted">
+              Team wählen (z. B. P-S), du steuerst 1 Team, der Rest ist KI — es entsteht ein frischer Spielstand.
+            </span>
+          </div>
+        </div>
       </section>
 
       <div className="oly-section-heading">

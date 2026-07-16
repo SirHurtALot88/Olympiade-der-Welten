@@ -35,8 +35,13 @@ export function setFoundationView(
     onFoundationNavigationStart?.();
     const targetView = getDefaultFoundationViewTarget(view);
     setActiveView(targetView);
-    const team =
-      typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("team") : null;
+    const currentSearchParams =
+      typeof window !== "undefined" ? new URL(window.location.href).searchParams : null;
+    const team = currentSearchParams?.get("team") ?? null;
+    // Preserve the pinned saveId across in-app navigation -- otherwise every
+    // top-level nav click (Home, Season, Markt, ...) would silently drop it
+    // and later reloads would fall back to the global active save.
+    const saveId = currentSearchParams?.get("saveId") ?? null;
     syncFoundationUrlState(
       {
         view: targetView,
@@ -46,6 +51,7 @@ export function setFoundationView(
         panel: null,
         facilityId: null,
         facilityAction: null,
+        saveId,
       },
       { mode: pushHistory ? "push" : "replace" },
     );

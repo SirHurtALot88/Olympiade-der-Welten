@@ -1578,39 +1578,49 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
         </div>
         {roomContext ? (
-          <div className="foundation-ai-preseason-banner is-ready" data-testid="foundation-room-context-banner">
-            <div className="foundation-ai-preseason-copy">
-              <span className="eyebrow">Multiplayer-Room</span>
-              <strong>Raum {roomContext.roomCode}</strong>
-              {(() => {
-                const roomIdentity = roomLiveState?.roomParticipants.find(
-                  (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
-                );
-                return roomIdentity ? (
-                  <span className="pill" data-testid="foundation-room-participant-identity">
-                    Participant {roomIdentity.displayName}
+          (() => {
+            // Kompakter Room-Chip statt großem zentralem Banner: die schlanke
+            // Pill-Zeile lebt am rechten Rand des Kontext-Banners. Room-Code +
+            // "Zur Room-Ansicht" bleiben sichtbar, die Detailzeilen (Save-ID,
+            // Flow-Schritt, Sitzplatz-Token-Hinweis, Aktivitätsnotiz) wandern in
+            // den title-Tooltip (Hover), damit sie keine Höhe fressen.
+            const roomIdentity = roomLiveState?.roomParticipants.find(
+              (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
+            );
+            const roomChipDetail = [
+              `Save ${formatShortSaveId(roomContext.saveId)}`,
+              roomLiveState
+                ? `Schritt: ${getRoomFlowStep(roomLiveState.roomFlowState.step).label} · ${
+                    describeRoomFlowButton({
+                      state: roomLiveState,
+                      participantId: roomContext.participantId,
+                    }).label
+                  }`
+                : "Schreibaktionen laufen serverseitig mit Sitzplatz-Token.",
+              roomActivityNotice ? `${roomActivityNotice.title} — ${roomActivityNotice.detail}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <div
+                className="foundation-room-chip"
+                data-testid="foundation-room-context-banner"
+                title={`Multiplayer-Room · Raum ${roomContext.roomCode} · ${roomChipDetail}`}
+              >
+                <span className="pill foundation-room-chip-code">
+                  <span aria-hidden="true">👥</span> Raum {roomContext.roomCode}
+                </span>
+                {roomIdentity ? (
+                  <span className="pill foundation-room-chip-participant" data-testid="foundation-room-participant-identity">
+                    {roomIdentity.displayName}
                   </span>
-                ) : null;
-              })()}
-              <span className="muted">
-                Save {formatShortSaveId(roomContext.saveId)}
-                {roomLiveState
-                  ? ` · Schritt: ${getRoomFlowStep(roomLiveState.roomFlowState.step).label} · ${
-                      describeRoomFlowButton({
-                        state: roomLiveState,
-                        participantId: roomContext.participantId,
-                      }).label
-                    }`
-                  : " · Schreibaktionen laufen serverseitig mit Sitzplatz-Token."}
-              </span>
-              {roomActivityNotice ? (
-                <span className="muted">{roomActivityNotice.title} — {roomActivityNotice.detail}</span>
-              ) : null}
-            </div>
-            <a className="secondary-button inline-button" href={`/room/${roomContext.roomCode}`}>
-              Zur Room-Ansicht
-            </a>
-          </div>
+                ) : null}
+                <a className="secondary-button inline-button foundation-room-chip-link" href={`/room/${roomContext.roomCode}`}>
+                  Zur Room-Ansicht
+                </a>
+              </div>
+            );
+          })()
         ) : null}
         {foundationActionFeedback ? (
           <div
