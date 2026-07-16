@@ -2014,6 +2014,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onClose={closeTeamProfile}
                 onOpenPlayer={(playerId, activePlayerId) => void openPlayerDrawerById(playerId, activePlayerId)}
                 leagueHeatPools={leaguePlayerHeatPools}
+                gameState={gameState}
               />
             ) : null}
           </section>
