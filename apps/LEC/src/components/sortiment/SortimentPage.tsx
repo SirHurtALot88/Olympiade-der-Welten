@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import type { ArticleClass } from "@/lib/pricing/classification";
@@ -130,7 +130,10 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
   const [selectedWindow, setSelectedWindow] = useState<SaleWindowKey>(
     (searchParams.get("fenster") as SaleWindowKey | null) ?? "90"
   );
-  const [classFilter, setClassFilter] = useState<Set<ArticleClass>>(new Set());
+  const [classFilter, setClassFilter] = useState<Set<ArticleClass>>(() => {
+    const raw = searchParams.get("klasse");
+    return raw ? new Set(raw.split(",").filter((c): c is ArticleClass => CLASS_ORDER.includes(c as ArticleClass))) : new Set();
+  });
   const [statusFilter, setStatusFilter] = useState<Set<PriceStatus>>(new Set());
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -138,15 +141,17 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
 
   const columnWidths = useColumnWidths(COLS, STORAGE_KEY);
 
-  function syncUrl(next: { q?: string; fenster?: SaleWindowKey }) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next.q !== undefined) {
-      if (next.q) params.set("q", next.q);
-      else params.delete("q");
-    }
-    if (next.fenster !== undefined) params.set("fenster", next.fenster);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }
+  // URL-Query-Sync (q/fenster/klasse), so dass Links von Top/Flop und
+  // Empfehlungen (?q=…, ?klasse=ladenhueter) die Filter vorbelegen koennen.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (query.trim()) params.set("q", query.trim());
+    if (selectedWindow !== "90") params.set("fenster", selectedWindow);
+    if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, selectedWindow, classFilter]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -224,7 +229,6 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
               onChange={(e) => {
                 setQuery(e.target.value);
                 setVisibleCount(PAGE_SIZE);
-                syncUrl({ q: e.target.value });
               }}
               placeholder="Name oder Set-Code …"
             />
@@ -235,10 +239,7 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
                 key={w.key}
                 type="button"
                 className={selectedWindow === w.key ? "on" : undefined}
-                onClick={() => {
-                  setSelectedWindow(w.key);
-                  syncUrl({ fenster: w.key });
-                }}
+                onClick={() => setSelectedWindow(w.key)}
               >
                 {w.label}
               </button>
