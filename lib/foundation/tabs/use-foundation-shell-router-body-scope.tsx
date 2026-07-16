@@ -4397,19 +4397,33 @@ export function useFoundationShellRouterBodyScope({
     }
 
     fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
-    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false }).then((nextGameState) => {
-      if (nextGameState?.seasonState.seasonSnapshots === undefined) {
-        return;
-      }
-      setGameState((previous) => ({
-        ...previous,
-        seasonState: {
-          ...previous.seasonState,
-          seasonSnapshots: nextGameState.seasonState.seasonSnapshots,
-        },
-      }));
-      void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
-    });
+    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false })
+      .then((nextGameState) => {
+        if (!nextGameState) {
+          // Full-save load returned nothing — clear the key so a later render
+          // can retry instead of leaving archive-gated views (Ewige Tabelle)
+          // on a loading skeleton that never resolves.
+          fullSeasonArchiveLoadKeyRef.current = null;
+          return;
+        }
+        // Materialize an archive even when the save carries none: `?? []` flips
+        // `hasArchive` true so archive-gated views degrade to their honest
+        // empty-state ("keine archivierten Saisons") instead of an eternal
+        // skeleton. A real archive is used verbatim; a concurrently-loaded one
+        // is never clobbered.
+        const loadedSnapshots = nextGameState.seasonState.seasonSnapshots ?? [];
+        setGameState((previous) => ({
+          ...previous,
+          seasonState: {
+            ...previous.seasonState,
+            seasonSnapshots: previous.seasonState.seasonSnapshots ?? loadedSnapshots,
+          },
+        }));
+        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+      })
+      .catch(() => {
+        fullSeasonArchiveLoadKeyRef.current = null;
+      });
   }, [
     activeSaveId,
     foundationSaveMode,
