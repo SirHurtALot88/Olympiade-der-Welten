@@ -26,7 +26,7 @@ export const SPONSOR_BRAND_PARENTS: SponsorBrandParent[] = [
   { id: "obi-baumarkt", name: "O.B.I. Baumarkt", industry: "retail", region: "dach", flavorBase: "Baumarkt-Partner mit solider Basisfinanzierung." },
   { id: "hornbach-co", name: "Hornbach & Co", industry: "retail", region: "dach", flavorBase: "Heimwerker-Marke für verlässliche Saisonbudgets." },
   { id: "bauhaus-arena", name: "Bauhaus Arena", industry: "retail", region: "dach", flavorBase: "DIY-Sponsor mit Fokus auf Team-Identität." },
-  { id: "toom-werkstadt", name: "Toom Werkstadt", industry: "retail", region: "dach", flavorBase: "Regionaler Handwerkspartner." },
+  { id: "toom-werkstadt", name: "Toom Werkstatt", industry: "retail", region: "dach", flavorBase: "Regionaler Handwerkspartner." },
   { id: "hagebau-united", name: "Hagebau United", industry: "retail", region: "dach", flavorBase: "Genossenschaftlicher Sponsor mit breiter Reichweite." },
   { id: "aldi-nordpack", name: "Aldi Nordpack", industry: "retail", region: "dach", flavorBase: "Discounter-Partner — effizient und planbar." },
   { id: "lidl-plus", name: "Lidl Plus", industry: "retail", region: "dach", flavorBase: "Massenmarkt-Sponsor mit klaren Zielen." },
