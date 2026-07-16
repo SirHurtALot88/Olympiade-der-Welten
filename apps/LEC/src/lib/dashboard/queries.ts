@@ -1,14 +1,72 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
-import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
+import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
-/** Laedt alle Artikel + Fenster-Snapshots aus der DB und baut das Dashboard-View-Model. */
-export async function loadDashboardViewModel(prisma: PrismaClient): Promise<DashboardViewModel> {
-  const articles = await prisma.article.findMany({
-    where: { isCard: true },
-    include: { saleWindows: true },
+export interface ArticleAggregatesResult {
+  aggregates: ArticleAggregate[];
+  costSettings: CostSettingsValues;
+}
+
+/**
+ * Laedt die aktive (`active=true`) `CostSettings`-Version aus der DB, sonst
+ * die Konzept-Defaults (KONZEPT §7.3). Wiederverwendet von allen Seiten, die
+ * mit den Kostensaetzen rechnen, sowie von `/einstellungen` (aktueller Stand).
+ */
+export async function loadActiveCostSettings(prisma: PrismaClient): Promise<CostSettingsValues> {
+  const active = await prisma.costSettings.findFirst({
+    where: { active: true },
+    orderBy: { version: "desc" },
   });
+  if (!active) return DEFAULT_COST_SETTINGS;
+  return {
+    buyShippingUnderFive: active.buyShippingUnderFive,
+    buyShippingFive: active.buyShippingFive,
+    shippingSingle: active.shippingSingle,
+    shippingPack: active.shippingPack,
+    registeredSingle: active.registeredSingle,
+    registeredPack: active.registeredPack,
+    packagingSingle: active.packagingSingle,
+    packagingPack: active.packagingPack,
+    fixedYearlyEbayShop: active.fixedYearlyEbayShop,
+    fixedYearlyBillbee: active.fixedYearlyBillbee,
+    fixedYearlyLexoffice: active.fixedYearlyLexoffice,
+    ebayCommissionRate: active.ebayCommissionRate,
+    ebayCommissionVat: active.ebayCommissionVat,
+    ebayCommissionFixed: active.ebayCommissionFixed,
+    adFeeRateSingle: active.adFeeRateSingle,
+    adFeeRateMin: active.adFeeRateMin,
+    adFeeRateGood: active.adFeeRateGood,
+    marginMinMultiplier: active.marginMinMultiplier,
+    marginGoodMultiplier: active.marginGoodMultiplier,
+  };
+}
+
+/**
+ * Gemeinsamer Loader (PAGES_CONCEPT Vorarbeit): Prisma -> `ArticleAggregate[]`
+ * + `CostSettingsValues`. Basis fuer den Dashboard-View-Model UND alle
+ * eigenstaendigen Seiten (/sortiment, /top-flop, /empfehlungen, …), damit
+ * nicht jede Seite ihre eigene Prisma-Query schreibt.
+ */
+export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
+  const [articles, latestMarketPrices, costSettings] = await Promise.all([
+    prisma.article.findMany({
+      where: { isCard: true },
+      include: { saleWindows: true },
+    }),
+    prisma.marketPrice.findMany({
+      orderBy: { fetchedAt: "desc" },
+    }),
+    loadActiveCostSettings(prisma),
+  ]);
+
+  // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
+  const latestTrendByArticle = new Map<string, number | null>();
+  for (const mp of latestMarketPrices) {
+    if (!latestTrendByArticle.has(mp.articleId)) {
+      latestTrendByArticle.set(mp.articleId, mp.priceTrend ?? null);
+    }
+  }
 
   const aggregates: ArticleAggregate[] = articles.map((article) => {
     const windows: ArticleAggregate["windows"] = {};
@@ -26,6 +84,7 @@ export async function loadDashboardViewModel(prisma: PrismaClient): Promise<Dash
         existing.dbI += sw.dbI;
         existing.dbII += sw.dbII;
         existing.avgPrice = existing.qty > 0 ? existing.revenue / existing.qty : 0;
+        existing.rank = existing.rank ?? sw.rank ?? null;
       } else {
         windows[key] = {
           qty: sw.qty,
@@ -36,6 +95,7 @@ export async function loadDashboardViewModel(prisma: PrismaClient): Promise<Dash
           dbI: sw.dbI,
           dbII: sw.dbII,
           avgPrice: sw.avgPrice,
+          rank: sw.rank ?? null,
         };
       }
     }
@@ -45,11 +105,17 @@ export async function loadDashboardViewModel(prisma: PrismaClient): Promise<Dash
       nameRaw: article.nameRaw,
       setCode: article.setCode,
       packQty: article.packQty,
+      stock: article.stock,
+      latestMarketTrend: latestTrendByArticle.get(article.id) ?? null,
       windows,
     };
   });
 
-  // TODO(Phase 3): cost_settings aus der DB laden (versioniert, konfigurierbar
-  // ueber die Einstellungen-Seite). Bis dahin Defaults aus KONZEPT §7.3.
-  return buildDashboardViewModel(aggregates, DEFAULT_COST_SETTINGS);
+  return { aggregates, costSettings };
+}
+
+/** Laedt alle Artikel + Fenster-Snapshots aus der DB und baut das Dashboard-View-Model. */
+export async function loadDashboardViewModel(prisma: PrismaClient): Promise<DashboardViewModel> {
+  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
+  return buildDashboardViewModel(aggregates, costSettings);
 }

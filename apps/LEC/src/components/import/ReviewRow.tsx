@@ -84,7 +84,17 @@ export function ReviewRow({ item, onResolved }: Props) {
         <span className={`pill ${item.source === "billbee" ? "p-warn" : "p-mkt"}`} style={{ flex: "none" }}>
           {item.source}
         </span>
-        <span style={{ fontSize: 12.7, fontWeight: 600, minWidth: 0, flex: 1 }} title={item.nameRaw}>
+        <span
+          style={{
+            fontSize: 12.7,
+            fontWeight: 600,
+            minWidth: 0,
+            flex: "1 1 260px",
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+          }}
+          title={item.nameRaw}
+        >
           {item.nameRaw}
         </span>
         {item.setCode && <span className="code">{item.setCode}</span>}

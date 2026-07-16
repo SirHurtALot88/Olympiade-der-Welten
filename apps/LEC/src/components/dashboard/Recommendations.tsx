@@ -16,13 +16,21 @@ const CHIPS: Record<Recommendation["kind"], { cls: string; label: string }> = {
 
 interface Props {
   recommendations: Recommendation[];
+  /** Gesamtzahl (falls die Liste hier nur ein Ausschnitt ist), fuer den "Alle ansehen"-Teaser. */
+  totalCount?: number;
 }
 
-export function Recommendations({ recommendations }: Props) {
+export function Recommendations({ recommendations, totalCount }: Props) {
+  const showMoreLink = totalCount !== undefined && totalCount > recommendations.length;
   return (
     <div className="card" style={{ padding: "6px 14px 8px" }}>
       <h3 style={{ padding: "12px 4px 6px" }}>
         KI-Empfehlungen <span className="r">regelbasiert · Stufe 1</span>
+        {showMoreLink && (
+          <a href="/empfehlungen" className="col-reset" style={{ textDecoration: "none", marginLeft: 10 }}>
+            Alle {totalCount} ansehen →
+          </a>
+        )}
       </h3>
       {recommendations.length === 0 && (
         <div style={{ padding: "10px 8px", fontSize: 12.5, color: "var(--faint)" }}>

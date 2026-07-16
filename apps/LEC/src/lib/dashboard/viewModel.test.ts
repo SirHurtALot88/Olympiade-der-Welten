@@ -12,6 +12,7 @@ function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
     dbI: 7,
     dbII: 5,
     avgPrice: 10,
+    rank: null,
     ...overrides,
   };
 }
@@ -22,6 +23,8 @@ function article(nameRaw: string, overrides: Partial<ArticleAggregate> = {}): Ar
     nameRaw,
     setCode: null,
     packQty: 1,
+    stock: 0,
+    latestMarketTrend: null,
     windows: {},
     ...overrides,
   };

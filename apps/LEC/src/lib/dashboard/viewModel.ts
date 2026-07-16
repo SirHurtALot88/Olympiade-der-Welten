@@ -12,6 +12,7 @@ export interface WindowAggregate {
   dbI: number;
   dbII: number;
   avgPrice: number;
+  rank: number | null;
 }
 
 export interface ArticleAggregate {
@@ -19,6 +20,11 @@ export interface ArticleAggregate {
   nameRaw: string;
   setCode: string | null;
   packQty: number;
+  /** Lagerbestand (Stk). Aktuell i. d. R. 0 -- Billbee-"Verkaeufe nach Artikel" liefert keinen
+   * Bestand (siehe KONZEPT §5.4/PAGES_CONCEPT §B); Follow-up: Billbee-Artikelstamm-Import. */
+  stock: number;
+  /** Cardmarket-Preistrend aus dem juengsten MarketPrice-Datensatz, sonst null ("—"). */
+  latestMarketTrend: number | null;
   windows: Partial<Record<SaleWindowKey, WindowAggregate>>;
 }
 
@@ -56,17 +62,40 @@ export interface MoverItem {
   dbIIPercent: number;
 }
 
+/** Kennzahlen je Zeitfenster fuer Chris' Dashboard-Spalten (PAGES_CONCEPT §B). */
+export interface SortimentWindowMetrics {
+  qty: number;
+  revenue: number;
+  avgPrice: number;
+  rank: number | null;
+}
+
 export interface SortimentRow {
   articleId: string;
   nameRaw: string;
   setCode: string | null;
   velocity: [number, number, number]; // 30 / 90 / 365
   revenue365: number;
-  vk: number;
+  vk: number; // Preis VK (Ø Verkaufspreis der Referenz-Periode)
+  ek: number; // Preis EK je Stk (Referenz-Periode)
   corridor: { min: number; good: number };
   priceStatus: ReturnType<typeof classifyPriceStatus>;
   articleClass: ArticleClass;
   classLabel: string;
+  /** DB I / DB II je verkauftem Stueck (Referenz-Periode), DB II % gleiche Basis wie Klassifikation. */
+  dbIPerUnit: number;
+  dbIIPerUnit: number;
+  dbIIPercent: number;
+  /** Rank/Verkaeufe/Umsatz/Ø-Preis je Fenster (30/90/365/all) fuer die Dashboard-Spalten. */
+  windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
+  /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
+  stock: number;
+  /** Stk x VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
+  potentialRevenue: number | null;
+  /** Bestandsreichweite in Monaten (Stk / Verkaeufe pro Monat aus 90T), null ohne Bestand/Velocity. */
+  stockMonthsCover: number | null;
+  /** Cardmarket-Preistrend (aus MarketPrice), null wenn noch nicht erfasst -> "—". */
+  priceTrend: number | null;
 }
 
 export interface OperatingQuotas {
@@ -143,16 +172,7 @@ export function buildDashboardViewModel(
   };
 
   // Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1).
-  const classified = articles.map((a) => {
-    const c = classifyArticle({
-      qty30d: a.windows["30"]?.qty ?? 0,
-      qty90d: a.windows["90"]?.qty ?? 0,
-      qty365d: a.windows["365"]?.qty ?? 0,
-      qtyAllTime: a.windows.all?.qty ?? 0,
-      dbIIPercent: pct(a.windows.all?.dbII ?? 0, a.windows.all?.revenue ?? 1),
-    });
-    return { article: a, ...c };
-  });
+  const classified = classifyArticles(articles);
 
   // Laeuft gerade gut: Top-Bewegung 30 Tage unter den Artikeln mit positivem DB I.
   const moversGood: MoverItem[] = articles
@@ -172,25 +192,11 @@ export function buildDashboardViewModel(
     .slice(0, 4)
     .map((a) => toMoverItem(a, "all"));
 
-  // Sortiment-Tabelle: primär nach AKTUELLER Velocity (90d, dann 30d) sortiert,
-  // Umsatz nur als Tiebreaker -- NICHT nach Lebenszeit-/365T-Umsatz sortieren,
-  // sonst dominieren eingebrochene Alt-Renner ("Bundles waren mal stark,
-  // sind es aktuell aber nicht mehr", KONZEPT §2). "Läuft gut jetzt" statt
-  // "lief mal gut": aktive Artikel zuerst, Ladenhüter fallen ans Ende.
-  const sortiment: SortimentRow[] = articles
-    .filter((a) => (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0) > 0)
-    .sort((a, b) => {
-      const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
-      if (qty90Diff !== 0) return qty90Diff;
-      const qty30Diff = (b.windows["30"]?.qty ?? 0) - (a.windows["30"]?.qty ?? 0);
-      if (qty30Diff !== 0) return qty30Diff;
-      return (
-        (b.windows["365"]?.revenue ?? b.windows.all?.revenue ?? 0) -
-        (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
-      );
-    })
-    .slice(0, 20)
-    .map((a) => buildSortimentRow(a, classified.find((c) => c.article === a)!.articleClass, costSettings));
+  // Vollstaendige Sortiment-Liste (PAGES_CONCEPT Vorarbeit: kein slice(0,20)/
+  // revenue>0-Filter mehr -- Ladenhueter mit 0 € muessen auf /sortiment
+  // sichtbar sein). Die Dashboard-Vorschau schneidet clientseitig auf die
+  // ersten N Zeilen (siehe SortimentTable `limit`-Prop).
+  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings);
 
   const quotaWindow = windows["365"].revenue > 0 ? windows["365"] : windows.all;
   const quotaAgg = articles.reduce(
@@ -227,7 +233,17 @@ export function buildDashboardViewModel(
 }
 
 function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
-  const agg = a.windows[window] ?? { qty: 0, revenue: 0, ek: 0, dbI: 0, dbII: 0, ebayFeeTotal: 0, shippingCost: 0, avgPrice: 0 };
+  const agg = a.windows[window] ?? {
+    qty: 0,
+    revenue: 0,
+    ek: 0,
+    dbI: 0,
+    dbII: 0,
+    ebayFeeTotal: 0,
+    shippingCost: 0,
+    avgPrice: 0,
+    rank: null,
+  };
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
@@ -240,7 +256,37 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
   };
 }
 
-function buildSortimentRow(
+export interface ClassifiedArticle {
+  article: ArticleAggregate;
+  articleClass: ArticleClass;
+  label: string;
+  reason: string;
+}
+
+/** Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1) -- wiederverwendbarer Baustein. */
+export function classifyArticles(articles: ArticleAggregate[]): ClassifiedArticle[] {
+  return articles.map((a) => {
+    const c = classifyArticle({
+      qty30d: a.windows["30"]?.qty ?? 0,
+      qty90d: a.windows["90"]?.qty ?? 0,
+      qty365d: a.windows["365"]?.qty ?? 0,
+      qtyAllTime: a.windows.all?.qty ?? 0,
+      dbIIPercent: pct(a.windows.all?.dbII ?? 0, a.windows.all?.revenue ?? 1),
+    });
+    return { article: a, ...c };
+  });
+}
+
+/** Monatliche Verkaufsgeschwindigkeit aus dem 90-Tage-Fenster (90 T ≈ 3 Monate). */
+function monthlyVelocity(a: ArticleAggregate): number {
+  return (a.windows["90"]?.qty ?? 0) / 3;
+}
+
+/**
+ * Baut die Sortiment-Zeile eines Artikels -- wiederverwendbarer Baustein
+ * (PAGES_CONCEPT Vorarbeit), genutzt von Dashboard-Vorschau UND `/sortiment`.
+ */
+export function buildSortimentRow(
   a: ArticleAggregate,
   articleClass: ArticleClass,
   costSettings: CostSettingsValues
@@ -257,6 +303,20 @@ function buildSortimentRow(
   const corridor = computePriceCorridor(hk.total, vk || hk.total, costSettings);
   const priceStatus = vk > 0 ? classifyPriceStatus(vk, corridor) : "im_korridor";
 
+  const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
+  const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
+  const dbIIPercent = referenceAgg && referenceAgg.revenue > 0 ? referenceAgg.dbII / referenceAgg.revenue : 0;
+
+  const windowMetrics: SortimentRow["windows"] = {};
+  for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
+    const agg = a.windows[key];
+    if (!agg) continue;
+    windowMetrics[key] = { qty: agg.qty, revenue: agg.revenue, avgPrice: agg.avgPrice, rank: agg.rank };
+  }
+
+  const velocityPerMonth = monthlyVelocity(a);
+  const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
+
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
@@ -264,11 +324,46 @@ function buildSortimentRow(
     velocity: [a.windows["30"]?.qty ?? 0, a.windows["90"]?.qty ?? 0, a.windows["365"]?.qty ?? 0],
     revenue365: a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0,
     vk,
+    ek: ekPerUnit,
     corridor: { min: corridor.vkMin, good: corridor.vkGood },
     priceStatus,
     articleClass,
     classLabel: LABELS_DE[articleClass],
+    dbIPerUnit,
+    dbIIPerUnit,
+    dbIIPercent,
+    windows: windowMetrics,
+    stock: a.stock,
+    potentialRevenue: a.stock > 0 ? a.stock * vk : null,
+    stockMonthsCover,
+    priceTrend: a.latestMarketTrend,
   };
+}
+
+/**
+ * Vollstaendige Sortiment-Liste, KEIN Filter/Slice (PAGES_CONCEPT Vorarbeit) --
+ * Ladenhüter mit 0 € Umsatz muessen auf `/sortiment` sichtbar sein. Default-
+ * Sortierung: aktuelle Velocity (90d, dann 30d) vor Lebenszeit-/365T-Umsatz,
+ * siehe Kommentar in `buildDashboardViewModel` (Bundle-Falle KONZEPT §2).
+ */
+export function buildFullSortiment(
+  articles: ArticleAggregate[],
+  classified: ClassifiedArticle[],
+  costSettings: CostSettingsValues
+): SortimentRow[] {
+  const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
+  return [...articles]
+    .sort((a, b) => {
+      const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
+      if (qty90Diff !== 0) return qty90Diff;
+      const qty30Diff = (b.windows["30"]?.qty ?? 0) - (a.windows["30"]?.qty ?? 0);
+      if (qty30Diff !== 0) return qty30Diff;
+      return (
+        (b.windows["365"]?.revenue ?? b.windows.all?.revenue ?? 0) -
+        (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
+      );
+    })
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings));
 }
 
 const LABELS_DE: Record<ArticleClass, string> = {
