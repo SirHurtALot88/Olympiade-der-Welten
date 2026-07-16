@@ -247,6 +247,10 @@ const FoundationLeagueLeadersHost = dynamic(() => import("@/app/foundation/leagu
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Liga-Leader werden geladen…" />,
 });
+const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
+});
 const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/FoundationDiszisHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
@@ -367,6 +371,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationPrizeFinanceShellHostProps,
   foundationRanksHostProps,
   foundationLeagueLeadersHostProps,
+  foundationAllTimeTableHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
   foundationMatchdayResultHostProps,
@@ -2879,6 +2884,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
+
+          {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
 

@@ -10,12 +10,12 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
-import { filterTransfermarktFreeAgentsByBracket, type TransfermarktPoolBracketBucket } from "@/lib/market/transfermarkt-pool-audit";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import { getScoutingTierWindow, resolveScoutingConfidenceFromLevel } from "@/lib/market/transfermarkt-scouting";
 import { computeCompositeTopSixAverage, computeDisciplineTopSixImpact, computeTopSixAxisImpact, computeCandidateAxisTeamRankEstimates } from "@/lib/market/transfermarkt-roster-impact";
 import { officialDisciplineWeightOrder, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { appendRoomContextToParams, readFoundationRoomContextFromLocation, withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { formatMarketPreviewError } from "@/lib/room/parse-room-write-context";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
@@ -396,13 +396,10 @@ function passesMarketFitVisibilityFilter(item: TransfermarktFreeAgentItem, hideP
 
 function passesMarketAxisFilters(
   item: TransfermarktFreeAgentItem,
-  selectedAxes: MarketAxisKey[],
   axisMinimums: Record<MarketAxisKey, number>,
 ) {
-  if (selectedAxes.length === 0) {
-    return true;
-  }
-  return selectedAxes.every((axis) => {
+  // Jeder Achs-Mindestwert filtert eigenständig (unabhängig voneinander); 0 = aus.
+  return (Object.keys(axisMinimums) as MarketAxisKey[]).every((axis) => {
     const minimum = axisMinimums[axis];
     if (minimum <= 0) {
       return true;
@@ -536,7 +533,6 @@ export default function TransfermarktV2Client({
     >(),
   );
   const marketAbortRef = useRef<AbortController | null>(null);
-  const poolBracketAbortRef = useRef<AbortController | null>(null);
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewVersionRef = useRef(0);
@@ -626,9 +622,8 @@ export default function TransfermarktV2Client({
   const [filterPresetMessage, setFilterPresetMessage] = useState<string | null>(null);
   const [selectedDisciplineLens, setSelectedDisciplineLens] = useState<OfficialDisciplineWeightId | "">("");
   const [wishlistSort, setWishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
-  const [poolBracketPanel, setPoolBracketPanel] = useState<TransfermarktPoolBracketBucket | null>(null);
-  const [poolBracketItems, setPoolBracketItems] = useState<TransfermarktFreeAgentItem[]>([]);
-  const [poolBracketBusy, setPoolBracketBusy] = useState(false);
+  // Phase-0-Cleanup: Pool-Bracket-Drilldown (State + Paging-Effekt) entfernt — kein
+  // Renderpfad im Neuen Look setzt jemals poolBracketPanel, der Effekt lief nie.
 
   useEffect(() => () => {
     if (wishlistClickTimerRef.current != null) {
@@ -655,6 +650,41 @@ export default function TransfermarktV2Client({
   function resetMarketFilters() {
     applyMarketFilterSnapshot(createDefaultMarketFilterSnapshot());
     setFilterPresetMessage("Filter zurückgesetzt.");
+  }
+
+  // F2 — Gespeicherte Suchen: speichern/anwenden/löschen. Manipuliert nur den
+  // filterPresets-State; die Persistenz nach localStorage übernimmt weiterhin der
+  // writeMarketFilterStorage-Effekt (currentFilterSnapshot ist der aktuelle Filter).
+  function saveMarketFilterPreset(name: string) {
+    const trimmed = name.trim().slice(0, 32) || "Filter";
+    const now = new Date().toISOString();
+    setFilterPresets((current) =>
+      [
+        {
+          id: `preset-${crypto.randomUUID()}`,
+          name: trimmed,
+          snapshot: currentFilterSnapshot,
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...current,
+      ].slice(0, 18),
+    );
+    setFilterPresetMessage(`Suche „${trimmed}" gespeichert.`);
+  }
+
+  function applyMarketFilterPreset(id: string) {
+    const preset = filterPresets.find((entry) => entry.id === id);
+    if (!preset) {
+      return;
+    }
+    applyMarketFilterSnapshot(preset.snapshot);
+    setFilterPresetMessage(`Suche „${preset.name}" geladen.`);
+  }
+
+  function deleteMarketFilterPreset(id: string) {
+    setFilterPresets((current) => current.filter((entry) => entry.id !== id));
+    setFilterPresetMessage("Gespeicherte Suche gelöscht.");
   }
 
   const currentFilterSnapshot = useMemo<MarketFilterSnapshot>(
@@ -722,6 +752,10 @@ export default function TransfermarktV2Client({
   }, [marketItems]);
   const ratioSliderMax = Math.max(1, maxLoadedRatio);
   const effectiveMinRatio = maxRatio > 0 ? Math.min(maxRatio, ratioSliderMax) : 0;
+  // Anzahl aktiver Achs-Mindestwerte (> 0) — jeder filtert eigenständig.
+  const activeAxisMinimumCount = (Object.keys(axisMinimums) as MarketAxisKey[]).filter(
+    (axis) => axisMinimums[axis] > 0,
+  ).length;
 
   const visibleItems = useMemo(() => {
     const filtered = marketItems.filter((item) => {
@@ -752,14 +786,14 @@ export default function TransfermarktV2Client({
           return false;
         }
       }
-      if (!passesMarketAxisFilters(item, selectedAxes, axisMinimums)) {
+      if (!passesMarketAxisFilters(item, axisMinimums)) {
         return false;
       }
       return true;
     });
 
     return sortCandidates(filtered, sortMode);
-  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedAxes, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
+  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
   const selectedPlayer = useMemo(
     () =>
       visibleItems.find((item) => item.playerId === selectedPlayerId) ??
@@ -1361,7 +1395,7 @@ export default function TransfermarktV2Client({
             setMarketItems([]);
             setMarketTotal(0);
             setMarketHasMore(false);
-            setMarketError(payload.error ?? "Transfermarkt konnte nicht geladen werden.");
+            setMarketError(formatMarketPreviewError(payload.error) ?? "Transfermarkt konnte nicht geladen werden.");
             return;
           }
 
@@ -1446,109 +1480,6 @@ export default function TransfermarktV2Client({
     };
   }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
 
-  useEffect(() => {
-    if (!poolBracketPanel || !bootstrapReady || !defaultSaveId || defaultSaveId === "loading-save" || defaultSeasonId === "loading") {
-      setPoolBracketItems([]);
-      setPoolBracketBusy(false);
-      return;
-    }
-    const activePoolBracketPanel = poolBracketPanel;
-
-    let cancelled = false;
-    const controller = new AbortController();
-    poolBracketAbortRef.current?.abort();
-    poolBracketAbortRef.current = controller;
-
-    async function loadPoolBracketPlayers() {
-      setPoolBracketBusy(true);
-      try {
-        if (deferredSearch.trim().length === 0 && !marketHasMore && marketItems.length > 0) {
-          const filtered = filterTransfermarktFreeAgentsByBracket(marketItems, activePoolBracketPanel.bracket);
-          if (!cancelled) {
-            setPoolBracketItems(filtered);
-          }
-          return;
-        }
-
-        const mergedItems: TransfermarktFreeAgentItem[] = [];
-        const seen = new Set<string>();
-        let nextOffset = 0;
-        let hasMore = true;
-
-        while (hasMore) {
-          const params = appendRoomContextToParams(
-            new URLSearchParams({
-              saveId: defaultSaveId,
-              seasonId: defaultSeasonId,
-              source,
-              teamId: selectedTeamId,
-              limit: String(MARKET_PAGE_LIMIT),
-              offset: String(nextOffset),
-            }),
-            roomContextRef.current,
-          );
-          const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const payload = (await response.json()) as MarketFeedResponse;
-          if (cancelled || controller.signal.aborted) {
-            return;
-          }
-          if (!response.ok || payload.error) {
-            if (!cancelled) {
-              setPoolBracketItems([]);
-            }
-            return;
-          }
-
-          payload.items.forEach((item) => {
-            if (!seen.has(item.playerId)) {
-              mergedItems.push(item);
-              seen.add(item.playerId);
-            }
-          });
-          nextOffset += payload.returned;
-          hasMore = Boolean(payload.hasMore && payload.returned > 0);
-        }
-
-        if (!cancelled) {
-          setPoolBracketItems(filterTransfermarktFreeAgentsByBracket(mergedItems, activePoolBracketPanel.bracket));
-        }
-      } catch (error) {
-        if (cancelled || controller.signal.aborted || isAbortError(error)) {
-          return;
-        }
-        if (!cancelled) {
-          setPoolBracketItems([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setPoolBracketBusy(false);
-        }
-      }
-    }
-
-    void loadPoolBracketPlayers();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (poolBracketAbortRef.current === controller) {
-        poolBracketAbortRef.current = null;
-      }
-    };
-  }, [
-    bootstrapReady,
-    defaultSaveId,
-    defaultSeasonId,
-    deferredSearch,
-    marketHasMore,
-    marketItems,
-    poolBracketPanel,
-    selectedTeamId,
-    source,
-  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1641,7 +1572,7 @@ export default function TransfermarktV2Client({
           setOfferedSalary(payload.summary.offeredSalary);
         }
         if ((!response.ok || payload.error) && !payload.summary) {
-          setPreviewError(payload.error ?? "Vorschau konnte nicht geladen werden.");
+          setPreviewError(formatMarketPreviewError(payload.error) ?? "Vorschau konnte nicht geladen werden.");
           return;
         }
         setPreviewError(null);
@@ -1716,7 +1647,10 @@ export default function TransfermarktV2Client({
       });
       const payload = (await response.json()) as MarketBuyResponse;
       if (!response.ok || payload.error || !payload.summary?.canBuy) {
-        setPreviewError(payload.error ?? payload.summary?.blockingReasons?.[0] ?? "Kauf konnte nicht bestätigt werden.");
+        setPreviewError(
+          formatMarketPreviewError(payload.error ?? payload.summary?.blockingReasons?.[0]) ??
+            "Kauf konnte nicht bestätigt werden.",
+        );
         return;
       }
       setBuyPreview(payload.summary);
@@ -1925,16 +1859,23 @@ export default function TransfermarktV2Client({
         onSortModeChange={(mode) => setSortMode(mode)}
         selectedClassAxes={selectedClassAxes}
         onToggleClassAxis={(axis) => setSelectedClassAxes((current) => toggleSelection(current, axis))}
-        selectedAxes={selectedAxes}
         axisMinimums={axisMinimums}
-        onToggleAxis={(axis) => setSelectedAxes((current) => toggleSelection(current, axis))}
         onAxisMinimumChange={(axis, value) => setAxisMinimums((current) => ({ ...current, [axis]: value }))}
         hidePoorFit={hidePoorFit}
         onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
         minRatioFilter={maxRatio}
         onMinRatioFilterChange={(value) => setMaxRatio(value)}
         onResetFilters={resetMarketFilters}
-        activeFilterCount={selectedClassNames.length + selectedRaceNames.length + selectedAxes.length + selectedClassAxes.length}
+        activeFilterCount={
+          selectedClassNames.length +
+          selectedRaceNames.length +
+          activeAxisMinimumCount +
+          selectedClassAxes.length
+        }
+        filterPresets={filterPresets.map((preset) => ({ id: preset.id, name: preset.name }))}
+        onApplyFilterPreset={applyMarketFilterPreset}
+        onSaveFilterPreset={saveMarketFilterPreset}
+        onDeleteFilterPreset={deleteMarketFilterPreset}
         candidates={renderedVisibleItems}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}
@@ -1976,6 +1917,19 @@ export default function TransfermarktV2Client({
         previewRosterAfter={previewRosterAfter}
         previewMarketValueBefore={previewMarketValueBefore}
         previewMarketValueAfter={previewMarketValueAfter}
+        previewAcceptChance={buyPreview?.acceptChance ?? null}
+        previewCounterChance={buyPreview?.counterChance ?? null}
+        previewRejectChance={buyPreview?.rejectChance ?? null}
+        offeredSalary={offeredSalary}
+        previewExpectedSalary={buyPreview?.expectedSalary ?? buyPreview?.baseExpectedSalary ?? null}
+        onOfferedSalaryChange={(value) => {
+          // Phase-2 F2 — Deal-Desk-Slider setzt dasselbe Angebots-State wie das Modal; der
+          // Manuell-Flag hält den Preview-Effekt auf dem 90-ms-Debounce-Pfad statt Auto-Reset.
+          setOfferedSalary(value);
+          setSalaryEditedManually(true);
+        }}
+        previewYearlySalarySchedule={buyPreview?.yearlySalarySchedule ?? null}
+        previewBuyoutCost={buyPreview?.buyoutCost ?? null}
         buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
         buyWarnings={filterVisibleNegotiationWarnings(buyPreview?.warnings).map(formatNegotiationSignalLabel)}
         topSixCount={topSixCount}

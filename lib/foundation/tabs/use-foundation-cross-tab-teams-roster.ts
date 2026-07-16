@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 
-import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import type { TeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
@@ -46,6 +46,8 @@ import {
   resolveSeasonDisciplineAreaTotal,
 } from "@/lib/season/season-discipline-area-groups";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { extractSeasonNumber, getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
 
 export type FoundationRosterTableRow = {
   entry: RosterEntry;
@@ -447,10 +449,72 @@ export function useFoundationCrossTabTeamsRoster(input: {
         averageFatigue: currentAverageFatigue,
         disciplineValues: liveDisciplineValues,
       };
-      const history = [
-        currentHistoryRow,
-        ...archivedHistoryRows.filter((row) => row.seasonId !== input.gameState.season.id),
-      ];
+      // Lückenlose Team-Historie: jede Season von Season 1 (bzw. der frühesten
+      // Snapshot-Season) bis zur aktuellen Season erhält eine Zeile. Seasons ohne
+      // Snapshot bekommen eine Platzhalter-Zeile (Rang/Punkte/MW/Cash = null),
+      // damit die Historie-Tabelle die komplette Timeline zeigt.
+      const buildTeamHistoryPlaceholderRow = (seasonId: string): TeamDetailDrawerHistoryRow => ({
+        seasonId,
+        seasonName: getCanonicalSeasonLabel({ seasonId, seasonName: null }),
+        isLive: false,
+        rank: null,
+        points: null,
+        pps: null,
+        ppPow: null,
+        ppSpe: null,
+        ppMen: null,
+        ppSoc: null,
+        cash: null,
+        salaryTotal: null,
+        marketValue: null,
+        guv: null,
+        topBuyPlayer: null,
+        topBuyPlayerId: null,
+        topBuyAmount: null,
+        topSellPlayer: null,
+        topSellPlayerId: null,
+        topSellAmount: null,
+        topSellProfit: null,
+        injuriesCount: null,
+        averageFatigue: null,
+        disciplineValues: {},
+      });
+      const archivedHistoryRowsBySeasonId = new Map(
+        archivedHistoryRows
+          .filter((row) => row.seasonId !== input.gameState.season.id)
+          .map((row) => [row.seasonId, row] as const),
+      );
+      const currentTeamSeasonNumber = getCurrentSeasonNumber(input.gameState);
+      let history: TeamDetailDrawerHistoryRow[];
+      if (currentTeamSeasonNumber == null) {
+        // Fail-open: ohne auflösbare Season-Nummer bleibt die bisherige Logik.
+        history = [currentHistoryRow, ...archivedHistoryRowsBySeasonId.values()];
+      } else {
+        const archivedSeasonNumbers = [...archivedHistoryRowsBySeasonId.keys()]
+          .map((seasonId) => extractSeasonNumber({ seasonId, seasonName: null }))
+          .filter((value): value is number => value != null);
+        const firstTeamSeasonNumber =
+          archivedSeasonNumbers.length > 0 ? Math.min(1, ...archivedSeasonNumbers) : 1;
+        // Echte Snapshot-Season-IDs je Nummer wiederverwenden, fehlende Jahre als
+        // kanonische `season-<n>`-ID synthetisieren.
+        const seasonIdByNumber = new Map<number, string>();
+        for (const seasonId of archivedHistoryRowsBySeasonId.keys()) {
+          const number = extractSeasonNumber({ seasonId, seasonName: null });
+          if (number != null && !seasonIdByNumber.has(number)) {
+            seasonIdByNumber.set(number, seasonId);
+          }
+        }
+        // Live-Zeile zuerst, danach absteigend (neueste zuerst) — wie zuvor.
+        const rows: TeamDetailDrawerHistoryRow[] = [currentHistoryRow];
+        for (let number = currentTeamSeasonNumber - 1; number >= firstTeamSeasonNumber; number -= 1) {
+          const seasonId = seasonIdByNumber.get(number) ?? `season-${number}`;
+          if (seasonId === input.gameState.season.id) {
+            continue;
+          }
+          rows.push(archivedHistoryRowsBySeasonId.get(seasonId) ?? buildTeamHistoryPlaceholderRow(seasonId));
+        }
+        history = rows;
+      }
 
       if (scope === "history-summary") {
         return {

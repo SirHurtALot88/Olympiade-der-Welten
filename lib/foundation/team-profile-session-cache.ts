@@ -1,4 +1,4 @@
-import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 
 type TeamProfileCacheEntry = {
   contentSignature: string;

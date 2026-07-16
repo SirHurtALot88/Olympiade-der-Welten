@@ -29,7 +29,7 @@ async function readTransfermarktV2Source() {
 }
 const marketBuyHostPath = path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx");
 const lineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
-const teamDrawerPath = path.join(root, "app/foundation/TeamDetailDrawer.tsx");
+const teamProfileNewLookPath = path.join(root, "app/foundation/team-profile/TeamProfileNewLook.tsx");
 const teamsRosterHookPath = path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts");
 const fitServicePath = path.join(root, "lib/market/transfermarkt-fit.ts");
 const globalsPath = path.join(root, "app/globals.css");
@@ -85,9 +85,9 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".market-v2-scout-certainty-bar");
     expect(fileText).toContain("nl-market-focus-card");
     expect(fileText).toContain("scoutingLevel");
-    expect(fileText).toContain("filterTransfermarktFreeAgentsByBracket");
-    expect(fileText).toContain("poolBracketPanel");
-    expect(fileText).toContain("setPoolBracketPanel");
+    // Phase 0: der tote Pool-Bracket-Drilldown (poolBracketPanel + Paging-Effekt,
+    // nie von einer gerenderten UI ausgelöst) wurde entfernt — daher hier keine
+    // Assertion mehr auf filterTransfermarktFreeAgentsByBracket/poolBracketPanel.
     expect(fileText).toContain("nl-market-board");
     expect(fileText).toContain('data-testid="transfer-deal-open-button"');
     expect(buyHostText).toContain("Kauf final abschließen");
@@ -101,7 +101,9 @@ describe("foundation transfermarkt ui contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(fileText).toContain("nl-market-ratio-chips");
+    // Mindest-MW/Gehalt-Ratio ist jetzt ein Range-Slider (statt Schnell-Chips).
+    expect(fileText).toContain("nl-market-ratio-slider");
+    expect(fileText).toContain('type="range"');
     expect(fileText).toContain("MW ÷ Gehalt ≥");
     expect(fileText).toContain("minRatioFilter");
     expect(fileText).toContain("setMaxSalary");
@@ -222,7 +224,10 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("getTransfermarktPortraitModel");
     expect(fileText).toContain("playerRatingsById");
     expect(fileText).toContain("nl-market-candidate-portrait");
-    expect(fileText).toContain("caScore={item.ovr}");
+    // Phase 0: CA-Sterne im Fokus-Card auf EINE kanonische Stelle reduziert
+    // (Kandidaten-Kopf-Duplikat `caScore={item.ovr}` entfernt); die Sterne
+    // leben jetzt am Fokus-„Talent"-Row via focusStarProps.
+    expect(fileText).toContain("caScore={focusStarProps.caScore}");
     expect(fileText).toContain("NlAbilityStars");
     expect(fileText).toContain('data-testid="transfer-candidate-card"');
     expect(fileText).toContain("OptimizedMediaImage");
@@ -231,20 +236,20 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".foundation-player-portrait-preview-panel");
   });
 
-  it("keeps the team drawer relationship cards alive", async () => {
-    const [clientText, teamsRosterHookText, drawerText, cssText] = await Promise.all([
+  it("keeps the team profile relationship cards alive", async () => {
+    const [clientText, teamsRosterHookText, teamProfileText, cssText] = await Promise.all([
       readFoundationOrchestratorSource(root),
       fs.readFile(teamsRosterHookPath, "utf8"),
-      fs.readFile(teamDrawerPath, "utf8"),
+      fs.readFile(teamProfileNewLookPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
     expect(clientText).toContain("buildTeamDetailDrawerData");
     expect(teamsRosterHookText).toContain("buildTeamRelationshipCards");
     expect(teamsRosterHookText).toContain("relationships: drawerRelationships");
-    expect(drawerText).toContain("relationships:");
-    expect(drawerText).toContain("formatRelationshipList");
-    expect(cssText).toContain(".team-drawer-relationship-chip");
+    expect(teamProfileText).toContain("renderRelationshipColumn");
+    expect(teamProfileText).toContain("data.relationships.allies");
+    expect(teamProfileText).toContain("data.relationships.rivals");
   });
 
   it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
@@ -339,10 +344,10 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("exposes sprint L mobile preview sheet, candidate chips, contract control, rejection meter, and Auto labels", async () => {
-    const [v2Text, sellHostText, drawerText, teamsPanelText, cssText] = await Promise.all([
+    const [v2Text, sellHostText, teamProfileText, teamsPanelText, cssText] = await Promise.all([
       readTransfermarktV2Source(),
       fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"), "utf8"),
-      fs.readFile(teamDrawerPath, "utf8"),
+      fs.readFile(teamProfileNewLookPath, "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
@@ -355,9 +360,9 @@ describe("foundation transfermarkt ui contract", () => {
     expect(sellHostText).toContain("Auto-Empfehlung");
     expect(sellHostText).not.toContain("AI-Empfehlung");
 
-    expect(drawerText).toContain('data-testid="team-drawer-tabs"');
-    expect(drawerText).toContain('data-testid="team-drawer-transfer-tab"');
-    expect(drawerText).toContain('data-testid="team-drawer-duel-card"');
+    expect(teamProfileText).toContain('data-testid="foundation-team-profile"');
+    expect(teamProfileText).toContain('data-testid="nl-teamprofile-roster"');
+    expect(teamProfileText).toContain('data-testid="nl-teamprofile-history"');
     expect(teamsPanelText).toContain('data-testid="teams-v2-transfer-tab"');
     expect(teamsPanelText).toContain("teams-v2-name-cell is-sticky-actions");
     expect(teamsPanelText).toContain("table-icon-button");

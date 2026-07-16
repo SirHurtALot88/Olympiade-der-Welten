@@ -37,14 +37,16 @@
  *   client-seitiges Prädikat auf `rows`, kein neuer Shell-State) — filtert die
  *   Spielerliste im Verzeichnis auf den angeklickten Bracket, erneuter Klick
  *   hebt den Filter wieder auf.
- * - Wishlist-Stern je Zeile: reiner Lesezugriff auf die im `gameState`-Prop
- *   bereits vorhandene Transfermarkt-Wishlist des eigenen Teams
- *   (`gameState.seasonState.transferWishlist`, via `getTeamTransferWishlistEntries`).
- *   BEWUSST read-only — ein Schreibpfad (Stern zum Hinzufügen/Entfernen) würde
- *   einen neuen Callback-Prop aus `FoundationShellRouterBody.tsx`
- *   (Shell-Datei) erfordern, siehe `toggleTransferWishlist` in
- *   `use-foundation-shell-router-body-scope.tsx`; das ist außerhalb dieser
- *   additiven Komponente nicht herstellbar, ohne Shell-Dateien anzufassen.
+ * - Wishlist-Stern je Zeile: Lesezugriff auf die im `gameState`-Prop bereits
+ *   vorhandene Transfermarkt-Wishlist des eigenen Teams
+ *   (`gameState.seasonState.transferWishlist`, via `getTeamTransferWishlistEntries`)
+ *   PLUS Schreibpfad (P1, #3): der Stern ist jetzt ein interaktiver Toggle
+ *   (`aria-pressed`, Tastatur, ☆/★). Er reicht denselben Shell-Handler durch, den
+ *   auch der Transfermarkt nutzt — `toggleTransferWishlist` in
+ *   `use-foundation-shell-router-body-scope.tsx`, hier als playerId-Variante
+ *   `toggleTransferWishlistByPlayerId` über den optionalen `onToggleWishlist`-Prop
+ *   (aus `FoundationShellRouterBody.tsx` durchgereicht). Fehlt der Callback,
+ *   bleibt der Stern read-only wie in Phase 0.
  *
  * Weitere Zusätze (UI/UX-Upgrades):
  * - Leader-Podium (`FoundationPlayersLeaderPodium.tsx`): Seiten-Hero, klassisches
@@ -93,6 +95,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlEmptyState,
   NlMedalBadge,
   NlRankingDrawer,
   NlSubTabs,
@@ -101,6 +104,8 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  NL_TONE_VAR,
+  useCountUp,
   type NlAxisKey,
   type NlRankingDrawerRow,
   type NlTone,
@@ -128,9 +133,21 @@ import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
 import {
+  getActiveSaveIdFromLocation,
   rowMatchesQueryChips,
   type QueryChip,
 } from "@/app/foundation/players-table/foundation-players-query-chips";
+import {
+  NL_PLAYERS_COLUMN_PRESETS,
+  NL_PLAYERS_DEFAULT_PRESET_ID,
+  NL_PLAYERS_HIDEABLE_COLUMN_IDS,
+  NL_PLAYERS_STRUCTURAL_COLUMN_IDS,
+  readColumnPreferences,
+  resolvePresetVisibility,
+  writeColumnPreferences,
+  type NlPlayersColumnPresetId,
+  type NlPlayersColumnVisibility,
+} from "@/app/foundation/players-table/foundation-players-column-presets";
 import FoundationPlayersLeaderPodium from "@/app/foundation/players-table/FoundationPlayersLeaderPodium";
 import FoundationPlayersQueryChipsBar from "@/app/foundation/players-table/FoundationPlayersQueryChipsBar";
 import FoundationPlayersScatterCard from "@/app/foundation/players-table/FoundationPlayersScatterCard";
@@ -155,6 +172,15 @@ export type FoundationPlayersTableNewLookProps = {
   playerBracketCounts: Record<number, number>;
   openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
   openTeamProfileById: (teamId: string) => void;
+  /**
+   * Wishlist-Schreibpfad (P1, #3): schaltet einen Spieler auf/von der
+   * Transfermarkt-Merkliste des eigenen Teams. Reicht denselben Shell-Handler
+   * durch, den auch der Transfermarkt nutzt (`toggleTransferWishlist`, hier als
+   * playerId-Variante `toggleTransferWishlistByPlayerId` aus dem Shell-Scope).
+   * Optional: fehlt der Callback (z. B. alte Aufrufer), bleibt der Stern
+   * read-only wie in Phase 0.
+   */
+  onToggleWishlist?: (playerId: string) => void;
 };
 
 const NL_PLAYERS_SCOPE_ITEMS: Array<{ id: PlayerTableScope; label: string }> = [
@@ -369,7 +395,63 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   { id: "traits", label: "Traits", sortKey: "traits", align: "left" },
 ];
 
+/**
+ * Trait-Chips (statt kommasepariertem Text): positive Traits im Good-Ton,
+ * negative im Risk-Ton. Kompakt (leben in einer Tabellenzelle), Inline-Styles
+ * über die vorhandenen Ton-Tokens (`NL_TONE_VAR`) — keine neue globals.css.
+ * Rendert nichts, wenn der Spieler keine Traits hat (Fallback "—" übernimmt der Aufrufer).
+ */
+function renderTraitChips(traitsPositive: string[], traitsNegative: string[]) {
+  const entries: Array<{ label: string; tone: "good" | "risk" }> = [
+    ...traitsPositive.map((label) => ({ label, tone: "good" as const })),
+    ...traitsNegative.map((label) => ({ label, tone: "risk" as const })),
+  ];
+  if (entries.length === 0) {
+    return null;
+  }
+  return (
+    <span style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+      {entries.map((entry, index) => {
+        const tone = NL_TONE_VAR[entry.tone];
+        return (
+          <span
+            key={`${entry.tone}-${entry.label}-${index}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "1px 6px",
+              borderRadius: "999px",
+              lineHeight: 1.45,
+              fontSize: "var(--nl-fs-xs)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)`,
+              background: `color-mix(in srgb, ${tone} 14%, transparent)`,
+              color: `color-mix(in srgb, ${tone} 80%, var(--nl-ink))`,
+            }}
+          >
+            {entry.label}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 const NL_PLAYERS_PAGE_SIZE = 100;
+
+/**
+ * Obergrenze für den "Alle anzeigen"-Sprung (P1, #Alle-anzeigen-Jank). Bewusst
+ * KEINE Virtualisierung: die Zeilen tragen aufklappbare PPs-Detailzeilen,
+ * Vergleichs-Checkboxen, sortierbare Achsen-Buttons und Portrait-Hover-Anchor —
+ * @tanstack/react-virtual mit absolut positionierten Zeilen würde die
+ * <tr>/<td>-Semantik, das Aufklappen (variable Höhe), den Sticky-Kopf und den
+ * Hover-Steckbrief brechen. Statt das zu riskieren bleibt die Pagination
+ * erhalten; "Alle anzeigen" springt höchstens auf diese sichere Obergrenze und
+ * die "+100"-Schaltfläche lädt bei Bedarf inkrementell weiter (kein Massen-
+ * Render von ~400 interaktiven Zeilen auf einen Schlag).
+ */
+const NL_PLAYERS_ALLE_MAX = 300;
 
 // Fog of war (verdecktes Potenzial fremder Spieler): siehe
 // `getFoggedPoScoreRange` in `foundation-players-fog-of-war.ts` (geteilt mit
@@ -388,10 +470,6 @@ function getLeagueRank(value: number | null | undefined, pool: number[]): number
     }
   }
   return higher + 1;
-}
-
-function formatLeagueRankSub(rank: number | null): string | undefined {
-  return rank != null ? `#${formatNlNumber(rank, 0)} Liga` : undefined;
 }
 
 /** Kompaktes "Top 8%" → "T8%" für enge Zellen (Achsen-Zeilen). Leitet nichts neu her — reine Textkürzung des `formatLeaguePercentile`-Labels. */
@@ -443,6 +521,70 @@ function renderMetricRankChip(value: number | null | undefined, pool: number[]) 
   );
 }
 
+/**
+ * Kleine Inline-SVG-UI-Icons statt ASCII-Glyphen (Sortier-Pfeile, Auf-/
+ * Zuklapp-Chevron, Schließen). Bewusst dekorativ (`aria-hidden`, `currentColor`,
+ * `1em`) — die Barrierefreiheit hängt weiter an den bestehenden Button-`aria-label`/
+ * `title`s, das SVG ersetzt nur die visuelle Glyphe. Minimal & konsistent gehalten.
+ */
+function NlSortGlyph({ direction }: { direction: "none" | "asc" | "desc" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {direction !== "desc" ? <path d="M4 7l4-4 4 4" opacity={direction === "asc" ? 1 : 0.55} /> : null}
+      {direction !== "asc" ? <path d="M4 9l4 4 4-4" opacity={direction === "desc" ? 1 : 0.55} /> : null}
+    </svg>
+  );
+}
+
+/** Auf-/Zuklapp-Chevron (▸ zu / ▾ auf) — ein Pfad, per Rotation umgeschaltet. */
+function NlChevronGlyph({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: open ? "rotate(90deg)" : "none", transformOrigin: "center" }}
+    >
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+/** Schließen-Kreuz (×) als Icon. */
+function NlCloseGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
+
 export default function FoundationPlayersTableNewLook({
   rows,
   gameState,
@@ -460,8 +602,11 @@ export default function FoundationPlayersTableNewLook({
   playerBracketCounts,
   openPlayerDrawerById,
   openTeamProfileById,
+  onToggleWishlist,
 }: FoundationPlayersTableNewLookProps) {
   const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_PAGE_SIZE);
+  /** Namenssuche im Verzeichnis (P1) — Substring, case-insensitiv, ganz vorn im Filter-Stack. */
+  const [nameQuery, setNameQuery] = useState("");
   /** Welche Zeile ist gerade per PPs-Klick aufgeklappt (max. eine gleichzeitig). */
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   /** Verzeichnis (bestehende Tabelle) vs. ligaweiter Analyse-Hub (#47). */
@@ -493,6 +638,62 @@ export default function FoundationPlayersTableNewLook({
    * der Picker ist nur die Sichtbarkeit des Auswahl-Controls.
    */
   const [disciplinePickerOpen, setDisciplinePickerOpen] = useState(false);
+  /**
+   * Spalten-Sichtbarkeit + aktives Saved View (Phase 3, FM-Stil). Init ist
+   * deterministisch die Vorgabe "Alles" (alle Datenspalten sichtbar = bisheriges
+   * Verhalten) — die tatsächlich gespeicherten Präferenzen werden erst per Mount-
+   * Effekt aus localStorage nachgeladen (SSR-sicher, kein Hydration-Mismatch),
+   * exakt wie der Query-Chip-Presets-Mount-Effekt im Chips-Builder.
+   */
+  const [columnVisibility, setColumnVisibility] = useState<NlPlayersColumnVisibility>(() =>
+    resolvePresetVisibility(NL_PLAYERS_DEFAULT_PRESET_ID),
+  );
+  const [activeColumnPreset, setActiveColumnPreset] = useState<NlPlayersColumnPresetId>(NL_PLAYERS_DEFAULT_PRESET_ID);
+  /** Auf-/zugeklapptes "Spalten"-Menü (Popover). */
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+
+  // Gespeicherte Spalten-Präferenzen beim Mount nachladen (rein clientseitig).
+  useEffect(() => {
+    const stored = readColumnPreferences(getActiveSaveIdFromLocation());
+    if (stored) {
+      setColumnVisibility(stored.visibility);
+      setActiveColumnPreset(stored.preset);
+    }
+  }, []);
+
+  /** Ist eine Spalte sichtbar? Strukturspalten (Vgl./Bild/Name+Stern) immer, Datenspalten laut Karte. */
+  function isColumnVisible(columnId: string): boolean {
+    if (NL_PLAYERS_STRUCTURAL_COLUMN_IDS.includes(columnId)) {
+      return true;
+    }
+    return columnVisibility[columnId] !== false;
+  }
+
+  /** Benanntes View anwenden (setzt Sichtbarkeit komplett) und persistieren. */
+  function applyColumnPreset(presetId: NlPlayersColumnPresetId) {
+    const visibility = resolvePresetVisibility(presetId);
+    setColumnVisibility(visibility);
+    setActiveColumnPreset(presetId);
+    writeColumnPreferences(getActiveSaveIdFromLocation(), { preset: presetId, visibility });
+  }
+
+  /** Einzelne Datenspalte umschalten — löst das benannte View zu "custom" auf und persistiert. */
+  function toggleColumnVisibility(columnId: string) {
+    const next: NlPlayersColumnVisibility = { ...columnVisibility, [columnId]: columnVisibility[columnId] === false };
+    setColumnVisibility(next);
+    setActiveColumnPreset("custom");
+    writeColumnPreferences(getActiveSaveIdFromLocation(), { preset: "custom", visibility: next });
+  }
+
+  /** Tatsächlich gerenderte Spalten (Struktur immer, Datenspalten laut Sichtbarkeit) — Kopf, Zellen und Detail-`colSpan` teilen sich diese Liste. */
+  const visibleColumns = useMemo(
+    () =>
+      NL_PLAYERS_COLUMNS.filter(
+        (column) =>
+          NL_PLAYERS_STRUCTURAL_COLUMN_IDS.includes(column.id) || columnVisibility[column.id] !== false,
+      ),
+    [columnVisibility],
+  );
 
   /** Aktuell sortierte Disziplin (`discipline:<id>`-Sortierschlüssel), falls aktiv. */
   const activeDisciplineSortId = useMemo(() => getDisciplineIdFromSortKey(sortState?.key), [sortState?.key]);
@@ -510,15 +711,30 @@ export default function FoundationPlayersTableNewLook({
   useEffect(() => {
     setVisibleCount(NL_PLAYERS_PAGE_SIZE);
     setExpandedPlayerId(null);
-  }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket, selectedExpiryBucket, queryChips]);
+  }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket, selectedExpiryBucket, queryChips, nameQuery]);
+
+  /**
+   * Namenssuche (P1): case-insensitiver Substring auf den Spielernamen, ganz vorn
+   * im Filter-Stack — die bestehende Bracket-/Vertrags-/Query-Chip-Pipeline
+   * komponiert sich darauf und stackt (ersetzt nichts).
+   */
+  const nameFilteredRows = useMemo(() => {
+    const query = nameQuery.trim().toLowerCase();
+    if (!query) {
+      return rows;
+    }
+    return rows.filter((row) => row.player.name.toLowerCase().includes(query));
+  }, [rows, nameQuery]);
 
   /** Spielerliste, zusätzlich auf den angeklickten MW-Bracket eingeschränkt (falls aktiv). */
   const bracketFilteredRows = useMemo(() => {
     if (selectedMwBracket == null) {
-      return rows;
+      return nameFilteredRows;
     }
-    return rows.filter((row) => getTransfermarktBracket(getPlayerDisplayMarketValue(row.player)) === selectedMwBracket);
-  }, [rows, selectedMwBracket]);
+    return nameFilteredRows.filter(
+      (row) => getTransfermarktBracket(getPlayerDisplayMarketValue(row.player)) === selectedMwBracket,
+    );
+  }, [nameFilteredRows, selectedMwBracket]);
 
   /** Zusätzlich auf den angeklickten Vertragsauslauf-Bucket eingeschränkt (falls aktiv). */
   const expiryFilteredRows = useMemo(() => {
@@ -556,6 +772,15 @@ export default function FoundationPlayersTableNewLook({
   /** Rasse-Optionen für den Query-Chip-Builder — aus denselben `rows` wie die bestehenden Klassen-Optionen. */
   const raceOptions = useMemo(
     () => Array.from(new Set(rows.map((row) => row.player.race))).sort((left, right) => left.localeCompare(right)),
+    [rows],
+  );
+
+  /** Beste-Disziplin-Optionen für den Query-Chip-Kategorie-Picker — nur real vorkommende Labels (kein erfundener Katalog). */
+  const bestDisciplineOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(rows.map((row) => row.bestDiscipline).filter((label): label is string => Boolean(label))),
+      ).sort((left, right) => left.localeCompare(right)),
     [rows],
   );
 
@@ -665,11 +890,26 @@ export default function FoundationPlayersTableNewLook({
     };
   }, [rows]);
 
+  // Kit-Zähleranimation der Summary-Kacheln (Spieler-Anzahl / Ø OVR / Ø MW) —
+  // respektiert prefers-reduced-motion (springt dann direkt auf den Zielwert).
+  const countUpCount = useCountUp(summary.count);
+  const countUpAvgOvr = useCountUp(summary.avgOvr);
+  const countUpAvgMw = useCountUp(summary.avgMw);
+
   const visibleRows = useMemo(
     () => queryChipFilteredRows.slice(0, visibleCount),
     [queryChipFilteredRows, visibleCount],
   );
   const hasMoreRows = queryChipFilteredRows.length > visibleRows.length;
+
+  // Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query-Chips) aktiv? Genutzt für den
+  // Leerzustand UND (unten) für die "Filter aktiv"-Anzeige im Analyse-Hub.
+  const hasExtraDirectoryFilters =
+    selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0 || nameQuery.trim().length > 0;
+  // "Schränkt der aktive Filter die Auswahl wirklich ein?" — genau dieselbe
+  // gefilterte Liste, die die Tabelle rendert (`queryChipFilteredRows`), gegen die
+  // rohen `rows` gemessen. Nur dann bekommt der Hub die "Filter aktiv"-Anzeige.
+  const hubFilterNarrows = queryChipFilteredRows.length < rows.length;
 
   /**
    * Klasse für die aktuell sortierte Spalte (Header + jede Körperzelle
@@ -696,7 +936,7 @@ export default function FoundationPlayersTableNewLook({
 
   function renderSortHeader(sortKey: string, label: string, tooltip?: string) {
     const isActive = sortState?.key === sortKey;
-    const arrow = !isActive ? "↕" : sortState?.direction === "asc" ? "↑" : "↓";
+    const direction: "none" | "asc" | "desc" = !isActive ? "none" : sortState?.direction === "asc" ? "asc" : "desc";
     return (
       <button
         type="button"
@@ -706,7 +946,9 @@ export default function FoundationPlayersTableNewLook({
         aria-label={`Nach ${label} sortieren`}
       >
         <span>{label}</span>
-        <b aria-hidden="true">{arrow}</b>
+        <b aria-hidden="true">
+          <NlSortGlyph direction={direction} />
+        </b>
       </button>
     );
   }
@@ -736,7 +978,10 @@ export default function FoundationPlayersTableNewLook({
           aria-expanded={disciplinePickerOpen}
           title="Nach einer Disziplin-Wertung sortieren"
         >
-          Disziplinen <b aria-hidden="true">{disciplinePickerOpen ? "▾" : "▸"}</b>
+          Disziplinen{" "}
+          <b aria-hidden="true">
+            <NlChevronGlyph open={disciplinePickerOpen} />
+          </b>
         </button>
         {disciplinePickerOpen ? (
           <select
@@ -759,34 +1004,6 @@ export default function FoundationPlayersTableNewLook({
           </select>
         ) : null}
       </div>
-    );
-  }
-
-  /** Leader-Chip: Wert + Spielername, Klick = Portal in den Spieler-Drawer. */
-  function renderLeaderChip(
-    label: string,
-    row: FoundationPlayerScopeRow | null,
-    value: number | null,
-    pool: number[],
-    tone: "accent" | "spe" | "soc" | "neutral",
-    digits: number,
-    title: string,
-    /** Geldwert (Marktwert): über den geteilten Formatter mit Einheit " Mio" statt bloßer Zahl. */
-    money = false,
-  ) {
-    if (row == null || value == null) {
-      return <StatChip label={label} value="—" tone={tone} title={title} />;
-    }
-    const rank = getLeagueRank(value, pool);
-    return (
-      <StatChip
-        label={label}
-        value={money ? formatNlMoney(value) : formatNlNumber(value, digits)}
-        tone={tone}
-        sub={[row.player.name, formatLeagueRankSub(rank)].filter(Boolean).join(" · ")}
-        title={`${title} — ${row.player.name} öffnen`}
-        onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
-      />
     );
   }
 
@@ -965,6 +1182,11 @@ export default function FoundationPlayersTableNewLook({
     const playerOwned = row.team?.humanControlled ?? false;
     const isCompareSelected = comparePlayerIds.includes(row.player.id);
     const compareDisabled = !isCompareSelected && comparePlayerIds.length >= 4;
+    // Wishlist-Schreibpfad (P1, #3): der Stern ist interaktiv, sobald ein eigenes
+    // Team existiert UND der Shell-Toggle durchgereicht wurde — sonst bleibt er
+    // der read-only Stern aus Phase 0 (nur sichtbar, wenn schon auf der Liste).
+    const isWishlisted = wishlistPlayerIds.has(row.player.id);
+    const wishlistWritable = Boolean(onToggleWishlist) && ownTeamId != null;
 
     /**
      * Geteilte Props für den Hover-Steckbrief (#Hover-Steckbrief, additiv):
@@ -1054,32 +1276,61 @@ export default function FoundationPlayersTableNewLook({
         </td>
         <td className={`nl-players-td-name${sortCellClass("name")}`}>
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-            <button
-              type="button"
-              className="nl-players-name-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                openPlayerDrawerById(row.player.id, row.roster?.id);
-              }}
-              title={`${row.player.name} öffnen`}
-            >
-              <span className="nl-players-name-line">
-                {wishlistPlayerIds.has(row.player.id) ? (
-                  <span className="nl-players-wishlist-star" aria-label="Auf deiner Transfermarkt-Wishlist" title="Auf deiner Transfermarkt-Wishlist">
-                    ★
-                  </span>
-                ) : null}
-                <span className="nl-players-name">{row.player.name}</span>
-              </span>
-              {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
-                  bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
-                  Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
-              {row.transferStatus !== "Active Player" ? (
-                <span className="nl-players-status">{row.transferStatus}</span>
+            {/* Stern + Namens-Button sind Geschwister in der `nl-players-name-line`
+                (Buttons dürfen nicht verschachtelt werden) — beide teilen weiter
+                denselben Hover-Steckbrief-Anchor. */}
+            <span className="nl-players-name-line">
+              {wishlistWritable ? (
+                // Interaktiver Toggle: reused `nl-players-name-button` nur als
+                // Button-Reset, `nl-players-wishlist-star` gewinnt in der Kaskade
+                // für den Warn-Ton. ☆ = nicht auf Liste, ★ = auf Liste.
+                <button
+                  type="button"
+                  className="nl-players-name-button nl-players-wishlist-star"
+                  aria-pressed={isWishlisted}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleWishlist?.(row.player.id);
+                  }}
+                  aria-label={
+                    isWishlisted
+                      ? `${row.player.name} von Merkliste entfernen`
+                      : `${row.player.name} auf Merkliste setzen`
+                  }
+                  title={isWishlisted ? "Von Merkliste" : "Auf Merkliste"}
+                >
+                  {isWishlisted ? "★" : "☆"}
+                </button>
+              ) : isWishlisted ? (
+                <span
+                  className="nl-players-wishlist-star"
+                  aria-label="Auf deiner Transfermarkt-Wishlist"
+                  title="Auf deiner Transfermarkt-Wishlist"
+                >
+                  ★
+                </span>
               ) : null}
-            </button>
+              <button
+                type="button"
+                className="nl-players-name-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openPlayerDrawerById(row.player.id, row.roster?.id);
+                }}
+                title={`${row.player.name} öffnen`}
+              >
+                <span className="nl-players-name">{row.player.name}</span>
+                {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
+                    bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
+                    Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
+                {row.transferStatus !== "Active Player" ? (
+                  <span className="nl-players-status">{row.transferStatus}</span>
+                ) : null}
+              </button>
+            </span>
           </FoundationPlayerPortraitPreview>
         </td>
+        {isColumnVisible("team") ? (
         <td className={`nl-players-td-team${sortCellClass("team")}`}>
           <button
             type="button"
@@ -1116,6 +1367,8 @@ export default function FoundationPlayersTableNewLook({
             <span className="nl-players-team-name">{row.team?.name ?? "Free Agent"}</span>
           </button>
         </td>
+        ) : null}
+        {isColumnVisible("class") ? (
         <td className={`nl-players-td-icon${sortCellClass("class")}`}>
           <ClassIcon
             classNameValue={row.player.className}
@@ -1123,11 +1376,19 @@ export default function FoundationPlayersTableNewLook({
             iconClassName="table-identity-icon-image"
           />
         </td>
+        ) : null}
+        {isColumnVisible("race") ? (
         <td className={`nl-players-td-icon${sortCellClass("race")}`}>
           <RaceIcon race={row.player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
         </td>
+        ) : null}
+        {isColumnVisible("abilityStars") ? (
         <td className="nl-ptable-td-ability nl-ptable-td-ability-stacked">{renderAbilityStars(row)}</td>
+        ) : null}
+        {isColumnVisible("axes") ? (
         <td className="nl-players-td-axes">{renderAxisBars(row)}</td>
+        ) : null}
+        {isColumnVisible("pps") ? (
         <td
           className={`nl-players-td-metric nl-players-td-pps is-highlight-primary${sortCellClass("pps")} ${
             row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
@@ -1149,18 +1410,22 @@ export default function FoundationPlayersTableNewLook({
                 {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}
               </span>
               <b className="nl-players-pps-toggle-caret" aria-hidden="true">
-                {isPpsExpanded ? "▾" : "▸"}
+                <NlChevronGlyph open={isPpsExpanded} />
               </b>
             </button>
             {renderMetricPercentileChip(row.playerPps, leaguePlayerHeatPools.pps)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("ovr") ? (
         <td className={`nl-players-td-metric nl-ptable-ovr-cell${sortCellClass("ovr")}`}>
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
             {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("mvs") ? (
         <td
           className={`nl-players-td-metric${sortCellClass("mvs")} ${
             row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""
@@ -1171,6 +1436,8 @@ export default function FoundationPlayersTableNewLook({
             {renderMetricPercentileChip(row.playerMvs, leaguePlayerHeatPools.mvs)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("mw") ? (
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(marketValue, 2)}</span>
@@ -1183,6 +1450,8 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("salary") ? (
         <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(annualSalary, 2)}</span>
@@ -1201,6 +1470,8 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("contract") ? (
         <td className={`nl-players-td-contract${sortCellClass("contract")}`}>
           {row.roster ? (
             <span className="nl-players-contract">
@@ -1215,12 +1486,18 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
+        ) : null}
+        {isColumnVisible("appearances") ? (
         <td className={`nl-players-td-metric${sortCellClass("appearances")}`}>
           {row.seasonPerformance ? row.seasonPerformance.appearances : "—"}
         </td>
+        ) : null}
+        {isColumnVisible("bestDiscipline") ? (
         <td className={`nl-players-td-disc${sortCellClass("bestDiscipline")}`}>
           <DisciplineIcon label={row.bestDiscipline ?? "—"} showLabel={Boolean(row.bestDiscipline)} />
         </td>
+        ) : null}
+        {isColumnVisible("careerLeague") ? (
         <td
           className={`nl-players-td-career${sortCellClass("careerLeague")}`}
           title={
@@ -1240,9 +1517,13 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
+        ) : null}
+        {isColumnVisible("traits") ? (
         <td className={`nl-players-td-traits${sortCellClass("traits")}`} title={traitsText}>
-          {traitsText}
+          {/* Trait-Chips statt Kommatext: positiv = Good-Ton, negativ = Risk-Ton (Fallback "—"). */}
+          {renderTraitChips(row.player.traitsPositive, row.player.traitsNegative) ?? "—"}
         </td>
+        ) : null}
       </tr>
     );
 
@@ -1253,11 +1534,119 @@ export default function FoundationPlayersTableNewLook({
     return [
       rowElement,
       <tr key={`${row.player.id}-pps-detail`} id={ppsDetailId} className="nl-players-detail-row">
-        <td className="nl-players-detail-cell" colSpan={NL_PLAYERS_COLUMNS.length}>
+        <td className="nl-players-detail-cell" colSpan={visibleColumns.length}>
           {renderPpsDetail(row)}
         </td>
       </tr>,
     ];
+  }
+
+  /**
+   * "Spalten"-Steuerung (Phase 3, FM-Stil): Popover mit den 4 benannten
+   * Saved Views plus Einzel-Toggles je Datenspalte. Strukturspalten
+   * (Vgl./Bild/Name+Stern) tauchen bewusst NICHT auf — sie sind nicht
+   * abschaltbar. Styling ist bewusst inline (kein Zugriff auf globals.css)
+   * und lehnt sich über die `--nl-*`-Tokens an das restliche Panel an.
+   */
+  function renderColumnMenu() {
+    return (
+      <span className="nl-players-columns-control" style={{ position: "relative", display: "inline-flex" }}>
+        <button
+          type="button"
+          className="nl-players-more-button"
+          data-testid="nl-players-columns-toggle"
+          aria-haspopup="true"
+          aria-expanded={columnMenuOpen}
+          onClick={() => setColumnMenuOpen((open) => !open)}
+          title="Spalten ein-/ausblenden und Ansichten wählen"
+        >
+          Spalten
+        </button>
+        {columnMenuOpen ? (
+          <>
+            {/* Unsichtbarer Backdrop: Klick außerhalb schließt das Menü (kein globaler Dokument-Listener). */}
+            <button
+              type="button"
+              aria-label="Spalten-Menü schließen"
+              onClick={() => setColumnMenuOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 40,
+                background: "transparent",
+                border: "none",
+                cursor: "default",
+              }}
+            />
+            <div
+              className="nl-players-columns-menu"
+              role="group"
+              aria-label="Spalten-Sichtbarkeit und Ansichten"
+              data-testid="nl-players-columns-menu"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                zIndex: 41,
+                minWidth: 220,
+                maxHeight: "60vh",
+                overflowY: "auto",
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                background: "var(--nl-surface, var(--nl-panel))",
+                border: "1px solid var(--nl-line)",
+                borderRadius: "var(--nl-r-md, 10px)",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.28)",
+                color: "var(--nl-ink)",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} role="group" aria-label="Gespeicherte Ansichten">
+                {NL_PLAYERS_COLUMN_PRESETS.map((preset) => {
+                  const isActive = activeColumnPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="nl-players-more-button"
+                      aria-pressed={isActive}
+                      onClick={() => applyColumnPreset(preset.id)}
+                      title={`Ansicht "${preset.label}" anwenden`}
+                      style={
+                        isActive
+                          ? { background: "var(--nl-accent)", borderColor: "var(--nl-accent)", color: "#fff" }
+                          : undefined
+                      }
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ height: 1, background: "var(--nl-line)", margin: "2px 0" }} aria-hidden="true" />
+              {NL_PLAYERS_HIDEABLE_COLUMN_IDS.map((id) => {
+                const label = NL_PLAYERS_COLUMNS.find((column) => column.id === id)?.label ?? id;
+                return (
+                  <label
+                    key={id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility[id] !== false}
+                      onChange={() => toggleColumnVisibility(id)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+      </span>
+    );
   }
 
   return (
@@ -1274,6 +1663,32 @@ export default function FoundationPlayersTableNewLook({
         title="Spieler"
         actions={
           <div className="nl-players-filters">
+            {/* Namenssuche (P1): spiegelt das Compare-Picker-Eingabemuster
+                (`nl-compare-picker-input`) und trägt eine kleine ×-Clear-
+                Affordanz mit dem geteilten Inline-Close-SVG (Phase 0). */}
+            <label className="nl-players-filter">
+              <span>Name</span>
+              <input
+                type="search"
+                className="nl-compare-picker-input"
+                value={nameQuery}
+                onChange={(event) => setNameQuery(event.target.value)}
+                placeholder="Spielername…"
+                autoComplete="off"
+                aria-label="Spieler nach Name suchen"
+              />
+              {nameQuery ? (
+                <button
+                  type="button"
+                  className="nl-players-bracket-filter-clear"
+                  onClick={() => setNameQuery("")}
+                  aria-label="Namenssuche zurücksetzen"
+                  title="Namenssuche zurücksetzen"
+                >
+                  <NlCloseGlyph />
+                </button>
+              ) : null}
+            </label>
             <label className="nl-players-filter">
               <span>Team</span>
               <select
@@ -1326,19 +1741,19 @@ export default function FoundationPlayersTableNewLook({
           <StatChipRow className="nl-players-summary-chips" aria-label="Auswahl-Kennzahlen">
             <StatChip
               label="Spieler"
-              value={formatNlNumber(summary.count, 0)}
+              value={formatNlNumber(countUpCount, 0)}
               tone="neutral"
               title="Anzahl Spieler in der aktuellen Auswahl"
             />
             <StatChip
               label="Ø OVR"
-              value={formatNlNumber(summary.avgOvr, 1)}
+              value={formatNlNumber(countUpAvgOvr, 1)}
               tone="accent"
               title="Durchschnittliches Overall-Rating der Auswahl"
             />
             <StatChip
               label="Ø MW"
-              value={formatNlMoney(summary.avgMw)}
+              value={formatNlMoney(countUpAvgMw)}
               tone="neutral"
               title="Durchschnittlicher Marktwert der Auswahl"
             />
@@ -1360,45 +1775,12 @@ export default function FoundationPlayersTableNewLook({
         </div>
         {playersView === "directory" ? (
           <>
-            <StatChipRow label="Leader" className="nl-players-leader-chips" aria-label="Leader der Auswahl">
-              {renderLeaderChip(
-                "Top OVR",
-                summary.topOvr,
-                summary.topOvr?.playerOvr ?? null,
-                leaguePlayerHeatPools.ovr,
-                "accent",
-                1,
-                "Bestes Overall-Rating der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top PPs",
-                summary.topPps,
-                summary.topPps?.playerPps ?? null,
-                leaguePlayerHeatPools.pps,
-                "spe",
-                1,
-                "Meiste Performance-Punkte der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top MVS",
-                summary.topMvs,
-                summary.topMvs?.playerMvs ?? null,
-                leaguePlayerHeatPools.mvs,
-                "soc",
-                1,
-                "Bester Market Value Score der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top MW",
-                summary.topMw,
-                summary.topMwValue,
-                [],
-                "neutral",
-                2,
-                "Höchster Marktwert der Auswahl",
-                true,
-              )}
-            </StatChipRow>
+            {/* De-Dup (Phase 0): Die frühere "Top OVR/PPs/MVS/MW"-Leader-Chip-Zeile
+                wurde entfernt — das Leader-Podium direkt darüber zeigt dieselben
+                Top-3 (OVR/PPs/MVS) prominenter, und Top MW ist im Analyse-Hub-
+                Leaderboard (MW-Kennzahl) abgedeckt. Kein "Volle Rangliste"-/
+                Ranking-Drawer-Einstieg lebte hier (der sitzt im Hub), daher gibt
+                es nichts umzuquartieren. */}
             <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl — Balken anklicken filtert die Spielerliste">
               <div className="nl-players-bracket-bars">
                 {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => {
@@ -1425,9 +1807,9 @@ export default function FoundationPlayersTableNewLook({
                   );
                 })}
               </div>
-              <p className="nl-ptable-bracket-legend">
-                {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => `B${bracket} ${range}`).join(" · ")}
-              </p>
+              {/* De-Dup (Phase 0): Die lange Bracket-Legenden-Zeile ("B1 <12,5M · …")
+                  wurde entfernt — dieselbe Range steht bereits im `title`-Tooltip
+                  jedes Histogramm-Balkens ("B{n} · {range} · {count} Spieler"). */}
               {selectedMwBracket != null ? (
                 <div className="nl-players-bracket-filter-chip">
                   <span>
@@ -1441,7 +1823,7 @@ export default function FoundationPlayersTableNewLook({
                     aria-label="Marktwert-Filter zurücksetzen"
                     title="Marktwert-Filter zurücksetzen"
                   >
-                    ×
+                    <NlCloseGlyph />
                   </button>
                 </div>
               ) : null}
@@ -1477,7 +1859,7 @@ export default function FoundationPlayersTableNewLook({
                   aria-label="Vertrags-Filter zurücksetzen"
                   title="Vertrags-Filter zurücksetzen"
                 >
-                  ×
+                  <NlCloseGlyph />
                 </button>
               ) : null}
             </div>
@@ -1491,46 +1873,60 @@ export default function FoundationPlayersTableNewLook({
           onChipsChange={setQueryChips}
           classOptions={playerClassOptions}
           raceOptions={raceOptions}
+          bestDisciplineOptions={bestDisciplineOptions}
         />
       ) : null}
 
       {playersView === "hub" ? (
+        // Korrektheits-Fix (Phase 0): Der Hub bekommt jetzt EXAKT die im Verzeichnis
+        // gerenderte, gefilterte Liste (`queryChipFilteredRows` — Bracket/Vertrag/
+        // Query-Chips) statt der rohen `rows`. Vorher gingen diese Filter beim
+        // Ansichtswechsel still verloren. `filterActive` blendet im Hub-Kopf einen
+        // "Filter aktiv"-Hinweis ein, sobald der Filter die Auswahl wirklich einschränkt.
         <FoundationPlayersHub
-          rows={rows}
+          rows={queryChipFilteredRows}
           gameState={gameState}
           leaguePlayerHeatPools={leaguePlayerHeatPools}
+          filterActive={hubFilterNarrows}
           openPlayerDrawerById={openPlayerDrawerById}
           openTeamProfileById={openTeamProfileById}
         />
       ) : queryChipFilteredRows.length === 0 ? (
-        <NlCard className="nl-players-empty-card">
-          <p className="nl-players-empty-text">
-            {selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0
+        // Kit-Leerzustand statt bespoke `nl-players-empty-card`-Paragraph + Button
+        // (die alte Card-Klasse bewusst weggelassen — `.nl-empty-state` trägt eine
+        // eigene Oberfläche, sonst gäbe es Card-in-Card-Chrome).
+        <NlEmptyState
+          title="Keine Spieler"
+          message={
+            hasExtraDirectoryFilters
               ? "Keine Spieler bei diesen Filtern — MW-/Vertrags-Filter oder Query-Chips zurücksetzen oder Umfang/Team/Klasse anpassen."
-              : "Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen."}
-          </p>
-          {selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0 ? (
-            <button
-              type="button"
-              className="nl-players-more-button"
-              onClick={() => {
-                setSelectedMwBracket(null);
-                setSelectedExpiryBucket(null);
-                setQueryChips([]);
-              }}
-            >
-              Alle Zusatzfilter zurücksetzen
-            </button>
-          ) : null}
-        </NlCard>
+              : "Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen."
+          }
+          action={
+            hasExtraDirectoryFilters
+              ? {
+                  label: "Alle Zusatzfilter zurücksetzen",
+                  onClick: () => {
+                    setSelectedMwBracket(null);
+                    setSelectedExpiryBucket(null);
+                    setQueryChips([]);
+                    setNameQuery("");
+                  },
+                }
+              : undefined
+          }
+        />
       ) : (
         <NlCard
           className="nl-players-table-card"
           eyebrow="Sortierbare Daten"
           title="Spielerliste"
           actions={
-            <span className="nl-players-shown nl-tnum" aria-live="polite">
-              {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <span className="nl-players-shown nl-tnum" aria-live="polite">
+                {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+              </span>
+              {renderColumnMenu()}
             </span>
           }
         >
@@ -1538,7 +1934,7 @@ export default function FoundationPlayersTableNewLook({
             <table className="nl-players-table nl-tnum">
               <thead>
                 <tr>
-                  {NL_PLAYERS_COLUMNS.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th
                       key={column.id}
                       scope="col"
@@ -1570,13 +1966,23 @@ export default function FoundationPlayersTableNewLook({
               >
                 Mehr anzeigen (+{NL_PLAYERS_PAGE_SIZE})
               </button>
+              {/* "Alle anzeigen" springt höchstens auf NL_PLAYERS_ALLE_MAX (siehe
+                  Konstante) statt ~400 interaktive Zeilen auf einmal zu rendern;
+                  bei mehr Treffern lädt die "+100"-Schaltfläche weiter. */}
               <button
                 type="button"
                 className="nl-players-more-button"
-                onClick={() => setVisibleCount(queryChipFilteredRows.length)}
+                onClick={() => setVisibleCount(Math.min(queryChipFilteredRows.length, NL_PLAYERS_ALLE_MAX))}
               >
-                Alle {formatNlNumber(queryChipFilteredRows.length, 0)} anzeigen
+                {queryChipFilteredRows.length > NL_PLAYERS_ALLE_MAX
+                  ? `Erste ${formatNlNumber(NL_PLAYERS_ALLE_MAX, 0)} anzeigen`
+                  : `Alle ${formatNlNumber(queryChipFilteredRows.length, 0)} anzeigen`}
               </button>
+              {queryChipFilteredRows.length > NL_PLAYERS_ALLE_MAX ? (
+                <small className="muted" role="note">
+                  Zeigt max. erste {formatNlNumber(NL_PLAYERS_ALLE_MAX, 0)} auf einmal (Performance) — "Mehr anzeigen" lädt weiter.
+                </small>
+              ) : null}
             </div>
           ) : null}
         </NlCard>
@@ -1594,7 +2000,7 @@ export default function FoundationPlayersTableNewLook({
             aria-label="Vergleichsauswahl aufheben"
             title="Vergleichsauswahl aufheben"
           >
-            ×
+            <NlCloseGlyph />
           </button>
         </div>
       ) : null}
@@ -1605,6 +2011,9 @@ export default function FoundationPlayersTableNewLook({
         rows={compareRows}
         openPlayerDrawerById={openPlayerDrawerById}
         onRemove={(playerId) => setComparePlayerIds((current) => current.filter((id) => id !== playerId))}
+        leaguePlayerHeatPools={leaguePlayerHeatPools}
+        allRows={rows}
+        onAddToCompare={toggleCompareSelection}
       />
     </div>
   );
@@ -1645,12 +2054,15 @@ function FoundationPlayersHub({
   rows,
   gameState,
   leaguePlayerHeatPools,
+  filterActive = false,
   openPlayerDrawerById,
   openTeamProfileById,
 }: {
   rows: FoundationPlayerScopeRow[];
   gameState: GameState;
   leaguePlayerHeatPools: LeaguePlayerHeatPools;
+  /** Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query) schränken die übergebenen `rows` ein. */
+  filterActive?: boolean;
   openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
   openTeamProfileById: (teamId: string) => void;
 }) {
@@ -1793,8 +2205,19 @@ function FoundationPlayersHub({
         eyebrow="Ranking · aktuelle Auswahl"
         title="Liga-Leaderboard"
         actions={
-          <div className="nl-phub-metric-bar" role="group" aria-label="Kennzahl wählen">
-            {NL_PHUB_METRICS.map((entry) => (
+          <>
+            {/* "Filter aktiv"-Hinweis: die Verzeichnis-Zusatzfilter schränken diese
+                Hub-Auswahl gerade wirklich ein (Phase-0-Korrektheits-Fix). */}
+            {filterActive ? (
+              <StatChip
+                label="Filter"
+                value="aktiv"
+                tone="warn"
+                title="Bracket-/Vertrags-/Query-Filter aus dem Verzeichnis sind hier aktiv und schränken die Auswahl ein."
+              />
+            ) : null}
+            <div className="nl-phub-metric-bar" role="group" aria-label="Kennzahl wählen">
+              {NL_PHUB_METRICS.map((entry) => (
               <button
                 key={entry.key}
                 type="button"
@@ -1804,8 +2227,9 @@ function FoundationPlayersHub({
               >
                 {entry.label}
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         }
       >
         {topBoardRows.length === 0 ? (

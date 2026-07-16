@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 import FoundationTeamsDetailPanel, {
   type FoundationTeamsDetailPanelProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsDetailPanel";

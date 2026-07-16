@@ -38,6 +38,12 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "players", label: "Spieler", tooltip: "Spieler suchen und Profil öffnen.", icon: "◎" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
+      {
+        id: "allTimeTable",
+        label: "Ewige Tabelle",
+        tooltip: "Team-Entwicklung über alle Saisons: Punkte, MW, Cash und der ewige Leader.",
+        icon: "∑",
+      },
     ],
   },
   {

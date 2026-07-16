@@ -12,6 +12,7 @@ import {
   NlProgressBar,
   NlRadar,
   NlSkeletonCard,
+  NlWhatIfSlider,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -21,7 +22,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
 import {
@@ -98,8 +99,8 @@ const NL_MARKET_SORT_TITLES: Record<TransfermarktNewLookSortMode, string> = {
 
 const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = ["need", "fit", "value", "potential", "cheap", "salary"];
 const NL_MARKET_AXES: NlAxisKey[] = ["pow", "spe", "men", "soc"];
-/** Schnell-Stufen für den Mindest-MW/Gehalt-Filter (Value = MW ÷ Gehalt). */
-const NL_MARKET_RATIO_STEPS = [1, 1.5, 2.5, 4] as const;
+/** Obergrenze des Mindest-MW/Gehalt-Sliders (Value = MW ÷ Gehalt); 0 = Filter aus. */
+const NL_MARKET_RATIO_SLIDER_MAX = 8;
 
 /** Achse → Vorsaison-Feld (Performance-Punkte + Rang) auf RosterRow.previousSeasonAxis. */
 const NL_PREV_SEASON_AXIS_KEYS: Record<
@@ -260,19 +261,22 @@ export type TransfermarktV2NewLookProps = {
   onSortModeChange: (mode: TransfermarktNewLookSortMode) => void;
   selectedClassAxes: NlAxisKey[];
   onToggleClassAxis: (axis: NlAxisKey) => void;
-  /** Achsen mit aktivem Mindestwert-Filter (POW/SPE/MEN/SOC), unabhängig von selectedClassAxes. */
-  selectedAxes: NlAxisKey[];
+  /** Mindestwert-Filter je Achse (POW/SPE/MEN/SOC); Wert > 0 filtert unabhängig. */
   axisMinimums: Record<NlAxisKey, number>;
-  onToggleAxis: (axis: NlAxisKey) => void;
   onAxisMinimumChange: (axis: NlAxisKey, value: number) => void;
   /** Blendet Kandidaten mit negativem Fit aus (Söldner immer sichtbar); Default an. */
   hidePoorFit: boolean;
   onToggleHidePoorFit: () => void;
-  /** Mindest-MW/Gehalt-Ratio (0 = aus). Chips ≥1 / ≥1,5 / ≥2,5 / ≥4. */
+  /** Mindest-MW/Gehalt-Ratio (0 = aus). Range-Slider 0–8, Schritt 0,5. */
   minRatioFilter: number;
   onMinRatioFilterChange: (value: number) => void;
   onResetFilters: () => void;
   activeFilterCount: number;
+  // Gespeicherte Suchen (F2) — Persistenz liegt im Client; hier nur Anzeige/Trigger.
+  filterPresets: { id: string; name: string }[];
+  onApplyFilterPreset: (id: string) => void;
+  onSaveFilterPreset: (name: string) => void;
+  onDeleteFilterPreset: (id: string) => void;
   // Kandidaten-Rail
   candidates: TransfermarktFreeAgentItem[];
   totalVisibleCount: number;
@@ -306,6 +310,18 @@ export type TransfermarktV2NewLookProps = {
   previewRosterAfter: number | null;
   previewMarketValueBefore: number | null;
   previewMarketValueAfter: number | null;
+  /** Reaktions-Wahrscheinlichkeiten der Gegenseite (F4) — noch vor dem Modal. */
+  previewAcceptChance: number | null;
+  previewCounterChance: number | null;
+  previewRejectChance: number | null;
+  /** F2 — Gehalts-What-if: aktueller Angebots-Wert (kontrolliert) + Erwartungswert der Gegenseite
+      als Basis für die Slider-Spanne. onOfferedSalaryChange setzt zugleich den Manuell-Editiert-Flag. */
+  offeredSalary: number | null;
+  previewExpectedSalary: number | null;
+  onOfferedSalaryChange: (value: number) => void;
+  /** F3 — Mehrsaison-Gehaltsstaffel (S+1/S+2 …) + Buyout-Kosten für die Budget-Leiste. */
+  previewYearlySalarySchedule: ContractYearSalary[] | null;
+  previewBuyoutCost: number | null;
   buyBlockingReasons: string[];
   buyWarnings: string[];
   // Team-Impact (im Client via computeTopSixAxisImpact/... berechnet)
@@ -418,6 +434,148 @@ const NL_DEV_TREND_TONE: Record<string, NlTone> = {
   strong_negative: "risk",
 };
 
+/* Phase 3 — Regressions-Risiko (PlayerRegressionRisk = none|low|medium|high, bereits am
+   Item aus dem Trainings-Forecast). Ton steigt mit der Stufe, Suffix nur an den Rändern. */
+const NL_REGRESSION_RISK_SUFFIX: Record<string, string> = {
+  low: " gering",
+  medium: "",
+  high: " hoch",
+};
+const NL_REGRESSION_RISK_TONE: Record<string, NlTone> = {
+  low: "warn",
+  medium: "warn",
+  high: "risk",
+};
+
+/**
+ * Phase 3 — tonfarbige Risiko-Chips (Doppelbelastung, Regressions-Risiko).
+ * Rendert ausschließlich real vorhandene, nicht-leere Werte — keine erfundenen
+ * Risiken, und keine Fog-Leaks (beide Felder liefert der Server bereits gegatet).
+ */
+function buildNlRiskChips(item: TransfermarktFreeAgentItem, keyPrefix: string): ReactNode[] {
+  const chips: ReactNode[] = [];
+  const doubleLoad = item.doubleLoadWarnings ?? [];
+  if (doubleLoad.length > 0) {
+    chips.push(
+      <span
+        key={`${keyPrefix}-doubleload`}
+        className={`nl-market-risk-chip ${nlToneClass("risk")}`}
+        title={doubleLoad.map((warning) => warning.tooltip).join("\n")}
+      >
+        Doppelbelastung{doubleLoad.length > 1 ? ` ×${doubleLoad.length}` : ""}
+      </span>,
+    );
+  }
+  const risk = item.regressionRisk;
+  if (risk != null && risk !== "none") {
+    chips.push(
+      <span
+        key={`${keyPrefix}-regression`}
+        className={`nl-market-risk-chip ${nlToneClass(NL_REGRESSION_RISK_TONE[risk] ?? "warn")}`}
+        title={`Regressions-Risiko aus dem Trainings-Forecast: ${risk}`}
+      >
+        Regressions-Risiko{NL_REGRESSION_RISK_SUFFIX[risk] ?? ""}
+      </span>,
+    );
+  }
+  return chips;
+}
+
+/**
+ * Phase 3 — "Ähnliche Spieler": clientseitiger Nearest-Neighbor über die vier
+ * sichtbaren Achsen (POW/SPE/MEN/SOC) des bereits geladenen Kandidaten-Pools.
+ * Fog-sicher — nutzt ausschließlich freigegebene Achswerte, className und MW
+ * (alles bereits in der Liste sichtbar); niemals PO/Potenzial fremder Spieler.
+ * Achsen werden über den Pool normiert (unterschiedliche Skalen), Distanz ist
+ * die mittlere quadratische Achsabweichung + kleiner MW-Term, mit leichtem
+ * Klassen-Bonus. Rein clientseitig über schon geladene Daten.
+ */
+function computeNlSimilarCandidates(
+  pool: TransfermarktFreeAgentItem[],
+  base: TransfermarktFreeAgentItem,
+  limit = 5,
+): TransfermarktFreeAgentItem[] {
+  // Min/Max je Achse über den Pool → Normalisierung auf 0..1.
+  const axisRange: Record<NlAxisKey, { min: number; max: number } | null> = {
+    pow: null,
+    spe: null,
+    men: null,
+    soc: null,
+  };
+  for (const axis of NL_MARKET_AXES) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const item of pool) {
+      const value = item[axis];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+    }
+    axisRange[axis] = Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null;
+  }
+  // Markt-Wert-Spanne für den kleinen MW-Ähnlichkeits-Term.
+  let mvMin = Infinity;
+  let mvMax = -Infinity;
+  for (const item of pool) {
+    const mv = item.marketValue;
+    if (typeof mv === "number" && Number.isFinite(mv)) {
+      if (mv < mvMin) mvMin = mv;
+      if (mv > mvMax) mvMax = mv;
+    }
+  }
+  const mvSpan = Number.isFinite(mvMin) && Number.isFinite(mvMax) && mvMax > mvMin ? mvMax - mvMin : null;
+
+  const normAxis = (axis: NlAxisKey, value: number): number => {
+    const range = axisRange[axis];
+    if (!range) return 0.5;
+    const span = range.max - range.min;
+    return span > 0 ? (value - range.min) / span : 0.5;
+  };
+
+  const scored = pool.flatMap((item) => {
+    if (item.playerId === base.playerId) return [];
+    let sumSq = 0;
+    let shared = 0;
+    for (const axis of NL_MARKET_AXES) {
+      const baseValue = base[axis];
+      const candValue = item[axis];
+      if (
+        typeof baseValue === "number" &&
+        Number.isFinite(baseValue) &&
+        typeof candValue === "number" &&
+        Number.isFinite(candValue)
+      ) {
+        const diff = normAxis(axis, baseValue) - normAxis(axis, candValue);
+        sumSq += diff * diff;
+        shared += 1;
+      }
+    }
+    // Mindestens zwei gemeinsame sichtbare Achsen, sonst kein sinnvoller Vergleich.
+    if (shared < 2) return [];
+    // Mittlere quadratische Abweichung → vergleichbar über verschieden viele Achsen.
+    let distance = Math.sqrt(sumSq / shared);
+    // Kleiner MW-Term (gewichtet), nur wenn beide einen MW haben.
+    if (
+      mvSpan != null &&
+      typeof base.marketValue === "number" &&
+      Number.isFinite(base.marketValue) &&
+      typeof item.marketValue === "number" &&
+      Number.isFinite(item.marketValue)
+    ) {
+      distance += 0.25 * Math.abs((base.marketValue - item.marketValue) / mvSpan);
+    }
+    // Kleiner Bonus für gleiche Klasse (Distanz sinkt → rankt höher).
+    if (item.className && base.className && item.className === base.className) {
+      distance *= 0.85;
+    }
+    return [{ item, distance }];
+  });
+
+  scored.sort((a, b) => a.distance - b.distance);
+  return scored.slice(0, limit).map((entry) => entry.item);
+}
+
 /**
  * In-Page-Portal: scrollt sanft zur passenden Markt-Sektion (Board-Kachel →
  * Deal-Desk/Kader/Wishlist). Respektiert prefers-reduced-motion, läuft nur im
@@ -449,7 +607,12 @@ function getNlInitials(name: string) {
   );
 }
 
-function NlMarketBeforeAfterRow({
+/**
+ * Vorher→Nachher-Zeile des Deal-Desks. Wird auch im Kauf-Modal
+ * (FoundationMarketBuyShellHost) verwendet, damit die Team-Auswirkung dort
+ * dieselbe Delta-Chip-Sprache spricht — daher exportiert.
+ */
+export function NlMarketBeforeAfterRow({
   label,
   before,
   after,
@@ -481,6 +644,66 @@ function NlMarketBeforeAfterRow({
   );
 }
 
+/**
+ * Segmentierte Wahrscheinlichkeits-Bar für Zusage/Nachforderung/Absage
+ * (good/warn/risk). Ein Renderpfad für Deal-Desk (F4) UND Kauf-Modal (F1),
+ * damit die Reaktion der Gegenseite überall gleich aussieht. Rendert nur
+ * vorhandene Werte; Breiten werden auf die Summe der bekannten Segmente
+ * normiert, damit die Bar auch bei fehlendem Segment sauber degradiert.
+ */
+export function NlMarketChanceBar({
+  acceptChance,
+  counterChance,
+  rejectChance,
+  className,
+  ariaLabel,
+}: {
+  acceptChance: number | null | undefined;
+  counterChance: number | null | undefined;
+  rejectChance: number | null | undefined;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const rawSegments: { key: string; label: string; tone: NlTone; value: number | null | undefined }[] = [
+    { key: "accept", label: "Zusage", tone: "good", value: acceptChance },
+    { key: "counter", label: "Nachf.", tone: "warn", value: counterChance },
+    { key: "reject", label: "Absage", tone: "risk", value: rejectChance },
+  ];
+  const segments = rawSegments.filter(
+    (segment): segment is { key: string; label: string; tone: NlTone; value: number } =>
+      typeof segment.value === "number" && Number.isFinite(segment.value),
+  );
+  if (segments.length === 0) {
+    return null;
+  }
+  const total = segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0);
+  const denom = total > 0 ? total : 1;
+  return (
+    <div
+      className={`nl-market-chance${className ? ` ${className}` : ""}`}
+      role="group"
+      aria-label={ariaLabel ?? "Verhandlungs-Wahrscheinlichkeiten"}
+    >
+      <div className="nl-market-chance-track" aria-hidden="true">
+        {segments.map((segment) => (
+          <span
+            key={segment.key}
+            className={`nl-market-chance-seg ${nlToneClass(segment.tone)}`}
+            style={{ width: `${(Math.max(0, segment.value) / denom) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="nl-market-chance-legend nl-tnum">
+        {segments.map((segment) => (
+          <span key={segment.key} className={`nl-market-chance-legend-item ${nlToneClass(segment.tone)}`}>
+            <b>{segment.label}</b> {Math.round(segment.value)}%
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProps) {
   const {
     teamName,
@@ -503,9 +726,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onSortModeChange,
     selectedClassAxes,
     onToggleClassAxis,
-    selectedAxes,
     axisMinimums,
-    onToggleAxis,
     onAxisMinimumChange,
     hidePoorFit,
     onToggleHidePoorFit,
@@ -513,6 +734,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onMinRatioFilterChange,
     onResetFilters,
     activeFilterCount,
+    filterPresets,
+    onApplyFilterPreset,
+    onSaveFilterPreset,
+    onDeleteFilterPreset,
     candidates,
     totalVisibleCount,
     selectedPlayerId,
@@ -543,6 +768,14 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     previewRosterAfter,
     previewMarketValueBefore,
     previewMarketValueAfter,
+    previewAcceptChance,
+    previewCounterChance,
+    previewRejectChance,
+    offeredSalary,
+    previewExpectedSalary,
+    onOfferedSalaryChange,
+    previewYearlySalarySchedule,
+    previewBuyoutCost,
     buyBlockingReasons,
     buyWarnings,
     topSixCount,
@@ -581,10 +814,46 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
   const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
 
+  // F2 — Inline-Eingabe für "Suche speichern": nur ein Namensfeld, die Persistenz
+  // selbst liegt im Client. Offen/zu + aktueller Entwurfsname.
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  const [savePresetName, setSavePresetName] = useState("");
+
+  function submitSavePreset() {
+    const trimmed = savePresetName.trim();
+    if (!trimmed) {
+      return;
+    }
+    onSaveFilterPreset(trimmed);
+    setSavePresetName("");
+    setSavePresetOpen(false);
+  }
+
   // FM26-Style Progressive Disclosure — Kandidaten-Kachel: welcher Kandidat ist
   // per explizitem Toggle (Touch/Tastatur) dauerhaft aufgeklappt. Hover/Fokus
   // enthüllt den Detail-Layer zusätzlich rein via CSS (kein State nötig).
   const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+
+  // F(neu) — Quick/Erweitert-Split der Controls-Karte: nur Suche/Sortierung/
+  // Achsen-Pills bleiben inline ("Quick"), der Rest (Achs-Mindestwerte,
+  // Fit-Toggle, Ratio-Slider) klappt als "Erweitert"-Akkordeon auf — gleiches
+  // Disclosure-Muster wie das Kader-Achsen-Akkordeon weiter unten. Reine
+  // Layout-Reorganisation, sämtliche Filter-States/Handler bleiben unverändert.
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  // Anzahl aktiver Erweitert-Filter für die Kopfzeile ("Erweitert · N aktiv"):
+  // je Achs-Mindestwert > 0, plus Ratio-Filter und aktiver Fit-Filter.
+  const advancedActiveCount =
+    NL_MARKET_AXES.reduce((sum, axis) => sum + (axisMinimums[axis] > 0 ? 1 : 0), 0) +
+    (minRatioFilter > 0 ? 1 : 0) +
+    (hidePoorFit ? 1 : 0);
+
+  // F(neu) — Pin & Vergleich: ein angehefteter Kandidat bleibt gemerkt; sobald
+  // ein ANDERER Kandidat fokussiert wird, erscheint ein Zwei-Spieler-Vergleich
+  // (überlagerter NlRadar + paarige StatChips). Ohne Pin ändert sich nichts.
+  const [pinnedPlayerId, setPinnedPlayerId] = useState<string | null>(null);
+  const pinnedPlayer = pinnedPlayerId ? marketItemsById.get(pinnedPlayerId) ?? null : null;
+  const compareActive =
+    pinnedPlayer != null && selectedPlayer != null && pinnedPlayer.playerId !== selectedPlayer.playerId;
 
   // F4 — Team-Stärke: Ø POW/SPE/MEN/SOC über den ganzen Kader UND über die
   // besten `topSixCount` Werte je Achse (gleiche Top-6-Semantik wie der
@@ -640,6 +909,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     [squadAxisSummaries],
   );
   const hasSquadSummary = rosterRows.length > 0 && squadAxisSummaries.some((entry) => entry.squadAvg != null);
+
+  // Phase 3 — "Ähnliche Spieler": clientseitige Nearest-Neighbor-Empfehlung über
+  // den bereits geladenen Kandidaten-Pool (nur sichtbare Achsen/MW/Klasse, fog-sicher).
+  const similarCandidates = useMemo(
+    () => (selectedPlayer ? computeNlSimilarCandidates(candidates, selectedPlayer) : []),
+    [candidates, selectedPlayer],
+  );
 
   // F2/F3 — Kader-Zähler im Kopf kohärent zur sichtbaren Liste: wenn ein
   // Kader gelistet ist, zählt genau diese Liste; sonst der Server-Wert.
@@ -763,20 +1039,39 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               Reset
             </button>
           </div>
+          {/* F(neu) — Erweitert-Akkordeon: selten genutzte Feineinstellungen
+              (Achs-Mindestwerte, Fit-Toggle, Ratio-Slider) verstecken sich hier,
+              damit die Quick-Zeile (Suche/Sortierung/Achsen-Pills) schlank bleibt. */}
+          <div className="nl-market-advanced">
+            <button
+              type="button"
+              className="nl-market-advanced-toggle"
+              aria-expanded={advancedFiltersOpen}
+              aria-controls="nl-market-advanced-panel"
+              onClick={() => setAdvancedFiltersOpen((open) => !open)}
+            >
+              <span className="nl-market-advanced-title">Erweitert</span>
+              {advancedActiveCount > 0 ? (
+                <span className="nl-market-advanced-count">· {advancedActiveCount} aktiv</span>
+              ) : null}
+              <span className="nl-market-advanced-caret" aria-hidden="true">
+                {advancedFiltersOpen ? "▾" : "▸"}
+              </span>
+            </button>
+            {advancedFiltersOpen ? (
+              <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
           <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
             {NL_MARKET_AXES.map((axis) => {
-              const active = selectedAxes.includes(axis);
+              // Ein Mindestwert > 0 filtert eigenständig — kein separater Toggle mehr nötig.
+              const active = axisMinimums[axis] > 0;
               return (
                 <div key={`nl-axis-min-${axis}`} className={`nl-market-axis-min ${nlToneClass(axis)}${active ? " is-active" : ""}`}>
-                  <button
-                    type="button"
-                    className={`nl-market-pill ${nlToneClass(axis)}${active ? " is-active" : ""}`}
-                    aria-pressed={active}
-                    onClick={() => onToggleAxis(axis)}
-                    title={`${NL_AXIS_LABELS[axis]}-Mindestwert aktivieren/deaktivieren`}
+                  <span
+                    className={`nl-market-pill nl-market-axis-min-label ${nlToneClass(axis)}${active ? " is-active" : ""}`}
+                    title={`${NL_AXIS_LABELS[axis]}-Mindestwert (0 = aus)`}
                   >
                     {NL_AXIS_LABELS[axis]} ≥
-                  </button>
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -787,9 +1082,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     onChange={(event) => {
                       const next = Math.max(0, Math.min(100, Number(event.target.value) || 0));
                       onAxisMinimumChange(axis, next);
-                      if (!active) {
-                        onToggleAxis(axis);
-                      }
                     }}
                   />
                 </div>
@@ -804,25 +1096,100 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <input type="checkbox" checked={hidePoorFit} onChange={onToggleHidePoorFit} />
               <span>Nur passende (Fit ≥ 0) + Söldner</span>
             </label>
-            <div className="nl-market-ratio-chips" role="group" aria-label="Mindest-Value (MW ÷ Gehalt)">
-              <span className="nl-market-ratio-chips-label" title="Value = MW ÷ Gehalt">
-                MW ÷ Gehalt ≥
+            <label className="nl-market-ratio-slider" title="Value = MW ÷ Gehalt (0 = aus)">
+              <span className="nl-market-ratio-slider-label">
+                MW ÷ Gehalt ≥{" "}
+                <strong className="nl-tnum">
+                  {minRatioFilter > 0 ? formatNlNumber(minRatioFilter, 1) : "aus"}
+                </strong>
               </span>
-              {NL_MARKET_RATIO_STEPS.map((step) => {
-                const active = minRatioFilter === step;
-                return (
+              <input
+                type="range"
+                min={0}
+                max={NL_MARKET_RATIO_SLIDER_MAX}
+                step={0.5}
+                value={Math.min(minRatioFilter, NL_MARKET_RATIO_SLIDER_MAX)}
+                aria-label="Mindest-Value MW ÷ Gehalt"
+                aria-valuetext={
+                  minRatioFilter > 0 ? `MW ÷ Gehalt ≥ ${formatNlNumber(minRatioFilter, 1)}` : "aus"
+                }
+                onChange={(event) => onMinRatioFilterChange(Number(event.target.value) || 0)}
+              />
+            </label>
+          </div>
+              </div>
+            ) : null}
+          </div>
+          {/* F2 — Gespeicherte Suchen: Chips zum Anwenden, Löschen je Preset,
+              "Suche speichern" mit Inline-Namensfeld. Persistenz liegt im Client. */}
+          <div className="nl-market-presets" role="group" aria-label="Gespeicherte Suchen">
+            <span className="nl-market-eyebrow">Gespeicherte Suchen</span>
+            <div className="nl-market-preset-chips">
+              {filterPresets.length > 0 ? (
+                filterPresets.map((preset) => (
+                  <span className="nl-market-preset-chip" key={preset.id}>
+                    <button
+                      type="button"
+                      className="nl-market-preset-apply"
+                      title={`Filter „${preset.name}" anwenden`}
+                      onClick={() => onApplyFilterPreset(preset.id)}
+                    >
+                      {preset.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="nl-market-preset-delete"
+                      aria-label={`Suche „${preset.name}" löschen`}
+                      title={`Suche „${preset.name}" löschen`}
+                      onClick={() => onDeleteFilterPreset(preset.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              ) : (
+                <span className="nl-market-muted">Noch keine gespeichert — aktuelle Filter unten sichern.</span>
+              )}
+              {savePresetOpen ? (
+                <span className="nl-market-preset-save-form">
+                  <input
+                    type="text"
+                    className="nl-market-preset-save-input"
+                    value={savePresetName}
+                    maxLength={32}
+                    placeholder="Name der Suche"
+                    aria-label="Name der gespeicherten Suche"
+                    autoFocus
+                    onChange={(event) => setSavePresetName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        submitSavePreset();
+                      } else if (event.key === "Escape") {
+                        setSavePresetOpen(false);
+                        setSavePresetName("");
+                      }
+                    }}
+                  />
                   <button
-                    key={`nl-ratio-${step}`}
                     type="button"
-                    className={`nl-market-pill${active ? " is-active" : ""}`}
-                    aria-pressed={active}
-                    title={`Nur Kandidaten mit MW ÷ Gehalt ≥ ${formatNlNumber(step, 1)}`}
-                    onClick={() => onMinRatioFilterChange(active ? 0 : step)}
+                    className="nl-market-preset-save-confirm"
+                    disabled={!savePresetName.trim()}
+                    onClick={submitSavePreset}
                   >
-                    ≥ {formatNlNumber(step, 1)}
+                    Sichern
                   </button>
-                );
-              })}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="nl-market-preset-save-open"
+                  title="Aktuelle Filter als Suche speichern"
+                  onClick={() => setSavePresetOpen(true)}
+                >
+                  + Suche speichern
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -876,15 +1243,14 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </span>,
                 ];
               });
-              // CA/PO immer zeigen, sobald das Rating (ovr) vorliegt — nicht mehr an
-              // die (bei ungescouteten Agents null) Sterne-Felder gekoppelt.
-              const detailHasOvr = typeof item.ovr === "number" && Number.isFinite(item.ovr);
-              const detailHasTalent = detailHasOvr || Boolean(item.axisStarsDisplay || item.potentialStarsDisplay);
-              const detailStarProps = getNlCandidateAbilityStarProps(item);
+              // Phase-0-Deduplizierung: CA/PO liegt kanonisch nur noch in der Fokus-Karte
+              // (Talent-Row), Fit/Bedarf im persistenten Signal-Chip der Kachel. Der
+              // Detail-Layer zeigt daher nur noch Achsen-Chips + Entwicklungs-Trend.
               const detailHasTrend = Boolean(item.developmentTrend);
-              const detailHasNeed = Boolean(item.needMatchLabel);
-              const detailHasContent =
-                detailAxisChips.length > 0 || detailHasTalent || detailHasTrend || detailHasNeed;
+              // Phase 3 — Risiko-Chips (Doppelbelastung / Regressions-Risiko) auch in der Kachel.
+              const detailRiskChips = buildNlRiskChips(item, `nl-cand-risk-${item.playerId}`);
+              const detailHasMeta = detailHasTrend || detailRiskChips.length > 0;
+              const detailHasContent = detailAxisChips.length > 0 || detailHasMeta;
               return (
                 <div
                   key={item.playerId}
@@ -948,15 +1314,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     <span className="nl-market-candidate-numbers nl-tnum">
                       <strong>{formatTransfermarktCurrency(item.marketValue)}</strong>
                       <small>{formatTransfermarktCurrency(item.salary)} p.a.</small>
-                      {typeof item.ovr === "number" && Number.isFinite(item.ovr) ? (
-                        <NlAbilityStars
-                          caScore={item.ovr}
-                          known
-                          compact
-                          label="Aktuell"
-                          className="nl-market-ca-stars"
-                        />
-                      ) : null}
+                      {/* CA/PO-Sterne entfernt — kanonisch nur in der Fokus-Karte (Phase-0-Dedup). */}
                     </span>
                     {/* Expliziter Expand-Toggle (Touch/Tastatur). stopPropagation, damit
                         Klick/Enter/Space nicht zusätzlich die Kachel-Auswahl auslöst. */}
@@ -990,18 +1348,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         {detailAxisChips}
                       </div>
                     ) : null}
-                    {detailHasTalent || detailHasTrend || detailHasNeed ? (
+                    {/* Talent-Sterne (CA/PO) und Bedarf-Chip hier entfernt — CA/PO steht
+                        kanonisch in der Fokus-Karte, Fit/Bedarf im Signal-Chip oben. */}
+                    {detailHasMeta ? (
                       <div className="nl-market-detail-meta">
-                        {detailHasTalent ? (
-                          <NlAbilityStars
-                            caScore={detailStarProps.caScore}
-                            poStarRange={detailStarProps.poStarRange}
-                            poScoreRange={detailStarProps.poScoreRange}
-                            poStars={detailStarProps.poStars}
-                            known={false}
-                            label="Talent"
-                          />
-                        ) : null}
                         {item.developmentTrend ? (
                           <span
                             className={`nl-market-signal-chip ${nlToneClass(
@@ -1012,14 +1362,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                             Trend {NL_DEV_TREND_LABEL[item.developmentTrend] ?? "—"}
                           </span>
                         ) : null}
-                        {item.needMatchLabel ? (
-                          <span
-                            className={`nl-market-signal-chip ${nlToneClass(needTone)}`}
-                            title="Eignung für deinen Kader"
-                          >
-                            {item.needMatchLabel}
-                          </span>
-                        ) : null}
+                        {detailRiskChips}
                       </div>
                     ) : null}
                     {!detailHasContent ? (
@@ -1108,28 +1451,22 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         value={formatTransfermarktRatio(selectedPlayer.marketValueSalaryRatio)}
                         tone={getNlRatioTone(selectedPlayer.marketValueSalaryRatio)}
                       />
+                      {/* Fit ohne needMatchLabel-Sub und ohne CA-Sterne — Bedarf steht im
+                          Kachel-Signal, CA/PO in der Talent-Row darunter (Phase-0-Dedup). */}
                       <StatChip
                         label="Fit"
                         value={selectedPlayer.fitDisplay}
                         tone={getNlFitTone(selectedPlayer.fit)}
-                        sub={selectedPlayer.needMatchLabel ?? undefined}
                       />
-                      {typeof selectedPlayer.ovr === "number" && Number.isFinite(selectedPlayer.ovr) ? (
-                        <NlAbilityStars
-                          caScore={selectedPlayer.ovr}
-                          known
-                          compact
-                          label="Aktuell"
-                          className="nl-market-ca-stars"
-                        />
-                      ) : null}
                     </StatChipRow>
                   </div>
                 </div>
 
                 {/* #68 — Achsen-Radar statt vier linearer Balken. Werte fog-gated (scoutedPow/…).
                     Radar + Tier-Chips laufen kompakt nebeneinander, damit die Top-Disziplinen
-                    darunter ohne großes Scrollen sichtbar bleiben. */}
+                    darunter ohne großes Scrollen sichtbar bleiben.
+                    Phase-0-Dedup: showValues entfernt — die vier Zahlen stehen kanonisch auf
+                    den Tier-Chips rechts, der Radar bleibt sauber. */}
                 <div className="nl-market-radar-row">
                   <div className="nl-market-focus-radar" aria-label="Kandidaten-Achsen">
                     <NlRadar
@@ -1138,10 +1475,23 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
                       })}
                       max={100}
-                      showValues
-                      aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
+                      // Phase-2 F1 — Ghost-Polygon des eigenen Kaders (Top-6-Ø je Achse). Nutzt die
+                      // bereits berechneten squadAxisSummaries.topAvg (gleiche computeTopSixAxisAverage-
+                      // Quelle wie der Team-Impact); NlRadar zeichnet den Ghost nur, wenn alle vier
+                      // Achsen echte Werte tragen. Macht den "Fit" Kandidat↔Aufstellung sofort sichtbar.
+                      ghostAxes={NL_MARKET_AXES.flatMap((axis) => {
+                        const summary = squadAxisSummaries.find((entry) => entry.axis === axis);
+                        return summary?.topAvg != null && Number.isFinite(summary.topAvg)
+                          ? [{ key: axis, value: summary.topAvg }]
+                          : [];
+                      })}
+                      ghostLabel={`Team Top-${topSixCount}`}
+                      aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC gegen Team Top-${topSixCount}`}
                       className="nl-market-axis-radar"
                     />
+                    <span className="nl-market-radar-ghost-note" aria-hidden="true">
+                      Ghost = Team Top-{topSixCount} Ø
+                    </span>
                   </div>
 
                   {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
@@ -1165,6 +1515,76 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     })}
                   </div>
                 </div>
+
+                {/* F(neu) — Head-to-Head: angehefteter vs. fokussierter Kandidat als
+                    überlagerter Mehrserien-Radar (NlRadar generischer Modus) plus
+                    paarige StatChip-Zeilen (MW/CA/POW/SPE/MEN/SOC). Nur sichtbar,
+                    solange ein ANDERER Spieler angeheftet ist; über "Pin lösen"
+                    dismissbar. Werte fog-gated wie sonst (unbekannt → "—" bzw. 0 im Radar). */}
+                {compareActive && pinnedPlayer ? (
+                  <div className="nl-market-compare" aria-label="Kandidaten-Vergleich" data-testid="nl-market-compare">
+                    <div className="nl-market-compare-head">
+                      <span className="nl-market-eyebrow">Vergleich · angeheftet vs. Fokus</span>
+                      <button
+                        type="button"
+                        className="nl-market-inline-action"
+                        title="Pin lösen — Vergleich beenden."
+                        onClick={() => setPinnedPlayerId(null)}
+                      >
+                        Pin lösen
+                      </button>
+                    </div>
+                    <div className="nl-market-compare-radar">
+                      <NlRadar
+                        axisDefs={NL_MARKET_AXES.map((axis) => ({ key: axis, label: NL_AXIS_LABELS[axis] }))}
+                        series={[
+                          {
+                            id: "pinned",
+                            label: pinnedPlayer.name,
+                            tone: "accent",
+                            dashed: true,
+                            values: Object.fromEntries(NL_MARKET_AXES.map((axis) => [axis, pinnedPlayer[axis]])),
+                          },
+                          {
+                            id: "selected",
+                            label: selectedPlayer.name,
+                            tone: "good",
+                            values: Object.fromEntries(NL_MARKET_AXES.map((axis) => [axis, selectedPlayer[axis]])),
+                          },
+                        ]}
+                        max={100}
+                        aria-label={`Vergleich ${pinnedPlayer.name} gegen ${selectedPlayer.name} über POW/SPE/MEN/SOC`}
+                        className="nl-market-axis-radar"
+                      />
+                    </div>
+                    {[pinnedPlayer, selectedPlayer].map((item, index) => (
+                      <StatChipRow
+                        key={`nl-compare-${item.playerId}`}
+                        className={`nl-market-compare-row${index === 0 ? " is-pinned" : " is-selected"}`}
+                        label={index === 0 ? "Angeheftet" : "Fokus"}
+                        aria-label={`${item.name} Vergleichswerte`}
+                      >
+                        <StatChip label="MW" value={formatTransfermarktCurrency(item.marketValue)} tone="accent" />
+                        <StatChip
+                          label="CA"
+                          value={typeof item.ovr === "number" && Number.isFinite(item.ovr) ? formatNlNumber(item.ovr, 0) : "—"}
+                          tone="neutral"
+                        />
+                        {NL_MARKET_AXES.map((axis) => {
+                          const value = item[axis];
+                          return (
+                            <StatChip
+                              key={`nl-compare-${item.playerId}-${axis}`}
+                              label={NL_AXIS_LABELS[axis]}
+                              value={typeof value === "number" && Number.isFinite(value) ? formatNlNumber(value, 0) : "—"}
+                              tone={axis}
+                            />
+                          );
+                        })}
+                      </StatChipRow>
+                    ))}
+                  </div>
+                ) : null}
 
                 {/* Feinattribute (12) — nur wirklich freigeschaltete Werte (buildTransfermarktScoutedAttributeRows
                     filtert nach Scouting-Level exakt wie im alten Look); kein Fog-Placeholder für Unbekanntes. */}
@@ -1240,6 +1660,72 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     ) : null}
                   </div>
                   ) : null;
+                })()}
+
+                {/* Phase 3 — Risiko-Chips (Doppelbelastung / Regressions-Risiko).
+                    Nur gerendert, wenn real vorhanden; Werte kommen bereits gegatet vom Server. */}
+                {(() => {
+                  const riskChips = buildNlRiskChips(selectedPlayer, `nl-focus-risk-${selectedPlayer.playerId}`);
+                  return riskChips.length > 0 ? (
+                    <div className="nl-market-risk-row" aria-label="Risiko-Hinweise">
+                      {riskChips}
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* F3 — Trait/Subclass-Chips mit Fog: bekannte Traits tonfarbig
+                    (positiv = good, negativ = risk), verdeckte Zahl als Fog-Chip.
+                    Fog-sicher — der Server hat visible/hidden bereits gegatet, hier
+                    wird nur gerendert, was mitgeliefert wurde. */}
+                {(() => {
+                  const positives = selectedPlayer.traitsPositive ?? [];
+                  const negatives = selectedPlayer.traitsNegative ?? [];
+                  const hiddenPositive = selectedPlayer.hiddenPositiveTraitCount ?? 0;
+                  const hiddenNegative = selectedPlayer.hiddenNegativeTraitCount ?? 0;
+                  const hasTraitContent =
+                    positives.length > 0 || negatives.length > 0 || hiddenPositive > 0 || hiddenNegative > 0;
+                  if (!hasTraitContent) {
+                    return null;
+                  }
+                  return (
+                    <div className="nl-market-traits" aria-label="Traits & verdeckte Merkmale">
+                      <span className="nl-market-eyebrow">Traits</span>
+                      <div className="nl-market-trait-chips">
+                        {positives.map((trait) => (
+                          <span
+                            key={`nl-trait-pos-${selectedPlayer.playerId}-${trait}`}
+                            className={`nl-market-trait-chip ${nlToneClass("good")}`}
+                          >
+                            {trait}
+                          </span>
+                        ))}
+                        {negatives.map((trait) => (
+                          <span
+                            key={`nl-trait-neg-${selectedPlayer.playerId}-${trait}`}
+                            className={`nl-market-trait-chip ${nlToneClass("risk")}`}
+                          >
+                            {trait}
+                          </span>
+                        ))}
+                        {hiddenPositive > 0 ? (
+                          <span
+                            className="nl-market-trait-chip is-fog"
+                            title="Positive Traits noch verdeckt — weiter scouten."
+                          >
+                            +{hiddenPositive} verdeckt
+                          </span>
+                        ) : null}
+                        {hiddenNegative > 0 ? (
+                          <span
+                            className="nl-market-trait-chip is-fog"
+                            title="Negative Traits noch verdeckt — weiter scouten."
+                          >
+                            +{hiddenNegative} verdeckt
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
                 })()}
 
                 {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore).
@@ -1331,6 +1817,26 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   >
                     {selectedPlayerScoutingWatched ? "Nicht mehr beobachten" : "Beobachten"}
                   </button>
+                  {/* F(neu) — Pin für den Zwei-Kandidaten-Vergleich: heftet den
+                      aktuellen Spieler an; ein zweiter, danach fokussierter
+                      Kandidat öffnet den Head-to-Head weiter oben. Erneuter Klick
+                      auf denselben Spieler löst den Pin wieder. */}
+                  <button
+                    type="button"
+                    className={`nl-market-secondary-action${pinnedPlayerId === selectedPlayer.playerId ? " is-active" : ""}`}
+                    title={
+                      pinnedPlayerId === selectedPlayer.playerId
+                        ? "Pin lösen — Vergleich beenden."
+                        : "Diesen Kandidaten anheften, dann einen zweiten wählen und beide vergleichen."
+                    }
+                    onClick={() =>
+                      setPinnedPlayerId((current) =>
+                        current === selectedPlayer.playerId ? null : selectedPlayer.playerId,
+                      )
+                    }
+                  >
+                    {pinnedPlayerId === selectedPlayer.playerId ? "Angeheftet" : "Anheften"}
+                  </button>
                 </div>
                 {selectedPlayerScoutCertainty != null ? (
                   <NlProgressBar
@@ -1344,6 +1850,51 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 ) : null}
                 {dealOpenDisabledReason ? (
                   <p className="nl-market-action-reason">Warum nicht: {dealOpenDisabledReason}</p>
+                ) : null}
+
+                {/* Phase 3 — "Ähnliche Spieler": kompakte Mini-Karten unter der Fokus-Karte.
+                    Nearest-Neighbor über den geladenen Pool (fog-sicher: Achsen/MW/Klasse).
+                    Klick wählt den Kandidaten über den bestehenden Select-Handler aus. */}
+                {similarCandidates.length > 0 ? (
+                  <div className="nl-market-similar" aria-label="Ähnliche Spieler">
+                    <span className="nl-market-eyebrow">Ähnliche Spieler</span>
+                    <div className="nl-market-similar-chips">
+                      {similarCandidates.map((sim) => {
+                        const simPortrait = getTransfermarktPortraitModel(sim);
+                        const simSrc = appendMediaImageVariant(simPortrait.src, "preview") ?? simPortrait.src;
+                        return (
+                          <button
+                            key={`nl-similar-${sim.playerId}`}
+                            type="button"
+                            className="nl-market-similar-chip"
+                            data-testid="transfer-similar-player"
+                            title={`${sim.name} — ${sim.className} · MW ${formatTransfermarktCurrency(sim.marketValue)}`}
+                            onClick={() => onSelectCandidate(sim.playerId)}
+                          >
+                            <span className="nl-market-similar-portrait" aria-hidden="true">
+                              {simSrc ? (
+                                <OptimizedMediaImage
+                                  src={simSrc}
+                                  alt=""
+                                  width={28}
+                                  height={28}
+                                  className="nl-market-portrait-img"
+                                />
+                              ) : (
+                                <span className="nl-market-portrait-initials">{simPortrait.initials}</span>
+                              )}
+                            </span>
+                            <span className="nl-market-similar-copy">
+                              <b>{sim.name}</b>
+                              <small>
+                                {sim.className} · {formatTransfermarktCurrency(sim.marketValue)}
+                              </small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : null}
               </>
             ) : (
@@ -1383,6 +1934,61 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <StatChip label="Ablöse" value={formatTransfermarktCurrency(previewPurchasePrice)} tone="accent" />
               <StatChip label="Forderung p.a." value={previewSalaryLabel} tone="warn" />
             </StatChipRow>
+            {/* Phase-2 F2 — Gehalts-What-if-Slider treibt das Angebot (offeredSalary im Client). Der
+                Preview-Fetch re-fetcht bei Gehaltsänderung (~90 ms Debounce), daher aktualisieren sich
+                Zusage-Bar UND Vorher→Nachher live beim Ziehen. Spanne um den Erwartungswert der
+                Gegenseite (Fallback: aktuelles Angebot / Kandidaten-Gehalt) — keine erfundenen Werte. */}
+            {selectedPlayer
+              ? (() => {
+                  const salaryBase =
+                    previewExpectedSalary != null && Number.isFinite(previewExpectedSalary)
+                      ? previewExpectedSalary
+                      : offeredSalary != null && Number.isFinite(offeredSalary)
+                        ? offeredSalary
+                        : selectedPlayer.salary;
+                  if (salaryBase == null || !Number.isFinite(salaryBase) || salaryBase <= 0) {
+                    return null;
+                  }
+                  const salaryValue =
+                    offeredSalary != null && Number.isFinite(offeredSalary) ? offeredSalary : salaryBase;
+                  // Regler-Spanne: 50 %–200 % des Erwartungswerts, oben immer das aktuelle Angebot einfassen.
+                  const salaryMax = Math.max(Math.round(salaryBase * 2), Math.round(salaryValue));
+                  const salaryStep = Math.max(1, Math.round(salaryBase / 50));
+                  return (
+                    <NlWhatIfSlider
+                      className="nl-market-salary-whatif"
+                      label="Gehaltsangebot p.a."
+                      value={salaryValue}
+                      min={0}
+                      max={salaryMax}
+                      step={salaryStep}
+                      onChange={onOfferedSalaryChange}
+                      formatValue={(value) => formatTransfermarktCurrency(value)}
+                      valueText={`Angebot ${formatTransfermarktCurrency(salaryValue)} p.a. — Erwartung ${formatTransfermarktCurrency(salaryBase)}`}
+                      stops={[
+                        formatTransfermarktCurrency(0),
+                        formatTransfermarktCurrency(Math.round(salaryBase)),
+                        formatTransfermarktCurrency(salaryMax),
+                      ]}
+                      accentColor="var(--nl-warn)"
+                      hint="Höheres Gehalt hebt die Zusage-Chance — Bar und Vorher→Nachher aktualisieren sich live."
+                    />
+                  );
+                })()
+              : null}
+            {/* F4 — Reaktion der Gegenseite schon vor dem Modal sichtbar: verhindert
+                Sackgassen-Klicks ins Kaufmodal. Gleiche Bar wie im Modal (F1). */}
+            {previewAcceptChance != null || previewCounterChance != null || previewRejectChance != null ? (
+              <div className="nl-market-deal-chance" aria-label="Erwartete Reaktion der Gegenseite">
+                <span className="nl-market-eyebrow">Erwartete Reaktion</span>
+                <NlMarketChanceBar
+                  acceptChance={previewAcceptChance}
+                  counterChance={previewCounterChance}
+                  rejectChance={previewRejectChance}
+                  ariaLabel="Zusage / Nachforderung / Absage"
+                />
+              </div>
+            ) : null}
             <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
               <NlMarketBeforeAfterRow
                 label="Cash"
@@ -1410,6 +2016,29 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 format={(value) => formatTransfermarktCurrency(value)}
               />
             </div>
+            {/* Phase-2 F3 — Mehrsaison-Budget-Leiste: die yearlySalarySchedule-Staffel (S+1/S+2 …) als
+                Balken-Chart, damit die einzelne Gehalts-Zeile zum echten Budgetplaner wird. Buyout-Kosten
+                (Restgehalt-Ablösung bei vorzeitigem Ausstieg) als Fußnote. Nur echte Preview-Felder. */}
+            {previewYearlySalarySchedule && previewYearlySalarySchedule.length > 0 ? (
+              <div className="nl-market-deal-budget" aria-label="Gehaltslast über die Vertragslaufzeit">
+                <span className="nl-market-eyebrow">Gehaltslast je Saison</span>
+                <NlBarChart
+                  bars={previewYearlySalarySchedule.map((year) => ({
+                    label: year.label && year.label.trim() ? year.label : `S+${year.seasonOffset}`,
+                    value: year.salary,
+                    tone: "warn" as NlTone,
+                  }))}
+                  format={(value) => formatTransfermarktCurrency(value)}
+                  aria-label="Gehaltslast je Saison der Vertragslaufzeit"
+                  className="nl-market-budget-barchart"
+                />
+                {previewBuyoutCost != null && Number.isFinite(previewBuyoutCost) ? (
+                  <small className="nl-market-deal-budget-buyout nl-tnum">
+                    Buyout (Restgehalt-Ablösung): {formatTransfermarktCurrency(previewBuyoutCost)}
+                  </small>
+                ) : null}
+              </div>
+            ) : null}
             {buyBlockingReasons.length > 0 ? (
               <div className="nl-market-warning-box is-blocking">
                 <strong>Noch offen</strong>
@@ -1452,11 +2081,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </>
                   ) : null}
                 </p>
-                {impactIsEstimate ? (
-                  <small className="nl-market-estimate-note">
-                    Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
-                  </small>
-                ) : null}
+                {/* Inline "geschätzt"-Note entfernt (Phase-0-Dedup) — der Header-Pill "geschätzt"
+                    und die title-Tooltips auf den Delta-Chips tragen den Hinweis bereits. */}
                 <div className="nl-market-impact-axes">
                   {topSixAxisImpact.map((row) => {
                     const rankEstimate = topSixAxisRankEstimates.find((entry) => entry.axis === row.axis);

@@ -27,6 +27,7 @@ import {
   getPlayerDisplaySalary,
   getRosterEntryDisplaySalary,
 } from "@/app/foundation/foundation-page-client-exports";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import { formatLeaguePercentile } from "@/lib/foundation/player-league-heat";
@@ -76,6 +77,13 @@ function appendDeltaSource(baseTitle: string, deltaSourceLabel: string | null | 
 
 export type PlayerHeroNewLookProps = {
   data: PlayerDetailDrawerData;
+  /**
+   * Voller GameState, durchgereicht vom Render-Ort (Profil-Seite/Drawer), da der
+   * `FoundationStateProvider` im Foundation-Shell nicht mehr gemountet wird und
+   * `useFoundationStateOptional()` hier dauerhaft `null` liefert. Wird bevorzugt
+   * vor dem (toten) Kontext genutzt: `gameState ?? foundationState?.gameState`.
+   */
+  gameState?: GameState | null;
   /** Bereits formatiertes Rollen-Label (formatRoleTag im Drawer), z. B. "Starter". */
   roleLabel: string;
   /** Echte CA/PO-Sterne (resolveCaPoDisplay im Drawer); ohne Werte kein Gauge. */
@@ -91,6 +99,7 @@ export type PlayerHeroNewLookProps = {
 
 export default function PlayerHeroNewLook({
   data,
+  gameState,
   roleLabel,
   isFreeAgent,
   onClose,
@@ -101,7 +110,18 @@ export default function PlayerHeroNewLook({
   // Foundation-Kontext (z. B. Storybook/Isolation) bleibt es bei `null` —
   // dann liefert `formatLeaguePercentile` schlicht kein Perzentil-Label.
   const foundationState = useFoundationStateOptional();
-  const leaguePoolSize = foundationState?.gameState.players.length ?? null;
+  // Prop zuerst (durchgereichter GameState), dann der (tote) Kontext als Fallback.
+  const resolvedGameState = gameState ?? foundationState?.gameState ?? null;
+  // Perzentil-Nenner MUSS zum Rang-Pool passen: OVR/PPs/MVS-Ränge werden in
+  // `buildPlayerRatingContractMap` gegen die AKTIVEN (rostierten) Spieler
+  // gebildet (`rankPoolPlayerIds: activePlayerIds`), NICHT gegen alle Spieler
+  // inkl. Free Agents. Nähmen wir `players.length` (~alle Spieler), käme Rang
+  // #156 fälschlich als „Top 5 %" heraus, obwohl es unter den aktiven Spielern
+  // eher Mittelfeld ist. Daher: eindeutige Roster-Spielerzahl.
+  const activePlayerPoolSize = resolvedGameState
+    ? new Set(resolvedGameState.rosters.map((entry) => entry.playerId).filter(Boolean)).size
+    : 0;
+  const leaguePoolSize = activePlayerPoolSize > 0 ? activePlayerPoolSize : null;
 
   // GEHALT-Chip (neben MW): reales Saison-Gehalt.
   //
@@ -120,10 +140,10 @@ export default function PlayerHeroNewLook({
   // Sekundär (nur falls `data.salary` ausnahmsweise null ist, z. B. Isolation
   // ohne Builder-Economy): eigene Kader-Auflösung über `foundationState`,
   // sonst Liga-Anzeigegehalt ohne Kaderbindung (`getPlayerDisplaySalary`).
-  const rosterEntry = foundationState
-    ? (foundationState.gameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
+  const rosterEntry = resolvedGameState
+    ? (resolvedGameState.rosters.find((entry) => entry.playerId === data.playerId) ?? null)
     : null;
-  const heroPlayer = foundationState?.gameState.players.find((entry) => entry.id === data.playerId) ?? null;
+  const heroPlayer = resolvedGameState?.players.find((entry) => entry.id === data.playerId) ?? null;
   const heroSalary =
     data.salary ??
     (rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, heroPlayer) : getPlayerDisplaySalary(heroPlayer));
@@ -225,31 +245,53 @@ export default function PlayerHeroNewLook({
             ) : null}
           </div>
           <StatChipRow className="nl-player-hero-chips" aria-label="Spieler-Kennzahlen">
+            {/* Fog-of-War (#): ein teamloser S1-Free-Agent hat keine Liga-Leistung —
+                OVR/PPs/MVS gibt es vor dem Kauf schlicht nicht, daher "—" (kein
+                Wert, kein Rang, kein Delta). MW und GEHALT bleiben real, denn die
+                sind auch vor dem Kauf gültige Marktangaben. */}
             <StatChip
               label="OVR"
-              value={formatNlNumber(data.ovr, 1)}
+              value={isFreeAgent ? "—" : formatNlNumber(data.ovr, 1)}
               tone="accent"
-              sub={formatHeroSub(data.ovrRank, data.ovrDelta, leaguePoolSize)}
-              title={appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.ovrRank, data.ovrDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Overall-Rating: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)
+              }
               onClick={buildLeadersClick("ovr", data.ovrRank)}
             />
             <StatChip
               label="PPs"
-              value={formatNlNumber(data.pps ?? data.ppsRating, 1)}
+              // Nur die reale Saison-PPs (`data.pps`), KEIN Fallback auf das
+              // Fähigkeits-Rating (`ppsRating`): vor dem ersten Spieltag gibt es
+              // keine Saisonleistung → „—" (identisch zu MVS und den
+              // Detail-Kacheln). Der frühere `?? data.ppsRating`-Fallback ließ
+              // an S1/MD1 fälschlich einen Rating-Wert (z. B. 43,4) erscheinen,
+              // obwohl noch kein Spiel gelaufen ist.
+              value={isFreeAgent ? "—" : formatNlNumber(data.pps, 1)}
               tone="spe"
-              sub={formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
-              title={appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Performance-Punkte: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)
+              }
               onClick={buildLeadersClick("pps", data.ppsRank)}
             />
             <StatChip
               label="MVS"
-              value={formatNlNumber(data.mvs, 1)}
+              value={isFreeAgent ? "—" : formatNlNumber(data.mvs, 1)}
               tone="soc"
-              sub={formatHeroSub(data.mvsRank, data.mvsDelta, leaguePoolSize)}
-              title={appendDeltaSource(
-                "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
-                data.mvsDeltaSourceLabel,
-              )}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.mvsRank, data.mvsDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Market Value Score: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource(
+                      "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
+                      data.mvsDeltaSourceLabel,
+                    )
+              }
               onClick={buildLeadersClick("mvs", data.mvsRank)}
             />
             <StatChip

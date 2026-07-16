@@ -283,6 +283,8 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
       return "foundation-diszis";
     case "leagueLeaders":
       return "league-leaders";
+    case "allTimeTable":
+      return "all-time-table";
     default:
       return null;
   }

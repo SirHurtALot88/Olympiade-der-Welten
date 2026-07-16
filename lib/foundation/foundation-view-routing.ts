@@ -25,6 +25,7 @@ export const FOUNDATION_VIEW_IDS = [
   "ranks",
   "diszis",
   "leagueLeaders",
+  "allTimeTable",
   "prize",
   "market",
   "marketV2",
@@ -85,6 +86,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "home-v2" || view === "homev2" || view === "home") {
     return "homeV2";
+  }
+  if (view === "ewige-tabelle" || view === "all-time-table" || view === "alltime") {
+    return "allTimeTable";
   }
   if (view === "kredite" || view === "credit" || view === "loans" || view === "credits-v2") {
     return "credits";

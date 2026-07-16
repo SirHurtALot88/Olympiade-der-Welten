@@ -47,18 +47,18 @@ describe("foundation page surfaces contract", () => {
 
 describe("team profile ui contract", () => {
   it("exposes full-page team dossier with roster navigation to player profile", async () => {
-    const [teamProfileText, drawerText] = await Promise.all([
+    const [teamProfileText, newLookText] = await Promise.all([
       fs.readFile(`${root}/app/foundation/team-profile/TeamProfileClient.tsx`, "utf8"),
-      fs.readFile(`${root}/app/foundation/TeamDetailDrawer.tsx`, "utf8"),
+      fs.readFile(`${root}/app/foundation/team-profile/TeamProfileNewLook.tsx`, "utf8"),
     ]);
 
-    expect(teamProfileText).toContain('variant="page"');
-    expect(drawerText).toContain('data-testid="foundation-team-profile"');
-    expect(drawerText).toContain("onOpenPlayer");
-    expect(drawerText).toContain("team-drawer-lead-summary");
-    expect(drawerText).toContain("team-drawer-relations-panel");
-    expect(drawerText).toContain("team-drawer-objective-board");
-    expect(drawerText).toContain("team-drawer-objective-row-main");
+    // The canonical team dossier is TeamProfileNewLook, rendered by TeamProfileClient.
+    expect(teamProfileText).toContain("<TeamProfileNewLook");
+    expect(newLookText).toContain('data-testid="foundation-team-profile"');
+    expect(newLookText).toContain("onOpenPlayer");
+    expect(newLookText).toContain("renderRelationshipColumn");
+    expect(newLookText).toContain('data-testid="nl-teamprofile-board"');
+    expect(newLookText).toContain('data-testid="nl-teamprofile-roster"');
   });
 });
 

@@ -1,9 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
-import { NlDeltaChip, NlRadar, NlSkeletonCard, formatNlNumber, type NlAxisKey } from "@/components/foundation/new-look";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import {
+  FATIGUE_HIGH,
+  NlCard,
+  NlCountUpValue,
+  NlDeltaChip,
+  NlEmptyState,
+  NlFatigueGauge,
+  NlProgressBar,
+  NlRadar,
+  NlSkeletonCard,
+  StatChip,
+  fatigueTone,
+  formatNlNumber,
+  type NlAxisKey,
+  type NlTone,
+} from "@/components/foundation/new-look";
+import { VeloRangeBar } from "@/components/foundation/velo-ui/VeloRangeBar";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
@@ -118,6 +136,138 @@ function formatIntensityLabel(intensity: MatchdayIntensityStage) {
   return "Normal";
 }
 
+/**
+ * Inline-Style für die Captain-Auswahl-Chips (Phase 3). Bewusst inline, weil
+ * globals.css hier nicht angefasst werden darf — Tokens halten es theme-treu.
+ * `active` markiert die aktuelle Auswahl (Rahmen/Fläche in Akzentfarbe).
+ */
+function captainChipStyle(active: boolean): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "5px 9px",
+    borderRadius: "var(--nl-r-sm)",
+    border: `1px solid ${active ? "var(--nl-accent)" : "var(--nl-line)"}`,
+    background: active ? "color-mix(in srgb, var(--nl-accent) 18%, transparent)" : "var(--nl-panel-2)",
+    color: active ? "var(--nl-accent)" : "var(--nl-ink)",
+    font: "inherit",
+    fontSize: "12px",
+    lineHeight: 1.1,
+    cursor: "pointer",
+  };
+}
+
+/* --- Feature 1: Portrait-Avatar + Hover-Vorschau -----------------------
+ * Kleiner, dichter Avatar-Chip (Initialen-Fallback) für Slot-/Kandidaten-/
+ * Fokus-Zeilen. Bewusst winzig (20–28px), damit Stats/Score nicht verdrängt
+ * werden und die Kandidatenliste gleich viele Zeilen zeigt wie zuvor. Der
+ * Hover reicht die exakt gleiche `FoundationPlayerPortraitPreview` durch wie
+ * das v2-Board (portaliertes Overlay ⇒ keine Layout-Verschiebung).
+ */
+
+type NlPortraitPlayer = {
+  id: string;
+  name: string;
+  portraitUrl: string | null;
+  className: string | null;
+  playerOvr?: number | null;
+  playerPps?: number | null;
+  coreStats?: { pow: number; spe: number; men: number; soc: number } | null;
+};
+
+/** Runder Mini-Avatar: Portrait falls vorhanden, sonst Initialen (Fallback bleibt bei Bildfehler sichtbar). */
+function NlPlayerAvatar({
+  portraitUrl,
+  name,
+  size = 22,
+}: {
+  portraitUrl?: string | null;
+  name: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initials = name.slice(0, 2).toUpperCase();
+  const showImg = Boolean(portraitUrl) && !failed;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "relative",
+        flex: "0 0 auto",
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "50%",
+        overflow: "hidden",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--nl-panel-2)",
+        border: "1px solid var(--nl-line)",
+        color: "var(--nl-mut)",
+        fontSize: `${Math.round(size * 0.42)}px`,
+        fontWeight: 700,
+        lineHeight: 1,
+      }}
+    >
+      {initials}
+      {showImg ? (
+        // Initialen bleiben als Unterlage — schlägt das Bild fehl, blenden wir es aus.
+        <img
+          src={portraitUrl as string}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Umhüllt einen Knoten mit der Portrait-Hover-Vorschau (identische Props wie
+ * `wrapLineupV2PortraitPreview` im v2-Board). Ohne coreStats gibt es keine
+ * Vorschau ⇒ Knoten wird unverändert zurückgegeben (progressive Enhancement).
+ */
+function wrapNlPortraitPreview(node: ReactNode, player: NlPortraitPlayer, disabled = false): ReactNode {
+  if (!player.coreStats) return node;
+  return (
+    <FoundationPlayerPortraitPreview
+      playerId={player.id}
+      name={player.name}
+      portraitUrl={player.portraitUrl}
+      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      playerOvr={player.playerOvr ?? null}
+      playerMvs={null}
+      playerPps={player.playerPps}
+      pow={player.coreStats.pow}
+      spe={player.coreStats.spe}
+      men={player.coreStats.men}
+      soc={player.coreStats.soc}
+      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+      variant="team"
+      context="lineupCandidate"
+      previewDensity="compact"
+      playerClassName={player.className}
+      disabled={disabled}
+    >
+      {node}
+    </FoundationPlayerPortraitPreview>
+  );
+}
+
+/* --- Feature 2: „Score to beat" — Rivalitäts-Stärke (spoiler-sicher) ----
+ * relationship < 0 = Rivalität; je negativer, desto schärfer. Nur ein Wort
+ * fürs Tooltip — keine Zahl, kein projiziertes Ergebnis.
+ */
+function rivalStrengthLabel(relationship: number): string {
+  if (relationship <= -4) return "Erzrivale";
+  if (relationship <= -3) return "starker Rivale";
+  return "Rivale";
+}
+
 /* --- v1-Entscheidungs-Signale (Schwellen synchron zu LegacyLineupFocusV2Board) --- */
 
 const NL_LEAD_ALTERNATIVLOS_MIN = 10;
@@ -151,6 +301,13 @@ function getNlSlotReadiness(projected: number | null, topPickScore: number | nul
   return { label: "Notfall", tone: "risk" };
 }
 
+/** Risiko-Wort → semantischer Ton für den Kit-Chip: hoch=risk, mittel=warn, niedrig=good. */
+function getNlRiskTone(riskLevel: string): NlTone {
+  if (riskLevel === "hoch") return "risk";
+  if (riskLevel === "mittel") return "warn";
+  return "good";
+}
+
 function getAxisForCategory(category: string | null | undefined): NlAxisKey | null {
   if (category === "power") return "pow";
   if (category === "speed") return "spe";
@@ -160,6 +317,12 @@ function getAxisForCategory(category: string | null | undefined): NlAxisKey | nu
 }
 
 const NL_AXIS_AREA_LABEL: Record<NlAxisKey, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
+
+/** Reason-Chip-Achse (pow/spe/men/soc) → Kit-Ton; unbekannt ⇒ neutral. */
+function reasonChipTone(axis: string): NlTone {
+  if (axis === "pow" || axis === "spe" || axis === "men" || axis === "soc") return axis;
+  return "neutral";
+}
 
 /* --- Kleinteile ------------------------------------------------------- */
 
@@ -786,7 +949,12 @@ export default function LineupNewLook({
   resolvePreview,
 }: LineupNewLookProps) {
   const [hoveredCandidateId, setHoveredCandidateId] = useState<string | null>(null);
+  // Compare-Tray (Feature 3): angehefteter Kandidat A; hovert man einen anderen
+  // (B), zeigt das Fokus-Panel A vs B (Radar-Overlay + Range + Delta).
+  const [pinnedCandidateId, setPinnedCandidateId] = useState<string | null>(null);
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
+  // Optimieren-Panel: Upgrade-Hinweise für die volle Aufstellung (Feature 1, additiv).
+  const [optimizeOpen, setOptimizeOpen] = useState(false);
   const [verdict, setVerdict] = useState<NlVerdictState | null>(null);
   const verdictTimeoutRef = useRef<number | null>(null);
   const prevAssignPulseRef = useRef<number | undefined>(undefined);
@@ -974,6 +1142,49 @@ export default function LineupNewLook({
     };
   }, [rosterCardByActivePlayerId, selections, slots]);
 
+  // Optimieren (Feature 1): pro BELEGTEM Slot prüfen, ob der Top-Kandidat der
+  // Slot-Summary ein anderer (= besserer) Spieler ist als der aktuell Gesetzte.
+  // `topCandidates` stammt aus getAvailableOptionsForSlot und schließt bereits
+  // anderswo gesetzte Spieler aus → jeder Vorschlag ist eligible & konfliktfrei.
+  // Gain = Top-Projektion − aktuelle Slot-Projektion; nur echte Zugewinne (>0).
+  const lineupUpgrades = useMemo(() => {
+    const rows: Array<{ slotKey: string; slotLabel: string; currentName: string; suggestedId: string; suggestedName: string; gain: number }> = [];
+    for (const slot of slots) {
+      const currentId = selections[slot.key];
+      if (!currentId) continue; // nur belegte Slots optimieren
+      const summary = slotCandidateSummaryByKey.get(slot.key);
+      const top = summary?.topCandidates[0] ?? null;
+      if (!top || top.activePlayerId === currentId) continue; // bereits der beste Kandidat gesetzt
+      const currentProjected = summary?.currentProjected ?? null;
+      const gain =
+        currentProjected != null && top.projectedScore != null
+          ? Number((top.projectedScore - currentProjected).toFixed(1))
+          : null;
+      if (gain == null || gain <= 0) continue; // nur echte Verbesserungen anbieten
+      rows.push({
+        slotKey: slot.key,
+        slotLabel: `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1}`,
+        currentName: rosterCardByActivePlayerId.get(currentId)?.name ?? getSelectedOptionMeta(currentId)?.name ?? "Spieler",
+        suggestedId: top.activePlayerId,
+        suggestedName: top.name,
+        gain,
+      });
+    }
+    return rows.sort((left, right) => right.gain - left.gain);
+  }, [slots, selections, slotCandidateSummaryByKey, rosterCardByActivePlayerId, getSelectedOptionMeta]);
+
+  // "Alle übernehmen": Snapshot sequenziell anwenden, aber pro Ziel-Spieler nur
+  // einmal — verhindert Doppel-Zuweisung, falls ein freier Spieler für zwei
+  // Slots zugleich Top-Vorschlag ist (Undo deckt Assignments bereits ab).
+  const applyAllUpgrades = () => {
+    const applied = new Set<string>();
+    for (const row of lineupUpgrades) {
+      if (applied.has(row.suggestedId)) continue;
+      applied.add(row.suggestedId);
+      onAssignPlayer(row.slotKey, row.suggestedId);
+    }
+  };
+
   const topPickForActiveSlot = useMemo(
     () => filteredCandidates.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? filteredCandidates[0] ?? null,
     [filteredCandidates],
@@ -987,6 +1198,69 @@ export default function LineupNewLook({
   const focusLaneD1 = focusBestSlots.find((entry) => entry.disciplineSide === "d1")?.projectedScore ?? null;
   const focusLaneD2 = focusBestSlots.find((entry) => entry.disciplineSide === "d2")?.projectedScore ?? null;
   const focusLaneVerdict = getNlLaneVerdict(focusLaneD1, focusLaneD2);
+  // Fatigue des Fokus-Spielers (Feature 2): als Mini-Gauge im Fokus-Panel.
+  const focusFatigue = focusPlayer?.activePlayerId ? getSelectedOptionMeta(focusPlayer.activePlayerId)?.fatigueCount ?? null : null;
+
+  // Slot-Projektion eines Spielers im aktiven Slot (Feature 1/3): Range + Punkt
+  // aus dem activeSlotCandidate; für den bereits Gesetzten fällt die Range auf
+  // die Slot-Preview zurück. Erfindet keine Werte — fehlt beides, bleibt null.
+  const slotStatsForPlayer = (playerId: string | null | undefined) => {
+    if (!playerId) return null;
+    const entry = filteredCandidates.find((candidate) => candidate.player.activePlayerId === playerId) ?? null;
+    const asc = entry?.activeSlotCandidate ?? null;
+    const slotProjected = activeSlot ? slotPreviewByKey.get(activeSlot.key)?.projected ?? null : null;
+    const isSelected = activeSlot ? selections[activeSlot.key] === playerId : false;
+    return {
+      player: rosterCardByActivePlayerId.get(playerId) ?? entry?.player ?? null,
+      projected: asc?.projectedScore ?? (isSelected ? slotProjected?.totalProjected ?? null : null),
+      rangeLow: asc?.rangeLow ?? (isSelected ? slotProjected?.rangeLow ?? null : null),
+      rangeHigh: asc?.rangeHigh ?? (isSelected ? slotProjected?.rangeHigh ?? null : null),
+    };
+  };
+
+  // Confidence-Band des Fokus-Spielers (Feature 1).
+  const focusStats = slotStatsForPlayer(focusPlayerId);
+
+  // Compare-Tray-Zustand (Feature 3): aktiv, sobald ein Kandidat angeheftet ist
+  // UND ein anderer gehovert wird. Ohne Pin bleibt das Fokus-Panel unverändert.
+  const compareActive =
+    pinnedCandidateId != null && hoveredCandidateId != null && hoveredCandidateId !== pinnedCandidateId;
+  const compareA = compareActive ? slotStatsForPlayer(pinnedCandidateId) : null;
+  const compareB = compareActive ? slotStatsForPlayer(hoveredCandidateId) : null;
+  // Gemeinsame Skala beider Vergleichs-Bänder, damit A und B direkt vergleichbar sind.
+  const compareDomain = (() => {
+    if (!compareA || !compareB) return null;
+    const values = [compareA.rangeLow, compareA.rangeHigh, compareA.projected, compareB.rangeLow, compareB.rangeHigh, compareB.projected].filter(
+      (value): value is number => value != null && Number.isFinite(value),
+    );
+    if (values.length === 0) return null;
+    return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
+  })();
+
+  // Reason-Chips je Kandidat (Feature 2): Achsen-Begründung aus der Slot-Summary
+  // des aktiven Slots (bereits vorhanden, war ungenutzt). Key = activePlayerId.
+  const reasonChipsByPlayerId = useMemo(() => {
+    const top = activeSlotKey ? slotCandidateSummaryByKey.get(activeSlotKey)?.topCandidates ?? [] : [];
+    return new Map(
+      top
+        .filter((candidate) => (candidate.reasonChips?.length ?? 0) > 0)
+        .map((candidate) => [candidate.activePlayerId, candidate.reasonChips ?? []] as const),
+    );
+  }, [activeSlotKey, slotCandidateSummaryByKey]);
+
+  // Gemeinsame Skala für die Confidence-Bänder der Top-4-Kandidaten, damit die
+  // Bänder untereinander vergleichbar sind (sonst eigene Skala je Zeile).
+  const candidateRangeDomain = useMemo(() => {
+    const values: number[] = [];
+    for (const entry of filteredCandidates.slice(0, 4)) {
+      const asc = entry.activeSlotCandidate;
+      if (asc?.rangeLow != null) values.push(asc.rangeLow);
+      if (asc?.rangeHigh != null) values.push(asc.rangeHigh);
+      if (asc?.projectedScore != null) values.push(asc.projectedScore);
+    }
+    if (values.length === 0) return null;
+    return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
+  }, [filteredCandidates]);
 
   const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
   const activeCaptainEntries = captainSelectEntriesBySide[activeCaptainSide] ?? [];
@@ -1042,6 +1316,21 @@ export default function LineupNewLook({
     const tacticPreview = disciplineTacticPreviewBySide?.[disciplineSide] ?? null;
     const progressPct = sideRequired > 0 ? Math.min(100, Math.round((sideSelected / sideRequired) * 100)) : 0;
 
+    // Feature 2 „Score to beat" (spoiler-sicher): nächste Saison-Rivalen dieser
+    // Disziplin. Quelle = context.teamPowerWindows[disciplineId].top8Rivals, gebaut
+    // aus der SAISON-Rangtabelle (rankSource "active_roster_top6_sum_discipline_
+    // score" — identisch zum Saisonstand). `rank` = aktueller Saison-Rang,
+    // `relationship` = Rivalitäts-Stärke (negativer = schärfer). Hier wird KEIN
+    // projiziertes Spieltag-Ergebnis und kein Nach-Spieltag-Rang berührt.
+    const disciplineId = discipline?.disciplineId ?? null;
+    const rivalWindow = disciplineId ? context.teamPowerWindows?.[disciplineId] ?? null : null;
+    const standingsRivals = rivalWindow?.top8Rivals ?? [];
+    // Rivalitäts-Druck spiegelt exakt die Client-Schwelle (rivalryPressureByDiscipline):
+    // sitzt ein Rivale auf Rang ≤ 3, wiegt „Vollgas" schwerer (Druck 1.5 statt 1) —
+    // reine Standings-Ableitung, dieselbe Größe, die bereits in die Projektion fließt.
+    const nearestRivalRank = standingsRivals.length > 0 ? Math.min(...standingsRivals.map((rival) => rival.rank)) : null;
+    const rivalPressureElevated = nearestRivalRank != null && nearestRivalRank <= 3;
+
     return (
       <section
         key={`nl-lineup-side-${disciplineSide}`}
@@ -1065,9 +1354,17 @@ export default function LineupNewLook({
             </div>
           </div>
           <div className="nl-lineup-side-meta">
-            <div className="nl-lineup-side-progress" aria-hidden="true">
-              <span style={{ width: `${progressPct}%` }} />
-            </div>
+            {/* Completeness-Fill jetzt über das Kit-Primitive NlProgressBar
+                (semantischer Ton nach Füllgrad). Die alte Klasse bleibt nur als
+                Größen-Constraint (90×4) erhalten; `progressPct` (0–100) treibt die
+                Bar direkt, damit der Füllgrad byte-genau dem alten Balken entspricht. */}
+            <NlProgressBar
+              value={progressPct}
+              max={100}
+              showValue={false}
+              className="nl-lineup-side-progress"
+              title={`${sideSelected}/${sideRequired || "—"} Pflicht-Slots besetzt`}
+            />
             <div className="nl-lineup-intensity" role="group" aria-label={`${disciplineSide.toUpperCase()} Intensity`}>
               {(["conserve", "normal", "push"] as const).map((stage) => (
                 <button
@@ -1091,10 +1388,72 @@ export default function LineupNewLook({
               ))}
             </div>
           </div>
+
+          {/* Feature 2: kompakter Rivalen-Streifen (eigene Zeile — side-head ist
+              flex-wrap). Zeigt Saison-Rang + Rivalitäts-Stärke der nächsten
+              Rivalen; Tooltip erklärt, warum „Vollgas" gegen sie mehr kostet.
+              Rein Standings-basiert — kein Spieltag-Ergebnis. */}
+          {standingsRivals.length > 0 ? (
+            <div
+              className="nl-lineup-side-rivals"
+              data-testid={`nl-lineup-side-rivals-${disciplineSide}`}
+              style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", fontSize: "11px" }}
+              title={
+                rivalPressureElevated
+                  ? "Zu schlagen: enge Saison-Rivalen (einer steht auf Rang ≤ 3 dieser Disziplin). Weil ein Rivale so weit oben rangiert, wiegt Vollgas hier schwerer — der Rivalitäts-Druck erhöht die Varianz deiner Projektion. Basis: Saisonstand, kein Spieltag-Ergebnis."
+                  : "Zu schlagen: deine nächsten Saison-Rivalen in dieser Disziplin (aus dem Saisonstand, kein Spieltag-Ergebnis)."
+              }
+            >
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700, letterSpacing: "0.02em" }}>Zu schlagen</span>
+              {standingsRivals.slice(0, 2).map((rival) => (
+                <span
+                  key={rival.teamId}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 7px",
+                    borderRadius: "var(--nl-r-pill)",
+                    border: "1px solid var(--nl-line)",
+                    background: "var(--nl-panel-2)",
+                    color: "var(--nl-ink)",
+                  }}
+                  title={`${rival.teamName}: Saison-Rang #${rival.rank} · ${rivalStrengthLabel(rival.relationship)}`}
+                >
+                  <strong className="nl-tnum" style={{ color: "var(--nl-accent)" }}>
+                    #{rival.rank}
+                  </strong>
+                  <span style={{ maxWidth: "9ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rival.teamName}</span>
+                  {/* Stärke als 1–3 Schwerter (nur Deko, Erklärung im Tooltip). */}
+                  <em style={{ fontStyle: "normal", color: "var(--nl-mut-2)" }} aria-hidden="true">
+                    {"⚔".repeat(Math.min(3, Math.max(1, Math.round(Math.abs(rival.relationship) - 1))))}
+                  </em>
+                </span>
+              ))}
+              {rivalPressureElevated ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    padding: "2px 7px",
+                    borderRadius: "var(--nl-r-pill)",
+                    border: "1px solid color-mix(in srgb, var(--nl-warn) 55%, transparent)",
+                    background: "color-mix(in srgb, var(--nl-warn) 16%, transparent)",
+                    color: "var(--nl-warn)",
+                    fontWeight: 700,
+                  }}
+                  title="Ein Rivale steht auf Rang ≤ 3 dieser Disziplin — Vollgas kostet hier mehr (erhöhter Rivalitäts-Druck)."
+                >
+                  Druck ↑
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <div className="nl-lineup-slot-grid">
-          {sideSlots.map((slot) => {
+          {sideSlots.map((slot, slotRevealIndex) => {
             const role = slotRoleByKey.get(slot.key) ?? null;
             const selectedId = selections[slot.key] ?? "";
             const player = selectedId ? rosterCardByActivePlayerId.get(selectedId) ?? null : null;
@@ -1115,14 +1474,21 @@ export default function LineupNewLook({
             const isJustAssigned = recentlyAssignedSlotKey === slot.key;
             const isCaptain = Boolean(selectedId) && captains[slot.disciplineSide] === selectedId;
             const fatigue = selectedId ? getSelectedOptionMeta(selectedId)?.fatigueCount ?? null : null;
+            // Nach-Spieltag-Belastung (Feature 2): aktuelle Fatigue + projizierte
+            // Zusatz-Ermüdung dieses Slots. >= FATIGUE_HIGH ⇒ Warn-Affordanz.
+            const aftermathFatigue = fatigue != null ? fatigue + (preview?.projected.additionalFatigue ?? 0) : null;
+            const aftermathHigh = aftermathFatigue != null && aftermathFatigue >= FATIGUE_HIGH;
 
             return (
               <article
                 key={`nl-lineup-slot-${slot.key}`}
                 id={`lineup-slot-${slot.key}`}
-                className={`nl-lineup-slot${player ? " is-filled" : " is-open"}${isActive ? " is-active" : ""}${isNextTarget ? " is-next" : ""}${isJustAssigned ? " is-just-assigned" : ""}${
+                // nl-reveal: gestaffelter Karten-Einstieg (CSS-only, Stagger-Index
+                // pro Seite) — dasselbe Muster wie MatchdayResultNewLook/Standings.
+                className={`nl-lineup-slot nl-reveal${player ? " is-filled" : " is-open"}${isActive ? " is-active" : ""}${isNextTarget ? " is-next" : ""}${isJustAssigned ? " is-just-assigned" : ""}${
                   dndEnabled && dragCandidateId ? " is-drop-target" : ""
                 }${dragOverSlotKey === slot.key ? " is-drag-over" : ""}${dragSourceSlotKey === slot.key ? " is-dragging" : ""}`}
+                style={{ "--nl-reveal-i": Math.min(slotRevealIndex, 14) } as CSSProperties}
                 draggable={player && dndEnabled ? true : undefined}
                 onDragStart={player ? (event) => handleSlotDragStart(event, slot.key, selectedId) : undefined}
                 onDragEnd={player ? clearDragState : undefined}
@@ -1141,15 +1507,25 @@ export default function LineupNewLook({
                   {player ? (
                     <span className="nl-lineup-slot-player">
                       <strong>
+                        {/* Feature 1: 22px-Portrait-Avatar (Initialen-Fallback) links vom Namen;
+                            Hover ⇒ volle Portrait-Karte (wie v2). `strong` ist bereits Flex-Row
+                            mit gap — Score/Fatigue rutschen dadurch nicht raus. */}
+                        {wrapNlPortraitPreview(
+                          <NlPlayerAvatar portraitUrl={player.portraitUrl} name={player.name} size={22} />,
+                          player,
+                          isReadOnly || isBusy,
+                        )}
                         {player.name}
                         {isCaptain ? <span className="nl-lineup-captain-badge">C</span> : null}
                       </strong>
                       <span className="nl-lineup-slot-score">
+                        {/* Nur noch die projizierte Slot-Punktzahl — die redundante
+                            "Basis"-Zweitzahl entfernt. Fatigue jetzt als Mini-Gauge
+                            (Feature 2) statt bloßem "F N"-Text. */}
                         <em className="nl-tnum">{formatNullableScore(projected)}</em>
-                        <small>
-                          Basis {formatNullableScore(preview?.selectedScore ?? null)}
-                          {fatigue != null ? ` · F ${Math.round(fatigue)}` : ""}
-                        </small>
+                        {fatigue != null ? (
+                          <NlFatigueGauge value={fatigue} label="F" title={`Fatigue ${Math.round(fatigue)}/100`} />
+                        ) : null}
                       </span>
                     </span>
                   ) : (
@@ -1173,6 +1549,16 @@ export default function LineupNewLook({
                     {issue ? (
                       <span className="nl-lineup-chip is-risk" title={issue.detail}>
                         {issue.label}
+                      </span>
+                    ) : null}
+                    {/* Fatigue-Aftermath-Warnung (Feature 2): Spieler ist nach diesem
+                        Spieltag hoch belastet. Ton über fatigueTone (⇒ is-risk). */}
+                    {aftermathHigh ? (
+                      <span
+                        className={`nl-lineup-chip is-${fatigueTone(aftermathFatigue as number)}`}
+                        title="nach diesem Spieltag hoch belastet"
+                      >
+                        Nach Spieltag hoch
                       </span>
                     ) : null}
                   </span>
@@ -1236,24 +1622,42 @@ export default function LineupNewLook({
         <div className="nl-lineup-hud-strength" key={`strength-${assignPulse ?? 0}`} data-testid="nl-lineup-team-strength">
           <div className="nl-lineup-hud-metric is-primary">
             <small>Erwartete Punkte</small>
+            {/* Count-up der Hero-Zahl (Kit-Primitive): animiert die obere
+                Fenstergrenze; die untere Grenze läuft proportional zur Animation
+                mit, sodass das "low–high"-Fenster erhalten bleibt und der Endwert
+                exakt formatProjectedMetricWindow entspricht. */}
             <strong className="nl-tnum">
-              {formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh)}
+              <NlCountUpValue
+                value={matchdayPreviewCards.totalRangeHigh}
+                format={(animatedHigh) => {
+                  const finalHigh = matchdayPreviewCards.totalRangeHigh;
+                  const low = matchdayPreviewCards.totalRangeLow;
+                  const ratio = finalHigh != null && finalHigh !== 0 ? animatedHigh / finalHigh : 1;
+                  return formatProjectedMetricWindow(low != null ? low * ratio : null, animatedHigh);
+                }}
+              />
             </strong>
           </div>
-          {(["d1", "d2"] as const).map((side) => {
-            const tactic = disciplineTacticPreviewBySide?.[side] ?? null;
-            const current = tactic ? tactic[getDisciplineIntensity(side)] : null;
-            return (
-              <div key={`hud-side-${side}`} className={`nl-lineup-hud-metric is-${side}`}>
-                <small>{side.toUpperCase()}</small>
-                <strong className="nl-tnum">{formatNullableScore(current)}</strong>
-              </div>
-            );
-          })}
-          <div className={`nl-lineup-hud-metric is-risk-${matchdayPreviewCards.riskLevel}`}>
-            <small>Risiko</small>
-            <strong>{matchdayPreviewCards.riskLevel}</strong>
-          </div>
+          {/* HUD-Paar "D1"/"D2" entfernt: wiederholte nur die Zahl, die bereits im
+              gewählten Intensity-Button (renderSide) steht — Buttons sind die
+              Single-Source-of-Truth. */}
+          {/* Risiko als tonfarbener Kit-Chip (StatChip → nlToneClass): hoch=risk,
+              mittel=warn, niedrig=good — statt des bloßen Kleinbuchstaben-Worts. */}
+          <StatChip
+            label="Risiko"
+            value={matchdayPreviewCards.riskLevel}
+            tone={getNlRiskTone(matchdayPreviewCards.riskLevel)}
+            title={`Risiko-Level: ${matchdayPreviewCards.riskLevel}`}
+          />
+          {/* Fatigue-Kosten (Feature 2): Summe der Zusatz-Ermüdung dieses Spieltags
+              (matchdayPreviewCards.totalFatigue). Ton über die kanonischen Fatigue-
+              Schwellen (≥40 warn, ≥65 risk). */}
+          <StatChip
+            label="Fatigue-Kosten"
+            value={`−${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
+            tone={fatigueTone(matchdayPreviewCards.totalFatigue)}
+            title={`Ermüdung, die dieser Spieltag kostet: ${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
+          />
           {teamAxisAverage ? (
             <div className="nl-lineup-hud-radar" title={`Ø Achsen der ${teamAxisAverage.count} gesetzten Spieler`}>
               <NlRadar axes={teamAxisAverage.axes} aria-label={`Team-Radar: Ø Achsen der ${teamAxisAverage.count} gesetzten Spieler`} />
@@ -1282,6 +1686,18 @@ export default function LineupNewLook({
             disabled={isBusy || isReadOnly || matchdayPreviewCards.openSlots === 0}
           >
             Automatisch füllen
+          </button>
+          {/* Optimieren (Feature 1): blendet die Upgrade-Karte ein/aus. */}
+          <button
+            type="button"
+            className={`nl-lineup-btn is-ghost${optimizeOpen ? " is-selected" : ""}`}
+            aria-expanded={optimizeOpen}
+            onClick={() => setOptimizeOpen((current) => !current)}
+            disabled={isReadOnly}
+            title="Bessere Kandidaten für belegte Slots vorschlagen"
+          >
+            Optimieren
+            {lineupUpgrades.length > 0 ? <em className="nl-tnum"> {lineupUpgrades.length}</em> : null}
           </button>
           <div className="nl-lineup-save-wrap">
             <button
@@ -1342,6 +1758,52 @@ export default function LineupNewLook({
         </div>
       ) : null}
 
+      {/* --- Optimieren (Feature 1): Upgrade-Hinweise für belegte Slots ------- */}
+      {optimizeOpen ? (
+        <NlCard
+          eyebrow="Optimieren"
+          title="Bessere Aufstellung finden"
+          data-testid="nl-lineup-optimize"
+          actions={
+            <>
+              {lineupUpgrades.length > 0 && !isReadOnly ? (
+                <button type="button" className="nl-lineup-btn is-primary" onClick={applyAllUpgrades} disabled={isBusy}>
+                  Alle übernehmen
+                </button>
+              ) : null}
+              <button type="button" className="nl-lineup-btn is-ghost" onClick={() => setOptimizeOpen(false)}>
+                Schließen
+              </button>
+            </>
+          }
+        >
+          {lineupUpgrades.length === 0 ? (
+            <NlEmptyState icon="✓" tone="good" title="Aufstellung ist bereits optimal" message="Für keinen belegten Slot gibt es einen stärkeren freien Kandidaten." />
+          ) : (
+            <ul className="nl-lineup-show-bonuslist">
+              {lineupUpgrades.map((row) => (
+                <li key={row.slotKey} className="nl-lineup-show-bonus" data-testid="nl-lineup-optimize-row">
+                  <span>
+                    <strong className="nl-tnum">{row.slotLabel}</strong> {row.currentName} → {row.suggestedName}
+                  </span>
+                  <NlDeltaChip value={row.gain} format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`} title="Projizierter Zugewinn dieses Wechsels" />
+                  {!isReadOnly ? (
+                    <button
+                      type="button"
+                      className="nl-lineup-btn is-ghost is-small"
+                      onClick={() => onAssignPlayer(row.slotKey, row.suggestedId)}
+                      disabled={isBusy}
+                    >
+                      Übernehmen
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </NlCard>
+      ) : null}
+
       {resolveShowData ? (
         <NlLineupResolveShow
           data={resolveShowData}
@@ -1384,7 +1846,52 @@ export default function LineupNewLook({
               ) : null}
             </header>
 
-            {focusPlayer ? (
+            {compareActive && compareA?.player && compareB?.player ? (
+              // Compare-Tray (Feature 3): angeheftet (A) vs. gehovert (B) —
+              // Radar-Overlay (Mehrserien-Modus), beide Confidence-Bänder auf
+              // gemeinsamer Skala und das Projektions-Delta B − A.
+              <div className="nl-lineup-focus-player" data-testid="nl-lineup-compare">
+                <div className="nl-lineup-focus-radar">
+                  {compareA.player.coreStats && compareB.player.coreStats ? (
+                    <NlRadar
+                      max={100}
+                      axisDefs={(["pow", "spe", "men", "soc"] as const).map((key) => ({ key, label: NL_AXIS_AREA_LABEL[key] }))}
+                      series={[
+                        { id: "pin", label: compareA.player.name, tone: "accent", values: compareA.player.coreStats },
+                        { id: "hover", label: compareB.player.name, tone: "good", dashed: true, values: compareB.player.coreStats },
+                      ]}
+                      aria-label={`Vergleichs-Radar: ${compareA.player.name} gegen ${compareB.player.name}`}
+                    />
+                  ) : (
+                    <p className="nl-lineup-focus-noradar">Keine Achsen-Daten für den Vergleich.</p>
+                  )}
+                </div>
+                <div className="nl-lineup-focus-meta">
+                  <span className="nl-lineup-eyebrow">Vergleich · angeheftet vs. gehovert</span>
+                  <strong>
+                    {compareA.player.name} vs. {compareB.player.name}
+                  </strong>
+                  <StatChip label="A" value={formatNullableScore(compareA.projected)} sub={compareA.player.name} tone="accent" title="Angehefteter Kandidat" />
+                  {compareA.rangeLow != null && compareA.rangeHigh != null ? (
+                    <VeloRangeBar low={compareA.rangeLow} high={compareA.rangeHigh} point={compareA.projected} tone="neutral" compact domainMin={compareDomain?.min ?? null} domainMax={compareDomain?.max ?? null} />
+                  ) : null}
+                  <StatChip label="B" value={formatNullableScore(compareB.projected)} sub={compareB.player.name} tone="good" title="Gehoverter Kandidat" />
+                  {compareB.rangeLow != null && compareB.rangeHigh != null ? (
+                    <VeloRangeBar low={compareB.rangeLow} high={compareB.rangeHigh} point={compareB.projected} tone="positive" compact domainMin={compareDomain?.min ?? null} domainMax={compareDomain?.max ?? null} />
+                  ) : null}
+                  {compareA.projected != null && compareB.projected != null ? (
+                    <NlDeltaChip
+                      value={Number((compareB.projected - compareA.projected).toFixed(1))}
+                      format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
+                      title="Projektions-Delta: gehovert (B) − angeheftet (A)"
+                    />
+                  ) : null}
+                  <button type="button" className="nl-lineup-btn is-ghost is-small" onClick={() => setPinnedCandidateId(null)}>
+                    Vergleich lösen
+                  </button>
+                </div>
+              </div>
+            ) : focusPlayer ? (
               <div className="nl-lineup-focus-player">
                 <div className="nl-lineup-focus-radar">
                   {focusPlayer.coreStats ? (
@@ -1401,7 +1908,12 @@ export default function LineupNewLook({
                   )}
                 </div>
                 <div className="nl-lineup-focus-meta">
-                  <strong>{focusPlayer.name}</strong>
+                  {/* Feature 1: 28px-Portrait-Avatar im Fokus-Panel (Initialen-Fallback).
+                      Detailkarte ist hier schon sichtbar (Radar/Stats) ⇒ kein Hover-Popover nötig. */}
+                  <strong style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                    <NlPlayerAvatar portraitUrl={focusPlayer.portraitUrl} name={focusPlayer.name} size={28} />
+                    <span>{focusPlayer.name}</span>
+                  </strong>
                   <small>
                     {focusPlayer.className ?? "—"}
                     {focusPlayer.playerOvr != null ? (
@@ -1418,12 +1930,28 @@ export default function LineupNewLook({
                       {focusLaneVerdict.label}
                     </span>
                   ) : null}
+                  {/* Lane-Verdikt-Chip + NlLaneMeter bleiben als Lane-Signal.
+                      Die frühere "Bester Slot: … · NN"-Zeile war nur das Maximum der
+                      Lane-Werte und damit redundant — entfernt. */}
                   <NlLaneMeter bestD1={focusLaneD1} bestD2={focusLaneD2} />
-                  {focusBestSlots[0] ? (
-                    <small className="nl-lineup-focus-bestslot">
-                      Bester Slot: {focusBestSlots[0].disciplineSide.toUpperCase()}-{focusBestSlots[0].slotIndex + 1} ·{" "}
-                      {formatNullableScore(focusBestSlots[0].projectedScore)}
-                    </small>
+                  {/* Confidence-Band (Feature 1): projizierte Punktespanne des
+                      Fokus-Spielers im aktiven Slot (füllt den in Phase 0 durch
+                      den entfernten Zeilen-Lane-Meter freigewordenen Platz). */}
+                  {focusStats && focusStats.rangeLow != null && focusStats.rangeHigh != null ? (
+                    <VeloRangeBar
+                      low={focusStats.rangeLow}
+                      high={focusStats.rangeHigh}
+                      point={focusStats.projected}
+                      tone="neutral"
+                      compact
+                      ariaLabel={`Projektion ${formatNullableScore(focusStats.rangeLow)} bis ${formatNullableScore(focusStats.rangeHigh)}${
+                        focusStats.projected != null ? `, Fokus ${formatNullableScore(focusStats.projected)}` : ""
+                      }`}
+                    />
+                  ) : null}
+                  {/* Fatigue als Mini-Gauge (Feature 2) statt bloßem Textwert. */}
+                  {focusFatigue != null ? (
+                    <NlFatigueGauge value={focusFatigue} label="Fatigue" title={`Fatigue ${Math.round(focusFatigue)}/100`} />
                   ) : null}
                   <button
                     type="button"
@@ -1432,36 +1960,95 @@ export default function LineupNewLook({
                   >
                     Profil
                   </button>
+                  {/* Pin-Affordanz (Feature 3): Fokus-Spieler zum Vergleich anheften;
+                      danach einen anderen Kandidaten hovern ⇒ A-vs-B-Compare-Tray. */}
+                  {focusPlayer.activePlayerId ? (
+                    <button
+                      type="button"
+                      className={`nl-lineup-btn is-ghost is-small${pinnedCandidateId === focusPlayer.activePlayerId ? " is-selected" : ""}`}
+                      aria-pressed={pinnedCandidateId === focusPlayer.activePlayerId}
+                      title="Zum Vergleich anheften — danach anderen Kandidaten hovern zeigt A vs B"
+                      onClick={() =>
+                        setPinnedCandidateId((current) =>
+                          current === focusPlayer.activePlayerId ? null : focusPlayer.activePlayerId ?? null,
+                        )
+                      }
+                    >
+                      {pinnedCandidateId === focusPlayer.activePlayerId ? "📌 Angeheftet" : "📌 Vergleichen"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
               <p className="nl-lineup-focus-noradar">Kandidat wählen oder Slot fokussieren.</p>
             )}
 
+            {/* Phase 3: Captain-Chip-Grid ersetzt das veraltete native <select>.
+                Jeder Kandidat ist ein fokussierbarer Button-Chip (Name + geschätzter
+                Captain-Bonus, optional Moral-Reward). Ein Klick ruft denselben
+                onUpdateCaptain-Handler wie zuvor auf — Selektionslogik/State bleiben
+                unverändert. Styling über Inline-Tokens (kein globals.css-Zugriff),
+                damit es kompakt in die Fokus-Rail passt. */}
             <div className="nl-lineup-captain">
-              <label>
-                <span>
-                  Captain {activeCaptainSide.toUpperCase()} · {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison ·{" "}
-                  {captainDraftRemaining} frei heute
-                </span>
-                <select
-                  className="nl-lineup-captain-select"
-                  value={captains[activeCaptainSide] ?? ""}
-                  disabled={isReadOnly || isBusy}
-                  onChange={(event) => onUpdateCaptain(activeCaptainSide, event.target.value)}
-                >
-                  <option value="">Kein Captain</option>
-                  {activeCaptainEntries.map((entry) => {
-                    const info = activeCaptainInfoById.get(entry.activePlayerId);
-                    return (
-                      <option key={entry.activePlayerId} value={entry.activePlayerId}>
-                        {entry.name}
-                        {info?.estimatedCaptainBonus != null ? ` (+${formatScore(info.estimatedCaptainBonus)})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
+              <span>Captain {activeCaptainSide.toUpperCase()} · {captainDraftRemaining} frei heute</span>
+              {/* Saison-Captain-Budget als Kit-NlProgressBar (invert: voll = ausgeschöpft → risk). */}
+              <NlProgressBar
+                value={captainSeasonUsedWithDraft}
+                max={captainSeasonLimit || 1}
+                label="Saisonbudget"
+                invert
+                format={(v) => `${formatNlNumber(v, 0)} / ${formatNlNumber(captainSeasonLimit, 0)}`}
+                title={`${captainSeasonUsedWithDraft} von ${captainSeasonLimit} Captain-Einsätzen dieser Saison verplant`}
+                className="nl-lineup-captain-budget"
+              />
+              <div
+                role="group"
+                aria-label={`Captain ${activeCaptainSide.toUpperCase()} wählen`}
+                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}
+              >
+                {/* "Kein Captain"-Chip (aktiv, wenn keine Auswahl gesetzt ist). */}
+                {(() => {
+                  const noneSelected = !captains[activeCaptainSide];
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={noneSelected}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateCaptain(activeCaptainSide, "")}
+                      style={captainChipStyle(noneSelected)}
+                    >
+                      Kein Captain
+                    </button>
+                  );
+                })()}
+                {activeCaptainEntries.map((entry) => {
+                  const info = activeCaptainInfoById.get(entry.activePlayerId);
+                  const isSelected = captains[activeCaptainSide] === entry.activePlayerId;
+                  return (
+                    <button
+                      key={entry.activePlayerId}
+                      type="button"
+                      aria-pressed={isSelected}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateCaptain(activeCaptainSide, entry.activePlayerId)}
+                      title={`${entry.name} als Captain ${activeCaptainSide.toUpperCase()} setzen`}
+                      style={captainChipStyle(isSelected)}
+                    >
+                      <strong style={{ fontWeight: isSelected ? 700 : 600 }}>{entry.name}</strong>
+                      {info?.estimatedCaptainBonus != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-good)", fontWeight: 700 }} title="Geschätzter Score-Bonus">
+                          +{formatScore(info.estimatedCaptainBonus)}
+                        </em>
+                      ) : null}
+                      {info?.moraleReward != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-accent)", fontWeight: 700 }} title="Moral-Reward bei Forderungserfüllung">
+                          ♥+{formatScore(info.moraleReward)}
+                        </em>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
@@ -1512,11 +2099,16 @@ export default function LineupNewLook({
             </header>
 
             <div className="nl-lineup-candidate-list" onMouseLeave={() => setHoveredCandidateId(null)}>
+              {/* Kit-Leerzustände statt bloßer <p>-Zeilen (einheitliches --nl-*-Vokabular). */}
               {!activeSlot ? (
-                <p className="nl-lineup-candidate-empty">Erst einen Slot links wählen — dann Kandidaten einsetzen.</p>
+                <NlEmptyState
+                  icon="🎯"
+                  title="Kein Slot fokussiert"
+                  message="Erst einen Slot links wählen — dann Kandidaten einsetzen."
+                />
               ) : null}
               {filteredCandidates.length === 0 ? (
-                <p className="nl-lineup-candidate-empty">Keine Kandidaten in dieser Gruppe.</p>
+                <NlEmptyState title="Keine Kandidaten" message="Keine Kandidaten in dieser Gruppe." />
               ) : (
                 filteredCandidates.map((entry: NlCandidateEntry, index: number) => {
                   const candidate = entry.player;
@@ -1527,8 +2119,9 @@ export default function LineupNewLook({
                   const isAssignedHere = Boolean(candidateId) && activeSelectionId === candidateId;
                   const bestSlots: NlBestSlotEntry[] = candidateId ? playerBestSlotSummaryByActivePlayerId.get(candidateId) ?? [] : [];
                   const bestSlot = bestSlots[0] ?? null;
-                  const laneD1 = bestSlots.find((slotEntry) => slotEntry.disciplineSide === "d1")?.projectedScore ?? null;
-                  const laneD2 = bestSlots.find((slotEntry) => slotEntry.disciplineSide === "d2")?.projectedScore ?? null;
+                  // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
+                  const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
+                  const candidateRange = entry.activeSlotCandidate ?? null;
 
                   return (
                     <button
@@ -1537,6 +2130,10 @@ export default function LineupNewLook({
                       className={`nl-lineup-candidate${isAssignedHere ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}${
                         dragCandidateId === candidateId && candidateId ? " is-dragging" : ""
                       }`}
+                      // Feature 1: Grid um eine schmale Avatar-Spalte erweitern (Basis war
+                      // "1fr auto"). „auto" ⇒ nur so breit wie der 20px-Avatar; Namens-/
+                      // Score-Spalte bleiben unverändert, also gleiche Zeilendichte.
+                      style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
                       disabled={isReadOnly || isBlocked || !candidateId}
                       draggable={dndEnabled && !isBlocked && Boolean(candidateId) ? true : undefined}
                       title={
@@ -1557,6 +2154,14 @@ export default function LineupNewLook({
                           {index + 1}
                         </span>
                       ) : null}
+                      {/* Feature 1: 20px-Avatar als erste Grid-Spalte (Initialen-Fallback,
+                          Hover ⇒ volle Karte). Klick fällt weiterhin auf den Button-Handler
+                          durch (Zuweisung); Drag-Quelle bleibt der gesamte Button. */}
+                      {wrapNlPortraitPreview(
+                        <NlPlayerAvatar portraitUrl={candidate.portraitUrl} name={candidate.name} size={20} />,
+                        candidate,
+                        isReadOnly || isBlocked,
+                      )}
                       <span className="nl-lineup-candidate-main">
                         <strong>{candidate.name}</strong>
                         <small>
@@ -1569,7 +2174,36 @@ export default function LineupNewLook({
                             {formatNullableScore(bestSlot.projectedScore)}
                           </small>
                         ) : null}
-                        <NlLaneMeter bestD1={laneD1} bestD2={laneD2} />
+                        {/* Reason-Chips (Feature 2): Top 1–2 Achsen-Begründungen als
+                            getönte StatChips (Achsen-Ton), statt nur Freitext oben. */}
+                        {reasonChips.length > 0 ? (
+                          <span className="nl-lineup-candidate-reasons">
+                            {reasonChips.slice(0, 2).map((chip) => (
+                              <StatChip
+                                key={chip.axis}
+                                label={chip.label}
+                                value={chip.rating ?? "—"}
+                                tone={reasonChipTone(chip.axis)}
+                                title={chip.detail}
+                              />
+                            ))}
+                          </span>
+                        ) : null}
+                        {/* Confidence-Band (Feature 1) auf den Top-4-Zeilen, gemeinsame
+                            Skala (candidateRangeDomain) ⇒ Bänder direkt vergleichbar.
+                            Ersetzt den in Phase 0 entfernten Zeilen-Lane-Meter. */}
+                        {index < 4 && candidateRange?.rangeLow != null && candidateRange?.rangeHigh != null ? (
+                          <VeloRangeBar
+                            low={candidateRange.rangeLow}
+                            high={candidateRange.rangeHigh}
+                            point={projectedScore}
+                            tone="neutral"
+                            compact
+                            domainMin={candidateRangeDomain?.min ?? null}
+                            domainMax={candidateRangeDomain?.max ?? null}
+                            ariaLabel={`Projektion ${formatNullableScore(candidateRange.rangeLow)} bis ${formatNullableScore(candidateRange.rangeHigh)}`}
+                          />
+                        ) : null}
                       </span>
                       <span className="nl-lineup-candidate-score">
                         <strong className="nl-tnum">{formatNullableScore(projectedScore)}</strong>

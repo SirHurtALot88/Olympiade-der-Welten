@@ -1,7 +1,8 @@
 "use client";
 
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData } from "@/lib/foundation/team-detail-drawer-types";
 import TeamProfileNewLook from "@/app/foundation/team-profile/TeamProfileNewLook";
 
 export type TeamProfileClientProps = {
@@ -10,6 +11,8 @@ export type TeamProfileClientProps = {
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
   onOpenContracts?: () => void;
   leagueHeatPools?: LeaguePlayerHeatPools;
+  /** Voller GameState — die Team-Profil-Seite liegt außerhalb des FoundationStateProvider. */
+  gameState?: GameState | null;
 };
 
 export default function TeamProfileClient({
@@ -18,6 +21,7 @@ export default function TeamProfileClient({
   onOpenPlayer,
   onOpenContracts,
   leagueHeatPools,
+  gameState,
 }: TeamProfileClientProps) {
   return (
     <TeamProfileNewLook
@@ -26,6 +30,7 @@ export default function TeamProfileClient({
       onOpenPlayer={onOpenPlayer}
       onOpenContracts={onOpenContracts}
       leagueHeatPools={leagueHeatPools}
+      gameState={gameState}
     />
   );
 }

@@ -5,14 +5,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
+  NlProgressBar,
+  NlRankingDrawer,
+  NlSparkline,
   NlSubTabs,
   StatChip,
   StatChipRow,
   formatNlNumber,
   nlToneClass,
+  type NlRankingDrawerRow,
+  type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import type { MatchdayArenaV2ClientProps } from "@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client";
 import {
   MATCHDAY_ARENA_PHASES,
@@ -62,6 +69,12 @@ import type { RoomArenaState } from "@/types/game";
  */
 
 type ArenaNewLookBoardSide = "d1" | "d2" | "total";
+
+/**
+ * MVP-Drilldown: welche Disziplin-Spalte der Tages-MVP-Rangliste im
+ * NlRankingDrawer geöffnet ist ("d1"/"d2"/"pp"; `null` = geschlossen).
+ */
+type ArenaMvpDrawerKey = "d1" | "d2" | "pp";
 
 type ArenaNewLookLoadState = "loading" | "ready" | "error";
 
@@ -188,6 +201,21 @@ const NL_ARENA_PHASE_DESCRIPTIONS: Record<MatchdayArenaPhaseId, string> = {
 
 type ArenaStageMover = { teamId: string; teamName: string; value: number };
 
+/**
+ * Feature 2 (Schlüsselmomente): ein akkumulierter Bühnen-Spotlight-Eintrag
+ * einer bereits enthüllten Phase — Schub (`gain`), Dämpfer (`loss`) oder
+ * Rang-Kletterer (`climb`). Trägt die Phasen-Herkunft für den Ticker.
+ */
+type ArenaKeyMoment = {
+  key: string;
+  phaseId: MatchdayArenaPhaseId;
+  phaseLabel: string;
+  kind: "gain" | "loss" | "climb";
+  teamId: string;
+  teamName: string;
+  value: number;
+};
+
 function formatSignedNlDelta(value: number): string {
   return `${value > 0 ? "+" : ""}${formatNlNumber(value, 1)}`;
 }
@@ -242,7 +270,16 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [speedIndex, setSpeedIndex] = useState(1);
   const [standingsPreview, setStandingsPreview] = useState<ArenaNewLookStandingsPreview | null>(null);
+  // MVP-Drilldown: geöffnete Disziplin-Spalte des Ranglisten-Drawers (null = zu).
+  const [mvpDrawerKey, setMvpDrawerKey] = useState<ArenaMvpDrawerKey | null>(null);
   const rowNodesRef = useRef<Map<string, HTMLElement>>(new Map());
+
+  // Phase 3 (Teilen): Zustand der Kopier-Bestätigung am eigenen Ergebnis-Recap.
+  // "copied" wird nach fester Verzögerung zurückgesetzt (kein Date.now()/Math.random(),
+  // reiner setTimeout mit konstanter Dauer, siehe Effect unten). "error" bleibt stehen,
+  // damit der markierbare Fallback-Text zum manuellen Kopieren sichtbar bleibt.
+  const [recapCopyState, setRecapCopyState] = useState<"idle" | "copied" | "error">("idle");
+  const recapCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Co-op room sync (shared hook with the classic arena — see
   // lib/room/use-arena-room-sync.ts). New Look's own reveal state is coarser
@@ -511,6 +548,31 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
   const finalPhaseIndex = MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === "final");
   const mvpsRevealed = phaseIndex >= finalPhaseIndex || boardSide === "total";
 
+  // MVP-Drilldown: Konfiguration der drei Disziplin-Spalten (Label/Ton/Quelle).
+  // Quelle ist die bereits berechnete, vollständige Top-Liste (bis zu 10) — es
+  // wird nichts neu berechnet oder nachgeladen.
+  const mvpDrawerConfig: Record<
+    ArenaMvpDrawerKey,
+    { label: string; tone: NlTone; subtitle: string; players: MatchdayMvpTopPlayerRow[] }
+  > = {
+    d1: { label: d1Label, tone: "pow", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.d1TopPlayers ?? [] },
+    d2: { label: d2Label, tone: "men", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.d2TopPlayers ?? [] },
+    pp: { label: "PP-Gewinner", tone: "soc", subtitle: "Beste Einzelwertungen · Endscore", players: scoreFeed?.ppWinners ?? [] },
+  };
+  const activeMvpDrawer = mvpDrawerKey ? mvpDrawerConfig[mvpDrawerKey] : null;
+  const activeMvpDrawerRows: NlRankingDrawerRow[] = activeMvpDrawer
+    ? activeMvpDrawer.players.map((player, index) => ({
+        id: `${player.playerId}-${player.slotIndex}`,
+        rank: index + 1,
+        name: player.playerName,
+        sub: player.teamName,
+        value: player.finalPlayerScore,
+        displayValue: formatNlNumber(player.finalPlayerScore, 1),
+        tone: activeMvpDrawer.tone,
+        isOwn: player.teamId === params.teamId,
+      }))
+    : [];
+
   const activeView = boardSide === "d2" ? d2View : d1View;
 
   // Reveal-Autoplay: Phasen automatisch durchschalten, solange aktiv und
@@ -542,6 +604,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     setExpandedTeamId(null);
     setIsAutoPlaying(false);
   }, [boardSide]);
+
+  // Phase 3 (Teilen): laufenden Reset-Timer der Kopier-Bestätigung beim Unmount
+  // abräumen, damit kein setState auf einer entfernten Komponente feuert.
+  useEffect(
+    () => () => {
+      if (recapCopyTimerRef.current) {
+        clearTimeout(recapCopyTimerRef.current);
+      }
+    },
+    [],
+  );
 
   function scrollToTeam(teamId: string) {
     const node = rowNodesRef.current.get(teamId);
@@ -662,6 +735,211 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     });
   }, [activeView, params.teamId]);
 
+  // Feature 2: Momentum-Sparkline für "Dein Lauf" — eigener Rang über die bereits
+  // enthüllten Phasen, invertiert (negierter Rang → oben = besserer Rang), analog
+  // zum invertierten Kumulativ-Rang in NlFieldRaceFormStrip. Bewusst nur bis zur
+  // aktuellen Phase geschnitten, damit die Sparkline den Endrang nicht vorwegnimmt.
+  const ownRunSparkPoints = useMemo(
+    () =>
+      ownRun
+        .slice(0, phaseIndex + 1)
+        .map((step) => step.rank)
+        .filter((rank): rank is number => typeof rank === "number" && Number.isFinite(rank))
+        .map((rank) => -rank),
+    [ownRun, phaseIndex],
+  );
+
+  // Feature 1: Erwartung vs. Ergebnis — Start-Rang (`baseRank`, nach reiner
+  // Basiswertung) gegen den End-Rang des eigenen Teams. `baseRank`/`rankDelta`
+  // werden vom Presenter bereits berechnet, aber nirgends gerendert; hier nur
+  // angezeigt, KEINE eigene Rang-Rechnung. Wird erst in der Ergebnis-Phase
+  // ausgespielt (siehe Render) — spoilerfrei.
+  const ownExpectation = useMemo(() => {
+    if (boardSide === "total" || activeView.length === 0) {
+      return null;
+    }
+    const row = activeView.find((entry) => entry.teamId === params.teamId);
+    if (!row) {
+      return null;
+    }
+    return {
+      teamName: row.teamName,
+      baseRank: row.baseRank,
+      finalRank: row.rank,
+      rankDelta: row.rankDelta,
+      total: activeView.length,
+      // Phase 3 (Teilen): Tagespunkte der eigenen Zeile für den Recap-Text —
+      // exakt der Wert, der in der Ergebnis-Phase auf dem Board steht.
+      points: row.points,
+    };
+  }, [activeView, params.teamId, boardSide]);
+
+  // Phase 3 (Teilen): Tages-MVP für den Recap — bester Einzelscore über beide
+  // Disziplin-Top-Listen (im Finale/Ergebnis bereits enthüllt, siehe MVP-Karte).
+  // Reine Auswahl aus schon berechneten Daten, keine eigene Wertung.
+  const resultMvpName = useMemo<string | null>(() => {
+    const pool = [...(scoreFeed?.d1TopPlayers ?? []), ...(scoreFeed?.d2TopPlayers ?? [])];
+    if (pool.length === 0) {
+      return null;
+    }
+    const best = pool.reduce((top, player) =>
+      player.finalPlayerScore > top.finalPlayerScore ? player : top,
+    );
+    return best.playerName || null;
+  }, [scoreFeed?.d1TopPlayers, scoreFeed?.d2TopPlayers]);
+
+  // Phase 3 (Teilen): kompakter Klartext-Recap NUR aus in der Ergebnis-Phase
+  // sichtbaren Daten (Rang, PPs, MVP, Rang-Bewegung aus baseRank/rankDelta).
+  // Fehlende Felder werden weggelassen (degradiert), statt Platzhalter zu zeigen.
+  const ownRecap = useMemo<string | null>(() => {
+    if (!isResultPhase || !ownExpectation) {
+      return null;
+    }
+    const matchdayLabel = scoreFeed?.targetMatchday.label?.trim() || "Spieltag";
+    const movement =
+      ownExpectation.rankDelta > 0
+        ? `▲${ownExpectation.rankDelta}`
+        : ownExpectation.rankDelta < 0
+          ? `▼${Math.abs(ownExpectation.rankDelta)}`
+          : "±0";
+    let text = `${matchdayLabel} — ${ownExpectation.teamName}: Platz #${ownExpectation.finalRank}`;
+    if (ownExpectation.points != null) {
+      text += `, ${formatNlNumber(ownExpectation.points, 1)} PPs`;
+    }
+    text += ".";
+    if (resultMvpName) {
+      text += ` MVP: ${resultMvpName}.`;
+    }
+    text += ` ${movement}`;
+    return text;
+  }, [isResultPhase, ownExpectation, scoreFeed?.targetMatchday.label, resultMvpName]);
+
+  // Phase 3 (Teilen): Recap in die Zwischenablage kopieren. Erst den offenen
+  // Reset-Timer stoppen, dann per navigator.clipboard.writeText kopieren. Bei
+  // Erfolg kurze "kopiert ✓"-Bestätigung mit fester Reset-Verzögerung; bei
+  // Fehlschlag "error" (markierbarer Fallback-Text bleibt im Render sichtbar).
+  async function handleCopyRecap(text: string) {
+    if (recapCopyTimerRef.current) {
+      clearTimeout(recapCopyTimerRef.current);
+      recapCopyTimerRef.current = null;
+    }
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("clipboard-unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      setRecapCopyState("copied");
+      recapCopyTimerRef.current = setTimeout(() => setRecapCopyState("idle"), 2400);
+    } catch {
+      // Fallback: Fehler anzeigen und den Text markierbar rendern, damit der
+      // Nutzer manuell kopieren kann. Kein Auto-Reset, solange der Fallback zählt.
+      setRecapCopyState("error");
+    }
+  }
+
+  // Feature 2 (Schlüsselmomente): Rang-Karten je Phase für ALLE Teams — dieselben
+  // Presenter-Rankings wie das Board, nur je Phase eingefroren. Basis für die
+  // Kletterer-Erkennung im persistenten Ticker.
+  const phaseRankMaps = useMemo<Map<string, number>[]>(() => {
+    if (activeView.length === 0) {
+      return [];
+    }
+    const slotScores = () => buildBaseScoreMap(activeView);
+    return MATCHDAY_ARENA_PHASES.map((phase) =>
+      buildArenaTeamRankMap(activeView, { phaseId: phase.id, revealedSlotCount: 0 }, slotScores),
+    );
+  }, [activeView]);
+
+  // Feature 2: Schlüsselmomente-Feed — akkumuliert die Bühnen-Spotlights
+  // (Stärkster Schub / Härtester Dämpfer / Kletterer) über ALLE bereits
+  // enthüllten Phasen (0…phaseIndex). Gleiche Logik wie `stageInfo`, nur je Phase
+  // statt nur der aktiven — spoilerfrei, weil verdeckte Phasen (> phaseIndex)
+  // ausgelassen werden.
+  const keyMoments = useMemo<ArenaKeyMoment[]>(() => {
+    if (boardSide === "total" || activeView.length === 0) {
+      return [];
+    }
+    const revealed = Math.min(phaseIndex, MATCHDAY_ARENA_PHASES.length - 1);
+    const entries: ArenaKeyMoment[] = [];
+    for (let i = 0; i <= revealed; i += 1) {
+      const phase = MATCHDAY_ARENA_PHASES[i];
+      if (!phase) {
+        continue;
+      }
+      let topGain: ArenaStageMover | null = null;
+      let topLoss: ArenaStageMover | null = null;
+      for (const row of activeView) {
+        const delta = getMatchdayArenaPhaseDelta(row, phase.id);
+        if (delta == null || delta === 0) {
+          continue;
+        }
+        if (delta > 0) {
+          if (!topGain || delta > topGain.value) {
+            topGain = { teamId: row.teamId, teamName: row.teamName, value: delta };
+          }
+        } else if (!topLoss || delta < topLoss.value) {
+          topLoss = { teamId: row.teamId, teamName: row.teamName, value: delta };
+        }
+      }
+      // Kletterer über den Rang-Sprung gegenüber der Phase davor (echte Presenter-Ränge).
+      let climber: ArenaStageMover | null = null;
+      const current = phaseRankMaps[i] ?? null;
+      const previous = i > 0 ? (phaseRankMaps[i - 1] ?? null) : null;
+      if (current && previous) {
+        for (const row of activeView) {
+          const rankDelta = getArenaStepRankDelta(current.get(row.teamId), previous.get(row.teamId));
+          if (rankDelta != null && rankDelta > 0 && (!climber || rankDelta > climber.value)) {
+            climber = { teamId: row.teamId, teamName: row.teamName, value: rankDelta };
+          }
+        }
+      }
+      if (topGain) {
+        entries.push({ key: `${phase.id}-gain`, phaseId: phase.id, phaseLabel: phase.label, kind: "gain", ...topGain });
+      }
+      if (topLoss) {
+        entries.push({ key: `${phase.id}-loss`, phaseId: phase.id, phaseLabel: phase.label, kind: "loss", ...topLoss });
+      }
+      if (climber) {
+        entries.push({ key: `${phase.id}-climb`, phaseId: phase.id, phaseLabel: phase.label, kind: "climb", ...climber });
+      }
+    }
+    return entries;
+  }, [activeView, phaseIndex, phaseRankMaps, boardSide]);
+
+  // Feature 3: Head-to-Head — eigenes Team gegen den unmittelbaren Rang-Nachbarn
+  // (bevorzugt eine Position darüber = das Team, das du jagst; als Erster gegen
+  // den Verfolger dahinter). Rein aus dem aktuell sortierten Board abgeleitet,
+  // Scores aus der laufenden Phase — spoilerfrei, identisch zu den Board-Werten.
+  const duel = useMemo(() => {
+    if (boardSide === "total" || boardRows.length < 2) {
+      return null;
+    }
+    const ownIndex = boardRows.findIndex((row) => row.teamId === params.teamId);
+    if (ownIndex < 0) {
+      return null;
+    }
+    const neighborIndex = ownIndex > 0 ? ownIndex - 1 : ownIndex + 1;
+    const own = boardRows[ownIndex];
+    const neighbor = boardRows[neighborIndex];
+    if (!own || !neighbor) {
+      return null;
+    }
+    const ownScore = getMatchdayArenaPhaseScore(own, activePhase) ?? 0;
+    const neighborScore = getMatchdayArenaPhaseScore(neighbor, activePhase) ?? 0;
+    const ownRank = rankMaps.current.get(own.teamId) ?? ownIndex + 1;
+    const neighborRank = rankMaps.current.get(neighbor.teamId) ?? neighborIndex + 1;
+    return {
+      own,
+      neighbor,
+      ownScore,
+      neighborScore,
+      ownRank,
+      neighborRank,
+      neighborIsAhead: ownIndex > 0,
+      scoreGap: Number((ownScore - neighborScore).toFixed(1)),
+    };
+  }, [boardRows, params.teamId, activePhase, rankMaps, boardSide]);
+
   // Gesamt-Tageswertung aus beiden Disziplin-Boards (echte Scores/Punkte).
   const totalRows = useMemo<ArenaNewLookTotalRow[]>(() => {
     const d1ByTeam = new Map(d1View.map((row) => [row.teamId, row] as const));
@@ -759,6 +1037,50 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     );
   }
 
+  // Feature 1: Finale-Aufschlüsselung. Der Score-Sprung in der Finale-/Ergebnis-
+  // Phase (der bereits vom Presenter als `phaseDelta` gezeigte Final-Delta) stammt
+  // aus Fatigue + Team-PPs, die erst hier greifen. Wir zerlegen ihn sichtbar in
+  // seine zwei Komponenten — reine Anzeige der schon berechneten Modifikatoren
+  // (`fatigueModifier`/`teamPpsModifier`), keine eigene Rechnung. Hinweis: Auf der
+  // Zeile liegt nur der Fatigue-Score-Modifikator, KEIN 0–100-Fatigue-Level, daher
+  // kein NlFatigueGauge — der Effekt wird als NlDeltaChip dargestellt.
+  function renderFinaleExplainer(row: MatchdayArenaScoreboardRowView) {
+    const fatigueMod = row.fatigueStatus === "mapped" ? row.fatigueModifier : null;
+    const teamPpsMod = row.teamPpsStatus === "ready" ? row.teamPpsModifier : null;
+    const hasFatigue = fatigueMod != null && Math.abs(fatigueMod) >= 0.05;
+    const hasTeamPps = teamPpsMod != null && Math.abs(teamPpsMod) >= 0.05;
+    if (!hasFatigue && !hasTeamPps) {
+      return null;
+    }
+    return (
+      <div className="nl-arena-finale-explainer" role="group" aria-label="Finale-Effekte: Fatigue und Team-PPs">
+        <span className="nl-arena-finale-explainer-label">Finale-Effekte</span>
+        <div className="nl-arena-finale-explainer-items">
+          {hasFatigue ? (
+            <span className="nl-arena-finale-explainer-item">
+              <span className="nl-arena-finale-explainer-item-label">Fatigue</span>
+              <NlDeltaChip
+                value={fatigueMod!}
+                format={formatSignedNlDelta}
+                title="Erschöpfungs-Effekt auf den Finalscore (Abzug = ausgelaugt)"
+              />
+            </span>
+          ) : null}
+          {hasTeamPps ? (
+            <span className="nl-arena-finale-explainer-item">
+              <span className="nl-arena-finale-explainer-item-label">Team-PPs</span>
+              <NlDeltaChip
+                value={teamPpsMod!}
+                format={formatSignedNlDelta}
+                title="Team-PPs-Effekt auf den Finalscore"
+              />
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   function renderDisciplineBoard() {
     return (
       <div
@@ -779,6 +1101,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           const isOwnTeam = row.teamId === params.teamId;
           const isExpanded = expandedTeamId === row.teamId;
           const breakdown = isExpanded ? getMatchdayArenaPhaseBreakdown(row, activePhase) : [];
+          // Gold-Glow für die Führung, sobald das Board die Finale-/Ergebnis-Phase
+          // erreicht (reine CSS-Deko über `.is-leader`).
+          const isLeaderGlow = rank === 1 && (activePhase === "final" || isResultPhase);
 
           return (
             <div
@@ -792,7 +1117,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               }}
               role="listitem"
               aria-current={isOwnTeam ? "true" : undefined}
-              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}`}
+              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
               style={{
                 ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
                 top: Math.max(0, rank - 1) * NL_ARENA_ROW_STRIDE,
@@ -853,8 +1178,15 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   title="Score-Herkunft aufklappen"
                   onClick={() => setExpandedTeamId((current) => (current === row.teamId ? null : row.teamId))}
                 >
+                  {/* Score als Count-Up (~400 ms) — konsistent mit dem Ergebnis-Screen.
+                      `key` je Phase erzwingt Re-Mount, damit der Zähler bei jedem
+                      Phasenwechsel neu hochläuft. */}
                   <strong key={`nl-arena-score-${activePhase}`} className="nl-arena-score nl-tnum">
-                    {formatNlNumber(phaseScore, 1)}
+                    <NlCountUpValue
+                      value={phaseScore}
+                      opts={{ durationMs: 400 }}
+                      format={(value) => formatNlNumber(value, 1)}
+                    />
                   </strong>
                 </button>
                 {isResultPhase && row.points != null ? (
@@ -864,13 +1196,21 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 ) : null}
               </span>
               {isExpanded ? (
+                // Phasen-Breakdown (Slots/Push/Form/Mut/Cap/Pow) über die Kit-Komponente
+                // `VeloImpactStrip` statt eigener Breakdown-Spans (siehe velo-ui/index.ts).
+                // Der Wrapper behält role/aria-label für die Score-Herkunft.
                 <div className="nl-arena-row-breakdown" role="group" aria-label={`Score-Herkunft ${row.teamName}`}>
-                  {breakdown.map((item) => (
-                    <span key={item.id} className={`nl-arena-row-breakdown-item is-${item.tone}`}>
-                      <span className="nl-arena-row-breakdown-label">{item.label}</span>
-                      <span className="nl-arena-row-breakdown-value">{item.valueLabel}</span>
-                    </span>
-                  ))}
+                  <VeloImpactStrip
+                    items={breakdown.map((item) => ({
+                      key: item.id,
+                      label: item.label,
+                      value: item.valueLabel,
+                      tone: item.tone,
+                    }))}
+                  />
+                  {/* Feature 1: In der Finale-/Ergebnis-Phase den ansonsten
+                      unerklärten Final-Sprung in Fatigue + Team-PPs zerlegen. */}
+                  {activePhase === "final" || isResultPhase ? renderFinaleExplainer(row) : null}
                 </div>
               ) : null}
             </div>
@@ -897,7 +1237,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   rowNodesRef.current.delete(row.teamId);
                 }
               }}
-              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}`}
+              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${row.medal === "gold" ? " is-leader" : ""}`}
               style={team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined}
             >
               <span className="nl-arena-rank">
@@ -916,7 +1256,12 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   {formatNlNumber(row.d1Points, 1)} · {formatNlNumber(row.d2Points, 1)}
                 </span>
                 <strong className="nl-arena-score nl-tnum" title="Gesamtscore beider Disziplinen">
-                  {formatNlNumber(row.totalScore, 1)}
+                  {/* Gesamtscore ebenfalls als Count-Up (~400 ms) — gleiche Behandlung wie das Disziplin-Board. */}
+                  <NlCountUpValue
+                    value={row.totalScore}
+                    opts={{ durationMs: 400 }}
+                    format={(value) => formatNlNumber(value, 1)}
+                  />
                 </strong>
                 <span className="nl-arena-points nl-tnum" title="Tagespunkte gesamt">
                   {row.totalPoints != null ? `${formatNlNumber(row.totalPoints, 1)} PPs` : "—"}
@@ -1003,15 +1348,24 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     );
   }
 
-  function renderMvpColumn(title: string, tone: "pow" | "men" | "soc", players: MatchdayMvpTopPlayerRow[]) {
+  // `players` ist die vollständige (bereits berechnete, bis zu 10 Einträge)
+  // Disziplin-Liste; die Karte zeigt weiter nur die Top-3, der Rest ist über den
+  // MVP-Drilldown-Drawer erreichbar (`drawerKey`). Keine neuen Daten/Server-Calls.
+  function renderMvpColumn(
+    title: string,
+    tone: "pow" | "men" | "soc",
+    drawerKey: ArenaMvpDrawerKey,
+    players: MatchdayMvpTopPlayerRow[],
+  ) {
+    const shown = players.slice(0, 3);
     return (
       <div className={`nl-arena-mvp-column ${nlToneClass(tone)}`}>
         <span className="nl-arena-mvp-title">{title}</span>
-        {players.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="nl-arena-mvp-empty">Noch keine Wertung.</p>
         ) : (
           <ol className="nl-arena-mvp-list">
-            {players.map((player, index) => (
+            {shown.map((player, index) => (
               <li key={`${player.playerId}-${player.slotIndex}`} className="nl-arena-mvp-row">
                 <span className="nl-arena-mvp-rank">
                   {index < 3 ? (
@@ -1049,11 +1403,81 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             ))}
           </ol>
         )}
+        {players.length > shown.length ? (
+          // Drilldown-Trigger: nur wenn die volle Liste über die Top-3 hinausgeht.
+          <button
+            type="button"
+            className="nl-arena-mvp-more"
+            onClick={() => setMvpDrawerKey(drawerKey)}
+            data-testid={`nl-arena-mvp-more-${drawerKey}`}
+          >
+            Alle {players.length} anzeigen
+          </button>
+        ) : null}
       </div>
     );
   }
 
-  const phaseItems = MATCHDAY_ARENA_PHASES.map((phase) => ({ id: phase.id, label: phase.label }));
+  // Wiederverwendbarer "Details & Diagnose"-Block: Pre-Race- und Post-Race-Zweig
+  // waren zuvor fast identisch dupliziert. `showResolveDetails` blendet die nur
+  // nach dem Resolve sinnvollen Zusatz-Infos (Auto-Lineups-Chip + Reveal-Sources-
+  // Zeile) ein; `totalTeamsFallback` deckt die unterschiedliche Readiness-Basis ab.
+  function renderDiagnose(showResolveDetails: boolean, totalTeamsFallback: number) {
+    return (
+      <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
+        <summary>
+          Details &amp; Diagnose
+          {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
+        </summary>
+        <div className="nl-arena-diagnose-body">
+          <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
+            <StatChip
+              label="Readiness"
+              value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? totalTeamsFallback}`}
+              tone={blockedTeams > 0 ? "warn" : "good"}
+              title="Teams mit vorhandener Einsatzliste"
+            />
+            {showResolveDetails ? (
+              <StatChip
+                label="Auto-Lineups"
+                value={autoLineups}
+                tone={autoLineups > 0 ? "warn" : "good"}
+                sub={`${blockedTeams} blockiert`}
+                title="Automatisch erzeugte Einsatzlisten"
+              />
+            ) : null}
+            <StatChip
+              label="Status"
+              value={scoreFeed?.status ?? (showResolveDetails ? "—" : "wartet")}
+              tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
+            />
+          </StatChipRow>
+          {showResolveDetails && scoreFeed ? (
+            <p className="nl-arena-diagnose-line">
+              Reveal-Sources: Form {scoreFeed.resolveSources.formCardSourceLabel ?? scoreFeed.resolveSources.formCardSourceStatus}{" "}
+              · Mutator {scoreFeed.resolveSources.mutatorSourceLabel ?? scoreFeed.resolveSources.mutatorSourceStatus} · Captain{" "}
+              {scoreFeed.resolveSources.captainSourceStatus} · Fatigue {scoreFeed.resolveSources.fatigueSourceStatus} · Team-PPs{" "}
+              {scoreFeed.resolveSources.teamPpsSourceStatus} · Team-Power{" "}
+              {scoreFeed.resolveSources.teamPowerSourceLabel ?? scoreFeed.resolveSources.teamPowerSourceStatus}
+            </p>
+          ) : null}
+          <p className="nl-arena-diagnose-line">
+            Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
+          </p>
+          {feedWarnings.length > 0 ? (
+            <ul className="nl-arena-diagnose-list">
+              {feedWarnings.slice(0, 20).map((warning, index) => (
+                <li key={`nl-arena-warning-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
+          )}
+        </div>
+      </details>
+    );
+  }
+
   const sideItems = [
     { id: "d1", label: d1Label },
     { id: "d2", label: d2Label },
@@ -1236,39 +1660,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             {renderPreRaceBoard()}
           </NlCard>
 
-          <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
-            <summary>
-              Details &amp; Diagnose
-              {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
-            </summary>
-            <div className="nl-arena-diagnose-body">
-              <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
-                <StatChip
-                  label="Readiness"
-                  value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? totalTeamsCount}`}
-                  tone={blockedTeams > 0 ? "warn" : "good"}
-                  title="Teams mit vorhandener Einsatzliste"
-                />
-                <StatChip
-                  label="Status"
-                  value={scoreFeed?.status ?? "wartet"}
-                  tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
-                />
-              </StatChipRow>
-              <p className="nl-arena-diagnose-line">
-                Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
-              </p>
-              {feedWarnings.length > 0 ? (
-                <ul className="nl-arena-diagnose-list">
-                  {feedWarnings.slice(0, 20).map((warning, index) => (
-                    <li key={`nl-arena-prerace-warning-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
-              )}
-            </div>
-          </details>
+          {renderDiagnose(false, totalTeamsCount)}
         </>
       ) : (
         <>
@@ -1329,19 +1721,10 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   >
                     Zurück
                   </button>
-                  <NlSubTabs
-                    items={phaseItems}
-                    activeId={activePhase}
-                    onSelect={(id) => {
-                      if (arenaControlsLocked) {
-                        return;
-                      }
-                      setIsAutoPlaying(false);
-                      setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === id)));
-                    }}
-                    aria-label="Reveal-Phase"
-                    className="nl-arena-phase-tabs"
-                  />
+                  {/* De-Dup: die eigenständige Phasen-Tab-Leiste (NlSubTabs) war ein
+                      Near-1:1-Duplikat der "Dein Lauf"-Schiene unten, die zusätzlich
+                      den eigenen Rang trägt. Phasen-Navigation läuft weiter über
+                      Zurück/Weiter (+ "Dein Lauf"-Schritte). */}
                   <button
                     className="nl-arena-button"
                     type="button"
@@ -1556,11 +1939,244 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                         );
                       })}
                     </ol>
+                    {/* Feature 2: Momentum-Sparkline des eigenen Rangs über die schon
+                        enthüllten Phasen — ergänzt die Schiene, Labels & Klick-zum-
+                        Springen bleiben erhalten. Oben = besserer Rang (invertiert). */}
+                    {ownRunSparkPoints.length >= 2 ? (
+                      <NlSparkline
+                        points={ownRunSparkPoints}
+                        tone="accent"
+                        className="nl-arena-run-spark"
+                        aria-label="Verlauf deines Rangs über die enthüllten Phasen (oben = besser)"
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+                {/* Feature 1: Erwartung vs. Ergebnis — nur in der Ergebnis-Phase
+                    (spoilerfrei). Zeigt Start-Rang (baseRank) → End-Rang des
+                    eigenen Teams samt Rang-Delta und zwei Vergleichs-Bars. */}
+                {isResultPhase && ownExpectation ? (
+                  <div
+                    className="nl-arena-expect"
+                    role="group"
+                    aria-label={`Erwartung gegen Ergebnis — ${ownExpectation.teamName}`}
+                  >
+                    <div className="nl-arena-expect-head">
+                      <span className="nl-arena-expect-eyebrow">Erwartung vs. Ergebnis</span>
+                      <span className="nl-arena-expect-team">{ownExpectation.teamName}</span>
+                    </div>
+                    <div className="nl-arena-expect-versus">
+                      <span
+                        className="nl-arena-expect-rank nl-tnum"
+                        title="Start-Rang nach der reinen Basiswertung (vor allen Modifikatoren)"
+                      >
+                        Start <strong>#{ownExpectation.baseRank}</strong>
+                      </span>
+                      <span className="nl-arena-expect-arrow" aria-hidden="true">
+                        →
+                      </span>
+                      <span
+                        className="nl-arena-expect-rank is-final nl-tnum"
+                        title="End-Rang in dieser Disziplin"
+                      >
+                        Ziel <strong>#{ownExpectation.finalRank}</strong>
+                      </span>
+                      <NlDeltaChip
+                        value={ownExpectation.rankDelta}
+                        format={(n) =>
+                          `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} ${Math.abs(n) === 1 ? "Rang" : "Ränge"}`
+                        }
+                        title="Rang-Bewegung vom Start- zum End-Rang (positiv = geklettert)"
+                      />
+                    </div>
+                    {/* Vergleichs-Bars: Füllgrad = besserer Rang voller
+                        (total − rank + 1), damit der Sprung sichtbar wird. */}
+                    <div className="nl-arena-expect-bars">
+                      <NlProgressBar
+                        label={`Start #${ownExpectation.baseRank}`}
+                        value={ownExpectation.total - ownExpectation.baseRank + 1}
+                        max={ownExpectation.total}
+                        tone="neutral"
+                        showValue={false}
+                        title={`Start-Rang ${ownExpectation.baseRank} von ${ownExpectation.total}`}
+                      />
+                      <NlProgressBar
+                        label={`Ziel #${ownExpectation.finalRank}`}
+                        value={ownExpectation.total - ownExpectation.finalRank + 1}
+                        max={ownExpectation.total}
+                        tone={
+                          ownExpectation.rankDelta > 0
+                            ? "good"
+                            : ownExpectation.rankDelta < 0
+                              ? "risk"
+                              : "accent"
+                        }
+                        showValue={false}
+                        title={`End-Rang ${ownExpectation.finalRank} von ${ownExpectation.total}`}
+                      />
+                    </div>
+                    {/* Phase 3 (Teilen): Kopier-Affordance für den Ergebnis-Recap.
+                        Klartext-Only (kein Bild/Canvas); bei Erfolg "kopiert ✓",
+                        bei Fehlschlag markierbarer Fallback-Text zum manuellen Kopieren. */}
+                    {ownRecap ? (
+                      <div className="nl-arena-share" role="group" aria-label="Spieltag-Recap teilen">
+                        <button
+                          type="button"
+                          className="nl-arena-button nl-arena-share-btn"
+                          data-testid="nl-arena-share"
+                          aria-live="polite"
+                          title="Spieltag-Recap als Text in die Zwischenablage kopieren"
+                          onClick={() => void handleCopyRecap(ownRecap)}
+                        >
+                          {recapCopyState === "copied"
+                            ? "kopiert ✓"
+                            : recapCopyState === "error"
+                              ? "Kopieren fehlgeschlagen"
+                              : "Teilen · Kopieren"}
+                        </button>
+                        {recapCopyState === "error" ? (
+                          <span className="nl-arena-share-fallback">
+                            Text markieren und kopieren:{" "}
+                            <span className="nl-arena-share-fallback-text">{ownRecap}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {/* Feature 3: Head-to-Head-Duell — eigenes Team gegen den direkten
+                    Rang-Nachbarn, zwei gegenläufige Vergleichs-Bars (F1-Timing-Tower)
+                    plus Score-/Rang-Abstand als Chips. Aktualisiert je Phase. */}
+                {duel ? (
+                  <div
+                    className="nl-arena-duel"
+                    role="group"
+                    aria-label={`Duell — ${duel.own.teamName} gegen ${duel.neighbor.teamName}`}
+                  >
+                    <div className="nl-arena-duel-head">
+                      <span className="nl-arena-duel-eyebrow">
+                        {duel.neighborIsAhead ? "Duell um den Platz davor" : "Duell mit dem Verfolger"}
+                      </span>
+                      <StatChipRow aria-label="Abstand zum Rang-Nachbarn">
+                        <StatChip
+                          label="Rang-Abstand"
+                          value={`#${duel.ownRank} · #${duel.neighborRank}`}
+                          tone="accent"
+                          title="Dein Rang gegenüber dem Rang des Nachbarn in dieser Phase"
+                        />
+                        <StatChip
+                          label="Score-Lücke"
+                          value={formatSignedNlDelta(duel.scoreGap)}
+                          tone={duel.scoreGap > 0 ? "good" : duel.scoreGap < 0 ? "risk" : "neutral"}
+                          title="Dein Score minus Score des Nachbarn (aktuelle Phase)"
+                        />
+                      </StatChipRow>
+                    </div>
+                    <div className="nl-arena-duel-bars">
+                      <button
+                        type="button"
+                        className="nl-arena-duel-side is-own"
+                        onClick={() => scrollToTeam(duel.own.teamId)}
+                        title={`${duel.own.teamName} im Board anzeigen`}
+                      >
+                        <span className="nl-arena-duel-side-name">
+                          <span className="nl-arena-duel-side-rank nl-tnum">#{duel.ownRank}</span>
+                          {duel.own.teamName}
+                          <span className="nl-arena-duel-side-badge">Du</span>
+                        </span>
+                        <NlProgressBar
+                          value={Math.max(0, duel.ownScore)}
+                          max={Math.max(maxPhaseScore, duel.ownScore, duel.neighborScore, 1)}
+                          tone="accent"
+                          showValue={false}
+                          format={(value) => formatNlNumber(value, 1)}
+                          title={`${duel.own.teamName}: ${formatNlNumber(duel.ownScore, 1)}`}
+                        />
+                        <span className="nl-arena-duel-side-score nl-tnum">
+                          {formatNlNumber(duel.ownScore, 1)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="nl-arena-duel-side is-rival"
+                        onClick={() => scrollToTeam(duel.neighbor.teamId)}
+                        title={`${duel.neighbor.teamName} im Board anzeigen`}
+                      >
+                        <span className="nl-arena-duel-side-name">
+                          <span className="nl-arena-duel-side-rank nl-tnum">#{duel.neighborRank}</span>
+                          {duel.neighbor.teamName}
+                        </span>
+                        <NlProgressBar
+                          value={Math.max(0, duel.neighborScore)}
+                          max={Math.max(maxPhaseScore, duel.ownScore, duel.neighborScore, 1)}
+                          tone="neutral"
+                          showValue={false}
+                          format={(value) => formatNlNumber(value, 1)}
+                          title={`${duel.neighbor.teamName}: ${formatNlNumber(duel.neighborScore, 1)}`}
+                        />
+                        <span className="nl-arena-duel-side-score nl-tnum">
+                          {formatNlNumber(duel.neighborScore, 1)}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {/* Feature 2: Schlüsselmomente — persistenter, scrollbarer Ticker.
+                    Sammelt die Bühnen-Spotlights aller enthüllten Phasen (neueste
+                    oben); jeder Eintrag springt per scrollToTeam ins Board. */}
+                {keyMoments.length > 0 ? (
+                  <div
+                    className="nl-arena-ticker"
+                    role="group"
+                    aria-label="Schlüsselmomente der enthüllten Phasen"
+                  >
+                    <div className="nl-arena-ticker-head">
+                      <span className="nl-arena-ticker-title">Schlüsselmomente</span>
+                      <span className="nl-arena-ticker-count nl-tnum">{keyMoments.length}</span>
+                    </div>
+                    <ol className="nl-arena-ticker-list">
+                      {[...keyMoments].reverse().map((moment) => {
+                        const toneClass =
+                          moment.kind === "gain"
+                            ? " is-good"
+                            : moment.kind === "loss"
+                              ? " is-risk"
+                              : " is-accent";
+                        const kindLabel =
+                          moment.kind === "gain"
+                            ? "Schub"
+                            : moment.kind === "loss"
+                              ? "Dämpfer"
+                              : "Kletterer";
+                        const valueText =
+                          moment.kind === "climb"
+                            ? `+${moment.value} ${moment.value === 1 ? "Rang" : "Ränge"}`
+                            : formatSignedNlDelta(moment.value);
+                        return (
+                          <li key={moment.key} className="nl-arena-ticker-item">
+                            <button
+                              type="button"
+                              className={`nl-arena-ticker-entry${toneClass}`}
+                              onClick={() => scrollToTeam(moment.teamId)}
+                              title={`${moment.teamName} im Board anzeigen — ${moment.phaseLabel}: ${kindLabel}`}
+                            >
+                              <span className="nl-arena-ticker-phase">{moment.phaseLabel}</span>
+                              <span className="nl-arena-ticker-kind">{kindLabel}</span>
+                              <span className="nl-arena-ticker-team">{moment.teamName}</span>
+                              <span className="nl-arena-ticker-value nl-tnum">{valueText}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   </div>
                 ) : null}
               </>
             ) : null}
-            {ownTeamRank != null && ownTeamName ? (
+            {/* De-Dup: im Disziplin-Board übernimmt der "Dein Team"-Bühnen-Chip den
+                Sprung zum eigenen Team; der Owncall-Button bleibt daher nur für das
+                Gesamt-Board (dort gibt es keinen Bühnen-Chip). */}
+            {boardSide === "total" && ownTeamRank != null && ownTeamName ? (
               <div className="nl-arena-owncall">
                 <button type="button" className="nl-arena-owncall-btn" onClick={scrollToOwnTeam}>
                   Zu meinem Team · {ownTeamName}
@@ -1594,9 +2210,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           >
             {mvpsRevealed ? (
               <div className="nl-arena-mvp-grid">
-                {renderMvpColumn(d1Label, "pow", (scoreFeed?.d1TopPlayers ?? []).slice(0, 3))}
-                {renderMvpColumn(d2Label, "men", (scoreFeed?.d2TopPlayers ?? []).slice(0, 3))}
-                {renderMvpColumn("PP-Gewinner", "soc", (scoreFeed?.ppWinners ?? []).slice(0, 3))}
+                {renderMvpColumn(d1Label, "pow", "d1", scoreFeed?.d1TopPlayers ?? [])}
+                {renderMvpColumn(d2Label, "men", "d2", scoreFeed?.d2TopPlayers ?? [])}
+                {renderMvpColumn("PP-Gewinner", "soc", "pp", scoreFeed?.ppWinners ?? [])}
               </div>
             ) : (
               <p className="nl-arena-mvp-teaser">
@@ -1606,55 +2222,30 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             )}
           </NlCard>
 
-          <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
-            <summary>
-              Details &amp; Diagnose
-              {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
-            </summary>
-            <div className="nl-arena-diagnose-body">
-              <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
-                <StatChip
-                  label="Readiness"
-                  value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? 0}`}
-                  tone={blockedTeams > 0 ? "warn" : "good"}
-                  title="Teams mit vorhandener Einsatzliste"
-                />
-                <StatChip
-                  label="Auto-Lineups"
-                  value={autoLineups}
-                  tone={autoLineups > 0 ? "warn" : "good"}
-                  sub={`${blockedTeams} blockiert`}
-                  title="Automatisch erzeugte Einsatzlisten"
-                />
-                <StatChip
-                  label="Status"
-                  value={scoreFeed?.status ?? "—"}
-                  tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
-                />
-              </StatChipRow>
-              {scoreFeed ? (
-                <p className="nl-arena-diagnose-line">
-                  Reveal-Sources: Form {scoreFeed.resolveSources.formCardSourceLabel ?? scoreFeed.resolveSources.formCardSourceStatus}{" "}
-                  · Mutator {scoreFeed.resolveSources.mutatorSourceLabel ?? scoreFeed.resolveSources.mutatorSourceStatus} · Captain{" "}
-                  {scoreFeed.resolveSources.captainSourceStatus} · Fatigue {scoreFeed.resolveSources.fatigueSourceStatus} · Team-PPs{" "}
-                  {scoreFeed.resolveSources.teamPpsSourceStatus} · Team-Power{" "}
-                  {scoreFeed.resolveSources.teamPowerSourceLabel ?? scoreFeed.resolveSources.teamPowerSourceStatus}
-                </p>
-              ) : null}
-              <p className="nl-arena-diagnose-line">
-                Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
-              </p>
-              {feedWarnings.length > 0 ? (
-                <ul className="nl-arena-diagnose-list">
-                  {feedWarnings.slice(0, 20).map((warning, index) => (
-                    <li key={`nl-arena-warning-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
-              )}
-            </div>
-          </details>
+          {/* MVP-Drilldown: die volle Disziplin-Rangliste (bis zu 10, bereits
+              berechnet) im leichten NlRankingDrawer — nur im Finale/Ergebnis
+              erreichbar (`mvpsRevealed`), also spoilerfrei. Reihen-Klick öffnet
+              das Spielerprofil, wie schon die Namens-Buttons in der Karte. */}
+          {mvpsRevealed && activeMvpDrawer ? (
+            <NlRankingDrawer
+              open={mvpDrawerKey != null}
+              onClose={() => setMvpDrawerKey(null)}
+              metricLabel={activeMvpDrawer.label}
+              metricKey={`mvp-${mvpDrawerKey}`}
+              subtitle={activeMvpDrawer.subtitle}
+              rows={activeMvpDrawerRows}
+              emptyLabel="Noch keine Wertung."
+              onSelectRow={(row) => {
+                // rank == index+1 in `players` → Spieler eindeutig auflösen.
+                const player = activeMvpDrawer.players[row.rank - 1];
+                if (player) {
+                  props.onOpenPlayerDetails?.({ playerId: player.playerId });
+                }
+              }}
+            />
+          ) : null}
+
+          {renderDiagnose(true, 0)}
         </>
       )}
     </div>

@@ -24,7 +24,7 @@ import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassCo
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
-import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { GameTerm } from "@/components/ui/GameTerm";
 import {
@@ -380,6 +380,8 @@ import {
 import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
 import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
+import type { FoundationAllTimeTableHostProps } from "@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost";
+import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -1091,7 +1093,8 @@ export function useFoundationShellRouterBodyScope({
     activeView === "prize" ||
     activeView === "ranks" ||
     activeView === "diszis" ||
-    activeView === "leagueLeaders";
+    activeView === "leagueLeaders" ||
+    activeView === "allTimeTable";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
   const shouldLoadSeasonArchive =
@@ -1100,6 +1103,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "prize" ||
     activeView === "ranks" ||
     activeView === "leagueLeaders" ||
+    activeView === "allTimeTable" ||
     activeView === "teams" ||
     activeView === "teamProfile" ||
     activeView === "players" ||
@@ -1308,6 +1312,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "leagueLeaders" ||
     activeView === "prize";
   const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders";
+  const shouldBuildAllTimeTable = activeView === "allTimeTable";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -9144,6 +9149,38 @@ export function useFoundationShellRouterBodyScope({
     });
   }, [leagueTrainingLeaderRows, seasonTopPlayerRows, shouldBuildLeagueLeaderBoards]);
 
+  // Ewige Tabelle — Live-Stand der laufenden Saison je Team, direkt aus dem
+  // Season-Standings-Feed (siehe `shouldLoadSeasonOverviewFeed`, das den
+  // Feed für "allTimeTable" mit-lädt). Ohne geladenen Feed bleibt die Ewige
+  // Tabelle ehrlich auf Archiv-Saisons beschränkt (kein erfundener Live-Wert).
+  const allTimeTableLiveStandingsByTeamId = useMemo(() => {
+    if (!shouldBuildAllTimeTable || !seasonStandingsFeed) {
+      return undefined;
+    }
+    return Object.fromEntries(
+      seasonStandingsFeed.items.map((item) => [
+        item.teamId,
+        {
+          rank: item.rank ?? null,
+          points: item.points ?? null,
+          marketValue: item.marketValueTotal ?? null,
+          cash: item.cashTotal ?? item.cash ?? null,
+        },
+      ]),
+    );
+  }, [seasonStandingsFeed, shouldBuildAllTimeTable]);
+
+  const allTimeTableModel = useMemo(() => {
+    if (!shouldBuildAllTimeTable) {
+      return null;
+    }
+    return buildAllTimeTableModel({
+      gameState,
+      selectedTeamId: activeManagerTeamId,
+      liveStandingsByTeamId: allTimeTableLiveStandingsByTeamId,
+    });
+  }, [activeManagerTeamId, allTimeTableLiveStandingsByTeamId, gameState, shouldBuildAllTimeTable]);
+
   const seasonV2StandingsRows = useMemo(
     () =>
       sortedSeasonStandRows.map((row) => {
@@ -10298,6 +10335,13 @@ export function useFoundationShellRouterBodyScope({
     onOpenPlayer: openPlayerProfileById,
   };
 
+  const foundationAllTimeTableHostProps: FoundationAllTimeTableHostProps = {
+    model: allTimeTableModel,
+    selectedTeamId: activeManagerTeamId,
+    seasonLabel: canonicalSeasonLabel,
+    onOpenTeam: openTeamProfileById,
+  };
+
   const foundationRanksHostProps: FoundationRanksHostProps = {
     sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
     ppAreaRankClassMaps,
@@ -10881,6 +10925,7 @@ export function useFoundationShellRouterBodyScope({
     foundationPrizeFinanceShellHostProps,
     foundationRanksHostProps,
     foundationLeagueLeadersHostProps,
+    foundationAllTimeTableHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
     foundationTrainingCompactHostProps,

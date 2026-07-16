@@ -5,6 +5,11 @@ import type { Dispatch, RefObject, SetStateAction } from "react";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import {
+  NlMarketBeforeAfterRow,
+  NlMarketChanceBar,
+} from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
+import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractShape, Team, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
@@ -225,69 +230,73 @@ export default function FoundationMarketBuyShellHost({
       </header>
 
       <div className="foundation-drilldown-body transfer-buy-modal-body" ref={buyModalBodyRef}>
-              <div className="transfer-buy-player-line">
-                <div className="transfer-modal-player-hero">
+              {/* Velo-Hero: Portrait + Meta + KPIs als StatChips (F1 — ersetzt die
+                  alte transfer-modal-kpi/pill/muted-Sprache durch das Kit-Vokabular). */}
+              <NlCard
+                className="market-v2-buy-hero-card"
+                eyebrow="Kandidat"
+                title={modalPlayerName}
+                actions={
+                  <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
+                    {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "prüfen"}
+                  </span>
+                }
+              >
+                <div className="market-v2-buy-hero">
                   {selectedPortrait?.src ? (
                     <OptimizedMediaImage
                       src={selectedPortrait.src}
                       alt={modalPlayerName}
                       width={72}
                       height={72}
-                      className="transfermarkt-portrait"
+                      className="transfermarkt-portrait market-v2-buy-hero-portrait"
                     />
                   ) : buyModalWishlistEntry ? (
                     (() => {
                       const buyModalPortraitBase = getPlayerPortraitBrowserUrl(buyModalWishlistEntry.playerId);
                       return (
-                    <OptimizedMediaImage
-                      src={appendMediaImageVariant(buyModalPortraitBase, "thumb") ?? buyModalPortraitBase}
-                      alt={modalPlayerName}
-                      width={72}
-                      height={72}
-                      className="transfermarkt-portrait"
-                    />
+                        <OptimizedMediaImage
+                          src={appendMediaImageVariant(buyModalPortraitBase, "thumb") ?? buyModalPortraitBase}
+                          alt={modalPlayerName}
+                          width={72}
+                          height={72}
+                          className="transfermarkt-portrait market-v2-buy-hero-portrait"
+                        />
                       );
                     })()
                   ) : (
-                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${modalPlayerName} placeholder`}>
+                    <div
+                      className="transfermarkt-portrait transfermarkt-portrait-placeholder market-v2-buy-hero-portrait"
+                      aria-label={`${modalPlayerName} placeholder`}
+                    >
                       {(selectedPortrait?.initials ?? modalPlayerName.slice(0, 2)).toUpperCase()}
                     </div>
                   )}
-                  <div className="transfer-modal-player-summary">
-                    <div className="transfer-modal-player-head">
-                      <strong>{modalPlayerName}</strong>
-                      <div className="transfer-modal-player-meta">
-                        <ClassIcon classNameValue={modalPlayerClass} showLabel={false} />
-                        <span className="muted">{modalPlayerClass}</span>
-                        <span className="muted">{modalPlayerRace}</span>
-                        <span className="pill">Bracket {modalPlayerBracket != null ? formatCompactNumber(modalPlayerBracket, 0) : "—"}</span>
-                        <span className="pill">{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team gewählt"}</span>
-                      </div>
+                  <div className="market-v2-buy-hero-copy">
+                    <div className="market-v2-buy-hero-meta">
+                      <ClassIcon classNameValue={modalPlayerClass} showLabel={false} />
+                      <span>{modalPlayerClass}</span>
+                      <span>{modalPlayerRace}</span>
+                      <span className="market-v2-buy-hero-tag">
+                        Bracket {modalPlayerBracket != null ? formatCompactNumber(modalPlayerBracket, 0) : "—"}
+                      </span>
+                      <span className="market-v2-buy-hero-tag">
+                        {selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team gewählt"}
+                      </span>
                     </div>
-                    <div className="transfer-modal-player-kpis">
-                      <article className="transfer-modal-kpi">
-                        <span>Marktwert</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerMarketValue)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Basisgehalt</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerSalary)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Aktuelle Forderung</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Zusage</span>
-                        <strong>{formatPercentLabel(buyPreview?.acceptChance)}</strong>
-                      </article>
-                    </div>
+                    <StatChipRow className="market-v2-buy-hero-stats" aria-label="Kandidaten-Kennzahlen">
+                      <StatChip label="Marktwert" value={formatTransfermarktCurrency(modalPlayerMarketValue)} tone="accent" />
+                      <StatChip label="Basisgehalt" value={formatTransfermarktCurrency(modalPlayerSalary)} tone="neutral" />
+                      <StatChip
+                        label="Forderung"
+                        value={formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}
+                        tone="warn"
+                      />
+                      <StatChip label="Zusage" value={formatPercentLabel(buyPreview?.acceptChance)} tone="good" />
+                    </StatChipRow>
                   </div>
                 </div>
-                <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "prüfen"}
-                </span>
-              </div>
+              </NlCard>
 
               {previewBusy && !buyPreview ? (
                 <div className="transfer-buy-preview-skeleton" data-testid="transfer-buy-preview-skeleton" aria-busy="true" aria-label="Kaufvorschau lädt">
@@ -316,9 +325,38 @@ export default function FoundationMarketBuyShellHost({
                 </div>
               ) : null}
               {buySuccess ? (
-                <div className="transfer-feedback-banner is-success">
+                // F2 — "VERPFLICHTET"-Moment: statt statischer Erfolgsmeldung
+                // zählen Ablöse + Gehalt aus der Buy-Preview hoch (NlCountUpValue,
+                // respektiert prefers-reduced-motion) und die Karte fährt über das
+                // Kit-Primitiv `.nl-reveal` dezent ein.
+                <div
+                  className="transfer-feedback-banner is-success market-v2-buy-signed nl-reveal"
+                  data-testid="market-v2-buy-signed"
+                  role="status"
+                  aria-live="polite"
+                >
                   <strong>Kauf erfolgreich</strong>
                   <span>{buySuccess}</span>
+                  {buyPreview ? (
+                    <div className="market-v2-buy-signed-figures" aria-label="Ablöse und Gehalt">
+                      <span className="market-v2-buy-signed-figure">
+                        <small>Ablöse</small>
+                        <NlCountUpValue
+                          value={buyPreview.purchasePrice}
+                          format={(value) => formatTransfermarktCurrency(value)}
+                          className="market-v2-buy-signed-value nl-tnum"
+                        />
+                      </span>
+                      <span className="market-v2-buy-signed-figure">
+                        <small>Gehalt p.a.</small>
+                        <NlCountUpValue
+                          value={buyPreview.expectedSalary ?? null}
+                          format={(value) => formatTransfermarktCurrency(value)}
+                          className="market-v2-buy-signed-value nl-tnum"
+                        />
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {source !== "sqlite" ? (
@@ -377,14 +415,15 @@ export default function FoundationMarketBuyShellHost({
                 onCancel={closeBuyModal}
               />
 
-              <div className="transfer-modal-section transfer-callout is-info transfer-compact-feedback-callout">
-                <div className="transfer-callout-title">
-                  <strong>Kompakt: Was er am Vertrag mag</strong>
-                  <span className="muted">schneller Check ohne Scrollen</span>
-                </div>
+              {/* F1 — Kompakt-Feedback als NlCard; die tonfarbigen negotiation-factor-Chips bleiben (bereits chip-artig). */}
+              <NlCard
+                className="market-v2-buy-feedback-card transfer-compact-feedback-callout"
+                eyebrow="schneller Check ohne Scrollen"
+                title="Kompakt: Was er am Vertrag mag"
+              >
                 <div className="transfer-compact-feedback-grid">
                     <div className="transfer-compact-feedback-column">
-                      <span className="muted">Passt gut</span>
+                      <span className="nl-market-eyebrow">Passt gut</span>
                       <div className="negotiation-factor-list">
                         {compactNegotiationFeedback.likes.length ? (
                           compactNegotiationFeedback.likes.map((entry) => (
@@ -398,7 +437,7 @@ export default function FoundationMarketBuyShellHost({
                       </div>
                     </div>
                     <div className="transfer-compact-feedback-column">
-                      <span className="muted">Stoert ihn</span>
+                      <span className="nl-market-eyebrow">Stoert ihn</span>
                       <div className="negotiation-factor-list">
                         {compactNegotiationFeedback.concerns.length ? (
                           compactNegotiationFeedback.concerns.map((entry) => (
@@ -417,7 +456,7 @@ export default function FoundationMarketBuyShellHost({
                       </div>
                     </div>
                   </div>
-              </div>
+              </NlCard>
 
                 {contractPreference ? (
                   <div className={`contract-preference-card is-${contractPreference.matchQuality}`}>
@@ -447,60 +486,67 @@ export default function FoundationMarketBuyShellHost({
                   </div>
                 ) : null}
 
-                <div className="metric-grid compact">
-                  <article className="metric-card">
-                    <span>Basisforderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.baseExpectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Aktuelle Forderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Forderungsfaktor</span>
-                    <strong>{buyPreview?.demandMultiplier != null ? `${formatCompactNumber(buyPreview.demandMultiplier * 100, 0)}%` : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Zusage / Nachf. / Absage</span>
-                    <strong className="negotiation-chance-row">
-                      <span className="is-positive">{formatPercentLabel(buyPreview?.acceptChance)}</span>
-                      <span className="is-warning">{formatPercentLabel(buyPreview?.counterChance)}</span>
-                      <span className="is-negative">{formatPercentLabel(buyPreview?.rejectChance)}</span>
-                    </strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Buyout</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.buyoutCost ?? null)}</strong>
-                  </article>
-                </div>
-                {buyPreview?.demandBreakdown?.length ? (
-                  <div className="transfer-demand-breakdown">
-                    <div className="transfer-callout-title">
-                      <strong>So entsteht die Forderung</strong>
-                      <span className="muted">
-                        {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)}
-                      </span>
-                    </div>
-                    <ul className="warning-list negotiation-factor-list">
-                      {buyPreview.demandBreakdown.map((entry) => (
-                        <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                          <strong>{formatDemandPercent(entry.percent)}</strong>
-                          <span>{entry.label}: {entry.reason}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {/* F1 — Forderungs-KPIs als StatChips, Reaktion als segmentierte
+                    Wahrscheinlichkeits-Bar (dieselbe NlMarketChanceBar wie im Deal-Desk). */}
+                <NlCard className="market-v2-buy-demand-card" eyebrow="Verhandlung" title="Forderung & Reaktion">
+                  <StatChipRow className="market-v2-buy-demand-stats" aria-label="Forderungs-Kennzahlen">
+                    <StatChip
+                      label="Basisforderung"
+                      value={formatTransfermarktCurrency(buyPreview?.baseExpectedSalary ?? null)}
+                      tone="neutral"
+                    />
+                    <StatChip
+                      label="Aktuelle Forderung"
+                      value={formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}
+                      tone="warn"
+                    />
+                    <StatChip
+                      label="Forderungsfaktor"
+                      value={buyPreview?.demandMultiplier != null ? `${formatCompactNumber(buyPreview.demandMultiplier * 100, 0)}%` : "—"}
+                      tone="accent"
+                    />
+                    <StatChip
+                      label="Buyout"
+                      value={formatTransfermarktCurrency(buyPreview?.buyoutCost ?? null)}
+                      tone="neutral"
+                    />
+                  </StatChipRow>
+                  <div className="market-v2-buy-chance" aria-label="Zusage / Nachforderung / Absage">
+                    <span className="nl-market-eyebrow">Zusage / Nachf. / Absage</span>
+                    <NlMarketChanceBar
+                      acceptChance={buyPreview?.acceptChance ?? null}
+                      counterChance={buyPreview?.counterChance ?? null}
+                      rejectChance={buyPreview?.rejectChance ?? null}
+                      ariaLabel="Zusage / Nachforderung / Absage"
+                    />
                   </div>
-                ) : null}
+                  {buyPreview?.demandBreakdown?.length ? (
+                    <div className="transfer-demand-breakdown">
+                      <div className="market-v2-buy-subhead">
+                        <strong>So entsteht die Forderung</strong>
+                        <span className="nl-market-eyebrow">
+                          {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)}
+                        </span>
+                      </div>
+                      <ul className="negotiation-factor-list">
+                        {buyPreview.demandBreakdown.map((entry) => (
+                          <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
+                            <strong>{formatDemandPercent(entry.percent)}</strong>
+                            <span>{entry.label}: {entry.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </NlCard>
 
               {buyPreview ? (
                 <>
-                  <div className="transfer-modal-section transfer-callout is-info">
-                    <div className="transfer-callout-title">
-                      <strong>Jahresplan</strong>
-                      <span className="muted">
-                        {formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · {buyPreview.contractLength} Saison{buyPreview.contractLength === 1 ? "" : "en"}
-                      </span>
-                    </div>
+                  <NlCard
+                    className="market-v2-buy-schedule-card"
+                    eyebrow={`${formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · ${buyPreview.contractLength} Saison${buyPreview.contractLength === 1 ? "" : "en"}`}
+                    title="Jahresplan"
+                  >
                     {buyPreview.yearlySalarySchedule?.length ? (
                       <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
                         <div className="contract-schedule-row is-head" role="row">
@@ -522,82 +568,88 @@ export default function FoundationMarketBuyShellHost({
                         </div>
                       </div>
                     ) : (
-                      <p className="muted">Noch kein Jahresplan verfügbar.</p>
+                      <p className="nl-market-muted">Noch kein Jahresplan verfügbar.</p>
                     )}
-                    <p className="muted" style={{ marginTop: 8 }}>
+                    <p className="market-v2-buy-schedule-note">
                       Forderungsweg: Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · aktuelle Forderung{" "}
                       {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Gesamtverschiebung {formatTransfermarktCurrency(marketAndFitDelta)}
                       {fitSalaryDiscountActive ? " · Fit-Bonus zuletzt aktiv" : ""}
                     </p>
-                  </div>
+                  </NlCard>
 
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Team-Auswirkung</strong>
-                      <span className="muted">Sofort sichtbar, final erst beim Abschluss</span>
+                  {/* F1 — Team-Auswirkung: Vorher→Nachher als NlMarketBeforeAfterRow +
+                      NlDeltaChip, exakt die gleiche Zeile wie der Deal-Desk im Neuen Look. */}
+                  <NlCard
+                    className="market-v2-buy-impact-card"
+                    eyebrow="Sofort sichtbar, final erst beim Abschluss"
+                    title="Team-Auswirkung"
+                  >
+                    <StatChipRow className="market-v2-buy-impact-topline" aria-label="Ablöse">
+                      <StatChip
+                        label="Kaufpreis / Ablöse"
+                        value={formatTransfermarktCurrency(buyPreview.purchasePrice)}
+                        tone="accent"
+                      />
+                    </StatChipRow>
+                    <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
+                      <NlMarketBeforeAfterRow
+                        label="Cash"
+                        before={buyPreview.cashBefore}
+                        after={buyPreview.cashAfter}
+                        format={(value) => formatTransfermarktCurrency(value)}
+                      />
+                      <NlMarketBeforeAfterRow
+                        label="Gehalt"
+                        before={buyPreview.salaryBefore}
+                        after={buyPreview.salaryAfter}
+                        format={(value) => formatTransfermarktCurrency(value)}
+                        invert
+                      />
+                      <NlMarketBeforeAfterRow
+                        label="Kader"
+                        before={buyPreview.rosterBefore}
+                        after={buyPreview.rosterAfter}
+                        format={(value) => (value != null ? String(Math.round(value)) : "—")}
+                      />
+                      <NlMarketBeforeAfterRow
+                        label="MW"
+                        before={buyPreview.marketValueBefore}
+                        after={buyPreview.marketValueAfter}
+                        format={(value) => formatTransfermarktCurrency(value)}
+                      />
                     </div>
-                    <div className="metric-grid compact">
-                      <article className="metric-card">
-                        <span>Kaufpreis / Ablöse</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.purchasePrice)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Cash vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.cashBefore)} / {formatTransfermarktCurrency(buyPreview.cashAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Kader vorher / nachher</span>
-                        <strong>{buyPreview.rosterBefore ?? "—"} / {buyPreview.rosterAfter ?? "—"}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Gehalt vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.salaryBefore)} / {formatTransfermarktCurrency(buyPreview.salaryAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>MW vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.marketValueBefore)} / {formatTransfermarktCurrency(buyPreview.marketValueAfter)}</strong>
-                      </article>
-                    </div>
-                  </div>
+                  </NlCard>
 
-                  <div className="transfer-buy-meta-grid">
-                    <div className="transfer-callout is-blocked">
-                      <div className="transfer-callout-title">
-                        <strong>Blocker</strong>
-                        <span className="muted">{buyPreview.blockingReasons.length}</span>
-                      </div>
+                  <div className="transfer-buy-meta-grid market-v2-buy-meta-grid">
+                    <NlCard className="market-v2-buy-meta-card" eyebrow={String(buyPreview.blockingReasons.length)} title="Blocker">
                       {buyPreview.blockingReasons.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
+                        <ul className="negotiation-factor-list">
                           {buyPreview.blockingReasons.map((reason) => (
                             <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="muted">Keine blockierenden Gruende.</p>
+                        <p className="nl-market-muted">Keine blockierenden Gruende.</p>
                       )}
-                    </div>
-                    <div className="transfer-callout is-warning">
-                      <div className="transfer-callout-title">
-                        <strong>Hinweise</strong>
-                        <span className="muted">{visibleBuyWarnings.length}</span>
-                      </div>
+                    </NlCard>
+                    <NlCard className="market-v2-buy-meta-card" eyebrow={String(visibleBuyWarnings.length)} title="Hinweise">
                       {visibleBuyWarnings.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
+                        <ul className="negotiation-factor-list">
                           {visibleBuyWarnings.map((warning) => (
                             <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="muted">Keine Warnungen.</p>
+                        <p className="nl-market-muted">Keine Warnungen.</p>
                       )}
-                    </div>
-                    <div className="transfer-callout is-info">
-                      <div className="transfer-callout-title">
-                        <strong>Warum der Deal so ausfällt</strong>
-                        <span className="muted">{buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren</span>
-                      </div>
+                    </NlCard>
+                    <NlCard
+                      className="market-v2-buy-meta-card"
+                      eyebrow={`${buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren`}
+                      title="Warum der Deal so ausfällt"
+                    >
                       {buyPreview.negotiationScoreBreakdown?.length ? (
-                        <ul className="warning-list negotiation-factor-list">
+                        <ul className="negotiation-factor-list">
                           {buyPreview.negotiationScoreBreakdown.map((entry) => (
                             <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
                               <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
@@ -606,12 +658,12 @@ export default function FoundationMarketBuyShellHost({
                           ))}
                         </ul>
                       ) : (
-                        <p className="muted">Noch keine Score-Faktoren verfügbar.</p>
+                        <p className="nl-market-muted">Noch keine Score-Faktoren verfügbar.</p>
                       )}
                       {buyPreview.negotiationReasons?.length ? (
                         <>
-                          <p className="muted" style={{ marginTop: 8 }}>Treiber</p>
-                          <ul className="warning-list negotiation-factor-list">
+                          <p className="market-v2-buy-subhead-inline">Treiber</p>
+                          <ul className="negotiation-factor-list">
                             {buyPreview.negotiationReasons.map((reason) => (
                               <li className="negotiation-factor is-positive" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
                             ))}
@@ -620,15 +672,15 @@ export default function FoundationMarketBuyShellHost({
                       ) : null}
                       {buyPreview.negotiationWarnings?.length ? (
                         <>
-                          <p className="muted" style={{ marginTop: 8 }}>Risiken</p>
-                          <ul className="warning-list negotiation-factor-list">
+                          <p className="market-v2-buy-subhead-inline">Risiken</p>
+                          <ul className="negotiation-factor-list">
                             {buyPreview.negotiationWarnings.map((warning) => (
                               <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
                             ))}
                           </ul>
                         </>
                       ) : null}
-                    </div>
+                    </NlCard>
                   </div>
                 </>
               ) : (

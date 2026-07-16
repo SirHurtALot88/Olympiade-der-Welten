@@ -37,6 +37,14 @@ export type NlTableProps<Row> = {
   renderCell?: (row: Row, column: NlTableColumn<Row>) => ReactNode;
   sortState?: NlTableSortState | null;
   onSort?: (key: string) => void;
+  /**
+   * Optionaler Zeilen-Klick (z. B. "Team-/Spielerprofil öffnen"). Macht die
+   * gesamte Zeile klick-/tastaturbedienbar (Enter/Space), ohne dass jede
+   * Zelle einen eigenen Button braucht. Klicks auf verschachtelte
+   * interaktive Elemente (Buttons/Links) innerhalb einer Zelle lösen die
+   * Zeile NICHT zusätzlich aus (Guard über `event.target`).
+   */
+  onRowClick?: (row: Row, index: number) => void;
   /** Zebra-Streifen (Standard: an). */
   zebra?: boolean;
   /** Hover-Hervorhebung der Zeile (Standard: an). */
@@ -79,6 +87,7 @@ export function NlTable<Row>({
   renderCell = defaultRenderCell,
   sortState,
   onSort,
+  onRowClick,
   zebra = true,
   hoverable = true,
   stickyHeader = true,
@@ -143,10 +152,42 @@ export function NlTable<Row>({
         <tbody>
           {rows.map((row, rowIndex) => {
             const rowExtra = rowClassName?.(row, rowIndex);
+            const rowClasses = [rowExtra ?? "", onRowClick ? "is-clickable" : ""].filter(Boolean).join(" ");
             return (
             <tr
               key={rowKey ? rowKey(row, rowIndex) : rowIndex}
-              className={rowExtra || undefined}
+              className={rowClasses || undefined}
+              onClick={
+                onRowClick
+                  ? (event) => {
+                      // Verschachtelte interaktive Elemente (z. B. ein Team-Link in einer
+                      // Zelle) sollen ihre eigene Aktion auslösen, nicht zusätzlich den
+                      // Zeilen-Klick — Klicks, die von einem <button>/<a> aufsteigen, werden
+                      // ignoriert.
+                      if ((event.target as HTMLElement).closest("button, a")) {
+                        return;
+                      }
+                      onRowClick(row, rowIndex);
+                    }
+                  : undefined
+              }
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        if (event.key === " ") {
+                          event.preventDefault();
+                        }
+                        onRowClick(row, rowIndex);
+                      }
+                    }
+                  : undefined
+              }
             >
               {columns.map((column) => (
                 <td

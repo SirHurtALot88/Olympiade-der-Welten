@@ -13,6 +13,29 @@ function preserveIfUnchangedFromCompact<T>(incoming: T, existing: T, compactSlic
   return matchesCompactSlice(incoming, compactSlice) ? existing : incoming;
 }
 
+/**
+ * Append-only archive guard for compact-load round-trips.
+ *
+ * The Foundation compact load strips `seasonSnapshots`/`standingsApplyLogs` to
+ * `undefined`, and the client re-stamps an EMPTY sentinel `[]` (see
+ * `apply-compact-season-archive-sentinel`). A naive `incoming ?? existing`
+ * (and even `preserveIfUnchangedFromCompact`, whose compact baseline is
+ * `undefined` — `"[]" !== undefined`) would let that `[]` clobber the durable
+ * DB archive on the next gameplay PUT — wiping every prior-season snapshot.
+ *
+ * These archives are APPEND-ONLY (they only grow, one entry per completed
+ * season / applied matchday). So the safe rule is: only accept the incoming
+ * array when it has AT LEAST as many entries as the persisted one; otherwise
+ * keep the durable copy. This blocks both the empty sentinel and any partial
+ * fetch from shrinking the archive, while still accepting legitimate growth
+ * (a freshly-completed season adds a snapshot → incoming is longer → wins).
+ */
+function preserveAppendOnlyArchive<T extends unknown[] | undefined>(incoming: T, existing: T): T {
+  const incomingLength = incoming?.length ?? 0;
+  const existingLength = existing?.length ?? 0;
+  return incomingLength >= existingLength ? incoming : existing;
+}
+
 function mergeKeyedCollection<T>(
   incoming: T[],
   existing: T[],
@@ -142,8 +165,18 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
       ...incoming.seasonState,
       persistedSeasonDerivations:
         incoming.seasonState.persistedSeasonDerivations ?? existing.seasonState.persistedSeasonDerivations,
-      seasonSnapshots: incoming.seasonState.seasonSnapshots ?? existing.seasonState.seasonSnapshots,
-      standingsApplyLogs: incoming.seasonState.standingsApplyLogs ?? existing.seasonState.standingsApplyLogs,
+      // Append-only archives: the compact client re-stamps an empty sentinel `[]`,
+      // which the old `incoming ?? existing` guard let clobber the durable DB
+      // archive (wiping every prior-season snapshot). Only accept incoming when it
+      // is at least as long as the persisted copy (see preserveAppendOnlyArchive).
+      seasonSnapshots: preserveAppendOnlyArchive(
+        incoming.seasonState.seasonSnapshots,
+        existing.seasonState.seasonSnapshots,
+      ),
+      standingsApplyLogs: preserveAppendOnlyArchive(
+        incoming.seasonState.standingsApplyLogs,
+        existing.seasonState.standingsApplyLogs,
+      ),
       lineupDrafts: mergeKeyedCollection(
         incoming.seasonState.lineupDrafts ?? [],
         existing.seasonState.lineupDrafts ?? [],

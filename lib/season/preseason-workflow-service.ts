@@ -727,6 +727,25 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
   blockingReasons: string[];
   warnings: string[];
 } {
+  // Benchmark freeze integrity: the authoritative season snapshot is written at
+  // season completion (season-completion-service), AFTER sponsor + facility
+  // settlement but BEFORE the transfer window — so its MW/Cash/roster are the
+  // "end of season, post-sponsors, pre-sales" values. This preseason path runs
+  // AFTER sales, so rebuilding + upserting from the current gameState would
+  // clobber those frozen values with post-sale numbers. If a `completed`
+  // snapshot for this season already exists, treat it as immutable and keep it.
+  const existingCompletedSnapshot = (save.gameState.seasonState.seasonSnapshots ?? []).find(
+    (snapshot) => snapshot.seasonId === save.gameState.season.id && snapshot.status === "completed",
+  );
+  if (existingCompletedSnapshot) {
+    return {
+      save,
+      snapshotId: existingCompletedSnapshot.snapshotId ?? null,
+      blockingReasons: [],
+      warnings: ["season_snapshot_already_frozen_pre_sale"],
+    };
+  }
+
   const snapshotPreview = buildSeasonSnapshotDryRun(save.gameState, {
     saveId: save.saveId,
     seasonId: save.gameState.season.id,

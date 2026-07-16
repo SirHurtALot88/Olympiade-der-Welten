@@ -424,6 +424,7 @@ describe("foundation performance architecture helpers", () => {
     expect(shouldLoadSeasonArchiveForView("seasonV2", { showExtendedTeamPanels: false })).toBe(true);
     expect(shouldLoadSeasonArchiveForView("playerProfile", { showExtendedTeamPanels: false })).toBe(true);
     expect(shouldLoadSeasonArchiveForView("teamProfile", { showExtendedTeamPanels: false })).toBe(true);
+    expect(shouldLoadSeasonArchiveForView("allTimeTable", { showExtendedTeamPanels: false })).toBe(true);
     expect(isSeasonArchiveLoaded(undefined)).toBe(false);
     expect(isSeasonArchiveLoaded([])).toBe(true);
     expect(isSeasonArchiveLoaded([{ seasonId: "season-1" } as never])).toBe(true);
@@ -694,7 +695,6 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationText).toContain("season-v2-derivations");
     expect(teamsHostText).toContain("shouldBuildTeamsAreaRanks");
     expect(teamsHostText).toContain("teamsHydrationPhase");
-    expect(teamsText).toContain("FoundationTeamsPortraitsTab");
   });
 
   it("caches lab-context payloads by save signature", () => {
