@@ -13,6 +13,11 @@
 import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
 import { classifyCompositionLane, deriveCompositionCounts } from "@/lib/ai/organic-squad/composition-plan";
 import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
+import {
+  deriveLeagueSuperstarLicenses,
+  MARQUEE_TARGET_MW_FLOOR,
+  type MarqueeLicenseTeamInput,
+} from "@/lib/ai/organic-squad/marquee-eligibility";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import {
   CATEGORY_TO_AXIS,
@@ -29,7 +34,7 @@ import {
 import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
-import { buildLeagueMarketBrackets, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
+import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
@@ -82,6 +87,20 @@ function resolveRosterSalaryTotal(gameState: GameState, teamId: string): number 
     if (player) total += Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0);
   }
   return total;
+}
+
+/** Market values of an arbitrary team's current roster (same value source as toOrganicPlayerView). Used
+ *  by the MARQUEE league-input builder below to count each team's existing Superstar-tier holdings — a
+ *  live gameState lookup, unlike the current-team startingSquad view already built in the caller. */
+function resolveRosterMarketValues(gameState: GameState, teamId: string): number[] {
+  const values: number[] = [];
+  const players = gameState.players ?? [];
+  for (const entry of gameState.rosters ?? []) {
+    if (entry.teamId !== teamId) continue;
+    const player = players.find((candidate) => candidate.id === entry.playerId);
+    if (player) values.push(Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0));
+  }
+  return values;
 }
 
 /** 0..100 (or 0..10 legacy) management value → 0..1, matching normalizeManagementValue. */
@@ -372,10 +391,52 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     }
     // computeIdentityLaneAppetite + applyGmBiasToLaneAppetite already derive premiumCap/superstarCap
     // internally via deriveLaneCapsFromAppetite (ai-needs-picks-compare-service.ts:2063,2090,2141) — the
-    // returned lanePhilosophy.premiumCap/superstarCap ARE that function's output for the final (post-GM-
+    // returned lanePhilosophy.premiumCap/premiumAppetite ARE that function's output for the final (post-GM-
     // tilt) premiumAppetite, so reading them off lanePhilosophy directly avoids a redundant second call.
+    // superstarCap, however, is NOT taken from lanePhilosophy any more (see MARQUEE license derivation
+    // below) — the identity-only premiumAppetite formula folds `(1 − financesN)` in, so it systematically
+    // under-scores exactly the richest star-chasing clubs for the Superstar slot; premiumCap/Star stay on
+    // the original appetite path (that balancing knob is unaffected, only Superstar moves to the league
+    // license).
     const gmProfile = getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null;
     const lanePhilosophy = applyGmBiasToLaneAppetite(computeIdentityLaneAppetite(input.identity ?? null), gmProfile);
+
+    // League-scaled marquee target price: MARQUEE_TARGET_MW_FLOOR (~75) is only a LOWER bound — the actual
+    // price rides the league's own top-end candidate pricing (98th percentile), so a late-season inflated
+    // league naturally prices its marquee at ~85-90 MW instead of staying pinned at the S1 floor forever.
+    // Computed once per call from THIS team's candidate pool and reused for every team below (a league-wide
+    // scalar this draft pass, not a per-team one — matches how `brackets` itself is reused).
+    const marqueeTargetMw = Math.max(
+      MARQUEE_TARGET_MW_FLOOR,
+      quantilePrice(candidates.map((view) => view.marketValue), 0.98),
+    );
+
+    // MARQUEE league license derivation (marquee-eligibility.ts): built fresh from gameState on every call,
+    // over ALL teams, so — being a pure function of gameState — it returns the SAME license set for every
+    // team call that sees the same gameState snapshot (a scarce league-wide resource, not a per-team roll).
+    // Because this runs once per team INSIDE a sequential draft pass, gameState (rosters/cash) shifts a
+    // little call to call as earlier teams' picks land, so the license set can drift slightly over the
+    // course of one pass — acceptable here (same tradeoff `brackets` above already makes) since the goal is
+    // "the league licenses ~2-3 teams this pass", not perfect single-snapshot simultaneity.
+    const leagueInput: MarqueeLicenseTeamInput[] = (input.gameState.teams ?? []).map((leagueTeam) => {
+      const leagueIdentity = (input.gameState.teamIdentities ?? []).find((i) => i.teamId === leagueTeam.teamId) ?? null;
+      const leagueGmProfile = getTeamGeneralManager(input.gameState, leagueTeam.teamId)?.profile ?? null;
+      const rosterMarketValues = resolveRosterMarketValues(input.gameState, leagueTeam.teamId);
+      const rosterSize = rosterMarketValues.length;
+      const leagueSlotsToFill = Math.max(1, (leagueIdentity?.playerOpt ?? ROSTER_MIN) - rosterSize);
+      const ssPlanCost = marqueeTargetMw + Math.max(0, leagueSlotsToFill - 1) * brackets.depth.floorMw;
+      return {
+        teamId: leagueTeam.teamId,
+        ambitionN: normId(leagueIdentity?.ambition),
+        starPriority: leagueGmProfile?.bias?.starPriority ?? 5,
+        archetype: leagueGmProfile?.archetype ?? "",
+        spendableNet: (leagueTeam.cash ?? 0) - ORGANIC_CASH_BUFFER,
+        ssPlanCost,
+        existingSuperstarCount: rosterMarketValues.filter((mv) => mv >= brackets.superstar.floorMw).length,
+      };
+    });
+    const licenses = deriveLeagueSuperstarLicenses(leagueInput);
+
     const counts = deriveCompositionCounts({
       optTarget: planWeights.optTarget,
       existingTiers,
@@ -383,8 +444,9 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       brackets,
       premiumAppetite: lanePhilosophy.premiumAppetite,
       premiumCap: lanePhilosophy.premiumCap,
-      superstarCap: lanePhilosophy.superstarCap,
+      superstarCap: licenses.has(input.team.teamId) ? 1 : 0,
       rosterMin: ROSTER_MIN,
+      marqueeTargetMw,
     });
     composition = { counts, brackets };
   }

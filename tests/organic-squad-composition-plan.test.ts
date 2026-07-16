@@ -71,7 +71,7 @@ describe("deriveCompositionCounts — affordability-waterfall planning", () => {
       existingTiers: EMPTY_TIERS,
       spendableNet: 500,
       brackets: BRACKETS,
-      premiumAppetite: 1.5, // ≥ SUPERSTAR_APPETITE_THRESHOLD (1.45)
+      premiumAppetite: 1.5, // Superstar is license-gated (superstarCap) now, not premiumAppetite-gated
       premiumCap: 3,
       superstarCap: 1,
       rosterMin: 8,

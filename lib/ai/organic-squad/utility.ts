@@ -160,20 +160,36 @@ const COMPOSITION_OVERAGE_PENALTY = 8;
 const COMPOSITION_OVERAGE_FLOOR = -16;
 /** Fade of the fill bonus from band target to ceiling, so the cheaper end of a band wins (budget stretches). */
 const COMPOSITION_TOPBAND_FADE = 0.5;
+/**
+ * Superstar-lane fill bonus (deficit > 0), used INSTEAD OF the normal COMPOSITION_VALUE for that one lane.
+ * A Superstar is "nice to have, not a must" — only the handful of league-licensed teams (see
+ * marquee-eligibility.ts) ever have a Superstar deficit at all (deficit <= 0 for everyone else, so this
+ * never touches them), but even for a licensed team the base economy otherwise avoids 65+ MW bodies
+ * entirely (they eat a huge share of the budget for one slot). A MODERATE bump — clearly above the normal
+ * fill bonus so a licensed, affording team tends to actually buy it, but not so large that it becomes a
+ * forced pick overriding affordability/discipline-fit — is what nudges realized league-wide Superstar count
+ * from ~0 up to the intended "typically 2-3" without making it a hard requirement. Superstar has no
+ * ceiling (brackets.superstar.ceilingMw is null) so there's no top-band fade to apply, unlike other lanes.
+ * Tunable: raise toward COMPOSITION_VALUE*3 (~60) if measurement still shows licensed teams passing on
+ * their Superstar; lower toward COMPOSITION_VALUE (~20, i.e. no special-case) if it over-fires.
+ */
+const COMPOSITION_SUPERSTAR_VALUE = 35;
 
 function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
   const comp = state.composition;
   if (!comp) return 0;
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
   // ALL tiers (incl. Star/Superstar and Reserve) take the normal deficit path so the plan's allocation is
-  // actually realized. The ~5 highest-appetite teams plan one Superstar (65+) and get nudged to buy it
-  // (target 2–3, max ~5 league-wide); Stars fill more broadly; poorer teams fill their planned Reserve
-  // rotation bodies; and over-plan buys in any tier are discouraged. The affordability waterfall already
-  // costs the premium slots into the plan, so a marquee buy no longer starves the roster (below-opt safe).
+  // actually realized. The ~2-3 (cap 5) league-licensed teams plan one Superstar (65+, aspirational ~75)
+  // and get a moderate nudge to buy it — not a forced pick; Stars fill more broadly; poorer teams fill
+  // their planned Reserve rotation bodies; and over-plan buys in any tier are discouraged. The affordability
+  // waterfall already costs the premium slots into the plan, so a marquee buy no longer starves the roster
+  // (below-opt safe).
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
   // deficit <= 0: tier already at/over target ⇒ gentle floored malus (never blocks a below-opt fill).
   if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
   // deficit > 0: fill bonus, mildly faded toward the band ceiling so the cheaper end of the band wins.
+  if (lane === "superstar") return COMPOSITION_SUPERSTAR_VALUE; // no ceiling ⇒ no top-band fade
   const band = comp.brackets[lane];
   const price = Math.max(0, player.marketValue);
   if (band.ceilingMw != null && band.ceilingMw > band.targetMw) {
