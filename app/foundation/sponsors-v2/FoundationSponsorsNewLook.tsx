@@ -3,17 +3,18 @@
 import { useMemo, useState } from "react";
 
 import {
-  NlBarChart,
   NlCard,
   NlDeltaChip,
   NlEmptyState,
   NlGauge,
   NlProgressBar,
   NlSubTabs,
+  NL_TONE_VAR,
   StatChip,
   StatChipRow,
   formatNlNumber,
   useCountUp,
+  type NlTone,
 } from "@/components/foundation/new-look";
 import {
   SPONSOR_ARCHETYPE_META,
@@ -30,6 +31,21 @@ function formatSignedCash(formatCash: (value: number) => string, value: number) 
   const abs = formatCash(Math.abs(value));
   return `${value > 0 ? "+" : value < 0 ? "-" : ""}${abs}`;
 }
+
+type SponsorComponentKind = SponsorOffer["components"][number]["kind"];
+
+/**
+ * Segment-Reihenfolge + Farbe für das gestapelte Angebots-Cash-Chart
+ * (Angebotsvergleich). Reihenfolge = Stapelung von unten (Basis) nach oben
+ * (Sonderziel); Labels kommen aus `getSponsorComponentKindLabel`, damit sie
+ * exakt zu den Angebotskarten passen.
+ */
+const SPONSOR_STACK_SEGMENTS: Array<{ kind: SponsorComponentKind; tone: NlTone }> = [
+  { kind: "base", tone: "accent" },
+  { kind: "rank", tone: "warn" },
+  { kind: "improvement", tone: "spe" },
+  { kind: "special", tone: "good" },
+];
 
 /**
  * "Neuer Look" Sponsoren — flag-gated, additiv (nur wenn `useNewLook` aktiv ist).
@@ -256,7 +272,22 @@ export default function FoundationSponsorsNewLook({
           (sum, component) => sum + (typeof component.rewardCash === "number" ? component.rewardCash : 0),
           0,
         );
-        return { offerId: offer.offerId, name: offer.name, archetype: offer.archetype, totalCash };
+        // Cash je Komponenten-Art (nur positive Beträge) für das gestapelte
+        // Vergleichs-Chart — Segmente zerlegen den Gesamtbetrag in Basis /
+        // Gewinnstufen / Tabellenziel / Sonderziel.
+        const kindTotals = new Map<SponsorComponentKind, number>();
+        for (const component of adjustedComponents) {
+          const cash = typeof component.rewardCash === "number" ? component.rewardCash : 0;
+          if (cash <= 0) continue;
+          kindTotals.set(component.kind, (kindTotals.get(component.kind) ?? 0) + cash);
+        }
+        const segments = SPONSOR_STACK_SEGMENTS.filter((seg) => (kindTotals.get(seg.kind) ?? 0) > 0).map((seg) => ({
+          kind: seg.kind,
+          label: getSponsorComponentKindLabel(seg.kind),
+          tone: seg.tone,
+          value: kindTotals.get(seg.kind) ?? 0,
+        }));
+        return { offerId: offer.offerId, name: offer.name, archetype: offer.archetype, totalCash, segments };
       }),
     [selectedTeamSponsorOffers, sponsorChoiceProfiles, applySponsorNegotiationToComponents],
   );
@@ -574,16 +605,56 @@ export default function FoundationSponsorsNewLook({
             {/* #76: Angebotsvergleich — Cash-Gesamt pro Angebot */}
             {offerCashSummaries.length > 1 ? (
               <NlCard className="nl-sponsor-compare-card" eyebrow="Angebotsvergleich" title="Cash-Gesamt pro Angebot">
-                <NlBarChart
-                  bars={offerCashSummaries.map((entry) => ({
-                    label: entry.name.length > 10 ? `${entry.name.slice(0, 9)}…` : entry.name,
-                    value: entry.totalCash,
-                    tone: SPONSOR_ARCHETYPE_META[entry.archetype].tone,
-                  }))}
-                  format={(value) => formatMoney(value)}
-                  aria-label="Cash-Gesamt Vergleich der aktuellen Sponsor-Angebote"
-                  className="nl-sponsor-compare-chart"
-                />
+                <div className="nl-sponsor-stackchart">
+                  <div
+                    className="nl-sponsor-stackchart-cols"
+                    role="img"
+                    aria-label="Cash-Gesamt je Angebot, gestapelt nach Basis, Gewinnstufen, Tabellenziel und Sonderziel"
+                  >
+                    {offerCashSummaries.map((entry) => {
+                      const maxTotal = Math.max(...offerCashSummaries.map((item) => item.totalCash), 1e-9);
+                      const fillPct = Math.max(0, Math.min(100, (entry.totalCash / maxTotal) * 100));
+                      return (
+                        <div className="nl-sponsor-stackcol" key={entry.offerId}>
+                          <span className="nl-sponsor-stackcol-total nl-tnum">{formatMoney(entry.totalCash)}</span>
+                          <div className="nl-sponsor-stackcol-track">
+                            <div
+                              className="nl-sponsor-stackcol-bar"
+                              style={{ height: `${fillPct}%` }}
+                              title={entry.segments
+                                .map((seg) => `${seg.label}: ${formatMoney(seg.value)}`)
+                                .join(" · ")}
+                            >
+                              {entry.segments.map((seg) => (
+                                <span
+                                  key={seg.kind}
+                                  className="nl-sponsor-stackseg"
+                                  style={{ flexGrow: seg.value, background: NL_TONE_VAR[seg.tone] }}
+                                  title={`${seg.label}: ${formatMoney(seg.value)}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="nl-sponsor-stackcol-label" title={entry.name}>
+                            {entry.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <ul className="nl-sponsor-stack-legend">
+                    {SPONSOR_STACK_SEGMENTS.map((seg) => (
+                      <li key={seg.kind}>
+                        <span
+                          className="nl-sponsor-stack-legend-dot"
+                          style={{ background: NL_TONE_VAR[seg.tone] }}
+                          aria-hidden="true"
+                        />
+                        {getSponsorComponentKindLabel(seg.kind)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </NlCard>
             ) : null}
             <div className="nl-sponsor-offer-grid">
