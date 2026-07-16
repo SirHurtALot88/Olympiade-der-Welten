@@ -150,8 +150,9 @@ const THEME_FIT_VALUE = 12;
  * without any hard band filter, slot sequence, or stopUtility change. `state.composition` undefined
  * (COMPOSE off, or no plan for this team) ⇒ this returns 0 exactly, so buyUtility is untouched.
  */
-const COMPOSITION_VALUE = 45;
-const COMPOSITION_OVERAGE_PENALTY = 30;
+const COMPOSITION_VALUE = 34;
+const COMPOSITION_OVERAGE_PENALTY = 8;
+const COMPOSITION_OVERAGE_FLOOR = -16;
 
 function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
   const comp = state.composition;
@@ -159,8 +160,11 @@ function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamStat
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
   // deficit > 0: this tier is still under its planned target ⇒ flat bonus for filling it.
-  // deficit <= 0: this tier is already at/over target ⇒ malus that grows with how far over it is.
-  return deficit > 0 ? COMPOSITION_VALUE : COMPOSITION_OVERAGE_PENALTY * deficit;
+  // deficit <= 0: this tier is already at/over target ⇒ a GENTLE malus (floored) that discourages
+  // over-concentrating one tier but is deliberately far smaller than BELOW_OPT_FILL_FLOOR(25)/
+  // ROTATION_VALUE(92), so it steers tier choice without ever blocking a needed below-opt fill (an
+  // over-strong malus was starving the last slots → below-opt spiked).
+  return deficit > 0 ? COMPOSITION_VALUE : Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
 }
 
 /**

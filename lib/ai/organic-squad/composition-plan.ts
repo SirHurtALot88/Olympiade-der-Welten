@@ -56,8 +56,9 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** premiumAppetite at/above which a team is even considered for a planned Superstar slot. */
-const SUPERSTAR_APPETITE_THRESHOLD = 1.05;
+/** premiumAppetite at/above which a team is even considered for a planned Superstar slot. Raised so only
+ *  the most premium clubs plan a Superstar (league-wide Superstar count was ~2.3, target ≤1). */
+const SUPERSTAR_APPETITE_THRESHOLD = 1.25;
 /** premiumAppetite at/above which a team plans one Star slot. */
 const STAR_APPETITE_THRESHOLD = 0.55;
 /** premiumAppetite at/above which (with a large-enough roster) a team plans a SECOND Star slot. */
@@ -65,12 +66,13 @@ const STAR_DOUBLE_APPETITE_THRESHOLD = 1.25;
 /** optTarget at/above which the second Star slot is allowed (a small roster can't spare two premium slots). */
 const STAR_DOUBLE_OPT_TARGET_MIN = 10;
 
-/** coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE·r — 0.18 (arm) → 0.32 (reich). */
-const CORE_SHARE_BASE = 0.18;
-const CORE_SHARE_SLOPE = 0.14;
-/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.30 (arm) → 0.20 (reich). */
-const BACKUP_SHARE_BASE = 0.3;
-const BACKUP_SHARE_SLOPE = 0.1;
+/** coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE·r — 0.24 (arm) → 0.34 (reich). Raised so Core grows
+ *  toward Backup (realized Core lags the plan since 30-45MW bodies cost more, so the plan aims higher). */
+const CORE_SHARE_BASE = 0.24;
+const CORE_SHARE_SLOPE = 0.1;
+/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.26 (arm) → 0.20 (reich). Lowered so Core≈Backup. */
+const BACKUP_SHARE_BASE = 0.26;
+const BACKUP_SHARE_SLOPE = 0.06;
 
 /** Order in which excess planned need is trimmed back to `slotsToFill` — Premium (superstar/star) is never touched. */
 const EXCESS_TRIM_ORDER: readonly MarketBracketLane[] = ["depth", "backup", "core"];
