@@ -23,10 +23,11 @@ describe("buyShippingShare", () => {
     ).toBeCloseTo(1.3);
   });
 
-  it("multipliziert 1,30 EUR mit der Packgroesse fuer Packs", () => {
+  it("zaehlt Einkaufs-Versand fuer Packs nur EINMALIG (3er-Pack gilt als 1 Einheit)", () => {
+    // Ein Pack wird als eine Einheit behandelt -> KEINE Multiplikation mit der Packgroesse.
     expect(
       buyShippingShare({ ek: 1, kind: "pack", packSize: 3, fixedCostPerUnit: 0 }, DEFAULT_COST_SETTINGS)
-    ).toBeCloseTo(3.9);
+    ).toBeCloseTo(1.15);
   });
 });
 
@@ -58,8 +59,8 @@ describe("computeHk", () => {
       { ek: 1.77, kind: "pack", packSize: 3, fixedCostPerUnit: shopFixed },
       DEFAULT_COST_SETTINGS
     );
-    // 1.77 + 3.90 (1.30x3) + 0.50 + 0.1875 + 0.062 + 0.5 (shopweite Fixkosten/Stk)
-    expect(hk.total).toBeCloseTo(1.77 + 3.9 + 0.5 + 0.1875 + 0.062 + 0.5, 5);
+    // 1.77 + 1.15 (Einkaufs-Versand EINMALIG, Pack = 1 Einheit) + 0.50 + 0.1875 + 0.062 + 0.5
+    expect(hk.total).toBeCloseTo(1.77 + 1.15 + 0.5 + 0.1875 + 0.062 + 0.5, 5);
   });
 
   it("belastet einen Nischen-Artikel mit wenigen eigenen Verkaeufen NICHT mit der vollen Shop-Fixkostenlast", () => {
