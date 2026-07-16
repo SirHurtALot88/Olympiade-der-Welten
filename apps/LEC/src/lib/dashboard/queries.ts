@@ -125,7 +125,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
 export async function saveCostSettings(
   prisma: PrismaClient,
   values: CostSettingsValues
-): Promise<CostSettingsValues & { id: string; version: number; createdAt: Date }> {
+): Promise<CostSettingsValues & { id: string; version: number; active: boolean; createdAt: Date }> {
   const maxVersion = await prisma.costSettings.aggregate({ _max: { version: true } });
   const nextVersion = (maxVersion._max.version ?? 0) + 1;
 
