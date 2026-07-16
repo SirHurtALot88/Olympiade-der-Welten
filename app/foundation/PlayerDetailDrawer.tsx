@@ -520,6 +520,73 @@ function formatDisciplineTier(value: number | null | undefined) {
   return "F";
 }
 
+// Aufsteigende Tier-Ordnung (schwach → stark). Wird beim Fog-of-War-Sortieren
+// genutzt, damit nur nach dem groben Klassen-Band (nicht nach der exakten Zahl)
+// sortiert wird — die feine Bestenreihenfolge bleibt so verdeckt.
+const DISCIPLINE_TIER_ORDER = ["F", "E", "D", "C", "B", "A", "S", "S+"] as const;
+
+function disciplineTierRank(tier: string | null | undefined) {
+  return tier ? DISCIPLINE_TIER_ORDER.indexOf(tier as (typeof DISCIPLINE_TIER_ORDER)[number]) : -1;
+}
+
+// Grobes Klassen-Band eines Attributs → repräsentativer Balkenwert (0..99).
+// So zeigt der Fog-of-War-Balken nur die Klasse (Höhe ≈ Band), nie die exakte
+// Zahl. Die Werte fallen bewusst in die Mitte des jeweiligen Bandes von
+// `formatDisciplineTier`, damit `formatDisciplineTier(bandValue)` das Band
+// wieder exakt zurückgibt.
+function attributeTierBandValue(tier: string | null | undefined): number | null {
+  switch (tier) {
+    case "S+":
+      return 95;
+    case "S":
+      return 87;
+    case "A":
+      return 76;
+    case "B":
+      return 65;
+    case "C":
+      return 53;
+    case "D":
+      return 41;
+    case "E":
+      return 29;
+    case "F":
+      return 12;
+    default:
+      return null;
+  }
+}
+
+// Deterministischer Per-Spieler-Seed (FNV-1a), gespiegelt aus
+// `lib/market/transfermarkt-scouting.ts` (`getSeedValue`). Gleicher Spieler +
+// gleicher Schlüssel → gleiche Pseudozufallszahl, damit die verdeckte
+// Reihenfolge stabil (kein Flackern) und trotzdem nicht die wahre Rangfolge ist.
+function getFogSeedValue(seed: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+// Mischt eine Liste für Fog-of-War-Anzeigen deterministisch per Spieler-Seed,
+// sodass die WAHRE (best-first) Rangfolge nicht ablesbar ist — analog zur
+// Transfermarkt-Scouting-Anzeige, die die Attribut-/Diszi-Reihenfolge ebenfalls
+// per Seed verschiebt (`buildTransfermarktScoutedAttributeRows`).
+function shuffleFoggedByPlayer<T>(items: T[], playerId: string, keyOf: (item: T) => string): T[] {
+  return [...items].sort((left, right) => {
+    const leftKey = keyOf(left);
+    const rightKey = keyOf(right);
+    const leftSeed = getFogSeedValue(`${playerId}:${leftKey}`);
+    const rightSeed = getFogSeedValue(`${playerId}:${rightKey}`);
+    if (leftSeed !== rightSeed) {
+      return leftSeed - rightSeed;
+    }
+    return leftKey.localeCompare(rightKey, "de");
+  });
+}
+
 
 function HelpLabel({
   children,
@@ -959,11 +1026,26 @@ function resolveCaPoDisplay(data: PlayerDetailDrawerData) {
   };
 }
 
-function PlayerCaPoStarStack({ data, newLook = false }: { data: PlayerDetailDrawerData; newLook?: boolean }) {
+function PlayerCaPoStarStack({
+  data,
+  newLook = false,
+  fogged = false,
+}: {
+  data: PlayerDetailDrawerData;
+  newLook?: boolean;
+  /**
+   * Fog-of-War: bei verdeckten Spielern (Free Agent / gescoutet / nicht im
+   * eigenen Kader) wird PO nur als geschätzte Sterne-RANGE gezeigt
+   * (`known={false}` → Hollow-Outline-Oberbereich in `NlAbilityStars`), nie als
+   * bestätigter Exaktwert. CA bleibt aus der Bewertung ableitbar (`caScore`),
+   * damit die Karte auch vor dem Kauf ein Fähigkeits-Signal hat.
+   */
+  fogged?: boolean;
+}) {
   const { caStars, poStars, caDisplay, poDisplay } = resolveCaPoDisplay(data);
 
   if (newLook) {
-    const known = data.attributeVisibility === "exact";
+    const known = !fogged && data.attributeVisibility === "exact";
     const poScoreRange = data.developmentInsight?.potentialRangeDisplay ?? null;
     return (
       <div className="player-drawer-ca-po-row" data-testid="player-drawer-ca-po-row">
@@ -1063,7 +1145,28 @@ function compareTopDisciplineRows(
   right: TopDisciplineRow,
   columnId: TopDisciplineColumnId,
   direction: TopDisciplineSortDirection,
+  fogged = false,
+  playerId = "",
 ) {
+  // Fog-of-War: bei verdeckten Spielern (Free Agent / gescoutet / nicht im
+  // eigenen Kader) darf die Stat-Spalte NICHT nach der exakten Zahl sortieren —
+  // das würde die wahre Bestenreihenfolge der Disziplinen verraten, obwohl nur
+  // das grobe Klassen-Band angezeigt wird. Deshalb nach Klassen-Band sortieren
+  // und innerhalb eines Bandes deterministisch (Spieler-Seed) mischen.
+  if (fogged && columnId === "value") {
+    const leftTier = disciplineTierRank(left.scoutedTier ?? formatDisciplineTier(left.value));
+    const rightTier = disciplineTierRank(right.scoutedTier ?? formatDisciplineTier(right.value));
+    const directionFactor = direction === "asc" ? 1 : -1;
+    if (leftTier !== rightTier) {
+      return (leftTier - rightTier) * directionFactor;
+    }
+    const leftSeed = getFogSeedValue(`${playerId}:${left.id}`);
+    const rightSeed = getFogSeedValue(`${playerId}:${right.id}`);
+    if (leftSeed !== rightSeed) {
+      return leftSeed - rightSeed;
+    }
+    return left.id.localeCompare(right.id, "de");
+  }
   const leftValue = getTopDisciplineSortValue(left, columnId);
   const rightValue = getTopDisciplineSortValue(right, columnId);
   const directionFactor = direction === "asc" ? 1 : -1;
@@ -1864,7 +1967,14 @@ export default function PlayerDetailDrawer({
     (columnId) => !isScoutedProfile || columnId === "discipline" || columnId === "value",
   );
   const topDisciplineCards = [...data.disciplineValues.slice(0, isScoutedProfile ? 5 : data.disciplineValues.length)].sort((left, right) =>
-    compareTopDisciplineRows(left, right, topDisciplineSort.columnId, topDisciplineSort.direction),
+    compareTopDisciplineRows(
+      left,
+      right,
+      topDisciplineSort.columnId,
+      topDisciplineSort.direction,
+      disciplineStatFogged,
+      data.playerId,
+    ),
   );
   const activeHistoryRow = data.historyRows.find((row) => row.isActiveSeason) ?? null;
   const seasonSnapshotAppearances = seasonPerformance?.appearances ?? activeHistoryRow?.appearances ?? null;
@@ -1921,17 +2031,33 @@ export default function PlayerDetailDrawer({
   );
   const attributeCeilingByKey = new Map(data.attributeCeilingPreview.map((entry) => [entry.attribute, entry] as const));
   // "Neuer Look" (#61 Attribut-Grid): Balken-Übersicht über der Karten-
-  // Detailansicht — nur exakt sichtbare, numerische Attribute (Fog-of-War
-  // bleibt exakt wie im Karten-Grid darunter: verdeckte/Range-Attribute
-  // erscheinen dort schlicht nicht).
-  // Fog-of-War: exakte Attribut-Balken nur für eigene Spieler. Für fremde
-  // Spieler bleibt der Balken-Chart leer (verdeckt), die Attribut-Karten
-  // darunter zeigen stattdessen nur das grobe Rating-Band.
+  // Detailansicht.
+  //
+  // Fog-of-War: für EIGENE/aktive Spieler (`abilitiesKnown`) zeigt der Chart die
+  // exakten Attributwerte. Für verdeckte Spieler (Free Agent / gescoutet / nicht
+  // im eigenen Kader) darf KEINE exakte Zahl durchsickern — stattdessen ein
+  // grobes Klassen-Band (Balkenhöhe ≈ Band, Beschriftung = Klasse, s.
+  // `attributeTierBandValue`/`formatDisciplineTier`), und die Reihenfolge wird
+  // per Spieler-Seed gemischt (`shuffleFoggedByPlayer`), damit die wahre
+  // Bestenreihenfolge nicht ablesbar ist. Labels: konsistent 3-buchstabig
+  // (POW/HEA/STA/INT/AWA/DET/SPE/DEX/CHA/WIL/SPI/TOR).
+  const attributeChartFogged = !abilitiesKnown;
   const attributeBarChartBars = abilitiesKnown
     ? data.attributeStats
         .filter((entry) => entry.value != null && Number.isFinite(entry.value))
-        .map((entry) => ({ label: entry.label.slice(0, 4).toUpperCase(), value: entry.value as number }))
-    : [];
+        .map((entry) => ({ label: entry.label.slice(0, 3).toUpperCase(), value: entry.value as number }))
+    : shuffleFoggedByPlayer(
+        data.attributeStats
+          .map((entry) => {
+            const bandValue = attributeTierBandValue(entry.ratingLabel);
+            return bandValue != null
+              ? { key: entry.key, label: entry.label.slice(0, 3).toUpperCase(), value: bandValue }
+              : null;
+          })
+          .filter((bar): bar is { key: string; label: string; value: number } => bar != null),
+        data.playerId,
+        (bar) => bar.key,
+      );
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
@@ -2069,18 +2195,11 @@ export default function PlayerDetailDrawer({
 
         <div className="player-drawer-body">
           <section className="player-drawer-section player-drawer-hero-surface" id="player-drawer-profile">
-            {isFreeAgent ? (
-              <div className={`player-drawer-top-grid player-drawer-transfer-hero-grid${showCompactAxisStrip ? "" : " is-single"}`}>
-                <div
-                  className="player-drawer-transfer-note"
-                  title="Free Agents haben noch keine gespeicherte Saisonleistung in diesem Save. OVR, PPs und MVS werden vor dem Kauf nicht angezeigt, die Achsenwerte bleiben sichtbar."
-                >
-                  <strong>Transfermarkt-Profil</strong>
-                  <span>Keine OVR/PPs/MVS vor dem Kauf.</span>
-                </div>
-                {showCompactAxisStrip ? axisStrip : null}
-              </div>
-            ) : (
+            {/* Einheitliches Kopf-Layout für ALLE Spieler (auch Free Agents):
+                Profil-Karte mit CA/PO-Sternstapel + KPI-Grid (OVR/PPs/MVS).
+                Free Agents sehen dieselbe Struktur — CA/PO als geschätzte Range
+                (`fogged`), OVR/PPs/MVS als "—" (keine Liga-Leistung vor dem
+                Kauf). So sieht das Profil unabhängig vom Einstieg gleich aus. */}
               <div className="player-drawer-top-grid">
                 <div className="player-drawer-profile-stack">
                   <div className={`player-drawer-profile-card${variant === "page" ? " is-compact" : ""}`}>
@@ -2094,7 +2213,7 @@ export default function PlayerDetailDrawer({
                     <span className="player-drawer-overline">
                       Scouting{` L${data.scoutingLevel ?? 0}`}
                     </span>
-                    <PlayerCaPoStarStack data={data} newLook={true} />
+                    <PlayerCaPoStarStack data={data} newLook={true} fogged={!abilitiesKnown} />
                     <div className="player-drawer-fatigue-gauge-wrap">
                       <NlFatigueGauge value={data.fatigue ?? 0} title={buildFatigueImpactTooltip(data)} />
                     </div>
@@ -2112,11 +2231,19 @@ export default function PlayerDetailDrawer({
                       <>
                         <div className="player-drawer-kpi-header">
                           <GameTerm term={metric.label} />
-                          <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
+                          {isFreeAgent ? null : (
+                            <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
+                          )}
                         </div>
-                        <strong className="player-drawer-kpi-value">{formatValue(metric.value, metric.digits)}</strong>
+                        <strong className="player-drawer-kpi-value">
+                          {isFreeAgent ? "—" : formatValue(metric.value, metric.digits)}
+                        </strong>
                         <div className="player-drawer-kpi-footer">
-                          {metric.delta != null ? (
+                          {isFreeAgent ? (
+                            <span className="player-drawer-kpi-missing" title="Erst nach dem Kauf verfügbar">
+                              Vor dem Kauf
+                            </span>
+                          ) : metric.delta != null ? (
                             <span className={`player-drawer-delta${getDeltaToneClass(metric.delta)}`}>
                               {metric.delta > 0 ? "+" : ""}
                               {formatValue(metric.delta, 1)}
@@ -2154,8 +2281,7 @@ export default function PlayerDetailDrawer({
                   })}
                 </div>
               </div>
-            )}
-            {!isFreeAgent && showCompactAxisStrip ? axisStrip : null}
+            {showCompactAxisStrip ? axisStrip : null}
             {isScoutedProfile && visibleScoutedAttributeChips.length ? (
               <div className="player-drawer-chip-row player-drawer-scout-attribute-row">
                 {visibleScoutedAttributeChips.map((entry) => (
@@ -2198,9 +2324,15 @@ export default function PlayerDetailDrawer({
                     // Preview. Das volle Detail (alle Diszis, sortierbar) lebt in der
                     // eigenen "Top-Disziplinen"-Tabelle weiter unten (kein inline
                     // Aufklapp-Zustand mehr in der Karte selbst, siehe PO-Feedback).
-                    const axisDisciplines = data.disciplineValues
-                      .filter((entry) => entry.category === card.tone)
-                      .slice(0, 5);
+                    // Fog-of-War: für eigene/aktive Spieler die stärksten 5
+                    // Disziplinen (best-first) dieser Achse. Für verdeckte Spieler
+                    // (Free Agent / gescoutet) NICHT die echte Top-5 zeigen — das
+                    // würde die Bestenreihenfolge verraten. Stattdessen die
+                    // Reihenfolge per Spieler-Seed mischen und erst dann 5 nehmen.
+                    const axisCategoryDisciplines = data.disciplineValues.filter((entry) => entry.category === card.tone);
+                    const axisDisciplines = disciplineStatFogged
+                      ? shuffleFoggedByPlayer(axisCategoryDisciplines, data.playerId, (entry) => entry.id).slice(0, 5)
+                      : axisCategoryDisciplines.slice(0, 5);
                     const disciplineListId = `player-drawer-axis-disciplines-${card.id}`;
                     const cardBody = (
                       <>
@@ -2256,7 +2388,17 @@ export default function PlayerDetailDrawer({
                         <div className="player-drawer-axis-discipline-list" id={disciplineListId}>
                           {axisDisciplines.length ? (
                             axisDisciplines.map((entry) => {
-                              const barPercent = Math.max(0, Math.min(100, entry.value ?? 0));
+                              // Fog-of-War: verdeckte Spieler zeigen nur das grobe
+                              // Klassen-Band (wie die Top-Disziplinen-Tabelle), nie
+                              // die exakte Diszi-Zahl — auch die Balkenhöhe folgt nur
+                              // dem Band (`attributeTierBandValue`), nicht dem Stat.
+                              const foggedTier = entry.scoutedTier ?? formatDisciplineTier(entry.value);
+                              const foggedBand = disciplineStatFogged
+                                ? getScoutingTierWindow(foggedTier, resolveScoutingConfidenceFromLevel(scoutingLevel))
+                                : null;
+                              const barPercent = disciplineStatFogged
+                                ? Math.max(0, Math.min(100, attributeTierBandValue(foggedTier) ?? 0))
+                                : Math.max(0, Math.min(100, entry.value ?? 0));
                               return (
                                 <div key={`axis-discipline-${card.id}-${entry.id}`} className="player-drawer-axis-discipline-row">
                                   <div className="player-drawer-axis-discipline-row-head">
@@ -2266,14 +2408,22 @@ export default function PlayerDetailDrawer({
                                         <span className="player-drawer-axis-discipline-count">({entry.playerCount})</span>
                                       ) : null}
                                     </span>
-                                    <span className="player-drawer-axis-discipline-value">{formatValue(entry.value, 0)}</span>
+                                    <span
+                                      className={`player-drawer-axis-discipline-value${foggedBand ? " is-fogged" : ""}`}
+                                    >
+                                      {foggedBand ?? formatValue(entry.value, 0)}
+                                    </span>
                                   </div>
                                   <NlProgressBar
                                     className="player-drawer-axis-discipline-progress"
                                     value={barPercent}
                                     tone={toNlAxisTone(card.tone)}
                                     showValue={false}
-                                    title={`${entry.label}: ${formatValue(entry.value, 0)}`}
+                                    title={
+                                      foggedBand
+                                        ? `${entry.label}: Klasse ${foggedBand}`
+                                        : `${entry.label}: ${formatValue(entry.value, 0)}`
+                                    }
                                   />
                                 </div>
                               );
@@ -2455,7 +2605,12 @@ export default function PlayerDetailDrawer({
                 <NlBarChart
                   bars={attributeBarChartBars}
                   max={99}
-                  aria-label={`Attribut-Übersicht für ${data.name}`}
+                  format={attributeChartFogged ? (value) => formatDisciplineTier(value) : undefined}
+                  aria-label={
+                    attributeChartFogged
+                      ? `Attribut-Klassen (verdeckt) für ${data.name}`
+                      : `Attribut-Übersicht für ${data.name}`
+                  }
                   className="player-drawer-attribute-barchart"
                 />
               </div>

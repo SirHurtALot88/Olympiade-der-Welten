@@ -225,31 +225,47 @@ export default function PlayerHeroNewLook({
             ) : null}
           </div>
           <StatChipRow className="nl-player-hero-chips" aria-label="Spieler-Kennzahlen">
+            {/* Fog-of-War (#): ein teamloser S1-Free-Agent hat keine Liga-Leistung —
+                OVR/PPs/MVS gibt es vor dem Kauf schlicht nicht, daher "—" (kein
+                Wert, kein Rang, kein Delta). MW und GEHALT bleiben real, denn die
+                sind auch vor dem Kauf gültige Marktangaben. */}
             <StatChip
               label="OVR"
-              value={formatNlNumber(data.ovr, 1)}
+              value={isFreeAgent ? "—" : formatNlNumber(data.ovr, 1)}
               tone="accent"
-              sub={formatHeroSub(data.ovrRank, data.ovrDelta, leaguePoolSize)}
-              title={appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.ovrRank, data.ovrDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Overall-Rating: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource("Overall-Rating · öffnet die Liga-Leaders-Liste", data.ovrDeltaSourceLabel)
+              }
               onClick={buildLeadersClick("ovr", data.ovrRank)}
             />
             <StatChip
               label="PPs"
-              value={formatNlNumber(data.pps ?? data.ppsRating, 1)}
+              value={isFreeAgent ? "—" : formatNlNumber(data.pps ?? data.ppsRating, 1)}
               tone="spe"
-              sub={formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
-              title={appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Performance-Punkte: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource("Performance-Punkte · öffnet die Liga-Leaders-Liste", data.ppsDeltaSourceLabel)
+              }
               onClick={buildLeadersClick("pps", data.ppsRank)}
             />
             <StatChip
               label="MVS"
-              value={formatNlNumber(data.mvs, 1)}
+              value={isFreeAgent ? "—" : formatNlNumber(data.mvs, 1)}
               tone="soc"
-              sub={formatHeroSub(data.mvsRank, data.mvsDelta, leaguePoolSize)}
-              title={appendDeltaSource(
-                "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
-                data.mvsDeltaSourceLabel,
-              )}
+              sub={isFreeAgent ? undefined : formatHeroSub(data.mvsRank, data.mvsDelta, leaguePoolSize)}
+              title={
+                isFreeAgent
+                  ? "Market Value Score: erst nach dem Kauf verfügbar"
+                  : appendDeltaSource(
+                      "Market Value Score: treibt Marktwert und Angebote — nicht der Marktwert selbst · öffnet die Liga-Leaders-Liste",
+                      data.mvsDeltaSourceLabel,
+                    )
+              }
               onClick={buildLeadersClick("mvs", data.mvsRank)}
             />
             <StatChip
