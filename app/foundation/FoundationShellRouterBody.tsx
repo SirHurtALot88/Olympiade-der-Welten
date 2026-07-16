@@ -16,7 +16,6 @@ import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb"
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
-import type { RoomParticipant } from "@/types/game";
 import { canFoundationNavigateBack, foundationNavigateBack } from "@/lib/foundation/foundation-navigation-history";
 import {
   BudgetedMediaImage,
@@ -54,7 +53,6 @@ import {
   clampBiasValue,
   clampIdentityValue,
   deriveChrisFrankyTeamIdsFromSettings,
-  describeRoomFlowButton,
   filterTeamsByControlScope,
   formatActiveManagerTeamSource,
   formatCockpitReason,
@@ -64,7 +62,6 @@ import {
   formatDisplayMoney,
   formatFeatureAuditStatus,
   formatFoundationSaveModeLabel,
-  formatGamePhaseLabel,
   formatHomeWarningLabel,
   formatIdentityWeight,
   formatLocalePoints,
@@ -876,6 +873,33 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     </div>
   ) : null;
 
+  // Kompaktes Multiplayer-Room-Badge für die Sidebar (Owner-Feedback: Save +
+  // Room-Block oben nach links in die Nav schieben und komprimieren). Zeigt nur
+  // das Nötigste: Raumcode, aktuellen Flow-Schritt, eine ggf. anliegende
+  // Aktivitätsnotiz (z. B. „Room-Session abgelaufen") und den Link zur
+  // Room-Ansicht. Save-ID/Participant leben schon in der Sidebar-Brand.
+  const roomBadgeNode = roomContext ? (
+    <div className="foundation-room-badge" data-testid="foundation-room-context-badge">
+      <div className="foundation-room-badge-head">
+        <span className="foundation-room-badge-eyebrow">Multiplayer-Room</span>
+        <strong className="foundation-room-badge-code">Raum {roomContext.roomCode}</strong>
+      </div>
+      {roomLiveState ? (
+        <span className="foundation-room-badge-status">
+          {getRoomFlowStep(roomLiveState.roomFlowState.step).label}
+        </span>
+      ) : null}
+      {roomActivityNotice ? (
+        <span className="foundation-room-badge-notice" title={roomActivityNotice.detail}>
+          {roomActivityNotice.title}
+        </span>
+      ) : null}
+      <a className="foundation-room-badge-link" href={`/room/${roomContext.roomCode}`}>
+        Zur Room-Ansicht
+      </a>
+    </div>
+  ) : null;
+
   // #82 — echte Zähler-Badges (nur Neuer Look, nur reale Zahlen).
   const inboxAllBadgeCount =
     Array.isArray(activeTeamOpenInboxItems) && activeTeamOpenInboxItems.length > 0
@@ -960,6 +984,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         activities={foundationActivities}
         breadcrumb={newLookBreadcrumb}
         teamPicker={activeTeamPickerNode}
+        roomBadge={roomBadgeNode}
         subNav={
           activeView === "marketV2" ? (
             <FoundationSubNav
@@ -1561,57 +1586,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         </div>
       ) : null}
 
-      {/* Slim status line only — Save-Name + "AKTIVES TEAM" leben jetzt kompakt
-          in der Sidebar (siehe activeTeamPickerNode oben). data-testid bleibt
-          erhalten, weil Screenshots/Smoke-Skripte darauf warten. */}
+      {/* Save-Identität + "AKTIVES TEAM" + Multiplayer-Room leben jetzt kompakt
+          links in der Sidebar (Sidebar-Brand bzw. activeTeamPickerNode /
+          roomBadgeNode oben). Dieser Streifen trägt nur noch transiente
+          Aktions-Rückmeldungen und die Kontext-Chips — der breite Save-/Room-
+          Block oben ist raus (Owner-Feedback: nach links schieben & komprimieren).
+          data-testid bleibt erhalten, weil Screenshots/Smoke-Skripte darauf warten. */}
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
-        <div className="foundation-context-main">
-          {activeView !== "homeV2" ? (
-            <details className="foundation-save-compact-menu" data-testid="foundation-save-compact-menu">
-              <summary>{isSaveBusy ? "Save lädt…" : formatShortSaveId(activeSaveId)}</summary>
-              <strong className="foundation-save-compact-full">{activeSaveName}</strong>
-              <span className="muted">
-                {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-                {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
-              </span>
-            </details>
-          ) : null}
-        </div>
-        {roomContext ? (
-          <div className="foundation-ai-preseason-banner is-ready" data-testid="foundation-room-context-banner">
-            <div className="foundation-ai-preseason-copy">
-              <span className="eyebrow">Multiplayer-Room</span>
-              <strong>Raum {roomContext.roomCode}</strong>
-              {(() => {
-                const roomIdentity = roomLiveState?.roomParticipants.find(
-                  (participant: RoomParticipant) => participant.participantId === roomContext.participantId,
-                );
-                return roomIdentity ? (
-                  <span className="pill" data-testid="foundation-room-participant-identity">
-                    Participant {roomIdentity.displayName}
-                  </span>
-                ) : null;
-              })()}
-              <span className="muted">
-                Save {formatShortSaveId(roomContext.saveId)}
-                {roomLiveState
-                  ? ` · Schritt: ${getRoomFlowStep(roomLiveState.roomFlowState.step).label} · ${
-                      describeRoomFlowButton({
-                        state: roomLiveState,
-                        participantId: roomContext.participantId,
-                      }).label
-                    }`
-                  : " · Schreibaktionen laufen serverseitig mit Sitzplatz-Token."}
-              </span>
-              {roomActivityNotice ? (
-                <span className="muted">{roomActivityNotice.title} — {roomActivityNotice.detail}</span>
-              ) : null}
-            </div>
-            <a className="secondary-button inline-button" href={`/room/${roomContext.roomCode}`}>
-              Zur Room-Ansicht
-            </a>
-          </div>
-        ) : null}
         {foundationActionFeedback ? (
           <div
             className={`foundation-action-feedback is-${foundationActionFeedback.tone}`}

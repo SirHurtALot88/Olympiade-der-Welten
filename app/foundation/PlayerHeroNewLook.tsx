@@ -112,7 +112,16 @@ export default function PlayerHeroNewLook({
   const foundationState = useFoundationStateOptional();
   // Prop zuerst (durchgereichter GameState), dann der (tote) Kontext als Fallback.
   const resolvedGameState = gameState ?? foundationState?.gameState ?? null;
-  const leaguePoolSize = resolvedGameState?.players.length ?? null;
+  // Perzentil-Nenner MUSS zum Rang-Pool passen: OVR/PPs/MVS-Ränge werden in
+  // `buildPlayerRatingContractMap` gegen die AKTIVEN (rostierten) Spieler
+  // gebildet (`rankPoolPlayerIds: activePlayerIds`), NICHT gegen alle Spieler
+  // inkl. Free Agents. Nähmen wir `players.length` (~alle Spieler), käme Rang
+  // #156 fälschlich als „Top 5 %" heraus, obwohl es unter den aktiven Spielern
+  // eher Mittelfeld ist. Daher: eindeutige Roster-Spielerzahl.
+  const activePlayerPoolSize = resolvedGameState
+    ? new Set(resolvedGameState.rosters.map((entry) => entry.playerId).filter(Boolean)).size
+    : 0;
+  const leaguePoolSize = activePlayerPoolSize > 0 ? activePlayerPoolSize : null;
 
   // GEHALT-Chip (neben MW): reales Saison-Gehalt.
   //
@@ -254,7 +263,13 @@ export default function PlayerHeroNewLook({
             />
             <StatChip
               label="PPs"
-              value={isFreeAgent ? "—" : formatNlNumber(data.pps ?? data.ppsRating, 1)}
+              // Nur die reale Saison-PPs (`data.pps`), KEIN Fallback auf das
+              // Fähigkeits-Rating (`ppsRating`): vor dem ersten Spieltag gibt es
+              // keine Saisonleistung → „—" (identisch zu MVS und den
+              // Detail-Kacheln). Der frühere `?? data.ppsRating`-Fallback ließ
+              // an S1/MD1 fälschlich einen Rating-Wert (z. B. 43,4) erscheinen,
+              // obwohl noch kein Spiel gelaufen ist.
+              value={isFreeAgent ? "—" : formatNlNumber(data.pps, 1)}
               tone="spe"
               sub={isFreeAgent ? undefined : formatHeroSub(data.ppsRank, data.ppsDelta, leaguePoolSize)}
               title={

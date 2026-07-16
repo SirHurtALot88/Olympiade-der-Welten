@@ -25,6 +25,10 @@ type FoundationSidebarProps = {
   // Kompakter "Aktives Team"-Picker, direkt unter dem Neuer-Look-Toggle.
   // Wiring (value/onChange/Optionsliste) kommt unverändert aus der Router-Body.
   teamPicker?: ReactNode;
+  // Kompaktes Multiplayer-Room-Badge (Raumcode + Status + Link), direkt unter
+  // dem Team-Picker. Früher lebte das als breiter Block im horizontalen
+  // Context-Banner oben — jetzt kompakt links in der Nav (Owner-Feedback).
+  roomBadge?: ReactNode;
 };
 
 const VIEW_WIDTH_SEGMENTS: ReadonlyArray<{
@@ -49,6 +53,7 @@ export default function FoundationSidebar({
   attentionByViewId,
   seasonContextLabel,
   teamPicker,
+  roomBadge,
 }: FoundationSidebarProps) {
   const [viewWidthMode, setViewWidthMode] = useViewWidth();
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
@@ -228,6 +233,7 @@ export default function FoundationSidebar({
         </div>
       </div>
       {teamPicker ? <div className="foundation-sidebar-team-picker">{teamPicker}</div> : null}
+      {roomBadge ? <div className="foundation-sidebar-room-badge">{roomBadge}</div> : null}
       {navGroups.map((group) => (
         <section key={group.id} className="foundation-sidebar-group">
           <span className="foundation-sidebar-group-label">{group.label}</span>

@@ -27,6 +27,10 @@ type FoundationShellProps = {
   // Banner + Titel fraßen die halbe Seite). Wiring bleibt bei der Router-Body,
   // hier nur Platzierung.
   teamPicker?: ReactNode;
+  // Kompaktes Multiplayer-Room-Badge, direkt unter dem Team-Picker in der
+  // Sidebar statt im großen horizontalen Context-Banner (Owner-Feedback: Save +
+  // Room-Block oben nach links in die Nav schieben und komprimieren).
+  roomBadge?: ReactNode;
 };
 
 function buildSeasonContextLabel(
@@ -58,6 +62,7 @@ export default function FoundationShell({
   isPending = false,
   activities = [],
   teamPicker,
+  roomBadge,
 }: FoundationShellProps) {
   const seasonContextLabel =
     seasonLabel && matchdayDisplayLabel
@@ -73,6 +78,7 @@ export default function FoundationShell({
         attentionByViewId={attentionByViewId}
         seasonContextLabel={seasonContextLabel}
         teamPicker={teamPicker}
+        roomBadge={roomBadge}
       />
       <div className="foundation-shell-main" id="foundation-main-content" tabIndex={-1}>
         <FoundationActivityStrip activities={activities} />
