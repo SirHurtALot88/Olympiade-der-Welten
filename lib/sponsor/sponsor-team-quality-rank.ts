@@ -115,12 +115,44 @@ function getHistoricalSeasonRanks(row: TeamManagementSnapshotRow, teamCount: num
   return seasons.map((entry) => clampRank(entry.rank as number, teamCount));
 }
 
-export function getMaxStarTierForQualityRank(qualityRank: number): SponsorStarTier {
-  if (qualityRank <= 4) return 5;
-  if (qualityRank <= 10) return 4;
-  if (qualityRank <= 18) return 3;
-  if (qualityRank <= 26) return 2;
-  return 1;
+function envNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed !== 0 ? parsed : fallback;
+}
+
+/**
+ * Feed 1 (TEIL A) — Beliebtheit hebt/senkt den Stern-Deckel organisch:
+ *  +1 Sternstufe ab Beliebtheit ≥ UP1 (Default 1.20),
+ *  +1 weitere (gesamt bis Deckel 5) ab ≥ UP2 (Default 1.35),
+ *  −1 symmetrisch bei ≤ DOWN (Default 0.70).
+ * So kann z. B. ein Rang-24-Überperformer mit hoher Beliebtheit 3★ statt 2★ erreichen. ENV-tunebar.
+ */
+export const SPONSOR_BELIEBTHEIT_STAR_UP1 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP1", 1.2);
+export const SPONSOR_BELIEBTHEIT_STAR_UP2 = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_UP2", 1.35);
+export const SPONSOR_BELIEBTHEIT_STAR_DOWN = envNumber("OLY_SPONSOR_BELIEBTHEIT_STAR_DOWN", 0.7);
+
+export function getBeliebtheitStarTierDelta(beliebtheit?: number | null): number {
+  if (beliebtheit == null || !Number.isFinite(beliebtheit)) {
+    return 0;
+  }
+  if (beliebtheit >= SPONSOR_BELIEBTHEIT_STAR_UP2) return 2;
+  if (beliebtheit >= SPONSOR_BELIEBTHEIT_STAR_UP1) return 1;
+  if (beliebtheit <= SPONSOR_BELIEBTHEIT_STAR_DOWN) return -1;
+  return 0;
+}
+
+function clampStarTier(tier: number): SponsorStarTier {
+  return Math.max(1, Math.min(5, Math.round(tier))) as SponsorStarTier;
+}
+
+export function getMaxStarTierForQualityRank(qualityRank: number, beliebtheit?: number | null): SponsorStarTier {
+  let baseTier: SponsorStarTier;
+  if (qualityRank <= 4) baseTier = 5;
+  else if (qualityRank <= 10) baseTier = 4;
+  else if (qualityRank <= 18) baseTier = 3;
+  else if (qualityRank <= 26) baseTier = 2;
+  else baseTier = 1;
+  return clampStarTier(baseTier + getBeliebtheitStarTierDelta(beliebtheit));
 }
 
 export function getPercentileTargetStarTier(leaguePosition: number, teamCount: number): SponsorStarTier {
@@ -179,10 +211,18 @@ function computeWeightedQualityRank(input: {
   };
 }
 
-export function buildLeagueTeamQualityRanks(rows: TeamManagementSnapshotRow[]): Map<string, SponsorTeamQualityRank> {
+export function buildLeagueTeamQualityRanks(
+  rows: TeamManagementSnapshotRow[],
+  beliebtheitByTeamId?: Record<string, { value: number }>,
+): Map<string, SponsorTeamQualityRank> {
   const teamCount = Math.max(1, rows.length);
   const budgetRankByTeamId = buildBudgetRankByTeamId(rows);
   const marketValueRankByTeamId = buildMarketValueRankByTeamId(rows, budgetRankByTeamId);
+
+  const beliebtheitOf = (teamId: string): number | null => {
+    const value = beliebtheitByTeamId?.[teamId]?.value;
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  };
 
   const preliminary = rows.map((row) => {
     const { qualityRank, components } = computeWeightedQualityRank({
@@ -195,7 +235,7 @@ export function buildLeagueTeamQualityRanks(rows: TeamManagementSnapshotRow[]): 
       teamId: row.teamId,
       qualityRank,
       components,
-      maxStarTier: getMaxStarTierForQualityRank(qualityRank),
+      maxStarTier: getMaxStarTierForQualityRank(qualityRank, beliebtheitOf(row.teamId)),
     };
   });
 
@@ -211,7 +251,11 @@ export function buildLeagueTeamQualityRanks(rows: TeamManagementSnapshotRow[]): 
     const leaguePosition = index + 1;
     const leaguePercentile = round2(((teamCount - leaguePosition) / Math.max(1, teamCount - 1)) * 100);
     const percentileTier = getPercentileTargetStarTier(leaguePosition, teamCount);
-    const targetStarTier = Math.min(entry.maxStarTier, percentileTier) as SponsorStarTier;
+    // Feed 1: Beliebtheit hebt auch den (perzentil-basierten) Ziel-Stern mit an, damit ein kleiner
+    // Überperformer den erhöhten Deckel tatsächlich erreicht (nicht nur der Cap steigt).
+    const beliebtheitDelta = getBeliebtheitStarTierDelta(beliebtheitOf(entry.teamId));
+    const liftedPercentileTier = clampStarTier(percentileTier + beliebtheitDelta);
+    const targetStarTier = Math.min(entry.maxStarTier, liftedPercentileTier) as SponsorStarTier;
 
     result.set(entry.teamId, {
       teamId: entry.teamId,

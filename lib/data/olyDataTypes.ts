@@ -234,6 +234,38 @@ export type StandingRecord = {
   cashTotal?: number | null;
 };
 
+/**
+ * Fortgeschriebener Beliebtheits-KPI eines Teams (TEIL A). Anders als der frühere stateless,
+ * größen-korrelierte KPI wird dieser Wert Saison für Saison FORTGESCHRIEBEN (siehe
+ * `advanceTeamBeliebtheitForSeasonTransition` in lib/economy/team-beliebtheit.ts):
+ *   value[t] = clamp(REVERT*1.0 + (1-REVERT)*value[t-1] + GAIN*spotlightDelta[t], 0.5, 1.5)
+ * `value` bleibt in [0.5, 1.5], neutral 1.0 (= Liga-Durchschnitt), und speist weiter die
+ * Arena-Kopplung (facility-season-end-service liest `.value` als arenaPopularityFactor).
+ * `spotlightDelta` ist LIGA-ZENTRIERT um 0 (Σ über die Liga ≈ 0) und aus überwiegend
+ * größen-neutralen End-of-Season-Signalen zusammengesetzt (siehe `components`).
+ */
+export type TeamBeliebtheitRecord = {
+  /** Fortgeschriebener Faktor, geclampt auf [0.5, 1.5]; 1.0 = Liga-Durchschnitt. */
+  value: number;
+  /** Liga-zentrierter Spotlight-Impuls dieser Saison (Σ über die Liga ≈ 0). */
+  spotlightDelta: number;
+  /** Bereits gewichtete, liga-zentrierte Einzelbeiträge zum spotlightDelta (Summe = spotlightDelta). */
+  components: {
+    /** Rang-Überperformance: expectedRank − finalRank (größen-neutral). */
+    overperf: number;
+    /** Bracket-Helden: Anteil Kader mit bracketScore≈1 (größen-neutral). */
+    bracket: number;
+    /** Upsets: zugelassene/erzielte Aufholjagden schwächer erwarteter Teams. */
+    upset: number;
+    /** Saison-Sprung: finalRank vs. bisher bester/mittlerer historischer Rang. */
+    jump: number;
+    /** Disziplin-Spotlight: Anteil Kader mit rankInDiscipline<=3 pro Kadergröße. */
+    discipline: number;
+    /** FanFavorites + Kosmetik-Trait-Term (bestehende weiche Effekte). */
+    fanFavorites: number;
+  };
+};
+
 export type StandingsApplyAuditLogRecord = {
   id: string;
   saveId: string;
@@ -2329,6 +2361,14 @@ export type SeasonState = {
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  /**
+   * Fortgeschriebener Beliebtheits-KPI pro Team (TEIL A). Wird 1×/Saison am Saison-Ende (vor der
+   * Sponsor-Angebots-Generierung des nächsten Zyklus) fortgeschrieben. Rückwärtskompatibel optional:
+   * fehlt der Eintrag, fällt die Fortschreibung auf einen neutralen Vorwert 1.0 zurück.
+   */
+  beliebtheitByTeamId?: Record<string, TeamBeliebtheitRecord>;
+  /** Zeitreihe der fortgeschriebenen Beliebtheits-`value`s pro Team (älteste zuerst), für Debug/Balance. */
+  beliebtheitHistoryByTeamId?: Record<string, number[]>;
   loans?: LoanRecord[];
   loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
   scoutingWatchlist?: ScoutingWatchlistEntry[];

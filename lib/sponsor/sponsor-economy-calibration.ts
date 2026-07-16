@@ -302,6 +302,28 @@ function applyQualityRebalanceToPayout(input: {
   };
 }
 
+/**
+ * Feed 2 (TEIL A) — erwartungs-relative Meilenstein-Leiter für den performance-Archetyp. Belohnt
+ * `overRankSteps = expectedRank − finalRank` (positiv = besser als erwartet). Ein UNTERES Team, das
+ * seine Kaderstärke-Erwartung übertrifft, zahlt so schon bei WENIGEN Rang-Anstiegen gut — unabhängig
+ * vom absoluten Endrang. ENV-tunebar (Sockel-Schutz Bottom-5 bleibt davon unberührt, siehe unten).
+ */
+export const SPONSOR_EXPECT_STEP_C = Number(process.env.OLY_SPONSOR_EXPECT_STEP_C ?? 4) || 4;
+export const SPONSOR_EXPECT_MAX_STEPS = Number(process.env.OLY_SPONSOR_EXPECT_MAX_STEPS ?? 8) || 8;
+
+export function getExpectationRelativeMilestoneBonus(
+  finalRank: number | null | undefined,
+  expectedRank: number | null | undefined,
+  salaryFactor = 1,
+): number {
+  if (finalRank == null || expectedRank == null || !Number.isFinite(finalRank) || !Number.isFinite(expectedRank)) {
+    return 0;
+  }
+  const overRankSteps = Math.round(expectedRank) - Math.round(finalRank);
+  const rewardedSteps = Math.max(0, Math.min(SPONSOR_EXPECT_MAX_STEPS, overRankSteps));
+  return round1(rewardedSteps * SPONSOR_EXPECT_STEP_C * salaryFactor);
+}
+
 export function getSponsorPayoutForFinalRankAndTier(
   finalRank: number | null | undefined,
   salaryFactor: number,
@@ -309,6 +331,7 @@ export function getSponsorPayoutForFinalRankAndTier(
   leagueMinSalary = SPONSOR_BASE_FLOOR_C,
   archetype: SponsorArchetype = "security",
   teamQualityRank?: number | null,
+  expectedRank?: number | null,
 ): number {
   const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
   // Archetyp-Kreuzung (WAVE 1): base UND milestone laufen über dieselben Tabellen — KEIN security-Sonderpfad
@@ -316,13 +339,30 @@ export function getSponsorPayoutForFinalRankAndTier(
   const rawBase = round1(
     effectiveBaseFloor * getArchetypeBaseMultiplier(archetype) * getStarTierBaseMultiplier(starTier),
   );
+
+  // Feed 2: für performance MIT bekannter Erwartung ersetzt die erwartungs-relative Leiter den statischen
+  // Rang-Milestone-Bump. Ohne expectedRank bleibt das Verhalten byte-identisch zu vorher (Rückwärtskompat,
+  // Wave-1-Tests unberührt).
+  const useExpectationLadder =
+    archetype === "performance" && expectedRank != null && Number.isFinite(expectedRank);
+  const rawMilestoneBase = useExpectationLadder
+    ? getExpectationRelativeMilestoneBonus(finalRank, expectedRank, salaryFactor)
+    : getRankMilestoneBonus(finalRank, salaryFactor);
   const rawMilestone = round1(
-    getRankMilestoneBonus(finalRank, salaryFactor) *
+    rawMilestoneBase *
       milestoneScale *
       SPONSOR_MILESTONE_LADDER_SCALE *
       getStarTierMilestoneMultiplier(starTier) *
       getArchetypeMilestoneMultiplier(archetype),
   );
+
+  if (useExpectationLadder) {
+    // Der statische getQualityRebalanceProfile-MILESTONE-Bump wird durch die Erwartung ERSETZT; der
+    // baseScale-SOCKEL-SCHUTZ (Bottom-5) bleibt zwingend erhalten.
+    const base = round1(rawBase * getQualityRebalanceProfile(teamQualityRank).baseScale);
+    return round1(base + rawMilestone);
+  }
+
   const { base, milestoneBonus } = applyQualityRebalanceToPayout({
     base: rawBase,
     milestoneBonus: rawMilestone,

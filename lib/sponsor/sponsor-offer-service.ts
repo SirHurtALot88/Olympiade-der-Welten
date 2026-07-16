@@ -208,7 +208,8 @@ export function buildSponsorOffersForTeam(input: {
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
   const startRank = row?.startplatz ?? row?.rank ?? null;
   const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
-  const qualityRanks = buildLeagueTeamQualityRanks(rows);
+  // Feed 1 (TEIL A): fortgeschriebene Beliebtheit hebt/senkt den Stern-Deckel der Angebots-Generierung.
+  const qualityRanks = buildLeagueTeamQualityRanks(rows, input.gameState.seasonState.beliebtheitByTeamId);
   const qualityRank = qualityRanks.get(input.teamId);
   if (!qualityRank) {
     return [];
