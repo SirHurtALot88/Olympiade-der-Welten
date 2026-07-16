@@ -21,11 +21,12 @@ export interface HkInput {
   fixedCostPerUnit: number;
 }
 
-/** Einkaufs-Versand-Anteil (KONZEPT §7.3): Einzel <5 Stk -> 1,15/Menge, sonst 1,30/Menge; Pack: 1,30/Menge x Packgroesse. */
+/**
+ * Einkaufs-Versand-Anteil (KONZEPT §7.3, korrigiert nach Chris' Vorgabe):
+ * Ein 3er-Pack gilt als EINE Einheit -> Einkaufs-Versand faellt nur EINMALIG an
+ * (NICHT x Packgroesse). Staffel wie beim Einzelkauf: <5 Stk -> 1,15, ab 5 -> 1,30.
+ */
 export function buyShippingShare(input: HkInput, settings: CostSettingsValues): number {
-  if (input.kind === "pack") {
-    return settings.buyShippingFive * (input.packSize ?? 3);
-  }
   const qty = input.purchaseQty ?? 1;
   return qty < 5 ? settings.buyShippingUnderFive : settings.buyShippingFive;
 }
