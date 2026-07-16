@@ -217,6 +217,15 @@ tbody td.r { white-space: nowrap; }
 tbody td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--panel2); }
+/* --- Resizable-Spalten (Sortiment) --- */
+table.resizable th { position: relative; overflow: hidden; }
+table.resizable th .th-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+table.resizable td { overflow: hidden; }
+.col-resizer { position: absolute; top: 0; right: 0; height: 100%; width: 11px; cursor: col-resize; touch-action: none; z-index: 3; }
+.col-resizer::after { content: ""; position: absolute; right: 4px; top: 20%; height: 60%; width: 2px; background: var(--border); border-radius: 2px; transition: background .12s; }
+.col-resizer:hover::after, .col-resizer.active::after { background: var(--accent); }
+.col-reset { margin-left: 10px; font: inherit; font-size: 11px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; cursor: pointer; vertical-align: middle; }
+.col-reset:hover { color: var(--ink); border-color: var(--accent); }
 .artname { font-weight: 600; font-size: 12.7px; max-width: 186px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .code { font-size: 10.5px; color: var(--faint); font-family: var(--fs-mono); letter-spacing: -.2px; }
 .veloc { display: inline-flex; align-items: center; gap: 8px; }
