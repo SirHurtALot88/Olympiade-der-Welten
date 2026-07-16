@@ -2243,6 +2243,43 @@ export type LeagueSetupTeamWarning = {
   status: string;
 };
 
+/**
+ * Frozen per-player valuation row captured at MD10 season end. Once the season is completed
+ * (gamePhase !== "season_active"), OVR/MVS/PPs/MW and the sale-factor bracket rank are read from
+ * this snapshot instead of being recomputed pool-relative, so post-season sales/roster changes do
+ * NOT shift the valuations of the remaining players. All fields are null-tolerant for draft/import
+ * players without ratings.
+ */
+export type FrozenValuationPlayerRow = {
+  playerId: string;
+  frozenOvr: number | null;
+  frozenOvrRank: number | null;
+  frozenMvs: number | null;
+  frozenMvsRank: number | null;
+  frozenPps: number | null;
+  frozenPpsRank: number | null;
+  frozenPpPow: number | null;
+  frozenPpPowRank: number | null;
+  frozenPpSpe: number | null;
+  frozenPpSpeRank: number | null;
+  frozenPpMen: number | null;
+  frozenPpMenRank: number | null;
+  frozenPpSoc: number | null;
+  frozenPpSocRank: number | null;
+  frozenMw: number | null;
+  frozenSaleBracket: number | null;
+  frozenSaleRankInBracket: number | null;
+  frozenSaleBracketSize: number | null;
+};
+
+export type FrozenValuationSnapshot = {
+  seasonId: string;
+  frozenAtMatchdayId: string;
+  createdAt: string;
+  playersById: Record<string, FrozenValuationPlayerRow>;
+  teamAggregatesByTeamId?: Record<string, { frozenTeamOvr: number | null; frozenTeamMvs: number | null }>;
+};
+
 export type SeasonState = {
   seasonId: string;
   schedule: Fixture[];
@@ -2323,6 +2360,11 @@ export type SeasonState = {
   adminBalancingConfig?: AdminBalancingConfigInput;
   /** Pre-computed ledger + OVR/PPS/MVS ratings; invalidated via contentSignature. */
   persistedSeasonDerivations?: unknown;
+  /**
+   * Snapshot of OVR/MVS/PPs/MW + sale-factor bracket ranks taken at MD10 season end. Present only
+   * after the season completes; cleared when a new season activates. See FrozenValuationSnapshot.
+   */
+  frozenValuationSnapshot?: FrozenValuationSnapshot;
 };
 
 export type SeasonEconomyFactorRecord = {

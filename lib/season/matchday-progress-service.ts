@@ -4,6 +4,7 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 
 export const ADVANCE_MATCHDAY_CONFIRM_TOKEN = "ADVANCE_LOCAL_MATCHDAY";
 
@@ -325,8 +326,23 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     prepared.saveId,
   );
 
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
-  return nextSeasonState.matchdayAdvanceLogs?.[nextSeasonState.matchdayAdvanceLogs.length - 1] ?? null;
+  // Season-End (kein weiterer Matchday = MD10 abgeschlossen): OVR/MVS/PPs/MW + Sale-Factor-Bracket
+  // über den vollen MD10-Kader-Pool EINFRIEREN. Der Snapshot wird auf dem eben gebauten
+  // season_completed-State berechnet (noch OHNE frozenValuationSnapshot → Gates rechnen live) und
+  // sorgt dafür, dass spätere Verkäufe/Roster-Änderungen die Werte der übrigen Spieler nicht mehr
+  // verschieben.
+  const finalGameState: GameState = prepared.nextMatchdayId
+    ? nextGameState
+    : {
+        ...nextGameState,
+        seasonState: {
+          ...nextGameState.seasonState,
+          frozenValuationSnapshot: buildFrozenValuationSnapshot(nextGameState),
+        },
+      };
+
+  persistence.saveSingleplayerState(save.saveId, finalGameState);
+  return finalGameState.seasonState.matchdayAdvanceLogs?.[(finalGameState.seasonState.matchdayAdvanceLogs?.length ?? 0) - 1] ?? null;
 }
 
 export async function previewMatchdayAdvance(

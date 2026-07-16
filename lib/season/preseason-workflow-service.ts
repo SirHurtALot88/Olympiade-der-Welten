@@ -578,6 +578,9 @@ function buildNextSeasonGameState(
     matchdayAdvanceLogs: [],
     cashPrizeApplyLogs: save.gameState.seasonState.cashPrizeApplyLogs ?? [],
     aiManagerBudgetReservations: undefined,
+    // Valuation-Freeze der abgelaufenen Saison auflösen — die neue Saison rechnet OVR/MVS/PPs/MW
+    // wieder live pool-relativ (season_active).
+    frozenValuationSnapshot: undefined,
     playerAvailabilityState: [],
     newGameFlow: {
       active: true,
