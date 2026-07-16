@@ -67,6 +67,14 @@ export interface ImportPlan {
   articles: ArticleIdentity[];
   saleWindows: PlannedSaleWindow[];
   reviewItems: PlannedReviewItem[];
+  /**
+   * true, wenn dieser Import einen eBay-Report enthielt und das Matching
+   * dadurch die Review-Liste neu bewertet hat. Nur dann darf persist.ts die
+   * offene Review-Liste ersetzen -- ein reiner Billbee-Import (ohne eBay) hat
+   * keine Match-Information und wuerde sonst die bestehenden Reviews grundlos
+   * loeschen.
+   */
+  reviewListEvaluated: boolean;
   stats: ImportPlanStats;
 }
 
@@ -84,13 +92,29 @@ export interface BuildImportPlanOptions {
 }
 
 export function buildImportPlan(
-  billbeeResults: BillbeeImportResult[],
+  rawBillbeeResults: BillbeeImportResult[],
   ebayResult: EbayImportResult | null,
   costSettings: CostSettingsValues,
   options: BuildImportPlanOptions = {}
 ): ImportPlan {
   const defaultPurchaseQty = options.defaultPurchaseQty ?? 3;
   const aliases = options.aliases ?? new Map<string, string>();
+
+  // Genau EIN Billbee-Ergebnis je Fenster-Key behalten (30/90/365/all).
+  // Hintergrund: Kommen mehrere Dateien mit demselben Fenster (z. B. ist
+  // billbee-alltime.xlsx versehentlich ein 30d-Duplikat, KONZEPT §12.1),
+  // wuerde sonst pro Artikel/Fenster mehr als ein Snapshot entstehen -- das
+  // verletzt die Unique-Constraint beim Persistieren UND wuerde im Dashboard
+  // doppelt zaehlen. Es gewinnt das Ergebnis mit dem spaetesten windowTo
+  // (frischeste Daten), bei Gleichstand das zuletzt hochgeladene.
+  const byWindow = new Map<SaleWindowKey, BillbeeImportResult>();
+  for (const result of rawBillbeeResults) {
+    const existing = byWindow.get(result.window);
+    if (!existing || result.windowTo.getTime() >= existing.windowTo.getTime()) {
+      byWindow.set(result.window, result);
+    }
+  }
+  const billbeeResults = Array.from(byWindow.values());
 
   // Fixkosten (eBay-Shop/Billbee/Lexoffice) sind SHOPWEITE Jahresgebuehren,
   // keine Artikel-Fixkosten -- sie werden EINMAL durch die insgesamt im Shop
@@ -258,6 +282,7 @@ export function buildImportPlan(
     articles,
     saleWindows,
     reviewItems,
+    reviewListEvaluated: ebayResult !== null,
     stats: {
       billbeeWindowsProcessed: billbeeResults.length,
       billbeeTotalRows: billbeeResults.reduce((sum, r) => sum + r.rows.length, 0),

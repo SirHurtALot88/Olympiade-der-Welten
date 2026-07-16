@@ -1,17 +1,26 @@
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "/", active: true },
-  { label: "Sortiment", href: "#", active: false },
-  { label: "Top / Flop", href: "#", active: false },
-  { label: "Marktpreise", href: "#", active: false },
+type NavKey =
+  | "dashboard"
+  | "sortiment"
+  | "topflop"
+  | "marktpreise"
+  | "empfehlungen"
+  | "import"
+  | "einstellungen";
+
+const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
+  { key: "dashboard", label: "Dashboard", href: "/" },
+  { key: "sortiment", label: "Sortiment", href: "#" },
+  { key: "topflop", label: "Top / Flop", href: "#" },
+  { key: "marktpreise", label: "Marktpreise", href: "#" },
 ];
 
-const NAV_ITEMS_STEUERUNG = [
-  { label: "Empfehlungen", href: "#", active: false },
-  { label: "Import & Matching", href: "#", active: false },
-  { label: "Einstellungen", href: "#", active: false },
+const NAV_ITEMS_STEUERUNG: { key: NavKey; label: string; href: string }[] = [
+  { key: "empfehlungen", label: "Empfehlungen", href: "#" },
+  { key: "import", label: "Import & Matching", href: "/import" },
+  { key: "einstellungen", label: "Einstellungen", href: "#" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ active = "dashboard" }: { active?: NavKey }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -23,13 +32,13 @@ export function Sidebar() {
       </div>
       <nav className="nav">
         {NAV_ITEMS.map((item) => (
-          <a key={item.label} className={item.active ? "active" : undefined} href={item.href}>
+          <a key={item.key} className={item.key === active ? "active" : undefined} href={item.href}>
             {item.label}
           </a>
         ))}
         <div className="navsec">Steuerung</div>
         {NAV_ITEMS_STEUERUNG.map((item) => (
-          <a key={item.label} className={item.active ? "active" : undefined} href={item.href}>
+          <a key={item.key} className={item.key === active ? "active" : undefined} href={item.href}>
             {item.label}
           </a>
         ))}

@@ -1,9 +1,9 @@
 /**
  * Lokales Verifikations-Skript: importiert die echten Billbee-/eBay-Exporte
- * aus apps/LEC/.local-fixtures/ (gitignored, NICHT Teil des Repos) und
- * schreibt sie in die lokale SQLite-DB. Dient nur der manuellen Verifikation
- * des Import-/Matching-Piplines gegen echte Geschaeftsdaten — laeuft nicht in
- * CI und wird nicht mit echten Daten committet.
+ * aus apps/LEC/.local-fixtures/ (gitignored, NICHT Teil des Repos) ueber
+ * dieselbe runImport-Pipeline wie die Web-App (POST /api/import) und schreibt
+ * sie in die lokale SQLite-DB. Dient nur der manuellen Verifikation gegen echte
+ * Geschaeftsdaten — laeuft nicht in CI und wird nicht mit echten Daten committet.
  *
  * Aufruf: npm run import:local
  */
@@ -13,11 +13,7 @@ import { loadDotEnv } from "./_env";
 
 loadDotEnv();
 
-import { parseBillbeeWorkbook } from "../src/lib/importers/billbee";
-import { parseEbayReport } from "../src/lib/importers/ebay";
-import { buildImportPlan } from "../src/lib/pipeline/importPlan";
-import { persistImportPlan } from "../src/lib/pipeline/persist";
-import { DEFAULT_COST_SETTINGS } from "../src/lib/pricing/costSettings";
+import { runImport, type UploadedFile } from "../src/lib/pipeline/runImport";
 import { prisma } from "../src/lib/db/client";
 
 async function main() {
@@ -27,48 +23,43 @@ async function main() {
     process.exit(1);
   }
 
-  const billbeeFiles = ["billbee-30d.xlsx", "billbee-90d.xlsx", "billbee-365d.xlsx", "billbee-alltime.xlsx"];
-  const billbeeResults = [];
-  for (const file of billbeeFiles) {
-    const filePath = path.join(fixturesDir, file);
+  const billbeeNames = ["billbee-30d.xlsx", "billbee-90d.xlsx", "billbee-365d.xlsx", "billbee-alltime.xlsx"];
+  const billbeeFiles: UploadedFile[] = [];
+  for (const name of billbeeNames) {
+    const filePath = path.join(fixturesDir, name);
     if (!fs.existsSync(filePath)) {
-      console.warn(`Ueberspringe fehlende Datei: ${file}`);
+      console.warn(`Ueberspringe fehlende Datei: ${name}`);
       continue;
     }
-    const buffer = fs.readFileSync(filePath);
-    const result = await parseBillbeeWorkbook(buffer);
-    console.log(
-      `${file}: Zeitraum ${result.windowFrom.toISOString().slice(0, 10)} - ${result.windowTo
-        .toISOString()
-        .slice(0, 10)} -> Fenster "${result.window}", ${result.rows.length} Zeilen`
-    );
-    billbeeResults.push(result);
+    billbeeFiles.push({ name, buffer: fs.readFileSync(filePath) });
   }
 
   const ebayPath = path.join(fixturesDir, "ebay-report-2026.csv");
-  let ebayResult = null;
-  if (fs.existsSync(ebayPath)) {
-    const csvText = fs.readFileSync(ebayPath, "utf-8");
-    ebayResult = parseEbayReport(csvText);
+  const ebayFile: UploadedFile | null = fs.existsSync(ebayPath)
+    ? { name: "ebay-report-2026.csv", buffer: fs.readFileSync(ebayPath) }
+    : null;
+
+  const summary = await runImport(prisma, { billbeeFiles, ebayFile });
+
+  console.log("--- Import-Zusammenfassung ---");
+  for (const w of summary.windows) {
+    console.log(`${w.fileName}: ${w.windowFrom} - ${w.windowTo} -> Fenster "${w.window}", ${w.rowCount} Zeilen`);
+  }
+  if (summary.ebay) {
     console.log(
-      `ebay-report-2026.csv: ${ebayResult.rows.length} Zeilen, Abo-Gebuehr ${ebayResult.subscriptionFee ?? "?"} EUR`
+      `${summary.ebay.fileName}: ${summary.ebay.rowCount} Zeilen, Abo-Gebuehr ${summary.ebay.subscriptionFee ?? "?"} EUR`
     );
   }
-
-  const plan = buildImportPlan(billbeeResults, ebayResult, DEFAULT_COST_SETTINGS);
-
-  console.log("\n--- Import-Plan-Statistik ---");
-  console.log(plan.stats);
-  console.log(`Karten-Artikel im Katalog: ${plan.articles.filter((a) => a.isCard).length} / ${plan.articles.length}`);
-  console.log(`Fenster-Snapshots geplant: ${plan.saleWindows.length}`);
-  console.log(`Review-Items (ungematcht): ${plan.reviewItems.length}`);
-  if (plan.reviewItems.length > 0) {
-    console.log("Beispiele:", plan.reviewItems.slice(0, 10).map((r) => `[${r.source}] ${r.nameRaw}`));
-  }
-
-  const persistResult = await persistImportPlan(prisma, plan);
-  console.log("\n--- Persistiert ---");
-  console.log(persistResult);
+  console.log({
+    articleCount: summary.articleCount,
+    cardArticleCount: summary.cardArticleCount,
+    matchedArticles: summary.matchedArticles,
+    matchRate: `${(summary.matchRate * 100).toFixed(1)} %`,
+    unmatchedBillbeeArticles: summary.unmatchedBillbeeArticles,
+    unmatchedEbayListings: summary.unmatchedEbayListings,
+    windowsReplaced: summary.windowsReplaced,
+    reviewItemsOpen: summary.reviewItemsOpen,
+  });
 
   await prisma.$disconnect();
 }
