@@ -38,6 +38,7 @@ import { buildTrainingTraitSignal } from "@/lib/training/trait-training-signal";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
 import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
@@ -630,8 +631,11 @@ export function buildOrganicSeasonProgression(input: {
     ? input.gameState.teamIdentities.find((entry) => entry.teamId === playerTeam.teamId) ?? null
     : null;
   const playerProfile = playerTeam ? getTeamStrategyProfile(input.gameState, playerTeam.teamId) : null;
+  const playerGmArchetype = playerTeam
+    ? getTeamGeneralManager(input.gameState, playerTeam.teamId)?.profile?.archetype ?? null
+    : null;
   const developmentTendency = playerTeam
-    ? getTeamDevelopmentTendency({ team: playerTeam, identity: playerIdentity, profile: playerProfile })
+    ? getTeamDevelopmentTendency({ team: playerTeam, identity: playerIdentity, profile: playerProfile, gmArchetype: playerGmArchetype })
     : null;
   const facilityModifierPct = getFacilityTrainingModifierPct(input.facilities, developmentTendency?.score ?? 0);
   const primaryTrainingClass =
@@ -653,7 +657,21 @@ export function buildOrganicSeasonProgression(input: {
   const axisStars = buildPlayerAxisStarProfile({ gameState: input.gameState, player: input.player });
   const axisPoStars = potentialRecord?.hiddenPotentialCeilingByAxis ?? null;
   const potentialGapFactor = getPotentialGapTrainingFactor(starSnapshot.potentialGap);
-  const potentialTrainingMultiplier = getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor;
+  // talent_builder ONLY: an additive lift on the potential band for high-potential players. The GLOBAL
+  // bands (getPotentialTrainingMultiplierFromRecord) stay untouched so the league median / MW economy
+  // does not tip — only this GM's own high-potential talents develop faster.
+  const talentBuilderPotentialFactor =
+    playerGmArchetype === "talent_builder" && potentialRating != null
+      ? potentialRating >= 80
+        ? 1.18
+        : potentialRating >= 72
+          ? 1.12
+          : potentialRating >= 58
+            ? 1.06
+            : 1
+      : 1;
+  const potentialTrainingMultiplier =
+    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor * talentBuilderPotentialFactor;
   const baseTrainingBudget = TRAINING_SETPOINTS_BY_MODE[trainingMode];
   const routeBonusMultiplier = getDevelopmentRouteBonusMultiplier(
     classNameToDevelopmentRoute(primaryTrainingClass),

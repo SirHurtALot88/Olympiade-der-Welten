@@ -95,7 +95,6 @@ function gameState(input: {
     contracts: [],
     transferHistory: [],
     logs: [],
-    facilities: [],
     facilityUpgrades: [],
     facilityStaff: [],
     scoutingAssignments: [],
@@ -118,7 +117,9 @@ function gameState(input: {
     newsItems: [],
     managerPlannerState: null,
     localTeamSettings: {},
-  };
+    // Cast: this fixture intentionally supplies a partial GameState; the extra/omitted
+    // fields drifted with the Foundation-UI merge and are irrelevant to sell-score tests.
+  } as unknown as GameState;
 }
 
 describe("ai-composite-sell-score", () => {
@@ -245,6 +246,59 @@ describe("ai-composite-sell-score", () => {
     });
     expect(fresh.components.lossResistance).toBeLessThan(older.components.lossResistance);
     expect(fresh.total).toBeLessThanOrEqual(older.total);
+  });
+
+  it("bargain_hunter GM archetype routes the team into the flip_shop profile", () => {
+    expect(resolveCompositeSellTeamProfile("Z-Z", 3, "bargain_hunter")).toBe("flip_shop");
+    // without the archetype and with a low (blended) aggression it must stay default
+    expect(resolveCompositeSellTeamProfile("Z-Z", 3, "culture_keeper")).toBe("default");
+    expect(resolveCompositeSellTeamProfile("Z-Z", 3)).toBe("default");
+  });
+
+  it("bargain_hunter strengthens loss resistance on a fresh under-purchase sell", () => {
+    const commonInput = {
+      teamId: "Z-Z",
+      team: team({ teamId: "Z-Z", cash: 80 }),
+      identity: null,
+      player: player("fresh", { marketValue: 20 }),
+      roster: rosterEntry("r1", "fresh", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-1" }),
+      gameState: gameState({
+        players: [player("fresh", { marketValue: 20 })],
+        rosters: [rosterEntry("r1", "fresh", { purchasePrice: 25, currentValue: 20, joinedSeasonId: "season-1" })],
+      }),
+      expectedSellValue: 6,
+      marketValue: 20,
+      salary: 6,
+      teamCash: 80,
+      teamSalaryTotal: 40,
+      cashPressureScore: 0.1,
+    };
+    const neutral = computeCompositeSellScore(commonInput);
+    const bargainHunter = computeCompositeSellScore({ ...commonInput, gmArchetype: "bargain_hunter" });
+    expect(bargainHunter.components.lossResistance).toBeLessThan(neutral.components.lossResistance);
+    expect(bargainHunter.total).toBeLessThanOrEqual(neutral.total);
+  });
+
+  it("flip_shop only takes real profit flips (drops sells below purchase)", () => {
+    const candidates: Array<{
+      candidate: { expectedSellValue: number; salary: number; purchasePrice: number | null };
+      score: number;
+    }> = [
+      { candidate: { expectedSellValue: 30, salary: 5, purchasePrice: 20 }, score: 60 }, // +10 profit
+      { candidate: { expectedSellValue: 12, salary: 4, purchasePrice: 20 }, score: 58 }, // -8 loss → drop
+      { candidate: { expectedSellValue: 25, salary: 3, purchasePrice: null }, score: 40 }, // unknown buy → keep
+    ];
+    const selected = selectCompositeSellCandidates({
+      candidates,
+      teamCash: 80,
+      teamSalaryTotal: 40,
+      cashPressureScore: 0.1,
+      teamProfile: "flip_shop",
+    });
+    const sells = selected.map((c) => c.expectedSellValue);
+    expect(sells).toContain(30);
+    expect(sells).toContain(25);
+    expect(sells).not.toContain(12);
   });
 
   it("can keep profit-selling below hardMin when allowProfitSellsBelowMin is set", () => {

@@ -29,6 +29,7 @@ import {
   isUnifiedPickEnabledForMarket,
 } from "@/lib/ai/unified-pick-planner-service";
 import { computeCompositeSellScore, selectCompositeSellCandidates } from "@/lib/ai/ai-composite-sell-score";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { teamHasCashBufferRebuildFocus } from "@/lib/ai/ai-team-cash-reserve-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -363,6 +364,7 @@ function chooseSellCandidates(
     ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
     : null;
   const cashPressureScore = sellRunway?.cashPressureScore ?? 0;
+  const gmArchetype = getTeamGeneralManager(gameState, team.teamId)?.profile?.archetype ?? null;
   const previewByPlayerId = new Map(sourceCandidates.map((candidate) => [candidate.playerId, candidate] as const));
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
@@ -391,6 +393,7 @@ function chooseSellCandidates(
         cashPressureScore,
         explanation: team.explanation,
         sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
+        gmArchetype,
       });
       const candidate = preview ?? ({
         activePlayerId: roster.id,

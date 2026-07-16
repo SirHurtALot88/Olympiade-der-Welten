@@ -6,7 +6,7 @@ import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_VARIANTS, listSponsorBrandTemplates } from "@/lib/sponsor/sponsor-brand-variants";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
-import { getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
+import { applySponsorNegotiationToComponents } from "@/lib/sponsor/sponsor-negotiation";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 
 function team(): Team {
@@ -146,10 +146,27 @@ describe("sponsor tier pool v2.6", () => {
     expect(contract?.termSeasons).toBe(1);
     expect(contract?.seasonsRemaining).toBe(1);
     expect(contract?.negotiationProfile).toBe("ambitious");
-    const expectedMultiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile: "ambitious" });
-    const baseTotal = offer.components.reduce((sum, component) => sum + component.rewardCash, 0);
+    // WAVE 1: Der Profil-Effekt ist kein einzelner Skalar mehr (base/upside/penalty skalieren getrennt),
+    // deshalb prüfen wir gegen die tatsächlich verhandlungs-adjustierten Komponenten statt gegen einen
+    // uniformen Multiplikator. Kernaussage bleibt: das Signieren wendet die Verhandlungs-Mathematik an.
+    const expectedComponents = applySponsorNegotiationToComponents({
+      components: offer.components,
+      termSeasons: 1,
+      negotiationProfile: "ambitious",
+    });
+    const expectedTotal = expectedComponents.reduce((sum, component) => sum + component.rewardCash, 0);
     const contractTotal = contract?.components.reduce((sum, component) => sum + component.rewardCash, 0) ?? 0;
-    expect(contractTotal).toBeGreaterThan(baseTotal * (expectedMultiplier - 0.05));
+    expect(contractTotal).toBeCloseTo(expectedTotal, 1);
+    // WAVE 1 Ambitioniert-Downside (archetyp-UNABHÄNGIG, die eigentliche Kernaussage): der garantierte
+    // Sockel (base) SINKT (×0.88), die Upside (rank/special/improvement) STEIGT (×1.25). Die reine
+    // Gesamtsumme kann dabei je nach Angebotsprofil steigen ODER fallen (bei einem flachen Sockel-Sponsor
+    // fällt sie — genau der gewollte Trade-off), deshalb prüfen wir die Komponenten getrennt, nicht die Summe.
+    const sumUpside = (components: typeof offer.components) =>
+      components.filter((c) => c.kind !== "base").reduce((sum, c) => sum + c.rewardCash, 0);
+    const origBase = offer.components.find((c) => c.kind === "base")?.rewardCash ?? 0;
+    const signedBase = contract?.components.find((c) => c.kind === "base")?.rewardCash ?? 0;
+    expect(signedBase).toBeLessThan(origBase); // Sockel-Abschlag
+    expect(sumUpside(contract?.components ?? [])).toBeGreaterThan(sumUpside(offer.components)); // Upside-Hebel
   });
 
   it("carries single-season contracts only until season advance", () => {

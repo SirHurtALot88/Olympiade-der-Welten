@@ -25,6 +25,8 @@ import {
   SPONSOR_BUILDING_COST_OFFSET_C,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applySponsorNegotiationToComponents } from "@/lib/sponsor/sponsor-negotiation";
+import type { SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
 function createTeam(index: number): Team {
   const code = `T-${String(index + 1).padStart(2, "0")}`;
@@ -219,19 +221,28 @@ describe("sponsor economy balance", () => {
     }
   });
 
-  it("preserves payout spread between bottom and championship security offers", () => {
+  it("places the rank spread on performance, not security (WAVE 1 crossover)", () => {
     const leagueMin = 38;
     const factor = 1.09;
-    const bottom = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "security");
-    const top = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
+    // WAVE 1 Kreuzung: Security ist jetzt der FLACHE "sichere" Typ (hoher garantierter Sockel, gedämpfte
+    // Rang-Upside) → kleine Eigenspreizung. Performance ist der STEILE Typ (schlanker Sockel, große Rang-
+    // Upside) → große Spreizung. Der Rang muss weiterhin für BEIDE zahlen (top > bottom), aber die
+    // Spreizung liegt jetzt bei Performance, nicht mehr bei Security. Das ist die bewusst geänderte
+    // Aussage: früher forderte dieser Test security-Dominanz oben — genau die ist jetzt (gewollt) weg.
+    const secBottom = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "security");
+    const secTop = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
+    const perfBottom = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "performance");
+    const perfTop = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "performance");
 
-    expect(top).toBeGreaterThan(bottom);
-    // Der flache Gebäude-Offset (SPONSOR_BUILDING_COST_OFFSET_C, angehoben 300→500) hebt den Sockel
-    // additiv und komprimiert damit bewusst die relative Rang-Spreizung (der schwächste Rang profitiert
-    // relativ mehr — genau der beabsichtigte Deflations-Ausgleich). Top zahlt weiterhin klar mehr
-    // (~1.7×), nur nicht mehr >1.8× wie beim kleineren Offset.
-    expect(top / bottom).toBeGreaterThan(1.65);
-    expect(top / bottom).toBeLessThan(3.5);
+    expect(secTop).toBeGreaterThan(secBottom); // Rang zahlt weiter, auch beim sicheren Typ
+    expect(perfTop).toBeGreaterThan(perfBottom);
+    // Performance ist deutlich rang-sensitiver (steilere Kurve) als Security.
+    expect(perfTop / perfBottom).toBeGreaterThan(secTop / secBottom);
+    // ... aber nicht runaway.
+    expect(perfTop / perfBottom).toBeLessThan(3.5);
+    // Und die Kreuzung selbst: Performance gewinnt oben, Security unten.
+    expect(perfTop).toBeGreaterThan(secTop);
+    expect(secBottom).toBeGreaterThan(perfBottom);
   });
 
   it("supports bottom-budget teams with meaningful sponsor income in singleplayer seed", () => {
@@ -521,4 +532,63 @@ describe("sponsor economy balance", () => {
 
     expect(getTeamSponsorContract(advanced, teamId)).toBeNull();
   }, 15000);
+
+  // ── WAVE 1 Erfolgs-Assertions: der Bug ist weg ──────────────────────────────────────────────
+
+  it("crosses archetypes: performance wins the top, security wins the bottom (no archetype dominates both ends)", () => {
+    const factor = 1.0;
+    const leagueMin = SPONSOR_BASE_FLOOR_C; // 32 — sauberer Anker mit klarer Marge auf beiden Seiten
+
+    // Spitze (Rang 1, 5★): performance (steile Meilenstein-Leiter) überholt security (hoher Sockel).
+    const topPerformance = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "performance");
+    const topSecurity = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
+    expect(topPerformance).toBeGreaterThan(topSecurity);
+
+    // Keller (Rang 32, 3★): security (Sockel 1.12) liegt vor performance (Sockel 0.78).
+    const bottomSecurity = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "security");
+    const bottomPerformance = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "performance");
+    expect(bottomSecurity).toBeGreaterThan(bottomPerformance);
+  });
+
+  it("keeps the offer display exactly equal to the settlement for every archetype", () => {
+    const factor = 1.09;
+    const leagueMin = 38;
+    for (const archetype of ["security", "performance", "identity"] as const) {
+      for (const starTier of [2, 3, 5] as const) {
+        const amounts = buildOfferCashAmounts({ archetype, salaryFactor: factor, starTier, leagueMinSalary: leagueMin });
+        const settlementTop = getSponsorPayoutForFinalRankAndTier(1, factor, starTier, leagueMin, archetype);
+        // totalAtMaxRank == Settlement(Rang 1)
+        expect(Math.abs(amounts.totalAtMaxRank - settlementTop)).toBeLessThanOrEqual(0.2);
+        // und der ANGEZEIGTE Split (Basis + Rang) entspricht demselben Settlement — der Kern-Bug (Anzeige ≠
+        // Settlement, security gewann überall) ist damit strukturell ausgeschlossen.
+        expect(Math.abs(amounts.baseCash + amounts.rankCash - settlementTop)).toBeLessThanOrEqual(0.2);
+      }
+    }
+  });
+
+  it("gives ambitious a real downside: base shrinks, upside grows vs safe/balanced", () => {
+    const components: SponsorOfferComponent[] = [
+      { componentId: "base-cash", kind: "base", label: "Basis", targetValue: 50, rewardCash: 50 },
+      { componentId: "rank-target", kind: "rank", label: "Rang", targetValue: 8, rewardCash: 20, penaltyCash: 2 },
+    ];
+    const apply = (profile: "safe" | "balanced" | "ambitious") =>
+      applySponsorNegotiationToComponents({ components, termSeasons: 1, negotiationProfile: profile });
+    const baseReward = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "base")!.rewardCash;
+    const rankReward = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "rank")!.rewardCash;
+    const rankPenalty = (list: SponsorOfferComponent[]) => list.find((c) => c.kind === "rank")!.penaltyCash ?? 0;
+
+    const safe = apply("safe");
+    const balanced = apply("balanced");
+    const ambitious = apply("ambitious");
+
+    // Bei schlechter Platzierung (nur Basis greift): safe > balanced > ambitious.
+    expect(baseReward(safe)).toBeGreaterThan(baseReward(balanced));
+    expect(baseReward(balanced)).toBeGreaterThan(baseReward(ambitious));
+    // Bei Titel (Rang-Upside): ambitious > balanced > safe.
+    expect(rankReward(ambitious)).toBeGreaterThan(rankReward(balanced));
+    expect(rankReward(balanced)).toBeGreaterThan(rankReward(safe));
+    // Echtes Risiko: ambitious verdoppelt den Malus, safe halbiert ihn.
+    expect(rankPenalty(ambitious)).toBeGreaterThan(rankPenalty(balanced));
+    expect(rankPenalty(balanced)).toBeGreaterThan(rankPenalty(safe));
+  });
 });

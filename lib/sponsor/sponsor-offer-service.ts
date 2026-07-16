@@ -56,6 +56,10 @@ function roundCash(value: number) {
   return Number(value.toFixed(1));
 }
 
+function clampCash(value: number, min: number, max: number) {
+  return roundCash(Math.max(min, Math.min(max, value)));
+}
+
 function getCurrentSalaryFactor(gameState: GameState): number {
   const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
   return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
@@ -145,7 +149,10 @@ function buildOffer(input: {
       label: `Gewinnstufen: ${buildMilestoneRankLabel()}`,
       targetValue: rankTarget,
       rewardCash: cashAmounts.rankCash,
-      penaltyCash: Math.max(0.5, roundCash(cashAmounts.rankCash * 0.05 * demandMult)),
+      // WAVE 1 (Punkt 3): Rang-Malus 0.05→0.15, aber relativ zur Upside gedeckelt (max halber Rang-Reward),
+      // damit der Malus nie die mögliche Belohnung übersteigt. Der ambitious-penaltyMult ×2 kommt on top
+      // (applySponsorNegotiationToComponents).
+      penaltyCash: clampCash(cashAmounts.rankCash * 0.15 * demandMult, 0.5, cashAmounts.rankCash * 0.5),
     },
     {
       componentId: "improvement-target",
@@ -157,7 +164,11 @@ function buildOffer(input: {
     {
       ...special,
       rewardCash: specialCash,
-      penaltyCash: special.penaltyCash != null ? roundCash(specialCash * 0.25 / demandMult) : undefined,
+      // WAVE 1 (Punkt 3): Special-Malus 0.25→0.4, ebenfalls relativ zur Upside gedeckelt (max halber Reward).
+      penaltyCash:
+        special.penaltyCash != null
+          ? clampCash(specialCash * 0.4 / demandMult, 0.5, specialCash * 0.5)
+          : undefined,
     },
     buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward }),
     ...(beatExpectedComponent ? [beatExpectedComponent] : []),
@@ -197,7 +208,8 @@ export function buildSponsorOffersForTeam(input: {
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
   const startRank = row?.startplatz ?? row?.rank ?? null;
   const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
-  const qualityRanks = buildLeagueTeamQualityRanks(rows);
+  // Feed 1 (TEIL A): fortgeschriebene Beliebtheit hebt/senkt den Stern-Deckel der Angebots-Generierung.
+  const qualityRanks = buildLeagueTeamQualityRanks(rows, input.gameState.seasonState.beliebtheitByTeamId);
   const qualityRank = qualityRanks.get(input.teamId);
   if (!qualityRank) {
     return [];

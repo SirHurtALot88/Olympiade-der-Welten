@@ -22,6 +22,7 @@ import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
+import { advanceTeamBeliebtheitForSeasonTransition } from "@/lib/economy/team-beliebtheit";
 import {
   buildSponsorChoiceSummary,
   chooseSponsorOfferForAiTeams,
@@ -672,11 +673,17 @@ function buildNextSeasonGameState(
     : refreshTeamObjectiveState(
         advanceScoutIntelTick({
           gameState: chooseSponsorOfferForAiTeams(
+            // TEIL A: Beliebtheits-KPI 1×/Saison fortschreiben — VOR regenerateSponsorOffersForSeason, damit
+            // der Stern-Deckel (Feed 1) den frisch fortgeschriebenen Wert nutzt. Liest die abgeschlossene
+            // Saison (save.gameState), schreibt in die frisch aktivierte Folge-Saison fort.
             regenerateSponsorOffersForSeason(
-              advanceSponsorContractsForNewSeason(
-                applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
-                nextSeasonId,
-              ),
+              advanceTeamBeliebtheitForSeasonTransition({
+                completedGameState: save.gameState,
+                nextGameState: advanceSponsorContractsForNewSeason(
+                  applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
+                  nextSeasonId,
+                ),
+              }),
             ),
           ),
           phase: "preseason",

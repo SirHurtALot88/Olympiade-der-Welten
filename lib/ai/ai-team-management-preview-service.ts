@@ -7,6 +7,7 @@ import type {
   TeamIdentity,
 } from "@/lib/data/olyDataTypes";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
@@ -188,6 +189,7 @@ type TeamContext = {
   prevSeasonInjuryCount: number;
   prevSeasonAvgMatchdayFatigue: number;
   chronicInjuryPlayerCount: number;
+  gmArchetype: string | null;
 };
 
 type CalculatedPlayerEconomy = {
@@ -479,6 +481,7 @@ function buildTeamContext(
     lastSeasonPrizeMoney,
     upcomingCategoryCounts,
     objectiveAiBias: getTeamObjectiveAiBias(gameState, teamId),
+    gmArchetype: getTeamGeneralManager(gameState, teamId)?.profile?.archetype ?? null,
     ...prevSeasonHealth,
   };
 }
@@ -643,7 +646,9 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
     (finances >= 70 ? 0.04 : 0) +
     (context.youthCount >= 2 ? 0.04 : 0) +
     recoveryBuildingNeed +
-    (objectiveBias?.facilityPriority ?? 0) * 0.09;
+    (objectiveBias?.facilityPriority ?? 0) * 0.09 +
+    // Facility architect: direct archetype hook so the build-budget share structurally leads.
+    (context.gmArchetype === "facility_architect" ? 0.12 : 0);
   const transferBias =
     0.28 +
     (context.rosterCount < context.identity.playerMin ? 0.24 : context.rosterCount < context.identity.playerOpt ? 0.14 : 0) +
@@ -765,6 +770,17 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       const incomeFacilityBonusBase = facility.facilityId === "fan_shop" ? 55 : 47;
       const incomeFacilityLevelBonus = Math.max(0, incomeFacilityBonusBase - currentLevel * 15);
       score += incomeFacilityLevelBonus;
+      // Facility architect weighs income buildings on NET cashflow: keep building/upgrading as long as
+      // the next level's season income beats its upkeep (avoids the upkeep trap while still expanding).
+      if (context.gmArchetype === "facility_architect") {
+        const nextIncome = nextDefinition?.seasonIncome ?? 0;
+        const nextUpkeep = nextDefinition?.seasonUpkeep ?? 0;
+        const netCashflow = nextIncome - nextUpkeep;
+        if (netCashflow > 0) {
+          score += 18 + Math.min(20, netCashflow * 1.5);
+          positive.push("Facility Architect: Netto-Cashflow des Income-Gebäudes ist positiv");
+        }
+      }
       if (currentLevel === 0) {
         positive.push("Income-Gebäude fehlt komplett");
       }
@@ -778,6 +794,11 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       if (context.team.cash < 18) negative.push("wenig freies Cash für Spezial-Investments");
     }
 
+    // Facility architect: general build bonus across all facilities — the archetype leads on
+    // infrastructure structurally rather than through the diluted blended facility bias.
+    if (context.gmArchetype === "facility_architect") {
+      score += 12;
+    }
     score = round(clamp(score, 0, 100), 2);
     const canSpend = spendCursor + upgradeCost <= budgetPlan.bucketsBefore.buildingBudget;
     const hasCashPressure =
@@ -793,7 +814,7 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       hasCashPressure &&
       lowStrategicValue &&
       !isNetPositiveIncomeFacility;
-    const buildScoreThreshold =
+    const baseBuildScoreThreshold =
       facility.facilityId === "recovery_center" &&
       (context.fatigueAvg >= 60 ||
         context.fatigueHighCount >= 2 ||
@@ -802,6 +823,11 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
         context.prevSeasonInjuryCount >= 8)
         ? 28
         : 45;
+    // Facility architect builds more readily: a lower build threshold across facilities.
+    const buildScoreThreshold =
+      context.gmArchetype === "facility_architect"
+        ? Math.min(baseBuildScoreThreshold, 30)
+        : baseBuildScoreThreshold;
     const wantsBuildOrUpgrade =
       score >= buildScoreThreshold && currentLevel < facility.maxLevel && canSpend;
     const action: AiManagementBuildingAction = shouldDowngrade
