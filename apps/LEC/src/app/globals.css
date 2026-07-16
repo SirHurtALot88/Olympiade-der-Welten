@@ -259,8 +259,14 @@ table.resizable td { overflow: hidden; }
 .rec .tx b { font-weight: 700; }
 .rec .tx span { color: var(--muted); }
 .racts { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-.chip { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; }
+.chip { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; background: transparent; color: inherit; font-family: inherit; }
 .chip:hover { background: var(--panel2); }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.filterrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.filterrow .fsep { width: 1px; align-self: stretch; background: var(--border); margin: 0 2px; }
+.filterrow .count { margin-left: auto; font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+.loadmore { display: flex; justify-content: center; padding: 14px 0 2px; }
+.p-muted { color: var(--faint); }
 .c-crit { color: var(--crit); border-color: var(--crit); } .c-warn { color: var(--warn); border-color: var(--warn); }
 .c-good { color: var(--good); border-color: var(--good); } .c-mkt { color: var(--market); border-color: var(--market); }
 .eff { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }

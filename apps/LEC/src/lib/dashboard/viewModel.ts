@@ -366,7 +366,8 @@ export function buildFullSortiment(
     .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings));
 }
 
-const LABELS_DE: Record<ArticleClass, string> = {
+/** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
+export const LABELS_DE: Record<ArticleClass, string> = {
   champion: "Champion",
   solide: "Solide",
   beobachten: "Beobachten",
