@@ -1,0 +1,29 @@
+{
+  "name": "Lava Golem",
+  "id": "player-0180-lava-golem",
+  "className": "Warlord",
+  "race": "Construct",
+  "alignment": "C-B",
+  "gender": "n",
+  "subclasses": ["Wayfarer", "Behemoth"],
+  "traitsPositive": ["FanFavorite", "Healthy", "FiredUp"],
+  "traitsNegative": ["Vindictive", "Scandalous"],
+  "attributes": {
+    "power": 98,
+    "health": 99,
+    "stamina": 29,
+    "intelligence": 1,
+    "awareness": 1,
+    "determination": 21,
+    "speed": 1,
+    "dexterity": 2,
+    "charisma": 94,
+    "will": 35,
+    "spirit": 2,
+    "torment": 96
+  },
+  "flavorDe": "In den frühen Jahren der Olympiade, als die Arenen noch roch nach frischem Stein und naiver Tapferkeit, gab es eine Disziplin, vor der selbst erfahrene Kämpfer die Schultern hochzogen: das Mini Deathmatch. Und in genau dieser Disziplin stand Lava Golem lange Zeit wie eine Naturgewalt mitten im Ring — wortlos, brennend und viel zu groß für einen Ort, der „mini“ im Namen trägt. Einst war er nur ein ausgestoßener Brocken aus den Tieföfen der Eisernen Hallen, zusammengehalten aus Lava, Wut und der hartnäckigen Weigerung, auseinanderzufallen. Heute kennt man ihn als den langjährigen Arena-Champion, dessen Schritte die Steine zum Glühen bringen und dessen Siege oft schon enden, bevor der Gegner verstanden hat, dass der Kampf überhaupt begonnen hat. Das Publikum liebt ihn. Die Gegner verfluchen ihn. Er selbst redet kaum — doch wer ihn einmal mitten im brüllenden Kolosseum gesehen hat, versteht, warum ausgerechnet er die Legende der ersten Arenenjahre wurde.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lava Golem.jpg",
+  "cost": 30,
+  "upkeepBase": 4
+}

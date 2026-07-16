@@ -1,0 +1,54 @@
+// term: aiTeamNeeds
+// id: aiSearchSelfTest
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTransferCandidatePool.value | playersWithTeamFitBreakdown.value | selectedTeam.value
+// extractionStatus: complete_or_primary_match
+const pool = Array.isArray({{ aiTransferCandidatePool.value }}) ? {{ aiTransferCandidatePool.value }} : [];
+const ui = Array.isArray({{ playersWithTeamFitBreakdown.value }}) ? {{ playersWithTeamFitBreakdown.value }} : [];
+
+const s = (v) => String(v ?? '').trim();
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+
+const has = (row, key) => row && row[key] != null && row[key] !== '';
+const countHas = (key) => pool.reduce((a, r) => a + (has(r, key) ? 1 : 0), 0);
+
+const teamVals = pool.map((r) => s(r.team).toUpperCase()).filter(Boolean);
+const nonTmTeams = teamVals.filter((t) => t && t !== 'TM');
+
+return {
+  candidatePoolSource: 'aiTransferCandidatePool (derived from playersWithImages, not UI filters)',
+  teamSelected: s({{ selectedTeam.value }}),
+  poolRows: pool.length,
+  uiRows_playersWithTeamFitBreakdown: ui.length,
+  uiCouplingWarning: pool.length === ui.length && pool.length > 0 ? 'Pool size equals UI size (could be coincidence, but check).' : null,
+  nonTransfermarktTeamLeakCount: nonTmTeams.length,
+  fieldCoverage: {
+    name: countHas('name'),
+    team: countHas('team'),
+    marktwert: countHas('marktwert'),
+    gehalt: countHas('gehalt'),
+    team_fit: countHas('team_fit'),
+    pow: countHas('pow'),
+    spe: countHas('spe'),
+    men: countHas('men'),
+    soc: countHas('soc'),
+    count_gt60: countHas('count_gt60'),
+    count_gt80: countHas('count_gt80') },
+
+  valueRanges: {
+    marktwert: {
+      min: pool.length ? Math.min(...pool.map((r) => n(r.marktwert)).filter((x) => x > 0)) : null,
+      max: pool.length ? Math.max(...pool.map((r) => n(r.marktwert)).filter((x) => x > 0)) : null },
+
+    gehalt: {
+      min: pool.length ? Math.min(...pool.map((r) => n(r.gehalt)).filter((x) => x >= 0)) : null,
+      max: pool.length ? Math.max(...pool.map((r) => n(r.gehalt)).filter((x) => x >= 0)) : null },
+
+    team_fit: {
+      min: pool.length ? Math.min(...pool.map((r) => n(r.team_fit)).filter((x) => Number.isFinite(x))) : null,
+      max: pool.length ? Math.max(...pool.map((r) => n(r.team_fit)).filter((x) => Number.isFinite(x))) : null } } };

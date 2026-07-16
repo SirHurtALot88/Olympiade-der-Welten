@@ -1,0 +1,20 @@
+{
+  "name": "Kiti",
+  "id": "player-1537-kiti",
+  "className": "Bard",
+  "race": "Human",
+  "alignment": "C-N",
+  "gender": "f",
+  "subclasses": ["Wayfarer", "Ninja"],
+  "traitsPositive": ["Ambitious", "Resourceful"],
+  "traitsNegative": ["Vindictive", "Timid", "Cheater"],
+  "attributes": {
+    "power": 13, "health": 40, "stamina": 53, "intelligence": 61,
+    "awareness": 65, "determination": 46, "speed": 60, "dexterity": 83,
+    "charisma": 79, "will": 21, "spirit": 87, "torment": 37
+  },
+  "flavorDe": "In den nebelverhangenen Häfen der Nebelroute erkennt man Kiti an ihren Stilettos und dem Haar, das an den Spitzen wie Feuer brennt, während es oben schon wieder kalt ist. Einst war sie nur die jüngere Schwester auf einem Messingflut-Schiff — zu schnell mit dem Messer, zu langsam mit dem Rückziehen und weit davon entfernt, Respekt zu ernten. Heute führt sie mit Kati die rauesten Überfälle zwischen den Inseln an und singt auf dem Deck nur noch, wenn jemand bezahlt oder blutet. Wer sie unterschätzt, merkt meist zu spät, dass sie längst drei Schritte voraus ist.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kiti.jpg",
+  "cost": 55,
+  "upkeepBase": 5
+}

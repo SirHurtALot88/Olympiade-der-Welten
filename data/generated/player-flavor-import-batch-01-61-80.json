@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "player-0061-astaroth",
+      "flavorDe": "Astaroth steht in der Totenmark, wo Ruinen noch nach Schwüren riechen und kaltes Licht durch zerbrochene Bögen fällt wie ein Urteil ohne Richter. Man sagt, das Grab habe ihn zurückgegeben — nicht leer, sondern mit Befehlen, die noch warm in seinem Schädel lagen und niemand mehr abzuholen kam. Sein Helm trägt Feuer wie eine Erinnerung, die nicht vergessen will; Schild und Speer glühen, als wäre jede Arena nur ein weiteres Grab, das zu tief gräbt. Seitdem klingt jede Glocke wie Schaufeln zu nah am Ohr. Wer ihn fordert, trifft keinen Toten. Er trifft jemanden, der noch arbeitet."
+    },
+    {
+      "id": "player-0062-kebet",
+      "flavorDe": "Kebet erwachte in den heißen Ödlanden unter einem Tempel, der älter ist als die Sprache der Priester — klein, bandagiert, mit Augen wie grüne Münzen in einem Gesicht aus Staub und Leinen. Man erzählt, er sei kein Fluch gewesen, sondern ein Versprechen: jemand habe ihn eingewickelt, damit er blieb, wenn alle anderen gingen. Seitdem wandelt er durch Kerzenhallen und vergessene Treppen, entspannt genug, um nicht zu schreien, und großzügig genug, um Fremden den Weg zu zeigen — auch wenn er selbst zögert, bevor er einen Schritt macht. Wer ihn unterschätzt, merkt, dass Mitleid manchmal härter ist als Zorn. Und dass kleine Wesen große Hallen kennen."
+    },
+    {
+      "id": "player-0063-kragar",
+      "flavorDe": "Kragar stammt aus den Eisernen Hallen, wo Hörner so normal sind wie Schnee und ein Kriegshammer schwerer wiegt als ein Name. Sein Fell trägt Kriegsbemalung wie Kartenlinien; sein Blick glüht rot, als hätte er gelernt, dass Zorn eine ehrliche Sprache ist. Er schlug sich durch Clankriege und Schmiedefeuer, getrieben von etwas, das älter ist als Groll — und doch vergisst er niemals, wer zuerst getroffen hat. Manche nennen ihn primitiv. Seine Feinde nennen ihn das Geräusch, bevor der Hammer fällt. Wer bleibt, versteht: Hier zählt nicht Adel. Hier zählt, wer noch steht."
+    },
+    {
+      "id": "player-0064-bumblecrank",
+      "flavorDe": "Bumblecrank wurde in den Grenzstädten geschmiedet, wo Nächte aus Neon und Ruß bestehen und niemand fragt, wer den Roboter bezahlt hat — solange er trifft. Sein Panzer ist gelb wie eine Warnung, zerkratzt wie ein Veteran, und die blauen Lichter in Brust und Faust leuchten, als wäre Wut eine saubere Energiequelle. Man baute ihn für Schwerstarbeit; er fand heraus, dass Schwerstarbeit und Schläge oft dasselbe sind. Treu bleibt er denen, die ihn nicht als Werkzeug behandeln; motiviert, sobald jemand die Glocke läutet. Wer vor ihm steht, hört zuerst Hydraulik. Dann hört er auf, Dinge zu hören."
+    },
+    {
+      "id": "player-0065-zeronis-prime",
+      "flavorDe": "Zeronis Prime rollt durch regennasse Straßen zwischen gotischen Türmen, als wäre die Stadt selbst nur ein Hindernis, das noch nicht gemessen wurde. Vier Ketten, ein Turm, bläuliches Glimmen in jeder Naht — gebaut in den Eisernen Hallen für Kriege, die länger dauerten als die Erinnerung der Bauherren. Man programmierte Wachsamkeit hinein und Loyalität dazu; Faulheit blieb als Restfehler, den niemand löschen wollte, weil er manchmal Leben rettet. Wenn es ernst wird, steht Zeronis Prime zwischen Schwachen und dem, was kommt — langsam, schwer, und unangenehm zuverlässig. Wer ihn unterschätzt, merkt: Geduld ist bei Panzern keine Tugend. Sie ist Mechanik."
+    },
+    {
+      "id": "player-0066-zen",
+      "flavorDe": "Zen trainiert in den verlassenen Passagen der Grenzstädte, wo Staub wie Erinnerung liegt und Ruinen noch nach alten Schwüren riechen. Er band sich die Augen ab, als das Sehen zu laut wurde — nicht aus Schwäche, sondern weil er merkte, dass die Welt ehrlicher klingt, wenn man aufhört, ihr ins Gesicht zu starren. Seitdem bewegt er sich zwischen Nebel und Stein wie jemand, der weiß, wo der nächste Schlag geboren wird, bevor der Angreifer denkt. Fleißig, wenn es zählt; hitzig, wenn jemand Unschuldige trifft. Wer ihn fordert, sollte nicht lächeln. Er sollte atmen — und merken, dass Atem hier schon zu viel verrät."
+    },
+    {
+      "id": "player-0067-greyhus",
+      "flavorDe": "Greyhus patrouilliert über den Trümmern der Grenzstädte, wo Himmel aus Rauch besteht und Raketen wie fernes Wetter aufsteigen. Sein Panzer ist dunkel, sein Blick zwei rote Linien ohne Mitleid, und auf den Schultern sitzen Dinge, die man besser nicht als Dekoration nennt. Man schuf ihn für totale Zerstörung; er lernte, dass totale Zerstörung auch bezahlt werden will. Flexibel genug, um den Auftrag zu wechseln; söldnerisch genug, um nicht zu fragen, warum — solange die Munition stimmt. Wer ihn sieht, riecht verbranntes Metall und alte Entscheidungen. Und versteht: Hier gibt es keine Verhandlung. Nur Reichweite."
+    },
+    {
+      "id": "player-0068-arlong",
+      "flavorDe": "Arlong kommt aus Lunira, wo Salz in den Narben sitzt und Ehre manchmal nur ein anderes Wort für Zähne ist. Sein Panzer trägt Schädel wie Trophäen einer Welt, die zu laut war; seine Axt ist schwer genug, um ehrlich zu sein. Man sagt, er habe einst einem Herrn gedient und ihn dann gefressen — nicht den Mann, sondern dessen Regeln. Seitdem läuft er durch Schluchten und Hafennebel, beliebt bei denen, die Chaos mögen, und gefährlich für alle, die glauben, Reptilien seien langsam. Wer schreit, bevor er trifft, versteht ihn nicht. Für Arlong ist der Schrei der Moment, in dem die Welt endlich ehrlich wird."
+    },
+    {
+      "id": "player-0069-leviathan",
+      "flavorDe": "Leviathan stammt aus den Tiefen unter Lunira, wo Mondlicht kaum ankommt und Ketten noch aus der Zeit stammen, als jemand glaubte, das Meer zähmen zu können. Sein Leib trägt Türkis und Gold wie eine alte Krone; sein Brüllen klingt wie Sturm, der gelernt hat, einen Namen zu tragen. Man band ihn lange genug, dass er vergaß, ob Freiheit leise oder laut ist — und deshalb zögert er manchmal, bevor er zuschlägt. Entspannt wirkt er nur, solange niemand die Wellen stört. Wer die Ketten im Wasser sieht, sollte nicht fragen, wer sie gelegt hat. Fragen weckt Dinge, die lieber schlafen."
+    },
+    {
+      "id": "player-0070-mechatron",
+      "flavorDe": "Mechatron wandert zwischen den Schmieden der Eisernen Hallen und den Ruinen der Grenzstädte, als wäre der Weg selbst sein Auftraggeber. Sein Panzer glüht in der Brust wie ein Ofen, der nie ausgeht; sein Hammer sprüht Funken, als wäre jeder Schlag eine kleine Eruption. Man baute ihn zum Schlagen und zum Tragen; er fand heraus, dass Tragen oft teurer ist als Schlagen. Flexibel, wenn die Karte wechselt; söldnerisch, wenn jemand den Preis kennt. Wer ihn hört, hört Metall, das denkt. Wer zu nah kommt, merkt: Hier gibt es keinen leisen Abschied."
+    },
+    {
+      "id": "player-0071-tempest",
+      "flavorDe": "Tempest formt sich an den stürmischen Küsten der Leeren Ränder, wo der Himmel zu niedrig hängt und Blitze wie Antworten aussehen, die niemand bestellt hat. Zwei Augen glühen im Wirbelsturm — kalt, wach, zu groß für einen Körper, der keiner ist. Man sagt, er sei kein Wetter, sondern ein Urteil, das gelernt hat zu drehen. Skandalös genug, um Legenden zu erzählen; abtrünnig genug, um keinem Herrn zu gehorchen, der nicht Donner spricht. Wer ihn ruft, ruft etwas, das nicht verhandelt. Wer bleibt, versteht: Wind hat keine Handschrift. Nur Spur."
+    },
+    {
+      "id": "player-0072-swiftstrike",
+      "flavorDe": "Swiftstrike jagt in den kalten Passhöhen der Eisernen Hallen, wo Mondlicht auf Schnee liegt wie kaltes Metall und jeder Atemzug ein Risiko ist. Sein Haar ist silbern wie der Winter selbst; sein Schwert trägt einen roten Stein, der leuchtet, als wäre Ehrgeiz eine Substanz. Er stammt aus einem Clan, der Rebellion nicht predigt, sondern leise übt — fleißig genug, um nicht zu verhungern, ehrgeizig genug, um nicht klein zu bleiben. Schüchtern wirkt er nur, bis das Blatt fällt. Wer ihn verfolgt, verliert ihn in der ersten Kurve. Wer ihn unterschätzt, findet den roten Stein plötzlich sehr nah."
+    },
+    {
+      "id": "player-0073-valeria-bloodfang",
+      "flavorDe": "Valeria Bloodfang plant in den nebligen Wäldern der Grünen Ringe, wo Karten mehr bedeuten als Schwüre und ein Finger auf Pergament manchmal schärfer ist als eine Klinge. Ihr grünes Haar fällt wie Moos; ihre Augen glühen wie Bernstein, der gelernt hat, nicht zu blinzeln. Sie jagte Clans, die zu laut waren, und überlebte Kriege, die zu ehrlich waren — kalt genug, um nicht zu zögern, wenn der Plan es verlangt. Feurig, wenn jemand ihren Weg versperrt; ehrgeizig, wenn jemand glaubt, Orcs lesen keine Landkarten. Wer sie unterschätzt, merkt: Blut ist hier kein Name. Es ist Terminologie."
+    },
+    {
+      "id": "player-0074-raphael",
+      "flavorDe": "Raphael operiert in den eisigen Grenzen der Grenzstädte, wo Schnee Visiere reinigt und rotes Licht die einzige Wärme ist, die man vertrauen darf. Sein Panzer ist schwer, sein Visier ein schmaler Streifen Zorn; drei Klingen auf dem Rücken wie drei Versionen desselben Versprechens. Man sagt, er sei einst loyal gewesen — bis Loyalität zu einem Befehl wurde, den niemand laut aussprechen wollte. Seitdem geht er allein durch Pässe und Ruinen, skandalös genug für Gerüchte, hitzig genug, um sie wahr zu machen. Wer ihn trifft, sollte nicht nach Adel fragen. Er sollte fragen, ob er noch schnell genug ist."
+    },
+    {
+      "id": "player-0075-naotsugu",
+      "flavorDe": "Naotsugu wacht in den alten Wäldern am Rand der Grünen Ringe, wo Sonnenstrahlen wie Schwüre durch Moos fallen und Stille lauter ist als manche Schlachten. Seine Maske trägt ein Gesicht aus Erz und Erinnerung; goldene Hörner biegen sich wie Fragen, die niemand stellen will. Man erzählt, er habe einst für einen Clan gestanden, bis der Clan zu viel verlangte und er den Wald behielt. Treu bleibt er denen, die ihr Wort halten; sonst nur präzise. Wer ihn im Nebel sieht, sollte nicht fragen, ob er menschlich ist. Fragen bringen selten Antworten. Klingen schon."
+    },
+    {
+      "id": "player-0076-boulderclash",
+      "flavorDe": "Boulderclash lebt in den vulkanischen Tälern der Eisernen Hallen, wo Feuer und Frost nebeneinander wohnen und niemand genau weiß, welcher Kopf gerade spricht. Zwei Gesichter, ein Leib, zu viel Kraft für eine einfache Meinung — der eine hält die Flamme, der andere das blaue Licht, und beide brüllen, wenn Besuch ungelegen kommt. Man sagt, er sei Wächter eines Passes gewesen, bis der Pass selbst explodierte; seitdem steht er im Rauch und wartet, als wäre Warten eine Form von Gesundheit. Faul wirkt er oft, bis jemand den falschen Stein tritt. Dann merkt man: Hier schlägt nicht einer zu. Hier schlägt das Wetter."
+    },
+    {
+      "id": "player-0077-buttercup",
+      "flavorDe": "Buttercup patrouilliert durch die Totenmark, wo Regen auf Rost fällt und verfallene Burgen wie halbvergessene Eide aus Stein stehen. Sein Panzer ist schwer, seine Augen leuchten gelb wie eine Laterne, die niemand angezündet hat — und doch hängt sie an seinem Hals, als wäre Licht eine Pflicht, nicht ein Luxus. Man sagt, er habe einst eine Brücke bewacht, die es nicht mehr gibt; seitdem geht er allein durch Pfützen und Nebel, treu genug, um zu bleiben, wenn andere fliehen. Sanft wirkt er, bis jemand die Laterne ausmachen will. Dann versteht man: Stiere erinnern sich an Wege länger als Menschen an Namen."
+    },
+    {
+      "id": "player-0078-baz",
+      "flavorDe": "Baz kriecht aus den Höllenschlünde nahen Feldern vor die Mauern der Kernlande, als wäre Krieg ein Witz, den nur er richtig erzählen kann. Sein Körper ist rosa und absurd; seine Waffen sind es nicht — Kanone, Banane, Dinge, die explodieren, wenn man zu höflich fragt. Man sagt, er sei einmal ein Garten gewesen, bis jemand Dünger und Wahnsinn verwechselte. Seitdem liebt ihn das Publikum und fürchten ihn die Vernünftigen: beliebt, wo Chaos Applaus bekommt; kalt, wenn jemand glaubt, Absurdität sei harmlos. Wer lacht, lacht zu früh. Baz lacht zuletzt — meistens mit Rauch."
+    },
+    {
+      "id": "player-0079-tomahawk",
+      "flavorDe": "Tomahawk steht Wache an einem Außenposten der Grenzstädte, wo Sonnenuntergänge orange sind wie Warnungen und Staub sich in jede Ritze legt, die jemals Mensch war. Sein Panzer ist verwittert, sein Visier smaragdgrün, und das Gewehr ruht auf der Brust wie ein Versprechen, das nicht müde wird. Man baute ihn zum Schützen; er fand heraus, dass Schützen manchmal mehr retten als schießen — auch wenn das Schießen leichter zu erklären ist. Aufgebracht, wenn Unschuldige in Gefahr sind; zaghaft, wenn niemand zusieht. Wer ihn trifft, sieht einen Boten ohne Gesicht. Wer ihn braucht, sieht eine Mauer, die noch steht."
+    },
+    {
+      "id": "player-0080-gaius",
+      "flavorDe": "Gaius marschiert durch die Höllenschlünde, als wäre Lava nur ein harter Boden für jemanden, der zu sehr an Helden glaubt. Sein Helm trägt rot wie Stolz; sein Schild trägt Ringe wie Geschichten, die er sich selbst erzählt. Er stammt aus einer Welt, die nach Marmor und Eid roch — bis er merkte, dass Eide selten bezahlen und Ruhm immer hungrig ist. Ehrgeizig genug, um zu glauben, er sei auserwählt; söldnerisch genug, um den Preis zu kennen, wenn die Arena ruft. Wer ihn fordert, trifft keinen Sterblichen. Er trifft jemanden, der Theater und Krieg verwechselt — und in beiden zu gut ist, um belächelt zu werden."
+    }
+  ]
+}

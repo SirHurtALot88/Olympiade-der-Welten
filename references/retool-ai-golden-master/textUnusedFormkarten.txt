@@ -1,0 +1,51 @@
+// term: playerExhaustionMap
+// id: textUnusedFormkarten
+// type: script
+// subtype: TextWidget2
+// page: Einsatzliste
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: selectTeamEinsatzliste.value | selectSpieltag.value || 1 | formatDataAsArray(simpleLineupCheck.data) || []
+// extractionStatus: complete_or_primary_match
+// Compute exhaustion for players based on consecutive appearances in the last 4 spieltage
+const team = {{ selectTeamEinsatzliste.value }};
+const spieltag = Number({{ selectSpieltag.value || 1 }});
+const rows = {{ formatDataAsArray(simpleLineupCheck.data) || [] }};
+
+// Filter rows for selected team and before current spieltag
+const relevant = rows.filter((r) => String(r.team_code).trim() === String(team).trim() && Number(r.spieltag) < spieltag);
+
+// consider only last 4 spieltage
+const last4 = relevant.filter((r) => Number(r.spieltag) >= spieltag - 4);
+
+// Build map name -> consecutive appearances count
+const consec = {};
+// For each player, track last used spieltage in order
+const byPlayer = {};
+for (const r of last4) {
+  const list = String(r.player_names_csv || '').split(/,\s*/).filter(Boolean);
+  for (const name of list) {
+    if (!byPlayer[name]) byPlayer[name] = new Set();
+    byPlayer[name].add(Number(r.spieltag));
+  }
+}
+
+for (const [name, set] of Object.entries(byPlayer)) {
+  const tags = Array.from(set).sort((a, b) => Number(b) - Number(a)); // desc
+  let count = 0;
+  let cur = spieltag - 1;
+  for (const t of tags) {
+    if (t === cur) {count++;cur--;} else if (t < cur) {break;}
+  }
+  // Penalties for consecutive usage in last 4: 5%, 10%, 15%, 20%
+  // count >= 1 -> -5%, >=2 -> -10%, >=3 -> -15%, >=4 -> -20%
+  let mult = 1.0;
+  if (count >= 4) mult = 0.80;else
+  if (count >= 3) mult = 0.85;else
+  if (count >= 2) mult = 0.90;else
+  if (count >= 1) mult = 0.95;
+  consec[name] = { count, multiplier: mult };
+}
+
+return consec;

@@ -1,0 +1,20 @@
+{
+  "name": "Kati",
+  "id": "player-1544-kati",
+  "className": "Bard",
+  "race": "Human",
+  "alignment": "C-N",
+  "gender": "f",
+  "subclasses": ["Wayfarer", "Ninja"],
+  "traitsPositive": ["Ambitious", "Resourceful"],
+  "traitsNegative": ["Vindictive", "Timid", "Cheater"],
+  "attributes": {
+    "power": 13, "health": 40, "stamina": 53, "intelligence": 67,
+    "awareness": 68, "determination": 34, "speed": 54, "dexterity": 75,
+    "charisma": 81, "will": 28, "spirit": 88, "torment": 35
+  },
+  "flavorDe": "Kati steht am Steuer, die Pfeife zwischen den Zähnen, während andere noch über Wind und Pech debattieren. Auf der Nebelroute gilt sie als die ältere Hälfte der Messingflut-Zwillinge: härter im Urteil, kälter im Blick und verdammt gut darin, aus einem chaotischen Hafen eine saubere Fluchtroute zu machen. Einst teilte sie mit Kiti nur ein schiefes Deck und denselben Nachnamen, den niemand laut aussprach. Heute ist ihr Name eine Warnung — nicht weil sie laut ist, sondern weil sie erscheint, bevor die Nebel sich lichten.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kati.jpg",
+  "cost": 55,
+  "upkeepBase": 5
+}

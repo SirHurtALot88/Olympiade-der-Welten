@@ -1,0 +1,647 @@
+// term: aiTeamNeeds
+// id: initTeamContextOnLoad
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: finalPickRecommendationsDisplay.value | aiTransferCandidatePool.value | getActivePlayersByTeam.data | getTeamRatingsTransfermarkt.data | getCashFromSaisonstand.value
+// extractionStatus: complete_or_primary_match
+// Final Pick Recommendations (Managed output)
+// vNext: Recommendation tier semantics + marginal team impact/value.
+// Constraints: do NOT touch search sequence, tier logic upstream, or package UI.
+//
+// CONTEXT BUGFIX:
+// The managed output must derive team context from LIVE queries, not from rows[0].
+// - roster_count_now from getActivePlayersByTeam.data
+// - cash from getCashFromSaisonstand.value.cash
+// - finances from getTeamRatingsTransfermarkt.data
+// - cash_stress01 + roster_depth_posture recomputed here
+
+const rows = Array.isArray({{ finalPickRecommendationsDisplay.value }}) ? {{ finalPickRecommendationsDisplay.value }} : [];
+if (!rows.length) return [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const norm = (v) => s(v).toLowerCase();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Candidate pool provides market distributions + per-discipline attr scores (diszi_attr_scores)
+const candPool = Array.isArray({{ aiTransferCandidatePool.value }}) ? {{ aiTransferCandidatePool.value }} : [];
+
+// ------------------------------------------------------------
+// LIVE TEAM CONTEXT (source of truth)
+// ------------------------------------------------------------
+const roster = typeof formatDataAsArray === 'function' ?
+formatDataAsArray({{ getActivePlayersByTeam.data }}) || [] :
+Array.isArray({{ getActivePlayersByTeam.data }}) ? {{ getActivePlayersByTeam.data }} : [];
+
+const roster_count_now = Array.isArray(roster) ? roster.length : 0;
+
+const trRows = typeof formatDataAsArray === 'function' ?
+formatDataAsArray({{ getTeamRatingsTransfermarkt.data }}) || [] :
+Array.isArray({{ getTeamRatingsTransfermarkt.data }}) ? {{ getTeamRatingsTransfermarkt.data }} : [];
+
+const tr = trRows?.[0] || {};
+const finances = clamp(n(tr?.finances) || 5, 1, 10);
+
+const cash = n({{ getCashFromSaisonstand.value }}?.cash || 0);
+
+// IMPORTANT: match aiTransferPicksQuery.js formula
+const cash_stress01 = clamp(
+0.55 * clamp((5 - finances) / 4, 0, 1) +
+0.45 * clamp((75 - cash) / 75, 0, 1),
+0,
+1);
+
+
+const target_roster_soft = 10;
+const target_roster_full = 12;
+const target_roster_floor_under_cash_stress = cash_stress01 >= 0.55 ? 7 : 8;
+
+const roster_depth_posture_ctx = (() => {
+  if (roster_count_now >= target_roster_soft) return 'enough_depth_already';
+  if (roster_count_now <= target_roster_floor_under_cash_stress - 1) return 'urgent_depth';
+  if (cash_stress01 >= 0.55) return 'quality_over_filler';
+  return 'balanced_build';
+})();
+
+const isUrgentDepthTeam = roster_depth_posture_ctx === 'urgent_depth' && roster_count_now > 0 && roster_count_now <= 5;
+
+// --------- League-market expensiveness (relative to candidate pool) ---------
+const poolFees = candPool.
+map((c) => n(c?.marktwert ?? c?.mw_neu ?? c?.MW ?? c?.market_value)).
+filter((x) => Number.isFinite(x) && x > 0).
+sort((a, b) => a - b);
+
+const poolSalaries = candPool.
+map((c) => n(c?.gehalt ?? c?.gehalt_rechnung ?? c?.Gehalt ?? c?.salary)).
+filter((x) => Number.isFinite(x) && x > 0).
+sort((a, b) => a - b);
+
+const percentileRank01 = (sortedAsc, val) => {
+  const arr = Array.isArray(sortedAsc) ? sortedAsc : [];
+  const v = n(val);
+  if (!arr.length || !(v > 0)) return null;
+
+  // count <= v (binary search)
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (arr[mid] <= v) lo = mid + 1;else
+    hi = mid;
+  }
+  return clamp(lo / arr.length, 0, 1);
+};
+
+const marketExpensivenessSignal = (fee) => {
+  const p = percentileRank01(poolFees, fee);
+  if (p == null) return 'normal_market';
+  if (p >= 0.995) return 'extreme_outlier';
+  if (p >= 0.975) return 'very_expensive';
+  if (p >= 0.90) return 'premium';
+  return 'normal_market';
+};
+
+// Salary burden: relative to market, not team payroll
+const salaryBurdenSignal = (salary) => {
+  const p = percentileRank01(poolSalaries, salary);
+  if (p == null) return 'medium';
+  if (p >= 0.99) return 'extreme';
+  if (p >= 0.92) return 'heavy';
+  if (p <= 0.25) return 'light';
+  return 'medium';
+};
+
+// --------- Necessity / posture ---------
+const depthNecessity01 = () => {
+  if (!(roster_count_now > 0)) return 0.5;
+  if (roster_count_now <= 4) return 1;
+  if (roster_count_now === 5) return 0.92;
+  if (roster_count_now === 6) return 0.75;
+  if (roster_count_now <= 8) return 0.55;
+  return 0.25;
+};
+
+const necessityLevel = () => {
+  const d = depthNecessity01();
+  if (d >= 0.90) return 'critical';
+  if (d >= 0.70) return 'high';
+  if (d >= 0.45) return 'medium';
+  return 'low';
+};
+
+const recommendationPosture = (roster_depth_posture) => {
+  if (isUrgentDepthTeam) return 'build_depth_first';
+  if (roster_depth_posture === 'quality_over_filler') return 'quality_over_filler';
+  if (roster_depth_posture === 'balanced_build') return 'balanced_build';
+  if (roster_depth_posture === 'enough_depth_already') return 'win_now';
+  return 'balanced_build';
+};
+
+// --------- Team strength (NOT league rank): top-6 avg per discipline ---------
+const DISCI_FIELDS = [
+'tdm', 'mini_dm', 'gewichtheben', 'hockey', 'breaking', 'staffel', 'time_trial',
+'spurt', 'climbing', 'fechten', 'schach', 'takeshi', 'tennis', 'i_spy',
+'wettessen', 'basketball', 'football', 'battlefield', 'eiskunst', 'showcase'];
+
+
+const candByName = new Map();
+for (const c of candPool) {
+  const key = norm(c?.name || c?.player_name);
+  if (key && !candByName.has(key)) candByName.set(key, c);
+}
+
+// baseline for roster: derive diszi_attr_scores for each roster player via candidate pool
+const rosterScoresByField = {};
+for (const f of DISCI_FIELDS) rosterScoresByField[f] = [];
+
+for (const r of Array.isArray(roster) ? roster : []) {
+  const key = norm(r?.name || r?.player_name);
+  if (!key) continue;
+  const cand = candByName.get(key);
+  const scores = cand?.diszi_attr_scores || null;
+  if (!scores) continue;
+  for (const f of DISCI_FIELDS) {
+    const v = n(scores?.[f]);
+    if (Number.isFinite(v) && v > 0) rosterScoresByField[f].push(v);
+  }
+}
+
+const topKAvg = (arr, k) => {
+  const a = (Array.isArray(arr) ? arr : []).
+  filter((x) => Number.isFinite(n(x))).
+  sort((x, y) => y - x);
+  if (!a.length) return 0;
+  const slice = a.slice(0, Math.max(1, k));
+  return slice.reduce((acc, x) => acc + n(x), 0) / slice.length;
+};
+
+const currentTeamTop6ByField = {};
+for (const f of DISCI_FIELDS) currentTeamTop6ByField[f] = topKAvg(rosterScoresByField[f], 6);
+
+const currentTeamOverallTop6Avg = (() => {
+  const vals = DISCI_FIELDS.map((f) => n(currentTeamTop6ByField[f])).filter((x) => Number.isFinite(x) && x > 0);
+  if (!vals.length) return 0;
+  return vals.reduce((a, x) => a + x, 0) / vals.length;
+})();
+
+// pool median per field for gap signal
+const poolFieldVals = {};
+for (const f of DISCI_FIELDS) poolFieldVals[f] = [];
+for (const c of candPool) {
+  const scores = c?.diszi_attr_scores || {};
+  for (const f of DISCI_FIELDS) {
+    const v = n(scores?.[f]);
+    if (Number.isFinite(v) && v > 0) poolFieldVals[f].push(v);
+  }
+}
+for (const f of DISCI_FIELDS) poolFieldVals[f].sort((a, b) => a - b);
+
+const pctAt = (sortedAsc, p) => {
+  const arr = Array.isArray(sortedAsc) ? sortedAsc : [];
+  if (!arr.length) return null;
+  const idx = Math.max(0, Math.min(arr.length - 1, Math.round((arr.length - 1) * p)));
+  return n(arr[idx]);
+};
+
+const poolMedianByField = {};
+for (const f of DISCI_FIELDS) poolMedianByField[f] = pctAt(poolFieldVals[f], 0.5) ?? null;
+
+const teamGap01ForField = (field) => {
+  const base = poolMedianByField[field];
+  const cur = n(currentTeamTop6ByField[field]);
+  if (!(base > 0)) return 0;
+  return clamp((base - cur) / Math.max(1, base), 0, 1);
+};
+
+const resolveRelevantDisciplineField = (r) => {
+  const direct = s(r?.disci_plug_field || r?.target_discipline_field || '');
+  if (direct && DISCI_FIELDS.includes(direct.toLowerCase())) return direct.toLowerCase();
+
+  const tags = Array.isArray(r?.need_tags_short) ? r.need_tags_short : r?.need_tags_short ? [r.need_tags_short] : [];
+  const joined = tags.map((t) => s(t).toUpperCase());
+
+  const map = {
+    TDM: 'tdm',
+    MINIDM: 'mini_dm',
+    GEW: 'gewichtheben',
+    HOC: 'hockey',
+    BRK: 'breaking',
+    STA: 'staffel',
+    TT: 'time_trial',
+    SPU: 'spurt',
+    CLM: 'climbing',
+    FEC: 'fechten',
+    SCH: 'schach',
+    TAK: 'takeshi',
+    TEN: 'tennis',
+    SPY: 'i_spy',
+    WET: 'wettessen',
+    BSK: 'basketball',
+    FOO: 'football',
+    BTL: 'battlefield',
+    EIS: 'eiskunst',
+    SHW: 'showcase' };
+
+
+  for (const t of joined) {
+    if (t.endsWith('+') || t.endsWith('★')) {
+      const code = t.replace('+', '').replace('★', '');
+      if (map[code]) return map[code];
+    }
+  }
+
+  return null;
+};
+
+// --------- Marginal team impact + efficiency ---------
+const projectedPickScoreForField = (playerName, field) => {
+  if (!playerName || !field) return null;
+  const cand = candByName.get(norm(playerName));
+  const v = n(cand?.diszi_attr_scores?.[field]);
+  return Number.isFinite(v) && v > 0 ? v : null;
+};
+
+const projectedNewTop6Avg = (field, newScore) => {
+  if (!field || !(newScore > 0)) return null;
+  const current = rosterScoresByField[field] || [];
+  const list = [...current, newScore].filter((x) => Number.isFinite(n(x)) && n(x) > 0);
+  if (!list.length) return newScore;
+  return topKAvg(list, 6);
+};
+
+const computeMarginalTeamImpact = (r) => {
+  const playerName = s(r?.player || r?.player_name || r?.name);
+  const field = resolveRelevantDisciplineField(r);
+
+  if (!field) {
+    const depthDelta = n(r?.roster_depth_delta);
+    const axisMatch = n(r?.axis_match);
+    const proxy01 = clamp(0.55 * clamp(depthDelta / 10, -1, 1) + 0.45 * clamp(axisMatch / 120, 0, 1), -1, 1);
+    return {
+      field: null,
+      current_team_score: currentTeamOverallTop6Avg,
+      projected_new_team_score: null,
+      marginal_gain: null,
+      marginal_team_impact: Number((proxy01 * 100).toFixed(1)),
+      basis: 'proxy_no_discipline' };
+
+  }
+
+  const newScore = projectedPickScoreForField(playerName, field);
+  const cur = n(currentTeamTop6ByField[field]);
+
+  if (!(newScore > 0)) {
+    const proxy01 = clamp(n(r?.discipline_match) / 12 * 0.8 + clamp(n(r?.axis_match) / 120, 0, 1) * 0.2, 0, 1);
+    return {
+      field,
+      current_team_score: Number(cur.toFixed(1)),
+      projected_new_team_score: null,
+      marginal_gain: null,
+      marginal_team_impact: Number((proxy01 * 100).toFixed(1)),
+      basis: 'proxy_missing_player_score' };
+
+  }
+
+  const newAvg = projectedNewTop6Avg(field, newScore);
+  const gain = newAvg == null ? null : newAvg - cur;
+  const impact01 = gain == null ? 0 : clamp(gain / 3.2, 0, 1);
+
+  return {
+    field,
+    current_team_score: Number(cur.toFixed(1)),
+    projected_new_team_score: newAvg == null ? null : Number(newAvg.toFixed(1)),
+    marginal_gain: gain == null ? null : Number(gain.toFixed(2)),
+    marginal_team_impact: Number((impact01 * 100).toFixed(1)),
+    basis: 'team_top6_avg' };
+
+};
+
+const combinedCostBurden01 = (r) => {
+  const fee = n(r?.mw ?? r?.market_value);
+  const sal = n(r?.salary ?? r?.gehalt);
+
+  const feePct = percentileRank01(poolFees, fee);
+  const salPct = percentileRank01(poolSalaries, sal);
+
+  const f = feePct == null ? 0.5 : feePct;
+  const g = salPct == null ? 0.5 : salPct;
+
+  return clamp(0.62 * f + 0.38 * g, 0, 1);
+};
+
+const valueEfficiencySignal = (impact01, cost01) => {
+  const score = clamp(impact01 * 1.15 - 0.85 * cost01, -1, 1);
+  if (score >= 0.45) return 'elite';
+  if (score >= 0.20) return 'strong';
+  if (score >= -0.10) return 'fair';
+  return 'low';
+};
+
+const currentTeamGapSignal = (r) => {
+  const f = resolveRelevantDisciplineField(r);
+  if (!f) return 'unknown';
+  const g01 = teamGap01ForField(f);
+  if (g01 >= 0.40) return 'big_gap';
+  if (g01 >= 0.22) return 'medium_gap';
+  return 'small_gap';
+};
+
+const computeGapVsLeagueWeights = (r) => {
+  const gap = currentTeamGapSignal(r);
+  const needType = norm(r?.need_type);
+
+  const hasHoleFlavor = needType.includes('discipline') || gap === 'big_gap' || gap === 'medium_gap';
+  if (hasHoleFlavor) return { team_gap_weight_used: 0.85, league_rank_weight_used: 0.15 };
+  return { team_gap_weight_used: 0.65, league_rank_weight_used: 0.35 };
+};
+
+// Luxury flags
+const luxuryFlags = (r) => {
+  const fee = n(r?.mw ?? r?.market_value);
+  const sal = n(r?.salary ?? r?.gehalt);
+  const exp = marketExpensivenessSignal(fee);
+  const bur = salaryBurdenSignal(sal);
+
+  const flags = [];
+
+  if (isUrgentDepthTeam) {
+    const feeUsage = n(r?.fee_usage);
+    const veryExp = exp === 'extreme_outlier' || exp === 'very_expensive' || exp === 'premium' && feeUsage >= 0.72;
+    const heavyBurden = bur === 'heavy' || bur === 'extreme';
+
+    if (veryExp || heavyBurden) {
+      flags.push('luxury_bet');
+      if (veryExp) flags.push('too_expensive_for_need');
+      flags.push('elite but not first move');
+    }
+  }
+
+  return flags;
+};
+
+const whyNotNecessaryShort = (r) => {
+  const fee = n(r?.mw ?? r?.market_value);
+  const sal = n(r?.salary ?? r?.gehalt);
+  const exp = marketExpensivenessSignal(fee);
+  const bur = salaryBurdenSignal(sal);
+  const depthVal = s(r?.roster_depth_value);
+
+  if (isUrgentDepthTeam) {
+    if (exp === 'extreme_outlier' || exp === 'very_expensive') return 'Depth urgent: too expensive as first move';
+    if (bur === 'extreme' || bur === 'heavy') return 'Depth urgent: salary burden high';
+    if (depthVal === 'filler_only') return 'Depth urgent: mostly filler';
+  }
+
+  if (s(r?.roster_depth_posture) === 'enough_depth_already') {
+    if (depthVal === 'filler_only') return 'Depth already ok: avoid filler';
+  }
+
+  return '';
+};
+
+const managedRerankDeltaDepthLuxury = (r) => {
+  if (!isUrgentDepthTeam) return 0;
+
+  const fee = n(r?.mw ?? r?.market_value);
+  const sal = n(r?.salary ?? r?.gehalt);
+
+  const exp = marketExpensivenessSignal(fee);
+  const bur = salaryBurdenSignal(sal);
+
+  const depthVal = s(r?.roster_depth_value);
+  const depthDelta = n(r?.roster_depth_delta);
+
+  const isVeryExp = exp === 'very_expensive' || exp === 'extreme_outlier';
+  const isPremium = exp === 'premium';
+  const isHeavy = bur === 'heavy' || bur === 'extreme';
+
+  const depthPositive = depthDelta >= 4 || depthVal === 'high_depth_value' || depthVal === 'medium_depth_value';
+
+  let malus = 0;
+  if ((isVeryExp || isHeavy) && !depthPositive) {
+    malus -= isVeryExp ? 10 : 6;
+    if (isHeavy) malus -= 3;
+  } else if (isPremium && isHeavy && !depthPositive) {
+    malus -= 5;
+  }
+
+  let bonus = 0;
+  if (depthVal === 'high_depth_value') bonus += 4;else
+  if (depthVal === 'medium_depth_value') bonus += 2;
+
+  const tierPrev = s(r?.recommendation_tier || r?.tier_final).toUpperCase();
+  const scorePrev = n(r?.final_total_score);
+  const reasonCode = s(r?.reason_code);
+
+  const eliteException = (tierPrev === 'S+' || scorePrev >= 112) && (reasonCode === 'ok' || reasonCode === 'low_need_match');
+  if (eliteException) malus = Math.max(malus, -4);
+
+  return bonus + malus;
+};
+
+// --------- Build enriched rows ---------
+const enriched = rows.map((r) => {
+  const fee = n(r?.mw ?? r?.market_value);
+  const sal = n(r?.salary ?? r?.gehalt);
+
+  const market_expensiveness_signal = marketExpensivenessSignal(fee);
+  const salary_burden_signal = salaryBurdenSignal(sal);
+
+  const necessity_level = necessityLevel();
+
+  // IMPORTANT: stamp posture from live context; do not depend on incoming rows[0]
+  const roster_depth_posture = roster_depth_posture_ctx;
+  const recommendation_posture = recommendationPosture(roster_depth_posture);
+
+  const impactObj = computeMarginalTeamImpact(r);
+  const impact01 = clamp(n(impactObj.marginal_team_impact) / 100, 0, 1);
+
+  const cost01 = combinedCostBurden01(r);
+  const value_efficiency_signal = valueEfficiencySignal(impact01, cost01);
+  const current_team_gap_signal = currentTeamGapSignal(r);
+
+  const weights = computeGapVsLeagueWeights(r);
+
+  const why_not_necessary_short = whyNotNecessaryShort(r);
+  const luxury_flags = luxuryFlags(r);
+
+  const depthLuxuryDelta = managedRerankDeltaDepthLuxury(r);
+
+  // Value-over-excess adjustment
+  const valueDelta = (() => {
+    const i = impact01;
+    const c = cost01;
+    const cheap01 = 1 - c;
+
+    let d = 0;
+    if (i >= 0.55 && c >= 0.85) d -= 4;else
+    if (i >= 0.45 && c >= 0.75) d -= 2;
+
+    if (i >= 0.40 && cheap01 >= 0.65) d += 3;else
+    if (i >= 0.30 && cheap01 >= 0.55) d += 2;
+
+    if (value_efficiency_signal === 'elite') d += 2;else
+    if (value_efficiency_signal === 'strong') d += 1;
+
+    return d;
+  })();
+
+  const baseManaged = n(r?.final_rerank_score_managed ?? r?.final_rerank_score ?? 0);
+  const final_rerank_delta_management = depthLuxuryDelta + valueDelta;
+  const final_rerank_score_managed = baseManaged + depthLuxuryDelta + valueDelta;
+
+  return {
+    ...r,
+
+    roster_count_now,
+    cash_stress01: Number(cash_stress01.toFixed(3)),
+    roster_depth_posture,
+
+    // extra explicit context (debug)
+    cash_now: Number(cash.toFixed(2)),
+    finances_now: Number(finances.toFixed(2)),
+    target_roster_floor_under_cash_stress,
+    target_roster_soft,
+    target_roster_full,
+
+    // keep row-level depth value from upstream if present
+    roster_depth_value: s(r?.roster_depth_value || 'unknown'),
+    roster_depth_delta: Number(n(r?.roster_depth_delta).toFixed(2)),
+    why_depth_short: s(r?.why_depth_short || ''),
+
+    // mgmt signals
+    market_expensiveness_signal,
+    salary_burden_signal,
+    necessity_level,
+    recommendation_posture,
+    why_not_necessary_short,
+    luxury_flags,
+
+    // new value/impact signals
+    marginal_team_impact: impactObj.marginal_team_impact,
+    marginal_team_impact_basis: impactObj.basis,
+    marginal_team_impact_field: impactObj.field,
+    marginal_gain: impactObj.marginal_gain,
+    current_team_score: impactObj.current_team_score,
+    projected_new_team_score: impactObj.projected_new_team_score,
+
+    current_team_gap_signal,
+    value_efficiency_signal,
+
+    league_rank_weight_used: weights.league_rank_weight_used,
+    team_gap_weight_used: weights.team_gap_weight_used,
+
+    // rerank management
+    final_rerank_delta_management: Number(final_rerank_delta_management.toFixed(2)),
+    final_rerank_score_managed: Number(final_rerank_score_managed.toFixed(2)) };
+
+});
+
+// Managed ordering: primarily by managed rerank
+enriched.sort((a, b) =>
+n(b.final_rerank_score_managed) - n(a.final_rerank_score_managed) ||
+n(b.final_rerank_score) - n(a.final_rerank_score) ||
+n(b.final_total_score) - n(a.final_total_score) ||
+n(a.mw) - n(b.mw));
+
+
+// --------- Recommendation tier semantics ---------
+const topScore = n(enriched[0]?.final_rerank_score_managed);
+
+const isFeasible = (r) => {
+  const cap = s(r?.budget_status_cap);
+  const cashS = s(r?.budget_status_cash);
+  if (cap === 'over cap') return false;
+  if (cashS === 'not payable') return false;
+  const b = s(r?.budget_status).toLowerCase();
+  if (b.includes('not feasible')) return false;
+  return true;
+};
+
+const hasClearLuxuryOrOverreach = (r) => {
+  const flags = Array.isArray(r?.luxury_flags) ? r.luxury_flags : [];
+  const why = s(r?.why_not_necessary_short).toLowerCase();
+  const exp = s(r?.market_expensiveness_signal);
+  const bur = s(r?.salary_burden_signal);
+
+  if (flags.includes('too_expensive_for_need')) return true;
+  if (why.includes('too expensive')) return true;
+  if (exp === 'extreme_outlier' && necessityLevel() !== 'critical') return true;
+  if ((bur === 'extreme' || bur === 'heavy') && necessityLevel() === 'low') return true;
+  return false;
+};
+
+const capTier = (tier, capTo) => {
+  const order = { 'S+': 6, S: 5, A: 4, B: 3, C: 2, D: 1, E: 0, F: 0 };
+  if ((order[tier] ?? 0) > (order[capTo] ?? 0)) return capTo;
+  return tier;
+};
+
+const tierFromSemantics = (r, idx) => {
+  const rank = idx + 1;
+  const score = n(r?.final_rerank_score_managed);
+  const rel = topScore > 0 ? score / topScore : 0;
+
+  const feasible = isFeasible(r);
+  const luxury = hasClearLuxuryOrOverreach(r);
+
+  const impact = clamp(n(r?.marginal_team_impact) / 100, 0, 1);
+  const eff = s(r?.value_efficiency_signal);
+
+  if (rank === 1 && feasible && !luxury) {
+    return {
+      tier: 'S+',
+      reason: `#1 managed move · feasible · not luxury · rel=${rel.toFixed(2)} · impact=${(impact * 100).toFixed(0)} · eff=${eff}` };
+
+  }
+
+  if (!feasible) {
+    return { tier: 'D', reason: 'Not feasible / not payable in current situation' };
+  }
+
+  if (rank <= 3 && rel >= 0.96) {
+    const baseTier = rank === 2 ? 'S' : 'A';
+    return {
+      tier: luxury ? capTier(baseTier, 'B') : baseTier,
+      reason: `Top ${rank} · very close to #1 (${(rel * 100).toFixed(1)}%)` + (luxury ? ' · luxury-capped' : '') };
+
+  }
+
+  if (rank <= 4 && rel >= 0.97 && (eff === 'elite' || eff === 'strong') && !luxury) {
+    return { tier: 'S+', reason: `Near-top + high efficiency (${eff})` };
+  }
+
+  let tier = 'C';
+  if (rel >= 0.92) tier = 'A';else
+  if (rel >= 0.86) tier = 'B';else
+  if (rel >= 0.78) tier = 'C';else
+  tier = 'D';
+
+  if (impact >= 0.70 && tier === 'B') tier = 'A';
+  if (impact >= 0.70 && tier === 'C') tier = 'B';
+
+  if (eff === 'elite' && (tier === 'B' || tier === 'C')) tier = 'A';else
+  if (eff === 'strong' && tier === 'C') tier = 'B';
+
+  if (luxury) tier = capTier(tier, 'B');
+
+  return {
+    tier,
+    reason: `rel=${rel.toFixed(2)} · impact=${(impact * 100).toFixed(0)} · eff=${eff}` + (luxury ? ' · luxury-capped' : '') };
+
+};
+
+return enriched.map((r, idx) => {
+  const t = tierFromSemantics(r, idx);
+  return {
+    ...r,
+    rank_managed: idx + 1,
+    tier_final: t.tier,
+    recommendation_tier: t.tier,
+    recommendation_tier_reason: t.reason };
+
+});

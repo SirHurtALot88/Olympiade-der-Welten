@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-hidden="true">
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#121722" stroke="#66d9a8" stroke-width="3"/>
+  <circle cx="32" cy="32" r="18" fill="#66d9a8" opacity="0.18"/>
+  <text x="32" y="37" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="800" fill="#66d9a8">SO</text>
+</svg>

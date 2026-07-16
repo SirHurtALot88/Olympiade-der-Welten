@@ -1,0 +1,74 @@
+// term: aiTeamNeeds
+// id: aiVarianceConfig
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: finalPicksCanonicalManaged.value | filterTeam.value
+// extractionStatus: complete_or_primary_match
+// Paket 5: Value / Gap-Filler Audit
+// Measures whether Paket 4 makes value picks more visible without changing scoring.
+//
+// Outputs:
+// {
+//   team,
+//   sourceCount,
+//   top10: { valuePickCount, gapFillerCount, avgMw },
+//   top20: { ... },
+//   top30: { ... },
+//   strongestValuePicks: [ { rank, player_name, market_value, value_bonus, gap_filler_flag, value_pick_flag } ]
+// }
+
+const rows = Array.isArray({{ finalPicksCanonicalManaged.value }}) ? {{ finalPicksCanonicalManaged.value }} : [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+
+const getMw = (r) => n(r?.market_value ?? r?.mw ?? r?.marktwert ?? r?.MW);
+const isValuePick = (r) => Boolean(s(r?.value_pick_flag));
+const isGapFiller = (r) => Boolean(r?.gap_filler_flag === true);
+
+const sliceN = (arr, k) => arr.slice(0, Math.max(0, k));
+
+const statsFor = (k) => {
+  const top = sliceN(rows, k);
+  const valuePickCount = top.filter(isValuePick).length;
+  const gapFillerCount = top.filter(isGapFiller).length;
+  const mwVals = top.map(getMw).filter((x) => Number.isFinite(x) && x > 0);
+  const avgMw = mwVals.length ? mwVals.reduce((a, x) => a + x, 0) / mwVals.length : null;
+
+  return {
+    n: k,
+    valuePickCount,
+    gapFillerCount,
+    avgMw: avgMw == null ? null : Number(avgMw.toFixed(2)) };
+
+};
+
+// strongest value picks: focus on flagged value picks, then sort by value_bonus desc, then by rank asc
+const strongestValuePicks = [...rows].
+filter((r) => isValuePick(r) || n(r?.value_bonus) > 0).
+map((r) => ({
+  rank: n(r?.final_rank ?? r?.rank ?? 9999),
+  player_name: s(r?.player_name || r?.player || r?.name),
+  market_value: Number(getMw(r).toFixed(2)),
+  value_bonus: Number(n(r?.value_bonus).toFixed(2)),
+  gap_filler_flag: Boolean(r?.gap_filler_flag === true),
+  value_pick_flag: s(r?.value_pick_flag) })).
+
+sort((a, b) =>
+n(b.value_bonus) - n(a.value_bonus) ||
+n(a.rank) - n(b.rank) ||
+n(a.market_value) - n(b.market_value)).
+
+slice(0, 25);
+
+return {
+  team: s({{ filterTeam.value }}),
+  sourceCount: rows.length,
+  top10: statsFor(10),
+  top20: statsFor(20),
+  top30: statsFor(30),
+  strongestValuePicks };

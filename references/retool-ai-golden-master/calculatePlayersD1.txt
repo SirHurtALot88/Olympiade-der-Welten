@@ -1,0 +1,13 @@
+// term: captain_boost_x10
+// id: calculatePlayersD1
+// type: datasource
+// subtype: SqlQueryUnified
+// page: Einsatzliste
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for captain_boost_x10.
+

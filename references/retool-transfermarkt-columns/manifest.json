@@ -1,0 +1,124 @@
+{
+  "sourcePath": "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json",
+  "extractedAt": "2026-06-03T20:23:47.288Z",
+  "tablesFound": 3,
+  "tables": [
+    {
+      "componentName": "playersTable",
+      "componentId": "playersTable",
+      "page": "transfermarktPage",
+      "subtype": "TableWidget2",
+      "dataSource": "{{ _.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc']) }}",
+      "columnCount": 45,
+      "rowActionCount": 2,
+      "dependencies": {
+        "queries": [
+          "_.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc'])",
+          "playersWithTeamFitBreakdown"
+        ],
+        "transformers": [],
+        "states": [],
+        "components": [],
+        "all": [
+          "_.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc'])",
+          "playersWithTeamFitBreakdown"
+        ]
+      }
+    },
+    {
+      "componentName": "aiTeamNeedsTable",
+      "componentId": "aiTeamNeedsTable",
+      "page": "transfermarktPage",
+      "subtype": "TableWidget2",
+      "dataSource": "{{ (Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category))) }}",
+      "columnCount": 13,
+      "rowActionCount": 0,
+      "dependencies": {
+        "queries": [],
+        "transformers": [],
+        "states": [
+          "(Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category)))",
+          "ai2NeedsSnapshot"
+        ],
+        "components": [],
+        "all": [
+          "(Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category)))",
+          "ai2NeedsSnapshot"
+        ]
+      }
+    },
+    {
+      "componentName": "playersTable2",
+      "componentId": "playersTable2",
+      "page": "transfermarktPage",
+      "subtype": "TableWidget2",
+      "dataSource": "{{ wishlistWithImages.value }}",
+      "columnCount": 38,
+      "rowActionCount": 2,
+      "dependencies": {
+        "queries": [],
+        "transformers": [
+          "wishlistWithImages",
+          "wishlistWithImages.value"
+        ],
+        "states": [
+          "pickedPlayers"
+        ],
+        "components": [],
+        "all": [
+          "pickedPlayers",
+          "wishlistWithImages",
+          "wishlistWithImages.value"
+        ]
+      }
+    }
+  ],
+  "foundColorCodes": [
+    "#000000",
+    "#002366",
+    "#0052CC",
+    "#0D5E1F",
+    "#0d47a1",
+    "#1565C0",
+    "#1b5e20",
+    "#2E7D32",
+    "#42A5F5",
+    "#455A64",
+    "#4CAF50",
+    "#66BB6A",
+    "#81C784",
+    "#90caf9",
+    "#B71C1C",
+    "#B8860B",
+    "#BBDEFB",
+    "#C8E6C9",
+    "#E0E0E0",
+    "#E3F2FD",
+    "#E65100",
+    "#E8F5E9",
+    "#EF5350",
+    "#EF6C00",
+    "#EF9A9A",
+    "#F44336",
+    "#F9A825",
+    "#FF9800",
+    "#FFAB91",
+    "#FFCC80",
+    "#FFCDD2",
+    "#FFE082",
+    "#FFE0B2",
+    "#FFEB3B",
+    "#FFF59D",
+    "#FFF9C4",
+    "#FFFDE7",
+    "#FFFFFF",
+    "#a5d6a7",
+    "#b71c1c",
+    "#e65100",
+    "#ff8a80",
+    "#ffe082"
+  ],
+  "foundConditionalFormattingRules": 113,
+  "columnsWithFormatting": 81,
+  "formattingExtractionQuality": "high"
+}

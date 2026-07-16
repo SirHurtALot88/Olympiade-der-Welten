@@ -1,0 +1,152 @@
+// term: aiPickSeasonPlan
+// id: aiPickSeasonPreview
+// type: widget
+// subtype: JavascriptQuery
+// page: Einsatzliste
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiPickSeasonPreview.data
+// extractionStatus: complete_or_primary_match
+const res = {{ aiPickSeasonPreview.data }};
+
+if (!res || !res.ok) {
+  return [];
+}
+
+const safeNum = (v) => {
+  const nn = Number(v);
+  return Number.isFinite(nn) ? nn : 0;
+};
+
+const fmtBullets = (arr) => {
+  const items = Array.isArray(arr) ? arr.filter(Boolean) : [];
+  if (!items.length) return '';
+  return items.map((ss) => `• ${String(ss)}`).join('\n');
+};
+
+const fmtList = (arr) => Array.isArray(arr) ? arr.filter(Boolean).join(', ') : '';
+
+const parseHybridFromBullets = (bulletsArr) => {
+  // Expect a bullet like: "HybridScore: 12.34 · KartenBias 0.56 · FatigueSum 3"
+  // And a bullet like: "D1: PP ceiling 28.0 (pc=2)"
+  const out = {
+    hybridScore: null,
+    kartenBias: null,
+    fatigueSum: null,
+    ppCeiling: null,
+    pc: null };
+
+
+  const lines = Array.isArray(bulletsArr) ? bulletsArr.map((x) => String(x || '')) : [];
+
+  for (const line of lines) {
+    if (line.includes('HybridScore:')) {
+      const mH = line.match(/HybridScore:\s*([0-9]+(?:\.[0-9]+)?)/i);
+      const mK = line.match(/KartenBias\s*([0-9]+(?:\.[0-9]+)?)/i);
+      const mF = line.match(/FatigueSum\s*([0-9]+(?:\.[0-9]+)?)/i);
+      if (mH) out.hybridScore = safeNum(mH[1]);
+      if (mK) out.kartenBias = safeNum(mK[1]);
+      if (mF) out.fatigueSum = safeNum(mF[1]);
+    }
+
+    if (line.includes('PP ceiling')) {
+      const mP = line.match(/PP ceiling\s*([0-9]+(?:\.[0-9]+)?)/i);
+      const mPc = line.match(/\(pc=\s*([0-9]+)\s*\)/i);
+      if (mP) out.ppCeiling = safeNum(mP[1]);
+      if (mPc) out.pc = Math.max(0, Math.round(safeNum(mPc[1])));
+    }
+  }
+
+  return out;
+};
+
+const makeCommentary = ({ disziplinNr, disziplin, disziplinColor, playersRequired, playersPicked, formkarten, cardOppScore, decisionBullets }) => {
+  const pickedCount = Array.isArray(playersPicked) ? playersPicked.length : 0;
+  const pc = Math.max(2, Math.min(6, pickedCount || safeNum(playersRequired) || 2));
+
+  const cards = Array.isArray(formkarten) ? formkarten.filter(Boolean) : [];
+  const hasCards = cards.length > 0;
+
+  const parsed = parseHybridFromBullets(decisionBullets);
+
+  const lines = [];
+
+  // 1) What happened
+  if (!hasCards) {
+    lines.push('Keine Formkarten zugewiesen.');
+  } else {
+    lines.push(`Formkarten: ${cards.join(', ')}`);
+  }
+
+  // 2) Core rule explanation (matches allocator logic in preview code)
+  lines.push('Heuristik: Positive Karten werden bevorzugt auf die stärksten Slots verteilt, negative Karten auf die schwächsten Slots (nach Slot-Strength).');
+
+  // 3) Why this could still be a 2er-slot
+  // Efficiency note: in this game, card impact scales with playercount; so smaller pc is "inefficient".
+  // But allocator still uses strength first; so a pc=2 slot can get positives if it is strong.
+  const pcEffTxt = pc <= 2 ? 'niedrig (pc=2 → Karten-Multiplikator klein)' : pc <= 3 ? 'mittel' : 'hoch';
+  lines.push(`Karten-Effizienz (Multiplikator): ${pcEffTxt}.`);
+
+  if (parsed.hybridScore != null) {
+    lines.push(`Slot-Strength Indikator (aus Bullets): HybridScore=${parsed.hybridScore.toFixed(2)}${parsed.ppCeiling != null ? ` · PP-ceiling=${parsed.ppCeiling.toFixed(1)}` : ''}${parsed.pc != null ? ` · pc=${parsed.pc}` : ''}`);
+  } else {
+    lines.push(`Slot-Strength Indikator: Kartenpotenzial=${safeNum(cardOppScore).toFixed(2)} (HybridScore nicht geparst)`);
+  }
+
+  // 4) Color + opportunity
+  if (disziplinColor) {
+    lines.push(`Diszi-Farbe: ${disziplinColor} · Kartenpotenzial=${safeNum(cardOppScore).toFixed(2)} (Color-Match/Negativ-Parking Bias).`);
+  } else {
+    lines.push(`Kartenpotenzial=${safeNum(cardOppScore).toFixed(2)}.`);
+  }
+
+  // 5) Direct answer hint
+  if (pc === 2 && hasCards) {
+    lines.push('Warum trotz pc=2 positive Karten? → Weil der Slot im Gesamtvergleich als "stark" bewertet wurde und Positiv-Karten nach Stärke verteilt werden (pc beeinflusst eher die Effizienz, nicht die Priorität).');
+  }
+
+  return lines.join('\n');
+};
+
+const rows = [];
+for (const st of res.spieltage || []) {
+  const spieltag = safeNum(st.spieltag);
+
+  const pushRow = (disziplinNr, d) => {
+    const key = `${spieltag}|${disziplinNr}`;
+
+    const playersPicked = Array.isArray(d?.playersPicked) ? d.playersPicked : [];
+    const formkartenArr = Array.isArray(d?.formkarten) ? d.formkarten : [];
+
+    rows.push({
+      key,
+      spieltag,
+      disziplinNr,
+      disziplin: d?.disziplin || null,
+
+      players: fmtList(playersPicked),
+      formkarten: fmtList(formkartenArr),
+      captain: !!d?.captain,
+      cardOppScore: safeNum(d?.cardOpportunity?.score),
+      decision_bullets: fmtBullets(d?.decisionBullets),
+
+      // New: commentary
+      kommentar: makeCommentary({
+        disziplinNr,
+        disziplin: d?.disziplin || null,
+        disziplinColor: d?.disziplinColor || d?.cardOpportunity?.disziColor || null,
+        playersRequired: d?.playersRequired || null,
+        playersPicked,
+        formkarten: formkartenArr,
+        cardOppScore: safeNum(d?.cardOpportunity?.score),
+        decisionBullets: d?.decisionBullets || [] }) });
+
+
+  };
+
+  pushRow(1, st.d1 || {});
+  pushRow(2, st.d2 || {});
+}
+
+return rows;

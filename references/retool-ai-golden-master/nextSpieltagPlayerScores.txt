@@ -1,0 +1,13 @@
+// term: playerExhaustionMap
+// id: nextSpieltagPlayerScores
+// type: function
+// subtype: Function
+// page: Saisonstand
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for playerExhaustionMap.
+

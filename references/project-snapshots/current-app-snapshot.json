@@ -1,0 +1,2579 @@
+{
+  "metadata": {
+    "generatedAt": "2026-06-09T22:57:27.309Z",
+    "gitBranch": null,
+    "gitCommit": null,
+    "packageName": "baue-einen-lokalen-web-app-prototyp",
+    "nodeVersion": "v24.16.0",
+    "npmVersion": "11.13.0",
+    "projectRoot": "/Users/chrisfalk/Documents/Codex/Olympiade der Welten"
+  },
+  "appStructure": {
+    "routes": [
+      {
+        "file": "app/api/ai/market-apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/market-apply"
+      },
+      {
+        "file": "app/api/ai/market-plan-apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/market-plan-apply"
+      },
+      {
+        "file": "app/api/ai/market-plan-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/market-plan-preview"
+      },
+      {
+        "file": "app/api/ai/needs-picks-compare/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/needs-picks-compare"
+      },
+      {
+        "file": "app/api/ai/picks-audit-reset/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/picks-audit-reset"
+      },
+      {
+        "file": "app/api/ai/picks-import/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/picks-import"
+      },
+      {
+        "file": "app/api/ai/picks-run/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/picks-run"
+      },
+      {
+        "file": "app/api/ai/roster-fill/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/roster-fill"
+      },
+      {
+        "file": "app/api/ai/sell-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/ai/sell-preview"
+      },
+      {
+        "file": "app/api/lineups/legacy/ai-batch-apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/ai-batch-apply"
+      },
+      {
+        "file": "app/api/lineups/legacy/ai-batch-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/ai-batch-preview"
+      },
+      {
+        "file": "app/api/lineups/legacy/ai-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/ai-preview"
+      },
+      {
+        "file": "app/api/lineups/legacy/form-cards/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/form-cards"
+      },
+      {
+        "file": "app/api/lineups/legacy/lab-context/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/lab-context"
+      },
+      {
+        "file": "app/api/lineups/legacy/preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy/preview"
+      },
+      {
+        "file": "app/api/lineups/legacy/route.ts",
+        "kind": "route",
+        "appPath": "/api/lineups/legacy"
+      },
+      {
+        "file": "app/api/media/player-portrait/[playerId]/route.ts",
+        "kind": "route",
+        "appPath": "/api/media/player-portrait/[playerId]"
+      },
+      {
+        "file": "app/api/media/team-logo/[teamId]/route.ts",
+        "kind": "route",
+        "appPath": "/api/media/team-logo/[teamId]"
+      },
+      {
+        "file": "app/api/resolve/legacy-matchday-apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/resolve/legacy-matchday-apply"
+      },
+      {
+        "file": "app/api/resolve/legacy-matchday-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/resolve/legacy-matchday-preview"
+      },
+      {
+        "file": "app/api/season/advance-matchday/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/advance-matchday"
+      },
+      {
+        "file": "app/api/season/cash-prize-apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/cash-prize-apply"
+      },
+      {
+        "file": "app/api/season/management-overview/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/management-overview"
+      },
+      {
+        "file": "app/api/season/matchday-auto-run/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/matchday-auto-run"
+      },
+      {
+        "file": "app/api/season/matchday-mvp-score/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/matchday-mvp-score"
+      },
+      {
+        "file": "app/api/season/prize-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/prize-preview"
+      },
+      {
+        "file": "app/api/season/season-snapshot/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/season-snapshot"
+      },
+      {
+        "file": "app/api/season/standings-overview/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/standings-overview"
+      },
+      {
+        "file": "app/api/season/whole-season-dry-run/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/whole-season-dry-run"
+      },
+      {
+        "file": "app/api/season/whole-season-dryrun/route.ts",
+        "kind": "route",
+        "appPath": "/api/season/whole-season-dryrun"
+      },
+      {
+        "file": "app/api/singleplayer-state/route.ts",
+        "kind": "route",
+        "appPath": "/api/singleplayer-state"
+      },
+      {
+        "file": "app/api/standings/apply/route.ts",
+        "kind": "route",
+        "appPath": "/api/standings/apply"
+      },
+      {
+        "file": "app/api/standings/preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/standings/preview"
+      },
+      {
+        "file": "app/api/transfermarkt/ai-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/ai-preview"
+      },
+      {
+        "file": "app/api/transfermarkt/ai-sell-preview/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/ai-sell-preview"
+      },
+      {
+        "file": "app/api/transfermarkt/buy/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/buy"
+      },
+      {
+        "file": "app/api/transfermarkt/free-agents/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/free-agents"
+      },
+      {
+        "file": "app/api/transfermarkt/history/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/history"
+      },
+      {
+        "file": "app/api/transfermarkt/recap/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/recap"
+      },
+      {
+        "file": "app/api/transfermarkt/sell/route.ts",
+        "kind": "route",
+        "appPath": "/api/transfermarkt/sell"
+      },
+      {
+        "file": "app/foundation/legacy-lineup-lab/page.tsx",
+        "kind": "page",
+        "appPath": "/foundation/legacy-lineup-lab"
+      },
+      {
+        "file": "app/foundation/legacy-resolve-lab/page.tsx",
+        "kind": "page",
+        "appPath": "/foundation/legacy-resolve-lab"
+      },
+      {
+        "file": "app/foundation/page.tsx",
+        "kind": "page",
+        "appPath": "/foundation"
+      },
+      {
+        "file": "app/foundation/transfermarkt-lab/page.tsx",
+        "kind": "page",
+        "appPath": "/foundation/transfermarkt-lab"
+      },
+      {
+        "file": "app/layout.tsx",
+        "kind": "layout",
+        "appPath": "/"
+      },
+      {
+        "file": "app/page.tsx",
+        "kind": "page",
+        "appPath": "/"
+      },
+      {
+        "file": "app/room/[roomCode]/page.tsx",
+        "kind": "page",
+        "appPath": "/room/[roomCode]"
+      }
+    ],
+    "foundationTabs": [
+      {
+        "id": "season",
+        "label": "Saisonstand"
+      },
+      {
+        "id": "lineup",
+        "label": "Einsatzliste"
+      },
+      {
+        "id": "teams",
+        "label": "Teams"
+      },
+      {
+        "id": "players",
+        "label": "Spieler"
+      },
+      {
+        "id": "ranks",
+        "label": "Ranks"
+      },
+      {
+        "id": "diszis",
+        "label": "Diszis"
+      },
+      {
+        "id": "prize",
+        "label": "Preisgeld"
+      },
+      {
+        "id": "market",
+        "label": "Transfermarkt"
+      },
+      {
+        "id": "history",
+        "label": "Transferhistorie"
+      },
+      {
+        "id": "cockpit",
+        "label": "Spieltag"
+      },
+      {
+        "id": "generator",
+        "label": "Player Generator"
+      },
+      {
+        "id": "teamSettings",
+        "label": "Team Settings"
+      },
+      {
+        "id": "admin",
+        "label": "Admin"
+      },
+      {
+        "id": "seasonPreview",
+        "label": "Saisonstand Preview"
+      },
+      {
+        "id": "debug",
+        "label": "Debug"
+      },
+      {
+        "id": "season",
+        "label": "Saisonstand"
+      },
+      {
+        "id": "lineup",
+        "label": "Einsatzliste"
+      },
+      {
+        "id": "market",
+        "label": "Transfermarkt"
+      },
+      {
+        "id": "prize",
+        "label": "Preisgeld"
+      }
+    ],
+    "apiEndpoints": [
+      "/api/ai/market-apply",
+      "/api/ai/market-plan-apply",
+      "/api/ai/market-plan-preview",
+      "/api/ai/needs-picks-compare",
+      "/api/ai/picks-audit-reset",
+      "/api/ai/picks-import",
+      "/api/ai/picks-run",
+      "/api/ai/roster-fill",
+      "/api/ai/sell-preview",
+      "/api/lineups/legacy/ai-batch-apply",
+      "/api/lineups/legacy/ai-batch-preview",
+      "/api/lineups/legacy/ai-preview",
+      "/api/lineups/legacy/form-cards",
+      "/api/lineups/legacy/lab-context",
+      "/api/lineups/legacy/preview",
+      "/api/lineups/legacy",
+      "/api/media/player-portrait/[playerId]",
+      "/api/media/team-logo/[teamId]",
+      "/api/resolve/legacy-matchday-apply",
+      "/api/resolve/legacy-matchday-preview",
+      "/api/season/advance-matchday",
+      "/api/season/cash-prize-apply",
+      "/api/season/management-overview",
+      "/api/season/matchday-auto-run",
+      "/api/season/matchday-mvp-score",
+      "/api/season/prize-preview",
+      "/api/season/season-snapshot",
+      "/api/season/standings-overview",
+      "/api/season/whole-season-dry-run",
+      "/api/season/whole-season-dryrun",
+      "/api/singleplayer-state",
+      "/api/standings/apply",
+      "/api/standings/preview",
+      "/api/transfermarkt/ai-preview",
+      "/api/transfermarkt/ai-sell-preview",
+      "/api/transfermarkt/buy",
+      "/api/transfermarkt/free-agents",
+      "/api/transfermarkt/history",
+      "/api/transfermarkt/recap",
+      "/api/transfermarkt/sell"
+    ]
+  },
+  "prisma": {
+    "schemaPath": "prisma/schema.prisma",
+    "models": [
+      "Save",
+      "Season",
+      "Team",
+      "TeamSeasonState",
+      "Player",
+      "PlayerAttribute",
+      "PlayerDisciplineScore",
+      "ActivePlayer",
+      "Discipline",
+      "DisciplineWeight",
+      "SeasonDisciplineConfig",
+      "Matchday",
+      "Lineup",
+      "LineupSlot",
+      "MatchdayResult",
+      "DisciplineResult",
+      "PlayerDisciplinePerformance",
+      "DisciplineHighlight",
+      "ResultAuditLog",
+      "Transfer"
+    ],
+    "enums": [
+      "SaveStatus",
+      "SeasonStatus",
+      "DisciplineCategory",
+      "MatchdayStatus",
+      "LineupStatus",
+      "DisciplineSide",
+      "ActivePlayerStatus",
+      "ActivePlayerRoleTag",
+      "TransferType",
+      "MatchdayResultStatus",
+      "LegacyReadinessStatus",
+      "PlayerAttributeKey"
+    ],
+    "migrations": [
+      "prisma/migrations/20260602191500_init_supabase_foundation/migration.sql",
+      "prisma/migrations/20260602203000_expand_discipline_weight_attributes/migration.sql",
+      "prisma/migrations/20260603070447_legacy_lineup_phase1/migration.sql",
+      "prisma/migrations/20260603184500_four_discipline_tags/migration.sql",
+      "prisma/migrations/20260603193000_add_legacy_matchday_result_tables/migration.sql",
+      "prisma/migrations/20260603221500_add_player_sheet_display_fields/migration.sql",
+      "prisma/migrations/20260604111500_add_player_attribute_sheet_fields/migration.sql",
+      "prisma/migrations/20260604124500_remove_player_age_nationality/migration.sql",
+      "prisma/migrations/20260604132000_drop_alliance_table/migration.sql"
+    ],
+    "syncScripts": [
+      {
+        "name": "db:generate",
+        "command": "tsx scripts/run-prisma-with-env.ts generate"
+      },
+      {
+        "name": "db:migrate",
+        "command": "tsx scripts/run-prisma-with-env.ts migrate deploy"
+      },
+      {
+        "name": "db:seed",
+        "command": "prisma db seed"
+      },
+      {
+        "name": "db:studio",
+        "command": "tsx scripts/run-prisma-with-env.ts studio"
+      },
+      {
+        "name": "db:smoke-studio-models",
+        "command": "tsx scripts/check-prisma-studio-models.ts"
+      },
+      {
+        "name": "db:check-foundation-projection",
+        "command": "tsx scripts/check-foundation-projection.ts"
+      },
+      {
+        "name": "db:compare-foundation-sources",
+        "command": "tsx scripts/compare-foundation-sources.ts"
+      },
+      {
+        "name": "player:sync-attribute-sheet-db",
+        "command": "tsx scripts/sync-player-attribute-sheet-to-db.ts"
+      },
+      {
+        "name": "player:sync-sheet-columns-db",
+        "command": "tsx scripts/sync-player-sheet-columns-to-db.ts"
+      },
+      {
+        "name": "season:sync-start-cash-db",
+        "command": "tsx scripts/sync-team-start-cash-to-db.ts"
+      }
+    ]
+  },
+  "services": [
+    {
+      "file": "lib/market/contract-negotiation-preview.ts",
+      "group": "lib/market",
+      "exports": [
+        "ContractNegotiationPreview",
+        "ContractSchedulePreview",
+        "TeamContractSeasonRow",
+        "TeamContractSeasonTable",
+        "buildContractNegotiationDraft",
+        "buildContractNegotiationPreview",
+        "buildContractSalarySchedule",
+        "buildTeamContractSeasonTable",
+        "calculateOpenBuyoutCost"
+      ],
+      "description": "contract-negotiation-preview module",
+      "lineCount": 553
+    },
+    {
+      "file": "lib/market/transfer-history-read-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransferHistoryItem",
+        "TransferHistoryReadParams",
+        "TransferHistoryReadResult",
+        "listTransferHistory"
+      ],
+      "description": "Read-only transfer history listing service.",
+      "lineCount": 284
+    },
+    {
+      "file": "lib/market/transfer-market.ts",
+      "group": "lib/market",
+      "exports": [
+        "evaluateTransferListing"
+      ],
+      "description": "transfer-market module",
+      "lineCount": 49
+    },
+    {
+      "file": "lib/market/transfer-recap-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransferRecapEntry",
+        "TransferRecapParams",
+        "TransferRecapResult",
+        "TransferRecapSource",
+        "TransferRecapSummary",
+        "TransferRecapTeamSummary",
+        "buildTransferRecap"
+      ],
+      "description": "transfer-recap-service module",
+      "lineCount": 633
+    },
+    {
+      "file": "lib/market/transfer-window-policy.ts",
+      "group": "lib/market",
+      "exports": [
+        "LOCAL_TRANSFER_WINDOW_PHASE",
+        "LocalTransferWindowPhase",
+        "isExplicitLocalTransferWindowPhase"
+      ],
+      "description": "transfer-window-policy module",
+      "lineCount": 8
+    },
+    {
+      "file": "lib/market/transfermarkt-buy-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktBuyExecuteResult",
+        "TransfermarktBuyParams",
+        "TransfermarktBuyPreview",
+        "executeTransfermarktBuy",
+        "previewTransfermarktBuy"
+      ],
+      "description": "Transfermarkt buy write path with preview/execute flow.",
+      "lineCount": 368
+    },
+    {
+      "file": "lib/market/transfermarkt-column-contract.ts",
+      "group": "lib/market",
+      "exports": [
+        "TRANSFERMARKT_COLUMN_CONTRACT",
+        "TransfermarktColumnContractEntry",
+        "TransfermarktColumnGroup",
+        "getTransfermarktAdvancedColumns",
+        "getTransfermarktBaseColumns"
+      ],
+      "description": "transfermarkt-column-contract module",
+      "lineCount": 77
+    },
+    {
+      "file": "lib/market/transfermarkt-fit.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktFitBreakdown",
+        "calculateTransfermarktFit",
+        "getTransfermarktBracket",
+        "hasMercenaryTrait",
+        "normalizeTransfermarktToken",
+        "toStringArray"
+      ],
+      "description": "transfermarkt-fit module",
+      "lineCount": 136
+    },
+    {
+      "file": "lib/market/transfermarkt-formatting-contract.ts",
+      "group": "lib/market",
+      "exports": [
+        "TRANSFERMARKT_CONFIRMED_COLOR_RULES",
+        "TRANSFERMARKT_UNKNOWN_COLOR_RULES",
+        "TransfermarktColorRule",
+        "TransfermarktFormattingCertainty",
+        "TransfermarktTier",
+        "formatTransfermarktCurrency",
+        "formatTransfermarktPoints",
+        "formatTransfermarktRatio",
+        "getConfirmedAxisHeatStyle",
+        "getConfirmedTierStyle",
+        "isUnknownFormattingRule"
+      ],
+      "description": "transfermarkt-formatting-contract module",
+      "lineCount": 126
+    },
+    {
+      "file": "lib/market/transfermarkt-lab.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktLabMode",
+        "getTransfermarktLabMode",
+        "getTransfermarktPortraitModel",
+        "isBrowserSafePortrait"
+      ],
+      "description": "Lab or debug helper for visual verification.",
+      "lineCount": 65
+    },
+    {
+      "file": "lib/market/transfermarkt-local-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "executeLocalTransfermarktBuy",
+        "executeLocalTransfermarktSell",
+        "listLocalTransferHistory",
+        "listLocalTransfermarktFreeAgents",
+        "previewLocalTransfermarktBuy",
+        "previewLocalTransfermarktSell"
+      ],
+      "description": "transfermarkt-local-service module",
+      "lineCount": 784
+    },
+    {
+      "file": "lib/market/transfermarkt-read-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktAvailabilityReason",
+        "TransfermarktDisciplineScore",
+        "TransfermarktFreeAgentItem",
+        "TransfermarktReadParams",
+        "TransfermarktReadResult",
+        "TransfermarktSalaryStatus",
+        "listTransfermarktFreeAgents",
+        "resolveTransfermarktScope"
+      ],
+      "description": "Read-only data loading service.",
+      "lineCount": 712
+    },
+    {
+      "file": "lib/market/transfermarkt-sell-service.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktSellExecuteResult",
+        "TransfermarktSellParams",
+        "TransfermarktSellPreview",
+        "executeTransfermarktSell",
+        "previewTransfermarktSell"
+      ],
+      "description": "Transfermarkt sell write path with preview/execute flow.",
+      "lineCount": 445
+    },
+    {
+      "file": "lib/market/transfermarkt-sheet-stats.ts",
+      "group": "lib/market",
+      "exports": [
+        "TransfermarktRatingTier",
+        "TransfermarktSheetStats",
+        "getTransfermarktTierFromPoints",
+        "loadTransfermarktSheetStats"
+      ],
+      "description": "Sheet import or audit helper.",
+      "lineCount": 199
+    },
+    {
+      "file": "lib/market/types.ts",
+      "group": "lib/market",
+      "exports": [
+        "TeamTransferLens",
+        "TransferAffordabilityStatus",
+        "TransferEvaluation",
+        "TransferMarketSnapshot",
+        "TransferRosterPressureStatus"
+      ],
+      "description": "types module",
+      "lineCount": 29
+    },
+    {
+      "file": "lib/standings/season-standings-sheet.ts",
+      "group": "lib/standings",
+      "exports": [
+        "LOCAL_PRIZE_MONEY_CSV_PATH",
+        "LOCAL_PRIZE_MONEY_JSON_PATH",
+        "LOCAL_RANK_TO_POINTS_CSV_PATH",
+        "LOCAL_RANK_TO_POINTS_JSON_PATH",
+        "LOCAL_STANDINGS_CSV_PATH",
+        "LOCAL_STANDINGS_JSON_PATH",
+        "PrizeMoneySheetRow",
+        "RankToPointsSheetRow",
+        "SEASON_STANDINGS_DISCIPLINE_COLUMNS",
+        "SEASON_STANDINGS_SHEET_URL",
+        "SeasonStandingsDisciplineColumn",
+        "SeasonStandingsSheetRow",
+        "SeasonStandingsTeamMappingAudit",
+        "StandingsDetectedTabKind",
+        "StandingsSheetAudit",
+        "StandingsSourceKind",
+        "StandingsSourceOptions",
+        "TeamMappingCandidate",
+        "detectSheetTabKind",
+        "extractSeasonStandingsDisciplineValues",
+        "inspectPrizeMoneySheet",
+        "inspectRankToPointsSheet",
+        "inspectSeasonStandingsSheet",
+        "mapSeasonStandingsRowsToTeams"
+      ],
+      "description": "Sheet import or audit helper.",
+      "lineCount": 922
+    },
+    {
+      "file": "lib/standings/standings-apply-service.ts",
+      "group": "lib/standings",
+      "exports": [
+        "STANDINGS_APPLY_CONFIRM_TOKEN",
+        "StandingsApplyParams",
+        "StandingsApplyPlannedChange",
+        "StandingsApplyResult",
+        "executeStandingsApply",
+        "previewStandingsApply"
+      ],
+      "description": "standings-apply-service module",
+      "lineCount": 351
+    },
+    {
+      "file": "lib/standings/standings-preview-engine.ts",
+      "group": "lib/standings",
+      "exports": [
+        "StandingsPreviewInput",
+        "StandingsPreviewItem",
+        "StandingsPreviewResult",
+        "StandingsPreviewResultStatus",
+        "StandingsPreviewSource",
+        "StandingsPreviewTieGroup",
+        "buildStandingsPreview"
+      ],
+      "description": "Read-only preview engine.",
+      "lineCount": 770
+    },
+    {
+      "file": "lib/standings/standings-tiebreaker-policy.ts",
+      "group": "lib/standings",
+      "exports": [
+        "DEFAULT_SHARED_RANK_MODE",
+        "DEFAULT_STANDINGS_TIEBREAKER_MODE",
+        "SharedRankMode",
+        "StandingTieGroup",
+        "StandingsTieBreakItem",
+        "StandingsTieBreakerMode",
+        "detectStandingTieGroups",
+        "resolveMatchdayRankWithTiePolicy",
+        "resolveProjectedRankWithTiePolicy"
+      ],
+      "description": "standings-tiebreaker-policy module",
+      "lineCount": 228
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-context-loader.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LegacyLineupContextLoader",
+        "buildLegacyLineupPreview",
+        "loadLegacyLineupContext"
+      ],
+      "description": "legacy-lineup-context-loader module",
+      "lineCount": 559
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-lab.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LegacyLineupLabPlayerOption",
+        "LegacyLineupLabSlot",
+        "buildLegacyLineupEntriesFromSelections",
+        "buildLegacyLineupLabPlayerOptions",
+        "buildLegacyLineupLabSlots",
+        "findDuplicateActivePlayerSelections"
+      ],
+      "description": "Lab or debug helper for visual verification.",
+      "lineCount": 127
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-local-service.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "calculateLocalLegacyLineupPreview",
+        "generateLocalLegacyFormCardsForSeason",
+        "getLocalLegacyLineupDraft",
+        "loadLocalLegacyLineupContext",
+        "loadLocalLegacyLineupContextFromGameState",
+        "saveLocalLegacyLineupDraft"
+      ],
+      "description": "legacy-lineup-local-service module",
+      "lineCount": 829
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-modifiers.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "buildGeneratedFormCardRecordsForSeason",
+        "buildGeneratedFormCardRecordsForTeam",
+        "calculateFormModifierForSide",
+        "calculateMutatorModifierForSide",
+        "calculateMvpForcedMutatorModifierForSide",
+        "createDefaultLineupDraftModifiers",
+        "ensureLocalFormCardsForSeason",
+        "getFormCardColorForDisciplineCategory",
+        "getLegacyFormCardSourceSummary",
+        "getLegacyMutatorSourceSummary",
+        "getLegacyMutatorTraitOptions",
+        "getModifierSelectionForSide",
+        "getPlayerClassColor",
+        "getTeamFormCardOptions",
+        "normalizeLineupDraftModifiers"
+      ],
+      "description": "legacy-lineup-modifiers module",
+      "lineCount": 486
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-repository.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LegacyLineupRepository"
+      ],
+      "description": "Persistence or read repository.",
+      "lineCount": 233
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-service.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LegacyLineupService",
+        "buildLegacyLineupPreview"
+      ],
+      "description": "legacy-lineup-service module",
+      "lineCount": 157
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-types.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "DisciplineSide",
+        "LegacyActivePlayerRef",
+        "LegacyDisciplineScoreRef",
+        "LegacyFormCardOption",
+        "LegacyLineupContext",
+        "LegacyLineupContextLoadResult",
+        "LegacyLineupContextMeta",
+        "LegacyLineupDraft",
+        "LegacyLineupEntryInput",
+        "LegacyLineupEntryScore",
+        "LegacyLineupKeyParams",
+        "LegacyLineupLoadedContext",
+        "LegacyLineupPreview",
+        "LegacyLineupPreviewResult",
+        "LegacyLineupRepositoryContext",
+        "LegacyLineupSaveResult",
+        "LegacyLineupScoreResult",
+        "LegacyLineupValidationOptions",
+        "LegacyLineupValidationResult",
+        "LegacyModifierEffectStatus",
+        "LegacyModifierSelectionSourceStatus",
+        "LegacyModifierSourceSummary",
+        "LegacyMutatorSlotEffect",
+        "LegacyMutatorTraitOption",
+        "LegacyResolveMutatorMode",
+        "LegacyResolvePreviewOptions",
+        "LegacyRosterPlayerRef"
+      ],
+      "description": "legacy-lineup-types module",
+      "lineCount": 407
+    },
+    {
+      "file": "lib/lineups/legacy-lineup-validator.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "validateLegacyLineupContext"
+      ],
+      "description": "legacy-lineup-validator module",
+      "lineCount": 133
+    },
+    {
+      "file": "lib/lineups/legacy-matchday-readiness.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LegacyMatchdayReadiness",
+        "LegacyMatchdayReadinessStatus",
+        "buildLegacyMatchdayReadiness"
+      ],
+      "description": "legacy-matchday-readiness module",
+      "lineCount": 184
+    },
+    {
+      "file": "lib/lineups/legacy-score-engine.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "buildLegacyLineupAggregateScore",
+        "scoreLegacyLineupDisciplineSide"
+      ],
+      "description": "legacy-score-engine module",
+      "lineCount": 258
+    },
+    {
+      "file": "lib/lineups/lineup-discipline-contract.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "LineupContractSourceStatus",
+        "LineupDisciplineContractEntry",
+        "MatchdayDisciplineSlotContract",
+        "MatchdayLineupContract",
+        "SEASON_CAPTAIN_SLOTS",
+        "buildLineupDisciplineContract",
+        "buildMatchdayLineupContract",
+        "countSeasonCaptains",
+        "countSeasonLineupDisciplineSides",
+        "createLineupDraftId",
+        "formatLineupTeamStatusLabel",
+        "getSeasonCaptainDisciplineSideKeys"
+      ],
+      "description": "lineup-discipline-contract module",
+      "lineCount": 228
+    },
+    {
+      "file": "lib/lineups/team-discipline-ranks.ts",
+      "group": "lib/lineups",
+      "exports": [
+        "TeamDisciplineRankEntry",
+        "TeamDisciplineRankSourceStatus",
+        "computeTeamDisciplineRanks",
+        "normalizeLineupDisciplineFieldName"
+      ],
+      "description": "team-discipline-ranks module",
+      "lineCount": 128
+    },
+    {
+      "file": "lib/resolve/legacy-matchday-readiness.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "LegacyMatchdayReadiness",
+        "LegacyMatchdayReadinessStatus",
+        "buildLegacyMatchdayReadiness"
+      ],
+      "description": "legacy-matchday-readiness module",
+      "lineCount": 173
+    },
+    {
+      "file": "lib/resolve/legacy-matchday-resolve-engine.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "buildLegacyMatchdayResolvePreview"
+      ],
+      "description": "legacy-matchday-resolve-engine module",
+      "lineCount": 536
+    },
+    {
+      "file": "lib/resolve/legacy-matchday-resolve-types.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "DisciplineHighlightCandidate",
+        "DisciplineResolvePreview",
+        "DisciplineTeamResolvePreview",
+        "LegacyMatchdayResolvePreview",
+        "PlayerPerformancePreview",
+        "ResolveHighlightType",
+        "ResolvePreviewStatus",
+        "TeamResolvePreview"
+      ],
+      "description": "legacy-matchday-resolve-types module",
+      "lineCount": 147
+    },
+    {
+      "file": "lib/resolve/legacy-matchday-result-apply-service.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "APPLY_CONFIRM_TOKEN",
+        "ApplyLegacyMatchdayResultFailure",
+        "ApplyLegacyMatchdayResultParams",
+        "ApplyLegacyMatchdayResultResult",
+        "ApplyLegacyMatchdayResultSuccess",
+        "LegacyMatchdayApplySource",
+        "LegacyMatchdayResultApplyService",
+        "LegacyMatchdayScopeParams",
+        "PrepareLegacyMatchdayResultApplyResult",
+        "prepareLegacyMatchdayResultApply"
+      ],
+      "description": "legacy-matchday-result-apply-service module",
+      "lineCount": 641
+    },
+    {
+      "file": "lib/resolve/legacy-matchday-result-mapper.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "DisciplineHighlightWritePayload",
+        "DisciplineResultWritePayload",
+        "LegacyMatchdayResultMapperInput",
+        "LegacyMatchdayResultWriteBundle",
+        "MatchdayResultPayloadStatus",
+        "MatchdayResultWritePayload",
+        "PlayerDisciplinePerformanceWritePayload",
+        "ResultAuditLogWritePayload",
+        "ResultReadinessStatus",
+        "mapLegacyMatchdayResolvePreviewToResultPayload"
+      ],
+      "description": "Mapping layer between sources and app models.",
+      "lineCount": 284
+    },
+    {
+      "file": "lib/resolve/legacy-resolve-lab.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "ResolveLabPlayerCatalogRow",
+        "ResolveLabSummary",
+        "ResolveLabTeamDetail",
+        "ResolveLabTeamEntryRow",
+        "ResolveLabTopPlayerRow",
+        "buildResolveLabPlayerCatalog",
+        "buildResolveLabSummary",
+        "buildResolveLabTeamDetails",
+        "buildResolveLabTopPlayersBySide",
+        "getHighlightCandidatesForTeam",
+        "getTopPlayerNameForTeam"
+      ],
+      "description": "Lab or debug helper for visual verification.",
+      "lineCount": 274
+    },
+    {
+      "file": "lib/resolve/rank-to-points.ts",
+      "group": "lib/resolve",
+      "exports": [
+        "DistributeRankPointsResult",
+        "DistributedRankPointEntry",
+        "RankToPointsSourceStatus",
+        "distributeRankPointsToPlayers",
+        "getRankToPointsValue",
+        "resolveDisciplinePlayerCount"
+      ],
+      "description": "rank-to-points module",
+      "lineCount": 212
+    },
+    {
+      "file": "lib/db/read/foundation-read-projection.ts",
+      "group": "lib/db",
+      "exports": [
+        "projectFoundationStateFromPrisma"
+      ],
+      "description": "foundation-read-projection module",
+      "lineCount": 298
+    },
+    {
+      "file": "lib/db/read/foundation-read-repository.ts",
+      "group": "lib/db",
+      "exports": [
+        "PrismaFoundationReadSnapshot",
+        "loadFoundationSnapshotFromPrisma"
+      ],
+      "description": "Persistence or read repository.",
+      "lineCount": 275
+    },
+    {
+      "file": "lib/db/seed/mappers.ts",
+      "group": "lib/db",
+      "exports": [
+        "buildActivePlayerId",
+        "buildDisciplineWeightId",
+        "buildPlayerAttributeId",
+        "buildPlayerDisciplineScoreId",
+        "buildSeasonDisciplineConfigId",
+        "buildTeamSeasonStateId",
+        "mapActivePlayerRecord",
+        "mapDisciplineRecord",
+        "mapDisciplineWeightRecord",
+        "mapPlayerAttributeRecord",
+        "mapPlayerDisciplineScoreRecords",
+        "mapPlayerRecord",
+        "mapSeasonDisciplineConfigRecord",
+        "mapTeamRecord",
+        "mapTeamSeasonStateRecord",
+        "toFloat",
+        "toInt",
+        "toNullableString"
+      ],
+      "description": "Mapping layer between sources and app models.",
+      "lineCount": 225
+    },
+    {
+      "file": "lib/db/seed/seedSources.ts",
+      "group": "lib/db",
+      "exports": [
+        "DisciplineWeightSeedRow",
+        "SeasonDisciplineConfigSeedRow",
+        "disciplineWeightSeedRows",
+        "seasonDisciplineConfigSeedRows"
+      ],
+      "description": "seedSources module",
+      "lineCount": 58
+    },
+    {
+      "file": "lib/data/dataAdapter.ts",
+      "group": "lib/data",
+      "exports": [
+        "buildRosterSeedData",
+        "createGameStateFromSeed",
+        "createSaveGameState",
+        "foundationSeedDisciplines",
+        "foundationSeedFixtures",
+        "foundationSeedMatchdays",
+        "foundationSeedSeason",
+        "loadFreshSeasonOneSeedData",
+        "loadSeedData",
+        "loadSourcePlayerTeamMapping",
+        "loadSourceTeamIdentities",
+        "loadSourceTeams",
+        "summarizeTeamRosterCoverage"
+      ],
+      "description": "dataAdapter module",
+      "lineCount": 491
+    },
+    {
+      "file": "lib/data/mediaAssets.ts",
+      "group": "lib/data",
+      "exports": [
+        "attachPlayerPortraitPath",
+        "attachTeamLogoPath",
+        "getMediaMappingSummary",
+        "getPlayerPortraitBrowserUrl",
+        "getPlayerPortraitPathById",
+        "getTeamLogoBrowserUrl",
+        "getTeamLogoPathById",
+        "hydrateGameStateMedia"
+      ],
+      "description": "mediaAssets module",
+      "lineCount": 80
+    },
+    {
+      "file": "lib/data/olyDataTypes.ts",
+      "group": "lib/data",
+      "exports": [
+        "CashPrizeApplyLogRecord",
+        "Contract",
+        "ContractNegotiationDraft",
+        "ContractNegotiationDraftStatus",
+        "ContractShape",
+        "ContractStatus",
+        "ContractYearSalary",
+        "Discipline",
+        "DisciplineCategory",
+        "DisciplineHighlightRecord",
+        "DisciplineResultRecord",
+        "Fixture",
+        "FormCardColor",
+        "FormCardRecord",
+        "GameLogEntry",
+        "GameState",
+        "LegacyResultReadinessStatus",
+        "LineupDisciplineSide",
+        "LineupDraft",
+        "LineupDraftEntry",
+        "LineupDraftModifierSide",
+        "LineupDraftModifiers",
+        "MappingReport",
+        "MappingWarning",
+        "MappingWarningType",
+        "Matchday",
+        "MatchdayAdvanceLogRecord",
+        "MatchdayResultRecord",
+        "MatchdayResultStatus",
+        "MatchdayState",
+        "OlySeedData",
+        "Player",
+        "PlayerAttributeSheetStats",
+        "PlayerDisciplinePerformanceRecord",
+        "PlayerGeneratorArchetype",
+        "PlayerGeneratorAttributeName",
+        "PlayerGeneratorAttributes",
+        "PlayerGeneratorAxisIntent",
+        "PlayerGeneratorAxisIntentValue",
+        "PlayerGeneratorAxisSource",
+        "PlayerGeneratorClassEngineStatus",
+        "PlayerGeneratorClassSuggestion",
+        "PlayerGeneratorDraft",
+        "PlayerGeneratorDraftStatusView",
+        "PlayerGeneratorEngineStatusView",
+        "PlayerGeneratorFormulaSourceStatus",
+        "PlayerGeneratorFormulaStatusSnapshot",
+        "PlayerGeneratorInput",
+        "PlayerGeneratorMarketValueEngineStatus",
+        "PlayerGeneratorMarketValueStatus",
+        "PlayerGeneratorMatchState",
+        "PlayerGeneratorQualityWarningCode",
+        "PlayerGeneratorRandomness",
+        "PlayerGeneratorResolvedAxisIntent",
+        "PlayerGeneratorRoleIntent",
+        "PlayerGeneratorSalaryEngineStatus",
+        "PlayerGeneratorSalaryStatus",
+        "PlayerGeneratorSaveStatusView",
+        "PlayerGeneratorStrengthTier",
+        "PlayerGeneratorValidationStatus",
+        "ResultAuditLogRecord",
+        "RosterEntry",
+        "SaveGameState",
+        "Season",
+        "SeasonDisciplineScheduleEntry",
+        "SeasonDisciplineScheduleSlot",
+        "SeasonDisciplineScheduleSourceStatus",
+        "SeasonSnapshotPlayerDisciplineBreakdownRecord",
+        "SeasonSnapshotPlayerPerformanceRecord",
+        "SeasonSnapshotPlayerTeamBreakdownRecord",
+        "SeasonSnapshotRecord",
+        "SeasonSnapshotTeamRecord",
+        "SeasonSnapshotTransferRecord",
+        "SeasonState",
+        "StandingRecord",
+        "StandingsApplyAuditLogRecord",
+        "Team",
+        "TeamArchetype",
+        "TeamControlMode",
+        "TeamControlSettings",
+        "TeamIdentity",
+        "TeamIdentityOverride",
+        "TeamStrategyBias",
+        "TeamStrategyLevel",
+        "TeamStrategyProfile",
+        "TransferHistoryEntry",
+        "TransferListing",
+        "TransferListingStatus"
+      ],
+      "description": "olyDataTypes module",
+      "lineCount": 965
+    },
+    {
+      "file": "lib/data/player-economy-display.ts",
+      "group": "lib/data",
+      "exports": [
+        "getImportedPlayerDisplayMarketValue",
+        "getImportedPlayerDisplaySalary"
+      ],
+      "description": "player-economy-display module",
+      "lineCount": 22
+    },
+    {
+      "file": "lib/data/player-ovr-scale.ts",
+      "group": "lib/data",
+      "exports": [
+        "getImportedPlayerOvrScale",
+        "normalizePlayerOvr"
+      ],
+      "description": "player-ovr-scale module",
+      "lineCount": 33
+    },
+    {
+      "file": "lib/data/playerAttributeSheet.ts",
+      "group": "lib/data",
+      "exports": [
+        "ATTRIBUTE_SHEET_ALIASES",
+        "PlayerAttributeSheetRow",
+        "fetchPlayerAttributeSheetRows",
+        "normalizeAttributeSheetName",
+        "summarizeMissingAttributeRows"
+      ],
+      "description": "playerAttributeSheet module",
+      "lineCount": 173
+    },
+    {
+      "file": "lib/data/playerAttributeSheetData.ts",
+      "group": "lib/data",
+      "exports": [
+        "getGeneratedPlayerAttributeRows",
+        "hydratePlayerWithAttributeSheet",
+        "hydratePlayersWithAttributeSheet"
+      ],
+      "description": "playerAttributeSheetData module",
+      "lineCount": 75
+    },
+    {
+      "file": "lib/data/playerStatsAdapter.ts",
+      "group": "lib/data",
+      "exports": [
+        "enrichPlayerDerivedStats",
+        "loadImportedPlayerStats",
+        "selectImportedPlayers"
+      ],
+      "description": "playerStatsAdapter module",
+      "lineCount": 26
+    }
+  ],
+  "scripts": [
+    {
+      "name": "next:clean",
+      "command": "tsx scripts/clean-next-runtime.ts",
+      "tags": [
+        "build/clean"
+      ]
+    },
+    {
+      "name": "build:clean",
+      "command": "npm run next:clean && npm run build",
+      "tags": [
+        "build/clean"
+      ]
+    },
+    {
+      "name": "dev",
+      "command": "tsx server.ts",
+      "tags": []
+    },
+    {
+      "name": "dev:clean",
+      "command": "./scripts/run-foundation-dev.sh --clean",
+      "tags": [
+        "build/clean"
+      ]
+    },
+    {
+      "name": "play",
+      "command": "./scripts/start-oly-game.sh",
+      "tags": []
+    },
+    {
+      "name": "build",
+      "command": "tsx scripts/run-next-build.ts",
+      "tags": [
+        "build/clean"
+      ]
+    },
+    {
+      "name": "start",
+      "command": "NODE_ENV=production tsx server.ts",
+      "tags": []
+    },
+    {
+      "name": "lint",
+      "command": "eslint .",
+      "tags": []
+    },
+    {
+      "name": "test",
+      "command": "vitest run",
+      "tags": []
+    },
+    {
+      "name": "db:generate",
+      "command": "tsx scripts/run-prisma-with-env.ts generate",
+      "tags": []
+    },
+    {
+      "name": "db:migrate",
+      "command": "tsx scripts/run-prisma-with-env.ts migrate deploy",
+      "tags": [
+        "db"
+      ]
+    },
+    {
+      "name": "db:seed",
+      "command": "prisma db seed",
+      "tags": [
+        "db"
+      ]
+    },
+    {
+      "name": "db:studio",
+      "command": "tsx scripts/run-prisma-with-env.ts studio",
+      "tags": [
+        "db"
+      ]
+    },
+    {
+      "name": "db:smoke-studio-models",
+      "command": "tsx scripts/check-prisma-studio-models.ts",
+      "tags": [
+        "smoke",
+        "db"
+      ]
+    },
+    {
+      "name": "project:audit-write-safety",
+      "command": "node --import tsx scripts/audit-write-safety.ts",
+      "tags": [
+        "audit",
+        "sync/import"
+      ]
+    },
+    {
+      "name": "project:check-mirror",
+      "command": "tsx scripts/check-project-mirror-consistency.ts",
+      "tags": []
+    },
+    {
+      "name": "project:export-snapshot",
+      "command": "tsx scripts/export-project-snapshot.ts",
+      "tags": []
+    },
+    {
+      "name": "app:check-live",
+      "command": "tsx scripts/check-local-live-app.ts",
+      "tags": []
+    },
+    {
+      "name": "db:check-foundation-projection",
+      "command": "tsx scripts/check-foundation-projection.ts",
+      "tags": []
+    },
+    {
+      "name": "db:compare-foundation-sources",
+      "command": "tsx scripts/compare-foundation-sources.ts",
+      "tags": []
+    },
+    {
+      "name": "lineup:check-context",
+      "command": "tsx scripts/check-legacy-lineup-context.ts",
+      "tags": []
+    },
+    {
+      "name": "lineup:check-readiness",
+      "command": "tsx scripts/check-legacy-matchday-readiness.ts",
+      "tags": []
+    },
+    {
+      "name": "lineup:smoke",
+      "command": "tsx scripts/smoke-legacy-lineup.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "transfermarkt:audit",
+      "command": "tsx scripts/audit-transfermarkt-state.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "transfermarkt:audit-buy-integrity",
+      "command": "tsx scripts/audit-transfermarkt-buy-integrity.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "transfermarkt:smoke-buy",
+      "command": "tsx scripts/smoke-transfermarkt-buy.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "transfermarkt:smoke-sell",
+      "command": "tsx scripts/smoke-transfermarkt-sell.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "golden:compare",
+      "command": "tsx scripts/compare-golden-master-fixture.ts",
+      "tags": []
+    },
+    {
+      "name": "ai:audit-full-repick",
+      "command": "tsx scripts/export-ai-full-repick-audit.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "player:audit-economy-source",
+      "command": "tsx scripts/audit-player-economy-source.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "player:audit-attributes-source",
+      "command": "node ./scripts/audit-player-attributes-source.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "player:audit-retool-attribute-mapping",
+      "command": "tsx scripts/audit-retool-attribute-mapping.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "player:sync-attribute-sheet-db",
+      "command": "tsx scripts/sync-player-attribute-sheet-to-db.ts",
+      "tags": [
+        "sync/import"
+      ]
+    },
+    {
+      "name": "player:sync-sheet-columns-db",
+      "command": "tsx scripts/sync-player-sheet-columns-to-db.ts",
+      "tags": [
+        "sync/import"
+      ]
+    },
+    {
+      "name": "season:audit-start-cash",
+      "command": "tsx scripts/audit-team-start-cash.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "season:sync-start-cash-db",
+      "command": "tsx scripts/sync-team-start-cash-to-db.ts",
+      "tags": [
+        "sync/import"
+      ]
+    },
+    {
+      "name": "season:smoke-management-loop",
+      "command": "npm exec -- tsx scripts/smoke-season-management-loop.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "season:smoke-matchday-auto-run",
+      "command": "tsx scripts/smoke-matchday-auto-run.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "season:smoke-matchday-mvp-score",
+      "command": "tsx scripts/smoke-matchday-mvp-score.ts --execute",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "season:smoke-whole-season-dry-run",
+      "command": "tsx scripts/smoke-whole-season-dry-run.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "season:smoke-local-loop",
+      "command": "tsx scripts/smoke-local-season-loop.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "season:smoke-local-multi-loop",
+      "command": "tsx scripts/smoke-local-multi-matchday-loop.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "resolve:check-legacy-matchday",
+      "command": "tsx scripts/check-legacy-matchday-resolve.ts",
+      "tags": []
+    },
+    {
+      "name": "resolve:smoke-preview",
+      "command": "tsx scripts/smoke-resolve-preview.ts",
+      "tags": [
+        "smoke",
+        "preview"
+      ]
+    },
+    {
+      "name": "resolve:smoke-apply",
+      "command": "node --import tsx scripts/smoke-legacy-matchday-result-apply.ts",
+      "tags": [
+        "smoke",
+        "sync/import"
+      ]
+    },
+    {
+      "name": "standings:audit-sheet",
+      "command": "tsx scripts/audit-season-standings-sheet.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "standings:export-sheets",
+      "command": "tsx scripts/export-standings-sheet-sources.ts",
+      "tags": []
+    },
+    {
+      "name": "prize:audit-normalized",
+      "command": "tsx scripts/audit-prize-money-normalized.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "standings:audit-tiebreaker",
+      "command": "tsx scripts/audit-standings-tiebreaker.ts",
+      "tags": [
+        "audit"
+      ]
+    },
+    {
+      "name": "standings:smoke-apply",
+      "command": "tsx scripts/smoke-standings-apply.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "cash:smoke-prize-apply",
+      "command": "tsx scripts/smoke-cash-prize-apply.ts",
+      "tags": [
+        "smoke"
+      ]
+    },
+    {
+      "name": "retool:extract-ai",
+      "command": "tsx scripts/extract-retool-ai-golden-master.ts",
+      "tags": [
+        "retool extract"
+      ]
+    },
+    {
+      "name": "retool:extract-player-attributes",
+      "command": "tsx scripts/extract-retool-player-attributes.ts",
+      "tags": [
+        "retool extract"
+      ]
+    },
+    {
+      "name": "retool:extract-transfermarkt-columns",
+      "command": "tsx scripts/extract-retool-transfermarkt-columns.ts",
+      "tags": [
+        "retool extract"
+      ]
+    },
+    {
+      "name": "retool:extract-standings-economy",
+      "command": "tsx scripts/extract-retool-standings-economy.ts",
+      "tags": [
+        "retool extract"
+      ]
+    }
+  ],
+  "tests": {
+    "files": [
+      "tests/ai-golden-master-configs.test.ts",
+      "tests/ai-legacy-lineup-api.test.ts",
+      "tests/ai-legacy-lineup.test.ts",
+      "tests/ai-market-plan-apply-api.test.ts",
+      "tests/ai-market-plan-apply-service.test.ts",
+      "tests/ai-market-plan-preview-api.test.ts",
+      "tests/ai-market-plan-preview.test.ts",
+      "tests/ai-needs-picks-compare-api.test.ts",
+      "tests/ai-needs-picks-compare-service.test.ts",
+      "tests/ai-needs.test.ts",
+      "tests/ai-pick-audit-reset-service.test.ts",
+      "tests/ai-pick-import-service.test.ts",
+      "tests/ai-picks-run-api.test.ts",
+      "tests/ai-picks-run-service.test.ts",
+      "tests/ai-transfermarkt-preview-api.test.ts",
+      "tests/ai-transfermarkt-preview.test.ts",
+      "tests/ai-transfermarkt-sell-preview-api.test.ts",
+      "tests/ai-transfermarkt-sell-preview.test.ts",
+      "tests/audit-prize-money-normalized.test.ts",
+      "tests/audit-retool-attribute-mapping.test.ts",
+      "tests/auto-roster-fill-api.test.ts",
+      "tests/auto-roster-fill-service.test.ts",
+      "tests/cash-prize-apply-api.test.ts",
+      "tests/cash-prize-apply-contract.test.ts",
+      "tests/cash-prize-apply-service.test.ts",
+      "tests/compare-golden-master-fixture-script.test.ts",
+      "tests/data-adapter.test.ts",
+      "tests/extract-retool-player-attributes.test.ts",
+      "tests/extract-retool-transfermarkt-columns.test.ts",
+      "tests/foundation-transfermarkt-ui-contract.test.ts",
+      "tests/game-engine.test.ts",
+      "tests/golden-master-fixture-diff.test.ts",
+      "tests/legacy-lineup-api.test.ts",
+      "tests/legacy-lineup-context-loader.test.ts",
+      "tests/legacy-lineup-lab.test.ts",
+      "tests/legacy-lineup-local-service.test.ts",
+      "tests/legacy-lineup-service.test.ts",
+      "tests/legacy-lineup.test.ts",
+      "tests/legacy-matchday-apply-api.test.ts",
+      "tests/legacy-matchday-preview-api.test.ts",
+      "tests/legacy-matchday-readiness.test.ts",
+      "tests/legacy-matchday-resolve.test.ts",
+      "tests/legacy-matchday-result-apply-service.test.ts",
+      "tests/legacy-matchday-result-mapper.test.ts",
+      "tests/legacy-resolve-lab-ui-contract.test.ts",
+      "tests/lineup-discipline-contract.test.ts",
+      "tests/matchday-auto-run-service.test.ts",
+      "tests/matchday-mvp-score-api.test.ts",
+      "tests/matchday-mvp-scoring-service.test.ts",
+      "tests/matchday-progress-api.test.ts",
+      "tests/matchday-progress-service.test.ts",
+      "tests/media-assets.test.ts",
+      "tests/player-attribute-sheet.test.ts",
+      "tests/player-attributes-source-audit.test.ts",
+      "tests/player-detail-drawer.test.ts",
+      "tests/player-economy-compare-service.test.ts",
+      "tests/player-economy-source-audit.test.ts",
+      "tests/player-formulas-market-value.test.ts",
+      "tests/player-formulas-salary.test.ts",
+      "tests/player-generator-service.test.ts",
+      "tests/player-stats-adapter.test.ts",
+      "tests/prisma-studio-contract.test.ts",
+      "tests/prize-money-preview-api.test.ts",
+      "tests/prize-money-preview.test.ts",
+      "tests/room-store.test.ts",
+      "tests/saisonstand-column-contract.test.ts",
+      "tests/season-management-loop.test.ts",
+      "tests/season-management-sheet.test.ts",
+      "tests/season-points-ledger.test.ts",
+      "tests/season-snapshot-service.test.ts",
+      "tests/season-standings-sheet.test.ts",
+      "tests/singleplayer-state.test.ts",
+      "tests/standings-apply-api.test.ts",
+      "tests/standings-apply-service.test.ts",
+      "tests/standings-online-version-contract.test.ts",
+      "tests/standings-preview-api.test.ts",
+      "tests/standings-preview-engine.test.ts",
+      "tests/standings-tiebreaker-policy.test.ts",
+      "tests/team-discipline-ranks.test.ts",
+      "tests/team-management-overview.test.ts",
+      "tests/team-start-cash.test.ts",
+      "tests/trait-training-signal.test.ts",
+      "tests/transfer-history-api.test.ts",
+      "tests/transfer-history-read-service.test.ts",
+      "tests/transfer-market.test.ts",
+      "tests/transfer-recap-service.test.ts",
+      "tests/transfermarkt-audit-script.test.ts",
+      "tests/transfermarkt-buy-api.test.ts",
+      "tests/transfermarkt-buy-integrity-audit.test.ts",
+      "tests/transfermarkt-buy-service.test.ts",
+      "tests/transfermarkt-column-contract.test.ts",
+      "tests/transfermarkt-formatting-contract.test.ts",
+      "tests/transfermarkt-free-agents-api.test.ts",
+      "tests/transfermarkt-lab.test.ts",
+      "tests/transfermarkt-local-service.test.ts",
+      "tests/transfermarkt-read-service.test.ts",
+      "tests/transfermarkt-sell-api.test.ts",
+      "tests/transfermarkt-sell-service.test.ts",
+      "tests/whole-season-dryrun-service.test.ts"
+    ],
+    "groups": {
+      "Transfermarkt": [
+        "tests/ai-transfermarkt-preview-api.test.ts",
+        "tests/ai-transfermarkt-preview.test.ts",
+        "tests/ai-transfermarkt-sell-preview-api.test.ts",
+        "tests/ai-transfermarkt-sell-preview.test.ts",
+        "tests/extract-retool-transfermarkt-columns.test.ts",
+        "tests/foundation-transfermarkt-ui-contract.test.ts",
+        "tests/transfer-history-api.test.ts",
+        "tests/transfer-history-read-service.test.ts",
+        "tests/transfermarkt-audit-script.test.ts",
+        "tests/transfermarkt-buy-api.test.ts",
+        "tests/transfermarkt-buy-integrity-audit.test.ts",
+        "tests/transfermarkt-buy-service.test.ts",
+        "tests/transfermarkt-column-contract.test.ts",
+        "tests/transfermarkt-formatting-contract.test.ts",
+        "tests/transfermarkt-free-agents-api.test.ts",
+        "tests/transfermarkt-lab.test.ts",
+        "tests/transfermarkt-local-service.test.ts",
+        "tests/transfermarkt-read-service.test.ts",
+        "tests/transfermarkt-sell-api.test.ts",
+        "tests/transfermarkt-sell-service.test.ts"
+      ],
+      "Buy": [
+        "tests/transfermarkt-buy-api.test.ts",
+        "tests/transfermarkt-buy-integrity-audit.test.ts",
+        "tests/transfermarkt-buy-service.test.ts"
+      ],
+      "Sell": [
+        "tests/ai-transfermarkt-sell-preview-api.test.ts",
+        "tests/ai-transfermarkt-sell-preview.test.ts",
+        "tests/transfermarkt-sell-api.test.ts",
+        "tests/transfermarkt-sell-service.test.ts"
+      ],
+      "History": [
+        "tests/transfer-history-api.test.ts",
+        "tests/transfer-history-read-service.test.ts"
+      ],
+      "Standings Preview": [
+        "tests/standings-online-version-contract.test.ts",
+        "tests/standings-preview-api.test.ts",
+        "tests/standings-preview-engine.test.ts"
+      ],
+      "Attribute Import": [
+        "tests/audit-retool-attribute-mapping.test.ts",
+        "tests/extract-retool-player-attributes.test.ts",
+        "tests/player-attribute-sheet.test.ts",
+        "tests/player-attributes-source-audit.test.ts"
+      ],
+      "Formatting": [
+        "tests/legacy-lineup-lab.test.ts",
+        "tests/legacy-resolve-lab-ui-contract.test.ts",
+        "tests/saisonstand-column-contract.test.ts",
+        "tests/transfermarkt-column-contract.test.ts",
+        "tests/transfermarkt-formatting-contract.test.ts",
+        "tests/transfermarkt-lab.test.ts"
+      ],
+      "Build Stability": [
+        "tests/ai-golden-master-configs.test.ts",
+        "tests/compare-golden-master-fixture-script.test.ts",
+        "tests/golden-master-fixture-diff.test.ts",
+        "tests/prisma-studio-contract.test.ts",
+        "tests/singleplayer-state.test.ts"
+      ]
+    },
+    "lastKnownStatus": "unknown at export time; run npm test for current status"
+  },
+  "docs": [
+    {
+      "file": "docs/AI_AUTOMATION_STATUS.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 2,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 1,
+        "standings": 1,
+        "cash": 3,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/AI_GOLDEN_MASTER_DEPENDENCY_MAP.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 0,
+        "cash": 24,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/AI_GOLDEN_MASTER_PORTING_SPEC.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 3,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 4,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 0,
+        "cash": 21,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/AI_GOLDEN_MASTER_TEST_CASES.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 2,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 12,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/AI_LEGACY_LOGIC_INVENTORY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 3,
+        "no writes": 0,
+        "transfermarkt": 3,
+        "standings": 0,
+        "cash": 9,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/AUTO_RESOLVE_HIGHLIGHTS_AND_VISUALIZATION_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/CASH_PRIZE_APPLY_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 1,
+        "standings": 7,
+        "cash": 17,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/CASH_PRIZE_SYSTEM_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 2,
+        "cash": 10,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/CURRENT_PROJECT_HANDOFF.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 9,
+        "standings": 5,
+        "cash": 8,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/DATABASE.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 1
+      }
+    },
+    {
+      "file": "docs/DATABASE_OPEN_QUESTIONS.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/GOLDEN_MASTER_FIXTURE_SPEC.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 1,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 3,
+        "cash": 3,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/GOLDEN_MASTER_VERIFICATION_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 1,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 5,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/LEGACY_LINEUP_LAB_TEST_CHECKLIST.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 1,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/LEGACY_MATCHDAY_RESOLVE_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 6,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/LEGACY_MATCHDAY_RESULT_APPLY_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 6,
+        "cash": 4,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/LOCAL_LIVE_VERIFICATION_CHECKLIST.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 11,
+        "standings": 2,
+        "cash": 1,
+        "attributes": 1
+      }
+    },
+    {
+      "file": "docs/MASTERPLAN_EXECUTION_RULES.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 7,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/MIRROR_WORKSPACE_NOTES.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/NEXT_BUILD_STABILITY_NOTES.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/PLAYER_ARRAY_FIELDS_POLICY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/PLAYER_ATTRIBUTES_12_IMPORT_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 4,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 3
+      }
+    },
+    {
+      "file": "docs/PLAYER_GENERATOR_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 2
+      }
+    },
+    {
+      "file": "docs/README_RETOOL_SYSTEM.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 12,
+        "standings": 2,
+        "cash": 4,
+        "attributes": 8
+      }
+    },
+    {
+      "file": "docs/RETOOL_ASK_MODE_QUESTIONS_STANDINGS_ECONOMY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 4,
+        "cash": 11,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/SCRIPT_TOOLING_REGISTRY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 18,
+        "standings": 29,
+        "cash": 14,
+        "attributes": 5
+      }
+    },
+    {
+      "file": "docs/SEASON_STANDINGS_SHEET_IMPORT_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 5,
+        "cash": 7,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/STANDINGS_APPLY_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 2,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 21,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/STANDINGS_ECONOMY_DEPENDENCY_MAP.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 1,
+        "standings": 2,
+        "cash": 2,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/STANDINGS_PREVIEW_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 3,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/STANDINGS_RETOOL_RULES_EXTRACT.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 1,
+        "TODO": 0,
+        "offline_legacy_only": 1,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 5,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/STANDINGS_TIEBREAKER_POLICY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 5,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/SYSTEM_MAP_RETOOL_REFERENCE.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 1,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TEAM_SETTINGS_AND_STRATEGY_PROFILES.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 0,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRAINING_AND_PROGRESSION_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_BUY_SERVICE_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 1,
+        "cash": 13,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_COLUMN_MAPPING.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 6,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 11,
+        "standings": 0,
+        "cash": 1,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_FORMATTING_MAP.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 1,
+        "no writes": 0,
+        "transfermarkt": 5,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_MVP_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 21,
+        "standings": 1,
+        "cash": 6,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_RETOOL_GAP.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 3,
+        "standings": 0,
+        "cash": 0,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFERMARKT_SELL_SERVICE_PLAN.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 2,
+        "standings": 2,
+        "cash": 17,
+        "attributes": 0
+      }
+    },
+    {
+      "file": "docs/TRANSFER_WINDOW_POLICY.md",
+      "keywordHits": {
+        "DONE": 0,
+        "BLOCKED": 0,
+        "TODO": 0,
+        "offline_legacy_only": 0,
+        "Golden Master": 0,
+        "no writes": 0,
+        "transfermarkt": 0,
+        "standings": 2,
+        "cash": 2,
+        "attributes": 0
+      }
+    }
+  ],
+  "knownCompletedBlocks": [
+    "Transfermarkt read-only",
+    "Buy-Service",
+    "Sell-Service",
+    "Transferhistorie",
+    "echte 12 Attribute importiert",
+    "negative Fit-Werte möglich",
+    "Build-Stabilität",
+    "Standings Preview read-only",
+    "Mutating Script Safety Audit"
+  ],
+  "knownBlockers": [
+    "Standings/Punkte-Sheet-Mapping fehlt",
+    "Rank-to-points Mapping fehlt",
+    "Cash/Preisgeld-Tabelle fehlt",
+    "VIP Wal Attribute fehlen",
+    "mögliche Offline-Legacy-Spuren entfernen",
+    "Golden-Master-Fit fehlt"
+  ],
+  "safetyFlags": [
+    {
+      "path": "lib/market/transfermarkt-buy-service.ts",
+      "kind": "buy write path",
+      "dryRunDefault": true,
+      "writeFlagRequired": true,
+      "allowedTables": [
+        "Transfer",
+        "ActivePlayer",
+        "TeamSeasonState"
+      ],
+      "forbiddenTables": [
+        "SQLite",
+        "standings",
+        "season prize",
+        "AI"
+      ]
+    },
+    {
+      "path": "lib/market/transfermarkt-sell-service.ts",
+      "kind": "sell write path",
+      "dryRunDefault": true,
+      "writeFlagRequired": true,
+      "allowedTables": [
+        "Transfer",
+        "ActivePlayer",
+        "TeamSeasonState"
+      ],
+      "forbiddenTables": [
+        "SQLite",
+        "standings",
+        "season prize",
+        "AI"
+      ]
+    },
+    {
+      "path": "lib/resolve/legacy-matchday-result-apply-service.ts",
+      "kind": "result apply path",
+      "dryRunDefault": true,
+      "writeFlagRequired": true,
+      "allowedTables": [
+        "local SeasonState.matchdayResults",
+        "local SeasonState.disciplineResults",
+        "local SeasonState.playerDisciplinePerformances",
+        "local SeasonState.disciplineHighlights",
+        "local SeasonState.resultAuditLogs"
+      ],
+      "forbiddenTables": [
+        "Prisma MatchdayResult",
+        "TeamSeasonState standings",
+        "cash",
+        "price money"
+      ]
+    },
+    {
+      "path": "scripts/sync-player-attribute-sheet-to-db.ts",
+      "kind": "attribute sync script",
+      "dryRunDefault": true,
+      "writeFlagRequired": true,
+      "allowedTables": [
+        "PlayerAttribute"
+      ],
+      "forbiddenTables": [
+        "transfermarkt",
+        "standings",
+        "SQLite"
+      ]
+    },
+    {
+      "path": "scripts/sync-player-sheet-columns-to-db.ts",
+      "kind": "player sheet sync script",
+      "dryRunDefault": true,
+      "writeFlagRequired": true,
+      "allowedTables": [
+        "Player",
+        "PlayerAttribute"
+      ],
+      "forbiddenTables": [
+        "transfermarkt",
+        "standings",
+        "SQLite"
+      ]
+    },
+    {
+      "path": "prisma/seed.ts",
+      "kind": "seed path",
+      "dryRunDefault": false,
+      "writeFlagRequired": false,
+      "allowedTables": [
+        "foundation seed tables"
+      ],
+      "forbiddenTables": [
+        "production-only destructive reset"
+      ]
+    },
+    {
+      "path": "prisma/migrations",
+      "kind": "migration path",
+      "dryRunDefault": false,
+      "writeFlagRequired": false,
+      "allowedTables": [
+        "schema-level changes"
+      ],
+      "forbiddenTables": [
+        "blind resets",
+        "drops without explicit intent"
+      ]
+    }
+  ],
+  "masterplanRules": {
+    "snapshotAfterPhase": true,
+    "phase0AWriteSafetyAudit": true,
+    "standingsApplyGateActive": true,
+    "noLegacyTermsInActiveStandings": true,
+    "buildGatePerPhase": [
+      "npm run next:clean",
+      "npm run build",
+      "npm run build",
+      "npm test",
+      "npm run db:smoke-studio-models (bei Prisma/DB-Aenderungen)"
+    ]
+  },
+  "sourceZip": {
+    "created": false,
+    "path": null,
+    "reason": "git unavailable"
+  }
+}

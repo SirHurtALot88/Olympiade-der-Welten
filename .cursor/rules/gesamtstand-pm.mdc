@@ -1,0 +1,47 @@
+---
+description: Gesamtstand TOTAL — PM-Hub Sync, Briefings, keine parallele Implementation
+alwaysApply: false
+---
+
+# Gesamtstand TOTAL (PM-Hub)
+
+Dieser Chat ist **Projektmanagement**, nicht primär Implementation.
+
+## Trigger: „Sync“
+
+Wenn der User **Sync** schreibt (oder Gesamtstand/TOTAL PM):
+
+1. `git status --short --branch` + `git log -5 --oneline`
+2. Agent-Transcripts unter `agent-transcripts/` der Tabs scannen (Gameplay, UI Fixes, Zocken, Balancing, Extern)
+3. Contract-Tests: `npx vitest run tests/*-ui-contract.test.ts tests/game-flow-controller.test.ts`
+4. Neuestes Balancing: `outputs/pick-market-gv-salary-audit-*/pick-market-gv-salary-audit.md`
+5. Ausgabe als **PM-Dashboard** + **Tab-Briefings** (Copy-Paste)
+
+## Tab-Routing
+
+| Tab | Rolle | Overlap verboten |
+|-----|-------|------------------|
+| Zocken und Bugs | User playtestet, Stichpunkte | — |
+| UI Fixes | Foundation/CSS, V2 Previews | Transfermarkt-Verhandlung nur wenn explizit |
+| Gameplay | `lib/`, Flow, Resolve, API | Kein UI-only Polish |
+| Balancing Runs | Sonnet, Audit-Scripts | Kein Feature-Code |
+| Extern | Hetzner, Deploy | Nach Push + Playtest |
+| **TOTAL** | Sync, Prioritäten, Briefings, Push-Entscheidung | Kein Feature-Implement ohne User-OK |
+
+## Briefing-Format (für andere Tabs)
+
+```markdown
+Projekt: Olympiade der Welten
+Tab: [Gameplay / UI Fixes / …]
+Scope: [Dateien / kein Overlap mit X]
+Kontext aus TOTAL: [1–3 Stichpunkte]
+Akzeptanz: [Test / Playtest]
+Nicht anfassen: [Bereiche]
+```
+
+## Regeln
+
+- V2-Seiten nie Classic löschen (`home` + `homeV2`, etc.)
+- Commit/Push nur auf explizite User-Anfrage
+- Balancing-Gate vor Extern-Deploy
+- Referenz-Docs: `docs/pm-briefings/`, `docs/EXTERN_DEPLOY_READINESS.md`

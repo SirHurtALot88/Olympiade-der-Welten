@@ -1,0 +1,35 @@
+{
+  "source": "retool",
+  "capturedAt": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "saveId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "seasonId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "matchdayId": "matchday-1",
+  "inputs": {
+    "exportIntent": "standings_before_matchday",
+    "requiredTeams": [
+      "best_matchday_team",
+      "mid_matchday_team",
+      "underfilled_or_bad_team"
+    ]
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+    "teams": [
+      {
+        "teamId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "teamName": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "rank": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "points": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "pointDiff": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "cash": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "totalScore": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Keine Fake-Werte eintragen.",
+    "Diese Datei muss aus echtem Retool-Output vor dem Matchday befuellt werden."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

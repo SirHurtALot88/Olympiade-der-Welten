@@ -1,0 +1,142 @@
+import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { FieldRaceLedgerEntry } from "@/lib/foundation/build-field-race-ledger";
+
+export type HomeV2TopPlayerCard = {
+  playerId: string;
+  name: string;
+  portraitUrl: string | null;
+  portraitPlaceholderUrl?: string | null;
+  portraitInitials: string;
+  rosterRank: number;
+  playerOvr: number | null;
+  playerPps: number | null;
+  playerMvs: number | null;
+  pow: number | null;
+  spe: number | null;
+  men: number | null;
+  soc: number | null;
+  contractLength: number | null;
+  marketValue: number | null;
+  highlight?: "top" | "prospect" | null;
+  ovrRank?: number | null;
+  mvsRank?: number | null;
+  ppsRank?: number | null;
+  caRating: number | null;
+  poRangeMin: number | null;
+  poRangeMax: number | null;
+  /** CA/PO-Sterne für die "Neuer Look" Portraitkarte (`NlAbilityStars`) — eigener Kader, immer bekannt. */
+  caStars?: number | string | null;
+  poStars?: number | string | null;
+};
+
+export const HOME_V2_TOP_PLAYER_COUNT = 6;
+
+export type HomeV2FacilitySnapshot = {
+  facilityId: string;
+  label: string;
+  level: number;
+  maxLevel: number;
+};
+
+export type HomeV2ScheduleItem = {
+  matchdayId: string;
+  label: string;
+  isCurrent: boolean;
+  isPast: boolean;
+};
+
+export type HomeV2InboxItem = {
+  id: string;
+  title: string;
+  detail: string;
+  severity: "critical" | "warning" | "info";
+};
+
+export type HomeV2TodayCard = {
+  key: string;
+  kicker: string;
+  title: string;
+  detail: string;
+  tone: "ready" | "warning" | "info";
+};
+
+export type HomeV2BoardObjective = {
+  objectiveId: string;
+  label: string;
+  status: string;
+  currentValue: string | number | boolean | null;
+  targetValue: string | number | boolean | null;
+};
+
+export type HomeV2ClientProps = {
+  teamName: string;
+  teamCode: string;
+  teamLogoUrl: string | null;
+  teamLogoInitials: string;
+  seasonName: string;
+  matchdayLabel: string;
+  managerLabel: string;
+  controlModeLabel: string;
+  rank: number | null;
+  points: number | null;
+  cash: number | null;
+  salaryTotal: number | null;
+  guv: number | null;
+  rosterCount: number;
+  /**
+   * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate (Summe
+   * `installmentPerSeason` über aktive Kredite) und Restschuld. Eigenes Team
+   * only (Fog of War, siehe `use-credits-view-model.ts`) — `null`/`0` bei
+   * fehlenden Krediten, dann bleibt der Chip ausgeblendet.
+   */
+  loanInstallment: number | null;
+  outstandingDebt: number | null;
+  /**
+   * Wave D · Feld-Rennen (fog-sicher, additiv, optional):
+   * - `fieldRaceForm`: letzte bis zu 5 Spieltage des eigenen Teams (D1).
+   * - `fieldRacePlayedMatchdays`: bereits gespielte Spieltage (Frühphasen-Zustand).
+   * - `fieldRaceTotalTeams`: Feldgröße für die feld-relative Rang-KPI (D2).
+   * - `fieldRaceRankMovement`: Δ Gesamtrang vs. letztem Spieltag (D4).
+   */
+  fieldRaceForm?: FieldRaceLedgerEntry[];
+  fieldRacePlayedMatchdays?: number;
+  fieldRaceTotalTeams?: number;
+  fieldRaceRankMovement?: number | null;
+  gmStoryLabel: string | null;
+  gmStoryDetail: string | null;
+  gmStoryTone: string | null;
+  boardPressure: number | null;
+  boardRating: number | null;
+  nextStepLabel: string;
+  nextStepStatus: string;
+  nextStepDetail: string;
+  nextStepBlocked?: boolean;
+  warnings: string[];
+  topPlayers: HomeV2TopPlayerCard[];
+  leagueHeatPools: LeaguePlayerHeatPools;
+  facilities: HomeV2FacilitySnapshot[];
+  scheduleItems: HomeV2ScheduleItem[];
+  inboxItems: HomeV2InboxItem[];
+  inboxCriticalCount?: number;
+  todayCards: HomeV2TodayCard[];
+  boardObjectives: HomeV2BoardObjective[];
+  /**
+   * Friction fix (Generalprobe #2): true when no team is human-controlled yet
+   * (fresh save) — surfaces a dedicated CTA instead of silently hiding the
+   * generic `no_active_team` warning chip.
+   */
+  showTeamPickerCta?: boolean;
+  onOpenTeamPicker?: () => void;
+  onContinue: () => void;
+  onOpenTeams: () => void;
+  onOpenLineup: () => void;
+  onOpenMarket: () => void;
+  onOpenTraining: () => void;
+  onOpenOffice: () => void;
+  onOpenFacilities?: () => void;
+  onOpenSeason: () => void;
+  onOpenInbox: () => void;
+  onCompleteInboxItem?: (itemId: string) => void;
+  onOpenBoardObjectives?: () => void;
+  onOpenPlayer: (playerId: string) => void;
+};

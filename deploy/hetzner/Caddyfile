@@ -1,0 +1,4 @@
+{$OLY_DOMAIN} {
+	reverse_proxy oly-app:3000
+}
+

@@ -1,0 +1,36 @@
+{
+  "source": "retool",
+  "capturedAt": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "saveId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "seasonId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "matchdayId": "matchday-1",
+  "inputs": {
+    "exportIntent": "matchday_result_snapshot",
+    "requiredTeams": [
+      "best_matchday_team",
+      "mid_matchday_team",
+      "underfilled_or_bad_team"
+    ]
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+    "teamResults": [
+      {
+        "teamId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "teamName": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "matchdayRank": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "d1Score": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "d2Score": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "totalScore": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "readinessStatus": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "warnings": []
+      }
+    ]
+  },
+  "notes": [
+    "Diese Datei haelt nur echten Retool-Output.",
+    "Falls Retool mehr Felder liefert, duerfen sie ergänzt, aber nicht erfunden werden."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

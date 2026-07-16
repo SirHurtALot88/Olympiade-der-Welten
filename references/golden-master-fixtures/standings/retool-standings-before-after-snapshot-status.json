@@ -1,0 +1,34 @@
+{
+  "source": "retool",
+  "capturedAt": "2026-06-04T00:00:00.000Z",
+  "saveId": null,
+  "seasonId": null,
+  "matchdayId": null,
+  "inputs": {
+    "requestedTeams": [
+      "best_matchday_team",
+      "mid_matchday_team",
+      "underfilled_or_bad_team"
+    ]
+  },
+  "outputs": {
+    "status": "missing_from_current_export",
+    "teams": [],
+    "requiredFields": [
+      "team",
+      "rankBefore",
+      "pointsBefore",
+      "matchdayRank",
+      "matchdayTotalScore",
+      "rankAfter",
+      "pointsAfter",
+      "pointDiff",
+      "cash"
+    ]
+  },
+  "notes": [
+    "Die aktuellen lokalen Retool-Spuren belegen globale Score- und Saisonstandspfade, aber noch keine belastbaren before/after-Snapshots fuer die Online-App-Version.",
+    "Echte before/after-Outputs muessen aus Retool Ask Mode oder einem expliziten Saisonstand-Sheet-Export nachgeliefert werden."
+  ],
+  "toleratedFloatDelta": 0
+}

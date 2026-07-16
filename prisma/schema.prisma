@@ -1,0 +1,538 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum SaveStatus {
+  active
+  archived
+  template
+}
+
+enum SeasonStatus {
+  planning
+  active
+  completed
+}
+
+enum DisciplineCategory {
+  power
+  speed
+  mental
+  social
+}
+
+enum MatchdayStatus {
+  planning
+  ready
+  resolved
+}
+
+enum LineupStatus {
+  draft
+  locked
+  submitted
+  resolved
+}
+
+enum DisciplineSide {
+  d1
+  d2
+}
+
+enum ActivePlayerStatus {
+  active
+  inactive
+  injured
+  free_agent
+}
+
+enum ActivePlayerRoleTag {
+  starter
+  bench
+  prospect
+}
+
+enum TransferType {
+  buy
+  sell
+}
+
+enum MatchdayResultStatus {
+  preview_applied
+  superseded
+  voided
+}
+
+enum LegacyReadinessStatus {
+  ready
+  underfilled_roster
+  missing_lineup
+  invalid_lineup
+  missing_score_coverage
+  unknown
+}
+
+enum PlayerAttributeKey {
+  power
+  health
+  determination
+  stamina
+  speed
+  dexterity
+  awareness
+  intelligence
+  will
+  charisma
+  spirit
+  torment
+}
+
+model Save {
+  id               String            @id
+  name             String
+  status           SaveStatus
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  seasons          Season[]
+  teamSeasonStates TeamSeasonState[]
+  activePlayers    ActivePlayer[]
+  lineups          Lineup[]
+  matchdayResults  MatchdayResult[]
+  resultAuditLogs  ResultAuditLog[]
+  transfers        Transfer[]
+}
+
+model Season {
+  id                       String                   @id
+  saveId                   String
+  name                     String
+  year                     Int
+  currentMatchday          Int
+  status                   SeasonStatus            @default(planning)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  save                     Save                    @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  teamSeasonStates         TeamSeasonState[]
+  disciplineWeights        DisciplineWeight[]
+  seasonDisciplineConfigs  SeasonDisciplineConfig[]
+  matchdays                Matchday[]
+  activePlayers            ActivePlayer[]
+  lineups                  Lineup[]
+  matchdayResults          MatchdayResult[]
+  resultAuditLogs          ResultAuditLog[]
+  transfers                Transfer[]
+}
+
+model Team {
+  id                String            @id
+  shortCode         String            @unique
+  name              String            @unique
+  logoPath          String?
+  logoUrl           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  seasonStates      TeamSeasonState[]
+  activePlayers     ActivePlayer[]
+  homeMatchdays     Matchday[]        @relation("HomeTeam")
+  awayMatchdays     Matchday[]        @relation("AwayTeam")
+  lineups           Lineup[]
+  disciplineResults DisciplineResult[]
+  performances      PlayerDisciplinePerformance[]
+  highlights        DisciplineHighlight[]        @relation("HighlightTeam")
+  relatedHighlights DisciplineHighlight[]        @relation("HighlightRelatedTeam")
+  outboundTransfers Transfer[]        @relation("TransferFromTeam")
+  inboundTransfers  Transfer[]        @relation("TransferToTeam")
+}
+
+model TeamSeasonState {
+  id               String   @id
+  saveId           String
+  seasonId         String
+  teamId           String
+  cash             Int
+  budget           Int
+  humanControlled  Boolean  @default(false)
+  rosterLimit      Int
+  pow              Int
+  spe              Int
+  men              Int
+  soc              Int
+  ambition         Int
+  finances         Int
+  boardConfidence  Int
+  harmony          Int
+  manners          Int
+  popularity       Int
+  cooperation      Int
+  playerMin        Int
+  playerOpt        Int
+  sponsor          Int?
+  sourceNote       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  save             Save     @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season           Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team             Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([saveId, seasonId, teamId])
+}
+
+model Player {
+  id                     String                  @id
+  name                   String
+  portraitPath           String?
+  portraitUrl            String?
+  className              String
+  race                   String
+  alignment              String
+  gender                 String
+  referenceClass         String?
+  imageSource            String?
+  bracketLabel           String?
+  flavorEn               String
+  flavorDe               String
+  subclasses             Json
+  traitsPositive         Json
+  traitsNegative         Json
+  preferredDisciplineIds Json
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  attributes             PlayerAttribute?
+  disciplineScores       PlayerDisciplineScore[]
+  activePlayers          ActivePlayer[]
+  lineupSlots            LineupSlot[]
+  performances           PlayerDisciplinePerformance[]
+  highlights             DisciplineHighlight[]
+  transfers              Transfer[]
+}
+
+model PlayerAttribute {
+  id           String   @id
+  playerId      String   @unique
+  rating        Float
+  marketValue   Int
+  salaryDemand  Int
+  displayMarketValue Float
+  displaySalary  Float
+  cost           Int
+  upkeepBase     Int
+  pow           Float
+  spe           Float
+  men           Float
+  soc           Float
+  power         Float?
+  health        Float?
+  stamina       Float?
+  intelligence  Float?
+  awareness     Float?
+  determination Float?
+  speed         Float?
+  dexterity     Float?
+  charisma      Float?
+  will          Float?
+  spirit        Float?
+  torment       Float?
+  powerRating         String?
+  healthRating        String?
+  staminaRating       String?
+  intelligenceRating  String?
+  awarenessRating     String?
+  determinationRating String?
+  speedRating         String?
+  dexterityRating     String?
+  charismaRating      String?
+  willRating          String?
+  spiritRating        String?
+  tormentRating       String?
+  fatigue       Float
+  form          Float
+  potential     Float
+  above20       Int
+  above40       Int
+  above60       Int
+  above80       Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  player        Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model PlayerDisciplineScore {
+  id           String     @id
+  playerId     String
+  disciplineId String
+  score        Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  player       Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  discipline   Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, disciplineId])
+}
+
+model ActivePlayer {
+  id               String              @id
+  saveId           String
+  seasonId         String
+  teamId           String
+  playerId         String
+  status           ActivePlayerStatus  @default(active)
+  roleTag          ActivePlayerRoleTag
+  contractLength   Int
+  salary           Int
+  upkeep           Int
+  purchasePrice    Int?
+  currentValue     Int?
+  joinedSeasonId   String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  save             Save                @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season           Season              @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  team             Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player           Player              @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  lineupSlots      LineupSlot[]
+  performances     PlayerDisciplinePerformance[]
+
+  @@unique([saveId, seasonId, playerId])
+}
+
+model Discipline {
+  id                String                   @id
+  name              String                   @unique
+  category          DisciplineCategory
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  weights           DisciplineWeight[]
+  seasonConfigs     SeasonDisciplineConfig[]
+  playerScores      PlayerDisciplineScore[]
+  lineupSlots       LineupSlot[]
+  disciplineResults DisciplineResult[]
+  performances      PlayerDisciplinePerformance[]
+  highlights        DisciplineHighlight[]
+}
+
+model DisciplineWeight {
+  id            String              @id
+  seasonId      String?
+  disciplineId  String
+  disciplineKey String
+  attributeKey  PlayerAttributeKey
+  weightPct     Float
+  source        String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  season        Season?             @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  discipline    Discipline          @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([disciplineId, attributeKey, seasonId])
+}
+
+model SeasonDisciplineConfig {
+  id            String     @id
+  seasonId      String
+  disciplineId  String
+  originalOrder Int?
+  displayOrder  Int?
+  playerCount   Int?
+  mutator1      String?
+  mutator2      String?
+  colorGroup    String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  season        Season     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  discipline    Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, disciplineId])
+}
+
+model Matchday {
+  id         String         @id
+  seasonId   String
+  index      Int
+  label      String
+  status     MatchdayStatus @default(planning)
+  homeTeamId String?
+  awayTeamId String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  season     Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  homeTeam   Team?          @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeam   Team?          @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  lineups    Lineup[]
+  result     MatchdayResult?
+
+  @@unique([seasonId, index])
+}
+
+model Lineup {
+  id         String       @id
+  saveId     String
+  seasonId   String
+  matchdayId String
+  teamId     String
+  status     LineupStatus @default(draft)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  save       Save         @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season     Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  matchday   Matchday     @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  team       Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  slots      LineupSlot[]
+
+  @@unique([saveId, seasonId, matchdayId, teamId])
+}
+
+model LineupSlot {
+  id             String         @id
+  lineupId       String
+  disciplineId   String
+  disciplineSide DisciplineSide
+  slotIndex      Int
+  playerId       String?
+  activePlayerId String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  lineup         Lineup         @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  discipline     Discipline     @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  player         Player?        @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  activePlayer   ActivePlayer?  @relation(fields: [activePlayerId], references: [id], onDelete: SetNull)
+
+  @@unique([lineupId, disciplineId, disciplineSide, slotIndex])
+}
+
+model MatchdayResult {
+  id                       String                @id
+  saveId                   String
+  seasonId                 String
+  matchdayId               String                @unique
+  status                   MatchdayResultStatus  @default(preview_applied)
+  sourceVersion            String
+  teamsTotal               Int
+  teamsReady               Int
+  teamsUnderfilled         Int
+  teamsMissingLineup       Int
+  teamsInvalidLineup       Int                  @default(0)
+  teamsMissingScoreCoverage Int                 @default(0)
+  warningsCount            Int
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  save                     Save                  @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season                   Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  matchday                 Matchday              @relation(fields: [matchdayId], references: [id], onDelete: Cascade)
+  disciplineResults        DisciplineResult[]
+  performances             PlayerDisciplinePerformance[]
+  highlights               DisciplineHighlight[]
+  auditLogs                ResultAuditLog[]
+
+  @@unique([saveId, seasonId, matchdayId])
+}
+
+model DisciplineResult {
+  id               String                @id
+  matchdayResultId String
+  teamId           String
+  disciplineId     String
+  disciplineSide   DisciplineSide
+  rank             Int
+  baseScore        Float
+  totalScore       Float
+  readinessStatus  LegacyReadinessStatus
+  warnings         Json
+  createdAt        DateTime              @default(now())
+  matchdayResult   MatchdayResult        @relation(fields: [matchdayResultId], references: [id], onDelete: Cascade)
+  team             Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  discipline       Discipline            @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([matchdayResultId, teamId, disciplineId, disciplineSide])
+}
+
+model PlayerDisciplinePerformance {
+  id               String                @id
+  matchdayResultId String
+  teamId           String
+  playerId         String
+  activePlayerId   String?
+  disciplineId     String
+  disciplineSide   DisciplineSide
+  slotIndex        Int
+  baseValue        Float
+  finalPlayerScore Float
+  scoreContribution Float
+  rankInTeam       Int
+  rankInDiscipline Int
+  isTop10          Boolean
+  isMvpCandidate   Boolean
+  storyWeight      Float?
+  createdAt        DateTime              @default(now())
+  matchdayResult   MatchdayResult        @relation(fields: [matchdayResultId], references: [id], onDelete: Cascade)
+  team             Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player           Player                @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  activePlayer     ActivePlayer?         @relation(fields: [activePlayerId], references: [id], onDelete: SetNull)
+  discipline       Discipline            @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([matchdayResultId, teamId, disciplineId, disciplineSide, slotIndex])
+}
+
+model DisciplineHighlight {
+  id               String         @id
+  matchdayResultId String
+  disciplineId     String?
+  highlightType    String
+  teamId           String?
+  playerId         String?
+  relatedTeamId    String?
+  importanceScore  Float
+  shortSummary     String?
+  payload          Json
+  createdAt        DateTime       @default(now())
+  matchdayResult   MatchdayResult @relation(fields: [matchdayResultId], references: [id], onDelete: Cascade)
+  discipline       Discipline?    @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
+  team             Team?          @relation("HighlightTeam", fields: [teamId], references: [id], onDelete: SetNull)
+  player           Player?        @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  relatedTeam      Team?          @relation("HighlightRelatedTeam", fields: [relatedTeamId], references: [id], onDelete: SetNull)
+
+  @@index([matchdayResultId, highlightType])
+}
+
+model ResultAuditLog {
+  id               String         @id
+  saveId           String
+  seasonId         String
+  matchdayId       String
+  matchdayResultId String?
+  action           String
+  payload          Json
+  createdAt        DateTime       @default(now())
+  save             Save           @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season           Season         @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  matchdayResult   MatchdayResult? @relation(fields: [matchdayResultId], references: [id], onDelete: SetNull)
+
+  @@index([saveId, seasonId, matchdayId])
+}
+
+model Transfer {
+  id                      String       @id
+  saveId                  String
+  seasonId                String
+  playerId                String
+  fromTeamId              String?
+  toTeamId                String?
+  type                    TransferType
+  fee                     Int
+  salary                  Int
+  marketValue             Int
+  remainingContractLength Int?
+  happenedAt              DateTime
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  save                    Save         @relation(fields: [saveId], references: [id], onDelete: Cascade)
+  season                  Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  player                  Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  fromTeam                Team?        @relation("TransferFromTeam", fields: [fromTeamId], references: [id], onDelete: SetNull)
+  toTeam                  Team?        @relation("TransferToTeam", fields: [toTeamId], references: [id], onDelete: SetNull)
+}

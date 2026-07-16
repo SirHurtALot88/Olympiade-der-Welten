@@ -1,0 +1,290 @@
+[
+  {
+    "teamId": "A-A",
+    "shortCode": "A-A",
+    "name": "Armageddon Aftermath",
+    "cash": 365000,
+    "budget": 970000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "B-B",
+    "shortCode": "B-B",
+    "name": "Blazing Beasts",
+    "cash": 380000,
+    "budget": 990000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "B-P",
+    "shortCode": "B-P",
+    "name": "Black Panthers",
+    "cash": 395000,
+    "budget": 1010000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "C-S",
+    "shortCode": "C-S",
+    "name": "Cold Steel",
+    "cash": 410000,
+    "budget": 1030000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "C-C",
+    "shortCode": "C-C",
+    "name": "Cash Creators",
+    "cash": 425000,
+    "budget": 1050000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "D-L",
+    "shortCode": "D-L",
+    "name": "Dire Legion",
+    "cash": 440000,
+    "budget": 1070000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "D-P",
+    "shortCode": "D-P",
+    "name": "Death Peaches",
+    "cash": 455000,
+    "budget": 1090000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "G-G",
+    "shortCode": "G-G",
+    "name": "Golden Gladiators",
+    "cash": 470000,
+    "budget": 1110000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "H-R",
+    "shortCode": "H-R",
+    "name": "Hell Raisers",
+    "cash": 485000,
+    "budget": 1130000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "L-K",
+    "shortCode": "L-K",
+    "name": "Lost Kingdom",
+    "cash": 500000,
+    "budget": 1150000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "L-R",
+    "shortCode": "L-R",
+    "name": "Last Ride",
+    "cash": 515000,
+    "budget": 1170000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "M-M",
+    "shortCode": "M-M",
+    "name": "Mayhem Mavericks",
+    "cash": 530000,
+    "budget": 1190000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "M-S",
+    "shortCode": "M-S",
+    "name": "Mortal Sin",
+    "cash": 545000,
+    "budget": 1210000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "N-N",
+    "shortCode": "N-N",
+    "name": "Nunchuck Ninjas",
+    "cash": 560000,
+    "budget": 1230000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "N-W",
+    "shortCode": "N-W",
+    "name": "Natures Wrath",
+    "cash": 575000,
+    "budget": 1250000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "P-C",
+    "shortCode": "P-C",
+    "name": "Pirate Crew",
+    "cash": 590000,
+    "budget": 1270000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "P-S",
+    "shortCode": "P-S",
+    "name": "Project Suicide",
+    "cash": 605000,
+    "budget": 1290000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "R-C",
+    "shortCode": "R-C",
+    "name": "Royal Court",
+    "cash": 620000,
+    "budget": 1310000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "R-L",
+    "shortCode": "R-L",
+    "name": "Raging Lunatics",
+    "cash": 635000,
+    "budget": 1330000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "R-R",
+    "shortCode": "R-R",
+    "name": "Riptide Rivers",
+    "cash": 650000,
+    "budget": 1350000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "S-C",
+    "shortCode": "S-C",
+    "name": "Stronghold Crusaders",
+    "cash": 665000,
+    "budget": 1370000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "S-S",
+    "shortCode": "S-S",
+    "name": "Silver Soldiers",
+    "cash": 680000,
+    "budget": 1390000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "T-C",
+    "shortCode": "T-C",
+    "name": "The Chantry",
+    "cash": 695000,
+    "budget": 1410000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "T-G",
+    "shortCode": "T-G",
+    "name": "The Giants",
+    "cash": 710000,
+    "budget": 1430000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "T-T",
+    "shortCode": "T-T",
+    "name": "Terrible Teachers",
+    "cash": 725000,
+    "budget": 1450000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "U-A",
+    "shortCode": "U-A",
+    "name": "Undercover Agents",
+    "cash": 740000,
+    "budget": 1470000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "V-D",
+    "shortCode": "V-D",
+    "name": "Vicious & Delicious",
+    "cash": 755000,
+    "budget": 1490000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "V-V",
+    "shortCode": "V-V",
+    "name": "Vigorous Vikings",
+    "cash": 770000,
+    "budget": 1510000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "V-W",
+    "shortCode": "V-W",
+    "name": "Vigilante Wranglers",
+    "cash": 785000,
+    "budget": 1530000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "W-L",
+    "shortCode": "W-L",
+    "name": "Wrecking Legionnaires",
+    "cash": 800000,
+    "budget": 1550000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "W-W",
+    "shortCode": "W-W",
+    "name": "Wicked Wizards",
+    "cash": 815000,
+    "budget": 1570000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  },
+  {
+    "teamId": "Z-H",
+    "shortCode": "Z-H",
+    "name": "Zero Heroes",
+    "cash": 830000,
+    "budget": 1590000,
+    "rosterLimit": 10,
+    "humanControlled": false
+  }
+]

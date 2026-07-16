@@ -1,0 +1,26 @@
+{
+  "name": "",
+  "className": "Hero",
+  "race": "Human",
+  "alignment": "N-G",
+  "gender": "m",
+  "subclasses": [],
+  "traitsPositive": [],
+  "traitsNegative": [],
+  "attributes": {
+    "power": 50,
+    "health": 50,
+    "stamina": 50,
+    "intelligence": 50,
+    "awareness": 50,
+    "determination": 50,
+    "speed": 50,
+    "dexterity": 50,
+    "charisma": 50,
+    "will": 50,
+    "spirit": 50,
+    "torment": 50
+  },
+  "flavorDe": "",
+  "portraitPath": null
+}

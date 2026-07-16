@@ -1,0 +1,226 @@
+[
+  {
+    "teamName": "Armageddon Aftermath",
+    "startBudget": 175,
+    "playerMin": 10,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Black Panthers",
+    "startBudget": 275,
+    "playerMin": 8,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Blazing Beasts",
+    "startBudget": 185,
+    "playerMin": 9,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Cash Creators",
+    "startBudget": 215,
+    "playerMin": 11,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Cold Steel",
+    "startBudget": 315,
+    "playerMin": 10,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Death Peaches",
+    "startBudget": 240,
+    "playerMin": 7,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Dire Legion",
+    "startBudget": 195,
+    "playerMin": 10,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Golden Gladiators",
+    "startBudget": 310,
+    "playerMin": 9,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Hell Raisers",
+    "startBudget": 285,
+    "playerMin": 9,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Last Ride",
+    "startBudget": 305,
+    "playerMin": 9,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Lost Kingdom",
+    "startBudget": 225,
+    "playerMin": 10,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Mayhem Mavericks",
+    "startBudget": 325,
+    "playerMin": 8,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Mortal Sin",
+    "startBudget": 245,
+    "playerMin": 10,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Natures Wrath",
+    "startBudget": 265,
+    "playerMin": 9,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Nunchuck Ninjas",
+    "startBudget": 270,
+    "playerMin": 7,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Pirate Crew",
+    "startBudget": 200,
+    "playerMin": 9,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Project Suicide",
+    "startBudget": 300,
+    "playerMin": 8,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Raging Lunatics",
+    "startBudget": 295,
+    "playerMin": 8,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Riptide Rivers",
+    "startBudget": 170,
+    "playerMin": 8,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Royal Court",
+    "startBudget": 220,
+    "playerMin": 10,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Silver Soldiers",
+    "startBudget": 280,
+    "playerMin": 7,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Stronghold Crusaders",
+    "startBudget": 205,
+    "playerMin": 7,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Terrible Teachers",
+    "startBudget": 260,
+    "playerMin": 12,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "The Chantry",
+    "startBudget": 210,
+    "playerMin": 10,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "The Giants",
+    "startBudget": 230,
+    "playerMin": 9,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Undercover Agents",
+    "startBudget": 190,
+    "playerMin": 9,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Vicious & Delicious",
+    "startBudget": 250,
+    "playerMin": 8,
+    "playerOpt": 11,
+    "warnings": []
+  },
+  {
+    "teamName": "Vigilante Wranglers",
+    "startBudget": 180,
+    "playerMin": 8,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Vigorous Vikings",
+    "startBudget": 235,
+    "playerMin": 8,
+    "playerOpt": 9,
+    "warnings": []
+  },
+  {
+    "teamName": "Wicked Wizards",
+    "startBudget": 255,
+    "playerMin": 9,
+    "playerOpt": 12,
+    "warnings": []
+  },
+  {
+    "teamName": "Wrecking Legionnaires",
+    "startBudget": 290,
+    "playerMin": 8,
+    "playerOpt": 10,
+    "warnings": []
+  },
+  {
+    "teamName": "Zero Heroes",
+    "startBudget": 320,
+    "playerMin": 8,
+    "playerOpt": 11,
+    "warnings": []
+  }
+]

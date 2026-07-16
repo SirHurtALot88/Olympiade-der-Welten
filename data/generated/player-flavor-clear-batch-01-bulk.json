@@ -1,0 +1,393 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "player-0001-umbros",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0002-kargath",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0004-wartusk",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0006-pooka",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0007-umbrafond",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0008-pandora",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0009-valira",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0010-monk-hans",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0011-rifle-bot-z",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0012-ragnarok",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0013-flora",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0014-celina",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0015-bloodmoon",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0016-broodmother",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0017-keira",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0018-cave-stalker",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0019-fleshkeeper",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0021-wildheart",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0022-buckbeak",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0023-floralis",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0024-scale",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0025-kindness",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0026-xal-thrix",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0027-gunther",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0028-anub-ra",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0029-granzor",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0030-samurai-shogun",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0031-silverfang",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0032-firedunk",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0033-tank",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0034-lasse",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0035-thraxis",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0036-sturla",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0037-deathknight-monk",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0038-jasmine-jackal",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0039-raisin",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0040-meira",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0041-drazara",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0042-warrior",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0043-leif-eriksson",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0044-bloodwraith",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0045-rugana",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0046-skybreaker",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0047-tavascron",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0048-sir-varrus",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0049-skysplitter-strider",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0050-bryndra",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0051-hexiron",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0052-dire-wulf",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0053-wolfdancer",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0054-ketilsson",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0055-neos",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0056-faxtar",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0057-gluttony",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0058-zelkor",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0059-forar",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0060-emberlash",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0061-astaroth",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0062-kebet",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0063-kragar",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0064-bumblecrank",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0065-zeronis-prime",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0066-zen",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0067-greyhus",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0068-arlong",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0069-leviathan",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0070-mechatron",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0071-tempest",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0072-swiftstrike",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0073-valeria-bloodfang",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0074-raphael",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0075-naotsugu",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0076-boulderclash",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0077-buttercup",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0078-baz",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0079-tomahawk",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0080-gaius",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0081-skryx",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0082-goro",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0083-scruffy",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0084-xix",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0085-summer",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0086-olaf",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0087-mary-slayblade",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0088-yasuo-windthrift",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0089-yuuri-shadowhand",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0090-grasshopper-m-vi",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0091-moknar",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0092-micro",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0093-draven",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0094-dualflame",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0095-lumen",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0096-faceless-void",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0097-tremble",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0098-vasdrotdir-undemshield",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0099-drake",
+      "flavorDe": ""
+    },
+    {
+      "id": "player-0100-red-riding-hood",
+      "flavorDe": ""
+    }
+  ]
+}

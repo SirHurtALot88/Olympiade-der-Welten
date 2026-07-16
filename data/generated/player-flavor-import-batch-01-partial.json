@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "player-0001-umbros",
+      "flavorDe": "Aus dem Gefallenen Ring kommt Umbros — nicht als Engel und nicht mehr als Diener, sondern als etwas dazwischen, das zu lange in den Ruinen der alten Tempel gestanden hat. Man erkennt ihn an den zerfetzten Flügeln, die wie verbrannte Segel hinter ihm hängen, und an den zwei weißen Punkten in einem Gesicht aus Schatten und Stein. Einst hielt er Wache an einer Schwelle, die niemand mehr benennen will; als die Schwelle brach, blieb er stehen, während andere flohen oder fielen. Seitdem wandert er durch verfallene Hallen und Nebelmeere, zu fleißig, um zu vergessen, und zu wütend, um zu beten. Wer ihn trifft, sagt, er rede selten — aber wenn er zuschlägt, klingt es, als würde etwas Altes endlich antworten."
+    },
+    {
+      "id": "player-0002-kargath",
+      "flavorDe": "In den Eisernen Hallen kennt man Kargath als den Mann auf dem Panzer — nicht weil er schnell ist, sondern weil er den Takt vorgibt, in dem ganze Armeen marschieren. Auf seinem gepanzerten Nashorn sitzt er zwischen Trommeln und rotem Banner, die Sonne im Visier seines Helms und der Staub einer tausend Mann starken Kolonne unter den Hufen. Er stammt aus einem Clan, der glaubt, dass Loyalität lauter klingt als Schwüre, und manchmal hat er recht. Zwischen Schmiede und Feldlager schläft er gern ein, solange niemand die Trommeln anfasst — dann ist er augenblicklich wach und unangenehm lebendig. Feinde nennen ihn lärmend. Freunde nennen ihn den Herzschlag, der nicht aussetzt."
+    },
+    {
+      "id": "player-0003-zed",
+      "flavorDe": "Zed wurde in den Grenzstädten nicht geboren, sondern zusammengeschraubt — ein schwarzer Körper aus Platten und Furz, der in regennassen Gassen lernte, schneller zu sein als die Aufträge, die man ihm gab. Die roten Linien in seiner Rüstung glühen wie Atem, wenn er kämpft; die Klingen in seinen Händen leuchten heller als jede Laterne in der Unterstadt. Manche sagen, er diene noch immer einem alten Meister. Andere behaupten, er habe den getötet und die Rechnung behalten. Was sicher ist: Er bewegt sich, als hätte er tausend Ausgänge im Kopf, und schaut dabei aus, als wäre er der Einzige, der weiß, welcher davon der richtige ist. Wer ihn unterschätzt, merkt zu spät, dass Präzision auch Eitelkeit sein kann."
+    },
+    {
+      "id": "player-0004-wartusk",
+      "flavorDe": "Wartusk herrscht über die Felder der Kernlande, die niemand mehr gern bei Regen betritt. Auf seinem Kopf sitzt eine goldene Krone voller kleiner Totenköpfe; an seinem Kiefer hängen Stoßzähne, die noch nach der letzten Ernte schmecken. Er kniet mitten im zertretenen Korn, den Stab aus Maiskolben in der Faust, als wäre er gleichzeitig König und Erntedämon. Man erzählt, er habe einst nur die Felder beschützt — bis die Felder selbst zu wenig blieben und er begann, die Leute darauf zu zählen. Heute folgt ihm eine stille Angst, die nicht brüllt, sondern wartet. Wer ihn sieht, versteht: Hier regiert jemand, der Ernährung und Vernichtung in derselben Geste hält."
+    },
+    {
+      "id": "player-0005-badmona",
+      "flavorDe": "Badmona kam aus den Grenzstädten, wo Verträge so dünn sind wie Messer und genauso leicht blutig werden. Ihr silbernes Haar und die eisblauen Augen passen nicht zu den dunklen Ruinen, in denen man sie meistens findet — aber die Klinge in ihrer Hand schon. Sie trägt keine Rüstung, die prahlt; sie trägt Rüstung, die funktioniert. Die blaue Energie entlang der Klinge summt wie ein Versprechen, das sie selten ausspricht. Man sagt, sie sei ehrgeizig bis zur Kälte und hitzig, wenn jemand ihren Namen falsch ausspricht. Wer sie im Kampf trifft, merkt schnell: Sie kämpft nicht, um zu gewinnen — sie kämpft, damit niemand vergisst, wer zuletzt gelächelt hat."
+    },
+    {
+      "id": "player-0006-pooka",
+      "flavorDe": "Tief in den Grünen Ringen, wo das Licht wie Honig durch uralte Stämme fällt, geht Pooka aufrecht durch den Wald — eine Löwin mit Krone, Gold und einer Geste, die mehr einladend als drohend wirkt. Ihr Volk nennt sie die Sonnenpfote, nicht weil sie sanft wäre, sondern weil sie glaubt, dass Führung sichtbar sein muss. Sie trägt Rüstung wie Festtagsgewand und schaut dabei aus, als hätte sie schon hundert Schlachten überlebt, ohne eine Spur von Eile zu zeigen. Treue folgt ihr leise; Motivation folgt laut. Wer sie in der Arena sieht, versteht schnell: Das ist kein Raubtier, das zuschlägt — das ist eine Königin, die erwartet, dass die Welt Schritt hält."
+    },
+    {
+      "id": "player-0007-umbrafond",
+      "flavorDe": "Umbrafond wächst in den Grünen Ringen — nicht als Baum und nicht als Frau, sondern als etwas, das beides verwechselt, wenn der Nebel tief genug liegt. Moos, Wurzeln und ein grünes Herz in der Brust halten sie zusammen; aus ihren Fingerspitzen springt Licht, als würde der Wald selbst atmen. Sie bewegt sich langsam, fast schüchtern, und manche halten das für Schwäche, bis der Boden unter ihnen lebendig wird. Ihr Volk sagt, sie schütze die ältesten Pfade, weil niemand sonst mehr daran glaubt. Wer sie ruft, ruft selten laut — und doch kommt sie, treu wie Jahreszeiten, und bleibt stehen, bis entweder die Gefahr vergeht oder der Wald wieder Stille will."
+    },
+    {
+      "id": "player-0008-pandora",
+      "flavorDe": "Pandora stammt aus den Grenzstädten, wo Neon auf nassem Beton reflektiert und niemand fragt, wem du wirklich dienst. Ihr Anzug trägt sechs leuchtende Kernsegmente im Rücken — kleine blaue Herzen aus Technik, die bei jedem Schritt stärker pulsieren. Sie dreht sich im richtigen Moment um, immer eine halbe Sekunde früher, als man erwartet; die Pistolen in ihren Händen wirken dabei fast beiläufig. Man sagt, sie sei ruhig, wo andere schreien, und kalt, wo andere zögern. Ob sie Gerechtigkeit sucht oder nur den nächsten Auftrag, erzählt sie nicht. Wer sie verfolgt, verliert sie meist in der ersten Kurve — und findet sie wieder, wenn es zu spät ist."
+    },
+    {
+      "id": "player-0009-valira",
+      "flavorDe": "Valira kommt aus den Grünen Ringen, wo die Jagd noch bedeutet, etwas Schweres über die Schultern zu legen und lebend zurückzukehren. Blut auf Stirn und Brust ist bei ihr kein Schmuck, sondern Buchhaltung. Den Löwen trägt sie wie einen Mantel, den sie sich nicht erkämpft, sondern erarbeitet hat — Stille nach dem letzten Sprung, Staub in den Haaren, der Speer noch warm in der Hand. Ihr Volk jubelt, wenn sie heimkommt, nicht weil sie freundlich lächelt, sondern weil sie zurückkommt. Feinde nennen sie ungestüm. Freunde nennen sie ehrlich. Und alle wissen: Wenn Valira in den Ring tritt, riecht es kurz nach Regen, Erde und etwas, das zu groß war, um zu entkommen."
+    },
+    {
+      "id": "player-0010-monk-hans",
+      "flavorDe": "Monk Hans lebt in einem fernen Hof zwischen Stein, Garten und der stillen Disziplin eines Mannes, der gelernt hat, dass Wut teuer ist. Unter dem breiten Strohhut sitzt ein Gesicht, das zu oft gelächelt hat, um grausam zu wirken — und zu oft geschwiegen hat, um schwach zu sein. Er stammt nicht aus den Kernlanden und auch nicht aus den Grünen Ringen; sein Weg führte durch Häfen, Berge und lange Regenreisen, bis er irgendwo anhielt und blieb. Das Schwert trägt er, als wäre es ein Werkzeug, kein Schmuck. Wer ihn fordert, trifft selten Zorn. Er trifft Timing, Atem und die unangenehme Ruhe eines Menschen, der schon länger wartet, als der Gegner gedacht hat."
+    },
+    {
+      "id": "player-0011-rifle-bot-z",
+      "flavorDe": "Rifle Bot-Z patrouilliert dort, wo die Nebelroute in rostige Schächte übergeht — ein schwarzer Körper aus Panzerplatten, blaues Licht im Visier und ein Langgewehr, das er hält, als wäre es die einzige ehrliche Sprache in der Gegend. Er wurde für Fernarbeit gebaut, nicht für Gespräche; trotzdem folgt er manchen Auftraggebern länger, als Verträge es erklären. Manche nennen ihn Söldner. Er würde das nicht korrigieren. Wenn Regen von den Rohren tropft und der Boden glänzt, geht er in die Knie, zielt, wartet — loyal an Protokoll, abtrünnig genug, um den falschen Befehl zu ignorieren. Wer ihn im Visier hat, sieht keine Angst. Nur Distanz."
+    },
+    {
+      "id": "player-0012-ragnarok",
+      "flavorDe": "Ragnarok stammt aus den Höllenschlünden, wo der Boden selbst brennt und selbst Dämonen leiser werden, wenn er auftaucht. Sein Körper ist Fels und Lava, sein Atem Feuer, und in der Brust glüht ein Zeichen, das aussieht wie ein altes Siegel, das niemand mehr lesen kann. Man erzählt, er sei kein Tier und kein Gott, sondern die Erinnerung an einen Krieg, der zu groß war, um zu enden. Er brüllt selten zuerst — meistens reicht es, wenn er steht. Wer ihn reizt, merkt schnell, dass Rachsucht bei ihm kein Gefühl ist, sondern Geologie: langsam, unerbittlich, bis alles bricht. In der Ferne riecht man Asche, bevor man Schritte hört."
+    },
+    {
+      "id": "player-0013-flora",
+      "flavorDe": "Flora wächst in den Grünen Ringen wie eine Antwort auf zu viel Stille — Blumen im Haar, Blätter auf der Haut, Muskeln darunter, die nicht nach Zufall aussehen. Sie riecht nach feuchter Erde und Sommerregen, und wenn sie dich ansieht, fühlt es sich an, als würdest du geprüft, ob du dem Wald nützen oder nur nehmen willst. Ihr Volk sagt, sie sei schüchtern, bis jemand die falsche Wurzel tritt; dann wird sie plötzlich fleißig und laut genug, dass selbst alte Bäume aufhorchen. Sie kämpft nicht, um zu zerstören. Sie kämpft, damit etwas überlebt — manchmal den Wald, manchmal nur den einen Moment, in dem du verstehst, dass Schönheit hier Zähigkeit bedeutet."
+    },
+    {
+      "id": "player-0014-celina",
+      "flavorDe": "Celina reitet aus dem Rand der Höllenschlünde — rotes Haar wie Feuer im Rauch, ein Reptil unter ihr, das brüllt, als wäre die Welt zu klein. Ihre Rüstung ist wenig und absichtlich: Leder, Staub, eine Klinge, deren blaues Licht nicht zu der Glut passt, in der sie lebt. Man sagt, sie sei aus einem Clan geflohen, der zu lang gehorcht hat; sie selbst sagt wenig und lässt stattdessen den Sattel sprechen. Zwischen Flammen und Asche wirkt sie nicht verloren, sondern endlich richtig platziert — beweglich, zornig, motiviert wie jemand, der nichts mehr zu Hause hat außer dem nächsten Sturm. Wer sie sieht, versteht: Hier kommt keine Prinzessin. Hier kommt der Funke."
+    },
+    {
+      "id": "player-0015-bloodmoon",
+      "flavorDe": "Bloodmoon stammt aus dem Schwefelreich, wo Macht nach verbranntem Metall und alten Siegen riecht. Ihre Haut trägt die Farbe von langem Zorn, ihre Flügel den Schatten von Schlachten, die nie ganz vorbei sind. Die Klinge in ihrer Hand brennt nicht, um zu prahlen — sie brennt, weil sie es kann. In den Hallen der Dämonenlords spricht man leiser, wenn ihr Name fällt, nicht aus Respekt vor Höflichkeit, sondern weil Worte hier schnell zu teuer werden. Sie ist eloquent genug, um Verträge zu brechen, ehrgeizig genug, um sie danach neu zu schreiben, und berüchtigt genug, dass selbst Skandale wie Dekoration wirken. Wer sie trifft, riecht Schwefel — und merkt, dass Hitze manchmal eine Persönlichkeit ist."
+    },
+    {
+      "id": "player-0016-broodmother",
+      "flavorDe": "Tief unter den Grünen Ringen, wo Wurzeln in Höhlen übergehen und Licht selten ist, wartet Broodmother — nicht allein, sondern als Mitte eines Netzes, das älter ist als die meisten Namen oben. Ihre Kinder tragen Glut in leuchtenden Bäuchen, kleine Laternen in einem Reich aus Staub und Seide. Sie selbst bewegt sich selten schnell; sie muss es auch nicht. Wer in ihre Hallen gerät, hört zuerst das Knistern tausend kleiner Schritte und erst danach das Schweigen, das bedeutet, dass die Große wach ist. Man sagt, sie sei treu zu dem, was sie erschafft, und gnadenlos zu dem, was sie stört. Loyalität hier heißt: Du gehörst zur Brut — oder du wirst Futter."
+    },
+    {
+      "id": "player-0017-keira",
+      "flavorDe": "Keira kommt aus den Eisernen Hallen, obwohl ihr Herz oft eher nach Salz und offener See riecht — eine Frau aus Stein und Blut, die gelernt hat, dass Fleiß allein nicht reicht, wenn der Gegner schwerer ist. Die Totenschädel an ihrem Gürtel sind keine Trophäen zum Prahlen, sondern Abrechnung; das Kriegsrot auf ihren Wangen ist kein Schmuck, sondern der Tag. Sie brüllt, wenn andere zögern, und stürmt, wenn andere noch reden. Manche nennen sie gerissen, weil sie auch dann noch lächelt, wenn sie bereits gewonnen hat. Wer sie unterschätzt, findet heraus, dass Motivation in den Bergen anders klingt: nicht wie Hoffnung, sondern wie Lawine."
+    },
+    {
+      "id": "player-0018-cave-stalker",
+      "flavorDe": "Cave Stalker kennt die Eisernen Hallen von unten — die engen Gänge, die feuchten Steine, die Stellen, wo selbst Fackellicht zu feige wird. Sein Bart leuchtet im Glimmen wie Kohle, und wenn er brüllt, antworten die Hallen mit Echo statt Angst. Er trägt Haken, Dolche und mehr Ringe am Gürtel, als ein ehrlicher Mann braucht; manche sagen, er sei abtrünnig von seinem Clan, andere, er sei der Einzige, der noch weiß, wofür der Clan einmal stand. Er jagt nicht für Ruhm. Er jagt, weil etwas in der Dunkelheit lebt, das nicht frei herumlaufen sollte — und weil er loyal genug ist, um länger zu bleiben, als andere vernünftig finden."
+    },
+    {
+      "id": "player-0019-fleshkeeper",
+      "flavorDe": "Fleshkeeper regiert in den Tiefen nahe der Totenmark, wo Ketten von der Decke hängen und der Boden klebt. Sein Körper ist kein Körper im üblichen Sinn — eher Fleisch, das vergessen hat, unter Haut zu wohnen, gekrönt von Hörnern und einem Grinsen, das zu lange gelernt hat. Unten knien Knochen, die noch gehorchen, obwohl sie längst nichts mehr zu verlieren haben. Man flüstert, er sammle nicht Seelen, sondern Formen — was übrig bleibt, wenn jemand zu laut versprochen hat, unbesiegbar zu sein. Wer ihn sieht, riecht Eisen und Wärme, die nicht tröstet. Manche nennen ihn Skandal. Die Toten nennen ihn Meister."
+    },
+    {
+      "id": "player-0020-cloud-strife",
+      "flavorDe": "Cloud Strife stammt aus den Grenzstädten, wo Regen und Neon dasselbe Licht teilen und ein Schwert manchmal ehrlicher ist als ein Vertrag. Sein Haar ist hell wie Metall nach Blitz, das Auge unter der Binde hat zu viel gesehen, und die blauen Kerne auf der Brust summen, als würden sie noch an alte Aufträge denken. Er trägt den roten Mantel nicht, um schön auszusehen — er trägt ihn, damit man ihn in der Menge findet, wenn er will, und nicht findet, wenn er muss. Man sagt, er sei eitel, ehrgeizig und unerträglich beliebt, oft zur selben Zeit. Wer ihn fordert, trifft keinen Jungen aus der Gasse. Er trifft jemanden, der schon gelernt hat, dass Legenden teuer sind — und trotzdem bezahlt werden."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Yaezakura",
+  "id": "player-0158-yaezakura",
+  "className": "Warlord",
+  "race": "Human",
+  "alignment": "R-B",
+  "gender": "m",
+  "subclasses": ["Vigilante", "Warrior", "Isolated"],
+  "traitsPositive": ["Loyal", "Ambitious", "Cool"],
+  "traitsNegative": ["Scandalous", "Vindictive", "Obsessive"],
+  "attributes": {
+    "power": 87, "health": 86, "stamina": 53, "intelligence": 58,
+    "awareness": 27, "determination": 78, "speed": 36, "dexterity": 74,
+    "charisma": 99, "will": 77, "spirit": 58, "torment": 71
+  },
+  "flavorDe": "Auf verbrannten Feldern und in vergessenen Lagern erkennt man Yaezakura als die Gestalt mit dem roten Helmbusch und dem Speer, an dem noch immer Schädel hängen, die niemand offen benennen will. Er kam aus der Totenmark — nicht als Held, sondern als jemand, der zu viele Gräber gesehen hatte, um noch an Gnade zu glauben. Sein Rüstungston erzählt von Siegen, die zu laut waren, um sie zu feiern, und von Schlachten, die nicht aufhörten, sobald die Banner fielen. Yaezakura spricht wenig, aber wenn er den Speer hebt, wird aus Gerüchten schnell Erinnerung.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Yaezakura.jpg",
+  "cost": 100,
+  "upkeepBase": 9
+}

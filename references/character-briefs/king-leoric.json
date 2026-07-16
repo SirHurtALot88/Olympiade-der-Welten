@@ -1,0 +1,20 @@
+{
+  "name": "King Leoric",
+  "id": "player-1382-king-leoric",
+  "className": "Templar",
+  "race": "Human",
+  "alignment": "N-B",
+  "gender": "m",
+  "subclasses": ["Royalty", "Wraith", "Lord"],
+  "traitsPositive": ["Eloquent", "FanFavorite", "Fearless"],
+  "traitsNegative": ["Scandalous", "ColdBlooded", "Obsessive"],
+  "attributes": {
+    "power": 64, "health": 92, "stamina": 67, "intelligence": 38,
+    "awareness": 20, "determination": 88, "speed": 5, "dexterity": 13,
+    "charisma": 98, "will": 90, "spirit": 4, "torment": 83
+  },
+  "flavorDe": "Mortis Hall gehört King Leoric — nicht weil er der Stärkste war, sondern weil er der Einzige blieb, der nach dem Fall noch wie ein König aussah. In den kalten Hallen sitzt er auf einem Thron aus Knochen und kalter Flamme, spricht in Sätzen, die klingen, als hätten sie Jahrhunderten überlebt, und behandelt den Tod als Ordnung, die nur noch von ihm unterschrieben wird. Manche nennen ihn den amtierenden König der Untoten, andere einen Tyrannen mit zu schöner Stimme. Leoric lächelt selten. Wenn er es tut, wird es in Mortis Hall leiser.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/King Leoric.jpg",
+  "cost": 60,
+  "upkeepBase": 7
+}

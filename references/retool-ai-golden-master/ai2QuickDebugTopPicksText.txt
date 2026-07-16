@@ -1,0 +1,103 @@
+// term: AI2_06_SimulatePicks
+// id: ai2QuickDebugTopPicksText
+// type: widget
+// subtype: TextWidget2
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: AI2_06_SimulatePicks.data | AI2_03_Needs.data | filterTeam.value
+// extractionStatus: complete_or_primary_match
+// AI2 Quick Debug snapshot for transfermarktPage
+
+const sim = {{ AI2_06_SimulatePicks.data }} || {};
+const planned = Array.isArray(sim.planned_picks) ? sim.planned_picks : [];
+
+const needsRaw = {{ AI2_03_Needs.data }} || {};
+const needs = Array.isArray(needsRaw.needs) ? needsRaw.needs : [];
+
+const n = (v, fb = 0) => Number.isFinite(Number(v)) ? Number(v) : Number(fb);
+const s = (v) => String(v ?? '').trim();
+const lower = (v) => s(v).toLowerCase();
+
+// --- Top identity axes (2)
+const topAxes = needs.
+filter((nd) => s(nd?.category) === 'identity' && s(nd?.meta?.kind) === 'axis').
+map((nd) => ({
+  axis: lower(nd?.meta?.axis || nd?.id?.split('need:axis:')?.[1] || ''),
+  weight: n(nd?.weight, n(nd?.meta?.score?.need01)),
+  importance100: n(nd?.meta?.score?.importance100, Math.round(n(nd?.weight, 0) * 100)),
+  id: s(nd?.id) })).
+
+filter((x) => ['pow', 'spe', 'men', 'soc'].includes(x.axis)).
+sort((a, b) => b.weight - a.weight).
+slice(0, 2);
+
+// --- Top disciplines (2) — use weight; keep subKind for check
+const topDiszis = needs.
+filter((nd) => s(nd?.category) === 'discipline' && s(nd?.meta?.kind) === 'discipline').
+map((nd) => ({
+  diszi: lower(nd?.meta?.diszi || ''),
+  subKind: lower(nd?.meta?.subKind || ''),
+  axis: lower(nd?.meta?.axis || ''),
+  weight: n(nd?.weight, n(nd?.meta?.score?.need01)),
+  importance100: n(nd?.meta?.score?.importance100, Math.round(n(nd?.weight, 0) * 100)),
+  id: s(nd?.id) })).
+
+filter((x) => !!x.diszi).
+sort((a, b) => b.weight - a.weight).
+slice(0, 2);
+
+// --- Dynamic focus distribution across planned picks
+const focusCounts = {};
+for (const p of planned) {
+  const k = s(p?.focusType) + ':' + s(p?.focusKey);
+  if (!k || k === ':') continue;
+  focusCounts[k] = (focusCounts[k] || 0) + 1;
+}
+
+// --- Axis streak (helps detect "stuck" behavior)
+const axes = planned.map((p) => lower(p?.picked_axis_tracked || p?.step_axis || '')).filter(Boolean);
+let last = '';
+let streak = 0;
+let maxStreak = 0;
+for (const ax of axes) {
+  if (ax === last) {
+    streak += 1;
+  } else {
+    last = ax;
+    streak = 1;
+  }
+  if (streak > maxStreak) maxStreak = streak;
+}
+
+const topPicks = planned.
+filter((p) => s(p?.player_name)).
+slice(0, 4).
+map((p) => ({
+  step: n(p?.stepIndex),
+  player: s(p?.player_name),
+  score: n(p?.score_100_final, n(p?.score)),
+  price: n(p?.price),
+  axis: lower(p?.picked_axis_tracked || p?.step_axis),
+  diszi: lower(p?.step_diszi) }));
+
+
+return {
+  meta: {
+    team: s(sim.team || {{ filterTeam.value }}),
+    version: s(sim.version || ''),
+    plannedSteps: n(sim.plannedSteps, planned.length),
+    pickedCount: planned.filter((p) => s(p?.player_name)).length,
+    budgetStart: null,
+    budgetEnd: planned.length ? n(planned[planned.length - 1]?.budget_after) : null },
+
+  topAxes,
+  topDiszis,
+  focusCounts,
+  axisStreak: { maxStreak, axes },
+  topPicks,
+  notes: {
+    needsCount: needs.length,
+    hasSimData: !!sim && Object.keys(sim).length > 0,
+    hasNeedsData: !!needsRaw && Object.keys(needsRaw).length > 0 } };

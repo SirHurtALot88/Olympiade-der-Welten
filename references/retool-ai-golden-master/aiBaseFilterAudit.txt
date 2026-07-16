@@ -1,0 +1,38 @@
+// term: aiTeamNeeds
+// id: aiBaseFilterAudit
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTeamNeedsSnapshot.value
+// extractionStatus: complete_or_primary_match
+// Audit: aiTeamNeedsSnapshot content sanity
+const needs = Array.isArray({{ aiTeamNeedsSnapshot.value }}) ? {{ aiTeamNeedsSnapshot.value }} : [];
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+
+const safeJson = (txt) => {
+  try {return JSON.parse(String(txt || '{}'));} catch (e) {return {};}
+};
+
+const budgets = needs.map((r) => {
+  const prof = safeJson(r?.search_profile);
+  return {
+    need_type: s(r?.need_type),
+    need_label: s(r?.need_label),
+    budget_max: n(prof?.budget_max),
+    axis_focus: s(prof?.axis_focus || prof?.desired_axis || '') };
+
+});
+
+return {
+  needsCount: needs.length,
+  needTypes: [...new Set(needs.map((r) => s(r?.need_type)).filter(Boolean))],
+  budgetsStats: {
+    budget_max_min: budgets.length ? Math.min(...budgets.map((x) => n(x.budget_max))) : null,
+    budget_max_max: budgets.length ? Math.max(...budgets.map((x) => n(x.budget_max))) : null,
+    budget_max_zeroCount: budgets.filter((x) => !(n(x.budget_max) > 0)).length },
+
+  sample: budgets.slice(0, 8) };

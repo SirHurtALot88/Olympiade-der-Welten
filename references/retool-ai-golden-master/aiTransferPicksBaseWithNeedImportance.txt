@@ -1,0 +1,143 @@
+// term: aiTeamNeeds
+// id: aiTransferPicksBaseWithNeedImportance
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: finalPicksCanonicalManaged.value
+// extractionStatus: complete_or_primary_match
+// Final Pick scoring (0-100) with explicit components.
+// Goal: Make tuning transparent:
+//   need (0-30), skill (0-25), value (0-15), peak/impact (0-10), soft skills (0-20)
+// Returns: Array<Record<string, any>>
+
+const rows = Array.isArray({{ finalPicksCanonicalManaged.value }}) ? {{ finalPicksCanonicalManaged.value }} : [];
+if (!rows.length) return [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Helpers: normalize typical score fields to 0..1
+const score01 = (v, lo = 0, hi = 100) => {
+  const x = n(v);
+  if (!(hi > lo)) return 0;
+  return clamp((x - lo) / (hi - lo), 0, 1);
+};
+
+// Need sub-components (all map to 0..1)
+const needHit01 = (r) => clamp(n(r?.active_need_match_effective ?? r?.active_need_match) / 3, 0, 1);
+const discipline01 = (r) => clamp(n(r?.discipline_match ?? r?.discipline_bonus) / 12, 0, 1);
+const axis01 = (r) => clamp(n(r?.axis_match) / 200, 0, 1);
+const color01 = (r) => clamp(n(r?.color_match) / 100, 0, 1);
+
+// Peak/Impact signals
+const peak01 = (r) => score01(r?.peak_score, 0, 100);
+const impact01 = (r) => score01(r?.marginal_team_impact, 0, 100); // provided by managed layer; may be missing
+
+// Soft skills pool (all 0..1)
+const fit01 = (r) => score01(r?.fit_score ?? r?.fit, 0, 100);
+const identity01 = (r) => score01(r?.identity_score, 0, 100);
+const breadth01 = (r) => score01(r?.breadth_score, 0, 100);
+const ratio01 = (r) => score01(r?.ratio_score, 0, 100);
+const affordability01 = (r) => score01(r?.affordability, 0, 100);
+
+// ---------------------------
+// Component definitions
+// ---------------------------
+// IMPORTANT:
+// - These are ABSOLUTE point budgets (not percentages of Final).
+// - Each component returns 0..cap.
+//
+// Need mix must explicitly include discipline_hole contribution.
+
+const computeNeed30 = (r) => {
+  // Inside-need mix:
+  // - NEED HIT:   "is it one of the team’s real needs?"
+  // - DISCIPLINE: "does it plug a discipline hole?"  <-- this is the one you explicitly wanted
+  // - AXIS/COLOR: supporting signals
+  //
+  // Tuning (slightly more discipline-driven than before):
+  //  - discipline increased (more hole-fixing influence)
+  //  - axis/color reduced slightly to keep sum=1
+  const w = {
+    needHit: 0.42,
+    discipline: 0.38,
+    axis: 0.14,
+    color: 0.06 };
+
+
+  const x01 =
+  w.needHit * needHit01(r) +
+  w.discipline * discipline01(r) +
+  w.axis * axis01(r) +
+  w.color * color01(r);
+
+  return Number((30 * clamp(x01, 0, 1)).toFixed(2));
+};
+
+const computeSkill25 = (r) => {
+  // skill_score comes from the best pick-row (0..100)
+  return Number((25 * score01(r?.skill_score, 0, 100)).toFixed(2));
+};
+
+const computeValue15 = (r) => {
+  // value_score comes from the best pick-row (0..100)
+  return Number((15 * score01(r?.value_score, 0, 100)).toFixed(2));
+};
+
+const computePeakImpact10 = (r) => {
+  // We combine peak + team impact if present; fallback to peak only.
+  const hasImpact = Number.isFinite(Number(r?.marginal_team_impact));
+  const x01 = hasImpact ?
+  0.55 * peak01(r) + 0.45 * impact01(r) :
+  peak01(r);
+
+  return Number((10 * clamp(x01, 0, 1)).toFixed(2));
+};
+
+const computeSoft20 = (r) => {
+  // Soft skills bucket: fit / identity / breadth / ratio / affordability.
+  const w = {
+    fit: 0.35,
+    identity: 0.20,
+    breadth: 0.20,
+    ratio: 0.10,
+    affordability: 0.15 };
+
+
+  const x01 =
+  w.fit * fit01(r) +
+  w.identity * identity01(r) +
+  w.breadth * breadth01(r) +
+  w.ratio * ratio01(r) +
+  w.affordability * affordability01(r);
+
+  return Number((20 * clamp(x01, 0, 1)).toFixed(2));
+};
+
+return rows.map((r) => {
+  const need_abs = computeNeed30(r);
+  const skill_abs = computeSkill25(r);
+  const value_abs = computeValue15(r);
+  const peak_impact_abs = computePeakImpact10(r);
+  const soft_abs = computeSoft20(r);
+
+  const final_total_score_100 = Number((need_abs + skill_abs + value_abs + peak_impact_abs + soft_abs).toFixed(2));
+
+  return {
+    ...r,
+
+    // explicit absolute components (requested)
+    need_abs,
+    skill_abs,
+    value_abs,
+    peak_impact_abs,
+    soft_abs,
+
+    // single canonical 0-100 final
+    final_total_score_100 };
+
+});

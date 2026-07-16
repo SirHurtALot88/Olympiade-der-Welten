@@ -1,0 +1,38 @@
+{
+  "source": "retool",
+  "capturedAt": "TODO_RETOOL_EXPORT_REQUIRED",
+  "saveId": "TODO_RETOOL_EXPORT_REQUIRED",
+  "seasonId": "TODO_RETOOL_EXPORT_REQUIRED",
+  "matchdayId": null,
+  "inputs": {
+    "exportIntent": "season_end_cash_after",
+    "requiredTeams": [
+      "placement_top_team",
+      "mid_table_team",
+      "low_table_team"
+    ]
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_EXPORT_REQUIRED",
+    "teams": [
+      {
+        "teamId": "TODO_RETOOL_EXPORT_REQUIRED",
+        "teamName": "TODO_RETOOL_EXPORT_REQUIRED",
+        "placement": "TODO_RETOOL_EXPORT_REQUIRED",
+        "cashBefore": "TODO_RETOOL_EXPORT_REQUIRED",
+        "cashAfter": "TODO_RETOOL_EXPORT_REQUIRED",
+        "budgetBefore": "TODO_RETOOL_EXPORT_REQUIRED",
+        "budgetAfter": "TODO_RETOOL_EXPORT_REQUIRED",
+        "prizeMoneyApplied": "TODO_RETOOL_EXPORT_REQUIRED",
+        "bonusApplied": "TODO_RETOOL_EXPORT_REQUIRED",
+        "malusApplied": "TODO_RETOOL_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Diese Datei muss den echten Retool-Stand direkt nach dem Season-End-Cash-/Preisgeldschritt zeigen.",
+    "Erst mit before + prize table + after darf spaeter ein neuer Cash-Apply-Preview gebaut werden."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

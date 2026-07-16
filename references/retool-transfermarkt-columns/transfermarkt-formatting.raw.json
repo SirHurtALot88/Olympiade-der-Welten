@@ -1,0 +1,3698 @@
+{
+  "foundColorCodes": [
+    "#000000",
+    "#002366",
+    "#0052CC",
+    "#0D5E1F",
+    "#0d47a1",
+    "#1565C0",
+    "#1b5e20",
+    "#2E7D32",
+    "#42A5F5",
+    "#455A64",
+    "#4CAF50",
+    "#66BB6A",
+    "#81C784",
+    "#90caf9",
+    "#B71C1C",
+    "#B8860B",
+    "#BBDEFB",
+    "#C8E6C9",
+    "#E0E0E0",
+    "#E3F2FD",
+    "#E65100",
+    "#E8F5E9",
+    "#EF5350",
+    "#EF6C00",
+    "#EF9A9A",
+    "#F44336",
+    "#F9A825",
+    "#FF9800",
+    "#FFAB91",
+    "#FFCC80",
+    "#FFCDD2",
+    "#FFE082",
+    "#FFE0B2",
+    "#FFEB3B",
+    "#FFF59D",
+    "#FFF9C4",
+    "#FFFDE7",
+    "#FFFFFF",
+    "#a5d6a7",
+    "#b71c1c",
+    "#e65100",
+    "#ff8a80",
+    "#ffe082"
+  ],
+  "foundConditionalFormattingRules": 113,
+  "columnsWithFormatting": 81,
+  "formattingExtractionQuality": "high",
+  "tables": [
+    {
+      "componentName": "playersTable",
+      "dataSource": "{{ _.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc']) }}",
+      "columns": [
+        {
+          "table": "playersTable",
+          "columnId": "62cbc",
+          "label": "Bild",
+          "dataKey": "image_url",
+          "order": 0,
+          "type": "image",
+          "format": "image",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "center",
+          "width": 172,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "48156",
+          "label": "Name",
+          "dataKey": "name",
+          "order": 1,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 153.765625,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "75b6d",
+          "label": "Marktwert",
+          "dataKey": "marktwert",
+          "order": 2,
+          "type": "currency",
+          "format": "currency",
+          "numberFormat": null,
+          "currencyFormat": "currency",
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 121.546875,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "16518",
+          "label": "Gehalt",
+          "dataKey": "gehalt",
+          "order": 3,
+          "type": "currency",
+          "format": "currency",
+          "numberFormat": null,
+          "currencyFormat": "currency",
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 100,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "f3ff6",
+          "label": "Pow",
+          "dataKey": "pow",
+          "order": 4,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 65,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "f96e5",
+          "label": "Spe",
+          "dataKey": "spe",
+          "order": 5,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 71,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "729b6",
+          "label": "Men",
+          "dataKey": "men",
+          "order": 6,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 71,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "1c147",
+          "label": "Soc",
+          "dataKey": "soc",
+          "order": 7,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 63,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "7a25f",
+          "label": "Klasse",
+          "dataKey": "klasse",
+          "order": 8,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 151,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((c)=>({'Berserker':'#ff8a80','Warlord':'#ff8a80','Tank':'#ff8a80','Sprinter':'#a5d6a7','Rogue':'#a5d6a7','Charger':'#a5d6a7','Mage':'#90caf9','Overseer':'#90caf9','Templar':'#90caf9','Bard':'#ffe082','Hero':'#ffe082','Badass':'#ffe082','Tactician':'#ffe082'})[c] || '') (item) }}",
+            "{{ ((c)=>({'Berserker':'#b71c1c','Warlord':'#b71c1c','Tank':'#b71c1c','Sprinter':'#1b5e20','Rogue':'#1b5e20','Charger':'#1b5e20','Mage':'#0d47a1','Overseer':'#0d47a1','Templar':'#0d47a1','Bard':'#e65100','Hero':'#e65100','Badass':'#e65100','Tactician':'#e65100'})[c] || '') (item) }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((c)=>({'Berserker':'#ff8a80','Warlord':'#ff8a80','Tank':'#ff8a80','Sprinter':'#a5d6a7','Rogue':'#a5d6a7','Charger':'#a5d6a7','Mage':'#90caf9','Overseer':'#90caf9','Templar':'#90caf9','Bard':'#ffe082','Hero':'#ffe082','Badass':'#ffe082','Tactician':'#ffe082'})[c] || '') (item) }}",
+            "{{ ((c)=>({'Berserker':'#b71c1c','Warlord':'#b71c1c','Tank':'#b71c1c','Sprinter':'#1b5e20','Rogue':'#1b5e20','Charger':'#1b5e20','Mage':'#0d47a1','Overseer':'#0d47a1','Templar':'#0d47a1','Bard':'#e65100','Hero':'#e65100','Badass':'#e65100','Tactician':'#e65100'})[c] || '') (item) }}"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#ff8a80",
+            "#a5d6a7",
+            "#90caf9",
+            "#ffe082",
+            "#b71c1c",
+            "#1b5e20",
+            "#0d47a1",
+            "#e65100"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "d4a2b",
+          "label": "Fit",
+          "dataKey": "team_fit",
+          "order": 9,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 84.84375,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "b6f15",
+          "label": "Bracket",
+          "dataKey": "Bracket",
+          "order": 10,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 100,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "fb219",
+          "label": "Rasse",
+          "dataKey": "rasse",
+          "order": 11,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ _.startCase(item) }}",
+          "formattingExpressions": [
+            "{{ _.startCase(item) }}",
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "c4dac",
+          "label": ">20",
+          "dataKey": "count_gt20",
+          "order": 12,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 90,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }      // high = green\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }      // mid = yellow\n  return \"#F44336\";                            // low = red\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  // Dark text on yellow, light text on red/green\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }      // high = green\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }      // mid = yellow\n  return \"#F44336\";                            // low = red\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  // Dark text on yellow, light text on red/green\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#4CAF50",
+            "#FFEB3B",
+            "#F44336",
+            "#E0E0E0",
+            "#000000",
+            "#FFFFFF"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "a612f",
+          "label": ">40",
+          "dataKey": "count_gt40",
+          "order": 13,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 90,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#4CAF50",
+            "#FFEB3B",
+            "#F44336",
+            "#E0E0E0",
+            "#000000",
+            "#FFFFFF"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "efd36",
+          "label": ">60",
+          "dataKey": "count_gt60",
+          "order": 14,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 90,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#4CAF50",
+            "#FFEB3B",
+            "#F44336",
+            "#E0E0E0",
+            "#000000",
+            "#FFFFFF"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "aae25",
+          "label": ">80",
+          "dataKey": "count_gt80",
+          "order": 15,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 90,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+            "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#4CAF50",
+            "#FFEB3B",
+            "#F44336",
+            "#E0E0E0",
+            "#000000",
+            "#FFFFFF"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "f58f6",
+          "label": "Pow",
+          "dataKey": "power_rating",
+          "order": 16,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 71.5625,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "d547f",
+          "label": "Hea",
+          "dataKey": "health_rating",
+          "order": 17,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 72,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "f1aba",
+          "label": "Sta",
+          "dataKey": "stamina_rating",
+          "order": 18,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 65.109375,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "5c8aa",
+          "label": "Int",
+          "dataKey": "intelligence_rating",
+          "order": 19,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 63,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "59761",
+          "label": "Det",
+          "dataKey": "determination_rating",
+          "order": 20,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 69.5625,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "fc84a",
+          "label": "Awa",
+          "dataKey": "awareness_rating",
+          "order": 21,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 66.625,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "06d92",
+          "label": "Spe",
+          "dataKey": "speed_rating",
+          "order": 22,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 62.390625,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "84a8d",
+          "label": "Dex",
+          "dataKey": "dexterity_rating",
+          "order": 23,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 62.5625,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "8fa4a",
+          "label": "Cha",
+          "dataKey": "charisma_rating",
+          "order": 24,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 68.375,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "2e892",
+          "label": "Wil",
+          "dataKey": "will_rating",
+          "order": 25,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 67.71875,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "514a8",
+          "label": "Spi",
+          "dataKey": "spirit_rating",
+          "order": 26,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 70.484375,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "e93b8",
+          "label": "Tor",
+          "dataKey": "torment_rating",
+          "order": 27,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 64.1875,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+            "{{ !showAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#42A5F5",
+            "#2E7D32",
+            "#66BB6A",
+            "#F9A825",
+            "#FFEB3B",
+            "#FF9800",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "6a3e2",
+          "label": "Subclass 2",
+          "dataKey": "subclass_2",
+          "order": 28,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 114,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "04394",
+          "label": "Subclass 1",
+          "dataKey": "subclass_1",
+          "order": 29,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 121,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "fed53",
+          "label": "Subclass 3",
+          "dataKey": "subclass_3",
+          "order": 30,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 117.15625,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "bdd67",
+          "label": "Alignment",
+          "dataKey": "alignment",
+          "order": 31,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ _.startCase(item) }}",
+          "formattingExpressions": [
+            "{{ _.startCase(item) }}",
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "dce3f",
+          "label": "Trait+1",
+          "dataKey": "trait_pos_1",
+          "order": 32,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "9a5d7",
+          "label": "Trait+2",
+          "dataKey": "trait_pos_2",
+          "order": 33,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 137,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "6a629",
+          "label": "Trait+3",
+          "dataKey": "trait_pos_3",
+          "order": 34,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 132,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "0fdda",
+          "label": "Trait-1",
+          "dataKey": "trait_neg_1",
+          "order": 35,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 147,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "acd7f",
+          "label": "Trait-2",
+          "dataKey": "trait_neg_2",
+          "order": 36,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "bf96d",
+          "label": "Trait-3",
+          "dataKey": "trait_neg_3",
+          "order": 37,
+          "type": "tags",
+          "format": "tags",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 87,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "4ad96",
+          "label": "Geschlecht",
+          "dataKey": "geschlecht",
+          "order": 38,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ _.startCase(item) }}",
+          "formattingExpressions": [
+            "{{ _.startCase(item) }}",
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "3cb5e",
+          "label": "Marktwert gehalt ratio",
+          "dataKey": "marktwert_gehalt_ratio",
+          "order": 39,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 120,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0",
+            "true"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "8177d",
+          "label": "Fit Rasse",
+          "dataKey": "fit_rasse",
+          "order": 40,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "05d0e",
+          "label": "Fit Subclasses",
+          "dataKey": "fit_subclasses",
+          "order": 41,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 140,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "2364a",
+          "label": "Fit Traits",
+          "dataKey": "fit_traits",
+          "order": 42,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "398d9",
+          "label": "Fit Alignment",
+          "dataKey": "fit_alignment",
+          "order": 43,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 130,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "playersTable",
+          "columnId": "fc5a4",
+          "label": "",
+          "dataKey": "",
+          "order": 44,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "center",
+          "width": 16,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "false"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        }
+      ]
+    },
+    {
+      "componentName": "aiTeamNeedsTable",
+      "dataSource": "{{ (Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category))) }}",
+      "columns": [
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "ed1fd",
+          "label": "id",
+          "dataKey": "id",
+          "order": 0,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 180,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "true"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "7794a",
+          "label": "Weight",
+          "dataKey": "weight",
+          "order": 1,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 95,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "0f1cc",
+          "label": "Category",
+          "dataKey": "category",
+          "order": 2,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "a871a",
+          "label": "Weight (0-100)",
+          "dataKey": "weight",
+          "order": 3,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 125,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ (() => {\n  const v = Number(item ?? currentSourceRow?.weight ?? 0);\n  if (!Number.isFinite(v)) return null;\n  return Math.round(v * 1000) / 10; // 1 decimal\n})() }}",
+          "formattingExpressions": [
+            "{{ (() => {\n  const v = Number(item ?? currentSourceRow?.weight ?? 0);\n  if (!Number.isFinite(v)) return null;\n  return Math.round(v * 1000) / 10; // 1 decimal\n})() }}",
+            "{{ (() => {\n  const v = Number(currentSourceRow?.weight ?? 0) * 100;\n  if (!Number.isFinite(v)) return '';\n  if (v >= 80) return '#B71C1C';\n  if (v >= 60) return '#EF6C00';\n  if (v >= 40) return '#F9A825';\n  if (v >= 20) return '#2E7D32';\n  return '#455A64';\n})() }}",
+            "#FFFFFF",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => {\n  const v = Number(currentSourceRow?.weight ?? 0) * 100;\n  if (!Number.isFinite(v)) return '';\n  if (v >= 80) return '#B71C1C';\n  if (v >= 60) return '#EF6C00';\n  if (v >= 40) return '#F9A825';\n  if (v >= 20) return '#2E7D32';\n  return '#455A64';\n})() }}",
+            "#FFFFFF"
+          ],
+          "expressionRefs": [
+            "currentSourceRow",
+            "item"
+          ],
+          "foundColorCodes": [
+            "#B71C1C",
+            "#EF6C00",
+            "#F9A825",
+            "#2E7D32",
+            "#455A64",
+            "#FFFFFF"
+          ]
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "dde0b",
+          "label": "Market atk (0-1)",
+          "dataKey": "market_attackability01",
+          "order": 4,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 120,
+          "visible": "conditional",
+          "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "cb0ce",
+          "label": "Market top",
+          "dataKey": "market_top",
+          "order": 5,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 95,
+          "visible": "conditional",
+          "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "2eae9",
+          "label": "Market c80",
+          "dataKey": "market_count_ge_80",
+          "order": 6,
+          "type": "bigint",
+          "format": "bigint",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 95,
+          "visible": "conditional",
+          "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "cf8d4",
+          "label": "Reason",
+          "dataKey": "reason",
+          "order": 7,
+          "type": "multilineString",
+          "format": "multilineString",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 420,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "#E0E0E0",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "ac422",
+          "label": "meta (raw)",
+          "dataKey": "meta",
+          "order": 8,
+          "type": "json",
+          "format": "json",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 260,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "true"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "fda99",
+          "label": "Meta",
+          "dataKey": "meta",
+          "order": 9,
+          "type": "multilineString",
+          "format": "multilineString",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 360,
+          "visible": true,
+          "hiddenExpression": "false",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ (() => {\n  const m = currentSourceRow?.meta;\n  if (!m || typeof m !== 'object') return '';\n  const pick = (k) => (m?.[k] == null ? null : m[k]);\n\n  // Common roster meta fields\n  const rosterNow = pick('rosterNow');\n  const minPlayers = pick('minPlayers');\n  const targetPlayers = pick('targetPlayers');\n  const missingMin = pick('missingMin');\n  const missingTarget = pick('missingTarget');\n\n  const bits = [];\n  if (rosterNow != null && minPlayers != null) bits.push(`Roster: ${rosterNow}/${minPlayers}`);\n  if (targetPlayers != null) bits.push(`Target: ${targetPlayers}`);\n  if (missingMin != null) bits.push(`missingMin: ${missingMin}`);\n  if (missingTarget != null) bits.push(`missingTarget: ${missingTarget}`);\n\n  // Fallback: show keys\n  if (!bits.length) {\n    const keys = Object.keys(m).slice(0, 6);\n    return keys.length ? `meta keys: ${keys.join(', ')}${Object.keys(m).length > keys.length ? '…' : ''}` : '';\n  }\n\n  return bits.join(' · ');\n})() }}",
+          "formattingExpressions": [
+            "{{ (() => {\n  const m = currentSourceRow?.meta;\n  if (!m || typeof m !== 'object') return '';\n  const pick = (k) => (m?.[k] == null ? null : m[k]);\n\n  // Common roster meta fields\n  const rosterNow = pick('rosterNow');\n  const minPlayers = pick('minPlayers');\n  const targetPlayers = pick('targetPlayers');\n  const missingMin = pick('missingMin');\n  const missingTarget = pick('missingTarget');\n\n  const bits = [];\n  if (rosterNow != null && minPlayers != null) bits.push(`Roster: ${rosterNow}/${minPlayers}`);\n  if (targetPlayers != null) bits.push(`Target: ${targetPlayers}`);\n  if (missingMin != null) bits.push(`missingMin: ${missingMin}`);\n  if (missingTarget != null) bits.push(`missingTarget: ${missingTarget}`);\n\n  // Fallback: show keys\n  if (!bits.length) {\n    const keys = Object.keys(m).slice(0, 6);\n    return keys.length ? `meta keys: ${keys.join(', ')}${Object.keys(m).length > keys.length ? '…' : ''}` : '';\n  }\n\n  return bits.join(' · ');\n})() }}",
+            "#E0E0E0",
+            "false"
+          ],
+          "conditionalFormatting": [
+            "#E0E0E0"
+          ],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": [
+            "#E0E0E0"
+          ]
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "a7f45",
+          "label": "Team",
+          "dataKey": "team",
+          "order": 10,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 100,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "true"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "655ee",
+          "label": "Version",
+          "dataKey": "version",
+          "order": 11,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 140,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "true"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "aiTeamNeedsTable",
+          "columnId": "e79f0",
+          "label": "Debug notes",
+          "dataKey": "debug",
+          "order": 12,
+          "type": "multilineString",
+          "format": "multilineString",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 240,
+          "visible": false,
+          "hiddenExpression": "true",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ (() => {\n  const d = currentSourceRow?.debug;\n  const notes = Array.isArray(d?.notes) ? d.notes : [];\n  return notes.join(' | ');\n})() }}",
+          "formattingExpressions": [
+            "{{ (() => {\n  const d = currentSourceRow?.debug;\n  const notes = Array.isArray(d?.notes) ? d.notes : [];\n  return notes.join(' | ');\n})() }}",
+            "true"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": []
+        }
+      ]
+    },
+    {
+      "componentName": "playersTable2",
+      "dataSource": "{{ wishlistWithImages.value }}",
+      "columns": [
+        {
+          "table": "playersTable2",
+          "columnId": "4ccde",
+          "label": "Bild",
+          "dataKey": "image_url",
+          "order": 0,
+          "type": "image",
+          "format": "image",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "center",
+          "width": 110,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "75107",
+          "label": "Name",
+          "dataKey": "name",
+          "order": 1,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 147,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "191fa",
+          "label": "Marktwert",
+          "dataKey": "marktwert",
+          "order": 2,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 130,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "926cd",
+          "label": "Gehalt",
+          "dataKey": "gehalt",
+          "order": 3,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 110,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "e0244",
+          "label": "Fit",
+          "dataKey": "team_fit",
+          "order": 4,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 75,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "29705",
+          "label": "Pow",
+          "dataKey": "pow",
+          "order": 5,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 72,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#BBDEFB",
+            "#81C784",
+            "#C8E6C9",
+            "#FFF59D",
+            "#FFE082",
+            "#FFCC80",
+            "#FFAB91",
+            "#EF9A9A",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "2dfc1",
+          "label": "Spe",
+          "dataKey": "spe",
+          "order": 6,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 72,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#BBDEFB",
+            "#81C784",
+            "#C8E6C9",
+            "#FFF59D",
+            "#FFE082",
+            "#FFCC80",
+            "#FFAB91",
+            "#EF9A9A",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "e17c3",
+          "label": "Men",
+          "dataKey": "men",
+          "order": 7,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 72,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#BBDEFB",
+            "#81C784",
+            "#C8E6C9",
+            "#FFF59D",
+            "#FFE082",
+            "#FFCC80",
+            "#FFAB91",
+            "#EF9A9A",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "aedc3",
+          "label": "Soc",
+          "dataKey": "soc",
+          "order": 8,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 72,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ Math.round(Number(item)) }}",
+          "formattingExpressions": [
+            "{{ Math.round(Number(item)) }}",
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+            "#000000"
+          ],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": [
+            "#1565C0",
+            "#BBDEFB",
+            "#81C784",
+            "#C8E6C9",
+            "#FFF59D",
+            "#FFE082",
+            "#FFCC80",
+            "#FFAB91",
+            "#EF9A9A",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "9846d",
+          "label": "Klasse",
+          "dataKey": "klasse",
+          "order": 9,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 150,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#ff8a80'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#a5d6a7'; if (['Mage','Overseer','Templar'].includes(k)) return '#90caf9'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#ffe082'; return ''; })() }}",
+            "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#b71c1c'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#1b5e20'; if (['Mage','Overseer','Templar'].includes(k)) return '#0d47a1'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#e65100'; return ''; })() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#ff8a80'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#a5d6a7'; if (['Mage','Overseer','Templar'].includes(k)) return '#90caf9'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#ffe082'; return ''; })() }}",
+            "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#b71c1c'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#1b5e20'; if (['Mage','Overseer','Templar'].includes(k)) return '#0d47a1'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#e65100'; return ''; })() }}"
+          ],
+          "expressionRefs": [
+            "currentSourceRow"
+          ],
+          "foundColorCodes": [
+            "#ff8a80",
+            "#a5d6a7",
+            "#90caf9",
+            "#ffe082",
+            "#b71c1c",
+            "#1b5e20",
+            "#0d47a1",
+            "#e65100"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "4bba1",
+          "label": "Rasse",
+          "dataKey": "rasse",
+          "order": 10,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ _.startCase(item) }}",
+          "formattingExpressions": [
+            "{{ _.startCase(item) }}"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "96ded",
+          "label": ">20",
+          "dataKey": "count_gt20",
+          "order": 11,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 70,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "expressionRefs": [
+            "currentSourceRow",
+            "row"
+          ],
+          "foundColorCodes": [
+            "#2E7D32",
+            "#66BB6A",
+            "#FFEB3B",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "4511e",
+          "label": ">40",
+          "dataKey": "count_gt40",
+          "order": 12,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 70,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "expressionRefs": [
+            "currentSourceRow",
+            "row"
+          ],
+          "foundColorCodes": [
+            "#2E7D32",
+            "#66BB6A",
+            "#FFEB3B",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "20c09",
+          "label": ">60",
+          "dataKey": "count_gt60",
+          "order": 13,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 70,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "expressionRefs": [
+            "currentSourceRow",
+            "row"
+          ],
+          "foundColorCodes": [
+            "#2E7D32",
+            "#66BB6A",
+            "#FFEB3B",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "597c5",
+          "label": ">80",
+          "dataKey": "count_gt80",
+          "order": 14,
+          "type": "decimal",
+          "format": "decimal",
+          "numberFormat": "decimal",
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "right",
+          "width": 70,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "conditionalFormatting": [
+            "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+            "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+          ],
+          "expressionRefs": [
+            "currentSourceRow",
+            "row"
+          ],
+          "foundColorCodes": [
+            "#2E7D32",
+            "#66BB6A",
+            "#FFEB3B",
+            "#EF5350",
+            "#FFFFFF",
+            "#000000"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "6798b",
+          "label": "Cha",
+          "dataKey": "charisma_rating",
+          "order": 15,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "60423",
+          "label": "Int",
+          "dataKey": "intelligence_rating",
+          "order": 16,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "bdbde",
+          "label": "Wil",
+          "dataKey": "will_rating",
+          "order": 17,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "23a59",
+          "label": "Spe",
+          "dataKey": "speed_rating",
+          "order": 18,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "7d0b9",
+          "label": "Sta",
+          "dataKey": "stamina_rating",
+          "order": 19,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 95,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "6c010",
+          "label": "Hea",
+          "dataKey": "health_rating",
+          "order": 20,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 95,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "63d04",
+          "label": "Awa",
+          "dataKey": "awareness_rating",
+          "order": 21,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "55eb2",
+          "label": "Dex",
+          "dataKey": "dexterity_rating",
+          "order": 22,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "c373f",
+          "label": "Det",
+          "dataKey": "determination_rating",
+          "order": 23,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "d9236",
+          "label": "Pow",
+          "dataKey": "power_rating",
+          "order": 24,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 95,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "4e521",
+          "label": "Spi",
+          "dataKey": "spirit_rating",
+          "order": 25,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "6b52e",
+          "label": "Tor",
+          "dataKey": "torment_rating",
+          "order": 26,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 90,
+          "visible": "conditional",
+          "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+            "{{ !showWishlistAttributes.value }}"
+          ],
+          "conditionalFormatting": [
+            "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+            "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+          ],
+          "expressionRefs": [
+            "item",
+            "value"
+          ],
+          "foundColorCodes": [
+            "#BBDEFB",
+            "#E3F2FD",
+            "#C8E6C9",
+            "#E8F5E9",
+            "#FFF9C4",
+            "#FFFDE7",
+            "#FFE0B2",
+            "#FFCDD2",
+            "#002366",
+            "#0052CC",
+            "#0D5E1F",
+            "#2E7D32",
+            "#B8860B",
+            "#F9A825",
+            "#E65100",
+            "#B71C1C"
+          ]
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "a51ca",
+          "label": "Subclass 1",
+          "dataKey": "subclass_1",
+          "order": 27,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "4555e",
+          "label": "Subclass 2",
+          "dataKey": "subclass_2",
+          "order": 28,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "b0728",
+          "label": "Subclass 3",
+          "dataKey": "subclass_3",
+          "order": 29,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "8a9d6",
+          "label": "Alignment",
+          "dataKey": "alignment",
+          "order": 30,
+          "type": "string",
+          "format": "string",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "c2cf7",
+          "label": "Trait+1",
+          "dataKey": "trait_pos_1",
+          "order": 31,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "e3b95",
+          "label": "Trait+2",
+          "dataKey": "trait_pos_2",
+          "order": 32,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 140,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "2839b",
+          "label": "Trait+3",
+          "dataKey": "trait_pos_3",
+          "order": 33,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 140,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "1cf51",
+          "label": "Trait-1",
+          "dataKey": "trait_neg_1",
+          "order": 34,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "da39a",
+          "label": "Trait-2",
+          "dataKey": "trait_neg_2",
+          "order": 35,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "781c7",
+          "label": "Trait-3",
+          "dataKey": "trait_neg_3",
+          "order": 36,
+          "type": "tags",
+          "format": "tags",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 145,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": null,
+          "formattingExpressions": [],
+          "conditionalFormatting": [],
+          "expressionRefs": [],
+          "foundColorCodes": []
+        },
+        {
+          "table": "playersTable2",
+          "columnId": "43fd2",
+          "label": "Geschlecht",
+          "dataKey": "geschlecht",
+          "order": 37,
+          "type": "tag",
+          "format": "tag",
+          "numberFormat": null,
+          "currencyFormat": null,
+          "percentFormat": null,
+          "decimalSettings": null,
+          "prefix": null,
+          "suffix": null,
+          "alignment": "left",
+          "width": 120,
+          "visible": true,
+          "hiddenExpression": "",
+          "editable": false,
+          "readOnly": true,
+          "valueFormatting": "{{ _.startCase(item) }}",
+          "formattingExpressions": [
+            "{{ _.startCase(item) }}"
+          ],
+          "conditionalFormatting": [],
+          "expressionRefs": [
+            "item"
+          ],
+          "foundColorCodes": []
+        }
+      ]
+    }
+  ],
+  "sourcePath": "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json",
+  "extractedAt": "2026-06-03T20:23:47.288Z"
+}

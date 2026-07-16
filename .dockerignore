@@ -1,0 +1,15 @@
+.git
+.next
+node_modules
+node_modules_broken_*
+outputs
+reports
+backups
+*.log
+.env*
+!.env.reference.example
+.DS_Store
+coverage
+playwright-report
+test-results
+tsconfig.tsbuildinfo

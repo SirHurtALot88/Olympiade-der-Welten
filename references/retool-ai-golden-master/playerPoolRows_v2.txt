@@ -1,0 +1,51 @@
+// term: disciplineRecipesGlobal
+// id: playerPoolRows_v2
+// type: function
+// subtype: Function
+// page: einsatzlisteSlotsV2Page
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: playerPoolRowsTableOfficial_v4.value | v2_slots_d1.value | v2_slots_d2.value
+// extractionStatus: complete_or_primary_match
+// playerOptionsForSlots_v2
+// Builds select option lists for D1/D2 slots.
+// IMPORTANT: keep cross-diszi exclusivity + stable option values (player name).
+//
+// Mini-cleanup (unification):
+// Slot dropdowns should use the same official row source as the table.
+// Was: playerPoolRows_v2.value
+// Now: playerPoolRowsTableOfficial_v4.value
+
+const rows = {{ playerPoolRowsTableOfficial_v4.value }} || [];
+const d1Slots = {{ v2_slots_d1.value }} || [];
+const d2Slots = {{ v2_slots_d2.value }} || [];
+
+const selectedD1 = new Set(d1Slots.map((s) => String(s.playerName || '')).filter(Boolean));
+const selectedD2 = new Set(d2Slots.map((s) => String(s.playerName || '')).filter(Boolean));
+
+const sortBy = (key) => (a, b) =>
+Number(b[key] || 0) - Number(a[key] || 0) ||
+String(a.name || '').localeCompare(String(b.name || ''));
+
+// D1: exclude players currently selected in ANY D2 slot (cross-diszi exclusivity)
+// Show d1Effective (fatigue-adjusted) in label.
+const d1 = rows.
+filter((r) => !selectedD2.has(String(r.name))).
+sort(sortBy('d1Effective')).
+map((r) => ({
+  label: `${r.name} (${r.d1Effective ?? 0})`,
+  value: r.name // keep stable selection identity
+}));
+
+// D2: exclude players currently selected in ANY D1 slot (cross-diszi exclusivity)
+// Show d2Effective (fatigue-adjusted) in label.
+const d2 = rows.
+filter((r) => !selectedD1.has(String(r.name))).
+sort(sortBy('d2Effective')).
+map((r) => ({
+  label: `${r.name} (${r.d2Effective ?? 0})`,
+  value: r.name // keep stable selection identity
+}));
+
+return { d1, d2 };

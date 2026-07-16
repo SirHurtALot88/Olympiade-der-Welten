@@ -1,0 +1,20 @@
+{
+  "name": "Bloodraven",
+  "id": "player-0723-bloodraven",
+  "className": "Rogue",
+  "race": "Human",
+  "alignment": "C-N",
+  "gender": "f",
+  "subclasses": ["Maniac", "Destroyer", "Amazoness"],
+  "traitsPositive": ["Loyal", "Sexy", "Diligent"],
+  "traitsNegative": ["Scandalous", "Cruel", "Cruel"],
+  "attributes": {
+    "power": 66, "health": 29, "stamina": 48, "intelligence": 36,
+    "awareness": 37, "determination": 83, "speed": 81, "dexterity": 93,
+    "charisma": 82, "will": 16, "spirit": 10, "torment": 82
+  },
+  "flavorDe": "In den schneeverhangenen Wäldern nahe der Totenmark jagt Bloodraven leiser, als ihre rot leuchtenden Augen vermuten lassen. Ihr schwarzes Haar, der Pelz an den Schultern und die zwei Klingen mit glühenden Schneiden machen sie zur Legende unter den Grenzgängern — nicht weil sie hold ist, sondern weil sie jeden Pfad zweimal kennt: einmal zum Jagen, einmal zum Verschwinden. Einst war sie nur eine Überlebende zwischen Frost und Schuld. Heute folgt ihr Ruf wie ein Messer durch Nebel: loyal zu den Wenigen, die zählen, gnadenlos zu allen anderen. Wer sie im Schnee sieht, sollte nicht fragen, wen sie sucht — sondern ob er schon zu lange hier steht.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Bloodraven.jpg",
+  "cost": 55,
+  "upkeepBase": 5
+}

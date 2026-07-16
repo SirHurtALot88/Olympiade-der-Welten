@@ -1,0 +1,40 @@
+// term: aiTeamNeeds
+// id: aiPicksAudit
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTransferPackagesSnapshot.value | getCashFromSaisonstand.value | getActivePlayersByTeam.data
+// extractionStatus: complete_or_primary_match
+const pkgs = Array.isArray({{ aiTransferPackagesSnapshot.value }}) ? {{ aiTransferPackagesSnapshot.value }} : [];
+const cash = Number({{ getCashFromSaisonstand.value }}?.cash || 0);
+const roster = formatDataAsArray({{ getActivePlayersByTeam.data }}) || [];
+const slotsLeft = Math.max(0, 12 - (roster?.length || 0));
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+
+const overCash = pkgs.filter((p) => n(p.total_fee) > cash);
+const overSlots = pkgs.filter((p) => n(p.player_count) > slotsLeft);
+const infeasible = pkgs.filter((p) => !p.feasible);
+
+return {
+  packagesCount: pkgs.length,
+  cash,
+  slotsLeft,
+  feasibleCount: pkgs.length - infeasible.length,
+  infeasibleCount: infeasible.length,
+  overCashCount: overCash.length,
+  overSlotsCount: overSlots.length,
+  examples: {
+    top5: pkgs.slice(0, 5).map((p) => ({
+      package_name: p.package_name,
+      total_fee: n(p.total_fee),
+      remaining_cash: n(p.remaining_cash),
+      player_count: n(p.player_count),
+      feasible: Boolean(p.feasible),
+      package_score: n(p.package_score) })),
+
+    overCash: overCash.slice(0, 5).map((p) => ({ package_name: p.package_name, total_fee: n(p.total_fee) })),
+    overSlots: overSlots.slice(0, 5).map((p) => ({ package_name: p.package_name, player_count: n(p.player_count) })) } };

@@ -1,0 +1,20 @@
+{
+  "name": "Chainmaster",
+  "id": "player-0159-chainmaster",
+  "className": "Warlord",
+  "race": "Demon",
+  "alignment": "N-B",
+  "gender": "m",
+  "subclasses": ["Undead", "Prime Evil", "Lord"],
+  "traitsPositive": ["Eloquent", "Healthy", "Motivated"],
+  "traitsNegative": ["Cruel", "ColdBlooded", "Obsessive"],
+  "attributes": {
+    "power": 76, "health": 84, "stamina": 68, "intelligence": 74,
+    "awareness": 43, "determination": 69, "speed": 15, "dexterity": 86,
+    "charisma": 89, "will": 66, "spirit": 33, "torment": 83
+  },
+  "flavorDe": "Tief im Schwefelreich hängt Chainmaster in Ketten, die schwer genug sind, einen Turm zu binden — und trotzdem nicht schwer genug scheinen. Das blaue Feuer in seiner Brust leuchtet durch die Risse seiner Rüstung wie ein Herz, das sich weigert zu verstehen, was Gefangenschaft bedeutet. Man sagt, er habe einst Herrscher geknebelt, Rebellen gezähmt und ganze Schlachten nur mit dem Klang von Eisen beendet. Heute ist Chainmaster weniger Gefangener als lebende Warnung: Wer an seine Ketten rührt, erfährt schnell, dass sie längst auch ihn tragen.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Chainmaster.jpg",
+  "cost": 90,
+  "upkeepBase": 9
+}

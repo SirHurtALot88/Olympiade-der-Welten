@@ -1,0 +1,48 @@
+fromTab,toTab,v4Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,10084,8,3265,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Inbox,Einsatzliste,34339,1,161,/api/lineups/legacy/lab-context,Tabwechsel >5s,slow
+Einsatzliste,Arena,13586,2,3280,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Arena,Saisonstand,11312,1,3510,/api/matchday/arena-base,Tabwechsel >5s,slow
+Saisonstand,Teams,127435,0,0,,"locator.waitFor: Timeout 120000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""foundation-teams-view""]').first() to be visible
+",failed
+Teams,Spieler,120005,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-players')
+",failed
+Spieler,Training,120005,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-trainingCompact')
+",failed
+Training,Gebäude,120006,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-trainingV2')
+",failed
+Gebäude,Training (revisit),120005,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-trainingCompact')
+",failed
+Gebäude,Transfermarkt,120005,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-marketV2')
+",failed
+Transfermarkt,Scouting,120004,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-scoutingCenterV2')
+",failed
+Scouting,Historie,120006,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-historyV2')
+",failed
+Historie,Ranks,120005,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-ranks')
+",failed
+Ranks,Diszis,159655,7,25038,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Diszis,Sponsoren,145271,0,0,,"locator.waitFor: Timeout 120000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""team-sponsor-choice""]:not(.foundation-section-hidden)').first() to be visible
+",failed
+Sponsoren,Lexikon,11349,0,0,,Tabwechsel >5s,slow
+START,Home,54991,,,initial_load,,ok

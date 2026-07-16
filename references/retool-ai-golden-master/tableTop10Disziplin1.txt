@@ -1,0 +1,13 @@
+// term: captain_boost_x10
+// id: tableTop10Disziplin1
+// type: widget
+// subtype: TableWidget2
+// page: Einsatzliste
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for captain_boost_x10.
+

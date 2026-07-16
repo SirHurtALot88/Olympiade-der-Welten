@@ -1,0 +1,370 @@
+# Current App Snapshot
+
+## 1. Executive Summary
+- Generated: 2026-06-09T22:57:27.309Z
+- Project root: `/Users/chrisfalk/Documents/Codex/Olympiade der Welten`
+- Package: `baue-einen-lokalen-web-app-prototyp`
+- Git branch: `unknown`
+- Git commit: `unknown`
+- Node / npm: `v24.16.0` / `11.13.0`
+
+## 2. Current Feature Status
+- Completed:
+  - Transfermarkt read-only
+  - Buy-Service
+  - Sell-Service
+  - Transferhistorie
+  - echte 12 Attribute importiert
+  - negative Fit-Werte möglich
+  - Build-Stabilität
+  - Standings Preview read-only
+  - Mutating Script Safety Audit
+- Blockers:
+  - Standings/Punkte-Sheet-Mapping fehlt
+  - Rank-to-points Mapping fehlt
+  - Cash/Preisgeld-Tabelle fehlt
+  - VIP Wal Attribute fehlen
+  - mögliche Offline-Legacy-Spuren entfernen
+  - Golden-Master-Fit fehlt
+
+## 3. Routes / Pages
+- `/api/ai/market-apply` (route)
+- `/api/ai/market-plan-apply` (route)
+- `/api/ai/market-plan-preview` (route)
+- `/api/ai/needs-picks-compare` (route)
+- `/api/ai/picks-audit-reset` (route)
+- `/api/ai/picks-import` (route)
+- `/api/ai/picks-run` (route)
+- `/api/ai/roster-fill` (route)
+- `/api/ai/sell-preview` (route)
+- `/api/lineups/legacy/ai-batch-apply` (route)
+- `/api/lineups/legacy/ai-batch-preview` (route)
+- `/api/lineups/legacy/ai-preview` (route)
+- `/api/lineups/legacy/form-cards` (route)
+- `/api/lineups/legacy/lab-context` (route)
+- `/api/lineups/legacy/preview` (route)
+- `/api/lineups/legacy` (route)
+- `/api/media/player-portrait/[playerId]` (route)
+- `/api/media/team-logo/[teamId]` (route)
+- `/api/resolve/legacy-matchday-apply` (route)
+- `/api/resolve/legacy-matchday-preview` (route)
+- `/api/season/advance-matchday` (route)
+- `/api/season/cash-prize-apply` (route)
+- `/api/season/management-overview` (route)
+- `/api/season/matchday-auto-run` (route)
+- `/api/season/matchday-mvp-score` (route)
+- `/api/season/prize-preview` (route)
+- `/api/season/season-snapshot` (route)
+- `/api/season/standings-overview` (route)
+- `/api/season/whole-season-dry-run` (route)
+- `/api/season/whole-season-dryrun` (route)
+- `/api/singleplayer-state` (route)
+- `/api/standings/apply` (route)
+- `/api/standings/preview` (route)
+- `/api/transfermarkt/ai-preview` (route)
+- `/api/transfermarkt/ai-sell-preview` (route)
+- `/api/transfermarkt/buy` (route)
+- `/api/transfermarkt/free-agents` (route)
+- `/api/transfermarkt/history` (route)
+- `/api/transfermarkt/recap` (route)
+- `/api/transfermarkt/sell` (route)
+- `/foundation/legacy-lineup-lab` (page)
+- `/foundation/legacy-resolve-lab` (page)
+- `/foundation` (page)
+- `/foundation/transfermarkt-lab` (page)
+- `/` (layout)
+- `/` (page)
+- `/room/[roomCode]` (page)
+
+Foundation tabs:
+- `season` → Saisonstand
+- `lineup` → Einsatzliste
+- `teams` → Teams
+- `players` → Spieler
+- `ranks` → Ranks
+- `diszis` → Diszis
+- `prize` → Preisgeld
+- `market` → Transfermarkt
+- `history` → Transferhistorie
+- `cockpit` → Spieltag
+- `generator` → Player Generator
+- `teamSettings` → Team Settings
+- `admin` → Admin
+- `seasonPreview` → Saisonstand Preview
+- `debug` → Debug
+- `season` → Saisonstand
+- `lineup` → Einsatzliste
+- `market` → Transfermarkt
+- `prize` → Preisgeld
+
+## 4. API Endpoints
+- `/api/ai/market-apply`
+- `/api/ai/market-plan-apply`
+- `/api/ai/market-plan-preview`
+- `/api/ai/needs-picks-compare`
+- `/api/ai/picks-audit-reset`
+- `/api/ai/picks-import`
+- `/api/ai/picks-run`
+- `/api/ai/roster-fill`
+- `/api/ai/sell-preview`
+- `/api/lineups/legacy/ai-batch-apply`
+- `/api/lineups/legacy/ai-batch-preview`
+- `/api/lineups/legacy/ai-preview`
+- `/api/lineups/legacy/form-cards`
+- `/api/lineups/legacy/lab-context`
+- `/api/lineups/legacy/preview`
+- `/api/lineups/legacy`
+- `/api/media/player-portrait/[playerId]`
+- `/api/media/team-logo/[teamId]`
+- `/api/resolve/legacy-matchday-apply`
+- `/api/resolve/legacy-matchday-preview`
+- `/api/season/advance-matchday`
+- `/api/season/cash-prize-apply`
+- `/api/season/management-overview`
+- `/api/season/matchday-auto-run`
+- `/api/season/matchday-mvp-score`
+- `/api/season/prize-preview`
+- `/api/season/season-snapshot`
+- `/api/season/standings-overview`
+- `/api/season/whole-season-dry-run`
+- `/api/season/whole-season-dryrun`
+- `/api/singleplayer-state`
+- `/api/standings/apply`
+- `/api/standings/preview`
+- `/api/transfermarkt/ai-preview`
+- `/api/transfermarkt/ai-sell-preview`
+- `/api/transfermarkt/buy`
+- `/api/transfermarkt/free-agents`
+- `/api/transfermarkt/history`
+- `/api/transfermarkt/recap`
+- `/api/transfermarkt/sell`
+
+## 5. Prisma Models / Migrations
+Models:
+- `Save`
+- `Season`
+- `Team`
+- `TeamSeasonState`
+- `Player`
+- `PlayerAttribute`
+- `PlayerDisciplineScore`
+- `ActivePlayer`
+- `Discipline`
+- `DisciplineWeight`
+- `SeasonDisciplineConfig`
+- `Matchday`
+- `Lineup`
+- `LineupSlot`
+- `MatchdayResult`
+- `DisciplineResult`
+- `PlayerDisciplinePerformance`
+- `DisciplineHighlight`
+- `ResultAuditLog`
+- `Transfer`
+
+Enums:
+- `SaveStatus`
+- `SeasonStatus`
+- `DisciplineCategory`
+- `MatchdayStatus`
+- `LineupStatus`
+- `DisciplineSide`
+- `ActivePlayerStatus`
+- `ActivePlayerRoleTag`
+- `TransferType`
+- `MatchdayResultStatus`
+- `LegacyReadinessStatus`
+- `PlayerAttributeKey`
+
+Migrations:
+- `prisma/migrations/20260602191500_init_supabase_foundation/migration.sql`
+- `prisma/migrations/20260602203000_expand_discipline_weight_attributes/migration.sql`
+- `prisma/migrations/20260603070447_legacy_lineup_phase1/migration.sql`
+- `prisma/migrations/20260603184500_four_discipline_tags/migration.sql`
+- `prisma/migrations/20260603193000_add_legacy_matchday_result_tables/migration.sql`
+- `prisma/migrations/20260603221500_add_player_sheet_display_fields/migration.sql`
+- `prisma/migrations/20260604111500_add_player_attribute_sheet_fields/migration.sql`
+- `prisma/migrations/20260604124500_remove_player_age_nationality/migration.sql`
+- `prisma/migrations/20260604132000_drop_alliance_table/migration.sql`
+
+## 6. Write Paths
+- `lib/market/transfermarkt-buy-service.ts`: buy write path; dryRun default: yes; write flag nötig: yes; allowed: Transfer, ActivePlayer, TeamSeasonState; forbidden: SQLite, standings, season prize, AI
+- `lib/market/transfermarkt-sell-service.ts`: sell write path; dryRun default: yes; write flag nötig: yes; allowed: Transfer, ActivePlayer, TeamSeasonState; forbidden: SQLite, standings, season prize, AI
+- `lib/resolve/legacy-matchday-result-apply-service.ts`: result apply path; dryRun default: yes; write flag nötig: yes; allowed: local SeasonState.matchdayResults, local SeasonState.disciplineResults, local SeasonState.playerDisciplinePerformances, local SeasonState.disciplineHighlights, local SeasonState.resultAuditLogs; forbidden: Prisma MatchdayResult, TeamSeasonState standings, cash, price money
+- `scripts/sync-player-attribute-sheet-to-db.ts`: attribute sync script; dryRun default: yes; write flag nötig: yes; allowed: PlayerAttribute; forbidden: transfermarkt, standings, SQLite
+- `scripts/sync-player-sheet-columns-to-db.ts`: player sheet sync script; dryRun default: yes; write flag nötig: yes; allowed: Player, PlayerAttribute; forbidden: transfermarkt, standings, SQLite
+- `prisma/seed.ts`: seed path; dryRun default: no; write flag nötig: no; allowed: foundation seed tables; forbidden: production-only destructive reset
+- `prisma/migrations`: migration path; dryRun default: no; write flag nötig: no; allowed: schema-level changes; forbidden: blind resets, drops without explicit intent
+
+## 7. Read-only Preview Paths
+- `lib/market/contract-negotiation-preview.ts`: contract-negotiation-preview module
+- `lib/market/transfer-history-read-service.ts`: Read-only transfer history listing service.
+- `lib/market/transfermarkt-read-service.ts`: Read-only data loading service.
+- `lib/standings/standings-preview-engine.ts`: Read-only preview engine.
+
+## 8. Masterplan Rules
+- Snapshot after phase: yes
+- Phase 0A write safety audit: yes
+- Standings apply gate active: yes
+- No legacy terms in active standings: yes
+- Build gate per phase:
+  - npm run next:clean
+  - npm run build
+  - npm run build
+  - npm test
+  - npm run db:smoke-studio-models (bei Prisma/DB-Aenderungen)
+
+## 9. Audits / Smoke Scripts
+- `next:clean`: tsx scripts/clean-next-runtime.ts [build/clean]
+- `build:clean`: npm run next:clean && npm run build [build/clean]
+- `dev`: tsx server.ts
+- `dev:clean`: ./scripts/run-foundation-dev.sh --clean [build/clean]
+- `play`: ./scripts/start-oly-game.sh
+- `build`: tsx scripts/run-next-build.ts [build/clean]
+- `start`: NODE_ENV=production tsx server.ts
+- `lint`: eslint .
+- `test`: vitest run
+- `db:generate`: tsx scripts/run-prisma-with-env.ts generate
+- `db:migrate`: tsx scripts/run-prisma-with-env.ts migrate deploy [db]
+- `db:seed`: prisma db seed [db]
+- `db:studio`: tsx scripts/run-prisma-with-env.ts studio [db]
+- `db:smoke-studio-models`: tsx scripts/check-prisma-studio-models.ts [smoke, db]
+- `project:audit-write-safety`: node --import tsx scripts/audit-write-safety.ts [audit, sync/import]
+- `project:check-mirror`: tsx scripts/check-project-mirror-consistency.ts
+- `project:export-snapshot`: tsx scripts/export-project-snapshot.ts
+- `app:check-live`: tsx scripts/check-local-live-app.ts
+- `db:check-foundation-projection`: tsx scripts/check-foundation-projection.ts
+- `db:compare-foundation-sources`: tsx scripts/compare-foundation-sources.ts
+- `lineup:check-context`: tsx scripts/check-legacy-lineup-context.ts
+- `lineup:check-readiness`: tsx scripts/check-legacy-matchday-readiness.ts
+- `lineup:smoke`: tsx scripts/smoke-legacy-lineup.ts [smoke]
+- `transfermarkt:audit`: tsx scripts/audit-transfermarkt-state.ts [audit]
+- `transfermarkt:audit-buy-integrity`: tsx scripts/audit-transfermarkt-buy-integrity.ts [audit]
+- `transfermarkt:smoke-buy`: tsx scripts/smoke-transfermarkt-buy.ts [smoke]
+- `transfermarkt:smoke-sell`: tsx scripts/smoke-transfermarkt-sell.ts [smoke]
+- `golden:compare`: tsx scripts/compare-golden-master-fixture.ts
+- `ai:audit-full-repick`: tsx scripts/export-ai-full-repick-audit.ts [audit]
+- `player:audit-economy-source`: tsx scripts/audit-player-economy-source.ts [audit]
+- `player:audit-attributes-source`: node ./scripts/audit-player-attributes-source.ts [audit]
+- `player:audit-retool-attribute-mapping`: tsx scripts/audit-retool-attribute-mapping.ts [audit]
+- `player:sync-attribute-sheet-db`: tsx scripts/sync-player-attribute-sheet-to-db.ts [sync/import]
+- `player:sync-sheet-columns-db`: tsx scripts/sync-player-sheet-columns-to-db.ts [sync/import]
+- `season:audit-start-cash`: tsx scripts/audit-team-start-cash.ts [audit]
+- `season:sync-start-cash-db`: tsx scripts/sync-team-start-cash-to-db.ts [sync/import]
+- `season:smoke-management-loop`: npm exec -- tsx scripts/smoke-season-management-loop.ts [smoke]
+- `season:smoke-matchday-auto-run`: tsx scripts/smoke-matchday-auto-run.ts [smoke]
+- `season:smoke-matchday-mvp-score`: tsx scripts/smoke-matchday-mvp-score.ts --execute [smoke]
+- `season:smoke-whole-season-dry-run`: tsx scripts/smoke-whole-season-dry-run.ts [smoke]
+- `season:smoke-local-loop`: tsx scripts/smoke-local-season-loop.ts [smoke]
+- `season:smoke-local-multi-loop`: tsx scripts/smoke-local-multi-matchday-loop.ts [smoke]
+- `resolve:check-legacy-matchday`: tsx scripts/check-legacy-matchday-resolve.ts
+- `resolve:smoke-preview`: tsx scripts/smoke-resolve-preview.ts [smoke, preview]
+- `resolve:smoke-apply`: node --import tsx scripts/smoke-legacy-matchday-result-apply.ts [smoke, sync/import]
+- `standings:audit-sheet`: tsx scripts/audit-season-standings-sheet.ts [audit]
+- `standings:export-sheets`: tsx scripts/export-standings-sheet-sources.ts
+- `prize:audit-normalized`: tsx scripts/audit-prize-money-normalized.ts [audit]
+- `standings:audit-tiebreaker`: tsx scripts/audit-standings-tiebreaker.ts [audit]
+- `standings:smoke-apply`: tsx scripts/smoke-standings-apply.ts [smoke]
+- `cash:smoke-prize-apply`: tsx scripts/smoke-cash-prize-apply.ts [smoke]
+- `retool:extract-ai`: tsx scripts/extract-retool-ai-golden-master.ts [retool extract]
+- `retool:extract-player-attributes`: tsx scripts/extract-retool-player-attributes.ts [retool extract]
+- `retool:extract-transfermarkt-columns`: tsx scripts/extract-retool-transfermarkt-columns.ts [retool extract]
+- `retool:extract-standings-economy`: tsx scripts/extract-retool-standings-economy.ts [retool extract]
+
+## 10. Tests
+- Last known local status: unknown at export time; run npm test for current status
+- Test files: 99
+- Transfermarkt:
+  - `tests/ai-transfermarkt-preview-api.test.ts`
+  - `tests/ai-transfermarkt-preview.test.ts`
+  - `tests/ai-transfermarkt-sell-preview-api.test.ts`
+  - `tests/ai-transfermarkt-sell-preview.test.ts`
+  - `tests/extract-retool-transfermarkt-columns.test.ts`
+  - `tests/foundation-transfermarkt-ui-contract.test.ts`
+  - `tests/transfer-history-api.test.ts`
+  - `tests/transfer-history-read-service.test.ts`
+  - `tests/transfermarkt-audit-script.test.ts`
+  - `tests/transfermarkt-buy-api.test.ts`
+  - `tests/transfermarkt-buy-integrity-audit.test.ts`
+  - `tests/transfermarkt-buy-service.test.ts`
+  - `tests/transfermarkt-column-contract.test.ts`
+  - `tests/transfermarkt-formatting-contract.test.ts`
+  - `tests/transfermarkt-free-agents-api.test.ts`
+  - `tests/transfermarkt-lab.test.ts`
+  - `tests/transfermarkt-local-service.test.ts`
+  - `tests/transfermarkt-read-service.test.ts`
+  - `tests/transfermarkt-sell-api.test.ts`
+  - `tests/transfermarkt-sell-service.test.ts`
+- Standings Preview:
+  - `tests/standings-online-version-contract.test.ts`
+  - `tests/standings-preview-api.test.ts`
+  - `tests/standings-preview-engine.test.ts`
+- Attribute Import:
+  - `tests/audit-retool-attribute-mapping.test.ts`
+  - `tests/extract-retool-player-attributes.test.ts`
+  - `tests/player-attribute-sheet.test.ts`
+  - `tests/player-attributes-source-audit.test.ts`
+- Build Stability:
+  - `tests/ai-golden-master-configs.test.ts`
+  - `tests/compare-golden-master-fixture-script.test.ts`
+  - `tests/golden-master-fixture-diff.test.ts`
+  - `tests/prisma-studio-contract.test.ts`
+  - `tests/singleplayer-state.test.ts`
+
+## 11. Blockers / Next Steps
+- Standings/Punkte-Sheet-Mapping fehlt
+- Rank-to-points Mapping fehlt
+- Cash/Preisgeld-Tabelle fehlt
+- VIP Wal Attribute fehlen
+- mögliche Offline-Legacy-Spuren entfernen
+- Golden-Master-Fit fehlt
+
+## Docs
+- `docs/AI_AUTOMATION_STATUS.md`
+- `docs/AI_GOLDEN_MASTER_DEPENDENCY_MAP.md`
+- `docs/AI_GOLDEN_MASTER_PORTING_SPEC.md`
+- `docs/AI_GOLDEN_MASTER_TEST_CASES.md`
+- `docs/AI_LEGACY_LOGIC_INVENTORY.md`
+- `docs/AUTO_RESOLVE_HIGHLIGHTS_AND_VISUALIZATION_PLAN.md`
+- `docs/CASH_PRIZE_APPLY_PLAN.md`
+- `docs/CASH_PRIZE_SYSTEM_PLAN.md`
+- `docs/CURRENT_PROJECT_HANDOFF.md`
+- `docs/DATABASE.md`
+- `docs/DATABASE_OPEN_QUESTIONS.md`
+- `docs/GOLDEN_MASTER_FIXTURE_SPEC.md`
+- `docs/GOLDEN_MASTER_VERIFICATION_PLAN.md`
+- `docs/LEGACY_LINEUP_LAB_TEST_CHECKLIST.md`
+- `docs/LEGACY_MATCHDAY_RESOLVE_PLAN.md`
+- `docs/LEGACY_MATCHDAY_RESULT_APPLY_PLAN.md`
+- `docs/LOCAL_LIVE_VERIFICATION_CHECKLIST.md`
+- `docs/MASTERPLAN_EXECUTION_RULES.md`
+- `docs/MIRROR_WORKSPACE_NOTES.md`
+- `docs/NEXT_BUILD_STABILITY_NOTES.md`
+- `docs/PLAYER_ARRAY_FIELDS_POLICY.md`
+- `docs/PLAYER_ATTRIBUTES_12_IMPORT_PLAN.md`
+- `docs/PLAYER_GENERATOR_PLAN.md`
+- `docs/README_RETOOL_SYSTEM.md`
+- `docs/RETOOL_ASK_MODE_QUESTIONS_STANDINGS_ECONOMY.md`
+- `docs/SCRIPT_TOOLING_REGISTRY.md`
+- `docs/SEASON_STANDINGS_SHEET_IMPORT_PLAN.md`
+- `docs/STANDINGS_APPLY_PLAN.md`
+- `docs/STANDINGS_ECONOMY_DEPENDENCY_MAP.md`
+- `docs/STANDINGS_PREVIEW_PLAN.md`
+- `docs/STANDINGS_RETOOL_RULES_EXTRACT.md`
+- `docs/STANDINGS_TIEBREAKER_POLICY.md`
+- `docs/SYSTEM_MAP_RETOOL_REFERENCE.md`
+- `docs/TEAM_SETTINGS_AND_STRATEGY_PROFILES.md`
+- `docs/TRAINING_AND_PROGRESSION_PLAN.md`
+- `docs/TRANSFERMARKT_BUY_SERVICE_PLAN.md`
+- `docs/TRANSFERMARKT_COLUMN_MAPPING.md`
+- `docs/TRANSFERMARKT_FORMATTING_MAP.md`
+- `docs/TRANSFERMARKT_MVP_PLAN.md`
+- `docs/TRANSFERMARKT_RETOOL_GAP.md`
+- `docs/TRANSFERMARKT_SELL_SERVICE_PLAN.md`
+- `docs/TRANSFER_WINDOW_POLICY.md`
+
+## Source Zip
+- Created: no
+- Path: not created
+- Reason: git unavailable
+

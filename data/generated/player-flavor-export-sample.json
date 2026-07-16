@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "exportedAt": "2026-06-27T20:46:28.747Z",
+  "count": 3,
+  "filters": {
+    "missingOnly": true,
+    "limit": 3,
+    "offset": 0,
+    "ids": null,
+    "names": null
+  },
+  "styleGuidePath": "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/world/olympiade-welt-lexikon.md",
+  "entries": [
+    {
+      "id": "player-0001-umbros",
+      "name": "Umbros",
+      "className": "Berserker",
+      "race": "Demon",
+      "alignment": "C-B",
+      "gender": "m",
+      "subclasses": [
+        "Fallen Angel",
+        "Destroyer",
+        "Undead"
+      ],
+      "traitsPositive": [
+        "Diligent",
+        "FiredUp"
+      ],
+      "traitsNegative": [
+        "ColdBlooded",
+        "Renegade"
+      ],
+      "flavorDe": "",
+      "flavorEn": "",
+      "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Umbros.jpg",
+      "hasPortrait": true
+    },
+    {
+      "id": "player-0002-kargath",
+      "name": "Kargath",
+      "className": "Berserker",
+      "race": "Human",
+      "alignment": "R-N",
+      "gender": "m",
+      "subclasses": [
+        "Warrior",
+        "Pet Master",
+        "Beast"
+      ],
+      "traitsPositive": [
+        "FiredUp",
+        "Loyal"
+      ],
+      "traitsNegative": [
+        "Feisty",
+        "Lazy"
+      ],
+      "flavorDe": "",
+      "flavorEn": "",
+      "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Kargath.jpg",
+      "hasPortrait": true
+    },
+    {
+      "id": "player-0003-zed",
+      "name": "Zed",
+      "className": "Berserker",
+      "race": "Construct",
+      "alignment": "C-N",
+      "gender": "n",
+      "subclasses": [
+        "Bot",
+        "Ninja",
+        "Assassin"
+      ],
+      "traitsPositive": [
+        "Flexible",
+        "Altruistic"
+      ],
+      "traitsNegative": [
+        "Manipulative",
+        "Egomaniac"
+      ],
+      "flavorDe": "",
+      "flavorEn": "",
+      "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Zed.jpg",
+      "hasPortrait": true
+    }
+  ]
+}

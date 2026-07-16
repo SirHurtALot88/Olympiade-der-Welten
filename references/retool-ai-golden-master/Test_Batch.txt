@@ -1,0 +1,73 @@
+// term: AI2_06_SimulatePicks
+// id: Test_Batch
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: autoBuyBatchPicksData.value | getAllPlayersRaw.data | playersTable.data
+// extractionStatus: complete_or_primary_match
+// Enrich the AI2 batch picks rows (autoBuyBatchPicksData) with core stats POW/SPE/MEN/SOC.
+// IMPORTANT: Use the DB "Player" master data (via getAllPlayersRaw) as the canonical stats source
+// so the modal always shows the same POW/SPE/MEN/SOC as the database.
+
+return (() => {
+  const rows = Array.isArray({{ autoBuyBatchPicksData.value }}) ?
+  {{ autoBuyBatchPicksData.value }} :
+  [];
+
+  const n = (v) => Number.isFinite(Number(v)) ? Number(v) : null;
+  const norm = (v) => String(v ?? '').toLowerCase().trim();
+
+  // Canonical stats source: DB master "Player" table (robust numeric casting)
+  const dbPlayers = typeof formatDataAsArray === 'function' ?
+  formatDataAsArray({{ getAllPlayersRaw.data }}) || [] :
+  Array.isArray({{ getAllPlayersRaw.data }}) ? {{ getAllPlayersRaw.data }} : [];
+
+  // Secondary fallback (should mostly match DB, but can include computed/merged fields like image_url)
+  const uiPlayers = Array.isArray({{ playersTable.data }}) ?
+  {{ playersTable.data }} :
+  typeof formatDataAsArray === 'function' ? formatDataAsArray({{ playersTable.data }}) || [] : [];
+
+  const byNameDb = new Map();
+  dbPlayers.forEach((p) => {
+    const key = norm(p?.name);
+    if (!key) return;
+    // Prefer first occurrence; names should be unique in DB anyway.
+    if (!byNameDb.has(key)) byNameDb.set(key, p);
+  });
+
+  const byNameUi = new Map();
+  uiPlayers.forEach((p) => {
+    const key = norm(p?.name);
+    if (!key) return;
+    if (!byNameUi.has(key)) byNameUi.set(key, p);
+  });
+
+  return rows.map((r) => {
+    const name = String(r?.player_name || r?.name || '').trim();
+    const key = norm(name);
+
+    const db = byNameDb.get(key) || null;
+    const ui = byNameUi.get(key) || null;
+
+    // Canonical priority: DB -> (UI fallback) -> existing row
+    const pow = n(db?.pow ?? ui?.pow ?? r?.pow) ?? 0;
+    const spe = n(db?.spe ?? ui?.spe ?? r?.spe) ?? 0;
+    const men = n(db?.men ?? ui?.men ?? r?.men) ?? 0;
+    const soc = n(db?.soc ?? ui?.soc ?? r?.soc) ?? 0;
+
+    return {
+      ...r,
+      pow,
+      spe,
+      men,
+      soc,
+
+      // Helpful debug markers (kept internal / can be hidden in table)
+      _coreStatsSource: db ? 'db_Player' : ui ? 'ui_fallback' : 'row_fallback',
+      _hasDbCoreStats: Boolean(db && (db.pow != null || db.spe != null || db.men != null || db.soc != null)) };
+
+  });
+})();

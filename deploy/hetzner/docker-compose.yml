@@ -1,0 +1,45 @@
+services:
+  oly-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      OLY_APP_SQLITE_PATH: /app/data/persistence/oly-app.sqlite
+      # Player/team images (macOS Dropbox paths) are served from a host folder
+      # mounted read-only below. Upload the Dropbox subtree to /opt/oly-media on
+      # the host, i.e. /opt/oly-media/Chris/Olympiade der Welten/...
+      OLY_MEDIA_DROPBOX_ROOT: /app/media/dropbox
+      # Phase-1-Login (optional, standardmaessig AUS). Siehe deploy/hetzner/.env.example.
+      OLY_AUTH_ENABLED: ${OLY_AUTH_ENABLED:-}
+      OLY_AUTH_SECRET: ${OLY_AUTH_SECRET:-}
+      OLY_USER_CHRIS_PASSWORD: ${OLY_USER_CHRIS_PASSWORD:-}
+      OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
+    volumes:
+      - oly-data:/app/data/persistence
+      - /opt/oly-media:/app/media/dropbox:ro
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - oly-app
+    environment:
+      OLY_DOMAIN: ${OLY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  oly-data:
+  caddy-data:
+  caddy-config:
+

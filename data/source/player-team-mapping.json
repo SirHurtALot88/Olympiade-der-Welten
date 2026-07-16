@@ -1,0 +1,1310 @@
+{
+  "source": "manual-authoritative-2026-06",
+  "rows": [
+    {
+      "playerName": "Queen Loriana",
+      "teamId": "C-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Cornelius",
+      "teamId": "C-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mushu",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Myriaclaw",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ryze",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Taryn",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Chrono Blaze",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ixali",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Swiftstrike",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Grimma",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Jason",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Elda",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kayle",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Zhyrak",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vertessa",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vareon",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Count Dr Acula",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Jarissa",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kashivan",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Amalyth",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Amorhasi",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sarna",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Selene Dusk",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Duradel",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Shadowsong",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Freyla",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Brynhild",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Dreamscape",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Emberaxe",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Amelie Briochard",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Prinzessin Valeria",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mirava",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Titania",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Calista",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gaius",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Melanie Knox",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vorgnar",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Boulderclash",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gorehook",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Fog",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Zalrath",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Astragor",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nefruet Pixelwick",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Tomebinder",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Camille",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Warbell",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Garka",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Harbinger",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Greyhus",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Alma",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lirith",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Worlddestroyer Illada",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Starflame",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Drownda",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Steelclaw",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Arhu",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Xara",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Granzor",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mazzikin",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Rasca Blutbeere",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Szel",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vixen",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lich",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Black",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Skeleton King",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Myth",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kvaltigar",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Bonehead",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Morblat",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Jasmin T",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Anba",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Stylekill",
+      "teamId": "M-M",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Drukk",
+      "teamId": "M-M",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Maeltharion",
+      "teamId": "M-M",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Swordmaster Yamira",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "The Dark Lady",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Grandine",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lohat",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Eluna",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Chiron",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Baumwise Baumbart",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nula",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Valeria Cruz",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Molbaal",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kryntheron",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Stinger",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Carlito Suge",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Skrythrax",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Flamehoof",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Raven",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kirin",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nyxiel",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Wavebreaker",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vodianoi",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ilara Deepwater",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Floodhair",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Zalithar",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Seekermaw",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "The Mountain",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Dr Elias Merrin",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sir Varrus",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ione the Unbreakable",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Widowmaker",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vindicator",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Cybel",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Hummingbird",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Humility",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sunny",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Dawnwhisper",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mei Hua",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Glados",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Prophet",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Garim Steelshade",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Node",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Darius Kade",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Olivia",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Greybeard",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Strider",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gallahad",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Udalf",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "The Mask",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lexa",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Bulwark",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kaylen",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Aerin",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Abe Lincoln",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Future",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Raquel",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lady Arthas",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Passion",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lord Mortivus",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Rook Mareth",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Drift Marrow",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lyselith",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Guardian Hauler",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kaela Stormshield",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Johanna",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Braxis",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sgt Dreadnought",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Talinara",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Volithor",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kelly",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Shade",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Amber",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Aida",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mitsuhiko",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gearstrike",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Techblade",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Voliwolf",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Agent X9",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Judia Hopara",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Travis",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Macbeth",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Executioner",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vega",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Esulkar",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Wildfire",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Morganna",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Crimson Sorcha",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Burning Voice",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ilirana",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Alara Silverlight",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Selina",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Karthogg",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Punisher",
+      "teamId": "V-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Galor V",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vorrak",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Urgoth",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Grusha",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Pyronomicon",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Krolach",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Bubblegrim",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Crimson Shadow",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Espresso",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Krang",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Rocky",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "A'Kalya",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Thrizala",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Tenzin",
+      "teamId": "C-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Xena",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Akatsuki",
+      "teamId": "V-V",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Aeloria",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Merlin",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ser Camelot",
+      "teamId": "R-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nightowl",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Skarath",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Thraxis",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Zhauron",
+      "teamId": "W-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Snarl",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Silverfang",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ardarel",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Schattenfaust",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Chef",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "King Arlen Morgolor",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ares",
+      "teamId": "D-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Auza",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Kadis",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Skorath",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Selune",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Weaver of Time",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Aolion",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Siren",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sam Fisher",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Elyu",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Donnernaht",
+      "teamId": "W-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Rampage",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Ciri Eisblatt",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Pride Lumiere",
+      "teamId": "T-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Maya",
+      "teamId": "B-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nysha",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Dromon",
+      "teamId": "A-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Velvra",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Voidrake",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Soulsinger",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gravemind Atoll",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Familie Flauschwinge",
+      "teamId": "B-B",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Akaryu",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sgt Valfiel",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Isabella",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Inefinna",
+      "teamId": "C-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sir Ruckus",
+      "teamId": "G-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Hollow Choir",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Venom",
+      "teamId": "L-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lok Than",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vortex-01",
+      "teamId": "S-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Celina",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Belinda",
+      "teamId": "V-D",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lord Gildnor",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Neyrissa",
+      "teamId": "R-L",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Richelle Foy",
+      "teamId": "S-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Makena",
+      "teamId": "L-K",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gyford Driftwood",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Amoreus",
+      "teamId": "M-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Vortex Dancer",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Elyna Silberblatt",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Leif Eriksson",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lucy",
+      "teamId": "P-C",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Gargonth",
+      "teamId": "T-G",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Elara",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Wingless",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Untaught Scribe",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Tommy Rourke",
+      "teamId": "T-T",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nyrven",
+      "teamId": "R-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Bloodseeker",
+      "teamId": "H-R",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Mindweaver",
+      "teamId": "C-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Raphael",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nachtschatten",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Nukka",
+      "teamId": "C-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Bluschel",
+      "teamId": "Z-H",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Naida",
+      "teamId": "N-W",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Jin",
+      "teamId": "U-A",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Lira Schattenflug",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Noface",
+      "teamId": "N-N",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Munara",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Akali",
+      "teamId": "D-P",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Slippery Man",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Sir Quacksalot",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Veit Dali",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Oruk",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Orakelpfropf",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Smokie",
+      "teamId": "P-S",
+      "sourceNote": "manual-authoritative-2026-06"
+    }
+  ]
+}

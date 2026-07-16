@@ -1,0 +1,77 @@
+mode,fromTab,toTab,durationMs,apiCallsCount,slowestApiMs,slowestApiPath,mainThreadHint,warnings,status
+chain,START,Home,11986,0,0,,yes,initial_load; Tabwechsel >5s; main_thread_heavy,slow
+chain,Home,Inbox,1074,0,0,,no,,ok
+chain,Inbox,Einsatzliste,1135,2,13,/api/lineups/legacy/ai-preview,no,,ok
+chain,Einsatzliste,Einsatzliste v2,890,5,26,/api/lineups/legacy/ai-preview,no,,ok
+chain,Einsatzliste v2,Arena,1455,1,4,/api/media/team-logo/A-A,no,,ok
+chain,Arena,Saisonstand,1870,5,6,/api/media/team-logo/W-L,no,,ok
+chain,Saisonstand,Teams,1359,0,0,,no,,ok
+chain,Teams,Teams (revisit),891,0,0,,no,,ok
+chain,Teams,Spieler,1385,0,0,,no,,ok
+chain,Spieler,Training,3638,2,1325,/api/media/player-portrait/player-1223-emissary-corwan,no,,ok
+chain,Training,Gebäude,1144,0,0,,no,,ok
+chain,Gebäude,Training (revisit),1387,0,0,,no,,ok
+chain,Gebäude,Transfermarkt,1277,3,163,/api/transfermarkt/history,no,,ok
+chain,Transfermarkt,Scouting,1537,2,292,/api/transfermarkt/buy,no,,ok
+chain,Scouting,Historie,1133,1,306,/api/transfermarkt/history,no,,ok
+chain,Historie,Ranks,1927,0,0,,no,,ok
+chain,Ranks,Diszis,1063,0,0,,no,,ok
+chain,Diszis,Sponsoren,2051,1,525,/api/season/prize-preview,no,,ok
+chain,Sponsoren,Lexikon,1166,0,0,,no,,ok
+chain,Lexikon,Cockpit,1694,2,480,/api/season/prize-preview,no,,ok
+chain,Cockpit,Generator,1156,2,844,/api/season/management-overview,no,,ok
+chain,Generator,Settings,1360,0,0,,no,,ok
+chain,Settings,Admin,1005,0,0,,no,,ok
+home_direct,Home,Inbox (cold),1038,0,0,,no,,ok
+home_direct,Home,Inbox (warm),1168,0,0,,no,,ok
+home_direct,Home,Einsatzliste (cold),1096,2,235,/api/lineups/legacy/lab-context,no,,ok
+home_direct,Home,Einsatzliste (warm),1012,2,217,/api/lineups/legacy/lab-context,no,,ok
+home_direct,Home,Einsatzliste v2 (cold),1119,5,239,/api/lineups/legacy/lab-context,no,,ok
+home_direct,Home,Einsatzliste v2 (warm),1052,2,226,/api/lineups/legacy/lab-context,no,,ok
+home_direct,Home,Arena (cold),1109,1,234,/api/media/team-logo/A-A,no,,ok
+home_direct,Home,Arena (warm),1143,1,245,/api/media/team-logo/A-A,no,,ok
+home_direct,Home,Saisonstand (cold),1076,18,290,/api/media/team-logo/D-P,no,,ok
+home_direct,Home,Saisonstand (warm),1143,0,0,,no,,ok
+home_direct,Home,Teams (cold),1097,0,0,,no,,ok
+home_direct,Home,Teams (warm),1158,0,0,,no,,ok
+home_direct,Home,Spieler (cold),1194,0,0,,no,,ok
+home_direct,Home,Spieler (warm),1259,0,0,,no,,ok
+home_direct,Home,Training (cold),1311,5,106,/api/media/team-logo/A-A,no,,ok
+home_direct,Home,Training (warm),1104,0,0,,no,,ok
+home_direct,Home,Gebäude (cold),983,0,0,,no,,ok
+home_direct,Home,Gebäude (warm),992,0,0,,no,,ok
+home_direct,Home,Transfermarkt (cold),1206,12,227,/api/media/player-portrait/player-0577-tarakor,no,,ok
+home_direct,Home,Transfermarkt (warm),1433,7,340,/api/transfermarkt/free-agents,no,,ok
+home_direct,Home,Scouting (cold),1038,0,0,,no,,ok
+home_direct,Home,Scouting (warm),1139,0,0,,no,,ok
+home_direct,Home,Historie (cold),1061,1,251,/api/transfermarkt/history,no,,ok
+home_direct,Home,Historie (warm),1040,1,240,/api/transfermarkt/history,no,,ok
+home_direct,Home,Ranks (cold),902,0,0,,no,,ok
+home_direct,Home,Ranks (warm),1084,0,0,,no,,ok
+home_direct,Home,Diszis (cold),959,0,0,,no,,ok
+home_direct,Home,Diszis (warm),946,0,0,,no,,ok
+home_direct,Home,Sponsoren (cold),1722,1,324,/api/season/prize-preview,no,,ok
+home_direct,Home,Sponsoren (warm),1662,1,255,/api/season/prize-preview,no,,ok
+home_direct,Home,Lexikon (cold),1105,0,0,,no,,ok
+home_direct,Home,Lexikon (warm),1007,0,0,,no,,ok
+home_direct,Home,Cockpit (cold),1280,3,221,/api/season/prize-preview,no,,ok
+home_direct,Home,Cockpit (warm),1335,3,333,/api/season/prize-preview,no,,ok
+home_direct,Home,Generator (cold),1068,0,0,,no,,ok
+home_direct,Home,Generator (warm),1089,0,0,,no,,ok
+home_direct,Home,Settings (cold),1038,0,0,,no,,ok
+home_direct,Home,Settings (warm),1013,0,0,,no,,ok
+home_direct,Home,Admin (cold),1005,0,0,,no,,ok
+home_direct,Home,Admin (warm),1018,0,0,,no,,ok
+drilldown,Spieler,Spielerprofil (cold),3721,7,1378,/api/media/player-portrait/player-1223-emissary-corwan,no,,ok
+drilldown,Spielerprofil,Spielerprofil (warm),13223,79,2802,/api/media/player-portrait/player-1423-eisenherz,no,Tabwechsel >5s,slow
+drilldown,Spielerprofil,Spieler-Tab overview,364,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab details,653,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab contract,1876,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab training,1528,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab report,1536,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab career,787,0,0,,no,,ok
+drilldown,Teams,Teamprofil (cold),1108,14,726,/api/media/team-logo/B-P,no,,ok
+drilldown,Teamprofil,Teamprofil (warm),122710,40,34,/api/media/team-logo/M-M,no,Tabwechsel >5s,slow
+drilldown,Teams,Teams-Tab Portraits,922,0,0,,no,,ok
+drilldown,Teams,Teams-Tab Kader,1309,31,36,/api/media/team-logo/Z-H,no,,ok
+drilldown,Teams,Teams-Tab Verträge,687,0,0,,no,,ok

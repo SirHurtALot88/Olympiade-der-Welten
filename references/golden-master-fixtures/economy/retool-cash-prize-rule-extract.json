@@ -1,0 +1,43 @@
+{
+  "source": "retool",
+  "capturedAt": "2026-06-04T00:00:00.000Z",
+  "saveId": null,
+  "seasonId": null,
+  "matchdayId": null,
+  "inputs": {
+    "referenceFiles": [
+      "docs/README_RETOOL_SYSTEM.md",
+      "references/retool-ai-golden-master/executeSeasonEnd.js",
+      "references/retool-ai-golden-master/finalPicksScore100_v2.txt",
+      "references/retool-ai-golden-master/runAiSearch.js"
+    ]
+  },
+  "outputs": {
+    "confirmedCashFields": [
+      "cash",
+      "budget"
+    ],
+    "confirmedTransferEconomyRules": [
+      "buy reduces cash",
+      "sell increases cash",
+      "buy and sell touch Saisonstand cash/salary related state"
+    ],
+    "salarySignals": [
+      "salary",
+      "gehalt",
+      "expected_salary",
+      "season_salary",
+      "salary_factor_current",
+      "salary_factors_5"
+    ],
+    "prizeMoneyStatus": "season_end_rule_not_fully_reconstructed",
+    "placementStatus": "placement_spur_found_but_not_fully_isolated",
+    "bonusMalusStatus": "not_safely_reconstructed_from_current_export"
+  },
+  "notes": [
+    "Transfermarkt Buy/Sell haben sichere Cash-Spuren.",
+    "Preisgeld- und Platzierungslogik ist im aktuellen Export als Thema sichtbar, aber nicht als belastbar isolierte finale Query rekonstruiert.",
+    "Season-End-Spuren existieren, aber die konkrete Preisgeldtabelle oder Platzierungsstaffel ist aus den vorliegenden Dateien noch nicht sicher extrahierbar."
+  ],
+  "toleratedFloatDelta": 0
+}

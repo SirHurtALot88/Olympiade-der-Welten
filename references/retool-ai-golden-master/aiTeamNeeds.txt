@@ -1,0 +1,757 @@
+// term: aiTeamNeeds
+// id: aiTeamNeeds
+// type: script
+// subtype: JavascriptQuery
+// page: Teams
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: filterTeam.value | getCashFromSaisonstand.value | getActivePlayersByTeam.data | getTeamRatingsTransfermarkt.data | teamDisciplineRankings.value | disciplineRecipesGlobal.value | teamIdentityOverrides.value | aiVarianceConfig.value | transfermarktSalaryBudgetLogic.value
+// extractionStatus: complete_or_primary_match
+// aiTeamNeeds (FULL RESTORE + PATCHED + IDENTITY-FIRST AXIS TUNING)
+// Fixes:
+// 1) team ratings are matched by selected team, not blindly first row
+// 2) budget_max uses transfermarktSalaryBudgetLogic.allowed_budget_for_search as primary source
+// 3) specialist_push restored
+// 4) discipline rankings also match team robustly
+// 5) axis logic updated: identity/team rating first, weakness only small helper in thin-roster mode
+// 6) avoids common scope/output issues so query still returns stable rows
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const lower = (v) => String(v ?? '').trim().toLowerCase();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// -------------------------
+// Retool entity bindings
+// -------------------------
+const teamCode = s({{ filterTeam.value }});
+if (!teamCode) return [];
+
+const cashRow = {{ getCashFromSaisonstand.value }};
+const cash = n(cashRow && cashRow.cash);
+
+const activePlayersRaw = {{ getActivePlayersByTeam.data }};
+const teamRatingsRaw = {{ getTeamRatingsTransfermarkt.data }};
+
+const teamDisciplineRankingsRaw = {{ teamDisciplineRankings.value }};
+const disciplineRecipes = {{ disciplineRecipesGlobal.value }};
+const teamIdentityOverridesObj = {{ teamIdentityOverrides.value }};
+const varianceCfg = {{ aiVarianceConfig.value }};
+const budgetLogic = {{ transfermarktSalaryBudgetLogic.value }};
+
+// -------------------------
+// Coercions / helpers
+// -------------------------
+const coerceRows = (src) => {
+  if (Array.isArray(src)) return src.filter(Boolean);
+
+  try {
+    if (typeof formatDataAsArray === 'function') {
+      const arr = formatDataAsArray(src);
+      if (Array.isArray(arr)) return arr.filter(Boolean);
+    }
+  } catch (e) {}
+
+  if (src && typeof src === 'object' && !Array.isArray(src)) {
+    const keys = Object.keys(src);
+    const arrayKeys = keys.filter((k) => Array.isArray(src[k]));
+    if (arrayKeys.length) {
+      const len = Math.max(...arrayKeys.map((k) => src[k].length));
+      const out = [];
+      for (let i = 0; i < len; i++) {
+        const row = {};
+        for (const k of arrayKeys) row[k] = src[k][i];
+        out.push(row);
+      }
+      return out.filter(Boolean);
+    }
+  }
+
+  return [];
+};
+
+const matchTeamRow = (row, code) => {
+  const wanted = lower(code);
+  const values = [
+    row?.team_code,
+    row?.teamCode,
+    row?.team,
+    row?.team_name,
+    row?.teamName,
+    row?.name,
+    row?.Name,
+    row?.Team
+  ].map((x) => lower(x)).filter(Boolean);
+
+  return values.includes(wanted);
+};
+
+const roster = coerceRows(activePlayersRaw);
+const rosterCount = Array.isArray(roster) ? roster.length : 0;
+
+const trRows = coerceRows(teamRatingsRaw);
+const tr =
+  trRows.find((row) => matchTeamRow(row, teamCode)) ||
+  trRows[0] ||
+  {};
+
+const rankingsRows = coerceRows(teamDisciplineRankingsRaw);
+const disciplineRankRow =
+  rankingsRows.find((row) => matchTeamRow(row, teamCode)) ||
+  rankingsRows.find((row) => s(row?.team) === teamCode) ||
+  null;
+
+const totalTeams = Math.max(1, n(rankingsRows.length) || 1);
+
+// -------------------------
+// Core context
+// -------------------------
+const harmony = clamp(n(tr.harmony) || 4, 1, 10);
+const ambition = clamp(n(tr.ambition) || 5, 1, 10);
+const finances = clamp(n(tr.finances) || 5, 1, 10);
+
+// Budget must come from manager budget logic first
+const budget_max = (() => {
+  const fromBudgetLogic = n(budgetLogic?.allowed_budget_for_search);
+  if (fromBudgetLogic > 0) return fromBudgetLogic;
+
+  const sampledCashUsage = n(varianceCfg?.cashUsageTarget?.sampled);
+  if (sampledCashUsage > 0) return clamp(cash * sampledCashUsage, 0, cash);
+
+  return cash;
+})();
+
+const axisPriorityAbs = {
+  pow: clamp(n(tr.power) || 0, 0, 20),
+  spe: clamp(n(tr.speed) || 0, 0, 20),
+  men: clamp(n(tr.mental) || 0, 0, 20),
+  soc: clamp(n(tr.social) || 0, 0, 20)
+};
+
+const axisPriority01 = (axis) => clamp(n(axisPriorityAbs[axis]) / 20, 0, 1);
+
+const avg = (key) => rosterCount ? roster.reduce((a, r) => a + n(r?.[key]), 0) / rosterCount : 0;
+const teamCore = {
+  pow: avg('pow'),
+  spe: avg('spe'),
+  men: avg('men'),
+  soc: avg('soc')
+};
+
+// -------------------------
+// Variance layer
+// -------------------------
+const vc = varianceCfg || {};
+const team_variation_factor = Number(n(vc.team_variation_factor).toFixed(3));
+
+const cashUsageTargetCorridor = vc.cashUsageTarget || { center: 0.45, min: 0.35, max: 0.92, sampled: 0.45 };
+const fitMinSoftCorridor = vc.fitMinSoft || { center: 0, min: 0, max: 15, sampled: 0 };
+const holeGate01Corridor = vc.holeGate01 || { center: 1, min: 0, max: 1, sampled: 1 };
+
+const cashUsageTarget = n(cashUsageTargetCorridor.sampled);
+const fitMinSoft = n(fitMinSoftCorridor.sampled);
+const holeGate01 = n(holeGate01Corridor.sampled);
+
+// -------------------------
+// Thin roster detection
+// -------------------------
+const overrides = teamIdentityOverridesObj || {};
+const teamIdentity = overrides[teamCode] || overrides[s(teamCode)] || null;
+
+const player_min = clamp(
+  Math.round(
+    n(
+      tr?.player_min ||
+      tr?.playerMin ||
+      tr?.min_players ||
+      tr?.minPlayers ||
+      tr?.min_player ||
+      tr?.minPlayer
+    ) || (finances >= 7 ? 10 : 9)
+  ),
+  7,
+  12
+);
+
+const targetRosterSize = clamp(
+  n(teamIdentity?.roster?.target) ||
+  n(tr?.optimum || tr?.player_optimum || tr?.playerOptimum || tr?.optimal_players || tr?.target_players) ||
+  10,
+  7,
+  12
+);
+
+const rosterFill01 = targetRosterSize > 0 ? clamp(rosterCount / targetRosterSize, 0, 1) : 0;
+const thinRoster = rosterCount < Math.max(7, targetRosterSize - 2);
+
+// -------------------------
+// Roster colors
+// -------------------------
+const classToColor = {
+  Berserker: 'red', Warlord: 'red', Tank: 'red',
+  Sprinter: 'green', Rogue: 'green', Charger: 'green',
+  Mage: 'blue', Overseer: 'blue', Templar: 'blue',
+  Bard: 'yellow', Hero: 'yellow', Badass: 'yellow', Tactician: 'yellow'
+};
+
+const colorToAxis = { red: 'pow', green: 'spe', blue: 'men', yellow: 'soc' };
+
+const rosterColorCounts = (roster || []).reduce(
+  (acc, r) => {
+    const c = String(classToColor[String(r?.klasse || '')] || '').toLowerCase();
+    if (!c) return acc;
+    acc[c] = (acc[c] || 0) + 1;
+    return acc;
+  },
+  { red: 0, green: 0, blue: 0, yellow: 0 }
+);
+
+const rosterSizeSafe = Math.max(1, rosterCount || 1);
+const colorShare01 = (color) => clamp(n(rosterColorCounts[color] || 0) / rosterSizeSafe, 0, 1);
+
+const primaryColors = Object.entries(rosterColorCounts)
+  .sort((a, b) => n(b[1]) - n(a[1]))
+  .slice(0, 2)
+  .map((x) => x[0]);
+
+// -------------------------
+// Strategy / finance snapshot
+// -------------------------
+const salary_now = (roster || []).reduce(
+  (a, r) => a + n(r?.gehalt ?? r?.salary ?? r?.Gehalt ?? r?.gehalt_rechnung),
+  0
+);
+
+const salary_runway = salary_now > 0 ? cash / salary_now : cash > 0 ? 99 : 0;
+
+const fitPolicy = {
+  minFitSoft: Number(fitMinSoft.toFixed(1)),
+  minFitHard: harmony >= 10 ? 12 : harmony >= 9 ? 10 : harmony >= 8 ? 8 : harmony >= 7 ? 6 : 0,
+  fit25Bonus: harmony >= 10 ? 10 : harmony >= 9 ? 8 : harmony >= 8 ? 6 : harmony >= 7 ? 3 : 0
+};
+
+const strategy = {
+  finance: {
+    cash: Number(cash.toFixed(2)),
+    salary_now: Number(salary_now.toFixed(2)),
+    salary_runway: Number(salary_runway.toFixed(2)),
+    cashUsageTarget: Number(cashUsageTarget.toFixed(3)),
+    budget_max: Number(budget_max.toFixed(2)),
+    ambition,
+    finances,
+    harmony
+  },
+  fit_policy: {
+    harmony,
+    min_fit_soft: fitPolicy.minFitSoft,
+    min_fit_hard: fitPolicy.minFitHard,
+    fit25_bonus: fitPolicy.fit25Bonus
+  },
+  roster: {
+    rosterCount,
+    player_min,
+    targetRosterSize,
+    rosterFill01: Number(rosterFill01.toFixed(3)),
+    thinRoster,
+    holeGate01: Number(holeGate01.toFixed(3))
+  },
+  roster_color: {
+    primary_colors: primaryColors,
+    shares: {
+      red: colorShare01('red'),
+      green: colorShare01('green'),
+      blue: colorShare01('blue'),
+      yellow: colorShare01('yellow')
+    }
+  },
+  variance: {
+    team_variation_factor,
+    sampled_cashUsageTarget: Number(cashUsageTarget.toFixed(3)),
+    sampled_fitMinSoft: Number(fitMinSoft.toFixed(1)),
+    sampled_holeGate01: Number(holeGate01.toFixed(3))
+  }
+};
+
+const fit_tendency = {
+  harmony,
+  mode: harmony <= 3 ? 'tolerant' : harmony <= 6 ? 'neutral' : 'prefers_high_fit',
+  min_fit_soft: fitPolicy.minFitSoft,
+  min_fit_hard: fitPolicy.minFitHard,
+  fit25_bonus: fitPolicy.fit25Bonus
+};
+
+// -------------------------
+// Shared discipline meta for hole + specialist
+// -------------------------
+const DISCIPLINES = [
+  { field: 'tdm', label: 'TDM', color: 'red' },
+  { field: 'mini_dm', label: 'Mini DM', color: 'red' },
+  { field: 'gewichtheben', label: 'Gewichtheben', color: 'red' },
+  { field: 'hockey', label: 'Hockey', color: 'red' },
+  { field: 'breaking', label: 'Breaking', color: 'red' },
+  { field: 'staffel', label: 'Staffel', color: 'green' },
+  { field: 'time_trial', label: 'Time Trial', color: 'green' },
+  { field: 'spurt', label: 'Spurt', color: 'green' },
+  { field: 'climbing', label: 'Climbing', color: 'green' },
+  { field: 'fechten', label: 'Fechten', color: 'green' },
+  { field: 'schach', label: 'Schach', color: 'blue' },
+  { field: 'takeshi', label: 'Takeshi', color: 'blue' },
+  { field: 'tennis', label: 'Tennis', color: 'blue' },
+  { field: 'i_spy', label: 'I Spy', color: 'blue' },
+  { field: 'wettessen', label: 'Wettessen', color: 'blue' },
+  { field: 'basketball', label: 'Basketball', color: 'yellow' },
+  { field: 'football', label: 'Football', color: 'yellow' },
+  { field: 'battlefield', label: 'Battlefield', color: 'yellow' },
+  { field: 'eiskunst', label: 'Eiskunst', color: 'yellow' },
+  { field: 'showcase', label: 'Showcase', color: 'yellow' }
+];
+
+const ATTR_TO_AXIS = {
+  power: 'pow', health: 'pow', stamina: 'pow', determination: 'pow',
+  speed: 'spe', dexterity: 'spe',
+  intelligence: 'men', awareness: 'men', will: 'men',
+  charisma: 'soc', spirit: 'soc', torment: 'soc'
+};
+
+const getAttr = (row, attr) => {
+  const direct = n(row?.[attr]);
+  if (direct > 0) return direct;
+  const ax = ATTR_TO_AXIS[String(attr || '').toLowerCase()];
+  return ax ? n(row?.[ax]) : 0;
+};
+
+const weightedAttrScore = (row, weights) => {
+  const entries = Object.entries(weights || {}).filter(([, w]) => n(w) > 0);
+  if (!entries.length) return 0;
+  const sumW = entries.reduce((a, [, w]) => a + n(w), 0) || 1;
+  const raw = entries.reduce((acc, [attr, w]) => acc + getAttr(row, attr) * n(w), 0);
+  return raw / sumW;
+};
+
+const priorityFitFromWeights01 = (weights, fallbackAxis) => {
+  const entries = Object.entries(weights || {}).filter((x) => n(x[1]) > 0);
+  if (!entries.length) return axisPriority01(fallbackAxis);
+
+  let sumW = 0;
+  let blended = 0;
+
+  for (const [attr, wRaw] of entries) {
+    const w = n(wRaw);
+    const ax = ATTR_TO_AXIS[String(attr || '').toLowerCase()] || fallbackAxis;
+    sumW += w;
+    blended += axisPriority01(ax) * w;
+  }
+
+  if (sumW <= 0) return axisPriority01(fallbackAxis);
+  return clamp(blended / sumW, 0, 1);
+};
+
+// -------------------------
+// Needs
+// -------------------------
+const needs = [];
+
+// A) Axis upgrade needs
+{
+  const axisLabelLong = { pow: 'Power (POW)', spe: 'Speed (SPE)', men: 'Mental (MEN)', soc: 'Social (SOC)' };
+  const axisLabelShort = { pow: 'POW', spe: 'SPE', men: 'MEN', soc: 'SOC' };
+
+  const coreVals = Object.values(teamCore);
+  const coreMax = coreVals.length ? Math.max(...coreVals) : 0;
+  const coreMin = coreVals.length ? Math.min(...coreVals) : 0;
+  const coreRange = coreMax - coreMin || 1;
+  const weakness01 = (axis) => clamp((coreMax - n(teamCore[axis])) / coreRange, 0, 1);
+
+  const totalPriorityAbs = ['pow', 'spe', 'men', 'soc'].reduce((acc, ax) => acc + n(axisPriorityAbs[ax] || 0), 0);
+  const desiredShare = (axis) => {
+    if (totalPriorityAbs <= 0) return 0;
+    return clamp(n(axisPriorityAbs[axis] || 0) / totalPriorityAbs, 0, 1);
+  };
+
+  const axisMass = {
+    pow: roster.reduce((acc, r) => acc + n(r?.pow), 0),
+    spe: roster.reduce((acc, r) => acc + n(r?.spe), 0),
+    men: roster.reduce((acc, r) => acc + n(r?.men), 0),
+    soc: roster.reduce((acc, r) => acc + n(r?.soc), 0)
+  };
+
+  const totalMass = n(axisMass.pow) + n(axisMass.spe) + n(axisMass.men) + n(axisMass.soc);
+  const actualShare = (axis) => {
+    if (totalMass <= 0) return 0;
+    return clamp(n(axisMass[axis] || 0) / totalMass, 0, 1);
+  };
+
+  const coverageGap = (axis) => clamp(Math.max(0, desiredShare(axis) - actualShare(axis)), 0, 1);
+  const topPriorityAxis =
+    Object.entries(axisPriorityAbs).sort((a, b) => n(b[1]) - n(a[1]))[0]?.[0] || 'pow';
+
+  const mode = thinRoster ? 'identity_build' : ambition >= 7 ? 'peak' : 'depth';
+
+  const axes = ['pow', 'spe', 'men', 'soc'];
+  const axisRows = axes
+    .map((axis) => {
+      const p01 = axisPriority01(axis);
+      const w01 = weakness01(axis);
+      const dSh = desiredShare(axis);
+      const aSh = actualShare(axis);
+      const gap = coverageGap(axis);
+      const topPriorityBonus01 = axis === topPriorityAxis ? 0.08 : 0;
+
+      // Thin-roster rule:
+      // identity/team rating first, coverage gap second,
+      // weakness only a tiny helper and only if there is a real gap
+      const weakThin01 = gap >= 0.04 ? w01 : 0;
+
+      const score = thinRoster
+        ? clamp(
+            0.68 * p01 +
+            0.24 * gap +
+            0.03 * weakThin01 +
+            topPriorityBonus01,
+            0,
+            1
+          )
+        : clamp(
+            0.72 * p01 +
+            0.14 * gap +
+            0.08 * w01 +
+            0.06 * topPriorityBonus01,
+            0,
+            1
+          );
+
+      return {
+        axis,
+        p01,
+        w01,
+        desiredShare: dSh,
+        actualShare: aSh,
+        coverageGap: gap,
+        topPriorityBonus01,
+        weakThin01,
+        score
+      };
+    })
+    .filter((x) => x.p01 > 0)
+    .sort((a, b) =>
+      n(b.score) - n(a.score) ||
+      n(b.p01) - n(a.p01) ||
+      n(b.coverageGap) - n(a.coverageGap) ||
+      n(b.w01) - n(a.w01)
+    );
+
+  for (const ax of axisRows) {
+    if (ax.score < 0.10) continue;
+
+    const profileObj = {
+      budget_max,
+      axis_focus: ax.axis,
+      axis_priority: axisPriorityAbs[ax.axis],
+      upgrade_mode: mode,
+      identity_bias: { ...teamCore },
+      desired_share: Number(n(ax.desiredShare).toFixed(4)),
+      actual_share: Number(n(ax.actualShare).toFixed(4)),
+      coverage_gap: Number(n(ax.coverageGap).toFixed(4)),
+      weakness_01: Number(n(ax.w01).toFixed(4)),
+      top_priority_axis: topPriorityAxis,
+      fit_tendency,
+      strategy
+    };
+
+    const reason = thinRoster
+      ? 'Thin roster (' + rosterCount + '/' + targetRosterSize + ') → Identity build | team rating ' + axisPriorityAbs[ax.axis] + '/20 | desired ' + (ax.desiredShare * 100).toFixed(0) + '% | actual ' + (ax.actualShare * 100).toFixed(0) + '% | gap ' + (ax.coverageGap * 100).toFixed(0) + '% | weakness ' + (ax.w01 * 100).toFixed(0) + '% | Ø ' + n(teamCore[ax.axis]).toFixed(1)
+      : 'Team rating ' + axisPriorityAbs[ax.axis] + '/20 | gap ' + (ax.coverageGap * 100).toFixed(0) + '% | weakness ' + (ax.w01 * 100).toFixed(0) + '% | Ø ' + n(teamCore[ax.axis]).toFixed(1);
+
+    const imp = thinRoster
+      ? clamp(52 + ax.score * 36, 0, 100)
+      : clamp(35 + ax.score * 55, 0, 100);
+
+    needs.push({
+      need_type: 'axis_upgrade',
+      need_label: axisLabelLong[ax.axis] + ' Upgrade',
+      importance_score: imp,
+      reason,
+      search_profile: JSON.stringify(profileObj),
+      search_profile_pretty: 'Budget ≤ ' + budget_max.toFixed(1) + ' | Fokus ' + axisLabelShort[ax.axis] + ' | Modus ' + mode,
+      team_variation_factor,
+      need_corridors: { cashUsageTarget: cashUsageTargetCorridor }
+    });
+  }
+}
+
+// B) discipline_hole needs
+{
+  if (disciplineRankRow && totalTeams > 1) {
+    const recipes = disciplineRecipes || {};
+
+    const scored = DISCIPLINES
+      .map((d) => {
+        const rank = n(disciplineRankRow?.[d.field + '_rank']);
+        const sum = n(disciplineRankRow?.[d.field + '_sum']);
+        if (!rank) return null;
+
+        const holeSeverity = clamp((rank - 1) / Math.max(1, totalTeams - 1), 0, 1);
+        const weights = recipes[d.field] || null;
+        const fallbackAxis = colorToAxis[d.color] || 'pow';
+        const priorityFit = priorityFitFromWeights01(weights, fallbackAxis);
+
+        const share = colorShare01(d.color);
+        const relevance = primaryColors.includes(d.color) ? 1 : share > 0 ? 0.65 : 0.35;
+
+        let holeScore = holeSeverity * (0.35 + 0.65 * priorityFit) * relevance;
+
+        const lowFitPenalty01 = priorityFit < 0.35 ? 0.55 : priorityFit < 0.50 ? 0.30 : 0;
+        const gated = holeScore * (thinRoster ? 0.12 + 0.88 * holeGate01 : 1);
+        holeScore = gated * (1 - lowFitPenalty01);
+
+        return {
+          field: d.field,
+          label: d.label,
+          color: d.color,
+          rank,
+          sum,
+          discipline_weights: weights,
+          holeSeverity: Number(holeSeverity.toFixed(3)),
+          priorityFit: Number(priorityFit.toFixed(3)),
+          relevance: Number(relevance.toFixed(3)),
+          holeScore
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => n(b.holeScore) - n(a.holeScore));
+
+    const mode = thinRoster ? 'identity_build' : ambition >= 7 ? 'peak' : 'depth';
+
+    scored.slice(0, 2).forEach((d) => {
+      if (n(d.holeSeverity) < 0.30) return;
+
+      const profileObj = {
+        budget_max,
+        need_family: 'discipline',
+        discipline: d.label,
+        discipline_field: d.field,
+        discipline_rank: d.rank,
+        discipline_sum: Number(n(d.sum).toFixed(1)),
+        total_teams: totalTeams,
+        upgrade_mode: mode,
+        holeSeverity: d.holeSeverity,
+        priorityFit: d.priorityFit,
+        relevance: d.relevance,
+        holeScore: Number(n(d.holeScore).toFixed(4)),
+        discipline_weights: d.discipline_weights,
+        fit_tendency,
+        strategy
+      };
+
+      const baseImp = clamp(28 + n(d.holeScore) * 92 + (mode === 'peak' ? 3 : 0), 0, 96);
+      const importance_score = thinRoster ? Math.min(44, baseImp) : baseImp;
+
+      const reason = thinRoster
+        ? 'Thin roster (' + rosterCount + '/' + targetRosterSize + ') → Discipline holes gated | Diszi Rank ' + d.rank + '/' + totalTeams + ' | holeSeverity ' + (d.holeSeverity * 100).toFixed(0) + '% × priorityFit ' + (d.priorityFit * 100).toFixed(0) + '% × relevance ' + (d.relevance * 100).toFixed(0) + '%'
+        : 'Diszi Rank ' + d.rank + '/' + totalTeams + ' | holeSeverity ' + (d.holeSeverity * 100).toFixed(0) + '% × priorityFit ' + (d.priorityFit * 100).toFixed(0) + '% × relevance ' + (d.relevance * 100).toFixed(0) + '%';
+
+      needs.push({
+        need_type: 'discipline_hole',
+        need_label: 'Loch stopfen: ' + d.label,
+        importance_score,
+        reason,
+        search_profile: JSON.stringify(profileObj),
+        search_profile_pretty: 'Budget ≤ ' + budget_max.toFixed(1) + ' | Diszi ' + d.label + ' | Score ' + (n(d.holeScore) * 100).toFixed(0) + ' | Modus ' + mode,
+        team_variation_factor,
+        need_corridors: { holeGate01: holeGate01Corridor }
+      });
+    });
+  }
+}
+
+// B2) specialist_push restored
+{
+  const recipes = disciplineRecipes || {};
+
+  const specialistRows = DISCIPLINES
+    .map((d) => {
+      const weights = recipes[d.field] || null;
+      if (!weights || !Object.keys(weights).length) return null;
+
+      const fallbackAxis = colorToAxis[d.color] || 'pow';
+      const priorityFit = priorityFitFromWeights01(weights, fallbackAxis);
+
+      const rosterAvg = rosterCount
+        ? roster.reduce((acc, r) => acc + weightedAttrScore(r, weights), 0) / rosterCount
+        : 0;
+
+      const rosterTop = rosterCount
+        ? Math.max(...roster.map((r) => weightedAttrScore(r, weights)))
+        : 0;
+
+      const rank = n(disciplineRankRow?.[d.field + '_rank']);
+      const rankStrength01 = rank ? clamp((totalTeams - rank) / Math.max(1, totalTeams - 1), 0, 1) : 0;
+      const avgStrength01 = clamp((rosterAvg - 58) / 20, 0, 1);
+      const topStrength01 = clamp((rosterTop - 68) / 18, 0, 1);
+
+      const specialistScore =
+        0.42 * priorityFit +
+        0.33 * avgStrength01 +
+        0.15 * topStrength01 +
+        0.10 * rankStrength01;
+
+      return {
+        field: d.field,
+        label: d.label,
+        color: d.color,
+        weights,
+        priorityFit,
+        rosterAvg,
+        rosterTop,
+        rank,
+        specialistScore
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => n(b.specialistScore) - n(a.specialistScore));
+
+  const bestSpec = specialistRows[0];
+
+  if (
+    bestSpec &&
+    n(bestSpec.priorityFit) >= 0.35 &&
+    n(bestSpec.rosterAvg) >= 60 &&
+    !thinRoster
+  ) {
+    const sortedAttrs = Object.entries(bestSpec.weights).sort((a, b) => n(b[1]) - n(a[1]));
+    const requiredAttrs = sortedAttrs.slice(0, 2);
+
+    const required_attributes = {};
+    const reqPretty = [];
+
+    requiredAttrs.forEach(([attr]) => {
+      const baseAxis = ATTR_TO_AXIS[attr];
+      const baseline = rosterCount ? avg(baseAxis) : 55;
+      const minVal = clamp(Math.round(baseline + 10), 30, 95);
+      required_attributes[attr] = minVal;
+      reqPretty.push(`${attr}:${minVal}`);
+    });
+
+    const profileObj = {
+      budget_max,
+      need_family: 'specialist',
+      discipline: bestSpec.label,
+      discipline_field: bestSpec.field,
+      discipline_color: bestSpec.color,
+      axis_focus: colorToAxis[bestSpec.color] || '',
+      discipline_weights: bestSpec.weights,
+      upgrade_mode: 'peak',
+      history_mode: 'peak',
+      roster_avg: Number(n(bestSpec.rosterAvg).toFixed(2)),
+      roster_top: Number(n(bestSpec.rosterTop).toFixed(2)),
+      priority_fit: Number(n(bestSpec.priorityFit).toFixed(3)),
+      required_attributes,
+      fit_tendency,
+      strategy
+    };
+
+    needs.push({
+      need_type: 'specialist_push',
+      need_label: 'Specialist: ' + bestSpec.label + ' (Peak)',
+      importance_score: clamp(34 + n(bestSpec.specialistScore) * 52 + (ambition >= 7 ? 4 : 0), 0, 92),
+      reason:
+        'Bereits stark in ' + bestSpec.label +
+        ' | Kader-Ø ' + n(bestSpec.rosterAvg).toFixed(1) +
+        ' | Peak ' + n(bestSpec.rosterTop).toFixed(1) +
+        ' | priorityFit ' + (n(bestSpec.priorityFit) * 100).toFixed(0) + '%',
+      search_profile: JSON.stringify(profileObj),
+      search_profile_pretty:
+        'Budget ≤ ' + budget_max.toFixed(1) +
+        ' | Specialist ' + bestSpec.label +
+        ' | Pflicht ' + reqPretty.join(', ') +
+        ' | Peak',
+      team_variation_factor
+    });
+  }
+}
+
+// C) Color economy
+{
+  const colors = ['red', 'green', 'blue', 'yellow'];
+
+  const best = colors
+    .map((c) => {
+      const axis = colorToAxis[c];
+      const pr = axisPriority01(axis);
+      const sh = colorShare01(c);
+      const scarcity = sh <= 0.15 ? (0.15 - sh) / 0.15 : 0;
+      const stackPenalty = sh >= 0.60 ? (sh - 0.60) / 0.40 : 0;
+      const v = 0.75 * pr + 0.20 * scarcity - 0.55 * stackPenalty;
+      return { c, v, share: sh, axis };
+    })
+    .sort((a, b) => n(b.v) - n(a.v))[0];
+
+  if (best && best.v > 0.10) {
+    needs.push({
+      need_type: 'color_economy',
+      need_label: 'Klassenfarbe: ' + best.c + ' (' + String(best.axis).toUpperCase() + ')',
+      importance_score: clamp(28 + best.v * 60, 0, 92),
+      reason: 'Share ' + (best.share * 100).toFixed(0) + '% | Achsen-Priorität ' + axisPriorityAbs[best.axis] + '/20 | 2 Formkarten',
+      search_profile: JSON.stringify({
+        budget_max,
+        desired_class_color: best.c,
+        desired_axis: best.axis,
+        color_share: best.share,
+        axis_priority: axisPriorityAbs[best.axis],
+        fit_tendency,
+        strategy,
+        upgrade_mode: thinRoster ? 'identity_build' : ambition >= 7 ? 'peak' : 'depth'
+      }),
+      search_profile_pretty: 'Budget ≤ ' + budget_max.toFixed(1) + ' | Farbe ' + best.c + ' | Share ' + (best.share * 100).toFixed(0) + '%',
+      team_variation_factor
+    });
+  }
+}
+
+// D) Historical scouts
+{
+  const baseProf = (mode) => ({
+    budget_max,
+    axis_priority: { ...axisPriorityAbs },
+    fit_tendency,
+    strategy,
+    upgrade_mode: mode
+  });
+
+  needs.push({
+    need_type: 'historical_peak_opportunity',
+    need_label: 'Scouting: Historical Peak',
+    importance_score: clamp(18 + (ambition >= 7 ? 10 : 4), 0, 70),
+    reason: 'Scout-Signal: Spezialisten-Peaks historisch.',
+    search_profile: JSON.stringify(Object.assign({}, baseProf('peak'), { history_mode: 'peak' })),
+    search_profile_pretty: 'Budget ≤ ' + budget_max.toFixed(1) + ' | History peak',
+    team_variation_factor
+  });
+
+  needs.push({
+    need_type: 'historical_breadth_opportunity',
+    need_label: 'Scouting: Historical Breadth',
+    importance_score: clamp(18 + (ambition <= 6 ? 10 : 4), 0, 70),
+    reason: 'Scout-Signal: Breite/Vielseitigkeit historisch.',
+    search_profile: JSON.stringify(Object.assign({}, baseProf('depth'), { history_mode: 'breadth' })),
+    search_profile_pretty: 'Budget ≤ ' + budget_max.toFixed(1) + ' | History breadth',
+    team_variation_factor
+  });
+}
+
+// Final sort + top slice
+needs.sort((a, b) => n(b.importance_score) - n(a.importance_score));
+
+return needs.slice(0, 10).map((x, idx) => ({
+  need_rank: idx + 1,
+  need_id: teamCode + '::' + s(x.need_type) + '::' + s(x.need_label).slice(0, 32),
+  need_type: x.need_type,
+  need_label: x.need_label,
+  importance_score: Number(n(x.importance_score).toFixed(2)),
+  reason: x.reason,
+  search_profile: x.search_profile,
+  search_profile_pretty: x.search_profile_pretty,
+  team_variation_factor: x.team_variation_factor,
+  need_corridors: x.need_corridors || {}
+}));

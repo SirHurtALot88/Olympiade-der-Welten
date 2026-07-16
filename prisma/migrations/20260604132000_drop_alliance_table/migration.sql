@@ -1,0 +1,4 @@
+ALTER TABLE "Team"
+  DROP COLUMN IF EXISTS "allianceId";
+
+DROP TABLE IF EXISTS "Alliance";
