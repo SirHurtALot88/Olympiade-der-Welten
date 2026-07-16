@@ -255,8 +255,14 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   // mid-market instead of one lone superstar. priceStrain === priceInSlots (no-op) unless
   // OLY_DRAFT_STRAIN=1.
   const starAppetite = clamp(0.8 + 0.5 * w.wWin, 1.0, 2.2);
+  // Season-safety: the convex strain only ramps in when there are enough open OPT-slots to spread the
+  // budget across — i.e. the empty-roster DRAFT/rebuild regime, where a lone-superstar starves the
+  // remaining slots. In a filled follow-season roster with only 1–2 slots to fill, a 60M marquee at
+  // 80 cash is a legitimate single buy, so slotSpread → 0 fully disables the convex term and behaviour
+  // falls back to the plain linear thrift strain. Full protection at ≥5 open slots, off at ≤2.
+  const slotSpread = clamp((optSlotsRemaining - 2) / 3, 0, 1);
   const priceStrain = STRAIN_ENABLED
-    ? priceInSlots * (1 + PRICE_STRAIN_CONVEXITY * Math.max(0, priceInSlots - starAppetite))
+    ? priceInSlots * (1 + PRICE_STRAIN_CONVEXITY * slotSpread * Math.max(0, priceInSlots - starAppetite))
     : priceInSlots;
   const potential = Math.max(0, player.potential ?? 0);
   // Rotation/depth baseline: a fading part (full at an empty squad, 0 at optTarget) PLUS a flat
