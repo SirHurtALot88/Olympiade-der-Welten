@@ -1747,6 +1747,9 @@ export default function FoundationPlayersTableNewLook({
         rows={compareRows}
         openPlayerDrawerById={openPlayerDrawerById}
         onRemove={(playerId) => setComparePlayerIds((current) => current.filter((id) => id !== playerId))}
+        leaguePlayerHeatPools={leaguePlayerHeatPools}
+        allRows={rows}
+        onAddToCompare={toggleCompareSelection}
       />
     </div>
   );

@@ -113,10 +113,21 @@ export type FoundationPlayersSquadRidgelineProps = {
 export default function FoundationPlayersSquadRidgeline({ rows }: FoundationPlayersSquadRidgelineProps) {
   const innerWidth = CHART_WIDTH - PAD_LEFT - PAD_RIGHT;
 
+  // Eigene (vom Menschen geführte) Spieler — Grundlage der "mein Kader"-Kontur (Feature 3).
+  const ownRows = useMemo(() => rows.filter((row) => row.team?.humanControlled), [rows]);
+
   const axisRows = useMemo(() => {
     const histograms = RIDGE_AXES.map((axis) => ({ axis, ...buildAxisHistogram(rows, axis) }));
     const smoothed = histograms.map((entry) => ({ ...entry, smoothed: smoothCounts(entry.counts) }));
     const globalMax = Math.max(1, ...smoothed.flatMap((entry) => entry.smoothed));
+
+    // Eigenes Team mit IDENTISCHEM Bucketing/Glättung, aber auf sein EIGENES
+    // Maximum normalisiert — so wird die Kader-FORM mit der Liga-Form vergleichbar
+    // ("mein Kader vs. Liga"), nicht von der kleineren Absolutzahl erdrückt.
+    const ownHistograms = RIDGE_AXES.map((axis) => ({ axis, ...buildAxisHistogram(ownRows, axis) }));
+    const ownSmoothed = ownHistograms.map((entry) => smoothCounts(entry.counts));
+    const ownGlobalMax = Math.max(1, ...ownSmoothed.flatMap((values) => values));
+    const ownKnown = ownHistograms.reduce((sum, entry) => sum + entry.known, 0);
 
     return smoothed.map((entry, rowIndex) => {
       const baselineY = PAD_TOP + ROW_HEIGHT + rowIndex * ROW_STEP;
@@ -126,6 +137,16 @@ export default function FoundationPlayersSquadRidgeline({ rows }: FoundationPlay
         const y = baselineY - (value / globalMax) * ROW_AMPLITUDE;
         return { x, y };
       });
+      const ownEntry = ownHistograms[rowIndex]!;
+      const ownPoints: RidgePoint[] | null =
+        ownEntry.known > 0
+          ? ownSmoothed[rowIndex]!.map((value, binIndex) => {
+              const binCenter = (binIndex + 0.5) * RIDGE_BIN_WIDTH;
+              const x = PAD_LEFT + (binCenter / 100) * innerWidth;
+              const y = baselineY - (value / ownGlobalMax) * ROW_AMPLITUDE;
+              return { x, y };
+            })
+          : null;
       const peakBinIndex = entry.counts.reduce(
         (bestIndex, value, index) => (value > entry.counts[bestIndex]! ? index : bestIndex),
         0,
@@ -134,11 +155,12 @@ export default function FoundationPlayersSquadRidgeline({ rows }: FoundationPlay
         entry.known > 0
           ? `${formatNlNumber(peakBinIndex * RIDGE_BIN_WIDTH, 0)}–${formatNlNumber((peakBinIndex + 1) * RIDGE_BIN_WIDTH, 0)}`
           : null;
-      return { axis: entry.axis, baselineY, points, known: entry.known, peakLabel };
+      return { axis: entry.axis, baselineY, points, ownPoints, ownKnown: ownEntry.known, known: entry.known, peakLabel };
     });
-  }, [rows, innerWidth]);
+  }, [rows, ownRows, innerWidth]);
 
   const hasAnyData = axisRows.some((entry) => entry.known > 0);
+  const hasOwnData = axisRows.some((entry) => entry.ownKnown > 0);
 
   return (
     <NlCard className="nl-ridge-card" eyebrow="Kader-Analyse" title="Kader-Profil">
@@ -194,6 +216,20 @@ export default function FoundationPlayersSquadRidgeline({ rows }: FoundationPlay
                       </title>
                     </path>
                     <path className="nl-ridge-line" stroke={tone} d={buildRidgeLinePath(entry.points)} />
+                    {/* Kontur des eigenen Kaders (Feature 3): gestrichelt + Akzentton,
+                        auf eigenes Maximum normalisiert → "mein Kader vs. Liga". */}
+                    {entry.ownPoints ? (
+                      <path
+                        className="nl-ridge-line"
+                        stroke="var(--nl-accent)"
+                        style={{ strokeDasharray: "4 3", strokeWidth: 2 }}
+                        d={buildRidgeLinePath(entry.ownPoints)}
+                      >
+                        <title>
+                          {NL_AXIS_LABELS[entry.axis]} · dein Kader: {formatNlNumber(entry.ownKnown, 0)} Spieler mit Wert
+                        </title>
+                      </path>
+                    ) : null}
                   </g>
                 );
               })}
@@ -210,10 +246,23 @@ export default function FoundationPlayersSquadRidgeline({ rows }: FoundationPlay
                 {NL_AXIS_LABELS[axis]}
               </span>
             ))}
+            {/* Kontur-Eintrag für den eigenen Kader (Feature 3) — gleiche Legenden-
+                Mechanik wie die Achsen, nur als gestrichelter Akzent-Umriss. */}
+            {hasOwnData ? (
+              <span className="nl-ridge-legend-item">
+                <span
+                  className="nl-ridge-legend-swatch"
+                  style={{ background: "transparent", border: "1.5px dashed var(--nl-accent)" }}
+                  aria-hidden="true"
+                />{" "}
+                Dein Kader (Kontur)
+              </span>
+            ) : null}
           </div>
           <p className="nl-phub-hint">
             Stärkeverteilung von POW/SPE/MEN/SOC über {formatNlNumber(rows.length, 0)} Spieler der aktuellen Auswahl —
             höher heißt mehr Spieler in diesem Wertebereich.
+            {hasOwnData ? " Die gestrichelte Kontur zeigt die (formangeglichene) Verteilung deines eigenen Kaders." : ""}
           </p>
         </>
       )}
