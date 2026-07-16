@@ -165,6 +165,11 @@ function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamStat
   const comp = state.composition;
   if (!comp) return 0;
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
+  // Premium (Star/Superstar) is left ENTIRELY to the base economy: it already buys stars only when
+  // affordable and still reaches opt (REF ≈ 8.7 Star / 0.3 Superstar). Nudging premium up made teams
+  // over-reach on a star, drain budget and fall below opt — the whole below-opt/star-inflation problem.
+  // COMPOSE only shapes the body tiers (Core/Depth/Backup) + discourages a Reserve tail.
+  if (lane === "superstar" || lane === "star") return 0;
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
   // deficit <= 0: tier already at/over target ⇒ gentle floored malus (never blocks a below-opt fill).
   if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
