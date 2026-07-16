@@ -100,7 +100,7 @@ export const SPONSOR_ARCHETYPE_BASE_MULT: Record<SponsorArchetype, number> = {
 export const SPONSOR_ARCHETYPE_MILESTONE_MULT: Record<SponsorArchetype, number> = {
   security: Number(process.env.OLY_SPONSOR_ARCH_MS_SECURITY ?? 0.5) || 0.5,
   identity: Number(process.env.OLY_SPONSOR_ARCH_MS_IDENTITY ?? 1.0) || 1.0,
-  performance: Number(process.env.OLY_SPONSOR_ARCH_MS_PERFORMANCE ?? 1.55) || 1.55,
+  performance: Number(process.env.OLY_SPONSOR_ARCH_MS_PERFORMANCE ?? 1.45) || 1.45,
 };
 
 export function getArchetypeBaseMultiplier(archetype: SponsorArchetype): number {
