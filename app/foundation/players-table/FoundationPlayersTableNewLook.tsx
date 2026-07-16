@@ -37,14 +37,16 @@
  *   client-seitiges Prädikat auf `rows`, kein neuer Shell-State) — filtert die
  *   Spielerliste im Verzeichnis auf den angeklickten Bracket, erneuter Klick
  *   hebt den Filter wieder auf.
- * - Wishlist-Stern je Zeile: reiner Lesezugriff auf die im `gameState`-Prop
- *   bereits vorhandene Transfermarkt-Wishlist des eigenen Teams
- *   (`gameState.seasonState.transferWishlist`, via `getTeamTransferWishlistEntries`).
- *   BEWUSST read-only — ein Schreibpfad (Stern zum Hinzufügen/Entfernen) würde
- *   einen neuen Callback-Prop aus `FoundationShellRouterBody.tsx`
- *   (Shell-Datei) erfordern, siehe `toggleTransferWishlist` in
- *   `use-foundation-shell-router-body-scope.tsx`; das ist außerhalb dieser
- *   additiven Komponente nicht herstellbar, ohne Shell-Dateien anzufassen.
+ * - Wishlist-Stern je Zeile: Lesezugriff auf die im `gameState`-Prop bereits
+ *   vorhandene Transfermarkt-Wishlist des eigenen Teams
+ *   (`gameState.seasonState.transferWishlist`, via `getTeamTransferWishlistEntries`)
+ *   PLUS Schreibpfad (P1, #3): der Stern ist jetzt ein interaktiver Toggle
+ *   (`aria-pressed`, Tastatur, ☆/★). Er reicht denselben Shell-Handler durch, den
+ *   auch der Transfermarkt nutzt — `toggleTransferWishlist` in
+ *   `use-foundation-shell-router-body-scope.tsx`, hier als playerId-Variante
+ *   `toggleTransferWishlistByPlayerId` über den optionalen `onToggleWishlist`-Prop
+ *   (aus `FoundationShellRouterBody.tsx` durchgereicht). Fehlt der Callback,
+ *   bleibt der Stern read-only wie in Phase 0.
  *
  * Weitere Zusätze (UI/UX-Upgrades):
  * - Leader-Podium (`FoundationPlayersLeaderPodium.tsx`): Seiten-Hero, klassisches
@@ -157,6 +159,15 @@ export type FoundationPlayersTableNewLookProps = {
   playerBracketCounts: Record<number, number>;
   openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
   openTeamProfileById: (teamId: string) => void;
+  /**
+   * Wishlist-Schreibpfad (P1, #3): schaltet einen Spieler auf/von der
+   * Transfermarkt-Merkliste des eigenen Teams. Reicht denselben Shell-Handler
+   * durch, den auch der Transfermarkt nutzt (`toggleTransferWishlist`, hier als
+   * playerId-Variante `toggleTransferWishlistByPlayerId` aus dem Shell-Scope).
+   * Optional: fehlt der Callback (z. B. alte Aufrufer), bleibt der Stern
+   * read-only wie in Phase 0.
+   */
+  onToggleWishlist?: (playerId: string) => void;
 };
 
 const NL_PLAYERS_SCOPE_ITEMS: Array<{ id: PlayerTableScope; label: string }> = [
@@ -373,6 +384,19 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
 
 const NL_PLAYERS_PAGE_SIZE = 100;
 
+/**
+ * Obergrenze für den "Alle anzeigen"-Sprung (P1, #Alle-anzeigen-Jank). Bewusst
+ * KEINE Virtualisierung: die Zeilen tragen aufklappbare PPs-Detailzeilen,
+ * Vergleichs-Checkboxen, sortierbare Achsen-Buttons und Portrait-Hover-Anchor —
+ * @tanstack/react-virtual mit absolut positionierten Zeilen würde die
+ * <tr>/<td>-Semantik, das Aufklappen (variable Höhe), den Sticky-Kopf und den
+ * Hover-Steckbrief brechen. Statt das zu riskieren bleibt die Pagination
+ * erhalten; "Alle anzeigen" springt höchstens auf diese sichere Obergrenze und
+ * die "+100"-Schaltfläche lädt bei Bedarf inkrementell weiter (kein Massen-
+ * Render von ~400 interaktiven Zeilen auf einen Schlag).
+ */
+const NL_PLAYERS_ALLE_MAX = 300;
+
 // Fog of war (verdecktes Potenzial fremder Spieler): siehe
 // `getFoggedPoScoreRange` in `foundation-players-fog-of-war.ts` (geteilt mit
 // `FoundationPlayersLeaderPodium.tsx`, daher in eine eigene Datei ausgelagert
@@ -522,8 +546,11 @@ export default function FoundationPlayersTableNewLook({
   playerBracketCounts,
   openPlayerDrawerById,
   openTeamProfileById,
+  onToggleWishlist,
 }: FoundationPlayersTableNewLookProps) {
   const [visibleCount, setVisibleCount] = useState(NL_PLAYERS_PAGE_SIZE);
+  /** Namenssuche im Verzeichnis (P1) — Substring, case-insensitiv, ganz vorn im Filter-Stack. */
+  const [nameQuery, setNameQuery] = useState("");
   /** Welche Zeile ist gerade per PPs-Klick aufgeklappt (max. eine gleichzeitig). */
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   /** Verzeichnis (bestehende Tabelle) vs. ligaweiter Analyse-Hub (#47). */
@@ -572,15 +599,30 @@ export default function FoundationPlayersTableNewLook({
   useEffect(() => {
     setVisibleCount(NL_PLAYERS_PAGE_SIZE);
     setExpandedPlayerId(null);
-  }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket, selectedExpiryBucket, queryChips]);
+  }, [playerScope, playerTeamFilter, playerClassFilter, selectedMwBracket, selectedExpiryBucket, queryChips, nameQuery]);
+
+  /**
+   * Namenssuche (P1): case-insensitiver Substring auf den Spielernamen, ganz vorn
+   * im Filter-Stack — die bestehende Bracket-/Vertrags-/Query-Chip-Pipeline
+   * komponiert sich darauf und stackt (ersetzt nichts).
+   */
+  const nameFilteredRows = useMemo(() => {
+    const query = nameQuery.trim().toLowerCase();
+    if (!query) {
+      return rows;
+    }
+    return rows.filter((row) => row.player.name.toLowerCase().includes(query));
+  }, [rows, nameQuery]);
 
   /** Spielerliste, zusätzlich auf den angeklickten MW-Bracket eingeschränkt (falls aktiv). */
   const bracketFilteredRows = useMemo(() => {
     if (selectedMwBracket == null) {
-      return rows;
+      return nameFilteredRows;
     }
-    return rows.filter((row) => getTransfermarktBracket(getPlayerDisplayMarketValue(row.player)) === selectedMwBracket);
-  }, [rows, selectedMwBracket]);
+    return nameFilteredRows.filter(
+      (row) => getTransfermarktBracket(getPlayerDisplayMarketValue(row.player)) === selectedMwBracket,
+    );
+  }, [nameFilteredRows, selectedMwBracket]);
 
   /** Zusätzlich auf den angeklickten Vertragsauslauf-Bucket eingeschränkt (falls aktiv). */
   const expiryFilteredRows = useMemo(() => {
@@ -742,7 +784,7 @@ export default function FoundationPlayersTableNewLook({
   // Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query-Chips) aktiv? Genutzt für den
   // Leerzustand UND (unten) für die "Filter aktiv"-Anzeige im Analyse-Hub.
   const hasExtraDirectoryFilters =
-    selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0;
+    selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0 || nameQuery.trim().length > 0;
   // "Schränkt der aktive Filter die Auswahl wirklich ein?" — genau dieselbe
   // gefilterte Liste, die die Tabelle rendert (`queryChipFilteredRows`), gegen die
   // rohen `rows` gemessen. Nur dann bekommt der Hub die "Filter aktiv"-Anzeige.
@@ -1019,6 +1061,11 @@ export default function FoundationPlayersTableNewLook({
     const playerOwned = row.team?.humanControlled ?? false;
     const isCompareSelected = comparePlayerIds.includes(row.player.id);
     const compareDisabled = !isCompareSelected && comparePlayerIds.length >= 4;
+    // Wishlist-Schreibpfad (P1, #3): der Stern ist interaktiv, sobald ein eigenes
+    // Team existiert UND der Shell-Toggle durchgereicht wurde — sonst bleibt er
+    // der read-only Stern aus Phase 0 (nur sichtbar, wenn schon auf der Liste).
+    const isWishlisted = wishlistPlayerIds.has(row.player.id);
+    const wishlistWritable = Boolean(onToggleWishlist) && ownTeamId != null;
 
     /**
      * Geteilte Props für den Hover-Steckbrief (#Hover-Steckbrief, additiv):
@@ -1108,30 +1155,58 @@ export default function FoundationPlayersTableNewLook({
         </td>
         <td className={`nl-players-td-name${sortCellClass("name")}`}>
           <FoundationPlayerPortraitPreview {...portraitPreviewProps}>
-            <button
-              type="button"
-              className="nl-players-name-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                openPlayerDrawerById(row.player.id, row.roster?.id);
-              }}
-              title={`${row.player.name} öffnen`}
-            >
-              <span className="nl-players-name-line">
-                {wishlistPlayerIds.has(row.player.id) ? (
-                  <span className="nl-players-wishlist-star" aria-label="Auf deiner Transfermarkt-Wishlist" title="Auf deiner Transfermarkt-Wishlist">
-                    ★
-                  </span>
-                ) : null}
-                <span className="nl-players-name">{row.player.name}</span>
-              </span>
-              {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
-                  bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
-                  Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
-              {row.transferStatus !== "Active Player" ? (
-                <span className="nl-players-status">{row.transferStatus}</span>
+            {/* Stern + Namens-Button sind Geschwister in der `nl-players-name-line`
+                (Buttons dürfen nicht verschachtelt werden) — beide teilen weiter
+                denselben Hover-Steckbrief-Anchor. */}
+            <span className="nl-players-name-line">
+              {wishlistWritable ? (
+                // Interaktiver Toggle: reused `nl-players-name-button` nur als
+                // Button-Reset, `nl-players-wishlist-star` gewinnt in der Kaskade
+                // für den Warn-Ton. ☆ = nicht auf Liste, ★ = auf Liste.
+                <button
+                  type="button"
+                  className="nl-players-name-button nl-players-wishlist-star"
+                  aria-pressed={isWishlisted}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleWishlist?.(row.player.id);
+                  }}
+                  aria-label={
+                    isWishlisted
+                      ? `${row.player.name} von Merkliste entfernen`
+                      : `${row.player.name} auf Merkliste setzen`
+                  }
+                  title={isWishlisted ? "Von Merkliste" : "Auf Merkliste"}
+                >
+                  {isWishlisted ? "★" : "☆"}
+                </button>
+              ) : isWishlisted ? (
+                <span
+                  className="nl-players-wishlist-star"
+                  aria-label="Auf deiner Transfermarkt-Wishlist"
+                  title="Auf deiner Transfermarkt-Wishlist"
+                >
+                  ★
+                </span>
               ) : null}
-            </button>
+              <button
+                type="button"
+                className="nl-players-name-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openPlayerDrawerById(row.player.id, row.roster?.id);
+                }}
+                title={`${row.player.name} öffnen`}
+              >
+                <span className="nl-players-name">{row.player.name}</span>
+                {/* Nur Ausnahmen bekommen eine Status-Caption (z. B. "Free Agent") —
+                    bei aktivem "Aktive Spieler"-Scope wäre "ACTIVE PLAYER" auf JEDER
+                    Zeile reine Redundanz (Excel-Beschreibung statt Spiel-UI). */}
+                {row.transferStatus !== "Active Player" ? (
+                  <span className="nl-players-status">{row.transferStatus}</span>
+                ) : null}
+              </button>
+            </span>
           </FoundationPlayerPortraitPreview>
         </td>
         <td className={`nl-players-td-team${sortCellClass("team")}`}>
@@ -1328,6 +1403,32 @@ export default function FoundationPlayersTableNewLook({
         title="Spieler"
         actions={
           <div className="nl-players-filters">
+            {/* Namenssuche (P1): spiegelt das Compare-Picker-Eingabemuster
+                (`nl-compare-picker-input`) und trägt eine kleine ×-Clear-
+                Affordanz mit dem geteilten Inline-Close-SVG (Phase 0). */}
+            <label className="nl-players-filter">
+              <span>Name</span>
+              <input
+                type="search"
+                className="nl-compare-picker-input"
+                value={nameQuery}
+                onChange={(event) => setNameQuery(event.target.value)}
+                placeholder="Spielername…"
+                autoComplete="off"
+                aria-label="Spieler nach Name suchen"
+              />
+              {nameQuery ? (
+                <button
+                  type="button"
+                  className="nl-players-bracket-filter-clear"
+                  onClick={() => setNameQuery("")}
+                  aria-label="Namenssuche zurücksetzen"
+                  title="Namenssuche zurücksetzen"
+                >
+                  <NlCloseGlyph />
+                </button>
+              ) : null}
+            </label>
             <label className="nl-players-filter">
               <span>Team</span>
               <select
@@ -1548,6 +1649,7 @@ export default function FoundationPlayersTableNewLook({
                     setSelectedMwBracket(null);
                     setSelectedExpiryBucket(null);
                     setQueryChips([]);
+                    setNameQuery("");
                   },
                 }
               : undefined
@@ -1600,13 +1702,23 @@ export default function FoundationPlayersTableNewLook({
               >
                 Mehr anzeigen (+{NL_PLAYERS_PAGE_SIZE})
               </button>
+              {/* "Alle anzeigen" springt höchstens auf NL_PLAYERS_ALLE_MAX (siehe
+                  Konstante) statt ~400 interaktive Zeilen auf einmal zu rendern;
+                  bei mehr Treffern lädt die "+100"-Schaltfläche weiter. */}
               <button
                 type="button"
                 className="nl-players-more-button"
-                onClick={() => setVisibleCount(queryChipFilteredRows.length)}
+                onClick={() => setVisibleCount(Math.min(queryChipFilteredRows.length, NL_PLAYERS_ALLE_MAX))}
               >
-                Alle {formatNlNumber(queryChipFilteredRows.length, 0)} anzeigen
+                {queryChipFilteredRows.length > NL_PLAYERS_ALLE_MAX
+                  ? `Erste ${formatNlNumber(NL_PLAYERS_ALLE_MAX, 0)} anzeigen`
+                  : `Alle ${formatNlNumber(queryChipFilteredRows.length, 0)} anzeigen`}
               </button>
+              {queryChipFilteredRows.length > NL_PLAYERS_ALLE_MAX ? (
+                <small className="muted" role="note">
+                  Zeigt max. erste {formatNlNumber(NL_PLAYERS_ALLE_MAX, 0)} auf einmal (Performance) — "Mehr anzeigen" lädt weiter.
+                </small>
+              ) : null}
             </div>
           ) : null}
         </NlCard>

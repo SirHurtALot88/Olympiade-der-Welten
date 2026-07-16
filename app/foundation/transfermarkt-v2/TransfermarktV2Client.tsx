@@ -652,6 +652,41 @@ export default function TransfermarktV2Client({
     setFilterPresetMessage("Filter zurückgesetzt.");
   }
 
+  // F2 — Gespeicherte Suchen: speichern/anwenden/löschen. Manipuliert nur den
+  // filterPresets-State; die Persistenz nach localStorage übernimmt weiterhin der
+  // writeMarketFilterStorage-Effekt (currentFilterSnapshot ist der aktuelle Filter).
+  function saveMarketFilterPreset(name: string) {
+    const trimmed = name.trim().slice(0, 32) || "Filter";
+    const now = new Date().toISOString();
+    setFilterPresets((current) =>
+      [
+        {
+          id: `preset-${crypto.randomUUID()}`,
+          name: trimmed,
+          snapshot: currentFilterSnapshot,
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...current,
+      ].slice(0, 18),
+    );
+    setFilterPresetMessage(`Suche „${trimmed}" gespeichert.`);
+  }
+
+  function applyMarketFilterPreset(id: string) {
+    const preset = filterPresets.find((entry) => entry.id === id);
+    if (!preset) {
+      return;
+    }
+    applyMarketFilterSnapshot(preset.snapshot);
+    setFilterPresetMessage(`Suche „${preset.name}" geladen.`);
+  }
+
+  function deleteMarketFilterPreset(id: string) {
+    setFilterPresets((current) => current.filter((entry) => entry.id !== id));
+    setFilterPresetMessage("Gespeicherte Suche gelöscht.");
+  }
+
   const currentFilterSnapshot = useMemo<MarketFilterSnapshot>(
     () => ({
       search,
@@ -1837,6 +1872,10 @@ export default function TransfermarktV2Client({
           activeAxisMinimumCount +
           selectedClassAxes.length
         }
+        filterPresets={filterPresets.map((preset) => ({ id: preset.id, name: preset.name }))}
+        onApplyFilterPreset={applyMarketFilterPreset}
+        onSaveFilterPreset={saveMarketFilterPreset}
+        onDeleteFilterPreset={deleteMarketFilterPreset}
         candidates={renderedVisibleItems}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}
@@ -1878,6 +1917,9 @@ export default function TransfermarktV2Client({
         previewRosterAfter={previewRosterAfter}
         previewMarketValueBefore={previewMarketValueBefore}
         previewMarketValueAfter={previewMarketValueAfter}
+        previewAcceptChance={buyPreview?.acceptChance ?? null}
+        previewCounterChance={buyPreview?.counterChance ?? null}
+        previewRejectChance={buyPreview?.rejectChance ?? null}
         buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
         buyWarnings={filterVisibleNegotiationWarnings(buyPreview?.warnings).map(formatNegotiationSignalLabel)}
         topSixCount={topSixCount}

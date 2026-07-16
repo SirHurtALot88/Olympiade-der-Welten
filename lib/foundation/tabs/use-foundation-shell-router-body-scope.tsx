@@ -2453,7 +2453,15 @@ export function useFoundationShellRouterBodyScope({
     }));
   }
 
-  function buildWishlistEntry(item: TransfermarktFreeAgentItem): TransferWishlistEntry {
+  // Nur die tatsächlich gelesenen Felder — so kann `buildWishlistEntry` sowohl
+  // vom vollen Transfermarkt-Item als auch vom leichten playerId-Pfad (Spieler-
+  // Verzeichnis, P1) genutzt werden, ohne ein ~40-Feld-Item zu erfinden.
+  type WishlistEntrySource = Pick<
+    TransfermarktFreeAgentItem,
+    "playerId" | "name" | "className" | "race" | "marketValue" | "salary" | "bracket" | "pow" | "spe" | "men" | "soc"
+  >;
+
+  function buildWishlistEntry(item: WishlistEntrySource): TransferWishlistEntry {
     return {
       id:
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -2496,6 +2504,54 @@ export function useFoundationShellRouterBodyScope({
     }
 
     saveTransferWishlist([buildWishlistEntry(item), ...currentEntries]);
+  }
+
+  /**
+   * playerId-Variante von `toggleTransferWishlist` (P1, #3) für das Spieler-
+   * Verzeichnis, das kein volles `TransfermarktFreeAgentItem` hat. Nutzt EXAKT
+   * dieselbe Logik (Slot-Check, `buildWishlistEntry`, `saveTransferWishlist`);
+   * die Spielerdaten kommen aus den bereits abgeleiteten `playerScopeRows`.
+   */
+  function toggleTransferWishlistByPlayerId(playerId: string) {
+    const currentEntries = gameState.seasonState.transferWishlist ?? [];
+    const existing = currentEntries.find((entry) => entry.playerId === playerId);
+    if (existing) {
+      saveTransferWishlist(currentEntries.filter((entry) => entry.playerId !== playerId));
+      return;
+    }
+    const teamId = marketTeamId || selectedTeam?.teamId || null;
+    if (!teamId) {
+      return;
+    }
+    const slotCheck = canAddPlayerToTransferWishlist(gameState, teamId, playerId);
+    if (!slotCheck.ok) {
+      showScoutingWishlistSlotNotice(teamId, playerId);
+      return;
+    }
+    const row = playerScopeRows.find((entry) => entry.player.id === playerId);
+    if (!row) {
+      return;
+    }
+    const marketValue = getPlayerDisplayMarketValue(row.player);
+    const salary = row.roster
+      ? getRosterEntryDisplaySalary(row.roster, row.player)
+      : getPlayerDisplaySalary(row.player);
+    saveTransferWishlist([
+      buildWishlistEntry({
+        playerId: row.player.id,
+        name: row.player.name,
+        className: row.player.className,
+        race: row.player.race,
+        marketValue,
+        salary,
+        bracket: getTransfermarktBracket(marketValue),
+        pow: row.player.coreStats.pow ?? null,
+        spe: row.player.coreStats.spe ?? null,
+        men: row.player.coreStats.men ?? null,
+        soc: row.player.coreStats.soc ?? null,
+      }),
+      ...currentEntries,
+    ]);
   }
 
   function removeTransferWishlistEntry(playerId: string) {
@@ -10850,6 +10906,7 @@ export function useFoundationShellRouterBodyScope({
     toggleTableSort,
     toggleTransferSellMarker,
     toggleTransferWishlist,
+    toggleTransferWishlistByPlayerId,
     trainingDevelopmentFilter,
     trainingDevelopmentSummary,
     teamBeliebtheit,

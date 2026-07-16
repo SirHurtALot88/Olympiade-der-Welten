@@ -271,6 +271,11 @@ export type TransfermarktV2NewLookProps = {
   onMinRatioFilterChange: (value: number) => void;
   onResetFilters: () => void;
   activeFilterCount: number;
+  // Gespeicherte Suchen (F2) — Persistenz liegt im Client; hier nur Anzeige/Trigger.
+  filterPresets: { id: string; name: string }[];
+  onApplyFilterPreset: (id: string) => void;
+  onSaveFilterPreset: (name: string) => void;
+  onDeleteFilterPreset: (id: string) => void;
   // Kandidaten-Rail
   candidates: TransfermarktFreeAgentItem[];
   totalVisibleCount: number;
@@ -304,6 +309,10 @@ export type TransfermarktV2NewLookProps = {
   previewRosterAfter: number | null;
   previewMarketValueBefore: number | null;
   previewMarketValueAfter: number | null;
+  /** Reaktions-Wahrscheinlichkeiten der Gegenseite (F4) — noch vor dem Modal. */
+  previewAcceptChance: number | null;
+  previewCounterChance: number | null;
+  previewRejectChance: number | null;
   buyBlockingReasons: string[];
   buyWarnings: string[];
   // Team-Impact (im Client via computeTopSixAxisImpact/... berechnet)
@@ -447,7 +456,12 @@ function getNlInitials(name: string) {
   );
 }
 
-function NlMarketBeforeAfterRow({
+/**
+ * Vorher→Nachher-Zeile des Deal-Desks. Wird auch im Kauf-Modal
+ * (FoundationMarketBuyShellHost) verwendet, damit die Team-Auswirkung dort
+ * dieselbe Delta-Chip-Sprache spricht — daher exportiert.
+ */
+export function NlMarketBeforeAfterRow({
   label,
   before,
   after,
@@ -475,6 +489,66 @@ function NlMarketBeforeAfterRow({
       ) : (
         <span className="nl-market-deal-flat nl-tnum">±0</span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Segmentierte Wahrscheinlichkeits-Bar für Zusage/Nachforderung/Absage
+ * (good/warn/risk). Ein Renderpfad für Deal-Desk (F4) UND Kauf-Modal (F1),
+ * damit die Reaktion der Gegenseite überall gleich aussieht. Rendert nur
+ * vorhandene Werte; Breiten werden auf die Summe der bekannten Segmente
+ * normiert, damit die Bar auch bei fehlendem Segment sauber degradiert.
+ */
+export function NlMarketChanceBar({
+  acceptChance,
+  counterChance,
+  rejectChance,
+  className,
+  ariaLabel,
+}: {
+  acceptChance: number | null | undefined;
+  counterChance: number | null | undefined;
+  rejectChance: number | null | undefined;
+  className?: string;
+  ariaLabel?: string;
+}) {
+  const rawSegments: { key: string; label: string; tone: NlTone; value: number | null | undefined }[] = [
+    { key: "accept", label: "Zusage", tone: "good", value: acceptChance },
+    { key: "counter", label: "Nachf.", tone: "warn", value: counterChance },
+    { key: "reject", label: "Absage", tone: "risk", value: rejectChance },
+  ];
+  const segments = rawSegments.filter(
+    (segment): segment is { key: string; label: string; tone: NlTone; value: number } =>
+      typeof segment.value === "number" && Number.isFinite(segment.value),
+  );
+  if (segments.length === 0) {
+    return null;
+  }
+  const total = segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0);
+  const denom = total > 0 ? total : 1;
+  return (
+    <div
+      className={`nl-market-chance${className ? ` ${className}` : ""}`}
+      role="group"
+      aria-label={ariaLabel ?? "Verhandlungs-Wahrscheinlichkeiten"}
+    >
+      <div className="nl-market-chance-track" aria-hidden="true">
+        {segments.map((segment) => (
+          <span
+            key={segment.key}
+            className={`nl-market-chance-seg ${nlToneClass(segment.tone)}`}
+            style={{ width: `${(Math.max(0, segment.value) / denom) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="nl-market-chance-legend nl-tnum">
+        {segments.map((segment) => (
+          <span key={segment.key} className={`nl-market-chance-legend-item ${nlToneClass(segment.tone)}`}>
+            <b>{segment.label}</b> {Math.round(segment.value)}%
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -509,6 +583,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onMinRatioFilterChange,
     onResetFilters,
     activeFilterCount,
+    filterPresets,
+    onApplyFilterPreset,
+    onSaveFilterPreset,
+    onDeleteFilterPreset,
     candidates,
     totalVisibleCount,
     selectedPlayerId,
@@ -539,6 +617,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     previewRosterAfter,
     previewMarketValueBefore,
     previewMarketValueAfter,
+    previewAcceptChance,
+    previewCounterChance,
+    previewRejectChance,
     buyBlockingReasons,
     buyWarnings,
     topSixCount,
@@ -576,6 +657,21 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
 
   // F5 — aufklappbare Achsen im Kader-Block (Akkordeon wie im Saisonstand-Board).
   const [expandedSquadAxis, setExpandedSquadAxis] = useState<NlAxisKey | null>(null);
+
+  // F2 — Inline-Eingabe für "Suche speichern": nur ein Namensfeld, die Persistenz
+  // selbst liegt im Client. Offen/zu + aktueller Entwurfsname.
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  const [savePresetName, setSavePresetName] = useState("");
+
+  function submitSavePreset() {
+    const trimmed = savePresetName.trim();
+    if (!trimmed) {
+      return;
+    }
+    onSaveFilterPreset(trimmed);
+    setSavePresetName("");
+    setSavePresetOpen(false);
+  }
 
   // FM26-Style Progressive Disclosure — Kandidaten-Kachel: welcher Kandidat ist
   // per explizitem Toggle (Touch/Tastatur) dauerhaft aufgeklappt. Hover/Fokus
@@ -815,6 +911,78 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 onChange={(event) => onMinRatioFilterChange(Number(event.target.value) || 0)}
               />
             </label>
+          </div>
+          {/* F2 — Gespeicherte Suchen: Chips zum Anwenden, Löschen je Preset,
+              "Suche speichern" mit Inline-Namensfeld. Persistenz liegt im Client. */}
+          <div className="nl-market-presets" role="group" aria-label="Gespeicherte Suchen">
+            <span className="nl-market-eyebrow">Gespeicherte Suchen</span>
+            <div className="nl-market-preset-chips">
+              {filterPresets.length > 0 ? (
+                filterPresets.map((preset) => (
+                  <span className="nl-market-preset-chip" key={preset.id}>
+                    <button
+                      type="button"
+                      className="nl-market-preset-apply"
+                      title={`Filter „${preset.name}" anwenden`}
+                      onClick={() => onApplyFilterPreset(preset.id)}
+                    >
+                      {preset.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="nl-market-preset-delete"
+                      aria-label={`Suche „${preset.name}" löschen`}
+                      title={`Suche „${preset.name}" löschen`}
+                      onClick={() => onDeleteFilterPreset(preset.id)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              ) : (
+                <span className="nl-market-muted">Noch keine gespeichert — aktuelle Filter unten sichern.</span>
+              )}
+              {savePresetOpen ? (
+                <span className="nl-market-preset-save-form">
+                  <input
+                    type="text"
+                    className="nl-market-preset-save-input"
+                    value={savePresetName}
+                    maxLength={32}
+                    placeholder="Name der Suche"
+                    aria-label="Name der gespeicherten Suche"
+                    autoFocus
+                    onChange={(event) => setSavePresetName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        submitSavePreset();
+                      } else if (event.key === "Escape") {
+                        setSavePresetOpen(false);
+                        setSavePresetName("");
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="nl-market-preset-save-confirm"
+                    disabled={!savePresetName.trim()}
+                    onClick={submitSavePreset}
+                  >
+                    Sichern
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="nl-market-preset-save-open"
+                  title="Aktuelle Filter als Suche speichern"
+                  onClick={() => setSavePresetOpen(true)}
+                >
+                  + Suche speichern
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {marketError ? (
@@ -1198,6 +1366,61 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   ) : null;
                 })()}
 
+                {/* F3 — Trait/Subclass-Chips mit Fog: bekannte Traits tonfarbig
+                    (positiv = good, negativ = risk), verdeckte Zahl als Fog-Chip.
+                    Fog-sicher — der Server hat visible/hidden bereits gegatet, hier
+                    wird nur gerendert, was mitgeliefert wurde. */}
+                {(() => {
+                  const positives = selectedPlayer.traitsPositive ?? [];
+                  const negatives = selectedPlayer.traitsNegative ?? [];
+                  const hiddenPositive = selectedPlayer.hiddenPositiveTraitCount ?? 0;
+                  const hiddenNegative = selectedPlayer.hiddenNegativeTraitCount ?? 0;
+                  const hasTraitContent =
+                    positives.length > 0 || negatives.length > 0 || hiddenPositive > 0 || hiddenNegative > 0;
+                  if (!hasTraitContent) {
+                    return null;
+                  }
+                  return (
+                    <div className="nl-market-traits" aria-label="Traits & verdeckte Merkmale">
+                      <span className="nl-market-eyebrow">Traits</span>
+                      <div className="nl-market-trait-chips">
+                        {positives.map((trait) => (
+                          <span
+                            key={`nl-trait-pos-${selectedPlayer.playerId}-${trait}`}
+                            className={`nl-market-trait-chip ${nlToneClass("good")}`}
+                          >
+                            {trait}
+                          </span>
+                        ))}
+                        {negatives.map((trait) => (
+                          <span
+                            key={`nl-trait-neg-${selectedPlayer.playerId}-${trait}`}
+                            className={`nl-market-trait-chip ${nlToneClass("risk")}`}
+                          >
+                            {trait}
+                          </span>
+                        ))}
+                        {hiddenPositive > 0 ? (
+                          <span
+                            className="nl-market-trait-chip is-fog"
+                            title="Positive Traits noch verdeckt — weiter scouten."
+                          >
+                            +{hiddenPositive} verdeckt
+                          </span>
+                        ) : null}
+                        {hiddenNegative > 0 ? (
+                          <span
+                            className="nl-market-trait-chip is-fog"
+                            title="Negative Traits noch verdeckt — weiter scouten."
+                          >
+                            +{hiddenNegative} verdeckt
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore).
                     Kurzcode statt abgeschnittenem Namen + Teilnehmerzahl (entry.playerCount, gleiche Quelle
                     wie im Spielerprofil über buildSeasonDisciplinePlayerCountMap). */}
@@ -1339,6 +1562,19 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <StatChip label="Ablöse" value={formatTransfermarktCurrency(previewPurchasePrice)} tone="accent" />
               <StatChip label="Forderung p.a." value={previewSalaryLabel} tone="warn" />
             </StatChipRow>
+            {/* F4 — Reaktion der Gegenseite schon vor dem Modal sichtbar: verhindert
+                Sackgassen-Klicks ins Kaufmodal. Gleiche Bar wie im Modal (F1). */}
+            {previewAcceptChance != null || previewCounterChance != null || previewRejectChance != null ? (
+              <div className="nl-market-deal-chance" aria-label="Erwartete Reaktion der Gegenseite">
+                <span className="nl-market-eyebrow">Erwartete Reaktion</span>
+                <NlMarketChanceBar
+                  acceptChance={previewAcceptChance}
+                  counterChance={previewCounterChance}
+                  rejectChance={previewRejectChance}
+                  ariaLabel="Zusage / Nachforderung / Absage"
+                />
+              </div>
+            ) : null}
             <div className="nl-market-deal-rows" aria-label="Vorher-Nachher mit Kauf">
               <NlMarketBeforeAfterRow
                 label="Cash"

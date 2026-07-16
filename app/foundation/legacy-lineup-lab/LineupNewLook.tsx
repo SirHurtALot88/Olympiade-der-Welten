@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEven
 
 import type { LegacyLineupFocusV2BoardProps } from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
 import {
+  FATIGUE_HIGH,
+  NlCard,
   NlCountUpValue,
   NlDeltaChip,
   NlEmptyState,
+  NlFatigueGauge,
   NlProgressBar,
   NlRadar,
   NlSkeletonCard,
   StatChip,
+  fatigueTone,
   formatNlNumber,
   type NlAxisKey,
   type NlTone,
@@ -805,6 +809,8 @@ export default function LineupNewLook({
 }: LineupNewLookProps) {
   const [hoveredCandidateId, setHoveredCandidateId] = useState<string | null>(null);
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
+  // Optimieren-Panel: Upgrade-Hinweise für die volle Aufstellung (Feature 1, additiv).
+  const [optimizeOpen, setOptimizeOpen] = useState(false);
   const [verdict, setVerdict] = useState<NlVerdictState | null>(null);
   const verdictTimeoutRef = useRef<number | null>(null);
   const prevAssignPulseRef = useRef<number | undefined>(undefined);
@@ -992,6 +998,49 @@ export default function LineupNewLook({
     };
   }, [rosterCardByActivePlayerId, selections, slots]);
 
+  // Optimieren (Feature 1): pro BELEGTEM Slot prüfen, ob der Top-Kandidat der
+  // Slot-Summary ein anderer (= besserer) Spieler ist als der aktuell Gesetzte.
+  // `topCandidates` stammt aus getAvailableOptionsForSlot und schließt bereits
+  // anderswo gesetzte Spieler aus → jeder Vorschlag ist eligible & konfliktfrei.
+  // Gain = Top-Projektion − aktuelle Slot-Projektion; nur echte Zugewinne (>0).
+  const lineupUpgrades = useMemo(() => {
+    const rows: Array<{ slotKey: string; slotLabel: string; currentName: string; suggestedId: string; suggestedName: string; gain: number }> = [];
+    for (const slot of slots) {
+      const currentId = selections[slot.key];
+      if (!currentId) continue; // nur belegte Slots optimieren
+      const summary = slotCandidateSummaryByKey.get(slot.key);
+      const top = summary?.topCandidates[0] ?? null;
+      if (!top || top.activePlayerId === currentId) continue; // bereits der beste Kandidat gesetzt
+      const currentProjected = summary?.currentProjected ?? null;
+      const gain =
+        currentProjected != null && top.projectedScore != null
+          ? Number((top.projectedScore - currentProjected).toFixed(1))
+          : null;
+      if (gain == null || gain <= 0) continue; // nur echte Verbesserungen anbieten
+      rows.push({
+        slotKey: slot.key,
+        slotLabel: `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1}`,
+        currentName: rosterCardByActivePlayerId.get(currentId)?.name ?? getSelectedOptionMeta(currentId)?.name ?? "Spieler",
+        suggestedId: top.activePlayerId,
+        suggestedName: top.name,
+        gain,
+      });
+    }
+    return rows.sort((left, right) => right.gain - left.gain);
+  }, [slots, selections, slotCandidateSummaryByKey, rosterCardByActivePlayerId, getSelectedOptionMeta]);
+
+  // "Alle übernehmen": Snapshot sequenziell anwenden, aber pro Ziel-Spieler nur
+  // einmal — verhindert Doppel-Zuweisung, falls ein freier Spieler für zwei
+  // Slots zugleich Top-Vorschlag ist (Undo deckt Assignments bereits ab).
+  const applyAllUpgrades = () => {
+    const applied = new Set<string>();
+    for (const row of lineupUpgrades) {
+      if (applied.has(row.suggestedId)) continue;
+      applied.add(row.suggestedId);
+      onAssignPlayer(row.slotKey, row.suggestedId);
+    }
+  };
+
   const topPickForActiveSlot = useMemo(
     () => filteredCandidates.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? filteredCandidates[0] ?? null,
     [filteredCandidates],
@@ -1005,6 +1054,8 @@ export default function LineupNewLook({
   const focusLaneD1 = focusBestSlots.find((entry) => entry.disciplineSide === "d1")?.projectedScore ?? null;
   const focusLaneD2 = focusBestSlots.find((entry) => entry.disciplineSide === "d2")?.projectedScore ?? null;
   const focusLaneVerdict = getNlLaneVerdict(focusLaneD1, focusLaneD2);
+  // Fatigue des Fokus-Spielers (Feature 2): als Mini-Gauge im Fokus-Panel.
+  const focusFatigue = focusPlayer?.activePlayerId ? getSelectedOptionMeta(focusPlayer.activePlayerId)?.fatigueCount ?? null : null;
 
   const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
   const activeCaptainEntries = captainSelectEntriesBySide[activeCaptainSide] ?? [];
@@ -1141,6 +1192,10 @@ export default function LineupNewLook({
             const isJustAssigned = recentlyAssignedSlotKey === slot.key;
             const isCaptain = Boolean(selectedId) && captains[slot.disciplineSide] === selectedId;
             const fatigue = selectedId ? getSelectedOptionMeta(selectedId)?.fatigueCount ?? null : null;
+            // Nach-Spieltag-Belastung (Feature 2): aktuelle Fatigue + projizierte
+            // Zusatz-Ermüdung dieses Slots. >= FATIGUE_HIGH ⇒ Warn-Affordanz.
+            const aftermathFatigue = fatigue != null ? fatigue + (preview?.projected.additionalFatigue ?? 0) : null;
+            const aftermathHigh = aftermathFatigue != null && aftermathFatigue >= FATIGUE_HIGH;
 
             return (
               <article
@@ -1174,10 +1229,13 @@ export default function LineupNewLook({
                         {isCaptain ? <span className="nl-lineup-captain-badge">C</span> : null}
                       </strong>
                       <span className="nl-lineup-slot-score">
-                        {/* Nur noch die projizierte Slot-Punktzahl (+ optionale
-                            Fatigue) — die redundante "Basis"-Zweitzahl entfernt. */}
+                        {/* Nur noch die projizierte Slot-Punktzahl — die redundante
+                            "Basis"-Zweitzahl entfernt. Fatigue jetzt als Mini-Gauge
+                            (Feature 2) statt bloßem "F N"-Text. */}
                         <em className="nl-tnum">{formatNullableScore(projected)}</em>
-                        {fatigue != null ? <small>F {Math.round(fatigue)}</small> : null}
+                        {fatigue != null ? (
+                          <NlFatigueGauge value={fatigue} label="F" title={`Fatigue ${Math.round(fatigue)}/100`} />
+                        ) : null}
                       </span>
                     </span>
                   ) : (
@@ -1201,6 +1259,16 @@ export default function LineupNewLook({
                     {issue ? (
                       <span className="nl-lineup-chip is-risk" title={issue.detail}>
                         {issue.label}
+                      </span>
+                    ) : null}
+                    {/* Fatigue-Aftermath-Warnung (Feature 2): Spieler ist nach diesem
+                        Spieltag hoch belastet. Ton über fatigueTone (⇒ is-risk). */}
+                    {aftermathHigh ? (
+                      <span
+                        className={`nl-lineup-chip is-${fatigueTone(aftermathFatigue as number)}`}
+                        title="nach diesem Spieltag hoch belastet"
+                      >
+                        Nach Spieltag hoch
                       </span>
                     ) : null}
                   </span>
@@ -1291,6 +1359,15 @@ export default function LineupNewLook({
             tone={getNlRiskTone(matchdayPreviewCards.riskLevel)}
             title={`Risiko-Level: ${matchdayPreviewCards.riskLevel}`}
           />
+          {/* Fatigue-Kosten (Feature 2): Summe der Zusatz-Ermüdung dieses Spieltags
+              (matchdayPreviewCards.totalFatigue). Ton über die kanonischen Fatigue-
+              Schwellen (≥40 warn, ≥65 risk). */}
+          <StatChip
+            label="Fatigue-Kosten"
+            value={`−${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
+            tone={fatigueTone(matchdayPreviewCards.totalFatigue)}
+            title={`Ermüdung, die dieser Spieltag kostet: ${formatNlNumber(matchdayPreviewCards.totalFatigue, 1)}`}
+          />
           {teamAxisAverage ? (
             <div className="nl-lineup-hud-radar" title={`Ø Achsen der ${teamAxisAverage.count} gesetzten Spieler`}>
               <NlRadar axes={teamAxisAverage.axes} aria-label={`Team-Radar: Ø Achsen der ${teamAxisAverage.count} gesetzten Spieler`} />
@@ -1319,6 +1396,18 @@ export default function LineupNewLook({
             disabled={isBusy || isReadOnly || matchdayPreviewCards.openSlots === 0}
           >
             Automatisch füllen
+          </button>
+          {/* Optimieren (Feature 1): blendet die Upgrade-Karte ein/aus. */}
+          <button
+            type="button"
+            className={`nl-lineup-btn is-ghost${optimizeOpen ? " is-selected" : ""}`}
+            aria-expanded={optimizeOpen}
+            onClick={() => setOptimizeOpen((current) => !current)}
+            disabled={isReadOnly}
+            title="Bessere Kandidaten für belegte Slots vorschlagen"
+          >
+            Optimieren
+            {lineupUpgrades.length > 0 ? <em className="nl-tnum"> {lineupUpgrades.length}</em> : null}
           </button>
           <div className="nl-lineup-save-wrap">
             <button
@@ -1377,6 +1466,52 @@ export default function LineupNewLook({
         <div className="nl-lineup-status" role="status">
           {statusMessage}
         </div>
+      ) : null}
+
+      {/* --- Optimieren (Feature 1): Upgrade-Hinweise für belegte Slots ------- */}
+      {optimizeOpen ? (
+        <NlCard
+          eyebrow="Optimieren"
+          title="Bessere Aufstellung finden"
+          data-testid="nl-lineup-optimize"
+          actions={
+            <>
+              {lineupUpgrades.length > 0 && !isReadOnly ? (
+                <button type="button" className="nl-lineup-btn is-primary" onClick={applyAllUpgrades} disabled={isBusy}>
+                  Alle übernehmen
+                </button>
+              ) : null}
+              <button type="button" className="nl-lineup-btn is-ghost" onClick={() => setOptimizeOpen(false)}>
+                Schließen
+              </button>
+            </>
+          }
+        >
+          {lineupUpgrades.length === 0 ? (
+            <NlEmptyState icon="✓" tone="good" title="Aufstellung ist bereits optimal" message="Für keinen belegten Slot gibt es einen stärkeren freien Kandidaten." />
+          ) : (
+            <ul className="nl-lineup-show-bonuslist">
+              {lineupUpgrades.map((row) => (
+                <li key={row.slotKey} className="nl-lineup-show-bonus" data-testid="nl-lineup-optimize-row">
+                  <span>
+                    <strong className="nl-tnum">{row.slotLabel}</strong> {row.currentName} → {row.suggestedName}
+                  </span>
+                  <NlDeltaChip value={row.gain} format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`} title="Projizierter Zugewinn dieses Wechsels" />
+                  {!isReadOnly ? (
+                    <button
+                      type="button"
+                      className="nl-lineup-btn is-ghost is-small"
+                      onClick={() => onAssignPlayer(row.slotKey, row.suggestedId)}
+                      disabled={isBusy}
+                    >
+                      Übernehmen
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </NlCard>
       ) : null}
 
       {resolveShowData ? (
@@ -1459,6 +1594,10 @@ export default function LineupNewLook({
                       Die frühere "Bester Slot: … · NN"-Zeile war nur das Maximum der
                       Lane-Werte und damit redundant — entfernt. */}
                   <NlLaneMeter bestD1={focusLaneD1} bestD2={focusLaneD2} />
+                  {/* Fatigue als Mini-Gauge (Feature 2) statt bloßem Textwert. */}
+                  {focusFatigue != null ? (
+                    <NlFatigueGauge value={focusFatigue} label="Fatigue" title={`Fatigue ${Math.round(focusFatigue)}/100`} />
+                  ) : null}
                   <button
                     type="button"
                     className="nl-lineup-btn is-ghost is-small"

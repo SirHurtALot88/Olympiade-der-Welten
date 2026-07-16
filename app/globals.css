@@ -46971,6 +46971,301 @@ button.foundation-team-portrait-card {
   margin: 0;
 }
 
+/* ============================================================
+   F4/F1 — Segmentierte Verhandlungs-Wahrscheinlichkeit
+   (Zusage/Nachforderung/Absage). Ein Renderpfad für Deal-Desk
+   im Neuen Look UND das Kauf-Modal; Segmentfarben aus --nl-tone.
+   ============================================================ */
+.is-new-look .nl-market-chance {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-market-chance-track {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  border-radius: var(--nl-r-pill);
+  overflow: hidden;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-chance-seg {
+  height: 100%;
+  min-width: 2px;
+  background: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-market-chance-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-chance-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-chance-legend-item::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--nl-tone, var(--nl-mut));
+}
+
+.is-new-look .nl-market-chance-legend-item b {
+  color: var(--nl-ink);
+  font-weight: 700;
+}
+
+.is-new-look .nl-market-deal-chance {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--nl-s3) 0;
+}
+
+/* ============================================================
+   F2 — Gespeicherte Suchen (Chips zum Anwenden + Löschen,
+   "Suche speichern" mit Inline-Namensfeld).
+   ============================================================ */
+.is-new-look .nl-market-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .nl-market-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  align-items: center;
+}
+
+.is-new-look .nl-market-preset-chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  overflow: hidden;
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-preset-apply {
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-preset-apply:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-preset-delete {
+  border: none;
+  border-left: 1px solid var(--nl-line);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-preset-delete:hover {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-market-preset-save-open,
+.is-new-look .nl-market-preset-save-confirm {
+  border: 1px dashed var(--nl-line-2);
+  background: transparent;
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--nl-r-pill);
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-preset-save-confirm {
+  border-style: solid;
+}
+
+.is-new-look .nl-market-preset-save-open:hover,
+.is-new-look .nl-market-preset-save-confirm:not(:disabled):hover {
+  color: var(--nl-accent);
+  border-color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-preset-save-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-market-preset-save-form {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.is-new-look .nl-market-preset-save-input {
+  min-width: 140px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  color: var(--nl-ink);
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+.is-new-look .nl-market-preset-save-input:focus-visible {
+  outline: var(--nl-focus-ring);
+  outline-offset: 1px;
+}
+
+/* ============================================================
+   F3 — Trait/Subclass-Chips mit Hidden-Count-Fog. Positive =
+   good-Ton, negative = risk-Ton, verdeckte Zahl als Fog-Chip.
+   ============================================================ */
+.is-new-look .nl-market-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-market-trait-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-new-look .nl-market-trait-chip {
+  --nl-tone: var(--nl-mut);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid color-mix(in srgb, var(--nl-tone) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-tone) 12%, transparent);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-market-trait-chip.is-fog {
+  border-style: dashed;
+  border-color: var(--nl-line-2);
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nl-mut) 10%, transparent),
+    color-mix(in srgb, var(--nl-mut) 10%, transparent) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  color: var(--nl-mut);
+  font-style: italic;
+}
+
+/* ============================================================
+   F1 — Kauf-Modal Velo-Layer (FoundationMarketBuyShellHost).
+   Ergänzt die NlCard/StatChip-Struktur um Hero-/Sektions-Spacing;
+   die Karten selbst tragen die .nl-card-Fläche.
+   ============================================================ */
+.is-new-look .market-v2-buy-shell .nl-card {
+  margin-bottom: var(--nl-s3);
+}
+
+.is-new-look .market-v2-buy-hero {
+  display: flex;
+  gap: var(--nl-s3);
+  align-items: center;
+}
+
+.is-new-look .market-v2-buy-hero-portrait {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--nl-r-md);
+}
+
+.is-new-look .market-v2-buy-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .market-v2-buy-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .market-v2-buy-hero-tag {
+  padding: 2px 8px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .market-v2-buy-chance {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--nl-s3);
+}
+
+.is-new-look .market-v2-buy-subhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  margin: var(--nl-s3) 0 var(--nl-s2);
+}
+
+.is-new-look .market-v2-buy-subhead strong {
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .market-v2-buy-subhead-inline {
+  margin: var(--nl-s2) 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .market-v2-buy-schedule-note {
+  margin-top: var(--nl-s2);
+  font-size: 12px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .market-v2-buy-impact-topline {
+  margin-bottom: var(--nl-s3);
+}
+
 /* Wishlist + Kader Kontext */
 .is-new-look .nl-market-context-grid {
   display: grid;
@@ -51461,6 +51756,46 @@ button.foundation-team-portrait-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* Feature 1: Finale-Explainer — zerlegt den Final-Sprung in Fatigue + Team-PPs.
+   Nimmt im Row-Breakdown eine eigene volle Zeile ein (flex-basis 100%). */
+.is-new-look .nl-arena-finale-explainer {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  padding: 4px 8px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel);
+}
+
+.is-new-look .nl-arena-finale-explainer-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nl-mut);
+  font-size: 10px;
+}
+
+.is-new-look .nl-arena-finale-explainer-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-arena-finale-explainer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.is-new-look .nl-arena-finale-explainer-item-label {
+  font-size: 11px;
+  color: var(--nl-ink);
+}
+
 .is-new-look .nl-arena-owncall {
   position: sticky;
   top: 8px;
@@ -52414,6 +52749,14 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-arena-run-step.is-down .nl-arena-run-trend {
   color: var(--nl-risk);
+}
+
+/* Feature 2: Momentum-Sparkline am Ende der "Dein Lauf"-Schiene. */
+.is-new-look .nl-arena-run-spark {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 28px;
+  margin-inline-start: auto;
 }
 
 /* --- Playback: Tempo-Regler & Empty-State ---------------------------- */
