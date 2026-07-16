@@ -152,6 +152,67 @@ describe("player potential ceiling service", () => {
     expect(revealPotentialStars({ ceiling, currentStars: current, scoutingLevel: 3 }).overallMin).not.toBeNull();
   });
 
+  it("spreads potential-ceiling overall stars by potential score instead of saturating at 5", () => {
+    // Regression guard for the "every player shows 5★ potential" bug: the ceiling→star
+    // mapping must SPREAD by potential score (weak→low, only genuine top→5★), never
+    // collapse the whole league onto 5★. A young, roughly balanced prospect (so CA does
+    // not dominate) is scored across the potential range and the overall PO stars must
+    // rise monotonically and stay below 5★ for weak/mid potential.
+    const prospect = player({
+      id: "spread-prospect",
+      rating: 41,
+      coreStats: { pow: 42, spe: 40, men: 41, soc: 39 },
+      disciplineRatings: { d_pow: 42, d_spe: 40, d_men: 41, d_soc: 39 },
+    });
+    const peers = Array.from({ length: 40 }, (_, index) =>
+      player({
+        id: `spread-peer-${index}`,
+        coreStats: {
+          pow: 35 + index,
+          spe: 33 + (index % 9),
+          men: 30 + (index % 11),
+          soc: 32 + (index % 7),
+        },
+      }),
+    );
+    const gameState = {
+      players: [prospect, ...peers],
+      disciplines: [
+        { id: "d_pow", name: "Pow", category: "power", displayOrder: 1, originalOrder: 1, playerCount: 41 },
+        { id: "d_spe", name: "Spe", category: "speed", displayOrder: 2, originalOrder: 2, playerCount: 41 },
+        { id: "d_men", name: "Men", category: "mental", displayOrder: 3, originalOrder: 3, playerCount: 41 },
+        { id: "d_soc", name: "Soc", category: "social", displayOrder: 4, originalOrder: 4, playerCount: 41 },
+      ],
+    } as never;
+    const current = buildPlayerAxisStarProfile({ gameState, player: prospect });
+
+    const byScore = [45, 55, 65, 75, 90].map(
+      (hiddenPotentialScore) =>
+        buildPlayerPotentialCeilingProfile({
+          saveId: "spread-save",
+          player: prospect,
+          currentStars: current,
+          hiddenPotentialScore,
+        }).overall,
+    );
+
+    // Monotonic non-decreasing in potential score.
+    for (let index = 1; index < byScore.length; index += 1) {
+      expect(byScore[index]).toBeGreaterThanOrEqual(byScore[index - 1]!);
+    }
+    // Weak/mid potential must NOT read as a maxed 5★ ceiling (anti-saturation).
+    expect(byScore[0]).toBeLessThan(5);
+    expect(byScore[1]).toBeLessThan(5);
+    // Genuine top potential still climbs to the ceiling.
+    expect(byScore[byScore.length - 1]).toBeGreaterThanOrEqual(4.5);
+    // Real spread across the range — the whole league is not pinned to one value.
+    expect(byScore[byScore.length - 1]! - byScore[0]!).toBeGreaterThanOrEqual(1.5);
+    // Potential can never drop below current ability.
+    for (const overall of byScore) {
+      expect(overall).toBeGreaterThanOrEqual(current.overall);
+    }
+  });
+
   it("allows weak overall players to carry high single-axis potential ceilings", () => {
     const kohanLike = player({
       id: "kohan-like",

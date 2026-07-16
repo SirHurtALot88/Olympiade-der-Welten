@@ -180,7 +180,13 @@ export function NlAbilityStars(props: NlAbilityStarsProps) {
   const { known, compact = false, stacked = false, label, tone = "gold", className = "" } = props;
   const caStars = resolveCaStars(props);
   const poRange = resolvePoStarRange(props, caStars);
-  const poUncertain = !known && poRange != null && poRange.max > poRange.min;
+  // Unrealised-potential headroom (FM style): whenever the PO span is a real range
+  // (max > min), the min→max part is drawn as the HOLLOW/uncertain treatment —
+  // regardless of `known`. Potential is inherently a projection, not a confirmed
+  // value, so even OWN-team (`known`) players must show the certain floor as solid
+  // gold and the headroom above it as distinct hollow outline. `known` governs ONLY
+  // whether CA renders exact vs fogged; it must NOT collapse the PO headroom to solid.
+  const poUncertain = poRange != null && poRange.max > poRange.min;
 
   const ariaParts: string[] = [];
   if (label) ariaParts.push(label);
