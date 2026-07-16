@@ -56,23 +56,25 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-/** premiumAppetite at/above which a team is even considered for a planned Superstar slot. Raised so only
- *  the most premium clubs plan a Superstar (league-wide Superstar count was ~2.3, target ≤1). */
-const SUPERSTAR_APPETITE_THRESHOLD = 1.25;
-/** premiumAppetite at/above which a team plans one Star slot. */
-const STAR_APPETITE_THRESHOLD = 0.55;
+/** premiumAppetite at/above which a team is even considered for a planned Superstar slot. Only the very
+ *  most premium clubs plan a Superstar (target ≤1 league-wide). */
+const SUPERSTAR_APPETITE_THRESHOLD = 1.45;
+/** premiumAppetite at/above which a team plans one Star slot. Raised so Stars stay rare (planning a Star
+ *  for most teams drained their budget on a 45-65 body → below-opt spiked and Star count inflated). */
+const STAR_APPETITE_THRESHOLD = 0.95;
 /** premiumAppetite at/above which (with a large-enough roster) a team plans a SECOND Star slot. */
-const STAR_DOUBLE_APPETITE_THRESHOLD = 1.25;
+const STAR_DOUBLE_APPETITE_THRESHOLD = 1.55;
 /** optTarget at/above which the second Star slot is allowed (a small roster can't spare two premium slots). */
 const STAR_DOUBLE_OPT_TARGET_MIN = 10;
 
-/** coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE·r — 0.24 (arm) → 0.34 (reich). Raised so Core grows
- *  toward Backup (realized Core lags the plan since 30-45MW bodies cost more, so the plan aims higher). */
-const CORE_SHARE_BASE = 0.24;
-const CORE_SHARE_SLOPE = 0.1;
-/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.26 (arm) → 0.20 (reich). Lowered so Core≈Backup. */
-const BACKUP_SHARE_BASE = 0.26;
-const BACKUP_SHARE_SLOPE = 0.06;
+/** coreShare = CORE_SHARE_BASE + CORE_SHARE_SLOPE·r — 0.27 (arm) → 0.33 (reich). Aimed high because
+ *  realized Core lags the plan (30-45MW bodies cost more, poor teams degrade to Depth). */
+const CORE_SHARE_BASE = 0.27;
+const CORE_SHARE_SLOPE = 0.06;
+/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.27 (arm) → 0.23 (reich). Core≈Backup; Depth
+ *  is the residual (~0.44–0.46 of F) so it stays the largest cohort without running away. */
+const BACKUP_SHARE_BASE = 0.27;
+const BACKUP_SHARE_SLOPE = 0.04;
 
 /** Order in which excess planned need is trimmed back to `slotsToFill` — Premium (superstar/star) is never touched. */
 const EXCESS_TRIM_ORDER: readonly MarketBracketLane[] = ["depth", "backup", "core"];
