@@ -57860,34 +57860,100 @@ button.is-new-look .nl-thist-season-pill,
   flex-wrap: wrap;
 }
 
-.is-new-look .nl-sponsor-league-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-height: 520px;
+/* Moderne Liga-Sponsorenübersicht: responsives Karten-Grid statt flacher Liste. */
+.is-new-look .nl-sponsor-league-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--nl-s2);
+  max-height: 560px;
   overflow-y: auto;
+  padding: 2px;
 }
 
-.is-new-look .nl-sponsor-league-row {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s3);
-  padding: 6px var(--nl-s2);
-  border-radius: var(--nl-r-sm);
-  border: 1px solid transparent;
-}
-
-.is-new-look .nl-sponsor-league-row.is-current {
-  border-color: color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  background: var(--nl-accent-soft);
-}
-
-.is-new-look .nl-sponsor-league-team {
+.is-new-look .nl-sponsor-league-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--nl-s2);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-sponsor-league-item.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-sponsor-league-item.is-empty {
+  border-style: dashed;
+  border-color: var(--nl-line-2);
+  opacity: 0.72;
+}
+
+/* Golden Card: goldener Rahmen + zarter Schimmer, oben angepinnt. */
+.is-new-look .nl-sponsor-league-item.is-golden {
+  border-color: color-mix(in srgb, var(--nl-warn) 70%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--nl-warn) 16%, transparent), transparent 62%),
+    var(--nl-panel-2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-warn) 35%, transparent),
+    0 6px 20px color-mix(in srgb, var(--nl-warn) 22%, transparent);
+}
+
+.is-new-look .nl-sponsor-league-golden-badge {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 60%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 26%, var(--nl-panel));
+  color: var(--nl-warn);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-crest {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+}
+
+.is-new-look .nl-sponsor-league-crest .nl-sponsor-crest {
+  width: 34px;
+  height: 38px;
+  display: block;
+}
+
+.is-new-look .nl-sponsor-league-crest-empty {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  border-radius: var(--nl-r-sm);
+  border: 1px dashed var(--nl-line-2);
+  color: var(--nl-mut-2);
+  font-size: 12px;
+}
+
+.is-new-look .nl-sponsor-league-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   min-width: 0;
   flex: 1;
+}
+
+.is-new-look .nl-sponsor-league-teamline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .is-new-look .nl-sponsor-league-code {
@@ -57900,37 +57966,92 @@ button.is-new-look .nl-thist-season-pill,
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-sponsor-league-sponsor {
-  flex: 1;
+.is-new-look .nl-sponsor-league-teamname {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-league-you {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-sponsor-league-sponsor {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--nl-ink);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-security {
-  color: var(--nl-men);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-performance {
-  color: var(--nl-pow);
-}
-
-.is-new-look .nl-sponsor-league-sponsor.is-identity {
-  color: var(--nl-soc);
 }
 
 .is-new-look .nl-sponsor-league-sponsor.is-empty {
   color: var(--nl-mut-2);
   font-style: italic;
+  font-weight: 400;
+}
+
+.is-new-look .nl-sponsor-league-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-sponsor-league-chip {
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  line-height: 1.7;
+}
+
+.is-new-look .nl-sponsor-league-chip.is-security {
+  border-color: color-mix(in srgb, var(--nl-men) 45%, transparent);
+  color: var(--nl-men);
+}
+
+.is-new-look .nl-sponsor-league-chip.is-performance {
+  border-color: color-mix(in srgb, var(--nl-pow) 45%, transparent);
+  color: var(--nl-pow);
+}
+
+.is-new-look .nl-sponsor-league-chip.is-identity {
+  border-color: color-mix(in srgb, var(--nl-soc) 45%, transparent);
+  color: var(--nl-soc);
+}
+
+.is-new-look .nl-sponsor-league-stars {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--nl-warn);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-sponsor-league-stars-dim {
+  color: var(--nl-line-2);
 }
 
 .is-new-look .nl-sponsor-league-cash {
   flex-shrink: 0;
-  font-size: 12px;
-  color: var(--nl-mut);
+  align-self: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
 }
 
 /* --- Sponsoren #79: Rank-Ladder — aktuell erreichte Gewinnstufe --- */

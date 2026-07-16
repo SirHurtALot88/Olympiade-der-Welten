@@ -232,7 +232,7 @@ function ActiveContractHero({
   );
 }
 
-type LeagueSponsorSort = "cash" | "sponsor" | "team";
+type LeagueSponsorSort = "cash" | "sponsor" | "team" | "tier";
 
 export default function FoundationSponsorsNewLook({
   gameState,
@@ -328,12 +328,20 @@ export default function FoundationSponsorsNewLook({
         archetype: contract?.archetype ?? null,
         starTier: contract?.starTier ?? null,
         totalCash,
+        // Golden Card = seltener Premium-Elite-Sponsor (Underdog-Glück). Der
+        // Vertrag erbt `variantKey` vom Angebot (sponsor-offer-service), daher
+        // ist das der verlaessliche Golden-Indikator auf Vertragsebene.
+        isGolden: contract?.variantKey === "premium_elite",
       };
     });
   }, [gameState.teams, gameState.seasonState.sponsorContractsByTeamId]);
   const sortedLeagueSponsorRows = useMemo(() => {
     const list = [...leagueSponsorRows];
     list.sort((left, right) => {
+      // Golden-Card-Sponsoren immer zuerst — unabhaengig vom Sortier-Modus.
+      if (left.isGolden !== right.isGolden) {
+        return left.isGolden ? -1 : 1;
+      }
       if (leagueSponsorSort === "team") {
         return left.teamName.localeCompare(right.teamName, "de", { sensitivity: "base" });
       }
@@ -342,6 +350,9 @@ export default function FoundationSponsorsNewLook({
         if (left.sponsorName == null) return 1;
         if (right.sponsorName == null) return -1;
         return left.sponsorName.localeCompare(right.sponsorName, "de", { sensitivity: "base" });
+      }
+      if (leagueSponsorSort === "tier") {
+        return (right.starTier ?? -1) - (left.starTier ?? -1);
       }
       return (right.totalCash ?? -1) - (left.totalCash ?? -1);
     });
@@ -709,35 +720,79 @@ export default function FoundationSponsorsNewLook({
               items={[
                 { id: "cash", label: "Cash" },
                 { id: "sponsor", label: "Sponsor" },
+                { id: "tier", label: "Tier" },
                 { id: "team", label: "Team" },
               ]}
             />
           }
         >
-          <div className="nl-sponsor-league-list" role="list" aria-label="Sponsoren aller Teams">
-            {sortedLeagueSponsorRows.map((row) => (
-              <div
-                key={row.teamId}
-                role="listitem"
-                className={`nl-sponsor-league-row${row.teamName === selectedTeamName ? " is-current" : ""}`}
-              >
-                <span className="nl-sponsor-league-team">
-                  <span className="nl-sponsor-league-code">{row.shortCode}</span>
-                  <strong>{row.teamName}</strong>
-                </span>
-                {row.sponsorName ? (
-                  <span className={`nl-sponsor-league-sponsor is-${row.archetype ?? "none"}`}>
-                    {row.sponsorName}
-                    {row.starTier ? ` · ★${row.starTier}` : ""}
+          <div className="nl-sponsor-league-grid" role="list" aria-label="Sponsoren aller Teams">
+            {sortedLeagueSponsorRows.map((row) => {
+              const isCurrent = row.teamName === selectedTeamName;
+              const archetypeMeta = row.archetype ? SPONSOR_ARCHETYPE_META[row.archetype] : null;
+              const classes = [
+                "nl-sponsor-league-item",
+                isCurrent ? "is-current" : "",
+                row.isGolden ? "is-golden" : "",
+                row.sponsorName ? "" : "is-empty",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <div key={row.teamId} role="listitem" className={classes}>
+                  {row.isGolden ? (
+                    <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
+                      ★ Golden Card
+                    </span>
+                  ) : null}
+                  <span className="nl-sponsor-league-crest">
+                    {row.sponsorName && row.archetype ? (
+                      <SponsorCrest name={row.sponsorName} archetype={row.archetype} />
+                    ) : (
+                      <span className="nl-sponsor-league-crest-empty" aria-hidden="true">
+                        ✕
+                      </span>
+                    )}
                   </span>
-                ) : (
-                  <span className="nl-sponsor-league-sponsor is-empty">Kein Sponsor</span>
-                )}
-                <span className="nl-sponsor-league-cash nl-tnum">
-                  {row.totalCash != null ? formatMoney(row.totalCash) : "—"}
-                </span>
-              </div>
-            ))}
+                  <div className="nl-sponsor-league-body">
+                    <div className="nl-sponsor-league-teamline">
+                      <span className="nl-sponsor-league-code">{row.shortCode}</span>
+                      <span className="nl-sponsor-league-teamname" title={row.teamName}>
+                        {row.teamName}
+                      </span>
+                      {isCurrent ? <span className="nl-sponsor-league-you">Dein Team</span> : null}
+                    </div>
+                    {row.sponsorName ? (
+                      <>
+                        <span className="nl-sponsor-league-sponsor" title={row.sponsorName}>
+                          {row.sponsorName}
+                        </span>
+                        <div className="nl-sponsor-league-meta">
+                          {archetypeMeta ? (
+                            <span className={`nl-sponsor-league-chip is-${row.archetype}`}>{archetypeMeta.label}</span>
+                          ) : null}
+                          {row.starTier ? (
+                            <span
+                              className="nl-sponsor-league-stars"
+                              title={`Sterne-Tier ${row.starTier} von 5`}
+                              aria-label={`Sterne-Tier ${row.starTier} von 5`}
+                            >
+                              {"★".repeat(row.starTier)}
+                              <span className="nl-sponsor-league-stars-dim">{"★".repeat(5 - row.starTier)}</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="nl-sponsor-league-sponsor is-empty">Kein Sponsor</span>
+                    )}
+                  </div>
+                  <span className="nl-sponsor-league-cash nl-tnum">
+                    {row.totalCash != null ? formatMoney(row.totalCash) : "—"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </NlCard>
       </section>
