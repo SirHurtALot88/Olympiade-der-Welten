@@ -324,6 +324,26 @@ export function getExpectationRelativeMilestoneBonus(
   return round1(rewardedSteps * SPONSOR_EXPECT_STEP_C * salaryFactor);
 }
 
+/**
+ * Golden-Sponsor Rang-Payout-Boost (Wave-1-schonend). Ein golden markierter Vertrag hebt NUR die
+ * Rang-Meilenstein-Komponente um (MULT − 1), aber absolut gedeckelt bei GOLDEN_MS_ABS_CAP_C (salaryFactor-
+ * skaliert). Der Sockel (Bottom-5-Schutz) bleibt unangetastet. IDENTISCH angewandt in
+ * getSponsorPayoutForFinalRankAndTier (Settlement) UND buildOfferCashAmounts (Anzeige) → Anzeige==Settlement.
+ * Default isGolden=false ⇒ byte-identisch zu vorher (Wave-1-Tests unberührt). ENV-tunebar.
+ */
+export const SPONSOR_GOLDEN_MILESTONE_MULT = Number(process.env.OLY_SPONSOR_GOLDEN_MS_MULT ?? 1.3) || 1.3;
+export const SPONSOR_GOLDEN_MS_ABS_CAP_C = Number(process.env.OLY_SPONSOR_GOLDEN_MS_ABS_CAP_C ?? 8) || 8;
+
+/** goldenBonus = min(rawMilestone*(MULT−1), CAP*sf). Nur der positive Rang-Anteil, gedeckelt. */
+export function getGoldenMilestoneBonus(rawMilestone: number, salaryFactor = 1): number {
+  if (!Number.isFinite(rawMilestone) || rawMilestone <= 0) {
+    return 0;
+  }
+  return round1(
+    Math.min(rawMilestone * (SPONSOR_GOLDEN_MILESTONE_MULT - 1), SPONSOR_GOLDEN_MS_ABS_CAP_C * salaryFactor),
+  );
+}
+
 export function getSponsorPayoutForFinalRankAndTier(
   finalRank: number | null | undefined,
   salaryFactor: number,
@@ -332,6 +352,7 @@ export function getSponsorPayoutForFinalRankAndTier(
   archetype: SponsorArchetype = "security",
   teamQualityRank?: number | null,
   expectedRank?: number | null,
+  isGolden = false,
 ): number {
   const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
   // Archetyp-Kreuzung (WAVE 1): base UND milestone laufen über dieselben Tabellen — KEIN security-Sonderpfad
@@ -360,7 +381,8 @@ export function getSponsorPayoutForFinalRankAndTier(
     // Der statische getQualityRebalanceProfile-MILESTONE-Bump wird durch die Erwartung ERSETZT; der
     // baseScale-SOCKEL-SCHUTZ (Bottom-5) bleibt zwingend erhalten.
     const base = round1(rawBase * getQualityRebalanceProfile(teamQualityRank).baseScale);
-    return round1(base + rawMilestone);
+    const goldenBonus = isGolden ? getGoldenMilestoneBonus(rawMilestone, salaryFactor) : 0;
+    return round1(base + rawMilestone + goldenBonus);
   }
 
   const { base, milestoneBonus } = applyQualityRebalanceToPayout({
@@ -368,7 +390,9 @@ export function getSponsorPayoutForFinalRankAndTier(
     milestoneBonus: rawMilestone,
     teamQualityRank,
   });
-  return round1(base + milestoneBonus);
+  // Golden hebt NUR die (bereits rebalancierte) Rang-Komponente, gedeckelt — der Sockel bleibt unberührt.
+  const goldenBonus = isGolden ? getGoldenMilestoneBonus(milestoneBonus, salaryFactor) : 0;
+  return round1(base + milestoneBonus + goldenBonus);
 }
 
 export function buildOfferCashAmounts(input: {
@@ -377,6 +401,7 @@ export function buildOfferCashAmounts(input: {
   starTier: SponsorStarTier;
   leagueMinSalary?: number;
   teamQualityRank?: number | null;
+  isGolden?: boolean;
 }): { baseCash: number; rankCash: number; specialCash: number; totalAtMaxRank: number } {
   const leagueMinSalary = input.leagueMinSalary ?? SPONSOR_BASE_FLOOR_C;
   const { effectiveBaseFloor, milestonePool } = resolveSponsorEconomyAnchors(input.salaryFactor, leagueMinSalary);
@@ -392,6 +417,11 @@ export function buildOfferCashAmounts(input: {
 
   const rebalance = getQualityRebalanceProfile(input.teamQualityRank);
   let rankCash = round1(rawRank * rebalance.milestoneScale);
+  // Golden: identischer Rang-Boost wie im Settlement (getSponsorPayoutForFinalRankAndTier, static path).
+  // Basis ist die rebalancierte Rang-Komponente (== settlement milestoneBonus bei Rang 1). Gedeckelt.
+  if (input.isGolden) {
+    rankCash = round1(rankCash + getGoldenMilestoneBonus(rankCash, input.salaryFactor));
+  }
   // Schwachen-Schutz: der garantierte Sockel wird für schwache Teams angehoben (baseScale), für starke
   // gekürzt — hält die Bottom-5 wirtschaftlich oben und die Schere unter Ziel. Muss zur Settlement-Seite
   // (applyQualityRebalanceToPayout) passen, die denselben baseScale anwendet.
@@ -412,6 +442,8 @@ export function buildOfferCashAmounts(input: {
       leagueMinSalary,
       input.archetype,
       input.teamQualityRank,
+      undefined,
+      input.isGolden ?? false,
     ),
   );
   const specialCash = round1(totalAtMaxRank * 0.04);

@@ -25,6 +25,7 @@ export type SponsorSpecialPresentation = {
 
 export type SponsorOfferPresentation = {
   isChallenge: boolean;
+  isGolden: boolean;
   offerBadge: string | null;
   special: SponsorSpecialPresentation | null;
 };
@@ -173,16 +174,26 @@ export function isChallengeSponsorOffer(offer: SponsorOffer): boolean {
   return offer.isChallengeOffer === true || offer.flavor.includes("Challenge-Sponsor");
 }
 
+export function isGoldenSponsorOffer(offer: SponsorOffer): boolean {
+  return offer.isGolden === true;
+}
+
 export function buildSponsorOfferPresentation(input: {
   offer: SponsorOffer;
   gameState?: GameState;
   teamId?: string;
 }): SponsorOfferPresentation {
   const isChallenge = isChallengeSponsorOffer(input.offer);
+  const isGolden = isGoldenSponsorOffer(input.offer);
   const specialComponent = input.offer.components.find((component) => component.kind === "special") ?? null;
+  // Golden koexistiert mit Challenge (kein CSS/Karten-Umbau hier — nur das Badge-Feld für die spätere UI).
+  const badgeParts = [isGolden ? "Golden" : null, isChallenge ? "Challenge" : null].filter(
+    (part): part is string => part != null,
+  );
   return {
     isChallenge,
-    offerBadge: isChallenge ? "Challenge" : null,
+    isGolden,
+    offerBadge: badgeParts.length > 0 ? badgeParts.join(" · ") : null,
     special: specialComponent
       ? buildSpecialPresentation({
           component: specialComponent,

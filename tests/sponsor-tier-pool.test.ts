@@ -1,7 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplier, getRewardMultiplier, rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
+
+// Diese Suite prüft die HARTEN Cap-/Cluster-Grenzen (den Normalfall). Die Golden-Sterne-Varianz ist die
+// bewusste AUSNAHME davon (kleine Teams selten über Cap, große selten drunter) und würde die exakten
+// Grenzen seed-abhängig verletzen. Deshalb hier deterministisch abgeschaltet (Balance unverändert).
+beforeAll(() => {
+  process.env.OLY_SPONSOR_STAR_VARIANCE_OFF = "1";
+});
+afterAll(() => {
+  delete process.env.OLY_SPONSOR_STAR_VARIANCE_OFF;
+});
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
   return {

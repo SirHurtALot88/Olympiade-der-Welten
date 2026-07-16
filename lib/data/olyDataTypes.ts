@@ -1197,6 +1197,12 @@ export type SponsorOffer = {
   teamQualityRank?: number;
   /** Exactly one offer per team uses challenge specials (axis / salary / transfer). */
   isChallengeOffer?: boolean;
+  /**
+   * Golden-Sponsor-Los: höchstens EIN Slot/Team kann golden werden (underdog-/beliebtheits-gewichtet,
+   * mit Cooldown). Golden ist KEIN eigener Stern — der Offer behält seinen starTier — sondern hebt die
+   * Rang-Meilenstein-Komponente (gedeckelt). Wird in chooseSponsorOffer in den Vertrag mitkopiert.
+   */
+  isGolden?: boolean;
 };
 
 export type SponsorCommercialRating = {
@@ -1246,6 +1252,8 @@ export type TeamSponsorContract = {
   negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
   teamQualityRankAtSign?: number;
+  /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
+  isGolden?: boolean;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -2369,6 +2377,12 @@ export type SeasonState = {
   beliebtheitByTeamId?: Record<string, TeamBeliebtheitRecord>;
   /** Zeitreihe der fortgeschriebenen Beliebtheits-`value`s pro Team (älteste zuerst), für Debug/Balance. */
   beliebtheitHistoryByTeamId?: Record<string, number[]>;
+  /**
+   * Golden-Sponsor-Cooldown: true, wenn das Team in der VORSAISON einen golden Slot hatte. Speist den
+   * COOLDOWN_PENALTY-Term in rollGoldenLuck, damit kein Team dauerhaft golden bleibt. Rückwärtskompatibel
+   * optional: fehlt der Eintrag, gilt hadGoldenLastSeason = false.
+   */
+  goldenSponsorHistoryByTeamId?: Record<string, boolean>;
   loans?: LoanRecord[];
   loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
   scoutingWatchlist?: ScoutingWatchlistEntry[];
