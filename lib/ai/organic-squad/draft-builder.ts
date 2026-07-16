@@ -12,6 +12,7 @@
  */
 
 import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
+import { classifyCompositionLane } from "@/lib/ai/organic-squad/composition-plan";
 import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
 import {
   ROSTER_MAX,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/ai/organic-squad/types";
 import { buyUtility, stopUtility } from "@/lib/ai/organic-squad/utility";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
+import type { LeagueMarketBrackets, MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 
 /**
  * Small additive jitter (in buyUtility units) applied ONLY inside the greedy buy comparison, keyed by
@@ -88,6 +90,18 @@ export type OrganicSquadPlanInput = {
    * Null/undefined ⇒ no jitter regardless of the env amplitude — the builder stays fully deterministic.
    */
   draftSeed?: string | null;
+  /**
+   * Optional EXPLICIT role-composition plan (flag-gated OLY_DRAFT_COMPOSE — see draft-adapter.ts /
+   * composition-plan.ts deriveCompositionCounts). When set, this PURE builder tracks `boughtTiers`
+   * (initialized from startingSquad's tier counts, incremented after every buy) and feeds
+   * `{ counts, brackets, boughtTiers }` into OrganicTeamState.composition each iteration, which
+   * buyUtility reads for its soft compositionValue term. Undefined ⇒ state.composition stays undefined
+   * ⇒ that term is 0 ⇒ this builder is bit-identical to before this field existed.
+   */
+  composition?: {
+    counts: Record<MarketBracketLane, number>;
+    brackets: LeagueMarketBrackets;
+  };
 };
 
 export type OrganicSquadPlanResult = {
@@ -131,6 +145,19 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
   let cash = input.economy.cash;
   let salaryTotal = input.economy.salaryTotal;
 
+  // ANPASSUNG COMPOSE (flag-gated via input.composition, see OrganicSquadPlanInput doc above). boughtTiers
+  // starts at the starting squad's own tier counts and is incremented after every buy below, so the
+  // compositionValue term in buyUtility always sees "how much of the plan is filled so far".
+  const boughtTiers: Record<MarketBracketLane, number> | null = input.composition
+    ? { superstar: 0, star: 0, core: 0, depth: 0, backup: 0, reserve: 0 }
+    : null;
+  if (boughtTiers && input.composition) {
+    for (const player of input.startingSquad) {
+      const lane = classifyCompositionLane(player.marketValue, input.composition.brackets);
+      boughtTiers[lane] += 1;
+    }
+  }
+
   const buildState = () => {
     const disciplineNeeds = computeDisciplineNeeds(squad, input.identityAxisWeights, input.disciplines);
     const needAxisWeights = deriveNeedAxisWeights(disciplineNeeds);
@@ -154,6 +181,10 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       disciplineNeeds,
       needAxisWeights,
       identityAxisWeights: input.identityAxisWeights,
+      composition:
+        input.composition && boughtTiers
+          ? { counts: input.composition.counts, brackets: input.composition.brackets, boughtTiers }
+          : undefined,
     };
   };
 
@@ -232,6 +263,10 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
     salaryTotal += Math.max(0, best.salary);
     pool.splice(pool.indexOf(best), 1);
     decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
+    if (boughtTiers && input.composition) {
+      const lane = classifyCompositionLane(best.marketValue, input.composition.brackets);
+      boughtTiers[lane] += 1;
+    }
   }
 
   return {

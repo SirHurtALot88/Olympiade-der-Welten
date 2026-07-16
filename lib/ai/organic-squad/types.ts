@@ -13,6 +13,8 @@
  * null/unreliable at draft time and MUST NOT be used as quality. Market value is PRICE only.
  */
 
+import type { LeagueMarketBrackets, MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
+
 /** The four core attributes, each 0–100. */
 export type CoreAxis = "pow" | "spe" | "men" | "soc";
 
@@ -172,6 +174,20 @@ export type OrganicTeamState = {
    * don't pass it are unaffected (undefined ⇒ treated as the flat 0.25-per-axis default ⇒ no-op gate).
    */
   identityAxisWeights?: Record<CoreAxis, number>;
+  /**
+   * Optional EXPLICIT role-composition plan (flag-gated OLY_DRAFT_COMPOSE — see draft-adapter.ts
+   * planOrganicDraftForTeam / lib/ai/organic-squad/composition-plan.ts). Feeds the soft compositionValue
+   * term in utility.ts buyUtility: a pick earns a bonus while its own tier still sits under `counts`, a
+   * malus once `boughtTiers` for that tier has reached/passed it. Undefined ⇒ the term contributes 0
+   * (bit-identical to before this flag existed). `counts` is the TOTAL target tier pyramid for the
+   * finished roster (existing + planned); `boughtTiers` starts at the starting-squad's tier counts and is
+   * incremented in place by draft-builder.ts after every buy.
+   */
+  composition?: {
+    counts: Record<MarketBracketLane, number>;
+    brackets: LeagueMarketBrackets;
+    boughtTiers: Record<MarketBracketLane, number>;
+  };
 };
 
 /** Utility-model helper: count disciplines in a player's ratings strictly above a threshold. */

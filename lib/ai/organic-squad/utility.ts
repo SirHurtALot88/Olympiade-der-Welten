@@ -16,6 +16,7 @@
  */
 
 import { cashOptionValue } from "@/lib/ai/organic-squad/cash-option-value";
+import { classifyCompositionLane } from "@/lib/ai/organic-squad/composition-plan";
 import { disciplineSupportFactor, marginalCoverageValue } from "@/lib/ai/organic-squad/coverage-curve";
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import {
@@ -133,6 +134,34 @@ const SALARY_CAPITALIZATION = 2;
  * affordability (wThrift·price) or discipline need (ΔStrength). themeFit undefined ⇒ no term added.
  */
 const THEME_FIT_VALUE = 12;
+
+/**
+ * Env flag OLY_DRAFT_COMPOSE (see draft-adapter.ts / composition-plan.ts). Nothing in THIS file reads
+ * the env directly — the flag only controls whether `state.composition` is ever populated by the caller;
+ * `compositionAdjustment` below is a pure no-op (returns 0) whenever it is undefined, so COMPOSE off is
+ * bit-identical to before this term existed regardless of this file's code.
+ */
+
+/**
+ * Soft utility bonus/malus from the EXPLICIT role-composition plan (ANPASSUNG COMPOSE, flag-gated
+ * OLY_DRAFT_COMPOSE). Orthogonal to IDFIT/STRAIN/FILLQ: those shape WHICH player is best for a given
+ * discipline/price; this only nudges WHICH TIER a pick should come from, so the greedy loop naturally
+ * gravitates toward filling its own planned pyramid (see composition-plan.ts deriveCompositionCounts)
+ * without any hard band filter, slot sequence, or stopUtility change. `state.composition` undefined
+ * (COMPOSE off, or no plan for this team) ⇒ this returns 0 exactly, so buyUtility is untouched.
+ */
+const COMPOSITION_VALUE = 45;
+const COMPOSITION_OVERAGE_PENALTY = 30;
+
+function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
+  const comp = state.composition;
+  if (!comp) return 0;
+  const lane = classifyCompositionLane(player.marketValue, comp.brackets);
+  const deficit = comp.counts[lane] - comp.boughtTiers[lane];
+  // deficit > 0: this tier is still under its planned target ⇒ flat bonus for filling it.
+  // deficit <= 0: this tier is already at/over target ⇒ malus that grows with how far over it is.
+  return deficit > 0 ? COMPOSITION_VALUE : COMPOSITION_OVERAGE_PENALTY * deficit;
+}
 
 /**
  * Financial-distress SELL overrides (see sellUtility). A cash-strapped, over-salaried club must be able
@@ -337,6 +366,9 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
       clamp(state.cash / (optSlotsRemaining * DEPTH_REF_COST), 0, 1)
     : 0;
   const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
+  // ANPASSUNG COMPOSE (flag-gated via state.composition, see compositionAdjustment above): soft nudge
+  // toward the team's planned role pyramid. 0 whenever state.composition is undefined (COMPOSE off).
+  const compositionValue = compositionAdjustment(player, state);
   // No MW-cap / premium term: "too expensive" is judged purely by wThrift·priceInSlots·PRICE_SLOT_SCALE
   // — the player's price measured against THIS club's actual budget-per-slot — so the star ceiling
   // emerges from each club's economy, not a fixed line.
@@ -347,7 +379,8 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
     w.wThrift * priceStrain * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential +
-    themeFitValue
+    themeFitValue +
+    compositionValue
   );
 }
 

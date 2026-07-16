@@ -11,6 +11,7 @@
  */
 
 import { projectCashFlow } from "@/lib/ai/organic-squad/cash-flow-forecast";
+import { classifyCompositionLane, deriveCompositionCounts } from "@/lib/ai/organic-squad/composition-plan";
 import { computeDisciplineNeeds, deriveNeedAxisWeights } from "@/lib/ai/organic-squad/discipline-need";
 import { buildOrganicSquadPlan, type OrganicBuyDecision } from "@/lib/ai/organic-squad/draft-builder";
 import {
@@ -28,8 +29,13 @@ import {
 import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
+import { buildLeagueMarketBrackets, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import {
+  applyGmBiasToLaneAppetite,
+  computeIdentityLaneAppetite,
+} from "@/lib/ai/ai-needs-picks-compare-service";
 import {
   buildTeamThemeCompositionRuntimeContext,
   derivePlayerThemeTags,
@@ -48,6 +54,15 @@ const ORGANIC_CASH_BUFFER = 5;
  * below-opt is measured against the trimmed target so it does NOT rise. Default OFF.
  */
 const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
+
+/**
+ * Env flag for the EXPLICIT role-composition planner (see composition-plan.ts deriveCompositionCounts +
+ * utility.ts compositionValue term). Default OFF ("0"/unset) — when off, planOrganicDraftForTeam never
+ * builds a `composition` input, so OrganicTeamState.composition stays undefined and the draft is
+ * bit-identical to before this flag existed (same pattern as IDFIT_ENABLED in utility.ts:38/FILLQ_B_ENABLED
+ * above). This is a SOFT utility nudge only — no hard band filter, no slot sequence, no stopUtility change.
+ */
+const COMPOSE_ENABLED = process.env.OLY_DRAFT_COMPOSE === "1";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -336,11 +351,50 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     }
   }
 
+  // ANPASSUNG COMPOSE (flag-gated): derive an EXPLICIT target role pyramid for this team and hand it to
+  // buildOrganicSquadPlan as a soft utility nudge (see composition-plan.ts + utility.ts compositionValue).
+  // Reuses the SAME premium-appetite/cap derivation the S1/S2 market-pick planner already uses — no new
+  // magic numbers here. Deliberately built AFTER the FILLQ_B opt-trim above so the plan targets the final
+  // (possibly trimmed) optTarget, not the pre-trim one.
+  let composition: { counts: Record<MarketBracketLane, number>; brackets: ReturnType<typeof buildLeagueMarketBrackets> } | undefined;
+  if (COMPOSE_ENABLED) {
+    const brackets = buildLeagueMarketBrackets(candidates.map((view) => view.marketValue));
+    const existingTiers: Record<MarketBracketLane, number> = {
+      superstar: 0,
+      star: 0,
+      core: 0,
+      depth: 0,
+      backup: 0,
+      reserve: 0,
+    };
+    for (const view of startingSquad) {
+      existingTiers[classifyCompositionLane(view.marketValue, brackets)] += 1;
+    }
+    // computeIdentityLaneAppetite + applyGmBiasToLaneAppetite already derive premiumCap/superstarCap
+    // internally via deriveLaneCapsFromAppetite (ai-needs-picks-compare-service.ts:2063,2090,2141) — the
+    // returned lanePhilosophy.premiumCap/superstarCap ARE that function's output for the final (post-GM-
+    // tilt) premiumAppetite, so reading them off lanePhilosophy directly avoids a redundant second call.
+    const gmProfile = getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null;
+    const lanePhilosophy = applyGmBiasToLaneAppetite(computeIdentityLaneAppetite(input.identity ?? null), gmProfile);
+    const counts = deriveCompositionCounts({
+      optTarget: planWeights.optTarget,
+      existingTiers,
+      spendableNet: ctx.cash - ORGANIC_CASH_BUFFER,
+      brackets,
+      premiumAppetite: lanePhilosophy.premiumAppetite,
+      premiumCap: lanePhilosophy.premiumCap,
+      superstarCap: lanePhilosophy.superstarCap,
+      rosterMin: ROSTER_MIN,
+    });
+    composition = { counts, brackets };
+  }
+
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
     identityAxisWeights: ctx.identityAxisWeights,
     disciplines: ctx.disciplines,
+    composition,
     economy: {
       cash: ctx.cash,
       cashBuffer: ctx.cashBuffer,
