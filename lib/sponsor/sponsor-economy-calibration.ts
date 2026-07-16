@@ -75,6 +75,43 @@ export function getPrizeMoneyReference(rank: number, salaryFactor = 1): number {
   return round1(prize * salaryFactor);
 }
 
+/**
+ * Archetyp-Kreuzungs-Tabellen (WAVE 1). Security ist "sicher": hoher garantierter Sockel (base > 1),
+ * aber gedämpfte Rang-Upside (milestone < performance). Performance ist das Gegenteil: schlanker Sockel
+ * (base < 1), dafür die steilste Meilenstein-Leiter (milestone ≫ 1). Identity liegt neutral in der Mitte.
+ * Diese ZWEI Tabellen sind die EINZIGE Quelle der Archetyp-Differenzierung und werden IDENTISCH von
+ * getSponsorPayoutForFinalRankAndTier (Settlement) UND buildOfferCashAmounts (Anzeige) genutzt — dadurch
+ * ist die Anzeige exakt das Settlement. ENV-tunebar analog zu den übrigen OLY_SPONSOR_*-Knobs.
+ *
+ * Hinweis zu ARCHETYPE_MILESTONE_MULT.security: konzeptionell wäre ~0.62 (deutlich unter performance)
+ * wünschenswert, damit security "wenig Upside" hat. Der Balance-Test "preserves payout spread between
+ * bottom and championship security offers" verlangt aber weiterhin top/bottom > 1.65 für REINE security-
+ * Angebote. Da der auf 1.12 angehobene Sockel den Rang-32-Boden (bottom) hebt, komprimiert sich die
+ * security-Eigenspreizung; um den 1.65-Boden zu halten, muss die security-Meilenstein-Leiter höher liegen
+ * als der ursprünglich geschätzte 0.7 (rechnerisches Minimum ~0.95). 0.97 hält den Spread-Test mit Marge
+ * UND lässt performance an der Spitze weiterhin klar vor security (Kreuzung). ENV: OLY_SPONSOR_ARCH_MS_*.
+ */
+export const SPONSOR_ARCHETYPE_BASE_MULT: Record<SponsorArchetype, number> = {
+  security: Number(process.env.OLY_SPONSOR_ARCH_BASE_SECURITY ?? 1.08) || 1.08,
+  identity: Number(process.env.OLY_SPONSOR_ARCH_BASE_IDENTITY ?? 1.0) || 1.0,
+  performance: Number(process.env.OLY_SPONSOR_ARCH_BASE_PERFORMANCE ?? 0.9) || 0.9,
+};
+
+export const SPONSOR_ARCHETYPE_MILESTONE_MULT: Record<SponsorArchetype, number> = {
+  security: Number(process.env.OLY_SPONSOR_ARCH_MS_SECURITY ?? 0.5) || 0.5,
+  identity: Number(process.env.OLY_SPONSOR_ARCH_MS_IDENTITY ?? 1.0) || 1.0,
+  performance: Number(process.env.OLY_SPONSOR_ARCH_MS_PERFORMANCE ?? 1.55) || 1.55,
+};
+
+export function getArchetypeBaseMultiplier(archetype: SponsorArchetype): number {
+  return SPONSOR_ARCHETYPE_BASE_MULT[archetype] ?? 1;
+}
+
+export function getArchetypeMilestoneMultiplier(archetype: SponsorArchetype): number {
+  return SPONSOR_ARCHETYPE_MILESTONE_MULT[archetype] ?? 1;
+}
+
+/** @deprecated WAVE 1: Archetyp-Split läuft jetzt über SPONSOR_ARCHETYPE_BASE_MULT / getArchetypeBaseMultiplier. */
 export function getArchetypeBaseShare(archetype: SponsorArchetype): number {
   if (archetype === "security") return 0.65;
   if (archetype === "identity") return 0.55;
@@ -123,6 +160,7 @@ export function buildMilestoneRankLabel(): string {
   return SPONSOR_RANK_MILESTONES.map((milestone) => `${milestone.label} (+${milestone.bonusC} C)`).join(" · ");
 }
 
+/** @deprecated WAVE 1: Archetyp-Split läuft jetzt über SPONSOR_ARCHETYPE_MILESTONE_MULT / getArchetypeMilestoneMultiplier. */
 export function getArchetypeRankShare(archetype: SponsorArchetype): number {
   return round1(1 - getArchetypeBaseShare(archetype));
 }
@@ -273,15 +311,17 @@ export function getSponsorPayoutForFinalRankAndTier(
   teamQualityRank?: number | null,
 ): number {
   const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
-  const rawBase =
-    archetype === "security"
-      ? round1(effectiveBaseFloor)
-      : round1(effectiveBaseFloor * getStarTierBaseMultiplier(starTier));
+  // Archetyp-Kreuzung (WAVE 1): base UND milestone laufen über dieselben Tabellen — KEIN security-Sonderpfad
+  // mehr. Security bekommt einen hohen Sockel (base 1.12) aber gedämpfte Upside, performance umgekehrt.
+  const rawBase = round1(
+    effectiveBaseFloor * getArchetypeBaseMultiplier(archetype) * getStarTierBaseMultiplier(starTier),
+  );
   const rawMilestone = round1(
     getRankMilestoneBonus(finalRank, salaryFactor) *
       milestoneScale *
       SPONSOR_MILESTONE_LADDER_SCALE *
-      getStarTierMilestoneMultiplier(starTier),
+      getStarTierMilestoneMultiplier(starTier) *
+      getArchetypeMilestoneMultiplier(archetype),
   );
   const { base, milestoneBonus } = applyQualityRebalanceToPayout({
     base: rawBase,
@@ -302,33 +342,25 @@ export function buildOfferCashAmounts(input: {
   const { effectiveBaseFloor, milestonePool } = resolveSponsorEconomyAnchors(input.salaryFactor, leagueMinSalary);
   const baseMult = getStarTierBaseMultiplier(input.starTier);
   const milestoneMult = getStarTierMilestoneMultiplier(input.starTier);
-  const floorTotal =
-    input.archetype === "security"
-      ? round1(effectiveBaseFloor)
-      : round1(effectiveBaseFloor * baseMult);
-  const milestoneTotal = round1(milestonePool * milestoneMult);
-  const baseShare = getArchetypeBaseShare(input.archetype);
-  const rankShare = getArchetypeRankShare(input.archetype);
-
-  let baseCash =
-    input.archetype === "security"
-      ? floorTotal
-      : round1(floorTotal * (baseShare / getArchetypeBaseShare("security")));
-  let rankCash =
-    input.archetype === "security"
-      ? round1(milestoneTotal * rankShare)
-      : round1(milestoneTotal * (rankShare / getArchetypeRankShare("performance")));
+  // Anzeige==Settlement (WAVE 1): identische Archetyp-Tabellen wie getSponsorPayoutForFinalRankAndTier.
+  // rawBase = Sockel-Anteil, rawRank = Meilenstein-Anteil bei Rang 1 (getRankMilestoneBonus(1)*milestoneScale
+  // = milestonePool). Summe rawBase*baseScale + rawRank*milestoneScale == Settlement bei Rang 1.
+  const rawBase = round1(effectiveBaseFloor * getArchetypeBaseMultiplier(input.archetype) * baseMult);
+  const rawRank = round1(
+    milestonePool * SPONSOR_MILESTONE_LADDER_SCALE * milestoneMult * getArchetypeMilestoneMultiplier(input.archetype),
+  );
 
   const rebalance = getQualityRebalanceProfile(input.teamQualityRank);
-  rankCash = round1(rankCash * rebalance.milestoneScale);
+  let rankCash = round1(rawRank * rebalance.milestoneScale);
   // Schwachen-Schutz: der garantierte Sockel wird für schwache Teams angehoben (baseScale), für starke
   // gekürzt — hält die Bottom-5 wirtschaftlich oben und die Schere unter Ziel. Muss zur Settlement-Seite
   // (applyQualityRebalanceToPayout) passen, die denselben baseScale anwendet.
-  baseCash = round1(baseCash * rebalance.baseScale);
+  let baseCash = round1(rawBase * rebalance.baseScale);
 
   if (input.archetype === "security") {
-    // Security behält den effektiven Sockel als harte Untergrenze (aber ein hochgeschützter schwacher
-    // Sockel darf darüber liegen).
+    // Bottom-Schutz: der GARANTIERTE Sockel-Floor (effectiveBaseFloor) bleibt eine harte Untergrenze für
+    // den "sicheren" Typ. Da ARCHETYPE_BASE_MULT.security = 1.12 > 1 liegt, bindet dieser Floor faktisch
+    // nie, sichert die schwächsten Teams aber archetyp-eindeutig ab (bewusst an security gekoppelt).
     baseCash = round1(Math.max(baseCash, effectiveBaseFloor * rebalance.baseScale));
   }
 
@@ -369,19 +401,19 @@ export function estimateExpectedPayout(
   const starTier = offer.starTier ?? 2;
   const baseMult = getStarTierBaseMultiplier(starTier);
   const baseCash = baseComponent?.rewardCash ?? 0;
+  // WAVE 1: baseCash = effectiveBaseFloor * ARCHETYPE_BASE_MULT * starTierBaseMult (* baseScale). Dividiert
+  // man durch (FLOOR * starTierBaseMult * ARCHETYPE_BASE_MULT), fällt der Sockel als ~einheitlicher Faktor
+  // heraus — konsistent über alle Archetypen (löst die frühere share-basierte Sonderfall-Inferenz ab).
+  const archetypeBaseMult = getArchetypeBaseMultiplier(offer.archetype);
   const inferredFactor =
-    baseMult > 0 && offer.archetype === "security"
-      ? baseCash / (SPONSOR_BASE_FLOOR_C * baseMult)
-      : baseMult > 0 && offer.archetype === "performance"
-        ? baseCash / (SPONSOR_BASE_FLOOR_C * baseMult * (getArchetypeBaseShare("performance") / getArchetypeBaseShare("security")))
-        : baseMult > 0
-          ? baseCash / (SPONSOR_BASE_FLOOR_C * baseMult * (getArchetypeBaseShare("identity") / getArchetypeBaseShare("security")))
-          : 1;
+    baseMult > 0 && archetypeBaseMult > 0
+      ? baseCash / (SPONSOR_BASE_FLOOR_C * baseMult * archetypeBaseMult)
+      : 1;
   const salaryFactor = inferredFactor > 0 ? inferredFactor : 1;
   const resolvedLeagueMin =
     leagueMinSalary ??
     (offer.archetype === "security"
-      ? round1(baseCash / Math.max(0.01, getStarTierBaseMultiplier(starTier)))
+      ? round1(baseCash / Math.max(0.01, getStarTierBaseMultiplier(starTier) * archetypeBaseMult))
       : SPONSOR_BASE_FLOOR_C * salaryFactor);
   const targetTotal = getSponsorPayoutForFinalRankAndTier(
     powerRank,
