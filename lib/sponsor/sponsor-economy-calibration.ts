@@ -18,7 +18,7 @@ export const SPONSOR_BASE_FLOOR_C = 32;
  * Deflation relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot
  * UND Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
  */
-export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 15.6) || 15.6;
+export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 7) || 7;
 
 /**
  * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
@@ -33,7 +33,7 @@ export const SPONSOR_BASE_SALARY_BUFFER_C = -2;
  * Meilensteine stapelt) zahlt nicht mehr komplett über: sie kappt den Top-Bonus, ohne den Sockel (der die
  * Kleinen absichert) anzutasten. So sinkt die Rang-Spreizung Richtung der funktionierenden Preisgeld-Kurve.
  */
-export const SPONSOR_MILESTONE_LADDER_SCALE = 0.6;
+export const SPONSOR_MILESTONE_LADDER_SCALE = Number(process.env.OLY_SPONSOR_MILESTONE_LADDER ?? 0.8) || 0.8;
 
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
