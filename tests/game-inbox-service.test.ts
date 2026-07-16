@@ -484,6 +484,111 @@ describe("game inbox service", () => {
     expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:") && item.status === "open")).toBe(false);
   });
 
+  it("hints at a stronger captain when a much better candidate is on the roster", () => {
+    const players = [
+      makePlayer("p-cap", { name: "Schwacher Kapitän" }),
+      makePlayer("p-star", {
+        name: "Starker Anführer",
+        traitsPositive: ["Eloquent", "Ambitious"],
+        attributeSheetStats: { charisma: 95, will: 90, determination: 90, awareness: 90 } as never,
+      }),
+      ...Array.from({ length: 10 }, (_, index) => makePlayer(`p-${index + 1}`)),
+    ];
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        lineupDrafts: [
+          {
+            seasonId: "season-3",
+            matchdayId: "season-3-matchday-1",
+            teamId: "M-M",
+            entries: players.map((player, index) => ({
+              slotKey: `slot-${index}`,
+              playerId: player.id,
+              activePlayerId: `ap-${index}`,
+            })),
+            submittedAt: null,
+          } as never,
+        ],
+      },
+      players,
+      rosters: players.map((player) => ({
+        teamId: "M-M",
+        playerId: player.id,
+        contractLength: 2,
+        salary: 2,
+      })) as never,
+    });
+    gameState.teamCaptains = [
+      {
+        seasonId: "season-3",
+        teamId: "M-M",
+        playerId: "p-cap",
+        playerName: "Schwacher Kapitän",
+        leadershipScore: 5,
+        style: "leader",
+        effects: { moraleBuffer: 1, rivalryPressureReductionPct: 4, teamPowerModifierPct: 1, conflictSoftenChancePct: 6 },
+        traitSignals: [],
+        source: "manual_assignment",
+      },
+    ];
+
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const upgrade = items.find((item) => item.itemId.startsWith("captain_upgrade:"));
+    expect(upgrade?.title).toBe("Stärkerer Kapitän verfügbar");
+    expect(upgrade?.description).toContain("Starker Anführer");
+    expect(upgrade?.targetParams).toEqual({ team: "M-M", panel: "captain-picker" });
+  });
+
+  it("does not hint at a captain upgrade when none is materially stronger", () => {
+    const players = Array.from({ length: 11 }, (_, index) => makePlayer(`p-${index + 1}`));
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        lineupDrafts: [
+          {
+            seasonId: "season-3",
+            matchdayId: "season-3-matchday-1",
+            teamId: "M-M",
+            entries: players.map((player, index) => ({
+              slotKey: `slot-${index}`,
+              playerId: player.id,
+              activePlayerId: `ap-${index}`,
+            })),
+            submittedAt: null,
+          } as never,
+        ],
+      },
+      players,
+      rosters: players.map((player) => ({
+        teamId: "M-M",
+        playerId: player.id,
+        contractLength: 2,
+        salary: 2,
+      })) as never,
+    });
+    gameState.teamCaptains = [
+      {
+        seasonId: "season-3",
+        teamId: "M-M",
+        playerId: "p-1",
+        playerName: "p-1",
+        leadershipScore: 60,
+        style: "leader",
+        effects: { moraleBuffer: 3, rivalryPressureReductionPct: 10, teamPowerModifierPct: 4, conflictSoftenChancePct: 14 },
+        traitSignals: [],
+        source: "manual_assignment",
+      },
+    ];
+
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(items.some((item) => item.itemId.startsWith("captain_upgrade:"))).toBe(false);
+  });
+
   it("warns when negative form cards remain unused before season end", () => {
     const gameState = makeGameState({
       seasonState: {

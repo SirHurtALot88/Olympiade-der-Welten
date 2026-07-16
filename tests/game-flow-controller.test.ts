@@ -584,4 +584,88 @@ describe("game flow controller", () => {
     expect(flow.steps[0]?.stepId).toBe("team_confirm");
     expect(flow.steps.some((entry) => entry.stepId === "roster_review")).toBe(true);
   });
+
+  it("orders the onboarding captain step after training + buying, before choosing the sponsor", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [
+              { stepId: "training_facilities", status: "open" },
+              { stepId: "appoint_captain", status: "open" },
+              { stepId: "choose_sponsor", status: "open" },
+            ],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    const ids = flow.steps.map((step) => step.stepId);
+    const captainIdx = ids.indexOf("appoint_captain");
+    const trainingIdx = ids.indexOf("training_facilities");
+    const transfersIdx = ids.indexOf("fill_roster");
+    const sponsorIdx = ids.indexOf("choose_sponsor");
+    expect(captainIdx).toBeGreaterThan(-1);
+    expect(captainIdx).toBeGreaterThan(trainingIdx);
+    expect(captainIdx).toBeGreaterThan(transfersIdx);
+    expect(captainIdx).toBeLessThan(sponsorIdx);
+  });
+
+  it("blocks the human onboarding captain step until a captain is appointed", () => {
+    const withoutCaptain = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "appoint_captain", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    expect(withoutCaptain.steps.find((step) => step.stepId === "appoint_captain")?.status).toBe("ready");
+
+    const withCaptain = buildGameFlowState({
+      gameState: gameState({
+        teamCaptains: [
+          {
+            seasonId: "season-2",
+            teamId: "M-M",
+            playerId: "p-1",
+            playerName: "p-1",
+            leadershipScore: 40,
+            style: "leader",
+            effects: { moraleBuffer: 2, rivalryPressureReductionPct: 8, teamPowerModifierPct: 3, conflictSoftenChancePct: 12 },
+            traitSignals: [],
+            source: "manual_assignment",
+          },
+        ],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "appoint_captain", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+    expect(withCaptain.steps.find((step) => step.stepId === "appoint_captain")?.status).toBe("completed");
+  });
 });
