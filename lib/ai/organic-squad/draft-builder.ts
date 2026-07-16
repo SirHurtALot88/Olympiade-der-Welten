@@ -153,6 +153,7 @@ export function buildOrganicSquadPlan(input: OrganicSquadPlanInput): OrganicSqua
       weights: input.economy.weights,
       disciplineNeeds,
       needAxisWeights,
+      identityAxisWeights: input.identityAxisWeights,
     };
   };
 

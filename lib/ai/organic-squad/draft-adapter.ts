@@ -520,6 +520,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       weights: ctx.weights,
       disciplineNeeds,
       needAxisWeights,
+      identityAxisWeights: ctx.identityAxisWeights,
     };
   };
 

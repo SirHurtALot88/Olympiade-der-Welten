@@ -19,8 +19,10 @@ import { cashOptionValue } from "@/lib/ai/organic-squad/cash-option-value";
 import { disciplineSupportFactor, marginalCoverageValue } from "@/lib/ai/organic-squad/coverage-curve";
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import {
+  CATEGORY_TO_AXIS,
   SOLIDE_THRESHOLD,
   type CoreAxis,
+  type DisciplineCategory,
   type DisciplineNeed,
   type OrganicPlayerView,
   type OrganicTeamState,
@@ -28,6 +30,18 @@ import {
 
 /** A strong player that lands on no needed discipline still has some baseline value. */
 const COVERAGE_FLOOR = 0.25;
+
+/**
+ * Env flag for ANPASSUNG B1 (identity-gate on the star premium, see identityFitFactor below).
+ * Default OFF ("0"/unset) — main draft behaviour is bitidentical until this is flipped to "1".
+ */
+const IDFIT_ENABLED = process.env.OLY_DRAFT_IDFIT === "1";
+
+/**
+ * Env flag for ANPASSUNG B2 (convex, GM-scaled price strain, see priceStrain in buyUtility below).
+ * Default OFF ("0"/unset) — main draft behaviour is bitidentical until this is flipped to "1".
+ */
+const STRAIN_ENABLED = process.env.OLY_DRAFT_STRAIN === "1";
 
 /**
  * Quality of a solid, rotation-grade CORE body — the line above which quality is a genuine "star
@@ -55,6 +69,15 @@ const SUPPORT_QUALITY_BASELINE = 68;
  * stay cheap and it reaches OPT.
  */
 const PRICE_SLOT_SCALE = 30;
+
+/**
+ * ANPASSUNG B2 convexity coefficient (see priceStrain in buyUtility): how steeply the price penalty
+ * accelerates once a pick's priceInSlots exceeds the club's own starAppetite. 0 would fall back to the
+ * plain linear priceInSlots; 0.35 makes a pick at 2× appetite cost ~1.35× as much strain per slot as a
+ * pick right at appetite, growing further beyond that — steep enough to steer a poor/mid club off a
+ * lone superstar without materially touching a rich/star-biased club whose picks rarely cross appetite.
+ */
+const PRICE_STRAIN_CONVEXITY = 0.35;
 
 /**
  * Baseline value of a body for rotation/fatigue depth (≤12 deploy per matchday, fatigue), independent
@@ -124,6 +147,37 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
+ * ANPASSUNG B1 — identity-gate on the star PREMIUM (root cause: at an empty S1 roster every
+ * discipline's coverage-gap is 1.0, so IDENTITY_WEIGHT/GAP_WEIGHT in discipline-need.ts wash the
+ * identity signal out of needWeight and the FIRST/most-expensive pick is scored near identity-blind).
+ * `identityAxisWeights` is the team's own NORMALIZED playstyle emphasis (pow/spe/men/soc, sums to 1;
+ * see buildIdentityAxisWeights); 0.25 is the flat-equal share across 4 axes, so an axis at exactly
+ * that share is a no-op (factor 1) — an axis the identity leans hard into scores up to 1.2, a purely
+ * off-axis discipline (~0.15 share) scores down to ~0.46, and undersupplied input falls back to the
+ * flat share too (no-op). Only multiplies the star EXCESS (see marginalStrength) — the base body value
+ * is left alone so cheap/mid picks and the bracket pyramid are unaffected. Returns 1 (no-op) unless
+ * OLY_DRAFT_IDFIT=1.
+ */
+const IDENTITY_FIT_FLAT_SHARE = 0.25;
+const IDENTITY_FIT_EXPONENT = 1.5;
+const IDENTITY_FIT_MIN = 0.4;
+const IDENTITY_FIT_MAX = 1.2;
+
+function identityFitFactor(
+  category: DisciplineCategory,
+  identityAxisWeights: Record<CoreAxis, number> | undefined,
+): number {
+  if (!IDFIT_ENABLED) return 1;
+  const axis = CATEGORY_TO_AXIS[category];
+  const weight = identityAxisWeights?.[axis] ?? IDENTITY_FIT_FLAT_SHARE;
+  return clamp(
+    Math.pow(weight / IDENTITY_FIT_FLAT_SHARE, IDENTITY_FIT_EXPONENT),
+    IDENTITY_FIT_MIN,
+    IDENTITY_FIT_MAX,
+  );
+}
+
+/**
  * Marginal squad strength a player adds: stat quality × how much its "solide" disciplines are still
  * needed AND under-covered (via the coverage curve). Weighted average over the player's covered
  * needed disciplines; falls back to COVERAGE_FLOOR when the player covers no needed discipline.
@@ -133,6 +187,7 @@ export function marginalStrength(
   player: OrganicPlayerView,
   disciplineNeeds: DisciplineNeed[],
   needAxisWeights: Record<CoreAxis, number>,
+  identityAxisWeights?: Record<CoreAxis, number>,
 ): number {
   const quality = computePlayerQuality(player, needAxisWeights);
   // Split quality into a plain-body BASE (valued by breadth) and a star PREMIUM (excess, gated by
@@ -145,9 +200,14 @@ export function marginalStrength(
     if ((player.disciplineRatings[need.disciplineId] ?? 0) > SOLIDE_THRESHOLD) {
       const coverage = marginalCoverageValue(need.coveredCount);
       const support = disciplineSupportFactor(need.coveredCount);
-      // base·coverage: breadth value of another body. excess·coverage·support: the star premium,
-      // only realized when the discipline already carries support — peaks as the ~3rd body (sweet spot).
-      acc += need.needWeight * coverage * (base + excess * support);
+      // ANPASSUNG B1 (flag-gated, see identityFitFactor): the star premium is additionally scaled by
+      // how central this discipline's axis is to the team's OWN identity — 1 (no-op) unless
+      // OLY_DRAFT_IDFIT=1. base·coverage (breadth) is never touched by this gate.
+      const idFit = identityFitFactor(need.category, identityAxisWeights);
+      // base·coverage: breadth value of another body. excess·coverage·support·idFit: the star premium,
+      // only realized when the discipline already carries support — peaks as the ~3rd body (sweet spot)
+      // — and (when gated) further scaled by identity fit so an off-identity star's premium fizzles too.
+      acc += need.needWeight * coverage * (base + excess * support * idFit);
       weightSum += need.needWeight;
     }
   }
@@ -181,12 +241,23 @@ function wageStrain(player: OrganicPlayerView, state: OrganicTeamState): number 
 export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): number {
   const w = state.weights;
   const fullness = rosterFullnessFactor(state.rosterSize, w.optTarget);
-  const deltaStrength = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights) * fullness;
+  const deltaStrength =
+    marginalStrength(player, state.disciplineNeeds, state.needAxisWeights, state.identityAxisWeights) * fullness;
   // Budget-relative cost measured in remaining-OPT-slots of budget: transfer price + capitalized wage.
   const optSlotsRemaining = Math.max(1, w.optTarget - state.rosterSize);
   const budgetPerOptSlot = Math.max(1, state.cash / optSlotsRemaining);
   const effectiveCost = Math.max(0, player.marketValue) + SALARY_CAPITALIZATION * Math.max(0, player.salary);
   const priceInSlots = effectiveCost / budgetPerOptSlot;
+  // ANPASSUNG B2 (flag-gated): once a single pick eats more than the GM's own "star appetite" worth of
+  // slot-budget, the strain grows superlinearly instead of linearly — a rich/star-biased club (high
+  // wWin ⇒ high appetite) is barely affected (its stars rarely exceed the appetite), a poor/mid club's
+  // appetite is low so a big pick crosses it fast and gets punished hard, pushing its budget toward
+  // mid-market instead of one lone superstar. priceStrain === priceInSlots (no-op) unless
+  // OLY_DRAFT_STRAIN=1.
+  const starAppetite = clamp(0.8 + 0.5 * w.wWin, 1.0, 2.2);
+  const priceStrain = STRAIN_ENABLED
+    ? priceInSlots * (1 + PRICE_STRAIN_CONVEXITY * Math.max(0, priceInSlots - starAppetite))
+    : priceInSlots;
   const potential = Math.max(0, player.potential ?? 0);
   // Rotation/depth baseline: a fading part (full at an empty squad, 0 at optTarget) PLUS a flat
   // BELOW_OPT_FILL_FLOOR that holds as long as the roster is strictly under opt, then vanishes at opt.
@@ -205,7 +276,7 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   return (
     w.wWin * deltaStrength +
     rotationValue -
-    w.wThrift * priceInSlots * PRICE_SLOT_SCALE -
+    w.wThrift * priceStrain * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential +
     themeFitValue
@@ -219,7 +290,12 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
  */
 export function sellUtility(player: OrganicPlayerView, state: OrganicTeamState): number {
   const w = state.weights;
-  const strengthLoss = marginalStrength(player, state.disciplineNeeds, state.needAxisWeights);
+  const strengthLoss = marginalStrength(
+    player,
+    state.disciplineNeeds,
+    state.needAxisWeights,
+    state.identityAxisWeights,
+  );
   const saleValue = Math.max(0, player.marketValue);
   const cashOptionGain =
     cashOptionValue({

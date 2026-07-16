@@ -164,6 +164,14 @@ export type OrganicTeamState = {
   disciplineNeeds: DisciplineNeed[];
   /** Need weight per core axis (0–1), derived from disciplineNeeds; used by quality scoring. */
   needAxisWeights: Record<CoreAxis, number>;
+  /**
+   * NORMALIZED team-identity axis weights (pow/spe/men/soc of TeamIdentity, summing to 1 — see
+   * buildIdentityAxisWeights in draft-adapter.ts). NOT the need-weights above: this is the team's own
+   * playstyle emphasis, used only to gate the star PREMIUM in marginalStrength behind
+   * `OLY_DRAFT_IDFIT` (see utility.ts identityFitFactor). Optional so pre-existing callers/tests that
+   * don't pass it are unaffected (undefined ⇒ treated as the flat 0.25-per-axis default ⇒ no-op gate).
+   */
+  identityAxisWeights?: Record<CoreAxis, number>;
 };
 
 /** Utility-model helper: count disciplines in a player's ratings strictly above a threshold. */
