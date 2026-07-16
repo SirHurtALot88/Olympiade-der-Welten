@@ -1,6 +1,7 @@
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger, type SeasonPlayerPointsSummary, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getFrozenRatingRowsMap, isValuationFrozen } from "@/lib/season/frozen-valuation-snapshot";
 
 export type PlayerRatingWarning =
   | "ovr_raw_source_missing"
@@ -574,6 +575,25 @@ export function buildPlayerRatingContractMap(
   seasonPointsLedger?: SeasonPointsLedger,
   options?: { playerIds?: string[] | null },
 ) {
+  // Read-Gate: sobald die Saison eingefroren ist (nach MD10), NICHT mehr pool-relativ live
+  // rechnen — sonst verschieben Verkäufe/Roster-Änderungen OVR/MVS/PPs aller anderen Spieler.
+  // Stattdessen die zum MD10 eingefrorenen Rows zurückliefern (gefiltert auf die angefragten IDs).
+  const frozenRatingRows = isValuationFrozen(gameState) ? getFrozenRatingRowsMap(gameState) : null;
+  if (frozenRatingRows) {
+    const outputPlayerIdSet =
+      options?.playerIds != null ? new Set(options.playerIds.filter(Boolean)) : null;
+    if (!outputPlayerIdSet) {
+      return frozenRatingRows;
+    }
+    const filtered = new Map<string, PlayerRatingContractRow>();
+    for (const [playerId, row] of frozenRatingRows) {
+      if (outputPlayerIdSet.has(playerId)) {
+        filtered.set(playerId, row);
+      }
+    }
+    return filtered;
+  }
+
   const pointsLedger = seasonPointsLedger ?? buildSeasonPointsLedger(gameState);
   const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
   const outputPlayerIdSet =
