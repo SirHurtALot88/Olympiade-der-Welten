@@ -41,8 +41,8 @@ import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-ser
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
-import { runAutoRosterFillForMatchdaySetup } from "@/lib/ai/auto-roster-fill-service";
-import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
+import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -427,9 +427,9 @@ export async function POST(request: Request) {
   } else if (body.action === "fresh-season-1") {
     const created = persistence.createFreshSeasonOneSave({ name: body.name });
     // A fresh Season 1 seeds all 32 teams with EMPTY rosters; matchdays cannot resolve until every team has a
-    // roster/lineup. The whole-league roster-fill (~40s) runs in the BACKGROUND (detached) on this long-lived
+    // roster/lineup. The whole-league AI draft (~40s) runs in the BACKGROUND (detached) on this long-lived
     // custom Node server so the "new game" request returns immediately instead of blocking ~40s (which would
-    // time out behind a proxy). We mark the save "in_progress" now; the background fill flips it to "ready"
+    // time out behind a proxy). We mark the save "in_progress" now; the background draft flips it to "ready"
     // when every team is populated (or "failed" on error, retryable from the Cockpit). The UI shows a
     // "Liga wird erstellt…" gate and polls until "ready".
     const setupSaveId = created.saveId;
@@ -440,31 +440,43 @@ export async function POST(request: Request) {
     });
     void (async () => {
       try {
-        const fillResult = await runAutoRosterFillForMatchdaySetup(
+        // Route the fresh-season-1 whole-league draft through the ORGANIC engine (the same path S2+ and
+        // the manual re-pick buttons already use via /api/ai/picks-run) instead of the legacy
+        // auto-roster-fill planner, which was proven to produce bipolar/broken squads (superstars + trash,
+        // or an all-mid blob) on a fresh S1. teamScope:"all" + allowSetupAllTeams:true drafts every team
+        // (teamIds omitted); yieldBetweenTeams:true keeps the 5s league-setup status poll unblocked during
+        // this long (whole-league) run.
+        const runResult = await runAiPicksExecutePreview(
           {
             source: "sqlite",
             saveId: setupSaveId,
             seasonId: setupSeasonId,
             dryRun: false,
-            confirmToken: AUTO_ROSTER_FILL_CONFIRM_TOKEN,
+            confirmToken: AI_PICKS_RUN_CONFIRM_TOKEN,
+            teamScope: "all",
+            allowSetupAllTeams: true,
+            draftSeed: `${setupSaveId}:${setupSeasonId}:setup`,
+            yieldBetweenTeams: true,
+            batchPersistence: true,
           },
           persistence,
         );
-        // Surface teams the fill could not bring up to their minimum roster (or that ended blocked) so the
+        // Surface teams the draft could not bring up to their minimum roster (or that ended blocked) so the
         // "ready" banner can flag them instead of pretending everything worked. The league is still playable
         // ("ready"); these are "needs attention" markers, not a hard failure.
-        const leagueSetupWarnings: LeagueSetupTeamWarning[] = fillResult.teams
-          .filter((team) => team.rosterAfter < team.targetRosterMin)
+        const leagueSetupWarnings: LeagueSetupTeamWarning[] = runResult.teams
+          .filter((team) => team.targetRosterMin != null && team.rosterAfter < team.targetRosterMin)
           .map((team) => ({
             teamId: team.teamId,
             teamName: team.teamName,
             rosterAfter: team.rosterAfter,
-            targetMin: team.targetRosterMin,
-            status: team.status,
+            targetMin: team.targetRosterMin ?? 0,
+            status: team.blockingReasons.length > 0 ? "blocked" : "below_min",
           }));
-        if (leagueSetupWarnings.length > 0 || fillResult.summary.blockedTeams > 0) {
+        const blockedTeamCount = runResult.teams.filter((team) => team.blockingReasons.length > 0).length;
+        if (leagueSetupWarnings.length > 0 || blockedTeamCount > 0) {
           console.warn(
-            `[fresh-season-1] roster-fill left ${leagueSetupWarnings.length} team(s) below minimum, ${fillResult.summary.blockedTeams} blocked team(s).`,
+            `[fresh-season-1] AI draft left ${leagueSetupWarnings.length} team(s) below minimum, ${blockedTeamCount} blocked team(s).`,
           );
         }
         const filled = persistence.getSaveById(setupSaveId);
@@ -479,7 +491,7 @@ export async function POST(request: Request) {
           });
         }
       } catch (error) {
-        console.error("[fresh-season-1] background roster-fill failed (retryable from Cockpit):", error);
+        console.error("[fresh-season-1] background AI draft failed (retryable from Cockpit):", error);
         const errored = persistence.getSaveById(setupSaveId);
         if (errored) {
           persistence.saveSingleplayerState(setupSaveId, {

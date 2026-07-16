@@ -60,6 +60,21 @@ export type AiPicksRunParams = {
   stepsPerTeam?: number | null;
   runMode?: AiNeedsPicksRunMode | null;
   draftSeed?: string | null;
+  // Yields to the event loop between teams in the preview AND execute loops (mirrors
+  // auto-roster-fill-service.ts's per-team yield). The per-team work is CPU-bound and synchronous,
+  // so a long whole-league run (e.g. fresh-season-1 setup, 32 teams) would otherwise block the single
+  // JS thread in one go, starving any concurrent request (e.g. a status poll). Default false so the
+  // manual re-pick buttons and preseason automation (short runs, latency-sensitive) are unaffected.
+  // Only applied when !dryRun (dry-run preview-only calls are typically synchronous callers).
+  yieldBetweenTeams?: boolean;
+  // Batches roster persistence across the whole execute run: instead of reloading the save and flushing
+  // the full (~33 MB) game state to SQLite once PER TEAM (O(teams) serializations — the dominant cost of a
+  // whole-league fresh-season draft), a single in-memory run context is threaded across all teams and
+  // flushed ONCE after the execute loop. Each team still sees prior teams' buys (they mutate the shared
+  // context's in-memory game state via deferPersist), so the shrinking free-agent pool is unaffected.
+  // Default false → manual re-pick buttons and preseason automation keep the per-team flush (unchanged).
+  // Only applied when !dryRun. Safe to combine with yieldBetweenTeams.
+  batchPersistence?: boolean;
 };
 
 type TeamTargetSource =
@@ -2956,6 +2971,7 @@ function runOrganicTeamDraftExecute(input: {
   teamExecuteStartedAt: number;
   teamWarnings: string[];
   teamBlockingReasons: string[];
+  deferFlush?: boolean;
 }) {
   const {
     saveId,
@@ -2979,6 +2995,7 @@ function runOrganicTeamDraftExecute(input: {
     teamExecuteStartedAt,
     teamWarnings,
     teamBlockingReasons,
+    deferFlush,
   } = input;
 
   const gameState = teamRunContext.save.gameState;
@@ -3168,10 +3185,14 @@ function runOrganicTeamDraftExecute(input: {
     appliedCount += 1;
   }
 
-  // Team-end flush + result push + timing (mirrors the default path's per-team tail).
-  const afterSave = teamRunContext.deferredWrites > 0
-    ? flushLocalTransfermarktRunContext(teamRunContext)
-    : resolveStrictLocalSave(persistence, saveId);
+  // Team-end flush + result push + timing (mirrors the default path's per-team tail). When deferFlush is
+  // set (Stage C batching), we do NOT flush here — the buys already live in the shared context's in-memory
+  // game state, and a single flush after the whole execute loop persists them all at once.
+  const afterSave = deferFlush
+    ? teamRunContext.save
+    : teamRunContext.deferredWrites > 0
+      ? flushLocalTransfermarktRunContext(teamRunContext)
+      : resolveStrictLocalSave(persistence, saveId);
   const afterTeam = afterSave.gameState.teams.find((entry) => entry.teamId === teamId) ?? latestTeam;
   for (const transferId of transferHistoryIds) {
     if (!afterSave.gameState.transferHistory.some((entry) => entry.id === transferId)) {
@@ -3577,7 +3598,13 @@ export async function runAiPicksExecutePreview(
     appliedPicks: number;
   }>();
   const globallyReservedPlayerIds = new Set<string>();
+  const yieldBetweenTeams = Boolean(params.yieldBetweenTeams) && !dryRun;
   for (const team of selectedTeams) {
+    if (yieldBetweenTeams) {
+      // See AiPicksRunParams.yieldBetweenTeams: give the event loop a chance to service concurrent
+      // requests (e.g. a league-setup status poll) between teams during a long whole-league run.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
     const teamPreviewStartedAt = Date.now();
     const previewTeam = await buildTeamPreviewEntryWithDraftState({
       saveId: save.saveId,
@@ -3726,10 +3753,26 @@ export async function runAiPicksExecutePreview(
     blockingReasons,
   };
 
+  // Organic squad builder ist jetzt DEFAULT-ON (Cutover): jedes Team pickt live bei seinem Zug aus dem
+  // Restpool, statt über den Legacy-partialExecutionPlan vorab eingefroren/ausgeschlossen zu werden (der
+  // Bug, bei dem das zuletzt gedraftete Team mit 0 Spielern endete). Opt-out nur noch explizit mit
+  // OLY_ORGANIC_SQUAD_BUILDER=0 (Legacy-Pfad für A/B-Vergleiche).
+  const useOrganicSquadBuilder = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
+  // When the organic builder owns the execute, it recomputes its OWN min-feasible plan from the live
+  // free-agent pool and deliberately ignores the preview (unified) planner's picks and vetoes (see the
+  // per-team comment further down). On a FRESH Season-1 (empty rosters) the preview planner routinely
+  // fails to reach hard-min and emits team/quality-gate blockingReasons — pre-organic that aborted the
+  // whole run here, so the organic loop (which drafts cleanly) never ran and every team ended empty.
+  // So under organic, planner/quality-gate blocks must NOT abort execution. Two guardrails stay hard:
+  //   - preflightBlockingReasons (infra-level: cash inconsistency, unaffordable pool, …) still abort.
+  //   - the setup_all_teams confirmation gate (teamScope:"all" without allowSetupAllTeams) still aborts.
+  const setupAllTeamsUnconfirmed = teamScope === "all" && !allowSetupAllTeams;
+  const organicBypassesPlannerBlock = useOrganicSquadBuilder && !setupAllTeamsUnconfirmed;
+
   if (
     dryRun ||
     preflightBlockingReasons.length > 0 ||
-    (blockingReasons.length > 0 && !partialExecutionPlan)
+    (blockingReasons.length > 0 && !partialExecutionPlan && !organicBypassesPlannerBlock)
   ) {
     return result;
   }
@@ -3740,13 +3783,19 @@ export async function runAiPicksExecutePreview(
   const executedGlobalRows: GlobalPickRow[] = [];
   const executeStartedAt = Date.now();
   const liveTakenPlayerIds = new Set<string>();
-  // Organic squad builder ist jetzt DEFAULT-ON (Cutover): jedes Team pickt live bei seinem Zug aus dem
-  // Restpool, statt über den Legacy-partialExecutionPlan vorab eingefroren/ausgeschlossen zu werden (der
-  // Bug, bei dem das zuletzt gedraftete Team mit 0 Spielern endete). Opt-out nur noch explizit mit
-  // OLY_ORGANIC_SQUAD_BUILDER=0 (Legacy-Pfad für A/B-Vergleiche).
-  const useOrganicSquadBuilder = process.env.OLY_ORGANIC_SQUAD_BUILDER !== "0";
+  // Stage C (see AiPicksRunParams.batchPersistence): thread ONE run context across all teams and flush
+  // once after the loop, instead of a per-team reload + full-save flush. Only for the organic path (the
+  // whole-league setup draft); the legacy planner path keeps its per-team flush.
+  const batchPersistence = Boolean(params.batchPersistence) && !dryRun && useOrganicSquadBuilder;
+  const sharedRunContext = batchPersistence
+    ? createLocalTransfermarktRunContext({ save: resolveStrictLocalSave(persistence, save.saveId), persistence })
+    : null;
 
   for (const previewTeam of previewTeams) {
+    if (yieldBetweenTeams) {
+      // See AiPicksRunParams.yieldBetweenTeams: same cooperative yield as the preview loop above.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
     const teamExecuteStartedAt = Date.now();
     // The partial-execution plan is derived from the NON-organic preview planner. When the organic
     // squad builder owns the execute (flag on), it recomputes its OWN min-feasible plan from the live
@@ -3762,7 +3811,9 @@ export async function runAiPicksExecutePreview(
       });
       continue;
     }
-    const latestSave = resolveStrictLocalSave(persistence, save.saveId);
+    // When batching, the shared context's in-memory save already reflects every prior team's buys, so we
+    // read from it instead of a (stale-until-flushed) SQLite reload. Otherwise, per-team reload as before.
+    const latestSave = sharedRunContext ? sharedRunContext.save : resolveStrictLocalSave(persistence, save.saveId);
     const latestTeam = latestSave.gameState.teams.find((entry) => entry.teamId === previewTeam.teamId);
     if (!latestTeam) {
       executedTeams.push({
@@ -3813,11 +3864,21 @@ export async function runAiPicksExecutePreview(
         { execute: true },
       );
       if (loanResult.ok) {
-        preseasonLoanSave = persistence.saveSingleplayerState(latestSave.saveId, loanResult.gameState);
+        if (sharedRunContext) {
+          // Batching: apply the loan to the shared in-memory game state (defer its write to the final
+          // flush) so the buy loop sees the credited cash without a per-team SQLite write.
+          sharedRunContext.save = { ...sharedRunContext.save, gameState: loanResult.gameState };
+          sharedRunContext.deferredWrites += 1;
+          preseasonLoanSave = sharedRunContext.save;
+        } else {
+          preseasonLoanSave = persistence.saveSingleplayerState(latestSave.saveId, loanResult.gameState);
+        }
       }
     }
 
-    const teamRunContext = createLocalTransfermarktRunContext({ save: preseasonLoanSave, persistence });
+    // Batching: reuse the single shared context (preseasonLoanSave already IS sharedRunContext.save) so
+    // every team's buys accumulate in the same in-memory game state; flushed once after the loop.
+    const teamRunContext = sharedRunContext ?? createLocalTransfermarktRunContext({ save: preseasonLoanSave, persistence });
     const useFastBatchExecute = runMode === "season1_optimum_execute";
     const executedPicks: AiPicksRunPick[] = [];
     const transferHistoryIds: string[] = [];
@@ -3867,6 +3928,7 @@ export async function runAiPicksExecutePreview(
         teamExecuteStartedAt,
         teamWarnings,
         teamBlockingReasons,
+        deferFlush: batchPersistence,
       });
       continue;
     }
@@ -4455,6 +4517,12 @@ export async function runAiPicksExecutePreview(
       timing.totalMs = timing.previewMs + executeMs;
       timing.appliedPicks = executedPicks.filter((pick) => pick.status === "applied").length;
     }
+  }
+
+  // Stage C (see AiPicksRunParams.batchPersistence): all teams' buys were deferred into the shared
+  // in-memory game state; persist them to SQLite in a SINGLE flush now instead of once per team.
+  if (sharedRunContext && sharedRunContext.deferredWrites > 0) {
+    flushLocalTransfermarktRunContext(sharedRunContext);
   }
 
   const executeMs = Date.now() - executeStartedAt;
