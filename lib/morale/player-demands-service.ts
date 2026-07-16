@@ -411,7 +411,7 @@ function buildAppearanceDemand(input: {
   if (input.rosterRank > 6 && !hasAnyTrait(input.player, DEMAND_TRAITS)) return null;
   if (input.rosterRank > 3 && !hasAnyTrait(input.player, DEMAND_TRAITS)) return null;
   const current = input.context.playerSeasonAppearances?.[input.player.id] ?? 0;
-  const target = input.rosterRank <= 3 ? 5 : input.rosterRank <= 6 ? 3 : 2;
+  const target = input.rosterRank <= 3 ? 8 : input.rosterRank <= 6 ? 5 : 3;
   if (current >= target || (hasAnyTrait(input.player, LOW_MAINTENANCE_TRAITS) && current >= 1)) return null;
   return {
     demandId: `${input.context.seasonId}:${input.context.teamId}:${input.player.id}:appearances`,
