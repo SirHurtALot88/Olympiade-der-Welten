@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type ReactNode } from "react";
 
 import type { LegacyLineupFocusV2BoardProps } from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import {
   FATIGUE_HIGH,
   NlCard,
@@ -154,6 +156,116 @@ function captainChipStyle(active: boolean): CSSProperties {
     lineHeight: 1.1,
     cursor: "pointer",
   };
+}
+
+/* --- Feature 1: Portrait-Avatar + Hover-Vorschau -----------------------
+ * Kleiner, dichter Avatar-Chip (Initialen-Fallback) für Slot-/Kandidaten-/
+ * Fokus-Zeilen. Bewusst winzig (20–28px), damit Stats/Score nicht verdrängt
+ * werden und die Kandidatenliste gleich viele Zeilen zeigt wie zuvor. Der
+ * Hover reicht die exakt gleiche `FoundationPlayerPortraitPreview` durch wie
+ * das v2-Board (portaliertes Overlay ⇒ keine Layout-Verschiebung).
+ */
+
+type NlPortraitPlayer = {
+  id: string;
+  name: string;
+  portraitUrl: string | null;
+  className: string | null;
+  playerOvr?: number | null;
+  playerPps?: number | null;
+  coreStats?: { pow: number; spe: number; men: number; soc: number } | null;
+};
+
+/** Runder Mini-Avatar: Portrait falls vorhanden, sonst Initialen (Fallback bleibt bei Bildfehler sichtbar). */
+function NlPlayerAvatar({
+  portraitUrl,
+  name,
+  size = 22,
+}: {
+  portraitUrl?: string | null;
+  name: string;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  const initials = name.slice(0, 2).toUpperCase();
+  const showImg = Boolean(portraitUrl) && !failed;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "relative",
+        flex: "0 0 auto",
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "50%",
+        overflow: "hidden",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--nl-panel-2)",
+        border: "1px solid var(--nl-line)",
+        color: "var(--nl-mut)",
+        fontSize: `${Math.round(size * 0.42)}px`,
+        fontWeight: 700,
+        lineHeight: 1,
+      }}
+    >
+      {initials}
+      {showImg ? (
+        // Initialen bleiben als Unterlage — schlägt das Bild fehl, blenden wir es aus.
+        <img
+          src={portraitUrl as string}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Umhüllt einen Knoten mit der Portrait-Hover-Vorschau (identische Props wie
+ * `wrapLineupV2PortraitPreview` im v2-Board). Ohne coreStats gibt es keine
+ * Vorschau ⇒ Knoten wird unverändert zurückgegeben (progressive Enhancement).
+ */
+function wrapNlPortraitPreview(node: ReactNode, player: NlPortraitPlayer, disabled = false): ReactNode {
+  if (!player.coreStats) return node;
+  return (
+    <FoundationPlayerPortraitPreview
+      playerId={player.id}
+      name={player.name}
+      portraitUrl={player.portraitUrl}
+      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      playerOvr={player.playerOvr ?? null}
+      playerMvs={null}
+      playerPps={player.playerPps}
+      pow={player.coreStats.pow}
+      spe={player.coreStats.spe}
+      men={player.coreStats.men}
+      soc={player.coreStats.soc}
+      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+      variant="team"
+      context="lineupCandidate"
+      previewDensity="compact"
+      playerClassName={player.className}
+      disabled={disabled}
+    >
+      {node}
+    </FoundationPlayerPortraitPreview>
+  );
+}
+
+/* --- Feature 2: „Score to beat" — Rivalitäts-Stärke (spoiler-sicher) ----
+ * relationship < 0 = Rivalität; je negativer, desto schärfer. Nur ein Wort
+ * fürs Tooltip — keine Zahl, kein projiziertes Ergebnis.
+ */
+function rivalStrengthLabel(relationship: number): string {
+  if (relationship <= -4) return "Erzrivale";
+  if (relationship <= -3) return "starker Rivale";
+  return "Rivale";
 }
 
 /* --- v1-Entscheidungs-Signale (Schwellen synchron zu LegacyLineupFocusV2Board) --- */
@@ -1204,6 +1316,21 @@ export default function LineupNewLook({
     const tacticPreview = disciplineTacticPreviewBySide?.[disciplineSide] ?? null;
     const progressPct = sideRequired > 0 ? Math.min(100, Math.round((sideSelected / sideRequired) * 100)) : 0;
 
+    // Feature 2 „Score to beat" (spoiler-sicher): nächste Saison-Rivalen dieser
+    // Disziplin. Quelle = context.teamPowerWindows[disciplineId].top8Rivals, gebaut
+    // aus der SAISON-Rangtabelle (rankSource "active_roster_top6_sum_discipline_
+    // score" — identisch zum Saisonstand). `rank` = aktueller Saison-Rang,
+    // `relationship` = Rivalitäts-Stärke (negativer = schärfer). Hier wird KEIN
+    // projiziertes Spieltag-Ergebnis und kein Nach-Spieltag-Rang berührt.
+    const disciplineId = discipline?.disciplineId ?? null;
+    const rivalWindow = disciplineId ? context.teamPowerWindows?.[disciplineId] ?? null : null;
+    const standingsRivals = rivalWindow?.top8Rivals ?? [];
+    // Rivalitäts-Druck spiegelt exakt die Client-Schwelle (rivalryPressureByDiscipline):
+    // sitzt ein Rivale auf Rang ≤ 3, wiegt „Vollgas" schwerer (Druck 1.5 statt 1) —
+    // reine Standings-Ableitung, dieselbe Größe, die bereits in die Projektion fließt.
+    const nearestRivalRank = standingsRivals.length > 0 ? Math.min(...standingsRivals.map((rival) => rival.rank)) : null;
+    const rivalPressureElevated = nearestRivalRank != null && nearestRivalRank <= 3;
+
     return (
       <section
         key={`nl-lineup-side-${disciplineSide}`}
@@ -1261,6 +1388,68 @@ export default function LineupNewLook({
               ))}
             </div>
           </div>
+
+          {/* Feature 2: kompakter Rivalen-Streifen (eigene Zeile — side-head ist
+              flex-wrap). Zeigt Saison-Rang + Rivalitäts-Stärke der nächsten
+              Rivalen; Tooltip erklärt, warum „Vollgas" gegen sie mehr kostet.
+              Rein Standings-basiert — kein Spieltag-Ergebnis. */}
+          {standingsRivals.length > 0 ? (
+            <div
+              className="nl-lineup-side-rivals"
+              data-testid={`nl-lineup-side-rivals-${disciplineSide}`}
+              style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", fontSize: "11px" }}
+              title={
+                rivalPressureElevated
+                  ? "Zu schlagen: enge Saison-Rivalen (einer steht auf Rang ≤ 3 dieser Disziplin). Weil ein Rivale so weit oben rangiert, wiegt Vollgas hier schwerer — der Rivalitäts-Druck erhöht die Varianz deiner Projektion. Basis: Saisonstand, kein Spieltag-Ergebnis."
+                  : "Zu schlagen: deine nächsten Saison-Rivalen in dieser Disziplin (aus dem Saisonstand, kein Spieltag-Ergebnis)."
+              }
+            >
+              <span style={{ color: "var(--nl-mut)", fontWeight: 700, letterSpacing: "0.02em" }}>Zu schlagen</span>
+              {standingsRivals.slice(0, 2).map((rival) => (
+                <span
+                  key={rival.teamId}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 7px",
+                    borderRadius: "var(--nl-r-pill)",
+                    border: "1px solid var(--nl-line)",
+                    background: "var(--nl-panel-2)",
+                    color: "var(--nl-ink)",
+                  }}
+                  title={`${rival.teamName}: Saison-Rang #${rival.rank} · ${rivalStrengthLabel(rival.relationship)}`}
+                >
+                  <strong className="nl-tnum" style={{ color: "var(--nl-accent)" }}>
+                    #{rival.rank}
+                  </strong>
+                  <span style={{ maxWidth: "9ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rival.teamName}</span>
+                  {/* Stärke als 1–3 Schwerter (nur Deko, Erklärung im Tooltip). */}
+                  <em style={{ fontStyle: "normal", color: "var(--nl-mut-2)" }} aria-hidden="true">
+                    {"⚔".repeat(Math.min(3, Math.max(1, Math.round(Math.abs(rival.relationship) - 1))))}
+                  </em>
+                </span>
+              ))}
+              {rivalPressureElevated ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    padding: "2px 7px",
+                    borderRadius: "var(--nl-r-pill)",
+                    border: "1px solid color-mix(in srgb, var(--nl-warn) 55%, transparent)",
+                    background: "color-mix(in srgb, var(--nl-warn) 16%, transparent)",
+                    color: "var(--nl-warn)",
+                    fontWeight: 700,
+                  }}
+                  title="Ein Rivale steht auf Rang ≤ 3 dieser Disziplin — Vollgas kostet hier mehr (erhöhter Rivalitäts-Druck)."
+                >
+                  Druck ↑
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <div className="nl-lineup-slot-grid">
@@ -1318,6 +1507,14 @@ export default function LineupNewLook({
                   {player ? (
                     <span className="nl-lineup-slot-player">
                       <strong>
+                        {/* Feature 1: 22px-Portrait-Avatar (Initialen-Fallback) links vom Namen;
+                            Hover ⇒ volle Portrait-Karte (wie v2). `strong` ist bereits Flex-Row
+                            mit gap — Score/Fatigue rutschen dadurch nicht raus. */}
+                        {wrapNlPortraitPreview(
+                          <NlPlayerAvatar portraitUrl={player.portraitUrl} name={player.name} size={22} />,
+                          player,
+                          isReadOnly || isBusy,
+                        )}
                         {player.name}
                         {isCaptain ? <span className="nl-lineup-captain-badge">C</span> : null}
                       </strong>
@@ -1711,7 +1908,12 @@ export default function LineupNewLook({
                   )}
                 </div>
                 <div className="nl-lineup-focus-meta">
-                  <strong>{focusPlayer.name}</strong>
+                  {/* Feature 1: 28px-Portrait-Avatar im Fokus-Panel (Initialen-Fallback).
+                      Detailkarte ist hier schon sichtbar (Radar/Stats) ⇒ kein Hover-Popover nötig. */}
+                  <strong style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                    <NlPlayerAvatar portraitUrl={focusPlayer.portraitUrl} name={focusPlayer.name} size={28} />
+                    <span>{focusPlayer.name}</span>
+                  </strong>
                   <small>
                     {focusPlayer.className ?? "—"}
                     {focusPlayer.playerOvr != null ? (
@@ -1928,6 +2130,10 @@ export default function LineupNewLook({
                       className={`nl-lineup-candidate${isAssignedHere ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}${
                         dragCandidateId === candidateId && candidateId ? " is-dragging" : ""
                       }`}
+                      // Feature 1: Grid um eine schmale Avatar-Spalte erweitern (Basis war
+                      // "1fr auto"). „auto" ⇒ nur so breit wie der 20px-Avatar; Namens-/
+                      // Score-Spalte bleiben unverändert, also gleiche Zeilendichte.
+                      style={{ gridTemplateColumns: "auto minmax(0, 1fr) auto" }}
                       disabled={isReadOnly || isBlocked || !candidateId}
                       draggable={dndEnabled && !isBlocked && Boolean(candidateId) ? true : undefined}
                       title={
@@ -1948,6 +2154,14 @@ export default function LineupNewLook({
                           {index + 1}
                         </span>
                       ) : null}
+                      {/* Feature 1: 20px-Avatar als erste Grid-Spalte (Initialen-Fallback,
+                          Hover ⇒ volle Karte). Klick fällt weiterhin auf den Button-Handler
+                          durch (Zuweisung); Drag-Quelle bleibt der gesamte Button. */}
+                      {wrapNlPortraitPreview(
+                        <NlPlayerAvatar portraitUrl={candidate.portraitUrl} name={candidate.name} size={20} />,
+                        candidate,
+                        isReadOnly || isBlocked,
+                      )}
                       <span className="nl-lineup-candidate-main">
                         <strong>{candidate.name}</strong>
                         <small>

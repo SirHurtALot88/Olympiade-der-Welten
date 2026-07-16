@@ -46132,6 +46132,37 @@ button.foundation-team-portrait-card {
   color: var(--nl-ink);
 }
 
+/* F2 — "VERPFLICHTET"-Erfolgskarte im Kaufmodal: Ablöse + Gehalt zählen hoch
+   (NlCountUpValue), die Karte fährt über `.nl-reveal` dezent ein. */
+.is-new-look .market-v2-buy-signed-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .market-v2-buy-signed-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.is-new-look .market-v2-buy-signed-figure small {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .market-v2-buy-signed-value {
+  font-family: var(--nl-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--nl-good);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Aktionen */
 .is-new-look .nl-market-primary-action,
 .is-new-look .nl-scout-primary-action {
@@ -46414,6 +46445,94 @@ button.foundation-team-portrait-card {
 /* Achs-Mindestwert-Label ist statisch (kein Toggle mehr) — Standard-Cursor. */
 .is-new-look .nl-market-axis-min-label {
   cursor: default;
+}
+
+/* F(neu) — "Erweitert"-Akkordeon der Controls-Karte: volle Breite, Toggle-Kopf
+   mit Aktiv-Zähler; das Panel bündelt Achs-Mindestwerte + Fit/Value-Filter,
+   damit die Quick-Zeile (Suche/Sortierung/Achsen-Pills) schlank bleibt. */
+.is-new-look .nl-market-advanced {
+  width: 100%;
+  border-top: 1px solid var(--nl-line);
+  padding-top: var(--nl-s2);
+}
+
+.is-new-look .nl-market-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .nl-market-advanced-toggle:hover,
+.is-new-look .nl-market-advanced-toggle:focus-visible {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-advanced-title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.is-new-look .nl-market-advanced-count {
+  color: var(--nl-warn);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-advanced-caret {
+  color: var(--nl-mut);
+  font-size: 11px;
+}
+
+.is-new-look .nl-market-advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s2);
+}
+
+/* F(neu) — Head-to-Head-Vergleich (angeheftet vs. Fokus) in der Fokus-Karte:
+   überlagerter Mehrserien-Radar + paarige StatChip-Zeilen. */
+.is-new-look .nl-market-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border-radius: var(--nl-r-md);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-market-compare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-market-compare-radar {
+  display: flex;
+  justify-content: center;
+}
+
+.is-new-look .nl-market-compare-radar .nl-radar {
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Zeilen-Label je Kandidat in der jeweiligen Serienfarbe (Pin=Accent, Fokus=Good). */
+.is-new-look .nl-market-compare-row.is-pinned .nl-stat-chip-row-label {
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-market-compare-row.is-selected .nl-stat-chip-row-label {
+  color: var(--nl-good);
 }
 
 /* CA-Sterne inline (ersetzt den entfernten OVR-Wert): nur die CA-Zeile zeigen,

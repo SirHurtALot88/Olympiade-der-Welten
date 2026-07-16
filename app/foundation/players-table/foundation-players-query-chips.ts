@@ -17,6 +17,7 @@ import {
   getRosterEntryDisplaySalary,
 } from "@/app/foundation/foundation-page-client-exports";
 import { formatNlMoney, formatNlNumber } from "@/components/foundation/new-look";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import type { FoundationPlayerScopeRow } from "@/lib/foundation/tabs/use-foundation-cross-tab-player-directory";
 
 export type QueryChipAttr =
@@ -29,8 +30,13 @@ export type QueryChipAttr =
   | "spe"
   | "men"
   | "soc"
+  | "ca"
+  | "contract"
+  | "appearances"
+  | "careerPps"
   | "class"
-  | "race";
+  | "race"
+  | "bestDiscipline";
 
 export type QueryChipOperator = ">=" | "<=" | "=";
 
@@ -52,8 +58,15 @@ export const QUERY_CHIP_ATTRIBUTES: ReadonlyArray<QueryChipAttrMeta> = [
   { key: "spe", label: "SPE", kind: "number", digits: 0 },
   { key: "men", label: "MEN", kind: "number", digits: 0 },
   { key: "soc", label: "SOC", kind: "number", digits: 0 },
+  // Zusatz-Attribute (#Query-Chip-Erweiterung): CA (absolute Fähigkeit), Restlaufzeit
+  // (Vertragsjahre — "läuft aus" = Vertrag ≤ 1), Saison-Einsätze, All-Time-Karriere-PPs.
+  { key: "ca", label: "CA", kind: "number", digits: 1 },
+  { key: "contract", label: "Vertrag (J)", kind: "number", digits: 0 },
+  { key: "appearances", label: "Einsätze", kind: "number", digits: 0 },
+  { key: "careerPps", label: "All-Time-PPs", kind: "number", digits: 1 },
   { key: "class", label: "Klasse", kind: "category", digits: 0 },
   { key: "race", label: "Rasse", kind: "category", digits: 0 },
+  { key: "bestDiscipline", label: "Beste Diszi", kind: "category", digits: 0 },
 ];
 
 export type QueryChip = {
@@ -88,10 +101,22 @@ export function getQueryChipRowValue(row: FoundationPlayerScopeRow, attr: QueryC
     case "men":
     case "soc":
       return row.player.coreStats[attr] ?? null;
+    case "ca":
+      // CA = absolute, peak-gewichtete Fähigkeit aus den Kernwerten (gleiche Quelle wie Tabelle/Vergleich), kein OVR/PO.
+      return computeCurrentAbilityScore(row.player.coreStats);
+    case "contract":
+      // Verbleibende Vertragsjahre; Free Agents (kein Roster) haben keinen Vertrag → null.
+      return row.roster?.contractLength ?? null;
+    case "appearances":
+      return row.appearances;
+    case "careerPps":
+      return row.careerLeagueStats?.totalPps ?? null;
     case "class":
       return row.player.className;
     case "race":
       return row.player.race;
+    case "bestDiscipline":
+      return row.bestDiscipline;
     default:
       return null;
   }

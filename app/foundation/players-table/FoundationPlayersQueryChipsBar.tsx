@@ -39,6 +39,8 @@ export type FoundationPlayersQueryChipsBarProps = {
   onChipsChange: (chips: QueryChip[]) => void;
   classOptions: string[];
   raceOptions: string[];
+  /** Kategorien-Optionen für das Attribut "Beste Diszi" (aus den geladenen Zeilen abgeleitet). */
+  bestDisciplineOptions: string[];
 };
 
 export default function FoundationPlayersQueryChipsBar({
@@ -46,6 +48,7 @@ export default function FoundationPlayersQueryChipsBar({
   onChipsChange,
   classOptions,
   raceOptions,
+  bestDisciplineOptions,
 }: FoundationPlayersQueryChipsBarProps) {
   const [draftAttr, setDraftAttr] = useState<QueryChipAttr>("ovr");
   const [draftOperator, setDraftOperator] = useState<QueryChipOperator>(">=");
@@ -57,7 +60,14 @@ export default function FoundationPlayersQueryChipsBar({
 
   const activeAttrMeta = QUERY_CHIP_ATTRIBUTES.find((entry) => entry.key === draftAttr) ?? QUERY_CHIP_ATTRIBUTES[0]!;
   const isCategory = activeAttrMeta.kind === "category";
-  const categoryOptions = draftAttr === "class" ? classOptions : draftAttr === "race" ? raceOptions : [];
+  const categoryOptions =
+    draftAttr === "class"
+      ? classOptions
+      : draftAttr === "race"
+        ? raceOptions
+        : draftAttr === "bestDiscipline"
+          ? bestDisciplineOptions
+          : [];
 
   // Presets sind rein clientseitig — beim Mount aus localStorage laden (SSR-sicher via typeof-window-Guard in den Helfern).
   useEffect(() => {

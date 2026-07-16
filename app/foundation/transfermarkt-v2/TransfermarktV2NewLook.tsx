@@ -834,6 +834,27 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // enthüllt den Detail-Layer zusätzlich rein via CSS (kein State nötig).
   const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
 
+  // F(neu) — Quick/Erweitert-Split der Controls-Karte: nur Suche/Sortierung/
+  // Achsen-Pills bleiben inline ("Quick"), der Rest (Achs-Mindestwerte,
+  // Fit-Toggle, Ratio-Slider) klappt als "Erweitert"-Akkordeon auf — gleiches
+  // Disclosure-Muster wie das Kader-Achsen-Akkordeon weiter unten. Reine
+  // Layout-Reorganisation, sämtliche Filter-States/Handler bleiben unverändert.
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  // Anzahl aktiver Erweitert-Filter für die Kopfzeile ("Erweitert · N aktiv"):
+  // je Achs-Mindestwert > 0, plus Ratio-Filter und aktiver Fit-Filter.
+  const advancedActiveCount =
+    NL_MARKET_AXES.reduce((sum, axis) => sum + (axisMinimums[axis] > 0 ? 1 : 0), 0) +
+    (minRatioFilter > 0 ? 1 : 0) +
+    (hidePoorFit ? 1 : 0);
+
+  // F(neu) — Pin & Vergleich: ein angehefteter Kandidat bleibt gemerkt; sobald
+  // ein ANDERER Kandidat fokussiert wird, erscheint ein Zwei-Spieler-Vergleich
+  // (überlagerter NlRadar + paarige StatChips). Ohne Pin ändert sich nichts.
+  const [pinnedPlayerId, setPinnedPlayerId] = useState<string | null>(null);
+  const pinnedPlayer = pinnedPlayerId ? marketItemsById.get(pinnedPlayerId) ?? null : null;
+  const compareActive =
+    pinnedPlayer != null && selectedPlayer != null && pinnedPlayer.playerId !== selectedPlayer.playerId;
+
   // F4 — Team-Stärke: Ø POW/SPE/MEN/SOC über den ganzen Kader UND über die
   // besten `topSixCount` Werte je Achse (gleiche Top-6-Semantik wie der
   // Team-Impact via computeTopSixAxisAverage — keine erfundenen Werte).
@@ -1018,6 +1039,27 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               Reset
             </button>
           </div>
+          {/* F(neu) — Erweitert-Akkordeon: selten genutzte Feineinstellungen
+              (Achs-Mindestwerte, Fit-Toggle, Ratio-Slider) verstecken sich hier,
+              damit die Quick-Zeile (Suche/Sortierung/Achsen-Pills) schlank bleibt. */}
+          <div className="nl-market-advanced">
+            <button
+              type="button"
+              className="nl-market-advanced-toggle"
+              aria-expanded={advancedFiltersOpen}
+              aria-controls="nl-market-advanced-panel"
+              onClick={() => setAdvancedFiltersOpen((open) => !open)}
+            >
+              <span className="nl-market-advanced-title">Erweitert</span>
+              {advancedActiveCount > 0 ? (
+                <span className="nl-market-advanced-count">· {advancedActiveCount} aktiv</span>
+              ) : null}
+              <span className="nl-market-advanced-caret" aria-hidden="true">
+                {advancedFiltersOpen ? "▾" : "▸"}
+              </span>
+            </button>
+            {advancedFiltersOpen ? (
+              <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
           <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
             {NL_MARKET_AXES.map((axis) => {
               // Ein Mindestwert > 0 filtert eigenständig — kein separater Toggle mehr nötig.
@@ -1074,6 +1116,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 onChange={(event) => onMinRatioFilterChange(Number(event.target.value) || 0)}
               />
             </label>
+          </div>
+              </div>
+            ) : null}
           </div>
           {/* F2 — Gespeicherte Suchen: Chips zum Anwenden, Löschen je Preset,
               "Suche speichern" mit Inline-Namensfeld. Persistenz liegt im Client. */}
@@ -1471,6 +1516,76 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                   </div>
                 </div>
 
+                {/* F(neu) — Head-to-Head: angehefteter vs. fokussierter Kandidat als
+                    überlagerter Mehrserien-Radar (NlRadar generischer Modus) plus
+                    paarige StatChip-Zeilen (MW/CA/POW/SPE/MEN/SOC). Nur sichtbar,
+                    solange ein ANDERER Spieler angeheftet ist; über "Pin lösen"
+                    dismissbar. Werte fog-gated wie sonst (unbekannt → "—" bzw. 0 im Radar). */}
+                {compareActive && pinnedPlayer ? (
+                  <div className="nl-market-compare" aria-label="Kandidaten-Vergleich" data-testid="nl-market-compare">
+                    <div className="nl-market-compare-head">
+                      <span className="nl-market-eyebrow">Vergleich · angeheftet vs. Fokus</span>
+                      <button
+                        type="button"
+                        className="nl-market-inline-action"
+                        title="Pin lösen — Vergleich beenden."
+                        onClick={() => setPinnedPlayerId(null)}
+                      >
+                        Pin lösen
+                      </button>
+                    </div>
+                    <div className="nl-market-compare-radar">
+                      <NlRadar
+                        axisDefs={NL_MARKET_AXES.map((axis) => ({ key: axis, label: NL_AXIS_LABELS[axis] }))}
+                        series={[
+                          {
+                            id: "pinned",
+                            label: pinnedPlayer.name,
+                            tone: "accent",
+                            dashed: true,
+                            values: Object.fromEntries(NL_MARKET_AXES.map((axis) => [axis, pinnedPlayer[axis]])),
+                          },
+                          {
+                            id: "selected",
+                            label: selectedPlayer.name,
+                            tone: "good",
+                            values: Object.fromEntries(NL_MARKET_AXES.map((axis) => [axis, selectedPlayer[axis]])),
+                          },
+                        ]}
+                        max={100}
+                        aria-label={`Vergleich ${pinnedPlayer.name} gegen ${selectedPlayer.name} über POW/SPE/MEN/SOC`}
+                        className="nl-market-axis-radar"
+                      />
+                    </div>
+                    {[pinnedPlayer, selectedPlayer].map((item, index) => (
+                      <StatChipRow
+                        key={`nl-compare-${item.playerId}`}
+                        className={`nl-market-compare-row${index === 0 ? " is-pinned" : " is-selected"}`}
+                        label={index === 0 ? "Angeheftet" : "Fokus"}
+                        aria-label={`${item.name} Vergleichswerte`}
+                      >
+                        <StatChip label="MW" value={formatTransfermarktCurrency(item.marketValue)} tone="accent" />
+                        <StatChip
+                          label="CA"
+                          value={typeof item.ovr === "number" && Number.isFinite(item.ovr) ? formatNlNumber(item.ovr, 0) : "—"}
+                          tone="neutral"
+                        />
+                        {NL_MARKET_AXES.map((axis) => {
+                          const value = item[axis];
+                          return (
+                            <StatChip
+                              key={`nl-compare-${item.playerId}-${axis}`}
+                              label={NL_AXIS_LABELS[axis]}
+                              value={typeof value === "number" && Number.isFinite(value) ? formatNlNumber(value, 0) : "—"}
+                              tone={axis}
+                            />
+                          );
+                        })}
+                      </StatChipRow>
+                    ))}
+                  </div>
+                ) : null}
+
                 {/* Feinattribute (12) — nur wirklich freigeschaltete Werte (buildTransfermarktScoutedAttributeRows
                     filtert nach Scouting-Level exakt wie im alten Look); kein Fog-Placeholder für Unbekanntes. */}
                 {(() => {
@@ -1701,6 +1816,26 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     onClick={onToggleSelectedScoutingWatch}
                   >
                     {selectedPlayerScoutingWatched ? "Nicht mehr beobachten" : "Beobachten"}
+                  </button>
+                  {/* F(neu) — Pin für den Zwei-Kandidaten-Vergleich: heftet den
+                      aktuellen Spieler an; ein zweiter, danach fokussierter
+                      Kandidat öffnet den Head-to-Head weiter oben. Erneuter Klick
+                      auf denselben Spieler löst den Pin wieder. */}
+                  <button
+                    type="button"
+                    className={`nl-market-secondary-action${pinnedPlayerId === selectedPlayer.playerId ? " is-active" : ""}`}
+                    title={
+                      pinnedPlayerId === selectedPlayer.playerId
+                        ? "Pin lösen — Vergleich beenden."
+                        : "Diesen Kandidaten anheften, dann einen zweiten wählen und beide vergleichen."
+                    }
+                    onClick={() =>
+                      setPinnedPlayerId((current) =>
+                        current === selectedPlayer.playerId ? null : selectedPlayer.playerId,
+                      )
+                    }
+                  >
+                    {pinnedPlayerId === selectedPlayer.playerId ? "Angeheftet" : "Anheften"}
                   </button>
                 </div>
                 {selectedPlayerScoutCertainty != null ? (

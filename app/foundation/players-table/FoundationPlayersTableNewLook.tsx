@@ -104,6 +104,7 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  NL_TONE_VAR,
   useCountUp,
   type NlAxisKey,
   type NlRankingDrawerRow,
@@ -393,6 +394,49 @@ const NL_PLAYERS_COLUMNS: ReadonlyArray<{
   },
   { id: "traits", label: "Traits", sortKey: "traits", align: "left" },
 ];
+
+/**
+ * Trait-Chips (statt kommasepariertem Text): positive Traits im Good-Ton,
+ * negative im Risk-Ton. Kompakt (leben in einer Tabellenzelle), Inline-Styles
+ * über die vorhandenen Ton-Tokens (`NL_TONE_VAR`) — keine neue globals.css.
+ * Rendert nichts, wenn der Spieler keine Traits hat (Fallback "—" übernimmt der Aufrufer).
+ */
+function renderTraitChips(traitsPositive: string[], traitsNegative: string[]) {
+  const entries: Array<{ label: string; tone: "good" | "risk" }> = [
+    ...traitsPositive.map((label) => ({ label, tone: "good" as const })),
+    ...traitsNegative.map((label) => ({ label, tone: "risk" as const })),
+  ];
+  if (entries.length === 0) {
+    return null;
+  }
+  return (
+    <span style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+      {entries.map((entry, index) => {
+        const tone = NL_TONE_VAR[entry.tone];
+        return (
+          <span
+            key={`${entry.tone}-${entry.label}-${index}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "1px 6px",
+              borderRadius: "999px",
+              lineHeight: 1.45,
+              fontSize: "var(--nl-fs-xs)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)`,
+              background: `color-mix(in srgb, ${tone} 14%, transparent)`,
+              color: `color-mix(in srgb, ${tone} 80%, var(--nl-ink))`,
+            }}
+          >
+            {entry.label}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 const NL_PLAYERS_PAGE_SIZE = 100;
 
@@ -728,6 +772,15 @@ export default function FoundationPlayersTableNewLook({
   /** Rasse-Optionen für den Query-Chip-Builder — aus denselben `rows` wie die bestehenden Klassen-Optionen. */
   const raceOptions = useMemo(
     () => Array.from(new Set(rows.map((row) => row.player.race))).sort((left, right) => left.localeCompare(right)),
+    [rows],
+  );
+
+  /** Beste-Disziplin-Optionen für den Query-Chip-Kategorie-Picker — nur real vorkommende Labels (kein erfundener Katalog). */
+  const bestDisciplineOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(rows.map((row) => row.bestDiscipline).filter((label): label is string => Boolean(label))),
+      ).sort((left, right) => left.localeCompare(right)),
     [rows],
   );
 
@@ -1467,7 +1520,8 @@ export default function FoundationPlayersTableNewLook({
         ) : null}
         {isColumnVisible("traits") ? (
         <td className={`nl-players-td-traits${sortCellClass("traits")}`} title={traitsText}>
-          {traitsText}
+          {/* Trait-Chips statt Kommatext: positiv = Good-Ton, negativ = Risk-Ton (Fallback "—"). */}
+          {renderTraitChips(row.player.traitsPositive, row.player.traitsNegative) ?? "—"}
         </td>
         ) : null}
       </tr>
@@ -1819,6 +1873,7 @@ export default function FoundationPlayersTableNewLook({
           onChipsChange={setQueryChips}
           classOptions={playerClassOptions}
           raceOptions={raceOptions}
+          bestDisciplineOptions={bestDisciplineOptions}
         />
       ) : null}
 

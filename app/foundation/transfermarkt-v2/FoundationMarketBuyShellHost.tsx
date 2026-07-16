@@ -9,7 +9,7 @@ import {
   NlMarketBeforeAfterRow,
   NlMarketChanceBar,
 } from "@/app/foundation/transfermarkt-v2/TransfermarktV2NewLook";
-import { NlCard, StatChip, StatChipRow } from "@/components/foundation/new-look";
+import { NlCard, NlCountUpValue, StatChip, StatChipRow } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractShape, Team, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
@@ -325,9 +325,38 @@ export default function FoundationMarketBuyShellHost({
                 </div>
               ) : null}
               {buySuccess ? (
-                <div className="transfer-feedback-banner is-success">
+                // F2 — "VERPFLICHTET"-Moment: statt statischer Erfolgsmeldung
+                // zählen Ablöse + Gehalt aus der Buy-Preview hoch (NlCountUpValue,
+                // respektiert prefers-reduced-motion) und die Karte fährt über das
+                // Kit-Primitiv `.nl-reveal` dezent ein.
+                <div
+                  className="transfer-feedback-banner is-success market-v2-buy-signed nl-reveal"
+                  data-testid="market-v2-buy-signed"
+                  role="status"
+                  aria-live="polite"
+                >
                   <strong>Kauf erfolgreich</strong>
                   <span>{buySuccess}</span>
+                  {buyPreview ? (
+                    <div className="market-v2-buy-signed-figures" aria-label="Ablöse und Gehalt">
+                      <span className="market-v2-buy-signed-figure">
+                        <small>Ablöse</small>
+                        <NlCountUpValue
+                          value={buyPreview.purchasePrice}
+                          format={(value) => formatTransfermarktCurrency(value)}
+                          className="market-v2-buy-signed-value nl-tnum"
+                        />
+                      </span>
+                      <span className="market-v2-buy-signed-figure">
+                        <small>Gehalt p.a.</small>
+                        <NlCountUpValue
+                          value={buyPreview.expectedSalary ?? null}
+                          format={(value) => formatTransfermarktCurrency(value)}
+                          className="market-v2-buy-signed-value nl-tnum"
+                        />
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {source !== "sqlite" ? (
