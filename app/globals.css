@@ -2808,6 +2808,45 @@ a {
   font-size: 0.78rem;
 }
 
+/* Kompakter Multiplayer-Room-Chip: schlanke Pill-Zeile am rechten Rand des
+   Kontext-Banners statt großem, zentralem Block. `order` schiebt den Chip an
+   das Ende der Flex-Zeile, `margin-left: auto` hält ihn bündig an der Kante. */
+.foundation-room-chip {
+  order: 5;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  max-width: 100%;
+  padding: 3px 5px 3px 4px;
+  border: 1px solid rgba(93, 143, 214, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.foundation-room-chip .pill {
+  padding: 3px 9px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.foundation-room-chip-code {
+  font-weight: 600;
+}
+
+.foundation-room-chip-participant {
+  overflow: hidden;
+  max-width: 12ch;
+  text-overflow: ellipsis;
+}
+
+.foundation-room-chip-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
 .foundation-flow-controller {
   position: relative;
   display: grid;
