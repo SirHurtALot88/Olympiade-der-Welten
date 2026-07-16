@@ -12,6 +12,7 @@ function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
     dbI: 7,
     dbII: 5,
     avgPrice: 10,
+    rank: null,
     ...overrides,
   };
 }
@@ -22,6 +23,11 @@ function article(nameRaw: string, overrides: Partial<ArticleAggregate> = {}): Ar
     nameRaw,
     setCode: null,
     packQty: 1,
+    stock: 0,
+    active: true,
+    currentVk: null,
+    currentEk: null,
+    latestMarketTrend: null,
     windows: {},
     ...overrides,
   };
@@ -104,8 +110,35 @@ describe("buildDashboardViewModel", () => {
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.sortiment).toHaveLength(1);
-    expect(vm.sortiment[0].vk).toBeCloseTo(10);
+    expect(vm.sortiment[0].avgVkRealized).toBeCloseTo(10);
     expect(vm.sortiment[0].corridor.good).toBeGreaterThan(vm.sortiment[0].corridor.min);
+  });
+
+  it("nutzt den aktuellen Listen-VK (nicht den realisierten Ø-VK) fuer den Preis-Korridor-Vergleich", () => {
+    // Methodik-Klarstellung: DB I/II rechnen mit dem realisierten Ø-VK, aber
+    // die "zu teuer/guenstig"-Ampel prueft den AKTUELLEN Listenpreis aus dem
+    // Billbee-Artikelstamm-Export gegen den Korridor.
+    const articles: ArticleAggregate[] = [
+      article("Karte", {
+        currentVk: 1, // deutlich unter dem MIN-Korridor -> "unter_min"
+        windows: { "365": agg({ qty: 10, revenue: 100, ek: 30, avgPrice: 10 }) }, // realisierter Ø-VK 10 waere "im_korridor"
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment[0].avgVkRealized).toBeCloseTo(10);
+    expect(vm.sortiment[0].listingVk).toBeCloseTo(1);
+    expect(vm.sortiment[0].priceStatus).toBe("unter_min");
+  });
+
+  it("gibt `active` aus dem Billbee-Artikelstamm-Import durch (Ladenhueter-Klassifikation bleibt unabhaengig davon)", () => {
+    const articles: ArticleAggregate[] = [
+      article("Ausgelaufen", {
+        active: false,
+        windows: { all: agg({ qty: 5, revenue: 50 }) },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment[0].active).toBe(false);
   });
 
   it("berechnet Warenquote/Betriebsausgabenquote aus dem 365-Tage-Fenster", () => {
@@ -132,5 +165,33 @@ describe("buildDashboardViewModel", () => {
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(true);
+  });
+
+  it("erzeugt fuer JEDEN Low-Runner eine eigene Auslisten-Empfehlung (nicht nur den schlimmsten)", () => {
+    const articles: ArticleAggregate[] = [
+      article("Verlust A", {
+        windows: { all: agg({ qty: 5, revenue: 50, dbII: -20 }), "365": agg({ qty: 5, revenue: 50, dbII: -20 }) },
+      }),
+      article("Verlust B", {
+        windows: { all: agg({ qty: 5, revenue: 50, dbII: -80 }), "365": agg({ qty: 5, revenue: 50, dbII: -80 }) },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const auslisten = vm.recommendations.filter((r) => r.kind === "auslisten");
+    expect(auslisten).toHaveLength(2);
+    // Sortierung nach |€-Effekt| absteigend -> der groessere Verlust zuerst.
+    expect(auslisten[0].title).toContain("Verlust B");
+  });
+
+  it("buendelt Ladenhueter zu GENAU einem Sammel-Eintrag mit aufklappbarer Artikelliste", () => {
+    const articles: ArticleAggregate[] = [
+      article("Ladenhueter A", { windows: { all: agg({ qty: 3, revenue: 30, ek: 10 }) } }),
+      article("Ladenhueter B", { windows: { all: agg({ qty: 2, revenue: 20, ek: 15 }) } }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const lots = vm.recommendations.filter((r) => r.kind === "lot_bilden");
+    expect(lots).toHaveLength(1);
+    expect(lots[0].items).toHaveLength(2);
+    expect(lots[0].effectValue).toBeCloseTo(25); // 10 + 15 gebundener EK
   });
 });

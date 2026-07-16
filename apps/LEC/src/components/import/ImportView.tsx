@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UploadZone } from "./UploadZone";
+import { BillbeeArtikelUpload } from "./BillbeeArtikelUpload";
 import { ImportSummaryCard } from "./ImportSummaryCard";
 import { ReviewRow } from "./ReviewRow";
 import type { ImportSummary, OpenReviewItem } from "./types";
@@ -16,12 +17,13 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
   const router = useRouter();
   const [billbeeFiles, setBillbeeFiles] = useState<File[]>([]);
   const [ebayFile, setEbayFile] = useState<File | null>(null);
+  const [billbeeArtikelFile, setBillbeeArtikelFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [reviewItems, setReviewItems] = useState<OpenReviewItem[]>(initialReviewItems);
 
-  const canUpload = billbeeFiles.length > 0 || ebayFile !== null;
+  const canUpload = billbeeFiles.length > 0 || ebayFile !== null || billbeeArtikelFile !== null;
 
   async function handleUpload() {
     setUploading(true);
@@ -30,6 +32,7 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
       const form = new FormData();
       for (const f of billbeeFiles) form.append("billbee", f);
       if (ebayFile) form.append("ebay", ebayFile);
+      if (billbeeArtikelFile) form.append("billbeeArtikel", billbeeArtikelFile);
 
       const res = await fetch("/api/import", { method: "POST", body: form });
       const data = await res.json();
@@ -41,6 +44,7 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
       setSummary(data.summary as ImportSummary);
       setBillbeeFiles([]);
       setEbayFile(null);
+      setBillbeeArtikelFile(null);
       // Frische Review-Liste laden (Server-Komponente neu rendern).
       router.refresh();
       const reviewRes = await fetch("/api/review/list");
@@ -69,6 +73,8 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
         onRemoveBillbee={(index) => setBillbeeFiles((prev) => prev.filter((_, i) => i !== index))}
         disabled={uploading}
       />
+
+      <BillbeeArtikelUpload file={billbeeArtikelFile} onSetFile={setBillbeeArtikelFile} disabled={uploading} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <button

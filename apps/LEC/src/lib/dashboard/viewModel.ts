@@ -12,6 +12,7 @@ export interface WindowAggregate {
   dbI: number;
   dbII: number;
   avgPrice: number;
+  rank: number | null;
 }
 
 export interface ArticleAggregate {
@@ -19,6 +20,22 @@ export interface ArticleAggregate {
   nameRaw: string;
   setCode: string | null;
   packQty: number;
+  /** Lagerbestand (Stk), aus dem Billbee-Artikelstamm-Import ("Stock current Standard"). 0, solange
+   * der Artikel dort (noch) nicht vorkommt -- siehe `active`. */
+  stock: number;
+  /** true = im juengsten Billbee-Artikelstamm-Export vorhanden (aktueller Katalog). false = nur aus
+   * der Verkaufshistorie bekannt -> ausgelaufen/nicht mehr im Sortiment. */
+  active: boolean;
+  /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
+   * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
+   * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
+   * Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig") den aktuellen Listenpreis gegenprueft
+   * (Repricing-Frage), nicht den historischen Durchschnitt.
+   */
+  currentVk: number | null;
+  currentEk: number | null;
+  /** Cardmarket-Preistrend aus dem juengsten MarketPrice-Datensatz, sonst null ("—"). */
+  latestMarketTrend: number | null;
   windows: Partial<Record<SaleWindowKey, WindowAggregate>>;
 }
 
@@ -56,17 +73,52 @@ export interface MoverItem {
   dbIIPercent: number;
 }
 
+/** Kennzahlen je Zeitfenster fuer Chris' Dashboard-Spalten (PAGES_CONCEPT §B). */
+export interface SortimentWindowMetrics {
+  qty: number;
+  revenue: number;
+  avgPrice: number;
+  rank: number | null;
+}
+
 export interface SortimentRow {
   articleId: string;
   nameRaw: string;
   setCode: string | null;
   velocity: [number, number, number]; // 30 / 90 / 365
   revenue365: number;
-  vk: number;
+  /** REALISIERTER, gewichteter Ø-VK der Referenz-Periode (SaleWindow.avgPrice) -- Basis der Marge/DB,
+   * NICHT fuer den Preis-Korridor-Vergleich (dafuer `listingVk`). */
+  avgVkRealized: number;
+  /** Aktueller Listen-VK aus dem Billbee-Artikelstamm-Export, null wenn der Artikel dort (noch) nicht
+   * gepflegt ist. Basis fuer den Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig"). */
+  listingVk: number | null;
+  /** Realisierter EK je Stk (Referenz-Periode) -- Basis der Marge/DB (HK-Grundlage). */
+  ek: number;
+  /** Aktueller Listen-EK aus dem Artikelstamm-Export, rein informativ (Repricing), null falls unbekannt. */
+  currentEk: number | null;
   corridor: { min: number; good: number };
+  /** Ampel-Status: vergleicht den AKTUELLEN Listen-VK (Fallback: realisierter Ø-VK, wenn kein
+   * Artikelstamm-Preis vorliegt) gegen den Korridor. */
   priceStatus: ReturnType<typeof classifyPriceStatus>;
   articleClass: ArticleClass;
   classLabel: string;
+  /** DB I / DB II je verkauftem Stueck (Referenz-Periode, REALISIERT), DB II % gleiche Basis wie Klassifikation. */
+  dbIPerUnit: number;
+  dbIIPerUnit: number;
+  dbIIPercent: number;
+  /** Rank/Verkaeufe/Umsatz/Ø-Preis je Fenster (30/90/365/all) fuer die Dashboard-Spalten. */
+  windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
+  /** true = im aktuellen Billbee-Artikelstamm-Katalog (nicht ausgelaufen). */
+  active: boolean;
+  /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
+  stock: number;
+  /** Stk x aktueller Listen-VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
+  potentialRevenue: number | null;
+  /** Bestandsreichweite in Monaten (Stk / Verkaeufe pro Monat aus 90T), null ohne Bestand/Velocity. */
+  stockMonthsCover: number | null;
+  /** Cardmarket-Preistrend (aus MarketPrice), null wenn noch nicht erfasst -> "—". */
+  priceTrend: number | null;
 }
 
 export interface OperatingQuotas {
@@ -76,11 +128,26 @@ export interface OperatingQuotas {
   targetBetriebsausgabenquote: number;
 }
 
+export interface RecommendationLotItem {
+  articleId: string;
+  nameRaw: string;
+  setCode: string | null;
+  boundCapital: number;
+}
+
 export interface Recommendation {
+  /** Stabile ID fuer clientseitiges "Ausblenden" (localStorage, /empfehlungen). */
+  id: string;
   kind: "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
   title: string;
   detail: string;
   effect: string;
+  /** Numerischer Betrag hinter `effect` -- Basis fuer "Sortierung nach €-Effekt" (PAGES_CONCEPT §4). */
+  effectValue: number;
+  /** Suchbegriff fuer den Link zu /sortiment?q=… (nicht bei kind === "lot_bilden", das verlinkt nicht 1:1). */
+  linkQuery?: string;
+  /** Nur bei kind === "lot_bilden": aufklappbare Ladenhüter-Artikelliste (nicht 900 Einzelzeilen). */
+  items?: RecommendationLotItem[];
 }
 
 export interface DashboardViewModel {
@@ -91,7 +158,7 @@ export interface DashboardViewModel {
   sortiment: SortimentRow[];
   quotas: OperatingQuotas;
   recommendations: Recommendation[];
-  totals: { articleCount: number; cardArticleCount: number };
+  totals: { articleCount: number; cardArticleCount: number; marketPriceCount: number };
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -143,16 +210,7 @@ export function buildDashboardViewModel(
   };
 
   // Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1).
-  const classified = articles.map((a) => {
-    const c = classifyArticle({
-      qty30d: a.windows["30"]?.qty ?? 0,
-      qty90d: a.windows["90"]?.qty ?? 0,
-      qty365d: a.windows["365"]?.qty ?? 0,
-      qtyAllTime: a.windows.all?.qty ?? 0,
-      dbIIPercent: pct(a.windows.all?.dbII ?? 0, a.windows.all?.revenue ?? 1),
-    });
-    return { article: a, ...c };
-  });
+  const classified = classifyArticles(articles);
 
   // Laeuft gerade gut: Top-Bewegung 30 Tage unter den Artikeln mit positivem DB I.
   const moversGood: MoverItem[] = articles
@@ -172,25 +230,11 @@ export function buildDashboardViewModel(
     .slice(0, 4)
     .map((a) => toMoverItem(a, "all"));
 
-  // Sortiment-Tabelle: primär nach AKTUELLER Velocity (90d, dann 30d) sortiert,
-  // Umsatz nur als Tiebreaker -- NICHT nach Lebenszeit-/365T-Umsatz sortieren,
-  // sonst dominieren eingebrochene Alt-Renner ("Bundles waren mal stark,
-  // sind es aktuell aber nicht mehr", KONZEPT §2). "Läuft gut jetzt" statt
-  // "lief mal gut": aktive Artikel zuerst, Ladenhüter fallen ans Ende.
-  const sortiment: SortimentRow[] = articles
-    .filter((a) => (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0) > 0)
-    .sort((a, b) => {
-      const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
-      if (qty90Diff !== 0) return qty90Diff;
-      const qty30Diff = (b.windows["30"]?.qty ?? 0) - (a.windows["30"]?.qty ?? 0);
-      if (qty30Diff !== 0) return qty30Diff;
-      return (
-        (b.windows["365"]?.revenue ?? b.windows.all?.revenue ?? 0) -
-        (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
-      );
-    })
-    .slice(0, 20)
-    .map((a) => buildSortimentRow(a, classified.find((c) => c.article === a)!.articleClass, costSettings));
+  // Vollstaendige Sortiment-Liste (PAGES_CONCEPT Vorarbeit: kein slice(0,20)/
+  // revenue>0-Filter mehr -- Ladenhueter mit 0 € muessen auf /sortiment
+  // sichtbar sein). Die Dashboard-Vorschau schneidet clientseitig auf die
+  // ersten N Zeilen (siehe SortimentTable `limit`-Prop).
+  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings);
 
   const quotaWindow = windows["365"].revenue > 0 ? windows["365"] : windows.all;
   const quotaAgg = articles.reduce(
@@ -222,12 +266,26 @@ export function buildDashboardViewModel(
     sortiment,
     quotas,
     recommendations,
-    totals: { articleCount: articles.length, cardArticleCount: articles.length },
+    totals: {
+      articleCount: articles.length,
+      cardArticleCount: articles.length,
+      marketPriceCount: articles.filter((a) => a.latestMarketTrend !== null).length,
+    },
   };
 }
 
 function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
-  const agg = a.windows[window] ?? { qty: 0, revenue: 0, ek: 0, dbI: 0, dbII: 0, ebayFeeTotal: 0, shippingCost: 0, avgPrice: 0 };
+  const agg = a.windows[window] ?? {
+    qty: 0,
+    revenue: 0,
+    ek: 0,
+    dbI: 0,
+    dbII: 0,
+    ebayFeeTotal: 0,
+    shippingCost: 0,
+    avgPrice: 0,
+    rank: null,
+  };
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
@@ -240,22 +298,75 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
   };
 }
 
-function buildSortimentRow(
+export interface ClassifiedArticle {
+  article: ArticleAggregate;
+  articleClass: ArticleClass;
+  label: string;
+  reason: string;
+}
+
+/** Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1) -- wiederverwendbarer Baustein. */
+export function classifyArticles(articles: ArticleAggregate[]): ClassifiedArticle[] {
+  return articles.map((a) => {
+    const c = classifyArticle({
+      qty30d: a.windows["30"]?.qty ?? 0,
+      qty90d: a.windows["90"]?.qty ?? 0,
+      qty365d: a.windows["365"]?.qty ?? 0,
+      qtyAllTime: a.windows.all?.qty ?? 0,
+      dbIIPercent: pct(a.windows.all?.dbII ?? 0, a.windows.all?.revenue ?? 1),
+    });
+    return { article: a, ...c };
+  });
+}
+
+/** Monatliche Verkaufsgeschwindigkeit aus dem 90-Tage-Fenster (90 T ≈ 3 Monate). */
+function monthlyVelocity(a: ArticleAggregate): number {
+  return (a.windows["90"]?.qty ?? 0) / 3;
+}
+
+/**
+ * Baut die Sortiment-Zeile eines Artikels -- wiederverwendbarer Baustein
+ * (PAGES_CONCEPT Vorarbeit), genutzt von Dashboard-Vorschau UND `/sortiment`.
+ */
+export function buildSortimentRow(
   a: ArticleAggregate,
   articleClass: ArticleClass,
   costSettings: CostSettingsValues
 ): SortimentRow {
   const referenceAgg = a.windows["365"] ?? a.windows.all;
-  const vk = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.avgPrice : 0;
+  // REALISIERTER Ø-VK/EK der Referenz-Periode -- Basis der Marge/DB, siehe
+  // Methodik-Hinweis an SortimentRow.avgVkRealized.
+  const avgVkRealized = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.avgPrice : 0;
   const ekPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.ek / referenceAgg.qty : 0;
   const kind: ItemKind = a.packQty > 1 ? "pack" : "single";
+
+  // Aktueller Listen-VK (Billbee-Artikelstamm) ist die Basis fuer den
+  // Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig ggue. MIN/GUT bzw.
+  // Markt"); ohne Artikelstamm-Datensatz faellt das auf den realisierten
+  // Ø-VK zurueck (bisheriges Verhalten fuer Artikel ohne Bestandsimport).
+  const listingVk = a.currentVk !== null && a.currentVk > 0 ? a.currentVk : null;
+  const vkForCorridor = listingVk ?? avgVkRealized;
 
   const hk = computeHk(
     { ek: ekPerUnit, kind, packSize: a.packQty, fixedCostPerUnit: 0 },
     costSettings
   );
-  const corridor = computePriceCorridor(hk.total, vk || hk.total, costSettings);
-  const priceStatus = vk > 0 ? classifyPriceStatus(vk, corridor) : "im_korridor";
+  const corridor = computePriceCorridor(hk.total, vkForCorridor || hk.total, costSettings);
+  const priceStatus = vkForCorridor > 0 ? classifyPriceStatus(vkForCorridor, corridor) : "im_korridor";
+
+  const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
+  const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
+  const dbIIPercent = referenceAgg && referenceAgg.revenue > 0 ? referenceAgg.dbII / referenceAgg.revenue : 0;
+
+  const windowMetrics: SortimentRow["windows"] = {};
+  for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
+    const agg = a.windows[key];
+    if (!agg) continue;
+    windowMetrics[key] = { qty: agg.qty, revenue: agg.revenue, avgPrice: agg.avgPrice, rank: agg.rank };
+  }
+
+  const velocityPerMonth = monthlyVelocity(a);
+  const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
 
   return {
     articleId: a.articleId,
@@ -263,15 +374,54 @@ function buildSortimentRow(
     setCode: a.setCode,
     velocity: [a.windows["30"]?.qty ?? 0, a.windows["90"]?.qty ?? 0, a.windows["365"]?.qty ?? 0],
     revenue365: a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0,
-    vk,
+    avgVkRealized,
+    listingVk,
+    ek: ekPerUnit,
+    currentEk: a.currentEk,
     corridor: { min: corridor.vkMin, good: corridor.vkGood },
     priceStatus,
     articleClass,
     classLabel: LABELS_DE[articleClass],
+    dbIPerUnit,
+    dbIIPerUnit,
+    dbIIPercent,
+    windows: windowMetrics,
+    active: a.active,
+    stock: a.stock,
+    potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
+    stockMonthsCover,
+    priceTrend: a.latestMarketTrend,
   };
 }
 
-const LABELS_DE: Record<ArticleClass, string> = {
+/**
+ * Vollstaendige Sortiment-Liste, KEIN Filter/Slice (PAGES_CONCEPT Vorarbeit) --
+ * Ladenhüter mit 0 € Umsatz muessen auf `/sortiment` sichtbar sein. Default-
+ * Sortierung: aktuelle Velocity (90d, dann 30d) vor Lebenszeit-/365T-Umsatz,
+ * siehe Kommentar in `buildDashboardViewModel` (Bundle-Falle KONZEPT §2).
+ */
+export function buildFullSortiment(
+  articles: ArticleAggregate[],
+  classified: ClassifiedArticle[],
+  costSettings: CostSettingsValues
+): SortimentRow[] {
+  const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
+  return [...articles]
+    .sort((a, b) => {
+      const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
+      if (qty90Diff !== 0) return qty90Diff;
+      const qty30Diff = (b.windows["30"]?.qty ?? 0) - (a.windows["30"]?.qty ?? 0);
+      if (qty30Diff !== 0) return qty30Diff;
+      return (
+        (b.windows["365"]?.revenue ?? b.windows.all?.revenue ?? 0) -
+        (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
+      );
+    })
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings));
+}
+
+/** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
+export const LABELS_DE: Record<ArticleClass, string> = {
   champion: "Champion",
   solide: "Solide",
   beobachten: "Beobachten",
@@ -280,58 +430,99 @@ const LABELS_DE: Record<ArticleClass, string> = {
   ladenhueter: "Ladenhüter",
 };
 
-function buildRecommendations(
+const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
+  auslisten: 0,
+  preis_anpassen: 1,
+  nachkaufen: 2,
+  lot_bilden: 3,
+};
+
+/**
+ * Baut ALLE Handlungsempfehlungen (nicht nur ein Beispiel je Typ) --
+ * PAGES_CONCEPT §4: vollstaendige Liste fuer `/empfehlungen`, priorisiert nach
+ * €-Effekt. Das Dashboard zeigt davon nur die ersten 4 (Top-4 + "Alle
+ * ansehen"-Teaser, siehe DashboardShell/Recommendations).
+ */
+export function buildRecommendations(
   classified: Array<{ article: ArticleAggregate; articleClass: ArticleClass; reason: string }>,
   sortiment: SortimentRow[]
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
 
-  const lowRunner = classified
-    .filter((c) => c.articleClass === "low_runner")
-    .sort((a, b) => (a.article.windows.all?.dbII ?? 0) - (b.article.windows.all?.dbII ?? 0))[0];
-  if (lowRunner) {
+  // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
+  for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
+    const dbIILifetime = c.article.windows.all?.dbII ?? 0;
     recommendations.push({
+      id: `auslisten:${c.article.articleId}`,
       kind: "auslisten",
-      title: `${shortName(lowRunner.article.nameRaw)} auslisten.`,
-      detail: lowRunner.reason,
-      effect: `bindet € ${Math.abs(lowRunner.article.windows.all?.dbII ?? 0).toFixed(0)}`,
+      title: `${shortName(c.article.nameRaw)} auslisten.`,
+      detail: c.reason,
+      effect: `bindet € ${Math.abs(dbIILifetime).toFixed(0)}`,
+      effectValue: Math.abs(dbIILifetime),
+      linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
   }
 
-  const priceAlert = sortiment.find((s) => s.priceStatus === "unter_min");
-  if (priceAlert) {
+  // Preis anpassen: JEDER Artikel unter dem MIN-Korridor.
+  for (const s of sortiment.filter((s) => s.priceStatus === "unter_min")) {
+    const alertVk = s.listingVk ?? s.avgVkRealized;
+    const gap = s.corridor.min - alertVk;
     recommendations.push({
+      id: `preis_anpassen:${s.articleId}`,
       kind: "preis_anpassen",
-      title: `${shortName(priceAlert.nameRaw)} VK anheben.`,
-      detail: `Aktueller VK ${priceAlert.vk.toFixed(2)} € liegt unter dem MIN-Korridor ${priceAlert.corridor.min.toFixed(2)} €.`,
-      effect: `+ € ${(priceAlert.corridor.min - priceAlert.vk).toFixed(2)} / Stk`,
+      title: `${shortName(s.nameRaw)} VK anheben.`,
+      detail: `Aktueller VK ${alertVk.toFixed(2)} € liegt unter dem MIN-Korridor ${s.corridor.min.toFixed(2)} €.`,
+      effect: `+ € ${gap.toFixed(2)} / Stk`,
+      effectValue: gap,
+      linkQuery: s.setCode ?? s.nameRaw,
     });
   }
 
-  const champion = classified
-    .filter((c) => c.articleClass === "champion")
-    .sort((a, b) => (b.article.windows["30"]?.revenue ?? 0) - (a.article.windows["30"]?.revenue ?? 0))[0];
-  if (champion) {
+  // Nachkaufen: JEDER Champion.
+  for (const c of classified.filter((c) => c.articleClass === "champion")) {
+    const dbIILifetime = c.article.windows.all?.dbII ?? 0;
+    const dbIIPercentLifetime = pct(dbIILifetime, c.article.windows.all?.revenue ?? 1);
     recommendations.push({
+      id: `nachkaufen:${c.article.articleId}`,
       kind: "nachkaufen",
-      title: `${shortName(champion.article.nameRaw)} nachkaufen.`,
-      detail: champion.reason,
-      effect: `DB II ${(pct(champion.article.windows.all?.dbII ?? 0, champion.article.windows.all?.revenue ?? 1) * 100).toFixed(0)}%`,
+      title: `${shortName(c.article.nameRaw)} nachkaufen.`,
+      detail: c.reason,
+      effect: `DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · € ${dbIILifetime.toFixed(0)}`,
+      effectValue: Math.abs(dbIILifetime),
+      linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
   }
 
-  const ladenhueterCount = classified.filter((c) => c.articleClass === "ladenhueter").length;
-  if (ladenhueterCount > 0) {
-    const boundCapital = classified
-      .filter((c) => c.articleClass === "ladenhueter")
-      .reduce((sum, c) => sum + (c.article.windows.all?.ek ?? 0), 0);
+  // Ladenhüter: EIN Sammel-Eintrag mit aufklappbarer Artikelliste (nicht
+  // hunderte Einzelzeilen) -- Liste auf die groessten Kapitalbinder gedeckelt,
+  // vollstaendige Aufschluesselung ueber /sortiment?klasse=ladenhueter.
+  const ladenhueter = classified.filter((c) => c.articleClass === "ladenhueter");
+  if (ladenhueter.length > 0) {
+    const items: RecommendationLotItem[] = ladenhueter
+      .map((c) => ({
+        articleId: c.article.articleId,
+        nameRaw: c.article.nameRaw,
+        setCode: c.article.setCode,
+        boundCapital: c.article.windows.all?.ek ?? 0,
+      }))
+      .sort((a, b) => b.boundCapital - a.boundCapital);
+    const boundCapital = items.reduce((sum, i) => sum + i.boundCapital, 0);
     recommendations.push({
+      id: "lot_bilden",
       kind: "lot_bilden",
       title: "Ladenhüter zu Lots bündeln.",
-      detail: `${ladenhueterCount} Artikel ohne Velocity — als Sammlungs-Lot abverkaufen.`,
+      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
+      effectValue: boundCapital,
+      items: items.slice(0, 50),
     });
   }
+
+  recommendations.sort((a, b) => {
+    const diff = Math.abs(b.effectValue) - Math.abs(a.effectValue);
+    if (diff !== 0) return diff;
+    return RECOMMENDATION_KIND_PRIORITY[a.kind] - RECOMMENDATION_KIND_PRIORITY[b.kind];
+  });
 
   return recommendations;
 }

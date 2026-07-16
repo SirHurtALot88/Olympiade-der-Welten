@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ImportPlan } from "./importPlan";
 import type { SaleWindowKey } from "../parsing/date";
+import type { BillbeeArtikelRow } from "../importers/billbeeArtikel";
 
 export interface PersistResult {
   articlesUpserted: number;
@@ -151,4 +152,53 @@ export async function persistImportPlan(
     reviewItemsCreated,
     reviewItemsOpen,
   };
+}
+
+export interface PersistBillbeeArtikelResult {
+  upserted: number;
+  activeCount: number;
+}
+
+/**
+ * Persistiert einen Billbee-Artikelstamm-Import (Chris' Ergaenzung, siehe
+ * billbeeArtikel.ts): matcht ueber denselben Namens-Normalisierer wie die
+ * Verkaufsdaten (nameNormalized) und aktualisiert/erzeugt Article-Datensaetze
+ * mit Bestand, aktuellem VK/EK und `active=true`. ALLE Zeilen dieses Exports
+ * gelten als aktiv (Chris' Vorgabe) -- Artikel, die nur in der reinen
+ * Verkaufshistorie stehen (nicht in diesem Export), bleiben `active=false`
+ * ("ausgelaufen") und werden hier bewusst NICHT zurueckgesetzt.
+ */
+export async function persistBillbeeArtikel(
+  prisma: PrismaClient,
+  rows: BillbeeArtikelRow[]
+): Promise<PersistBillbeeArtikelResult> {
+  let upserted = 0;
+  for (const row of rows) {
+    await prisma.article.upsert({
+      where: { nameNormalized: row.nameNormalized },
+      create: {
+        nameNormalized: row.nameNormalized,
+        nameRaw: row.nameRaw,
+        setCode: row.setCode,
+        packQty: row.packQty,
+        isCard: row.isCard,
+        stock: row.stock,
+        active: true,
+        currentVk: row.currentVk,
+        currentEk: row.currentEk,
+      },
+      update: {
+        nameRaw: row.nameRaw,
+        setCode: row.setCode,
+        packQty: row.packQty,
+        isCard: row.isCard,
+        stock: row.stock,
+        active: true,
+        currentVk: row.currentVk,
+        currentEk: row.currentEk,
+      },
+    });
+    upserted++;
+  }
+  return { upserted, activeCount: rows.length };
 }

@@ -7,4 +7,5 @@ export interface ArticleSearchResult {
   id: string;
   nameRaw: string;
   setCode: string | null;
+  packQty: number;
 }

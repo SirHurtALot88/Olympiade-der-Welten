@@ -46,6 +46,17 @@ export function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
             </span>
           </div>
         )}
+        {summary.billbeeArtikel && (
+          <div style={{ display: "flex", gap: 10, color: "var(--muted)" }}>
+            <span className="pill p-good" style={{ flex: "none" }}>
+              Artikelstamm
+            </span>
+            <span>
+              {summary.billbeeArtikel.fileName} · {summary.billbeeArtikel.rowCount} Zeilen ·{" "}
+              {summary.billbeeArtikel.activeCount} aktiv gesetzt (Bestand + VK/EK aktualisiert)
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
