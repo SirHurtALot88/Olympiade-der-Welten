@@ -153,18 +153,32 @@ const THEME_FIT_VALUE = 12;
 const COMPOSITION_VALUE = 34;
 const COMPOSITION_OVERAGE_PENALTY = 8;
 const COMPOSITION_OVERAGE_FLOOR = -16;
+/**
+ * How much the fill bonus fades from the band FLOOR/target to its CEILING. The tier is planned, but WHICH
+ * body within the band should lean toward the cheaper end: grabbing the priciest in-band body (e.g. a
+ * 29 MW Depth instead of ~22) drains the budget so the last slots go unfilled (below-opt spikes) AND
+ * concentrates picks at bracket tops. Full bonus at/below targetMw, faded to (1-FADE) at the ceiling, so
+ * mid/low-band bodies win the tier — budget stretches to OPT and picks spread within the band.
+ */
+const COMPOSITION_TOPBAND_FADE = 0.75;
 
 function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
   const comp = state.composition;
   if (!comp) return 0;
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
-  // deficit > 0: this tier is still under its planned target ⇒ flat bonus for filling it.
   // deficit <= 0: this tier is already at/over target ⇒ a GENTLE malus (floored) that discourages
-  // over-concentrating one tier but is deliberately far smaller than BELOW_OPT_FILL_FLOOR(25)/
-  // ROTATION_VALUE(92), so it steers tier choice without ever blocking a needed below-opt fill (an
-  // over-strong malus was starving the last slots → below-opt spiked).
-  return deficit > 0 ? COMPOSITION_VALUE : Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
+  // over-concentrating one tier but is far smaller than BELOW_OPT_FILL_FLOOR(25)/ROTATION_VALUE(92), so
+  // it steers tier choice without ever blocking a needed below-opt fill.
+  if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
+  // deficit > 0: fill bonus, faded toward the band ceiling so the cheaper end of the band wins the tier.
+  const band = comp.brackets[lane];
+  const price = Math.max(0, player.marketValue);
+  if (band.ceilingMw != null && band.ceilingMw > band.targetMw) {
+    const pos = clamp((price - band.targetMw) / (band.ceilingMw - band.targetMw), 0, 1);
+    return COMPOSITION_VALUE * (1 - COMPOSITION_TOPBAND_FADE * pos);
+  }
+  return COMPOSITION_VALUE;
 }
 
 /**
