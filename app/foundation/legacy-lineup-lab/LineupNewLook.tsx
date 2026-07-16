@@ -134,6 +134,28 @@ function formatIntensityLabel(intensity: MatchdayIntensityStage) {
   return "Normal";
 }
 
+/**
+ * Inline-Style für die Captain-Auswahl-Chips (Phase 3). Bewusst inline, weil
+ * globals.css hier nicht angefasst werden darf — Tokens halten es theme-treu.
+ * `active` markiert die aktuelle Auswahl (Rahmen/Fläche in Akzentfarbe).
+ */
+function captainChipStyle(active: boolean): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "5px 9px",
+    borderRadius: "var(--nl-r-sm)",
+    border: `1px solid ${active ? "var(--nl-accent)" : "var(--nl-line)"}`,
+    background: active ? "color-mix(in srgb, var(--nl-accent) 18%, transparent)" : "var(--nl-panel-2)",
+    color: active ? "var(--nl-accent)" : "var(--nl-ink)",
+    font: "inherit",
+    fontSize: "12px",
+    lineHeight: 1.1,
+    cursor: "pointer",
+  };
+}
+
 /* --- v1-Entscheidungs-Signale (Schwellen synchron zu LegacyLineupFocusV2Board) --- */
 
 const NL_LEAD_ALTERNATIVLOS_MIN = 10;
@@ -1759,30 +1781,72 @@ export default function LineupNewLook({
               <p className="nl-lineup-focus-noradar">Kandidat wählen oder Slot fokussieren.</p>
             )}
 
+            {/* Phase 3: Captain-Chip-Grid ersetzt das veraltete native <select>.
+                Jeder Kandidat ist ein fokussierbarer Button-Chip (Name + geschätzter
+                Captain-Bonus, optional Moral-Reward). Ein Klick ruft denselben
+                onUpdateCaptain-Handler wie zuvor auf — Selektionslogik/State bleiben
+                unverändert. Styling über Inline-Tokens (kein globals.css-Zugriff),
+                damit es kompakt in die Fokus-Rail passt. */}
             <div className="nl-lineup-captain">
-              <label>
-                <span>
-                  Captain {activeCaptainSide.toUpperCase()} · {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison ·{" "}
-                  {captainDraftRemaining} frei heute
-                </span>
-                <select
-                  className="nl-lineup-captain-select"
-                  value={captains[activeCaptainSide] ?? ""}
-                  disabled={isReadOnly || isBusy}
-                  onChange={(event) => onUpdateCaptain(activeCaptainSide, event.target.value)}
-                >
-                  <option value="">Kein Captain</option>
-                  {activeCaptainEntries.map((entry) => {
-                    const info = activeCaptainInfoById.get(entry.activePlayerId);
-                    return (
-                      <option key={entry.activePlayerId} value={entry.activePlayerId}>
-                        {entry.name}
-                        {info?.estimatedCaptainBonus != null ? ` (+${formatScore(info.estimatedCaptainBonus)})` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
+              <span>Captain {activeCaptainSide.toUpperCase()} · {captainDraftRemaining} frei heute</span>
+              {/* Saison-Captain-Budget als Kit-NlProgressBar (invert: voll = ausgeschöpft → risk). */}
+              <NlProgressBar
+                value={captainSeasonUsedWithDraft}
+                max={captainSeasonLimit || 1}
+                label="Saisonbudget"
+                invert
+                format={(v) => `${formatNlNumber(v, 0)} / ${formatNlNumber(captainSeasonLimit, 0)}`}
+                title={`${captainSeasonUsedWithDraft} von ${captainSeasonLimit} Captain-Einsätzen dieser Saison verplant`}
+                className="nl-lineup-captain-budget"
+              />
+              <div
+                role="group"
+                aria-label={`Captain ${activeCaptainSide.toUpperCase()} wählen`}
+                style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}
+              >
+                {/* "Kein Captain"-Chip (aktiv, wenn keine Auswahl gesetzt ist). */}
+                {(() => {
+                  const noneSelected = !captains[activeCaptainSide];
+                  return (
+                    <button
+                      type="button"
+                      aria-pressed={noneSelected}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateCaptain(activeCaptainSide, "")}
+                      style={captainChipStyle(noneSelected)}
+                    >
+                      Kein Captain
+                    </button>
+                  );
+                })()}
+                {activeCaptainEntries.map((entry) => {
+                  const info = activeCaptainInfoById.get(entry.activePlayerId);
+                  const isSelected = captains[activeCaptainSide] === entry.activePlayerId;
+                  return (
+                    <button
+                      key={entry.activePlayerId}
+                      type="button"
+                      aria-pressed={isSelected}
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => onUpdateCaptain(activeCaptainSide, entry.activePlayerId)}
+                      title={`${entry.name} als Captain ${activeCaptainSide.toUpperCase()} setzen`}
+                      style={captainChipStyle(isSelected)}
+                    >
+                      <strong style={{ fontWeight: isSelected ? 700 : 600 }}>{entry.name}</strong>
+                      {info?.estimatedCaptainBonus != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-good)", fontWeight: 700 }} title="Geschätzter Score-Bonus">
+                          +{formatScore(info.estimatedCaptainBonus)}
+                        </em>
+                      ) : null}
+                      {info?.moraleReward != null ? (
+                        <em style={{ fontStyle: "normal", color: "var(--nl-accent)", fontWeight: 700 }} title="Moral-Reward bei Forderungserfüllung">
+                          ♥+{formatScore(info.moraleReward)}
+                        </em>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 

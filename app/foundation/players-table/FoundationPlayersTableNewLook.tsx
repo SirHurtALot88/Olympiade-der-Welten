@@ -132,9 +132,21 @@ import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score
 import FoundationPlayersCompareOverlay from "@/app/foundation/players-table/FoundationPlayersCompareOverlay";
 import { getFoggedPoScoreRange } from "@/app/foundation/players-table/foundation-players-fog-of-war";
 import {
+  getActiveSaveIdFromLocation,
   rowMatchesQueryChips,
   type QueryChip,
 } from "@/app/foundation/players-table/foundation-players-query-chips";
+import {
+  NL_PLAYERS_COLUMN_PRESETS,
+  NL_PLAYERS_DEFAULT_PRESET_ID,
+  NL_PLAYERS_HIDEABLE_COLUMN_IDS,
+  NL_PLAYERS_STRUCTURAL_COLUMN_IDS,
+  readColumnPreferences,
+  resolvePresetVisibility,
+  writeColumnPreferences,
+  type NlPlayersColumnPresetId,
+  type NlPlayersColumnVisibility,
+} from "@/app/foundation/players-table/foundation-players-column-presets";
 import FoundationPlayersLeaderPodium from "@/app/foundation/players-table/FoundationPlayersLeaderPodium";
 import FoundationPlayersQueryChipsBar from "@/app/foundation/players-table/FoundationPlayersQueryChipsBar";
 import FoundationPlayersScatterCard from "@/app/foundation/players-table/FoundationPlayersScatterCard";
@@ -582,6 +594,62 @@ export default function FoundationPlayersTableNewLook({
    * der Picker ist nur die Sichtbarkeit des Auswahl-Controls.
    */
   const [disciplinePickerOpen, setDisciplinePickerOpen] = useState(false);
+  /**
+   * Spalten-Sichtbarkeit + aktives Saved View (Phase 3, FM-Stil). Init ist
+   * deterministisch die Vorgabe "Alles" (alle Datenspalten sichtbar = bisheriges
+   * Verhalten) — die tatsächlich gespeicherten Präferenzen werden erst per Mount-
+   * Effekt aus localStorage nachgeladen (SSR-sicher, kein Hydration-Mismatch),
+   * exakt wie der Query-Chip-Presets-Mount-Effekt im Chips-Builder.
+   */
+  const [columnVisibility, setColumnVisibility] = useState<NlPlayersColumnVisibility>(() =>
+    resolvePresetVisibility(NL_PLAYERS_DEFAULT_PRESET_ID),
+  );
+  const [activeColumnPreset, setActiveColumnPreset] = useState<NlPlayersColumnPresetId>(NL_PLAYERS_DEFAULT_PRESET_ID);
+  /** Auf-/zugeklapptes "Spalten"-Menü (Popover). */
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+
+  // Gespeicherte Spalten-Präferenzen beim Mount nachladen (rein clientseitig).
+  useEffect(() => {
+    const stored = readColumnPreferences(getActiveSaveIdFromLocation());
+    if (stored) {
+      setColumnVisibility(stored.visibility);
+      setActiveColumnPreset(stored.preset);
+    }
+  }, []);
+
+  /** Ist eine Spalte sichtbar? Strukturspalten (Vgl./Bild/Name+Stern) immer, Datenspalten laut Karte. */
+  function isColumnVisible(columnId: string): boolean {
+    if (NL_PLAYERS_STRUCTURAL_COLUMN_IDS.includes(columnId)) {
+      return true;
+    }
+    return columnVisibility[columnId] !== false;
+  }
+
+  /** Benanntes View anwenden (setzt Sichtbarkeit komplett) und persistieren. */
+  function applyColumnPreset(presetId: NlPlayersColumnPresetId) {
+    const visibility = resolvePresetVisibility(presetId);
+    setColumnVisibility(visibility);
+    setActiveColumnPreset(presetId);
+    writeColumnPreferences(getActiveSaveIdFromLocation(), { preset: presetId, visibility });
+  }
+
+  /** Einzelne Datenspalte umschalten — löst das benannte View zu "custom" auf und persistiert. */
+  function toggleColumnVisibility(columnId: string) {
+    const next: NlPlayersColumnVisibility = { ...columnVisibility, [columnId]: columnVisibility[columnId] === false };
+    setColumnVisibility(next);
+    setActiveColumnPreset("custom");
+    writeColumnPreferences(getActiveSaveIdFromLocation(), { preset: "custom", visibility: next });
+  }
+
+  /** Tatsächlich gerenderte Spalten (Struktur immer, Datenspalten laut Sichtbarkeit) — Kopf, Zellen und Detail-`colSpan` teilen sich diese Liste. */
+  const visibleColumns = useMemo(
+    () =>
+      NL_PLAYERS_COLUMNS.filter(
+        (column) =>
+          NL_PLAYERS_STRUCTURAL_COLUMN_IDS.includes(column.id) || columnVisibility[column.id] !== false,
+      ),
+    [columnVisibility],
+  );
 
   /** Aktuell sortierte Disziplin (`discipline:<id>`-Sortierschlüssel), falls aktiv. */
   const activeDisciplineSortId = useMemo(() => getDisciplineIdFromSortKey(sortState?.key), [sortState?.key]);
@@ -1209,6 +1277,7 @@ export default function FoundationPlayersTableNewLook({
             </span>
           </FoundationPlayerPortraitPreview>
         </td>
+        {isColumnVisible("team") ? (
         <td className={`nl-players-td-team${sortCellClass("team")}`}>
           <button
             type="button"
@@ -1245,6 +1314,8 @@ export default function FoundationPlayersTableNewLook({
             <span className="nl-players-team-name">{row.team?.name ?? "Free Agent"}</span>
           </button>
         </td>
+        ) : null}
+        {isColumnVisible("class") ? (
         <td className={`nl-players-td-icon${sortCellClass("class")}`}>
           <ClassIcon
             classNameValue={row.player.className}
@@ -1252,11 +1323,19 @@ export default function FoundationPlayersTableNewLook({
             iconClassName="table-identity-icon-image"
           />
         </td>
+        ) : null}
+        {isColumnVisible("race") ? (
         <td className={`nl-players-td-icon${sortCellClass("race")}`}>
           <RaceIcon race={row.player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
         </td>
+        ) : null}
+        {isColumnVisible("abilityStars") ? (
         <td className="nl-ptable-td-ability nl-ptable-td-ability-stacked">{renderAbilityStars(row)}</td>
+        ) : null}
+        {isColumnVisible("axes") ? (
         <td className="nl-players-td-axes">{renderAxisBars(row)}</td>
+        ) : null}
+        {isColumnVisible("pps") ? (
         <td
           className={`nl-players-td-metric nl-players-td-pps is-highlight-primary${sortCellClass("pps")} ${
             row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""
@@ -1284,12 +1363,16 @@ export default function FoundationPlayersTableNewLook({
             {renderMetricPercentileChip(row.playerPps, leaguePlayerHeatPools.pps)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("ovr") ? (
         <td className={`nl-players-td-metric nl-ptable-ovr-cell${sortCellClass("ovr")}`}>
           <span className="nl-ptable-metric-cell">
             <span className="nl-tnum">{formatWholeNumber(row.playerOvr)}</span>
             {renderMetricRankChip(row.playerOvr, leaguePlayerHeatPools.ovr)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("mvs") ? (
         <td
           className={`nl-players-td-metric${sortCellClass("mvs")} ${
             row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""
@@ -1300,6 +1383,8 @@ export default function FoundationPlayersTableNewLook({
             {renderMetricPercentileChip(row.playerMvs, leaguePlayerHeatPools.mvs)}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("mw") ? (
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(marketValue, 2)}</span>
@@ -1312,6 +1397,8 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("salary") ? (
         <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
             <span className="nl-tnum">{formatLocalePoints(annualSalary, 2)}</span>
@@ -1330,6 +1417,8 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
           </span>
         </td>
+        ) : null}
+        {isColumnVisible("contract") ? (
         <td className={`nl-players-td-contract${sortCellClass("contract")}`}>
           {row.roster ? (
             <span className="nl-players-contract">
@@ -1344,12 +1433,18 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
+        ) : null}
+        {isColumnVisible("appearances") ? (
         <td className={`nl-players-td-metric${sortCellClass("appearances")}`}>
           {row.seasonPerformance ? row.seasonPerformance.appearances : "—"}
         </td>
+        ) : null}
+        {isColumnVisible("bestDiscipline") ? (
         <td className={`nl-players-td-disc${sortCellClass("bestDiscipline")}`}>
           <DisciplineIcon label={row.bestDiscipline ?? "—"} showLabel={Boolean(row.bestDiscipline)} />
         </td>
+        ) : null}
+        {isColumnVisible("careerLeague") ? (
         <td
           className={`nl-players-td-career${sortCellClass("careerLeague")}`}
           title={
@@ -1369,9 +1464,12 @@ export default function FoundationPlayersTableNewLook({
             "—"
           )}
         </td>
+        ) : null}
+        {isColumnVisible("traits") ? (
         <td className={`nl-players-td-traits${sortCellClass("traits")}`} title={traitsText}>
           {traitsText}
         </td>
+        ) : null}
       </tr>
     );
 
@@ -1382,11 +1480,119 @@ export default function FoundationPlayersTableNewLook({
     return [
       rowElement,
       <tr key={`${row.player.id}-pps-detail`} id={ppsDetailId} className="nl-players-detail-row">
-        <td className="nl-players-detail-cell" colSpan={NL_PLAYERS_COLUMNS.length}>
+        <td className="nl-players-detail-cell" colSpan={visibleColumns.length}>
           {renderPpsDetail(row)}
         </td>
       </tr>,
     ];
+  }
+
+  /**
+   * "Spalten"-Steuerung (Phase 3, FM-Stil): Popover mit den 4 benannten
+   * Saved Views plus Einzel-Toggles je Datenspalte. Strukturspalten
+   * (Vgl./Bild/Name+Stern) tauchen bewusst NICHT auf — sie sind nicht
+   * abschaltbar. Styling ist bewusst inline (kein Zugriff auf globals.css)
+   * und lehnt sich über die `--nl-*`-Tokens an das restliche Panel an.
+   */
+  function renderColumnMenu() {
+    return (
+      <span className="nl-players-columns-control" style={{ position: "relative", display: "inline-flex" }}>
+        <button
+          type="button"
+          className="nl-players-more-button"
+          data-testid="nl-players-columns-toggle"
+          aria-haspopup="true"
+          aria-expanded={columnMenuOpen}
+          onClick={() => setColumnMenuOpen((open) => !open)}
+          title="Spalten ein-/ausblenden und Ansichten wählen"
+        >
+          Spalten
+        </button>
+        {columnMenuOpen ? (
+          <>
+            {/* Unsichtbarer Backdrop: Klick außerhalb schließt das Menü (kein globaler Dokument-Listener). */}
+            <button
+              type="button"
+              aria-label="Spalten-Menü schließen"
+              onClick={() => setColumnMenuOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 40,
+                background: "transparent",
+                border: "none",
+                cursor: "default",
+              }}
+            />
+            <div
+              className="nl-players-columns-menu"
+              role="group"
+              aria-label="Spalten-Sichtbarkeit und Ansichten"
+              data-testid="nl-players-columns-menu"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                zIndex: 41,
+                minWidth: 220,
+                maxHeight: "60vh",
+                overflowY: "auto",
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                background: "var(--nl-surface, var(--nl-panel))",
+                border: "1px solid var(--nl-line)",
+                borderRadius: "var(--nl-r-md, 10px)",
+                boxShadow: "0 12px 32px rgba(0, 0, 0, 0.28)",
+                color: "var(--nl-ink)",
+                textAlign: "left",
+              }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} role="group" aria-label="Gespeicherte Ansichten">
+                {NL_PLAYERS_COLUMN_PRESETS.map((preset) => {
+                  const isActive = activeColumnPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      className="nl-players-more-button"
+                      aria-pressed={isActive}
+                      onClick={() => applyColumnPreset(preset.id)}
+                      title={`Ansicht "${preset.label}" anwenden`}
+                      style={
+                        isActive
+                          ? { background: "var(--nl-accent)", borderColor: "var(--nl-accent)", color: "#fff" }
+                          : undefined
+                      }
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ height: 1, background: "var(--nl-line)", margin: "2px 0" }} aria-hidden="true" />
+              {NL_PLAYERS_HIDEABLE_COLUMN_IDS.map((id) => {
+                const label = NL_PLAYERS_COLUMNS.find((column) => column.id === id)?.label ?? id;
+                return (
+                  <label
+                    key={id}
+                    style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility[id] !== false}
+                      onChange={() => toggleColumnVisibility(id)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+      </span>
+    );
   }
 
   return (
@@ -1661,8 +1867,11 @@ export default function FoundationPlayersTableNewLook({
           eyebrow="Sortierbare Daten"
           title="Spielerliste"
           actions={
-            <span className="nl-players-shown nl-tnum" aria-live="polite">
-              {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <span className="nl-players-shown nl-tnum" aria-live="polite">
+                {formatNlNumber(visibleRows.length, 0)} von {formatNlNumber(queryChipFilteredRows.length, 0)} Spielern
+              </span>
+              {renderColumnMenu()}
             </span>
           }
         >
@@ -1670,7 +1879,7 @@ export default function FoundationPlayersTableNewLook({
             <table className="nl-players-table nl-tnum">
               <thead>
                 <tr>
-                  {NL_PLAYERS_COLUMNS.map((column) => (
+                  {visibleColumns.map((column) => (
                     <th
                       key={column.id}
                       scope="col"
