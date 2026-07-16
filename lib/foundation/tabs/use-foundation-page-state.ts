@@ -372,12 +372,22 @@ export function useFoundationPageState({
     generatedAt: initialPersistenceState?._meta?.generatedAt ?? new Date().toISOString(),
     saveMode: initialPersistenceState?._meta?.saveMode,
   });
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(() =>
-    resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId) ?? initialClientGameState.teams[0]?.teamId ?? "",
+  // Active team resolution order: explicit route/prop → the club picked at new-game start
+  // (newGameFlow.selectedTeamId) → the human-controlled team → first team as a last resort.
+  // Previously this fell straight through to teams[0] (alphabetically A-A), so starting a season
+  // with e.g. P-S still opened on A-A. teams[0] is only a fallback when no team is owned.
+  const initialRouteTeamId = resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId);
+  const initialOwnedTeamId =
+    resolveFoundationTeamId(
+      initialClientGameState.teams,
+      initialClientGameState.seasonState.newGameFlow?.selectedTeamId,
+    ) ?? initialClientGameState.teams.find((team) => team.humanControlled)?.teamId ?? null;
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(
+    () => initialRouteTeamId ?? initialOwnedTeamId ?? initialClientGameState.teams[0]?.teamId ?? "",
   );
   const [managerTeamPreferenceHydrated, setManagerTeamPreferenceHydrated] = useState(false);
   const [activeManagerTeamSource, setActiveManagerTeamSource] = useState<ActiveManagerTeamSource>(() =>
-    resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId) ? "route" : "default_human_team",
+    initialRouteTeamId ? "route" : "default_human_team",
   );
   const [activeOwnerId, setActiveOwnerId] = useState<string>(
     // Wenn Phase-1-Login aktiv ist und eine Session vorliegt, gewinnt die echte
