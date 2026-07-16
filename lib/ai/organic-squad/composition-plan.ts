@@ -71,13 +71,27 @@ const STAR_DOUBLE_OPT_TARGET_MIN = 10;
  *  realized Core lags the plan (30-45MW bodies cost more, poor teams degrade to Depth). */
 const CORE_SHARE_BASE = 0.27;
 const CORE_SHARE_SLOPE = 0.06;
-/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.27 (arm) → 0.23 (reich). Core≈Backup; Depth
- *  is the residual (~0.44–0.46 of F) so it stays the largest cohort without running away. */
+/** backupShare = BACKUP_SHARE_BASE − BACKUP_SHARE_SLOPE·r — 0.27 (arm) → 0.23 (reich). Core≈Backup as a
+ *  WISH; the affordability waterfall then demotes some Core/Depth into Backup for cash-thin teams (they
+ *  genuinely can't afford Depth), so league-wide Backup ends up ≈ Depth rather than Depth strictly largest
+ *  — the honest economic outcome. Do NOT lower this to force Depth-largest: that only pushes poor teams
+ *  toward Depth they can't afford → below-opt spikes. */
 const BACKUP_SHARE_BASE = 0.27;
 const BACKUP_SHARE_SLOPE = 0.04;
 
 /** Order in which excess planned need is trimmed back to `slotsToFill` — Premium (superstar/star) is never touched. */
 const EXCESS_TRIM_ORDER: readonly MarketBracketLane[] = ["depth", "backup", "core"];
+
+/**
+ * Position within a band [floor..target] at which a planned body slot is COSTED for the affordability
+ * waterfall (step 5b): cost = floor + β·(target − floor). β = 1.0 budgets at the role mean (targetMw,
+ * the literal "Mittelwert pro Rolle") but over-trims Core, because the buy-side band fade
+ * (COMPOSITION_TOPBAND_FADE) already steers real purchases BELOW target — double-counting the margin.
+ * β = 0.5 costs the realistic expected spend (lower-mid band), keeping teams feasible (reach opt) without
+ * needlessly collapsing Core to all-Backup. Turn toward 1.0 if a re-run shows below-opt creeping back,
+ * toward 0.35 if Core collapses / finalCash balloons.
+ */
+const PLAN_COST_BAND_POS = 0.5;
 
 /**
  * Largest-remainder rounding of three non-negative shares that already sum (as floats) to `total`, so
@@ -207,6 +221,9 @@ export function deriveCompositionCounts(input: CompositionCountsInput): Record<M
     cheapFillNeeded: 0,
     premiumCap: input.premiumCap,
   };
+  // planSlotsFromBudget only budget-gates PREMIUM slots (Superstar/Star, via premiumCap + tail reserve);
+  // for core/depth/backup it does slot-count reconciliation only — there is NO body-tier cost check
+  // anywhere in it. So it settles premium affordability, but the body-tier counts come back unpriced.
   const allocated = planSlotsFromBudget({
     counts,
     spendable: input.spendableNet,
@@ -216,16 +233,46 @@ export function deriveCompositionCounts(input: CompositionCountsInput): Record<M
     superstarCap: input.superstarCap,
   });
 
+  // 5b. Affordability WATERFALL (the real budget-per-slot allocation). The budget-blind shares above are
+  // only a WISH; here we cost the planned body slots at a realistic per-role price (the cheaper half of
+  // each band — the buy-side fade steers picks below band target) and, while the plan overruns the team's
+  // spendable cash, demote one body slot at a time Core→Depth→Backup. Every demotion is 1:1 so the slot
+  // count is invariant (the plan can never induce below-opt), and each remaining slot ends up on a tier
+  // whose realistic body price fits the remaining per-slot budget — a poor team gets Depth/Backup instead
+  // of unaffordable Core it would only fail to buy (planned Core 107 vs realized 61). Premium is left as-is
+  // (base economy owns it) but its target cost is counted so it doesn't starve the body tiers.
+  let coreN = allocated.coreNeeded + allocated.specialistNeeded;
+  let depthN = allocated.depthNeeded + allocated.cheapFillNeeded;
+  let backupN = allocated.backupNeeded;
+  const planCostOf = (lane: MarketBracketLane) => {
+    const band = input.brackets[lane];
+    return band.floorMw + PLAN_COST_BAND_POS * (Math.max(band.targetMw, band.floorMw) - band.floorMw);
+  };
+  const premiumCost =
+    allocated.superstarAllowed * input.brackets.superstar.targetMw +
+    allocated.starAllowed * input.brackets.star.targetMw;
+  const depthMax = Math.ceil(0.5 * F); // demoted Core prefers Depth up to this, then spills to (cheaper) Backup
+  const coreCost = planCostOf("core"), depthCost = planCostOf("depth"), backupCost = planCostOf("backup");
+  let planCost = premiumCost + coreN * coreCost + depthN * depthCost + backupN * backupCost;
+  let guard = coreN + depthN + backupN + 2;
+  while (planCost > input.spendableNet && coreN + depthN > 0 && guard-- > 0) {
+    if (coreN > 0) {
+      coreN -= 1;
+      if (depthN < depthMax) { depthN += 1; planCost -= coreCost - depthCost; }
+      else { backupN += 1; planCost -= coreCost - backupCost; }
+    } else {
+      depthN -= 1; backupN += 1; planCost -= depthCost - backupCost;
+    }
+  }
+
   return {
     superstar: existingOf("superstar") + allocated.superstarAllowed,
     star: existingOf("star") + allocated.starAllowed,
-    // specialistNeeded/cheapFillNeeded are always fed as 0 above and planSlotsFromBudget never grows a
-    // 0-requested lane on its own (its scaling only shrinks, and its top-up only grows depthNeeded) — folded
-    // in defensively so a future allocator change can't silently drop counts.
-    core: existingOf("core") + allocated.coreNeeded + allocated.specialistNeeded,
-    depth: existingOf("depth") + allocated.depthNeeded + allocated.cheapFillNeeded,
-    backup: existingOf("backup") + allocated.backupNeeded,
-    // Reserve is never planned — a team keeps only whatever Reserve-tier bodies it already owns.
+    core: existingOf("core") + coreN,
+    depth: existingOf("depth") + depthN,
+    backup: existingOf("backup") + backupN,
+    // Reserve is never PLANNED as a target here — the base economy still fills the very poorest teams'
+    // last slots with Reserve bodies via the affordability filter when nothing cheaper-and-better fits.
     reserve: existingOf("reserve"),
   };
 }
