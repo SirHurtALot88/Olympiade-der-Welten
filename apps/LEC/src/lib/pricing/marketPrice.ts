@@ -41,3 +41,42 @@ export class ManualMarketPriceProvider implements MarketPriceProvider {
     return this.quotes.get(key) ?? null;
   }
 }
+
+/**
+ * Baut den harten Cardmarket-Produkt-URL-Parametersatz (KONZEPT §7.1): nur
+ * deutsche Karten/Verkaeufer, Mindestzustand NM, Menge = Pack-Groesse. `base`
+ * ist die vom Nutzer/Chris angegebene Produkt-URL-Basis (Set + Kartenname).
+ */
+export function buildCardmarketUrl(base: string, packQty: number): string {
+  const params = new URLSearchParams({
+    sellerCountry: "7",
+    language: "3",
+    minCondition: "2",
+    amount: String(Math.max(1, packQty)),
+  });
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}${params.toString()}`;
+}
+
+/**
+ * EK-Ableitung aus Cardmarket (KONZEPT §7.2): guenstigster verfuegbarer DE-Preis
+ * x Pack-Groesse + Einkaufs-Versand-Anteil = Markt-EK. `buyShippingShare` kommt
+ * aus costEngine.ts (haengt von Einzel/Pack + Bezugsmenge ab).
+ */
+export function computeMarketEk(priceFrom: number, packQty: number, buyShipping: number): number {
+  return priceFrom * Math.max(1, packQty) + buyShipping;
+}
+
+export type MarketStatus = "zu_guenstig" | "im_korridor" | "zu_teuer";
+
+/**
+ * "Zu teuer / zu guenstig ggue. Markt"-Ampel (KONZEPT §7.4): eigener VK vs.
+ * Cardmarket-Trend, +/-15 % um den Trend gilt als neutral ("im Korridor").
+ */
+export function classifyMarketStatus(ownVk: number, trend: number): MarketStatus {
+  if (trend <= 0) return "im_korridor";
+  const diff = (ownVk - trend) / trend;
+  if (diff < -0.15) return "zu_guenstig";
+  if (diff > 0.15) return "zu_teuer";
+  return "im_korridor";
+}

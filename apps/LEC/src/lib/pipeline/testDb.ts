@@ -16,6 +16,10 @@ export interface TestDb {
 
 function findMigrationSql(): string {
   // Von src/lib/pipeline/ aus zwei Ebenen hoch nach apps/LEC/prisma/migrations.
+  // ALLE Migrationen in chronologischer Reihenfolge anwenden (nicht nur die
+  // letzte!) -- neuere Migrationen sind i. d. R. inkrementelle ALTER-Schritte
+  // (siehe add_article_active_and_current_pricing), die ohne die vorherige
+  // init-Migration keine vollstaendige Tabellenstruktur ergeben.
   const migrationsDir = path.resolve(__dirname, "..", "..", "..", "prisma", "migrations");
   const dirs = fs
     .readdirSync(migrationsDir)
@@ -24,8 +28,28 @@ function findMigrationSql(): string {
   if (dirs.length === 0) {
     throw new Error("Keine Prisma-Migration gefunden.");
   }
-  const latest = dirs[dirs.length - 1];
-  return fs.readFileSync(path.join(migrationsDir, latest, "migration.sql"), "utf-8");
+  return dirs.map((d) => fs.readFileSync(path.join(migrationsDir, d, "migration.sql"), "utf-8")).join("\n");
+}
+
+/**
+ * Macht CREATE TABLE/INDEX-Anweisungen idempotent (IF NOT EXISTS). Noetig,
+ * weil mehrere Migrationen inkrementell dieselben Index-Namen neu anlegen
+ * (RedefineTable-Pattern bei SQLite-Spaltenaenderungen, z. B.
+ * add_article_active_and_current_pricing legt Article_setCode_idx erneut an,
+ * nachdem die alte Tabelle inkl. Index gedroppt wurde) -- ohne IF NOT EXISTS
+ * kam es dabei vereinzelt zu "already exists"-Fehlern beim Testaufbau.
+ */
+function makeIdempotent(stmt: string): string {
+  if (/^CREATE UNIQUE INDEX /i.test(stmt)) {
+    return stmt.replace(/^CREATE UNIQUE INDEX /i, "CREATE UNIQUE INDEX IF NOT EXISTS ");
+  }
+  if (/^CREATE INDEX /i.test(stmt)) {
+    return stmt.replace(/^CREATE INDEX /i, "CREATE INDEX IF NOT EXISTS ");
+  }
+  if (/^CREATE TABLE /i.test(stmt)) {
+    return stmt.replace(/^CREATE TABLE /i, "CREATE TABLE IF NOT EXISTS ");
+  }
+  return stmt;
 }
 
 export async function createTestDb(): Promise<TestDb> {
@@ -42,7 +66,8 @@ export async function createTestDb(): Promise<TestDb> {
     .join("\n")
     .split(";")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .filter((s) => s.length > 0)
+    .map(makeIdempotent);
 
   for (const stmt of statements) {
     await prisma.$executeRawUnsafe(stmt);

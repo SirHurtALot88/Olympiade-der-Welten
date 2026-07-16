@@ -254,4 +254,35 @@ describe("runImport", () => {
       })
     ).rejects.toThrow();
   });
+
+  it("verarbeitet den Billbee-Artikelstamm separat (Bestand + aktueller VK/EK + active=true)", async () => {
+    const wb = new ExcelJS.Workbook();
+    const sheet = wb.addWorksheet("Artikel");
+    const header = sheet.getRow(1);
+    header.getCell(4).value = "Titel";
+    header.getCell(10).value = "Price gross";
+    header.getCell(11).value = "CostPrice gross";
+    header.getCell(39).value = "Stock current Standard";
+    const row = sheet.getRow(2);
+    row.getCell(4).value = CARD_A;
+    row.getCell(10).value = 12.5;
+    row.getCell(11).value = 4;
+    row.getCell(39).value = 7;
+    const artikelBuffer = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const summary = await runImport(db.prisma, {
+      billbeeFiles: [],
+      ebayFile: null,
+      billbeeArtikelFile: { name: "billbee-artikel.xlsx", buffer: artikelBuffer },
+    });
+
+    expect(summary.billbeeArtikel).not.toBeNull();
+    expect(summary.billbeeArtikel?.rowCount).toBe(1);
+
+    const found = await db.prisma.article.findFirst({ where: { nameRaw: CARD_A } });
+    expect(found?.active).toBe(true);
+    expect(found?.stock).toBe(7);
+    expect(found?.currentVk).toBeCloseTo(12.5);
+    expect(found?.currentEk).toBeCloseTo(4);
+  });
 });

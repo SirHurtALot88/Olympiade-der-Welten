@@ -10,9 +10,10 @@ export default async function Page() {
   const classified = classifyArticles(aggregates);
   const rows = buildFullSortiment(aggregates, classified, costSettings);
 
-  // "Aktiv" = Verkaeufe in den letzten 365 Tagen (Lebenszeit-Historie allein
-  // reicht nicht -- genau das waeren sonst die Ladenhueter, KONZEPT §2).
-  const activeCount = rows.filter((r) => (r.windows["365"]?.qty ?? 0) > 0).length;
+  // "Aktiv" = im Billbee-Artikelstamm-Katalog vorhanden (Chris' Ergaenzung:
+  // die reine Verkaufshistorie enthaelt auch laengst ausgelaufene Artikel).
+  const activeCount = rows.filter((r) => r.active).length;
+  const discontinuedCount = rows.length - activeCount;
   const ladenhueterCount = rows.filter((r) => r.articleClass === "ladenhueter").length;
 
   return (
@@ -20,6 +21,7 @@ export default async function Page() {
       rows={rows}
       totalCount={rows.length}
       activeCount={activeCount}
+      discontinuedCount={discontinuedCount}
       ladenhueterCount={ladenhueterCount}
     />
   );

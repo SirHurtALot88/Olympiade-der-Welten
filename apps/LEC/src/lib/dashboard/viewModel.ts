@@ -20,9 +20,20 @@ export interface ArticleAggregate {
   nameRaw: string;
   setCode: string | null;
   packQty: number;
-  /** Lagerbestand (Stk). Aktuell i. d. R. 0 -- Billbee-"Verkaeufe nach Artikel" liefert keinen
-   * Bestand (siehe KONZEPT §5.4/PAGES_CONCEPT §B); Follow-up: Billbee-Artikelstamm-Import. */
+  /** Lagerbestand (Stk), aus dem Billbee-Artikelstamm-Import ("Stock current Standard"). 0, solange
+   * der Artikel dort (noch) nicht vorkommt -- siehe `active`. */
   stock: number;
+  /** true = im juengsten Billbee-Artikelstamm-Export vorhanden (aktueller Katalog). false = nur aus
+   * der Verkaufshistorie bekannt -> ausgelaufen/nicht mehr im Sortiment. */
+  active: boolean;
+  /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
+   * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
+   * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
+   * Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig") den aktuellen Listenpreis gegenprueft
+   * (Repricing-Frage), nicht den historischen Durchschnitt.
+   */
+  currentVk: number | null;
+  currentEk: number | null;
   /** Cardmarket-Preistrend aus dem juengsten MarketPrice-Datensatz, sonst null ("—"). */
   latestMarketTrend: number | null;
   windows: Partial<Record<SaleWindowKey, WindowAggregate>>;
@@ -76,21 +87,33 @@ export interface SortimentRow {
   setCode: string | null;
   velocity: [number, number, number]; // 30 / 90 / 365
   revenue365: number;
-  vk: number; // Preis VK (Ø Verkaufspreis der Referenz-Periode)
-  ek: number; // Preis EK je Stk (Referenz-Periode)
+  /** REALISIERTER, gewichteter Ø-VK der Referenz-Periode (SaleWindow.avgPrice) -- Basis der Marge/DB,
+   * NICHT fuer den Preis-Korridor-Vergleich (dafuer `listingVk`). */
+  avgVkRealized: number;
+  /** Aktueller Listen-VK aus dem Billbee-Artikelstamm-Export, null wenn der Artikel dort (noch) nicht
+   * gepflegt ist. Basis fuer den Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig"). */
+  listingVk: number | null;
+  /** Realisierter EK je Stk (Referenz-Periode) -- Basis der Marge/DB (HK-Grundlage). */
+  ek: number;
+  /** Aktueller Listen-EK aus dem Artikelstamm-Export, rein informativ (Repricing), null falls unbekannt. */
+  currentEk: number | null;
   corridor: { min: number; good: number };
+  /** Ampel-Status: vergleicht den AKTUELLEN Listen-VK (Fallback: realisierter Ø-VK, wenn kein
+   * Artikelstamm-Preis vorliegt) gegen den Korridor. */
   priceStatus: ReturnType<typeof classifyPriceStatus>;
   articleClass: ArticleClass;
   classLabel: string;
-  /** DB I / DB II je verkauftem Stueck (Referenz-Periode), DB II % gleiche Basis wie Klassifikation. */
+  /** DB I / DB II je verkauftem Stueck (Referenz-Periode, REALISIERT), DB II % gleiche Basis wie Klassifikation. */
   dbIPerUnit: number;
   dbIIPerUnit: number;
   dbIIPercent: number;
   /** Rank/Verkaeufe/Umsatz/Ø-Preis je Fenster (30/90/365/all) fuer die Dashboard-Spalten. */
   windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
+  /** true = im aktuellen Billbee-Artikelstamm-Katalog (nicht ausgelaufen). */
+  active: boolean;
   /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
   stock: number;
-  /** Stk x VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
+  /** Stk x aktueller Listen-VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
   potentialRevenue: number | null;
   /** Bestandsreichweite in Monaten (Stk / Verkaeufe pro Monat aus 90T), null ohne Bestand/Velocity. */
   stockMonthsCover: number | null;
@@ -292,16 +315,25 @@ export function buildSortimentRow(
   costSettings: CostSettingsValues
 ): SortimentRow {
   const referenceAgg = a.windows["365"] ?? a.windows.all;
-  const vk = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.avgPrice : 0;
+  // REALISIERTER Ø-VK/EK der Referenz-Periode -- Basis der Marge/DB, siehe
+  // Methodik-Hinweis an SortimentRow.avgVkRealized.
+  const avgVkRealized = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.avgPrice : 0;
   const ekPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.ek / referenceAgg.qty : 0;
   const kind: ItemKind = a.packQty > 1 ? "pack" : "single";
+
+  // Aktueller Listen-VK (Billbee-Artikelstamm) ist die Basis fuer den
+  // Preis-Korridor-/Markt-Vergleich ("zu teuer/guenstig ggue. MIN/GUT bzw.
+  // Markt"); ohne Artikelstamm-Datensatz faellt das auf den realisierten
+  // Ø-VK zurueck (bisheriges Verhalten fuer Artikel ohne Bestandsimport).
+  const listingVk = a.currentVk !== null && a.currentVk > 0 ? a.currentVk : null;
+  const vkForCorridor = listingVk ?? avgVkRealized;
 
   const hk = computeHk(
     { ek: ekPerUnit, kind, packSize: a.packQty, fixedCostPerUnit: 0 },
     costSettings
   );
-  const corridor = computePriceCorridor(hk.total, vk || hk.total, costSettings);
-  const priceStatus = vk > 0 ? classifyPriceStatus(vk, corridor) : "im_korridor";
+  const corridor = computePriceCorridor(hk.total, vkForCorridor || hk.total, costSettings);
+  const priceStatus = vkForCorridor > 0 ? classifyPriceStatus(vkForCorridor, corridor) : "im_korridor";
 
   const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
   const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
@@ -323,8 +355,10 @@ export function buildSortimentRow(
     setCode: a.setCode,
     velocity: [a.windows["30"]?.qty ?? 0, a.windows["90"]?.qty ?? 0, a.windows["365"]?.qty ?? 0],
     revenue365: a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0,
-    vk,
+    avgVkRealized,
+    listingVk,
     ek: ekPerUnit,
+    currentEk: a.currentEk,
     corridor: { min: corridor.vkMin, good: corridor.vkGood },
     priceStatus,
     articleClass,
@@ -333,8 +367,9 @@ export function buildSortimentRow(
     dbIIPerUnit,
     dbIIPercent,
     windows: windowMetrics,
+    active: a.active,
     stock: a.stock,
-    potentialRevenue: a.stock > 0 ? a.stock * vk : null,
+    potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
     priceTrend: a.latestMarketTrend,
   };
@@ -396,11 +431,14 @@ function buildRecommendations(
 
   const priceAlert = sortiment.find((s) => s.priceStatus === "unter_min");
   if (priceAlert) {
+    // priceStatus vergleicht den aktuellen Listen-VK (Fallback realisierter
+    // Ø-VK) gegen den Korridor -- siehe SortimentRow.listingVk.
+    const alertVk = priceAlert.listingVk ?? priceAlert.avgVkRealized;
     recommendations.push({
       kind: "preis_anpassen",
       title: `${shortName(priceAlert.nameRaw)} VK anheben.`,
-      detail: `Aktueller VK ${priceAlert.vk.toFixed(2)} € liegt unter dem MIN-Korridor ${priceAlert.corridor.min.toFixed(2)} €.`,
-      effect: `+ € ${(priceAlert.corridor.min - priceAlert.vk).toFixed(2)} / Stk`,
+      detail: `Aktueller VK ${alertVk.toFixed(2)} € liegt unter dem MIN-Korridor ${priceAlert.corridor.min.toFixed(2)} €.`,
+      effect: `+ € ${(priceAlert.corridor.min - alertVk).toFixed(2)} / Stk`,
     });
   }
 

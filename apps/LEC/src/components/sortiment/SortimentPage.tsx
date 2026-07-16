@@ -30,7 +30,8 @@ type ColId =
   | "verkaeufe"
   | "umsatz"
   | "avgpreis"
-  | "vk"
+  | "avgvk"
+  | "listingvk"
   | "ek"
   | "dbI"
   | "dbII"
@@ -48,7 +49,8 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
-  { id: "vk", label: "Preis VK", def: 82, min: 65, align: "r" },
+  { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
+  { id: "listingvk", label: "Akt. VK (Liste)", def: 104, min: 80, align: "r" },
   { id: "ek", label: "Preis EK", def: 82, min: 65, align: "r" },
   { id: "dbI", label: "DB I/Stk", def: 84, min: 65, align: "r" },
   { id: "dbII", label: "DB II/Stk", def: 88, min: 65, align: "r" },
@@ -66,7 +68,8 @@ const SORTABLE_COLS: ColId[] = [
   "verkaeufe",
   "umsatz",
   "avgpreis",
-  "vk",
+  "avgvk",
+  "listingvk",
   "ek",
   "dbI",
   "dbII",
@@ -84,6 +87,7 @@ interface Props {
   rows: SortimentRow[];
   totalCount: number;
   activeCount: number;
+  discontinuedCount: number;
   ladenhueterCount: number;
 }
 
@@ -98,8 +102,10 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
       return w?.revenue ?? 0;
     case "avgpreis":
       return w?.avgPrice ?? 0;
-    case "vk":
-      return row.vk;
+    case "avgvk":
+      return row.avgVkRealized;
+    case "listingvk":
+      return row.listingVk ?? -1;
     case "ek":
       return row.ek;
     case "dbI":
@@ -121,7 +127,7 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
   }
 }
 
-export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount }: Props) {
+export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -136,6 +142,10 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
   });
   const [statusFilter, setStatusFilter] = useState<Set<PriceStatus>>(new Set());
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
+  // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
+  // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
+  // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
+  const [showDiscontinued, setShowDiscontinued] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sort, setSort] = useState<{ colId: ColId; dir: "asc" | "desc" }>({ colId: "verkaeufe", dir: "desc" });
 
@@ -200,8 +210,11 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
+    if (!showDiscontinued) {
+      result = result.filter((r) => r.active);
+    }
     return result;
-  }, [rows, query, classFilter, statusFilter, onlyLadenhueter]);
+  }, [rows, query, classFilter, statusFilter, onlyLadenhueter, showDiscontinued]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -219,7 +232,7 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
   return (
     <AppShell
       title="Sortiment"
-      subtitle={`${totalCount} Artikel · ${activeCount} aktiv / ${ladenhueterCount} Ladenhüter`}
+      subtitle={`${activeCount} aktiv · ${discontinuedCount} ausgelaufen · ${ladenhueterCount} Ladenhüter`}
       topbarRight={
         <>
           <div className="search">
@@ -282,6 +295,17 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
         >
           nur Ladenhüter
         </button>
+        <button
+          type="button"
+          className={`chip${showDiscontinued ? " on" : ""}`}
+          onClick={() => {
+            setShowDiscontinued((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Artikel zeigen, die nur in der Verkaufshistorie stehen (nicht im aktuellen Billbee-Artikelstamm)"
+        >
+          auch ausgelaufene zeigen
+        </button>
         <span className="count">
           {filtered.length} von {totalCount}
         </span>
@@ -310,6 +334,11 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
                     <td>
                       <div className="artname" style={{ maxWidth: "100%" }} title={row.nameRaw}>
                         {row.nameRaw}
+                        {!row.active && (
+                          <span className="rank-badge" title="Nur in der Verkaufshistorie, nicht mehr im aktuellen Artikelstamm">
+                            ausgelaufen
+                          </span>
+                        )}
                       </div>
                       {row.setCode && <div className="code">{row.setCode}</div>}
                     </td>
@@ -319,7 +348,10 @@ export function SortimentPage({ rows, totalCount, activeCount, ladenhueterCount 
                     </td>
                     <td className="r num">€ {formatEuro(w?.revenue ?? 0)}</td>
                     <td className="r num">{w && w.qty > 0 ? `${formatEuroCents(w.avgPrice)} €` : "—"}</td>
-                    <td className="r num">{row.vk > 0 ? `${formatEuroCents(row.vk)} €` : "—"}</td>
+                    <td className="r num">{row.avgVkRealized > 0 ? `${formatEuroCents(row.avgVkRealized)} €` : "—"}</td>
+                    <td className="r num">
+                      {row.listingVk !== null ? `${formatEuroCents(row.listingVk)} €` : <span className="p-muted">—</span>}
+                    </td>
                     <td className="r num">{row.ek > 0 ? `${formatEuroCents(row.ek)} €` : "—"}</td>
                     <td className="r num">{formatEuroCents(row.dbIPerUnit)} €</td>
                     <td className="r num">{formatEuroCents(row.dbIIPerUnit)} €</td>

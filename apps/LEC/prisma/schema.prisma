@@ -23,6 +23,13 @@ model Article {
   condition      String?
   edition        String?
   stock          Int      @default(0)
+  /// true = im Billbee-Artikelstamm-Export vorhanden (= aktueller/aktiver Katalog).
+  /// false = nur in der Verkaufshistorie bekannt -> ausgelaufen/nicht mehr im Sortiment.
+  active         Boolean  @default(false)
+  /// Aktueller Listenpreis/EK aus dem Billbee-Artikelstamm-Export (Price gross / CostPrice gross),
+  /// genauer als der historische Fenster-Durchschnitt aus den Verkaufsdaten.
+  currentVk      Float?
+  currentEk      Float?
   /// false = herausgefiltert (Privatverkauf/Nicht-Karte)
   isCard         Boolean  @default(true)
   createdAt      DateTime @default(now())

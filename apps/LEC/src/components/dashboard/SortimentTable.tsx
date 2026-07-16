@@ -58,6 +58,10 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
           <tbody>
             {shown.map((row) => {
               const pill = STATUS_PILL[row.priceStatus];
+              // Aktueller Listen-VK ist die Vergleichsbasis fuer den Korridor
+              // (Fallback: realisierter Ø-VK ohne Artikelstamm-Daten), siehe
+              // SortimentRow.listingVk.
+              const vkForDisplay = row.listingVk ?? row.avgVkRealized;
               return (
                 <tr key={row.articleId}>
                   <td>
@@ -70,9 +74,9 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
                     <MicroVelocity values={row.velocity} max={maxVelocity} />
                   </td>
                   <td className="r num">€ {formatEuro(row.revenue365)}</td>
-                  <td className="r num">{row.vk > 0 ? `${formatEuroCents(row.vk)} €` : "—"}</td>
+                  <td className="r num">{vkForDisplay > 0 ? `${formatEuroCents(vkForDisplay)} €` : "—"}</td>
                   <td>
-                    <Corridor min={row.corridor.min} good={row.corridor.good} vk={row.vk} />
+                    <Corridor min={row.corridor.min} good={row.corridor.good} vk={vkForDisplay} />
                   </td>
                   <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
                   <td>

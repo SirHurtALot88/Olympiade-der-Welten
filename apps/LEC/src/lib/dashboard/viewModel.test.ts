@@ -24,6 +24,9 @@ function article(nameRaw: string, overrides: Partial<ArticleAggregate> = {}): Ar
     setCode: null,
     packQty: 1,
     stock: 0,
+    active: true,
+    currentVk: null,
+    currentEk: null,
     latestMarketTrend: null,
     windows: {},
     ...overrides,
@@ -107,8 +110,35 @@ describe("buildDashboardViewModel", () => {
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.sortiment).toHaveLength(1);
-    expect(vm.sortiment[0].vk).toBeCloseTo(10);
+    expect(vm.sortiment[0].avgVkRealized).toBeCloseTo(10);
     expect(vm.sortiment[0].corridor.good).toBeGreaterThan(vm.sortiment[0].corridor.min);
+  });
+
+  it("nutzt den aktuellen Listen-VK (nicht den realisierten Ø-VK) fuer den Preis-Korridor-Vergleich", () => {
+    // Methodik-Klarstellung: DB I/II rechnen mit dem realisierten Ø-VK, aber
+    // die "zu teuer/guenstig"-Ampel prueft den AKTUELLEN Listenpreis aus dem
+    // Billbee-Artikelstamm-Export gegen den Korridor.
+    const articles: ArticleAggregate[] = [
+      article("Karte", {
+        currentVk: 1, // deutlich unter dem MIN-Korridor -> "unter_min"
+        windows: { "365": agg({ qty: 10, revenue: 100, ek: 30, avgPrice: 10 }) }, // realisierter Ø-VK 10 waere "im_korridor"
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment[0].avgVkRealized).toBeCloseTo(10);
+    expect(vm.sortiment[0].listingVk).toBeCloseTo(1);
+    expect(vm.sortiment[0].priceStatus).toBe("unter_min");
+  });
+
+  it("gibt `active` aus dem Billbee-Artikelstamm-Import durch (Ladenhueter-Klassifikation bleibt unabhaengig davon)", () => {
+    const articles: ArticleAggregate[] = [
+      article("Ausgelaufen", {
+        active: false,
+        windows: { all: agg({ qty: 5, revenue: 50 }) },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment[0].active).toBe(false);
   });
 
   it("berechnet Warenquote/Betriebsausgabenquote aus dem 365-Tage-Fenster", () => {

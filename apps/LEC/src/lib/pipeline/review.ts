@@ -89,7 +89,7 @@ export async function searchArticles(
   prisma: PrismaClient,
   query: string,
   limit = 20
-): Promise<Array<{ id: string; nameRaw: string; setCode: string | null }>> {
+): Promise<Array<{ id: string; nameRaw: string; setCode: string | null; packQty: number }>> {
   const trimmed = query.trim();
   if (trimmed.length === 0) return [];
   const normalizedQuery = normalizedNameKey(trimmed);
@@ -102,7 +102,7 @@ export async function searchArticles(
         { setCode: { contains: trimmed.toUpperCase() } },
       ],
     },
-    select: { id: true, nameRaw: true, setCode: true },
+    select: { id: true, nameRaw: true, setCode: true, packQty: true },
     take: limit,
     orderBy: { nameNormalized: "asc" },
   });

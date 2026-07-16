@@ -19,9 +19,11 @@ export async function POST(req: NextRequest) {
 
   const billbeeFiles: UploadedFile[] = [];
   let ebayFile: UploadedFile | null = null;
+  let billbeeArtikelFile: UploadedFile | null = null;
   let totalBytes = 0;
 
-  // "billbee" kann mehrfach vorkommen (30/90/365d), "ebay" hoechstens einmal.
+  // "billbee" kann mehrfach vorkommen (30/90/365d), "ebay" und "billbeeArtikel"
+  // (Artikelstamm-Export, separater Upload-Slot) hoechstens einmal.
   for (const entry of formData.getAll("billbee")) {
     if (entry instanceof File) {
       const buffer = Buffer.from(await entry.arrayBuffer());
@@ -35,8 +37,14 @@ export async function POST(req: NextRequest) {
     totalBytes += buffer.byteLength;
     ebayFile = { name: ebayEntry.name, buffer };
   }
+  const billbeeArtikelEntry = formData.get("billbeeArtikel");
+  if (billbeeArtikelEntry instanceof File && billbeeArtikelEntry.size > 0) {
+    const buffer = Buffer.from(await billbeeArtikelEntry.arrayBuffer());
+    totalBytes += buffer.byteLength;
+    billbeeArtikelFile = { name: billbeeArtikelEntry.name, buffer };
+  }
 
-  if (billbeeFiles.length === 0 && !ebayFile) {
+  if (billbeeFiles.length === 0 && !ebayFile && !billbeeArtikelFile) {
     return NextResponse.json({ error: "no_files" }, { status: 400 });
   }
   if (totalBytes > MAX_TOTAL_BYTES) {
@@ -44,7 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const summary = await runImport(prisma, { billbeeFiles, ebayFile });
+    const summary = await runImport(prisma, { billbeeFiles, ebayFile, billbeeArtikelFile });
     return NextResponse.json({ ok: true, summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Import fehlgeschlagen.";

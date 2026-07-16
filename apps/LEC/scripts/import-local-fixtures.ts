@@ -39,7 +39,17 @@ async function main() {
     ? { name: "ebay-report-2026.csv", buffer: fs.readFileSync(ebayPath) }
     : null;
 
-  const summary = await runImport(prisma, { billbeeFiles, ebayFile });
+  // Billbee-Artikelstamm (Bestand + aktiver Katalog) -- optional, nur falls die
+  // Fixture-Datei vorliegt (siehe billbeeArtikel.ts).
+  const artikelPath = path.join(fixturesDir, "billbee-artikel.xlsx");
+  const billbeeArtikelFile: UploadedFile | null = fs.existsSync(artikelPath)
+    ? { name: "billbee-artikel.xlsx", buffer: fs.readFileSync(artikelPath) }
+    : null;
+  if (!billbeeArtikelFile) {
+    console.warn("Ueberspringe fehlende Datei: billbee-artikel.xlsx (Bestand/aktiver Katalog bleiben leer)");
+  }
+
+  const summary = await runImport(prisma, { billbeeFiles, ebayFile, billbeeArtikelFile });
 
   console.log("--- Import-Zusammenfassung ---");
   for (const w of summary.windows) {
@@ -48,6 +58,11 @@ async function main() {
   if (summary.ebay) {
     console.log(
       `${summary.ebay.fileName}: ${summary.ebay.rowCount} Zeilen, Abo-Gebuehr ${summary.ebay.subscriptionFee ?? "?"} EUR`
+    );
+  }
+  if (summary.billbeeArtikel) {
+    console.log(
+      `${summary.billbeeArtikel.fileName}: ${summary.billbeeArtikel.rowCount} Zeilen, ${summary.billbeeArtikel.activeCount} aktiv gesetzt`
     );
   }
   console.log({

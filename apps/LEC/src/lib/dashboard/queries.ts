@@ -106,6 +106,9 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       setCode: article.setCode,
       packQty: article.packQty,
       stock: article.stock,
+      active: article.active,
+      currentVk: article.currentVk,
+      currentEk: article.currentEk,
       latestMarketTrend: latestTrendByArticle.get(article.id) ?? null,
       windows,
     };
