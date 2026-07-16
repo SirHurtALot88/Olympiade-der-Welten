@@ -45,11 +45,12 @@ describe("deriveCompositionCounts — affordability-waterfall planning", () => {
 
         // Slot count is invariant (waterfall demotions are 1:1) ⇒ the plan can never itself induce below-opt.
         expect(sumCounts(counts)).toBe(optTarget);
-        // Reserve is never a planned target (the base economy fills the very poorest tails emergently).
-        expect(counts.reserve).toBe(0);
         // Feasibility: the plan is affordable at (at least) floor prices — no unaffordable Core air-slots.
         // (Only breaks if even an all-Backup roster exceeds budget, impossible at these r≥0.2 budgets.)
         expect(floorCost(counts, BRACKETS)).toBeLessThanOrEqual(spendableNet + 1e-6);
+        // Reserve is only planned as a small rotation floor for POORER teams (low budget/slot); a team
+        // that can afford Depth-grade bodies (r ≥ 0.8 ⇒ budget/slot ≥ ~29) plans none.
+        if (r >= 0.8) expect(counts.reserve).toBe(0);
       }
     },
   );
@@ -82,7 +83,7 @@ describe("deriveCompositionCounts — affordability-waterfall planning", () => {
     expect(sumCounts(counts)).toBe(12);
   });
 
-  it("poor club: no premium, affordable body-only plan that still fills every slot", () => {
+  it("poor club: no premium, affordable plan that fills every slot AND plans a few Reserve rotation bodies", () => {
     const counts = deriveCompositionCounts({
       optTarget: 10,
       existingTiers: EMPTY_TIERS,
@@ -96,7 +97,7 @@ describe("deriveCompositionCounts — affordability-waterfall planning", () => {
 
     expect(counts.superstar).toBe(0);
     expect(counts.star).toBe(0);
-    expect(counts.reserve).toBe(0);
+    expect(counts.reserve).toBeGreaterThanOrEqual(1); // poor team keeps cheap rotation bodies
     expect(sumCounts(counts)).toBe(10);
     expect(floorCost(counts, BRACKETS)).toBeLessThanOrEqual(150 + 1e-6);
   });

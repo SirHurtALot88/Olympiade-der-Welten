@@ -170,15 +170,9 @@ function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamStat
   // over-reach on a star, drain budget and fall below opt — the whole below-opt/star-inflation problem.
   // COMPOSE only shapes the body tiers (Core/Depth/Backup) + discourages a Reserve tail.
   if (lane === "superstar" || lane === "star") return 0;
-  // Reserve is never a planned target (counts.reserve = 0), so its deficit is ≤ 0 anyway; shift its curve
-  // down by one so it earns a malus from the FIRST Reserve body (−8) instead of neutral 0. This makes one
-  // more affordable Backup/Depth always beat a Reserve scrap when both are affordable — no more spilling
-  // over-plan fill into Reserve. Safe for min/opt: the hard affordability filter runs BEFORE utility, so
-  // when only Reserve is affordable it is still bought, and −8 ≪ BELOW_OPT_FILL_FLOOR (25).
-  if (lane === "reserve") {
-    const d = comp.counts.reserve - comp.boughtTiers.reserve;
-    return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * (d - 1));
-  }
+  // Reserve is now a legitimately PLANNED tier for poorer teams (rotation/cheap cards), so it takes the
+  // same deficit path as the other body tiers: a bonus while under its planned count (so the team fills
+  // its planned Reserve rotation bodies), a malus once over (so over-plan Reserve scrap is still avoided).
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
   // deficit <= 0: tier already at/over target ⇒ gentle floored malus (never blocks a below-opt fill).
   if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);

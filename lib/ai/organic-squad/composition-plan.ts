@@ -93,6 +93,14 @@ const EXCESS_TRIM_ORDER: readonly MarketBracketLane[] = ["depth", "backup", "cor
  */
 const PLAN_COST_BAND_POS = 0.5;
 
+/** Poorer teams plan a few cheap Reserve rotation bodies ("kleine Teams dürfen 2–3 Reserve holen für
+ *  Rotation/günstige Karten"), scaled by BUDGET-PER-SLOT (the real poverty measure): RESERVE_FLOOR_MAX at
+ *  a budget/slot of RESERVE_FLOOR_BUDGET_REF − RESERVE_FLOOR_BUDGET_SPAN, fading to 0 at REF (a team that
+ *  can afford Depth-grade bodies plans no Reserve). */
+const RESERVE_FLOOR_MAX = 3;
+const RESERVE_FLOOR_BUDGET_REF = 22; // ~Depth mid-price; at/above this budget/slot no Reserve floor
+const RESERVE_FLOOR_BUDGET_SPAN = 8; // full RESERVE_FLOOR_MAX once budget/slot is this far below REF
+
 /**
  * Largest-remainder rounding of three non-negative shares that already sum (as floats) to `total`, so
  * the rounded integers ALSO sum to `total` exactly (no drift from independent per-lane rounding).
@@ -244,24 +252,40 @@ export function deriveCompositionCounts(input: CompositionCountsInput): Record<M
   let coreN = allocated.coreNeeded + allocated.specialistNeeded;
   let depthN = allocated.depthNeeded + allocated.cheapFillNeeded;
   let backupN = allocated.backupNeeded;
+  let reserveN = 0;
   const planCostOf = (lane: MarketBracketLane) => {
     const band = input.brackets[lane];
     return band.floorMw + PLAN_COST_BAND_POS * (Math.max(band.targetMw, band.floorMw) - band.floorMw);
   };
+  // Reserve floor: poorer/smaller teams deliberately keep a couple of cheap Reserve rotation bodies
+  // ("2–3 günstige Karten für Rotation"), scaled inversely with budget-richness r — rich teams plan 0.
+  // Converted from the cheapest body tier (Backup). This is a WANTED feature, not a degradation.
+  const budgetPerSlot = input.spendableNet / Math.max(1, optTarget);
+  const reserveFloor = Math.min(
+    backupN,
+    Math.round(clamp((RESERVE_FLOOR_BUDGET_REF - budgetPerSlot) / RESERVE_FLOOR_BUDGET_SPAN, 0, 1) * RESERVE_FLOOR_MAX),
+  );
+  backupN -= reserveFloor;
+  reserveN += reserveFloor;
+
   const premiumCost =
     allocated.superstarAllowed * input.brackets.superstar.targetMw +
     allocated.starAllowed * input.brackets.star.targetMw;
   const depthMax = Math.ceil(0.5 * F); // demoted Core prefers Depth up to this, then spills to (cheaper) Backup
-  const coreCost = planCostOf("core"), depthCost = planCostOf("depth"), backupCost = planCostOf("backup");
-  let planCost = premiumCost + coreN * coreCost + depthN * depthCost + backupN * backupCost;
-  let guard = coreN + depthN + backupN + 2;
-  while (planCost > input.spendableNet && coreN + depthN > 0 && guard-- > 0) {
+  const coreCost = planCostOf("core"), depthCost = planCostOf("depth"), backupCost = planCostOf("backup"), reserveCost = planCostOf("reserve");
+  let planCost = premiumCost + coreN * coreCost + depthN * depthCost + backupN * backupCost + reserveN * reserveCost;
+  // Each body slot can step down up to 3 tiers (Core→Depth→Backup→Reserve), so bound the loop generously.
+  let guard = (coreN + depthN + backupN) * 3 + 4;
+  // Affordability waterfall: Core→Depth→Backup→Reserve, one slot at a time, until the plan fits budget.
+  while (planCost > input.spendableNet && coreN + depthN + backupN > 0 && guard-- > 0) {
     if (coreN > 0) {
       coreN -= 1;
       if (depthN < depthMax) { depthN += 1; planCost -= coreCost - depthCost; }
       else { backupN += 1; planCost -= coreCost - backupCost; }
-    } else {
+    } else if (depthN > 0) {
       depthN -= 1; backupN += 1; planCost -= depthCost - backupCost;
+    } else {
+      backupN -= 1; reserveN += 1; planCost -= backupCost - reserveCost;
     }
   }
 
@@ -271,8 +295,6 @@ export function deriveCompositionCounts(input: CompositionCountsInput): Record<M
     core: existingOf("core") + coreN,
     depth: existingOf("depth") + depthN,
     backup: existingOf("backup") + backupN,
-    // Reserve is never PLANNED as a target here — the base economy still fills the very poorest teams'
-    // last slots with Reserve bodies via the affordability filter when nothing cheaper-and-better fits.
-    reserve: existingOf("reserve"),
+    reserve: existingOf("reserve") + reserveN,
   };
 }
