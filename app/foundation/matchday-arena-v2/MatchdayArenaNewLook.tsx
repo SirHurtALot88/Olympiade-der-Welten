@@ -8,6 +8,7 @@ import {
   NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
+  NlSparkline,
   NlSubTabs,
   StatChip,
   StatChipRow,
@@ -664,6 +665,20 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     });
   }, [activeView, params.teamId]);
 
+  // Feature 2: Momentum-Sparkline für "Dein Lauf" — eigener Rang über die bereits
+  // enthüllten Phasen, invertiert (negierter Rang → oben = besserer Rang), analog
+  // zum invertierten Kumulativ-Rang in NlFieldRaceFormStrip. Bewusst nur bis zur
+  // aktuellen Phase geschnitten, damit die Sparkline den Endrang nicht vorwegnimmt.
+  const ownRunSparkPoints = useMemo(
+    () =>
+      ownRun
+        .slice(0, phaseIndex + 1)
+        .map((step) => step.rank)
+        .filter((rank): rank is number => typeof rank === "number" && Number.isFinite(rank))
+        .map((rank) => -rank),
+    [ownRun, phaseIndex],
+  );
+
   // Gesamt-Tageswertung aus beiden Disziplin-Boards (echte Scores/Punkte).
   const totalRows = useMemo<ArenaNewLookTotalRow[]>(() => {
     const d1ByTeam = new Map(d1View.map((row) => [row.teamId, row] as const));
@@ -758,6 +773,50 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
         />
         <span className="nl-arena-teamname">{teamName}</span>
       </button>
+    );
+  }
+
+  // Feature 1: Finale-Aufschlüsselung. Der Score-Sprung in der Finale-/Ergebnis-
+  // Phase (der bereits vom Presenter als `phaseDelta` gezeigte Final-Delta) stammt
+  // aus Fatigue + Team-PPs, die erst hier greifen. Wir zerlegen ihn sichtbar in
+  // seine zwei Komponenten — reine Anzeige der schon berechneten Modifikatoren
+  // (`fatigueModifier`/`teamPpsModifier`), keine eigene Rechnung. Hinweis: Auf der
+  // Zeile liegt nur der Fatigue-Score-Modifikator, KEIN 0–100-Fatigue-Level, daher
+  // kein NlFatigueGauge — der Effekt wird als NlDeltaChip dargestellt.
+  function renderFinaleExplainer(row: MatchdayArenaScoreboardRowView) {
+    const fatigueMod = row.fatigueStatus === "mapped" ? row.fatigueModifier : null;
+    const teamPpsMod = row.teamPpsStatus === "ready" ? row.teamPpsModifier : null;
+    const hasFatigue = fatigueMod != null && Math.abs(fatigueMod) >= 0.05;
+    const hasTeamPps = teamPpsMod != null && Math.abs(teamPpsMod) >= 0.05;
+    if (!hasFatigue && !hasTeamPps) {
+      return null;
+    }
+    return (
+      <div className="nl-arena-finale-explainer" role="group" aria-label="Finale-Effekte: Fatigue und Team-PPs">
+        <span className="nl-arena-finale-explainer-label">Finale-Effekte</span>
+        <div className="nl-arena-finale-explainer-items">
+          {hasFatigue ? (
+            <span className="nl-arena-finale-explainer-item">
+              <span className="nl-arena-finale-explainer-item-label">Fatigue</span>
+              <NlDeltaChip
+                value={fatigueMod!}
+                format={formatSignedNlDelta}
+                title="Erschöpfungs-Effekt auf den Finalscore (Abzug = ausgelaugt)"
+              />
+            </span>
+          ) : null}
+          {hasTeamPps ? (
+            <span className="nl-arena-finale-explainer-item">
+              <span className="nl-arena-finale-explainer-item-label">Team-PPs</span>
+              <NlDeltaChip
+                value={teamPpsMod!}
+                format={formatSignedNlDelta}
+                title="Team-PPs-Effekt auf den Finalscore"
+              />
+            </span>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
@@ -888,6 +947,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                       tone: item.tone,
                     }))}
                   />
+                  {/* Feature 1: In der Finale-/Ergebnis-Phase den ansonsten
+                      unerklärten Final-Sprung in Fatigue + Team-PPs zerlegen. */}
+                  {activePhase === "final" || isResultPhase ? renderFinaleExplainer(row) : null}
                 </div>
               ) : null}
             </div>
@@ -1596,6 +1658,17 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                         );
                       })}
                     </ol>
+                    {/* Feature 2: Momentum-Sparkline des eigenen Rangs über die schon
+                        enthüllten Phasen — ergänzt die Schiene, Labels & Klick-zum-
+                        Springen bleiben erhalten. Oben = besserer Rang (invertiert). */}
+                    {ownRunSparkPoints.length >= 2 ? (
+                      <NlSparkline
+                        points={ownRunSparkPoints}
+                        tone="accent"
+                        className="nl-arena-run-spark"
+                        aria-label="Verlauf deines Rangs über die enthüllten Phasen (oben = besser)"
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </>

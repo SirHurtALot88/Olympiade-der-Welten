@@ -753,6 +753,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   toggleTableSort,
   toggleTransferSellMarker,
   toggleTransferWishlist,
+  toggleTransferWishlistByPlayerId,
   trainingFacilityEffectPreview,
   trainingFacilityRows,
   trainingFacilitySeasonEndFinance,
@@ -2643,6 +2644,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               playerBracketCounts={playerBracketCounts}
               openPlayerDrawerById={openPlayerDrawerById}
               openTeamProfileById={openTeamProfileById}
+              onToggleWishlist={toggleTransferWishlistByPlayerId}
             />
           ) : null}
 
