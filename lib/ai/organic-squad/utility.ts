@@ -20,6 +20,7 @@ import { disciplineSupportFactor, marginalCoverageValue } from "@/lib/ai/organic
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import {
   CATEGORY_TO_AXIS,
+  CORE_AXES,
   SOLIDE_THRESHOLD,
   type CoreAxis,
   type DisciplineCategory,
@@ -178,6 +179,36 @@ function identityFitFactor(
 }
 
 /**
+ * ANPASSUNG B4 (flag-gated OLY_DRAFT_IDFIT) — identity-axis TILT on ΔStrength for the whole player,
+ * the decisive lever for "the expensive pick fits the team's axes". identityFitFactor above only gates
+ * the star PREMIUM of individual needed disciplines; but WHICH player becomes a team's marquee is driven
+ * by the plain need-weighted quality AVERAGE (+ an identity-blind specialist bonus), so a superstar
+ * whose mass sits on OFF-identity axes still wins. This computes an alignment ratio between the team's
+ * identity emphasis and the player's OWN axis-stat distribution (both sum-normalized ⇒ 1.0 when the
+ * player is flat or the team has no identity), then tilts ΔStrength toward on-identity players and away
+ * from off-identity ones. Emptiness-scaled so it only bites in the draft/rebuild regime (empty→sparse
+ * roster) and fades to a pure no-op by EMPTINESS_REF players — a filled follow-season roster is untouched.
+ */
+const IDENTITY_TILT_STRENGTH = 1.2;
+const IDENTITY_TILT_EMPTINESS_REF = 8;
+const IDENTITY_TILT_MIN = 0.6;
+const IDENTITY_TILT_MAX = 1.45;
+
+function identityAxisTilt(player: OrganicPlayerView, state: OrganicTeamState): number {
+  if (!IDFIT_ENABLED) return 1;
+  const identity = state.identityAxisWeights;
+  if (!identity) return 1;
+  const axisSum = CORE_AXES.reduce((sum, axis) => sum + Math.max(0, player[axis]), 0);
+  if (axisSum <= 0) return 1;
+  // fit = Σ identityShare · playerShare · 4 → 1.0 at neutral, >1 aligned, <1 anti-aligned.
+  const fit =
+    CORE_AXES.reduce((sum, axis) => sum + (identity[axis] ?? 0) * (Math.max(0, player[axis]) / axisSum), 0) *
+    CORE_AXES.length;
+  const emptiness = clamp((IDENTITY_TILT_EMPTINESS_REF - state.rosterSize) / IDENTITY_TILT_EMPTINESS_REF, 0, 1);
+  return clamp(1 + emptiness * IDENTITY_TILT_STRENGTH * (fit - 1), IDENTITY_TILT_MIN, IDENTITY_TILT_MAX);
+}
+
+/**
  * Marginal squad strength a player adds: stat quality × how much its "solide" disciplines are still
  * needed AND under-covered (via the coverage curve). Weighted average over the player's covered
  * needed disciplines; falls back to COVERAGE_FLOOR when the player covers no needed discipline.
@@ -242,7 +273,9 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const w = state.weights;
   const fullness = rosterFullnessFactor(state.rosterSize, w.optTarget);
   const deltaStrength =
-    marginalStrength(player, state.disciplineNeeds, state.needAxisWeights, state.identityAxisWeights) * fullness;
+    marginalStrength(player, state.disciplineNeeds, state.needAxisWeights, state.identityAxisWeights) *
+    fullness *
+    identityAxisTilt(player, state);
   // Budget-relative cost measured in remaining-OPT-slots of budget: transfer price + capitalized wage.
   const optSlotsRemaining = Math.max(1, w.optTarget - state.rosterSize);
   const budgetPerOptSlot = Math.max(1, state.cash / optSlotsRemaining);
