@@ -12,6 +12,7 @@ import {
   NlProgressBar,
   NlRadar,
   NlSkeletonCard,
+  NlWhatIfSlider,
   StatChip,
   StatChipRow,
   formatNlNumber,
@@ -21,7 +22,7 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
 import {
@@ -313,6 +314,14 @@ export type TransfermarktV2NewLookProps = {
   previewAcceptChance: number | null;
   previewCounterChance: number | null;
   previewRejectChance: number | null;
+  /** F2 — Gehalts-What-if: aktueller Angebots-Wert (kontrolliert) + Erwartungswert der Gegenseite
+      als Basis für die Slider-Spanne. onOfferedSalaryChange setzt zugleich den Manuell-Editiert-Flag. */
+  offeredSalary: number | null;
+  previewExpectedSalary: number | null;
+  onOfferedSalaryChange: (value: number) => void;
+  /** F3 — Mehrsaison-Gehaltsstaffel (S+1/S+2 …) + Buyout-Kosten für die Budget-Leiste. */
+  previewYearlySalarySchedule: ContractYearSalary[] | null;
+  previewBuyoutCost: number | null;
   buyBlockingReasons: string[];
   buyWarnings: string[];
   // Team-Impact (im Client via computeTopSixAxisImpact/... berechnet)
@@ -620,6 +629,11 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     previewAcceptChance,
     previewCounterChance,
     previewRejectChance,
+    offeredSalary,
+    previewExpectedSalary,
+    onOfferedSalaryChange,
+    previewYearlySalarySchedule,
+    previewBuyoutCost,
     buyBlockingReasons,
     buyWarnings,
     topSixCount,
@@ -1263,9 +1277,23 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         return typeof value === "number" && Number.isFinite(value) ? [{ key: axis, value }] : [];
                       })}
                       max={100}
-                      aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC`}
+                      // Phase-2 F1 — Ghost-Polygon des eigenen Kaders (Top-6-Ø je Achse). Nutzt die
+                      // bereits berechneten squadAxisSummaries.topAvg (gleiche computeTopSixAxisAverage-
+                      // Quelle wie der Team-Impact); NlRadar zeichnet den Ghost nur, wenn alle vier
+                      // Achsen echte Werte tragen. Macht den "Fit" Kandidat↔Aufstellung sofort sichtbar.
+                      ghostAxes={NL_MARKET_AXES.flatMap((axis) => {
+                        const summary = squadAxisSummaries.find((entry) => entry.axis === axis);
+                        return summary?.topAvg != null && Number.isFinite(summary.topAvg)
+                          ? [{ key: axis, value: summary.topAvg }]
+                          : [];
+                      })}
+                      ghostLabel={`Team Top-${topSixCount}`}
+                      aria-label={`${selectedPlayer.name} Achsen-Radar POW/SPE/MEN/SOC gegen Team Top-${topSixCount}`}
                       className="nl-market-axis-radar"
                     />
+                    <span className="nl-market-radar-ghost-note" aria-hidden="true">
+                      Ghost = Team Top-{topSixCount} Ø
+                    </span>
                   </div>
 
                   {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
@@ -1562,6 +1590,48 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <StatChip label="Ablöse" value={formatTransfermarktCurrency(previewPurchasePrice)} tone="accent" />
               <StatChip label="Forderung p.a." value={previewSalaryLabel} tone="warn" />
             </StatChipRow>
+            {/* Phase-2 F2 — Gehalts-What-if-Slider treibt das Angebot (offeredSalary im Client). Der
+                Preview-Fetch re-fetcht bei Gehaltsänderung (~90 ms Debounce), daher aktualisieren sich
+                Zusage-Bar UND Vorher→Nachher live beim Ziehen. Spanne um den Erwartungswert der
+                Gegenseite (Fallback: aktuelles Angebot / Kandidaten-Gehalt) — keine erfundenen Werte. */}
+            {selectedPlayer
+              ? (() => {
+                  const salaryBase =
+                    previewExpectedSalary != null && Number.isFinite(previewExpectedSalary)
+                      ? previewExpectedSalary
+                      : offeredSalary != null && Number.isFinite(offeredSalary)
+                        ? offeredSalary
+                        : selectedPlayer.salary;
+                  if (salaryBase == null || !Number.isFinite(salaryBase) || salaryBase <= 0) {
+                    return null;
+                  }
+                  const salaryValue =
+                    offeredSalary != null && Number.isFinite(offeredSalary) ? offeredSalary : salaryBase;
+                  // Regler-Spanne: 50 %–200 % des Erwartungswerts, oben immer das aktuelle Angebot einfassen.
+                  const salaryMax = Math.max(Math.round(salaryBase * 2), Math.round(salaryValue));
+                  const salaryStep = Math.max(1, Math.round(salaryBase / 50));
+                  return (
+                    <NlWhatIfSlider
+                      className="nl-market-salary-whatif"
+                      label="Gehaltsangebot p.a."
+                      value={salaryValue}
+                      min={0}
+                      max={salaryMax}
+                      step={salaryStep}
+                      onChange={onOfferedSalaryChange}
+                      formatValue={(value) => formatTransfermarktCurrency(value)}
+                      valueText={`Angebot ${formatTransfermarktCurrency(salaryValue)} p.a. — Erwartung ${formatTransfermarktCurrency(salaryBase)}`}
+                      stops={[
+                        formatTransfermarktCurrency(0),
+                        formatTransfermarktCurrency(Math.round(salaryBase)),
+                        formatTransfermarktCurrency(salaryMax),
+                      ]}
+                      accentColor="var(--nl-warn)"
+                      hint="Höheres Gehalt hebt die Zusage-Chance — Bar und Vorher→Nachher aktualisieren sich live."
+                    />
+                  );
+                })()
+              : null}
             {/* F4 — Reaktion der Gegenseite schon vor dem Modal sichtbar: verhindert
                 Sackgassen-Klicks ins Kaufmodal. Gleiche Bar wie im Modal (F1). */}
             {previewAcceptChance != null || previewCounterChance != null || previewRejectChance != null ? (
@@ -1602,6 +1672,29 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 format={(value) => formatTransfermarktCurrency(value)}
               />
             </div>
+            {/* Phase-2 F3 — Mehrsaison-Budget-Leiste: die yearlySalarySchedule-Staffel (S+1/S+2 …) als
+                Balken-Chart, damit die einzelne Gehalts-Zeile zum echten Budgetplaner wird. Buyout-Kosten
+                (Restgehalt-Ablösung bei vorzeitigem Ausstieg) als Fußnote. Nur echte Preview-Felder. */}
+            {previewYearlySalarySchedule && previewYearlySalarySchedule.length > 0 ? (
+              <div className="nl-market-deal-budget" aria-label="Gehaltslast über die Vertragslaufzeit">
+                <span className="nl-market-eyebrow">Gehaltslast je Saison</span>
+                <NlBarChart
+                  bars={previewYearlySalarySchedule.map((year) => ({
+                    label: year.label && year.label.trim() ? year.label : `S+${year.seasonOffset}`,
+                    value: year.salary,
+                    tone: "warn" as NlTone,
+                  }))}
+                  format={(value) => formatTransfermarktCurrency(value)}
+                  aria-label="Gehaltslast je Saison der Vertragslaufzeit"
+                  className="nl-market-budget-barchart"
+                />
+                {previewBuyoutCost != null && Number.isFinite(previewBuyoutCost) ? (
+                  <small className="nl-market-deal-budget-buyout nl-tnum">
+                    Buyout (Restgehalt-Ablösung): {formatTransfermarktCurrency(previewBuyoutCost)}
+                  </small>
+                ) : null}
+              </div>
+            ) : null}
             {buyBlockingReasons.length > 0 ? (
               <div className="nl-market-warning-box is-blocking">
                 <strong>Noch offen</strong>

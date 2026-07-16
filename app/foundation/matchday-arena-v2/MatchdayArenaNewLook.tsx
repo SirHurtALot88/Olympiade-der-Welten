@@ -8,6 +8,7 @@ import {
   NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
+  NlProgressBar,
   NlSparkline,
   NlSubTabs,
   StatChip,
@@ -190,6 +191,21 @@ const NL_ARENA_PHASE_DESCRIPTIONS: Record<MatchdayArenaPhaseId, string> = {
 };
 
 type ArenaStageMover = { teamId: string; teamName: string; value: number };
+
+/**
+ * Feature 2 (Schlüsselmomente): ein akkumulierter Bühnen-Spotlight-Eintrag
+ * einer bereits enthüllten Phase — Schub (`gain`), Dämpfer (`loss`) oder
+ * Rang-Kletterer (`climb`). Trägt die Phasen-Herkunft für den Ticker.
+ */
+type ArenaKeyMoment = {
+  key: string;
+  phaseId: MatchdayArenaPhaseId;
+  phaseLabel: string;
+  kind: "gain" | "loss" | "climb";
+  teamId: string;
+  teamName: string;
+  value: number;
+};
 
 function formatSignedNlDelta(value: number): string {
   return `${value > 0 ? "+" : ""}${formatNlNumber(value, 1)}`;
@@ -678,6 +694,131 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
         .map((rank) => -rank),
     [ownRun, phaseIndex],
   );
+
+  // Feature 1: Erwartung vs. Ergebnis — Start-Rang (`baseRank`, nach reiner
+  // Basiswertung) gegen den End-Rang des eigenen Teams. `baseRank`/`rankDelta`
+  // werden vom Presenter bereits berechnet, aber nirgends gerendert; hier nur
+  // angezeigt, KEINE eigene Rang-Rechnung. Wird erst in der Ergebnis-Phase
+  // ausgespielt (siehe Render) — spoilerfrei.
+  const ownExpectation = useMemo(() => {
+    if (boardSide === "total" || activeView.length === 0) {
+      return null;
+    }
+    const row = activeView.find((entry) => entry.teamId === params.teamId);
+    if (!row) {
+      return null;
+    }
+    return {
+      teamName: row.teamName,
+      baseRank: row.baseRank,
+      finalRank: row.rank,
+      rankDelta: row.rankDelta,
+      total: activeView.length,
+    };
+  }, [activeView, params.teamId, boardSide]);
+
+  // Feature 2 (Schlüsselmomente): Rang-Karten je Phase für ALLE Teams — dieselben
+  // Presenter-Rankings wie das Board, nur je Phase eingefroren. Basis für die
+  // Kletterer-Erkennung im persistenten Ticker.
+  const phaseRankMaps = useMemo<Map<string, number>[]>(() => {
+    if (activeView.length === 0) {
+      return [];
+    }
+    const slotScores = () => buildBaseScoreMap(activeView);
+    return MATCHDAY_ARENA_PHASES.map((phase) =>
+      buildArenaTeamRankMap(activeView, { phaseId: phase.id, revealedSlotCount: 0 }, slotScores),
+    );
+  }, [activeView]);
+
+  // Feature 2: Schlüsselmomente-Feed — akkumuliert die Bühnen-Spotlights
+  // (Stärkster Schub / Härtester Dämpfer / Kletterer) über ALLE bereits
+  // enthüllten Phasen (0…phaseIndex). Gleiche Logik wie `stageInfo`, nur je Phase
+  // statt nur der aktiven — spoilerfrei, weil verdeckte Phasen (> phaseIndex)
+  // ausgelassen werden.
+  const keyMoments = useMemo<ArenaKeyMoment[]>(() => {
+    if (boardSide === "total" || activeView.length === 0) {
+      return [];
+    }
+    const revealed = Math.min(phaseIndex, MATCHDAY_ARENA_PHASES.length - 1);
+    const entries: ArenaKeyMoment[] = [];
+    for (let i = 0; i <= revealed; i += 1) {
+      const phase = MATCHDAY_ARENA_PHASES[i];
+      if (!phase) {
+        continue;
+      }
+      let topGain: ArenaStageMover | null = null;
+      let topLoss: ArenaStageMover | null = null;
+      for (const row of activeView) {
+        const delta = getMatchdayArenaPhaseDelta(row, phase.id);
+        if (delta == null || delta === 0) {
+          continue;
+        }
+        if (delta > 0) {
+          if (!topGain || delta > topGain.value) {
+            topGain = { teamId: row.teamId, teamName: row.teamName, value: delta };
+          }
+        } else if (!topLoss || delta < topLoss.value) {
+          topLoss = { teamId: row.teamId, teamName: row.teamName, value: delta };
+        }
+      }
+      // Kletterer über den Rang-Sprung gegenüber der Phase davor (echte Presenter-Ränge).
+      let climber: ArenaStageMover | null = null;
+      const current = phaseRankMaps[i] ?? null;
+      const previous = i > 0 ? (phaseRankMaps[i - 1] ?? null) : null;
+      if (current && previous) {
+        for (const row of activeView) {
+          const rankDelta = getArenaStepRankDelta(current.get(row.teamId), previous.get(row.teamId));
+          if (rankDelta != null && rankDelta > 0 && (!climber || rankDelta > climber.value)) {
+            climber = { teamId: row.teamId, teamName: row.teamName, value: rankDelta };
+          }
+        }
+      }
+      if (topGain) {
+        entries.push({ key: `${phase.id}-gain`, phaseId: phase.id, phaseLabel: phase.label, kind: "gain", ...topGain });
+      }
+      if (topLoss) {
+        entries.push({ key: `${phase.id}-loss`, phaseId: phase.id, phaseLabel: phase.label, kind: "loss", ...topLoss });
+      }
+      if (climber) {
+        entries.push({ key: `${phase.id}-climb`, phaseId: phase.id, phaseLabel: phase.label, kind: "climb", ...climber });
+      }
+    }
+    return entries;
+  }, [activeView, phaseIndex, phaseRankMaps, boardSide]);
+
+  // Feature 3: Head-to-Head — eigenes Team gegen den unmittelbaren Rang-Nachbarn
+  // (bevorzugt eine Position darüber = das Team, das du jagst; als Erster gegen
+  // den Verfolger dahinter). Rein aus dem aktuell sortierten Board abgeleitet,
+  // Scores aus der laufenden Phase — spoilerfrei, identisch zu den Board-Werten.
+  const duel = useMemo(() => {
+    if (boardSide === "total" || boardRows.length < 2) {
+      return null;
+    }
+    const ownIndex = boardRows.findIndex((row) => row.teamId === params.teamId);
+    if (ownIndex < 0) {
+      return null;
+    }
+    const neighborIndex = ownIndex > 0 ? ownIndex - 1 : ownIndex + 1;
+    const own = boardRows[ownIndex];
+    const neighbor = boardRows[neighborIndex];
+    if (!own || !neighbor) {
+      return null;
+    }
+    const ownScore = getMatchdayArenaPhaseScore(own, activePhase) ?? 0;
+    const neighborScore = getMatchdayArenaPhaseScore(neighbor, activePhase) ?? 0;
+    const ownRank = rankMaps.current.get(own.teamId) ?? ownIndex + 1;
+    const neighborRank = rankMaps.current.get(neighbor.teamId) ?? neighborIndex + 1;
+    return {
+      own,
+      neighbor,
+      ownScore,
+      neighborScore,
+      ownRank,
+      neighborRank,
+      neighborIsAhead: ownIndex > 0,
+      scoreGap: Number((ownScore - neighborScore).toFixed(1)),
+    };
+  }, [boardRows, params.teamId, activePhase, rankMaps, boardSide]);
 
   // Gesamt-Tageswertung aus beiden Disziplin-Boards (echte Scores/Punkte).
   const totalRows = useMemo<ArenaNewLookTotalRow[]>(() => {
@@ -1669,6 +1810,198 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                         aria-label="Verlauf deines Rangs über die enthüllten Phasen (oben = besser)"
                       />
                     ) : null}
+                  </div>
+                ) : null}
+                {/* Feature 1: Erwartung vs. Ergebnis — nur in der Ergebnis-Phase
+                    (spoilerfrei). Zeigt Start-Rang (baseRank) → End-Rang des
+                    eigenen Teams samt Rang-Delta und zwei Vergleichs-Bars. */}
+                {isResultPhase && ownExpectation ? (
+                  <div
+                    className="nl-arena-expect"
+                    role="group"
+                    aria-label={`Erwartung gegen Ergebnis — ${ownExpectation.teamName}`}
+                  >
+                    <div className="nl-arena-expect-head">
+                      <span className="nl-arena-expect-eyebrow">Erwartung vs. Ergebnis</span>
+                      <span className="nl-arena-expect-team">{ownExpectation.teamName}</span>
+                    </div>
+                    <div className="nl-arena-expect-versus">
+                      <span
+                        className="nl-arena-expect-rank nl-tnum"
+                        title="Start-Rang nach der reinen Basiswertung (vor allen Modifikatoren)"
+                      >
+                        Start <strong>#{ownExpectation.baseRank}</strong>
+                      </span>
+                      <span className="nl-arena-expect-arrow" aria-hidden="true">
+                        →
+                      </span>
+                      <span
+                        className="nl-arena-expect-rank is-final nl-tnum"
+                        title="End-Rang in dieser Disziplin"
+                      >
+                        Ziel <strong>#{ownExpectation.finalRank}</strong>
+                      </span>
+                      <NlDeltaChip
+                        value={ownExpectation.rankDelta}
+                        format={(n) =>
+                          `${n > 0 ? "+" : ""}${formatNlNumber(n, 0)} ${Math.abs(n) === 1 ? "Rang" : "Ränge"}`
+                        }
+                        title="Rang-Bewegung vom Start- zum End-Rang (positiv = geklettert)"
+                      />
+                    </div>
+                    {/* Vergleichs-Bars: Füllgrad = besserer Rang voller
+                        (total − rank + 1), damit der Sprung sichtbar wird. */}
+                    <div className="nl-arena-expect-bars">
+                      <NlProgressBar
+                        label={`Start #${ownExpectation.baseRank}`}
+                        value={ownExpectation.total - ownExpectation.baseRank + 1}
+                        max={ownExpectation.total}
+                        tone="neutral"
+                        showValue={false}
+                        title={`Start-Rang ${ownExpectation.baseRank} von ${ownExpectation.total}`}
+                      />
+                      <NlProgressBar
+                        label={`Ziel #${ownExpectation.finalRank}`}
+                        value={ownExpectation.total - ownExpectation.finalRank + 1}
+                        max={ownExpectation.total}
+                        tone={
+                          ownExpectation.rankDelta > 0
+                            ? "good"
+                            : ownExpectation.rankDelta < 0
+                              ? "risk"
+                              : "accent"
+                        }
+                        showValue={false}
+                        title={`End-Rang ${ownExpectation.finalRank} von ${ownExpectation.total}`}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {/* Feature 3: Head-to-Head-Duell — eigenes Team gegen den direkten
+                    Rang-Nachbarn, zwei gegenläufige Vergleichs-Bars (F1-Timing-Tower)
+                    plus Score-/Rang-Abstand als Chips. Aktualisiert je Phase. */}
+                {duel ? (
+                  <div
+                    className="nl-arena-duel"
+                    role="group"
+                    aria-label={`Duell — ${duel.own.teamName} gegen ${duel.neighbor.teamName}`}
+                  >
+                    <div className="nl-arena-duel-head">
+                      <span className="nl-arena-duel-eyebrow">
+                        {duel.neighborIsAhead ? "Duell um den Platz davor" : "Duell mit dem Verfolger"}
+                      </span>
+                      <StatChipRow aria-label="Abstand zum Rang-Nachbarn">
+                        <StatChip
+                          label="Rang-Abstand"
+                          value={`#${duel.ownRank} · #${duel.neighborRank}`}
+                          tone="accent"
+                          title="Dein Rang gegenüber dem Rang des Nachbarn in dieser Phase"
+                        />
+                        <StatChip
+                          label="Score-Lücke"
+                          value={formatSignedNlDelta(duel.scoreGap)}
+                          tone={duel.scoreGap > 0 ? "good" : duel.scoreGap < 0 ? "risk" : "neutral"}
+                          title="Dein Score minus Score des Nachbarn (aktuelle Phase)"
+                        />
+                      </StatChipRow>
+                    </div>
+                    <div className="nl-arena-duel-bars">
+                      <button
+                        type="button"
+                        className="nl-arena-duel-side is-own"
+                        onClick={() => scrollToTeam(duel.own.teamId)}
+                        title={`${duel.own.teamName} im Board anzeigen`}
+                      >
+                        <span className="nl-arena-duel-side-name">
+                          <span className="nl-arena-duel-side-rank nl-tnum">#{duel.ownRank}</span>
+                          {duel.own.teamName}
+                          <span className="nl-arena-duel-side-badge">Du</span>
+                        </span>
+                        <NlProgressBar
+                          value={Math.max(0, duel.ownScore)}
+                          max={Math.max(maxPhaseScore, duel.ownScore, duel.neighborScore, 1)}
+                          tone="accent"
+                          showValue={false}
+                          format={(value) => formatNlNumber(value, 1)}
+                          title={`${duel.own.teamName}: ${formatNlNumber(duel.ownScore, 1)}`}
+                        />
+                        <span className="nl-arena-duel-side-score nl-tnum">
+                          {formatNlNumber(duel.ownScore, 1)}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="nl-arena-duel-side is-rival"
+                        onClick={() => scrollToTeam(duel.neighbor.teamId)}
+                        title={`${duel.neighbor.teamName} im Board anzeigen`}
+                      >
+                        <span className="nl-arena-duel-side-name">
+                          <span className="nl-arena-duel-side-rank nl-tnum">#{duel.neighborRank}</span>
+                          {duel.neighbor.teamName}
+                        </span>
+                        <NlProgressBar
+                          value={Math.max(0, duel.neighborScore)}
+                          max={Math.max(maxPhaseScore, duel.ownScore, duel.neighborScore, 1)}
+                          tone="neutral"
+                          showValue={false}
+                          format={(value) => formatNlNumber(value, 1)}
+                          title={`${duel.neighbor.teamName}: ${formatNlNumber(duel.neighborScore, 1)}`}
+                        />
+                        <span className="nl-arena-duel-side-score nl-tnum">
+                          {formatNlNumber(duel.neighborScore, 1)}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {/* Feature 2: Schlüsselmomente — persistenter, scrollbarer Ticker.
+                    Sammelt die Bühnen-Spotlights aller enthüllten Phasen (neueste
+                    oben); jeder Eintrag springt per scrollToTeam ins Board. */}
+                {keyMoments.length > 0 ? (
+                  <div
+                    className="nl-arena-ticker"
+                    role="group"
+                    aria-label="Schlüsselmomente der enthüllten Phasen"
+                  >
+                    <div className="nl-arena-ticker-head">
+                      <span className="nl-arena-ticker-title">Schlüsselmomente</span>
+                      <span className="nl-arena-ticker-count nl-tnum">{keyMoments.length}</span>
+                    </div>
+                    <ol className="nl-arena-ticker-list">
+                      {[...keyMoments].reverse().map((moment) => {
+                        const toneClass =
+                          moment.kind === "gain"
+                            ? " is-good"
+                            : moment.kind === "loss"
+                              ? " is-risk"
+                              : " is-accent";
+                        const kindLabel =
+                          moment.kind === "gain"
+                            ? "Schub"
+                            : moment.kind === "loss"
+                              ? "Dämpfer"
+                              : "Kletterer";
+                        const valueText =
+                          moment.kind === "climb"
+                            ? `+${moment.value} ${moment.value === 1 ? "Rang" : "Ränge"}`
+                            : formatSignedNlDelta(moment.value);
+                        return (
+                          <li key={moment.key} className="nl-arena-ticker-item">
+                            <button
+                              type="button"
+                              className={`nl-arena-ticker-entry${toneClass}`}
+                              onClick={() => scrollToTeam(moment.teamId)}
+                              title={`${moment.teamName} im Board anzeigen — ${moment.phaseLabel}: ${kindLabel}`}
+                            >
+                              <span className="nl-arena-ticker-phase">{moment.phaseLabel}</span>
+                              <span className="nl-arena-ticker-kind">{kindLabel}</span>
+                              <span className="nl-arena-ticker-team">{moment.teamName}</span>
+                              <span className="nl-arena-ticker-value nl-tnum">{valueText}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   </div>
                 ) : null}
               </>

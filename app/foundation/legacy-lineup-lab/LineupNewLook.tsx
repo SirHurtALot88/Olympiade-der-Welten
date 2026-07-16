@@ -19,6 +19,7 @@ import {
   type NlAxisKey,
   type NlTone,
 } from "@/components/foundation/new-look";
+import { VeloRangeBar } from "@/components/foundation/velo-ui/VeloRangeBar";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
@@ -182,6 +183,12 @@ function getAxisForCategory(category: string | null | undefined): NlAxisKey | nu
 }
 
 const NL_AXIS_AREA_LABEL: Record<NlAxisKey, string> = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" };
+
+/** Reason-Chip-Achse (pow/spe/men/soc) → Kit-Ton; unbekannt ⇒ neutral. */
+function reasonChipTone(axis: string): NlTone {
+  if (axis === "pow" || axis === "spe" || axis === "men" || axis === "soc") return axis;
+  return "neutral";
+}
 
 /* --- Kleinteile ------------------------------------------------------- */
 
@@ -808,6 +815,9 @@ export default function LineupNewLook({
   resolvePreview,
 }: LineupNewLookProps) {
   const [hoveredCandidateId, setHoveredCandidateId] = useState<string | null>(null);
+  // Compare-Tray (Feature 3): angehefteter Kandidat A; hovert man einen anderen
+  // (B), zeigt das Fokus-Panel A vs B (Radar-Overlay + Range + Delta).
+  const [pinnedCandidateId, setPinnedCandidateId] = useState<string | null>(null);
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
   // Optimieren-Panel: Upgrade-Hinweise für die volle Aufstellung (Feature 1, additiv).
   const [optimizeOpen, setOptimizeOpen] = useState(false);
@@ -1056,6 +1066,67 @@ export default function LineupNewLook({
   const focusLaneVerdict = getNlLaneVerdict(focusLaneD1, focusLaneD2);
   // Fatigue des Fokus-Spielers (Feature 2): als Mini-Gauge im Fokus-Panel.
   const focusFatigue = focusPlayer?.activePlayerId ? getSelectedOptionMeta(focusPlayer.activePlayerId)?.fatigueCount ?? null : null;
+
+  // Slot-Projektion eines Spielers im aktiven Slot (Feature 1/3): Range + Punkt
+  // aus dem activeSlotCandidate; für den bereits Gesetzten fällt die Range auf
+  // die Slot-Preview zurück. Erfindet keine Werte — fehlt beides, bleibt null.
+  const slotStatsForPlayer = (playerId: string | null | undefined) => {
+    if (!playerId) return null;
+    const entry = filteredCandidates.find((candidate) => candidate.player.activePlayerId === playerId) ?? null;
+    const asc = entry?.activeSlotCandidate ?? null;
+    const slotProjected = activeSlot ? slotPreviewByKey.get(activeSlot.key)?.projected ?? null : null;
+    const isSelected = activeSlot ? selections[activeSlot.key] === playerId : false;
+    return {
+      player: rosterCardByActivePlayerId.get(playerId) ?? entry?.player ?? null,
+      projected: asc?.projectedScore ?? (isSelected ? slotProjected?.totalProjected ?? null : null),
+      rangeLow: asc?.rangeLow ?? (isSelected ? slotProjected?.rangeLow ?? null : null),
+      rangeHigh: asc?.rangeHigh ?? (isSelected ? slotProjected?.rangeHigh ?? null : null),
+    };
+  };
+
+  // Confidence-Band des Fokus-Spielers (Feature 1).
+  const focusStats = slotStatsForPlayer(focusPlayerId);
+
+  // Compare-Tray-Zustand (Feature 3): aktiv, sobald ein Kandidat angeheftet ist
+  // UND ein anderer gehovert wird. Ohne Pin bleibt das Fokus-Panel unverändert.
+  const compareActive =
+    pinnedCandidateId != null && hoveredCandidateId != null && hoveredCandidateId !== pinnedCandidateId;
+  const compareA = compareActive ? slotStatsForPlayer(pinnedCandidateId) : null;
+  const compareB = compareActive ? slotStatsForPlayer(hoveredCandidateId) : null;
+  // Gemeinsame Skala beider Vergleichs-Bänder, damit A und B direkt vergleichbar sind.
+  const compareDomain = (() => {
+    if (!compareA || !compareB) return null;
+    const values = [compareA.rangeLow, compareA.rangeHigh, compareA.projected, compareB.rangeLow, compareB.rangeHigh, compareB.projected].filter(
+      (value): value is number => value != null && Number.isFinite(value),
+    );
+    if (values.length === 0) return null;
+    return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
+  })();
+
+  // Reason-Chips je Kandidat (Feature 2): Achsen-Begründung aus der Slot-Summary
+  // des aktiven Slots (bereits vorhanden, war ungenutzt). Key = activePlayerId.
+  const reasonChipsByPlayerId = useMemo(() => {
+    const top = activeSlotKey ? slotCandidateSummaryByKey.get(activeSlotKey)?.topCandidates ?? [] : [];
+    return new Map(
+      top
+        .filter((candidate) => (candidate.reasonChips?.length ?? 0) > 0)
+        .map((candidate) => [candidate.activePlayerId, candidate.reasonChips ?? []] as const),
+    );
+  }, [activeSlotKey, slotCandidateSummaryByKey]);
+
+  // Gemeinsame Skala für die Confidence-Bänder der Top-4-Kandidaten, damit die
+  // Bänder untereinander vergleichbar sind (sonst eigene Skala je Zeile).
+  const candidateRangeDomain = useMemo(() => {
+    const values: number[] = [];
+    for (const entry of filteredCandidates.slice(0, 4)) {
+      const asc = entry.activeSlotCandidate;
+      if (asc?.rangeLow != null) values.push(asc.rangeLow);
+      if (asc?.rangeHigh != null) values.push(asc.rangeHigh);
+      if (asc?.projectedScore != null) values.push(asc.projectedScore);
+    }
+    if (values.length === 0) return null;
+    return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
+  }, [filteredCandidates]);
 
   const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
   const activeCaptainEntries = captainSelectEntriesBySide[activeCaptainSide] ?? [];
@@ -1556,7 +1627,52 @@ export default function LineupNewLook({
               ) : null}
             </header>
 
-            {focusPlayer ? (
+            {compareActive && compareA?.player && compareB?.player ? (
+              // Compare-Tray (Feature 3): angeheftet (A) vs. gehovert (B) —
+              // Radar-Overlay (Mehrserien-Modus), beide Confidence-Bänder auf
+              // gemeinsamer Skala und das Projektions-Delta B − A.
+              <div className="nl-lineup-focus-player" data-testid="nl-lineup-compare">
+                <div className="nl-lineup-focus-radar">
+                  {compareA.player.coreStats && compareB.player.coreStats ? (
+                    <NlRadar
+                      max={100}
+                      axisDefs={(["pow", "spe", "men", "soc"] as const).map((key) => ({ key, label: NL_AXIS_AREA_LABEL[key] }))}
+                      series={[
+                        { id: "pin", label: compareA.player.name, tone: "accent", values: compareA.player.coreStats },
+                        { id: "hover", label: compareB.player.name, tone: "good", dashed: true, values: compareB.player.coreStats },
+                      ]}
+                      aria-label={`Vergleichs-Radar: ${compareA.player.name} gegen ${compareB.player.name}`}
+                    />
+                  ) : (
+                    <p className="nl-lineup-focus-noradar">Keine Achsen-Daten für den Vergleich.</p>
+                  )}
+                </div>
+                <div className="nl-lineup-focus-meta">
+                  <span className="nl-lineup-eyebrow">Vergleich · angeheftet vs. gehovert</span>
+                  <strong>
+                    {compareA.player.name} vs. {compareB.player.name}
+                  </strong>
+                  <StatChip label="A" value={formatNullableScore(compareA.projected)} sub={compareA.player.name} tone="accent" title="Angehefteter Kandidat" />
+                  {compareA.rangeLow != null && compareA.rangeHigh != null ? (
+                    <VeloRangeBar low={compareA.rangeLow} high={compareA.rangeHigh} point={compareA.projected} tone="neutral" compact domainMin={compareDomain?.min ?? null} domainMax={compareDomain?.max ?? null} />
+                  ) : null}
+                  <StatChip label="B" value={formatNullableScore(compareB.projected)} sub={compareB.player.name} tone="good" title="Gehoverter Kandidat" />
+                  {compareB.rangeLow != null && compareB.rangeHigh != null ? (
+                    <VeloRangeBar low={compareB.rangeLow} high={compareB.rangeHigh} point={compareB.projected} tone="positive" compact domainMin={compareDomain?.min ?? null} domainMax={compareDomain?.max ?? null} />
+                  ) : null}
+                  {compareA.projected != null && compareB.projected != null ? (
+                    <NlDeltaChip
+                      value={Number((compareB.projected - compareA.projected).toFixed(1))}
+                      format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`}
+                      title="Projektions-Delta: gehovert (B) − angeheftet (A)"
+                    />
+                  ) : null}
+                  <button type="button" className="nl-lineup-btn is-ghost is-small" onClick={() => setPinnedCandidateId(null)}>
+                    Vergleich lösen
+                  </button>
+                </div>
+              </div>
+            ) : focusPlayer ? (
               <div className="nl-lineup-focus-player">
                 <div className="nl-lineup-focus-radar">
                   {focusPlayer.coreStats ? (
@@ -1594,6 +1710,21 @@ export default function LineupNewLook({
                       Die frühere "Bester Slot: … · NN"-Zeile war nur das Maximum der
                       Lane-Werte und damit redundant — entfernt. */}
                   <NlLaneMeter bestD1={focusLaneD1} bestD2={focusLaneD2} />
+                  {/* Confidence-Band (Feature 1): projizierte Punktespanne des
+                      Fokus-Spielers im aktiven Slot (füllt den in Phase 0 durch
+                      den entfernten Zeilen-Lane-Meter freigewordenen Platz). */}
+                  {focusStats && focusStats.rangeLow != null && focusStats.rangeHigh != null ? (
+                    <VeloRangeBar
+                      low={focusStats.rangeLow}
+                      high={focusStats.rangeHigh}
+                      point={focusStats.projected}
+                      tone="neutral"
+                      compact
+                      ariaLabel={`Projektion ${formatNullableScore(focusStats.rangeLow)} bis ${formatNullableScore(focusStats.rangeHigh)}${
+                        focusStats.projected != null ? `, Fokus ${formatNullableScore(focusStats.projected)}` : ""
+                      }`}
+                    />
+                  ) : null}
                   {/* Fatigue als Mini-Gauge (Feature 2) statt bloßem Textwert. */}
                   {focusFatigue != null ? (
                     <NlFatigueGauge value={focusFatigue} label="Fatigue" title={`Fatigue ${Math.round(focusFatigue)}/100`} />
@@ -1605,6 +1736,23 @@ export default function LineupNewLook({
                   >
                     Profil
                   </button>
+                  {/* Pin-Affordanz (Feature 3): Fokus-Spieler zum Vergleich anheften;
+                      danach einen anderen Kandidaten hovern ⇒ A-vs-B-Compare-Tray. */}
+                  {focusPlayer.activePlayerId ? (
+                    <button
+                      type="button"
+                      className={`nl-lineup-btn is-ghost is-small${pinnedCandidateId === focusPlayer.activePlayerId ? " is-selected" : ""}`}
+                      aria-pressed={pinnedCandidateId === focusPlayer.activePlayerId}
+                      title="Zum Vergleich anheften — danach anderen Kandidaten hovern zeigt A vs B"
+                      onClick={() =>
+                        setPinnedCandidateId((current) =>
+                          current === focusPlayer.activePlayerId ? null : focusPlayer.activePlayerId ?? null,
+                        )
+                      }
+                    >
+                      {pinnedCandidateId === focusPlayer.activePlayerId ? "📌 Angeheftet" : "📌 Vergleichen"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -1705,6 +1853,9 @@ export default function LineupNewLook({
                   const isAssignedHere = Boolean(candidateId) && activeSelectionId === candidateId;
                   const bestSlots: NlBestSlotEntry[] = candidateId ? playerBestSlotSummaryByActivePlayerId.get(candidateId) ?? [] : [];
                   const bestSlot = bestSlots[0] ?? null;
+                  // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
+                  const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
+                  const candidateRange = entry.activeSlotCandidate ?? null;
 
                   return (
                     <button
@@ -1745,8 +1896,36 @@ export default function LineupNewLook({
                             {formatNullableScore(bestSlot.projectedScore)}
                           </small>
                         ) : null}
-                        {/* NlLaneMeter hier entfernt: dupliziert projected+delta,
-                            die rechts in .nl-lineup-candidate-score bereits stehen. */}
+                        {/* Reason-Chips (Feature 2): Top 1–2 Achsen-Begründungen als
+                            getönte StatChips (Achsen-Ton), statt nur Freitext oben. */}
+                        {reasonChips.length > 0 ? (
+                          <span className="nl-lineup-candidate-reasons">
+                            {reasonChips.slice(0, 2).map((chip) => (
+                              <StatChip
+                                key={chip.axis}
+                                label={chip.label}
+                                value={chip.rating ?? "—"}
+                                tone={reasonChipTone(chip.axis)}
+                                title={chip.detail}
+                              />
+                            ))}
+                          </span>
+                        ) : null}
+                        {/* Confidence-Band (Feature 1) auf den Top-4-Zeilen, gemeinsame
+                            Skala (candidateRangeDomain) ⇒ Bänder direkt vergleichbar.
+                            Ersetzt den in Phase 0 entfernten Zeilen-Lane-Meter. */}
+                        {index < 4 && candidateRange?.rangeLow != null && candidateRange?.rangeHigh != null ? (
+                          <VeloRangeBar
+                            low={candidateRange.rangeLow}
+                            high={candidateRange.rangeHigh}
+                            point={projectedScore}
+                            tone="neutral"
+                            compact
+                            domainMin={candidateRangeDomain?.min ?? null}
+                            domainMax={candidateRangeDomain?.max ?? null}
+                            ariaLabel={`Projektion ${formatNullableScore(candidateRange.rangeLow)} bis ${formatNullableScore(candidateRange.rangeHigh)}`}
+                          />
+                        ) : null}
                       </span>
                       <span className="nl-lineup-candidate-score">
                         <strong className="nl-tnum">{formatNullableScore(projectedScore)}</strong>

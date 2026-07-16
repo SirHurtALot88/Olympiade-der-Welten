@@ -1920,6 +1920,16 @@ export default function TransfermarktV2Client({
         previewAcceptChance={buyPreview?.acceptChance ?? null}
         previewCounterChance={buyPreview?.counterChance ?? null}
         previewRejectChance={buyPreview?.rejectChance ?? null}
+        offeredSalary={offeredSalary}
+        previewExpectedSalary={buyPreview?.expectedSalary ?? buyPreview?.baseExpectedSalary ?? null}
+        onOfferedSalaryChange={(value) => {
+          // Phase-2 F2 — Deal-Desk-Slider setzt dasselbe Angebots-State wie das Modal; der
+          // Manuell-Flag hält den Preview-Effekt auf dem 90-ms-Debounce-Pfad statt Auto-Reset.
+          setOfferedSalary(value);
+          setSalaryEditedManually(true);
+        }}
+        previewYearlySalarySchedule={buyPreview?.yearlySalarySchedule ?? null}
+        previewBuyoutCost={buyPreview?.buyoutCost ?? null}
         buyBlockingReasons={(buyPreview?.blockingReasons ?? []).map(formatNegotiationSignalLabel)}
         buyWarnings={filterVisibleNegotiationWarnings(buyPreview?.warnings).map(formatNegotiationSignalLabel)}
         topSixCount={topSixCount}
