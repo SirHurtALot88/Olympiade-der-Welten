@@ -1952,6 +1952,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             {activeView === "playerProfile" && playerProfileData ? (
               <PlayerProfileClient
                 data={playerProfileData}
+                gameState={gameState}
                 activeTab={playerProfileTab}
                 onTabChange={(tab) => {
                   setPlayerProfileTab(tab);

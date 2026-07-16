@@ -9,7 +9,7 @@ import { createEmptyLeaguePlayerHeatPools, type LeaguePlayerHeatPools } from "@/
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { groupObjectivesByCategory } from "@/lib/foundation/team-board-objectives";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
-import type { PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTypes";
+import type { GameState, PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTypes";
 
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import { buildTeamCareerSeries } from "@/lib/foundation/career-series";
@@ -357,6 +357,7 @@ function comparePlayersByOvr(left: TeamDetailDrawerPlayerCard, right: TeamDetail
 
 export default function TeamDetailDrawer({
   data,
+  gameState,
   onClose,
   onOpenPlayer,
   onOpenContracts,
@@ -365,6 +366,13 @@ export default function TeamDetailDrawer({
   leagueHeatPools,
 }: {
   data: TeamDetailDrawerData | null;
+  /**
+   * Voller GameState, durchgereicht vom Render-Ort, da der
+   * `FoundationStateProvider` im Foundation-Shell nicht mehr gemountet wird und
+   * `useFoundationStateOptional()` hier dauerhaft `null` liefert. Speist den
+   * Werdegang; bevorzugt vor dem (toten) Kontext: `gameState ?? foundationState?.gameState`.
+   */
+  gameState?: GameState | null;
   onClose: () => void;
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
   onOpenContracts?: () => void;
@@ -414,7 +422,8 @@ export default function TeamDetailDrawer({
   // "Neuer Look" (flag-gated, additive): season-over-season career series for
   // the Werdegang panel. With the flag OFF this stays null and nothing changes.
   const foundationState = useFoundationStateOptional();
-  const werdegangGameState = foundationState?.gameState ?? null;
+  // Prop zuerst (durchgereichter GameState), dann der (tote) Kontext als Fallback.
+  const werdegangGameState = gameState ?? foundationState?.gameState ?? null;
   const werdegangTeamId = data?.teamId ?? null;
   const werdegangSeries = useMemo(
     () =>

@@ -1673,6 +1673,7 @@ function PlayerDrawerLegacyHistoryTable<Row>({
 
 export default function PlayerDetailDrawer({
   data,
+  gameState,
   onClose,
   onOpenBuyPreview,
   onOpenTraining,
@@ -1688,6 +1689,14 @@ export default function PlayerDetailDrawer({
   variant = "drawer",
 }: {
   data: PlayerDetailDrawerData | null;
+  /**
+   * Voller GameState, durchgereicht vom Render-Ort (Profil-Seite über
+   * `PlayerProfileClient`), da der `FoundationStateProvider` im Foundation-Shell
+   * nicht mehr gemountet wird und `useFoundationStateOptional()` hier dauerhaft
+   * `null` liefert. Speist den Werdegang/Karriere-Verlauf; bevorzugt vor dem
+   * (toten) Kontext: `gameState ?? foundationState?.gameState`.
+   */
+  gameState?: GameState | null;
   onClose: () => void;
   onOpenBuyPreview?: (player: {
     playerId: string;
@@ -1760,7 +1769,9 @@ export default function PlayerDetailDrawer({
     }
   };
   const foundationState = useFoundationStateOptional();
-  const werdegangGameState = foundationState?.gameState ?? null;
+  // Prop zuerst (durchgereichter GameState vom Render-Ort), dann der (tote)
+  // Kontext als Fallback — sonst bleibt der Werdegang für gekaufte Spieler leer.
+  const werdegangGameState = gameState ?? foundationState?.gameState ?? null;
   const werdegangPlayerId = data?.playerId ?? null;
   const werdegangSeries = useMemo(
     () =>
@@ -2167,6 +2178,7 @@ export default function PlayerDetailDrawer({
             <>
               <PlayerHeroNewLook
                 data={data}
+                gameState={gameState}
                 roleLabel={isHiddenRoleTag(transferContext.roleTag) ? "" : formatRoleTag(transferContext.roleTag)}
                 caStars={newLookCaPo?.caStars ?? null}
                 poStars={newLookCaPo?.poStars ?? null}

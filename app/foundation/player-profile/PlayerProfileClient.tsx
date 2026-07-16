@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import { NlSubTabs } from "@/components/foundation/new-look";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import {
@@ -20,6 +21,8 @@ import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 type PlayerProfileClientProps = {
   data: PlayerDetailDrawerData;
+  /** Voller GameState — die Spielerprofil-Seite liegt außerhalb des FoundationStateProvider. */
+  gameState?: GameState | null;
   activeTab: PlayerProfileTabId;
   onTabChange: (tab: PlayerProfileTabId) => void;
   onClose?: () => void;
@@ -40,6 +43,7 @@ type PlayerProfileClientProps = {
 
 export default function PlayerProfileClient({
   data,
+  gameState,
   activeTab,
   onTabChange,
   onClose,
@@ -168,6 +172,7 @@ export default function PlayerProfileClient({
       <PlayerDetailDrawer
         variant="page"
         data={data}
+        gameState={gameState}
         onClose={() => {
           onClose?.();
         }}
