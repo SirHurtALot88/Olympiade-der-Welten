@@ -150,28 +150,25 @@ const THEME_FIT_VALUE = 12;
  * without any hard band filter, slot sequence, or stopUtility change. `state.composition` undefined
  * (COMPOSE off, or no plan for this team) ⇒ this returns 0 exactly, so buyUtility is untouched.
  */
-const COMPOSITION_VALUE = 34;
+// GENTLE nudge: the base organic economy already reaches opt, spreads within bands and keeps stars rare;
+// an aggressive composition term wrecks those virtues. Keep the term small so it only lifts the cheap
+// tail (Reserve → Depth/Backup) and grows Core toward Backup, WITHOUT overriding the base fill/price
+// economy that gets teams to opt. The per-tier band-position fade is applied uniformly INCLUDING premium
+// (superstar has no ceiling ⇒ treated as no fade) so it never makes stars relatively more attractive.
+const COMPOSITION_VALUE = 20;
 const COMPOSITION_OVERAGE_PENALTY = 8;
 const COMPOSITION_OVERAGE_FLOOR = -16;
-/**
- * How much the fill bonus fades from the band FLOOR/target to its CEILING. The tier is planned, but WHICH
- * body within the band should lean toward the cheaper end: grabbing the priciest in-band body (e.g. a
- * 29 MW Depth instead of ~22) drains the budget so the last slots go unfilled (below-opt spikes) AND
- * concentrates picks at bracket tops. Full bonus at/below targetMw, faded to (1-FADE) at the ceiling, so
- * mid/low-band bodies win the tier — budget stretches to OPT and picks spread within the band.
- */
-const COMPOSITION_TOPBAND_FADE = 0.75;
+/** Fade of the fill bonus from band target to ceiling, so the cheaper end of a band wins (budget stretches). */
+const COMPOSITION_TOPBAND_FADE = 0.5;
 
 function compositionAdjustment(player: OrganicPlayerView, state: OrganicTeamState): number {
   const comp = state.composition;
   if (!comp) return 0;
   const lane = classifyCompositionLane(player.marketValue, comp.brackets);
   const deficit = comp.counts[lane] - comp.boughtTiers[lane];
-  // deficit <= 0: this tier is already at/over target ⇒ a GENTLE malus (floored) that discourages
-  // over-concentrating one tier but is far smaller than BELOW_OPT_FILL_FLOOR(25)/ROTATION_VALUE(92), so
-  // it steers tier choice without ever blocking a needed below-opt fill.
+  // deficit <= 0: tier already at/over target ⇒ gentle floored malus (never blocks a below-opt fill).
   if (deficit <= 0) return Math.max(COMPOSITION_OVERAGE_FLOOR, COMPOSITION_OVERAGE_PENALTY * deficit);
-  // deficit > 0: fill bonus, faded toward the band ceiling so the cheaper end of the band wins the tier.
+  // deficit > 0: fill bonus, mildly faded toward the band ceiling so the cheaper end of the band wins.
   const band = comp.brackets[lane];
   const price = Math.max(0, player.marketValue);
   if (band.ceilingMw != null && band.ceilingMw > band.targetMw) {
