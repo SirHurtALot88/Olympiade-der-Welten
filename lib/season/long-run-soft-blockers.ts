@@ -49,6 +49,18 @@ export function isSoftPhaseAuditRed(
   // to test the sell/buy phase-separation fix in preseason/season_end. Not a real fix; only
   // active when explicitly opted in for a throwaway verification run. Revert before finishing.
   if (checkId === "draft_spend_plausible" && process.env.OLY_LONG_RUN_TEST_SOFT_DRAFT_SPEND === "1") return true;
+  // Diagnostic-only escape hatch: the pre-existing training/OVR peak-corridor RED
+  // (organic_peak_net_corridor — a separate training-balance issue) hard-stops the run at S1
+  // season_end, which blocks observing cross-season DRAFT behavior (value inflation, marquee
+  // cash-splurge over seasons). Only active when explicitly opted in for a throwaway observation
+  // run; does not change any game behavior. Not a fix for the corridor itself.
+  if (
+    checkId === "organic_peak_net_corridor" &&
+    phase === "season_end" &&
+    process.env.OLY_LONG_RUN_SOFT_TRAINING_CORRIDOR === "1"
+  ) {
+    return true;
+  }
   if (
     process.env.OLY_LONG_RUN_RELAX_DRAFT_TOPUP_AUDIT === "1" &&
     phase === "draft" &&
