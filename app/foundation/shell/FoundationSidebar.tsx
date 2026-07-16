@@ -34,7 +34,6 @@ const VIEW_WIDTH_SEGMENTS: ReadonlyArray<{
   title: string;
 }> = [
   { mode: "standard", label: "Standard", glyph: "▯", title: "Standardbreite — komfortabel, wie auf einem 15\"-MacBook" },
-  { mode: "wide", label: "Breit", glyph: "▭", title: "Breite Ansicht — mehr Inhalt pro Zeile" },
   { mode: "cinema", label: "Cinema", glyph: "▬", title: "Cinema — volle Breite, nutzt große 32\"-Monitore aus" },
 ];
 

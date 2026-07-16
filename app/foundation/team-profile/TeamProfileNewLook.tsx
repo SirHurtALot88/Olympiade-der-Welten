@@ -246,7 +246,7 @@ function buildTeamDepthChart(gameState: GameState, teamId: string): NlTeamProfil
     const capableCount = ranked.filter((entry) => entry.rating >= DEPTH_CAPABLE_RATING_FLOOR).length;
     const slotsNeeded = isFiniteNumber(discipline.playerCount) ? discipline.playerCount : null;
 
-    const cells: Array<NlTeamProfileDepthCell | null> = [0, 1, 2].map((index) => {
+    const cells: Array<NlTeamProfileDepthCell | null> = [0, 1, 2, 3, 4, 5].map((index) => {
       const entry = ranked[index];
       if (!entry) {
         return null;
@@ -658,7 +658,7 @@ export default function TeamProfileNewLook({
       return {
         axis: key,
         label,
-        cells: [0, 1, 2].map((index) => {
+        cells: [0, 1, 2, 3, 4, 5].map((index) => {
           const entry = ranked[index];
           return entry
             ? { playerId: entry.player.playerId, playerName: entry.player.name, rating: entry.rating }
@@ -1587,6 +1587,9 @@ export default function TeamProfileNewLook({
                     <th>1.</th>
                     <th>2.</th>
                     <th>3.</th>
+                    <th>4.</th>
+                    <th>5.</th>
+                    <th>6.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1656,41 +1659,54 @@ export default function TeamProfileNewLook({
                 Vereinfachte Ansicht (Achsen statt Einzeldisziplinen) — volle Disziplin-Tiefe benötigt Spielkontext.
               </p>
               <div className="nl-teamprofile-depth-shell">
+                {/* Transponiert: Achsen als Spalten (POW/SPE/MEN/SOC), Tiefe-Ränge (1.–6.) als Zeilen. */}
                 <table className="nl-teamprofile-depth-table nl-tnum">
                   <thead>
                     <tr>
-                      <th className="nl-teamprofile-depth-th-discipline">Achse</th>
-                      <th>1.</th>
-                      <th>2.</th>
-                      <th>3.</th>
+                      <th className="nl-teamprofile-depth-th-discipline">Tiefe</th>
+                      {depthChartFallback.map((column) => (
+                        <th
+                          key={column.axis}
+                          className={nlToneClass(column.axis)}
+                          style={{ color: "var(--nl-tone)" }}
+                        >
+                          <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />{" "}
+                          {column.label}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {depthChartFallback.map((row) => (
-                      <tr key={row.axis} className="nl-teamprofile-depth-row">
-                        <td className={`nl-teamprofile-depth-discipline ${nlToneClass(row.axis)}`}>
-                          <span className="nl-teamprofile-depth-axis-dot" aria-hidden="true" />
-                          {row.label}
+                    {[0, 1, 2, 3, 4, 5].map((rank) => (
+                      <tr key={rank} className="nl-teamprofile-depth-row">
+                        <td
+                          className="nl-teamprofile-depth-slots"
+                          style={{ textAlign: "left", fontWeight: 600 }}
+                        >
+                          {`${rank + 1}.`}
                         </td>
-                        {row.cells.map((cell, index) => (
-                          <td key={index} className="nl-teamprofile-depth-cell-wrap">
-                            {cell != null ? (
-                              <button
-                                type="button"
-                                className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
-                                onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
-                                title={`${cell.playerName} · ${row.label} ${formatNlNumber(cell.rating, 0)}`}
-                              >
-                                <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
-                                <span className="nl-teamprofile-depth-cell-rating nl-tnum">
-                                  {formatNlNumber(cell.rating, 0)}
-                                </span>
-                              </button>
-                            ) : (
-                              <span className="nl-teamprofile-depth-cell is-empty">—</span>
-                            )}
-                          </td>
-                        ))}
+                        {depthChartFallback.map((column) => {
+                          const cell = column.cells[rank] ?? null;
+                          return (
+                            <td key={column.axis} className="nl-teamprofile-depth-cell-wrap">
+                              {cell != null ? (
+                                <button
+                                  type="button"
+                                  className={`nl-teamprofile-depth-cell ${nlToneClass(getDepthRatingTone(cell.rating))}`}
+                                  onClick={() => onOpenPlayer(cell.playerId, cell.playerId)}
+                                  title={`${cell.playerName} · ${column.label} ${formatNlNumber(cell.rating, 0)}`}
+                                >
+                                  <span className="nl-teamprofile-depth-cell-name">{cell.playerName}</span>
+                                  <span className="nl-teamprofile-depth-cell-rating nl-tnum">
+                                    {formatNlNumber(cell.rating, 0)}
+                                  </span>
+                                </button>
+                              ) : (
+                                <span className="nl-teamprofile-depth-cell is-empty">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>

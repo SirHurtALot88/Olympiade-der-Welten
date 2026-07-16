@@ -754,7 +754,9 @@ a {
   top: 12px;
   display: grid;
   gap: 14px;
-  padding: 14px 12px;
+  /* Etwas großzügigeres inneres Seitenpadding (war 12px) — der Nav-Inhalt
+     klebte zu dicht am linken Rand. 16px gibt Luft, bleibt aber kompakt. */
+  padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(8, 14, 28, 0.92);
@@ -47208,32 +47210,29 @@ button.foundation-team-portrait-card {
   }
 }
 
-/* Task 6 — WIDE/CINEMA: Such-/Filter-Panel in die rechte Freifläche.
-   Bei breiter Renderbreite (data-view-width auf dem Shell-<main>, das auch
+/* Task 6 — CINEMA: Such-/Filter-Panel in die rechte Freifläche.
+   Bei voller Renderbreite (data-view-width auf dem Shell-<main>, das auch
    .is-new-look trägt) wird die Kandidatenliste nicht breiter — rechts bleibt
    Platz. Der Body-Wrapper (.nl-market-body) umschließt Controls-Karte +
    Hauptraster; im Standard ist er `display: contents` (unsichtbar, der bisherige
-   Block-Stack bleibt exakt erhalten). In Breit/Cinema wird er ein zweispaltiges
+   Block-Stack bleibt exakt erhalten). In Cinema wird er ein zweispaltiges
    Raster: Hauptraster links, Filter als STICKY Sidebar rechts. Genau EINE
    Grid-Zeile → keine Phantom-Row-Gaps; Sidebar klebt über die volle Höhe des
    Hauptrasters (align-self:start + sticky). */
 .is-new-look .nl-market-body {
   display: contents;
 }
-.is-new-look[data-view-width="wide"] .nl-market-body,
 .is-new-look[data-view-width="cinema"] .nl-market-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
   gap: var(--nl-s4);
   align-items: start;
 }
-.is-new-look[data-view-width="wide"] .nl-market-body > .nl-market-main-grid,
 .is-new-look[data-view-width="cinema"] .nl-market-body > .nl-market-main-grid {
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
 }
-.is-new-look[data-view-width="wide"] .nl-market-body > .nl-market-controls-card,
 .is-new-look[data-view-width="cinema"] .nl-market-body > .nl-market-controls-card {
   grid-column: 2;
   grid-row: 1;
@@ -47243,12 +47242,10 @@ button.foundation-team-portrait-card {
   min-width: 0;
 }
 /* In der schmalen Sidebar die Filter-Steuerung vertikal stapeln. */
-.is-new-look[data-view-width="wide"] .nl-market-controls-card .nl-market-controls,
 .is-new-look[data-view-width="cinema"] .nl-market-controls-card .nl-market-controls {
   flex-direction: column;
   align-items: stretch;
 }
-.is-new-look[data-view-width="wide"] .nl-market-controls-card .nl-market-search,
 .is-new-look[data-view-width="cinema"] .nl-market-controls-card .nl-market-search {
   min-width: 0;
 }
@@ -50999,7 +50996,9 @@ button.foundation-team-portrait-card {
    Gleiche .foundation-manager-team*-Klassen wie zuvor, hier nur auf die
    schmale Sidebar-Spalte herunterskaliert. ── */
 .foundation-sidebar-team-picker {
-  margin: 0 10px 10px;
+  /* Bündig zum linken Rand der Nav-Gruppen-Labels & -Items (kein seitlicher
+     Margin mehr — vorher `0 10px`, wodurch der Picker eingerückt wirkte). */
+  margin: 0 0 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -51034,33 +51033,24 @@ button.foundation-team-portrait-card {
    ────────────────────────────────────────────────────────────────────
    Ersetzt funktional den entfernten kosmetischen Neuer-Look-Toggle: ein
    kleiner, unaufdringlicher Segmented-Control in der Sidebar (Standard /
-   Breit / Cinema) wählt die Renderbreite der App. Die Wahl setzt
+   Cinema) wählt die Renderbreite der App. Die Wahl setzt
    `data-view-width` auf `<main class="app-shell foundation-shell …">`
    (siehe FoundationShellRouterBody). Die Basis-Breitenregel
    (`.foundation-shell.app-shell`, weiter oben) bleibt der Standard —
-   hier werden nur `wide`/`cinema` als breitere Kappen ergänzt. `width:
+   hier wird nur `cinema` als volle Breite ergänzt. `width:
    min(…, calc(100vw - 24px))` sorgt weiterhin dafür, dass kleine
    Viewports korrekt kollabieren (kein horizontaler Overflow).
    ════════════════════════════════════════════════════════════════════ */
 
 /* standard = unveränderter Default (min(1880px, calc(100vw - 24px))).
-   wide = breitere Kappe, cinema = effektiv volle Viewport-Breite. */
-.foundation-shell.app-shell[data-view-width="wide"] {
-  /* Tighter side gutter (was 100vw - 48px) so "Breit" actually hugs the
-     viewport edges instead of leaving noticeable empty space left/right. */
-  width: min(2600px, calc(100vw - 16px));
-}
+   cinema = effektiv volle Viewport-Breite. */
 .foundation-shell.app-shell[data-view-width="cinema"] {
   width: calc(100vw - 24px);
 }
 
-/* On very large / 4K-class viewports (32"+ monitors), let "Breit" scale up
-   further instead of staying pinned at the 2600px cap above — otherwise
-   "Breit" still leaves huge empty side margins on a 3840px-wide screen. */
+/* On very large / 4K-class viewports (32"+ monitors), let "Cinema" hug the
+   edges a little tighter. */
 @media (min-width: 2400px) {
-  .foundation-shell.app-shell[data-view-width="wide"] {
-    width: min(3200px, calc(100vw - 32px));
-  }
   .foundation-shell.app-shell[data-view-width="cinema"] {
     width: calc(100vw - 48px);
   }
@@ -51069,18 +51059,13 @@ button.foundation-team-portrait-card {
 /* The shell's own width above only affects the outer frame — the inner
    content (.foundation-shell-main and the wide table/panel shells) had
    fixed max-width caps (~1500–1840px) that applied regardless of the
-   shell's width, so widening the shell alone did not make Breit/Cinema
-   actually use the extra space. Relax those caps under wide/cinema only;
-   Standard keeps the original caps from the media queries above untouched. */
-.foundation-shell[data-view-width="wide"] .foundation-shell-main,
+   shell's width, so widening the shell alone did not make Cinema actually
+   use the extra space. Relax those caps under cinema only; Standard keeps
+   the original caps from the media queries above untouched. */
 .foundation-shell[data-view-width="cinema"] .foundation-shell-main {
   max-width: min(2600px, calc(100vw - 380px));
 }
 
-.foundation-shell[data-view-width="wide"] .market-v2-shell,
-.foundation-shell[data-view-width="wide"] .season-v2-shell,
-.foundation-shell[data-view-width="wide"] .training-compact-shell,
-.foundation-shell[data-view-width="wide"] .facilities-v2-shell,
 .foundation-shell[data-view-width="cinema"] .market-v2-shell,
 .foundation-shell[data-view-width="cinema"] .season-v2-shell,
 .foundation-shell[data-view-width="cinema"] .training-compact-shell,
@@ -51089,12 +51074,7 @@ button.foundation-team-portrait-card {
 }
 
 @media (min-width: 2400px) {
-  .foundation-shell[data-view-width="wide"] .foundation-shell-main,
   .foundation-shell[data-view-width="cinema"] .foundation-shell-main,
-  .foundation-shell[data-view-width="wide"] .market-v2-shell,
-  .foundation-shell[data-view-width="wide"] .season-v2-shell,
-  .foundation-shell[data-view-width="wide"] .training-compact-shell,
-  .foundation-shell[data-view-width="wide"] .facilities-v2-shell,
   .foundation-shell[data-view-width="cinema"] .market-v2-shell,
   .foundation-shell[data-view-width="cinema"] .season-v2-shell,
   .foundation-shell[data-view-width="cinema"] .training-compact-shell,
