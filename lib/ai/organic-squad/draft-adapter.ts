@@ -25,7 +25,7 @@ import {
   type OrganicTeamState,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
-import { sellUtility } from "@/lib/ai/organic-squad/utility";
+import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
@@ -38,6 +38,16 @@ import {
 
 /** Small flat solvency buffer (MW) — the floor of the cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
+
+/**
+ * Env flag for ANPASSUNG B (cash-scaled opt-trim). optTarget is otherwise cash-blind (weights.ts derives
+ * it purely from identity playerOpt + GM depth/elite bias), so a cash-thin club spreads its small budget
+ * over too many slots → budget-per-slot collapses → the last slots become Backup/Reserve scraps. When a
+ * club can't fund Depth-grade bodies across all its open slots, trim the target by up to 2 slots so the
+ * budget-per-slot rises enough to afford Depth — fewer but better bodies. Rich clubs (strain 0) untouched;
+ * below-opt is measured against the trimmed target so it does NOT rise. Default OFF.
+ */
+const FILLQ_B_ENABLED = process.env.OLY_DRAFT_FILLQB === "1";
 /**
  * The cash buffer scales with the club's WAGE BILL ("auch Top-/Aggro-Teams sollen was auf die Seite legen,
  * z.B. 0.25–0.5× Salary"): a club must keep roughly this fraction of its recurring salary as reserve, so a
@@ -312,6 +322,20 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     .filter((view) => view.marketValue > 0);
   const salaryTotal = startingSquad.reduce((sum, view) => sum + view.salary, 0);
 
+  // ANPASSUNG B: cash-scaled opt-trim. If the club can't fund Depth-grade bodies across every open slot,
+  // trim optTarget by up to 2 (never below ROSTER_MIN) so per-slot budget rises and Depth becomes
+  // affordable — fewer, better bodies instead of a Reserve tail. Rich clubs get strain 0 (untouched).
+  let planWeights = ctx.weights;
+  if (FILLQ_B_ENABLED) {
+    const slotsToFill = Math.max(1, ctx.weights.optTarget - startingSquad.length);
+    const budgetPerSlot = (ctx.cash - ORGANIC_CASH_BUFFER) / slotsToFill;
+    const strain = Math.min(1, Math.max(0, 1 - budgetPerSlot / DEPTH_REF_COST));
+    const trimmedOpt = Math.max(ROSTER_MIN, ctx.weights.optTarget - Math.round(2 * strain));
+    if (trimmedOpt !== ctx.weights.optTarget) {
+      planWeights = { ...ctx.weights, optTarget: trimmedOpt };
+    }
+  }
+
   const result = buildOrganicSquadPlan({
     startingSquad,
     candidates,
@@ -326,7 +350,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
       sponsorIncome: input.forecast?.sponsorIncome ?? 0,
       facilityNet: input.forecast?.facilityNet ?? 0,
       netTransfer: input.forecast?.netTransfer ?? 0,
-      weights: ctx.weights,
+      weights: planWeights,
       rosterMax: ctx.rosterMax,
       rosterMin: ROSTER_MIN,
       // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
@@ -342,7 +366,7 @@ export function planOrganicDraftForTeam(input: OrganicDraftPlanInput): OrganicDr
     finalSalaryTotal: result.finalSalaryTotal,
     finalRosterSize: result.finalSquad.length,
     stoppedBelowMin: result.stoppedBelowMin,
-    optTarget: ctx.weights.optTarget,
+    optTarget: planWeights.optTarget,
   };
 }
 

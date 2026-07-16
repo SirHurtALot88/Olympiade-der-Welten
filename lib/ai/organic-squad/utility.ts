@@ -45,6 +45,23 @@ const IDFIT_ENABLED = process.env.OLY_DRAFT_IDFIT === "1";
 const STRAIN_ENABLED = process.env.OLY_DRAFT_STRAIN === "1";
 
 /**
+ * Env flag for ANPASSUNG A (cash-scaled fill-quality bonus, see buyUtility). The below-opt fill value
+ * is otherwise tier-blind — a cheap Reserve body earns the same rotationValue as a Depth body, so the
+ * linear price term always picks the cheapest, flooding rosters with Backup/Reserve. This makes the
+ * fill value quality-aware (capped at core-grade so no star inflation) and cash-scaled so it fades to a
+ * no-op exactly when a team can't afford Depth-grade bodies → no below-opt risk. Default OFF.
+ */
+const FILLQ_A_ENABLED = process.env.OLY_DRAFT_FILLQA === "1";
+
+/**
+ * Reference effective cost of a Depth-grade body (~22-25 MW + capitalized wage). Used to gauge whether
+ * a team's per-slot budget can afford Depth-grade fill (Anpassung A + B). Exported for draft-adapter B.
+ */
+export const DEPTH_REF_COST = 30;
+/** Utility weight of the fill-quality bonus (Anpassung A). */
+const FILL_QUALITY_VALUE = 30;
+
+/**
  * Quality of a solid, rotation-grade CORE body — the line above which quality is a genuine "star
  * premium". Quality up to this is the BASE (every core/depth body provides it, valued by the breadth
  * coverage curve, UNGATED); only quality ABOVE this — the star/superstar premium — is gated by how
@@ -308,13 +325,25 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   const belowOptFraction = Math.max(0, (w.optTarget - state.rosterSize) / Math.max(1, w.optTarget));
   const belowOpt = state.rosterSize < w.optTarget ? 1 : 0;
   const rotationValue = ROTATION_VALUE * belowOptFraction + BELOW_OPT_FILL_FLOOR * belowOpt;
+  // ANPASSUNG A: cash-scaled fill-quality bonus — breaks the tier-blindness of rotationValue so a
+  // Depth-grade body outranks a Reserve scrap for the same fill slot, WHEN the team can afford it.
+  // Capped at SUPPORT_QUALITY_BASELINE (core-grade) so it never inflates star buys, and multiplied by
+  // cashComfort (→0 when per-slot budget can't fund a Depth body) so cash-thin teams still take the
+  // cheap body and reach opt — no below-opt risk. No-op unless OLY_DRAFT_FILLQA=1.
+  const fillQualityBonus = FILLQ_A_ENABLED
+    ? belowOpt *
+      FILL_QUALITY_VALUE *
+      clamp(Math.min(computePlayerQuality(player, state.needAxisWeights), SUPPORT_QUALITY_BASELINE) / SUPPORT_QUALITY_BASELINE, 0, 1) *
+      clamp(state.cash / (optSlotsRemaining * DEPTH_REF_COST), 0, 1)
+    : 0;
   const themeFitValue = THEME_FIT_VALUE * (player.themeFit ?? 0);
   // No MW-cap / premium term: "too expensive" is judged purely by wThrift·priceInSlots·PRICE_SLOT_SCALE
   // — the player's price measured against THIS club's actual budget-per-slot — so the star ceiling
   // emerges from each club's economy, not a fixed line.
   return (
     w.wWin * deltaStrength +
-    rotationValue -
+    rotationValue +
+    fillQualityBonus -
     w.wThrift * priceStrain * PRICE_SLOT_SCALE -
     w.wSustain * wageStrain(player, state) +
     w.wAsset * potential +
