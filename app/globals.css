@@ -46384,19 +46384,36 @@ button.foundation-team-portrait-card {
   cursor: pointer;
 }
 
-.is-new-look .nl-market-ratio-chips {
+.is-new-look .nl-market-ratio-slider {
   display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--nl-s1);
+  flex-direction: column;
+  gap: 4px;
+  min-width: 190px;
 }
 
-.is-new-look .nl-market-ratio-chips-label {
+.is-new-look .nl-market-ratio-slider-label {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--nl-mut);
+}
+
+.is-new-look .nl-market-ratio-slider-label strong {
+  color: var(--nl-ink);
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.is-new-look .nl-market-ratio-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--nl-accent);
+  cursor: pointer;
+}
+
+/* Achs-Mindestwert-Label ist statisch (kein Toggle mehr) — Standard-Cursor. */
+.is-new-look .nl-market-axis-min-label {
+  cursor: default;
 }
 
 /* CA-Sterne inline (ersetzt den entfernten OVR-Wert): nur die CA-Zeile zeigen,

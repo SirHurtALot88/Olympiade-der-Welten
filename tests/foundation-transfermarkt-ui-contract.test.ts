@@ -101,7 +101,9 @@ describe("foundation transfermarkt ui contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(fileText).toContain("nl-market-ratio-chips");
+    // Mindest-MW/Gehalt-Ratio ist jetzt ein Range-Slider (statt Schnell-Chips).
+    expect(fileText).toContain("nl-market-ratio-slider");
+    expect(fileText).toContain('type="range"');
     expect(fileText).toContain("MW ÷ Gehalt ≥");
     expect(fileText).toContain("minRatioFilter");
     expect(fileText).toContain("setMaxSalary");
