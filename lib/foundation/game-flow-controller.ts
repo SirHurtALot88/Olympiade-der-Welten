@@ -394,16 +394,6 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       teamId,
     }),
     step({
-      stepId: "appoint_captain",
-      label: "Kapitän ernennen",
-      cta: "Weiter: Kapitän wählen",
-      status: resolveOnboardingStepStatus(flow, "appoint_captain", gameState, teamId),
-      targetView: "home",
-      targetPanel: "captain-picker",
-      teamId,
-      blockers: teamId ? [] : ["no_active_team"],
-    }),
-    step({
       stepId: "first_transfers",
       label: "Erste Transfers",
       cta: "Weiter: Transfermarkt",
@@ -440,6 +430,18 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       status: resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId),
       targetView: "scoutingCenterV2",
       teamId,
+    }),
+    step({
+      // Kapitän erst NACH dem finalen Kader (Käufe) + Training ernennen — so
+      // kann auch ein neu gekaufter/entwickelter Spieler Kapitän werden.
+      stepId: "appoint_captain",
+      label: "Kapitän ernennen",
+      cta: "Weiter: Kapitän wählen",
+      status: resolveOnboardingStepStatus(flow, "appoint_captain", gameState, teamId),
+      targetView: "home",
+      targetPanel: "captain-picker",
+      teamId,
+      blockers: teamId ? [] : ["no_active_team"],
     }),
     step({
       stepId: "choose_sponsor",

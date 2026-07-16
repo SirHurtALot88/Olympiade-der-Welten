@@ -536,6 +536,45 @@ describe("game flow controller", () => {
     expect(flow.currentStep.stepId).toBe("choose_sponsor");
   });
 
+  it("appoints the captain after buying + training in season 1 onboarding, not before", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["md-1"] },
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            dismissed: false,
+            selectedTeamId: "M-M",
+            steps: [
+              { stepId: "team_confirm", status: "open" },
+              { stepId: "roster_review", status: "open" },
+              { stepId: "first_transfers", status: "open" },
+              { stepId: "fill_roster", status: "open" },
+              { stepId: "training_facilities", status: "open" },
+              { stepId: "appoint_captain", status: "open" },
+              { stepId: "choose_sponsor", status: "open" },
+            ],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    const ids = flow.steps.map((entry) => entry.stepId);
+    const captainIdx = ids.indexOf("appoint_captain");
+    const transfersIdx = ids.indexOf("first_transfers");
+    const trainingIdx = ids.indexOf("training_facilities");
+    const sponsorIdx = ids.indexOf("choose_sponsor");
+
+    expect(captainIdx).toBeGreaterThanOrEqual(0);
+    expect(captainIdx).toBeGreaterThan(transfersIdx); // nach Käufen
+    expect(captainIdx).toBeGreaterThan(trainingIdx); // nach Training
+    expect(captainIdx).toBeLessThan(sponsorIdx); // vor Sponsor
+  });
+
   it("keeps sponsor choice optional in later seasons without onboarding", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
