@@ -16,6 +16,7 @@ import { getScoutingTierWindow, resolveScoutingConfidenceFromLevel } from "@/lib
 import { computeCompositeTopSixAverage, computeDisciplineTopSixImpact, computeTopSixAxisImpact, computeCandidateAxisTeamRankEstimates } from "@/lib/market/transfermarkt-roster-impact";
 import { officialDisciplineWeightOrder, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { appendRoomContextToParams, readFoundationRoomContextFromLocation, withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
+import { formatMarketPreviewError } from "@/lib/room/parse-room-write-context";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
@@ -396,13 +397,10 @@ function passesMarketFitVisibilityFilter(item: TransfermarktFreeAgentItem, hideP
 
 function passesMarketAxisFilters(
   item: TransfermarktFreeAgentItem,
-  selectedAxes: MarketAxisKey[],
   axisMinimums: Record<MarketAxisKey, number>,
 ) {
-  if (selectedAxes.length === 0) {
-    return true;
-  }
-  return selectedAxes.every((axis) => {
+  // Jeder Achs-Mindestwert filtert eigenständig (unabhängig voneinander); 0 = aus.
+  return (Object.keys(axisMinimums) as MarketAxisKey[]).every((axis) => {
     const minimum = axisMinimums[axis];
     if (minimum <= 0) {
       return true;
@@ -722,6 +720,10 @@ export default function TransfermarktV2Client({
   }, [marketItems]);
   const ratioSliderMax = Math.max(1, maxLoadedRatio);
   const effectiveMinRatio = maxRatio > 0 ? Math.min(maxRatio, ratioSliderMax) : 0;
+  // Anzahl aktiver Achs-Mindestwerte (> 0) — jeder filtert eigenständig.
+  const activeAxisMinimumCount = (Object.keys(axisMinimums) as MarketAxisKey[]).filter(
+    (axis) => axisMinimums[axis] > 0,
+  ).length;
 
   const visibleItems = useMemo(() => {
     const filtered = marketItems.filter((item) => {
@@ -752,14 +754,14 @@ export default function TransfermarktV2Client({
           return false;
         }
       }
-      if (!passesMarketAxisFilters(item, selectedAxes, axisMinimums)) {
+      if (!passesMarketAxisFilters(item, axisMinimums)) {
         return false;
       }
       return true;
     });
 
     return sortCandidates(filtered, sortMode);
-  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedAxes, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
+  }, [axisMinimums, effectiveMinRatio, effectiveMaxSalary, effectiveMaxValue, hidePoorFit, marketItems, minFit, selectedClassAxes, selectedClassNames, selectedRaceNames, sortMode]);
   const selectedPlayer = useMemo(
     () =>
       visibleItems.find((item) => item.playerId === selectedPlayerId) ??
@@ -1361,7 +1363,7 @@ export default function TransfermarktV2Client({
             setMarketItems([]);
             setMarketTotal(0);
             setMarketHasMore(false);
-            setMarketError(payload.error ?? "Transfermarkt konnte nicht geladen werden.");
+            setMarketError(formatMarketPreviewError(payload.error) ?? "Transfermarkt konnte nicht geladen werden.");
             return;
           }
 
@@ -1641,7 +1643,7 @@ export default function TransfermarktV2Client({
           setOfferedSalary(payload.summary.offeredSalary);
         }
         if ((!response.ok || payload.error) && !payload.summary) {
-          setPreviewError(payload.error ?? "Vorschau konnte nicht geladen werden.");
+          setPreviewError(formatMarketPreviewError(payload.error) ?? "Vorschau konnte nicht geladen werden.");
           return;
         }
         setPreviewError(null);
@@ -1716,7 +1718,10 @@ export default function TransfermarktV2Client({
       });
       const payload = (await response.json()) as MarketBuyResponse;
       if (!response.ok || payload.error || !payload.summary?.canBuy) {
-        setPreviewError(payload.error ?? payload.summary?.blockingReasons?.[0] ?? "Kauf konnte nicht bestätigt werden.");
+        setPreviewError(
+          formatMarketPreviewError(payload.error ?? payload.summary?.blockingReasons?.[0]) ??
+            "Kauf konnte nicht bestätigt werden.",
+        );
         return;
       }
       setBuyPreview(payload.summary);
@@ -1925,16 +1930,19 @@ export default function TransfermarktV2Client({
         onSortModeChange={(mode) => setSortMode(mode)}
         selectedClassAxes={selectedClassAxes}
         onToggleClassAxis={(axis) => setSelectedClassAxes((current) => toggleSelection(current, axis))}
-        selectedAxes={selectedAxes}
         axisMinimums={axisMinimums}
-        onToggleAxis={(axis) => setSelectedAxes((current) => toggleSelection(current, axis))}
         onAxisMinimumChange={(axis, value) => setAxisMinimums((current) => ({ ...current, [axis]: value }))}
         hidePoorFit={hidePoorFit}
         onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
         minRatioFilter={maxRatio}
         onMinRatioFilterChange={(value) => setMaxRatio(value)}
         onResetFilters={resetMarketFilters}
-        activeFilterCount={selectedClassNames.length + selectedRaceNames.length + selectedAxes.length + selectedClassAxes.length}
+        activeFilterCount={
+          selectedClassNames.length +
+          selectedRaceNames.length +
+          activeAxisMinimumCount +
+          selectedClassAxes.length
+        }
         candidates={renderedVisibleItems}
         totalVisibleCount={visibleItems.length}
         selectedPlayerId={selectedPlayer?.playerId ?? null}

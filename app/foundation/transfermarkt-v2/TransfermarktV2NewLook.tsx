@@ -98,8 +98,8 @@ const NL_MARKET_SORT_TITLES: Record<TransfermarktNewLookSortMode, string> = {
 
 const NL_MARKET_SORT_ORDER: TransfermarktNewLookSortMode[] = ["need", "fit", "value", "potential", "cheap", "salary"];
 const NL_MARKET_AXES: NlAxisKey[] = ["pow", "spe", "men", "soc"];
-/** Schnell-Stufen für den Mindest-MW/Gehalt-Filter (Value = MW ÷ Gehalt). */
-const NL_MARKET_RATIO_STEPS = [1, 1.5, 2.5, 4] as const;
+/** Obergrenze des Mindest-MW/Gehalt-Sliders (Value = MW ÷ Gehalt); 0 = Filter aus. */
+const NL_MARKET_RATIO_SLIDER_MAX = 8;
 
 /** Achse → Vorsaison-Feld (Performance-Punkte + Rang) auf RosterRow.previousSeasonAxis. */
 const NL_PREV_SEASON_AXIS_KEYS: Record<
@@ -260,15 +260,13 @@ export type TransfermarktV2NewLookProps = {
   onSortModeChange: (mode: TransfermarktNewLookSortMode) => void;
   selectedClassAxes: NlAxisKey[];
   onToggleClassAxis: (axis: NlAxisKey) => void;
-  /** Achsen mit aktivem Mindestwert-Filter (POW/SPE/MEN/SOC), unabhängig von selectedClassAxes. */
-  selectedAxes: NlAxisKey[];
+  /** Mindestwert-Filter je Achse (POW/SPE/MEN/SOC); Wert > 0 filtert unabhängig. */
   axisMinimums: Record<NlAxisKey, number>;
-  onToggleAxis: (axis: NlAxisKey) => void;
   onAxisMinimumChange: (axis: NlAxisKey, value: number) => void;
   /** Blendet Kandidaten mit negativem Fit aus (Söldner immer sichtbar); Default an. */
   hidePoorFit: boolean;
   onToggleHidePoorFit: () => void;
-  /** Mindest-MW/Gehalt-Ratio (0 = aus). Chips ≥1 / ≥1,5 / ≥2,5 / ≥4. */
+  /** Mindest-MW/Gehalt-Ratio (0 = aus). Range-Slider 0–8, Schritt 0,5. */
   minRatioFilter: number;
   onMinRatioFilterChange: (value: number) => void;
   onResetFilters: () => void;
@@ -503,9 +501,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onSortModeChange,
     selectedClassAxes,
     onToggleClassAxis,
-    selectedAxes,
     axisMinimums,
-    onToggleAxis,
     onAxisMinimumChange,
     hidePoorFit,
     onToggleHidePoorFit,
@@ -765,18 +761,16 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
           </div>
           <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
             {NL_MARKET_AXES.map((axis) => {
-              const active = selectedAxes.includes(axis);
+              // Ein Mindestwert > 0 filtert eigenständig — kein separater Toggle mehr nötig.
+              const active = axisMinimums[axis] > 0;
               return (
                 <div key={`nl-axis-min-${axis}`} className={`nl-market-axis-min ${nlToneClass(axis)}${active ? " is-active" : ""}`}>
-                  <button
-                    type="button"
-                    className={`nl-market-pill ${nlToneClass(axis)}${active ? " is-active" : ""}`}
-                    aria-pressed={active}
-                    onClick={() => onToggleAxis(axis)}
-                    title={`${NL_AXIS_LABELS[axis]}-Mindestwert aktivieren/deaktivieren`}
+                  <span
+                    className={`nl-market-pill nl-market-axis-min-label ${nlToneClass(axis)}${active ? " is-active" : ""}`}
+                    title={`${NL_AXIS_LABELS[axis]}-Mindestwert (0 = aus)`}
                   >
                     {NL_AXIS_LABELS[axis]} ≥
-                  </button>
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -787,9 +781,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     onChange={(event) => {
                       const next = Math.max(0, Math.min(100, Number(event.target.value) || 0));
                       onAxisMinimumChange(axis, next);
-                      if (!active) {
-                        onToggleAxis(axis);
-                      }
                     }}
                   />
                 </div>
@@ -804,26 +795,26 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <input type="checkbox" checked={hidePoorFit} onChange={onToggleHidePoorFit} />
               <span>Nur passende (Fit ≥ 0) + Söldner</span>
             </label>
-            <div className="nl-market-ratio-chips" role="group" aria-label="Mindest-Value (MW ÷ Gehalt)">
-              <span className="nl-market-ratio-chips-label" title="Value = MW ÷ Gehalt">
-                MW ÷ Gehalt ≥
+            <label className="nl-market-ratio-slider" title="Value = MW ÷ Gehalt (0 = aus)">
+              <span className="nl-market-ratio-slider-label">
+                MW ÷ Gehalt ≥{" "}
+                <strong className="nl-tnum">
+                  {minRatioFilter > 0 ? formatNlNumber(minRatioFilter, 1) : "aus"}
+                </strong>
               </span>
-              {NL_MARKET_RATIO_STEPS.map((step) => {
-                const active = minRatioFilter === step;
-                return (
-                  <button
-                    key={`nl-ratio-${step}`}
-                    type="button"
-                    className={`nl-market-pill${active ? " is-active" : ""}`}
-                    aria-pressed={active}
-                    title={`Nur Kandidaten mit MW ÷ Gehalt ≥ ${formatNlNumber(step, 1)}`}
-                    onClick={() => onMinRatioFilterChange(active ? 0 : step)}
-                  >
-                    ≥ {formatNlNumber(step, 1)}
-                  </button>
-                );
-              })}
-            </div>
+              <input
+                type="range"
+                min={0}
+                max={NL_MARKET_RATIO_SLIDER_MAX}
+                step={0.5}
+                value={Math.min(minRatioFilter, NL_MARKET_RATIO_SLIDER_MAX)}
+                aria-label="Mindest-Value MW ÷ Gehalt"
+                aria-valuetext={
+                  minRatioFilter > 0 ? `MW ÷ Gehalt ≥ ${formatNlNumber(minRatioFilter, 1)}` : "aus"
+                }
+                onChange={(event) => onMinRatioFilterChange(Number(event.target.value) || 0)}
+              />
+            </label>
           </div>
         </div>
         {marketError ? (
