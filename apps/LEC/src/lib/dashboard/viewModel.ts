@@ -128,11 +128,26 @@ export interface OperatingQuotas {
   targetBetriebsausgabenquote: number;
 }
 
+export interface RecommendationLotItem {
+  articleId: string;
+  nameRaw: string;
+  setCode: string | null;
+  boundCapital: number;
+}
+
 export interface Recommendation {
+  /** Stabile ID fuer clientseitiges "Ausblenden" (localStorage, /empfehlungen). */
+  id: string;
   kind: "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
   title: string;
   detail: string;
   effect: string;
+  /** Numerischer Betrag hinter `effect` -- Basis fuer "Sortierung nach €-Effekt" (PAGES_CONCEPT §4). */
+  effectValue: number;
+  /** Suchbegriff fuer den Link zu /sortiment?q=… (nicht bei kind === "lot_bilden", das verlinkt nicht 1:1). */
+  linkQuery?: string;
+  /** Nur bei kind === "lot_bilden": aufklappbare Ladenhüter-Artikelliste (nicht 900 Einzelzeilen). */
+  items?: RecommendationLotItem[];
 }
 
 export interface DashboardViewModel {
@@ -415,61 +430,99 @@ export const LABELS_DE: Record<ArticleClass, string> = {
   ladenhueter: "Ladenhüter",
 };
 
-function buildRecommendations(
+const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
+  auslisten: 0,
+  preis_anpassen: 1,
+  nachkaufen: 2,
+  lot_bilden: 3,
+};
+
+/**
+ * Baut ALLE Handlungsempfehlungen (nicht nur ein Beispiel je Typ) --
+ * PAGES_CONCEPT §4: vollstaendige Liste fuer `/empfehlungen`, priorisiert nach
+ * €-Effekt. Das Dashboard zeigt davon nur die ersten 4 (Top-4 + "Alle
+ * ansehen"-Teaser, siehe DashboardShell/Recommendations).
+ */
+export function buildRecommendations(
   classified: Array<{ article: ArticleAggregate; articleClass: ArticleClass; reason: string }>,
   sortiment: SortimentRow[]
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
 
-  const lowRunner = classified
-    .filter((c) => c.articleClass === "low_runner")
-    .sort((a, b) => (a.article.windows.all?.dbII ?? 0) - (b.article.windows.all?.dbII ?? 0))[0];
-  if (lowRunner) {
+  // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
+  for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
+    const dbIILifetime = c.article.windows.all?.dbII ?? 0;
     recommendations.push({
+      id: `auslisten:${c.article.articleId}`,
       kind: "auslisten",
-      title: `${shortName(lowRunner.article.nameRaw)} auslisten.`,
-      detail: lowRunner.reason,
-      effect: `bindet € ${Math.abs(lowRunner.article.windows.all?.dbII ?? 0).toFixed(0)}`,
+      title: `${shortName(c.article.nameRaw)} auslisten.`,
+      detail: c.reason,
+      effect: `bindet € ${Math.abs(dbIILifetime).toFixed(0)}`,
+      effectValue: Math.abs(dbIILifetime),
+      linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
   }
 
-  const priceAlert = sortiment.find((s) => s.priceStatus === "unter_min");
-  if (priceAlert) {
-    // priceStatus vergleicht den aktuellen Listen-VK (Fallback realisierter
-    // Ø-VK) gegen den Korridor -- siehe SortimentRow.listingVk.
-    const alertVk = priceAlert.listingVk ?? priceAlert.avgVkRealized;
+  // Preis anpassen: JEDER Artikel unter dem MIN-Korridor.
+  for (const s of sortiment.filter((s) => s.priceStatus === "unter_min")) {
+    const alertVk = s.listingVk ?? s.avgVkRealized;
+    const gap = s.corridor.min - alertVk;
     recommendations.push({
+      id: `preis_anpassen:${s.articleId}`,
       kind: "preis_anpassen",
-      title: `${shortName(priceAlert.nameRaw)} VK anheben.`,
-      detail: `Aktueller VK ${alertVk.toFixed(2)} € liegt unter dem MIN-Korridor ${priceAlert.corridor.min.toFixed(2)} €.`,
-      effect: `+ € ${(priceAlert.corridor.min - alertVk).toFixed(2)} / Stk`,
+      title: `${shortName(s.nameRaw)} VK anheben.`,
+      detail: `Aktueller VK ${alertVk.toFixed(2)} € liegt unter dem MIN-Korridor ${s.corridor.min.toFixed(2)} €.`,
+      effect: `+ € ${gap.toFixed(2)} / Stk`,
+      effectValue: gap,
+      linkQuery: s.setCode ?? s.nameRaw,
     });
   }
 
-  const champion = classified
-    .filter((c) => c.articleClass === "champion")
-    .sort((a, b) => (b.article.windows["30"]?.revenue ?? 0) - (a.article.windows["30"]?.revenue ?? 0))[0];
-  if (champion) {
+  // Nachkaufen: JEDER Champion.
+  for (const c of classified.filter((c) => c.articleClass === "champion")) {
+    const dbIILifetime = c.article.windows.all?.dbII ?? 0;
+    const dbIIPercentLifetime = pct(dbIILifetime, c.article.windows.all?.revenue ?? 1);
     recommendations.push({
+      id: `nachkaufen:${c.article.articleId}`,
       kind: "nachkaufen",
-      title: `${shortName(champion.article.nameRaw)} nachkaufen.`,
-      detail: champion.reason,
-      effect: `DB II ${(pct(champion.article.windows.all?.dbII ?? 0, champion.article.windows.all?.revenue ?? 1) * 100).toFixed(0)}%`,
+      title: `${shortName(c.article.nameRaw)} nachkaufen.`,
+      detail: c.reason,
+      effect: `DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · € ${dbIILifetime.toFixed(0)}`,
+      effectValue: Math.abs(dbIILifetime),
+      linkQuery: c.article.setCode ?? c.article.nameRaw,
     });
   }
 
-  const ladenhueterCount = classified.filter((c) => c.articleClass === "ladenhueter").length;
-  if (ladenhueterCount > 0) {
-    const boundCapital = classified
-      .filter((c) => c.articleClass === "ladenhueter")
-      .reduce((sum, c) => sum + (c.article.windows.all?.ek ?? 0), 0);
+  // Ladenhüter: EIN Sammel-Eintrag mit aufklappbarer Artikelliste (nicht
+  // hunderte Einzelzeilen) -- Liste auf die groessten Kapitalbinder gedeckelt,
+  // vollstaendige Aufschluesselung ueber /sortiment?klasse=ladenhueter.
+  const ladenhueter = classified.filter((c) => c.articleClass === "ladenhueter");
+  if (ladenhueter.length > 0) {
+    const items: RecommendationLotItem[] = ladenhueter
+      .map((c) => ({
+        articleId: c.article.articleId,
+        nameRaw: c.article.nameRaw,
+        setCode: c.article.setCode,
+        boundCapital: c.article.windows.all?.ek ?? 0,
+      }))
+      .sort((a, b) => b.boundCapital - a.boundCapital);
+    const boundCapital = items.reduce((sum, i) => sum + i.boundCapital, 0);
     recommendations.push({
+      id: "lot_bilden",
       kind: "lot_bilden",
       title: "Ladenhüter zu Lots bündeln.",
-      detail: `${ladenhueterCount} Artikel ohne Velocity — als Sammlungs-Lot abverkaufen.`,
+      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
+      effectValue: boundCapital,
+      items: items.slice(0, 50),
     });
   }
+
+  recommendations.sort((a, b) => {
+    const diff = Math.abs(b.effectValue) - Math.abs(a.effectValue);
+    if (diff !== 0) return diff;
+    return RECOMMENDATION_KIND_PRIORITY[a.kind] - RECOMMENDATION_KIND_PRIORITY[b.kind];
+  });
 
   return recommendations;
 }

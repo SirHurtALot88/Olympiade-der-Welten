@@ -1,18 +1,21 @@
 import type { Recommendation } from "@/lib/dashboard/viewModel";
 
-const ICONS: Record<Recommendation["kind"], { cls: string; icon: string }> = {
+/** Icon/Chip-Zuordnung je Empfehlungstyp -- wiederverwendet von /empfehlungen. */
+export const RECOMMENDATION_ICONS: Record<Recommendation["kind"], { cls: string; icon: string }> = {
   auslisten: { cls: "p-crit", icon: "↓" },
   preis_anpassen: { cls: "p-warn", icon: "€" },
   nachkaufen: { cls: "p-good", icon: "↑" },
   lot_bilden: { cls: "p-mkt", icon: "◧" },
 };
 
-const CHIPS: Record<Recommendation["kind"], { cls: string; label: string }> = {
+export const RECOMMENDATION_CHIPS: Record<Recommendation["kind"], { cls: string; label: string }> = {
   auslisten: { cls: "c-crit", label: "Auslisten" },
   preis_anpassen: { cls: "c-warn", label: "Preis anpassen" },
   nachkaufen: { cls: "c-good", label: "Nachkaufen" },
   lot_bilden: { cls: "c-mkt", label: "Lot bilden" },
 };
+const ICONS = RECOMMENDATION_ICONS;
+const CHIPS = RECOMMENDATION_CHIPS;
 
 interface Props {
   recommendations: Recommendation[];
@@ -41,7 +44,7 @@ export function Recommendations({ recommendations, totalCount }: Props) {
         const icon = ICONS[rec.kind];
         const chip = CHIPS[rec.kind];
         return (
-          <div className="rec" key={i}>
+          <div className="rec" key={rec.id ?? i}>
             <div className={`ico ${icon.cls}`}>{icon.icon}</div>
             <div className="tx">
               <b>{rec.title}</b> <span>{rec.detail}</span>

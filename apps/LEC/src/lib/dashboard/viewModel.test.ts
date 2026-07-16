@@ -166,4 +166,32 @@ describe("buildDashboardViewModel", () => {
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(true);
   });
+
+  it("erzeugt fuer JEDEN Low-Runner eine eigene Auslisten-Empfehlung (nicht nur den schlimmsten)", () => {
+    const articles: ArticleAggregate[] = [
+      article("Verlust A", {
+        windows: { all: agg({ qty: 5, revenue: 50, dbII: -20 }), "365": agg({ qty: 5, revenue: 50, dbII: -20 }) },
+      }),
+      article("Verlust B", {
+        windows: { all: agg({ qty: 5, revenue: 50, dbII: -80 }), "365": agg({ qty: 5, revenue: 50, dbII: -80 }) },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const auslisten = vm.recommendations.filter((r) => r.kind === "auslisten");
+    expect(auslisten).toHaveLength(2);
+    // Sortierung nach |€-Effekt| absteigend -> der groessere Verlust zuerst.
+    expect(auslisten[0].title).toContain("Verlust B");
+  });
+
+  it("buendelt Ladenhueter zu GENAU einem Sammel-Eintrag mit aufklappbarer Artikelliste", () => {
+    const articles: ArticleAggregate[] = [
+      article("Ladenhueter A", { windows: { all: agg({ qty: 3, revenue: 30, ek: 10 }) } }),
+      article("Ladenhueter B", { windows: { all: agg({ qty: 2, revenue: 20, ek: 15 }) } }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const lots = vm.recommendations.filter((r) => r.kind === "lot_bilden");
+    expect(lots).toHaveLength(1);
+    expect(lots[0].items).toHaveLength(2);
+    expect(lots[0].effectValue).toBeCloseTo(25); // 10 + 15 gebundener EK
+  });
 });
