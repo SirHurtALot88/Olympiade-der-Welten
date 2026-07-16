@@ -93,6 +93,7 @@ import {
   NlBarChart,
   NlCard,
   NlDeltaChip,
+  NlEmptyState,
   NlMedalBadge,
   NlRankingDrawer,
   NlSubTabs,
@@ -101,6 +102,7 @@ import {
   formatNlMoney,
   formatNlNumber,
   nlToneClass,
+  useCountUp,
   type NlAxisKey,
   type NlRankingDrawerRow,
   type NlTone,
@@ -390,10 +392,6 @@ function getLeagueRank(value: number | null | undefined, pool: number[]): number
   return higher + 1;
 }
 
-function formatLeagueRankSub(rank: number | null): string | undefined {
-  return rank != null ? `#${formatNlNumber(rank, 0)} Liga` : undefined;
-}
-
 /** Kompaktes "Top 8%" → "T8%" für enge Zellen (Achsen-Zeilen). Leitet nichts neu her — reine Textkürzung des `formatLeaguePercentile`-Labels. */
 function formatCompactPercentile(label: string | null): string | null {
   return label ? label.replace(/^Top\s+/, "T") : null;
@@ -440,6 +438,70 @@ function renderMetricRankChip(value: number | null | undefined, pool: number[]) 
     <span className="nl-ptable-percentile nl-ptable-ovr-rank" title={`Liga-Rang #${rank} von ${pool.length}`}>
       #{formatNlNumber(rank, 0)}
     </span>
+  );
+}
+
+/**
+ * Kleine Inline-SVG-UI-Icons statt ASCII-Glyphen (Sortier-Pfeile, Auf-/
+ * Zuklapp-Chevron, Schließen). Bewusst dekorativ (`aria-hidden`, `currentColor`,
+ * `1em`) — die Barrierefreiheit hängt weiter an den bestehenden Button-`aria-label`/
+ * `title`s, das SVG ersetzt nur die visuelle Glyphe. Minimal & konsistent gehalten.
+ */
+function NlSortGlyph({ direction }: { direction: "none" | "asc" | "desc" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {direction !== "desc" ? <path d="M4 7l4-4 4 4" opacity={direction === "asc" ? 1 : 0.55} /> : null}
+      {direction !== "asc" ? <path d="M4 9l4 4 4-4" opacity={direction === "desc" ? 1 : 0.55} /> : null}
+    </svg>
+  );
+}
+
+/** Auf-/Zuklapp-Chevron (▸ zu / ▾ auf) — ein Pfad, per Rotation umgeschaltet. */
+function NlChevronGlyph({ open }: { open: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: open ? "rotate(90deg)" : "none", transformOrigin: "center" }}
+    >
+      <path d="M6 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+/** Schließen-Kreuz (×) als Icon. */
+function NlCloseGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
   );
 }
 
@@ -665,11 +727,26 @@ export default function FoundationPlayersTableNewLook({
     };
   }, [rows]);
 
+  // Kit-Zähleranimation der Summary-Kacheln (Spieler-Anzahl / Ø OVR / Ø MW) —
+  // respektiert prefers-reduced-motion (springt dann direkt auf den Zielwert).
+  const countUpCount = useCountUp(summary.count);
+  const countUpAvgOvr = useCountUp(summary.avgOvr);
+  const countUpAvgMw = useCountUp(summary.avgMw);
+
   const visibleRows = useMemo(
     () => queryChipFilteredRows.slice(0, visibleCount),
     [queryChipFilteredRows, visibleCount],
   );
   const hasMoreRows = queryChipFilteredRows.length > visibleRows.length;
+
+  // Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query-Chips) aktiv? Genutzt für den
+  // Leerzustand UND (unten) für die "Filter aktiv"-Anzeige im Analyse-Hub.
+  const hasExtraDirectoryFilters =
+    selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0;
+  // "Schränkt der aktive Filter die Auswahl wirklich ein?" — genau dieselbe
+  // gefilterte Liste, die die Tabelle rendert (`queryChipFilteredRows`), gegen die
+  // rohen `rows` gemessen. Nur dann bekommt der Hub die "Filter aktiv"-Anzeige.
+  const hubFilterNarrows = queryChipFilteredRows.length < rows.length;
 
   /**
    * Klasse für die aktuell sortierte Spalte (Header + jede Körperzelle
@@ -696,7 +773,7 @@ export default function FoundationPlayersTableNewLook({
 
   function renderSortHeader(sortKey: string, label: string, tooltip?: string) {
     const isActive = sortState?.key === sortKey;
-    const arrow = !isActive ? "↕" : sortState?.direction === "asc" ? "↑" : "↓";
+    const direction: "none" | "asc" | "desc" = !isActive ? "none" : sortState?.direction === "asc" ? "asc" : "desc";
     return (
       <button
         type="button"
@@ -706,7 +783,9 @@ export default function FoundationPlayersTableNewLook({
         aria-label={`Nach ${label} sortieren`}
       >
         <span>{label}</span>
-        <b aria-hidden="true">{arrow}</b>
+        <b aria-hidden="true">
+          <NlSortGlyph direction={direction} />
+        </b>
       </button>
     );
   }
@@ -736,7 +815,10 @@ export default function FoundationPlayersTableNewLook({
           aria-expanded={disciplinePickerOpen}
           title="Nach einer Disziplin-Wertung sortieren"
         >
-          Disziplinen <b aria-hidden="true">{disciplinePickerOpen ? "▾" : "▸"}</b>
+          Disziplinen{" "}
+          <b aria-hidden="true">
+            <NlChevronGlyph open={disciplinePickerOpen} />
+          </b>
         </button>
         {disciplinePickerOpen ? (
           <select
@@ -759,34 +841,6 @@ export default function FoundationPlayersTableNewLook({
           </select>
         ) : null}
       </div>
-    );
-  }
-
-  /** Leader-Chip: Wert + Spielername, Klick = Portal in den Spieler-Drawer. */
-  function renderLeaderChip(
-    label: string,
-    row: FoundationPlayerScopeRow | null,
-    value: number | null,
-    pool: number[],
-    tone: "accent" | "spe" | "soc" | "neutral",
-    digits: number,
-    title: string,
-    /** Geldwert (Marktwert): über den geteilten Formatter mit Einheit " Mio" statt bloßer Zahl. */
-    money = false,
-  ) {
-    if (row == null || value == null) {
-      return <StatChip label={label} value="—" tone={tone} title={title} />;
-    }
-    const rank = getLeagueRank(value, pool);
-    return (
-      <StatChip
-        label={label}
-        value={money ? formatNlMoney(value) : formatNlNumber(value, digits)}
-        tone={tone}
-        sub={[row.player.name, formatLeagueRankSub(rank)].filter(Boolean).join(" · ")}
-        title={`${title} — ${row.player.name} öffnen`}
-        onClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}
-      />
     );
   }
 
@@ -1149,7 +1203,7 @@ export default function FoundationPlayersTableNewLook({
                 {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}
               </span>
               <b className="nl-players-pps-toggle-caret" aria-hidden="true">
-                {isPpsExpanded ? "▾" : "▸"}
+                <NlChevronGlyph open={isPpsExpanded} />
               </b>
             </button>
             {renderMetricPercentileChip(row.playerPps, leaguePlayerHeatPools.pps)}
@@ -1326,19 +1380,19 @@ export default function FoundationPlayersTableNewLook({
           <StatChipRow className="nl-players-summary-chips" aria-label="Auswahl-Kennzahlen">
             <StatChip
               label="Spieler"
-              value={formatNlNumber(summary.count, 0)}
+              value={formatNlNumber(countUpCount, 0)}
               tone="neutral"
               title="Anzahl Spieler in der aktuellen Auswahl"
             />
             <StatChip
               label="Ø OVR"
-              value={formatNlNumber(summary.avgOvr, 1)}
+              value={formatNlNumber(countUpAvgOvr, 1)}
               tone="accent"
               title="Durchschnittliches Overall-Rating der Auswahl"
             />
             <StatChip
               label="Ø MW"
-              value={formatNlMoney(summary.avgMw)}
+              value={formatNlMoney(countUpAvgMw)}
               tone="neutral"
               title="Durchschnittlicher Marktwert der Auswahl"
             />
@@ -1360,45 +1414,12 @@ export default function FoundationPlayersTableNewLook({
         </div>
         {playersView === "directory" ? (
           <>
-            <StatChipRow label="Leader" className="nl-players-leader-chips" aria-label="Leader der Auswahl">
-              {renderLeaderChip(
-                "Top OVR",
-                summary.topOvr,
-                summary.topOvr?.playerOvr ?? null,
-                leaguePlayerHeatPools.ovr,
-                "accent",
-                1,
-                "Bestes Overall-Rating der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top PPs",
-                summary.topPps,
-                summary.topPps?.playerPps ?? null,
-                leaguePlayerHeatPools.pps,
-                "spe",
-                1,
-                "Meiste Performance-Punkte der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top MVS",
-                summary.topMvs,
-                summary.topMvs?.playerMvs ?? null,
-                leaguePlayerHeatPools.mvs,
-                "soc",
-                1,
-                "Bester Market Value Score der Auswahl",
-              )}
-              {renderLeaderChip(
-                "Top MW",
-                summary.topMw,
-                summary.topMwValue,
-                [],
-                "neutral",
-                2,
-                "Höchster Marktwert der Auswahl",
-                true,
-              )}
-            </StatChipRow>
+            {/* De-Dup (Phase 0): Die frühere "Top OVR/PPs/MVS/MW"-Leader-Chip-Zeile
+                wurde entfernt — das Leader-Podium direkt darüber zeigt dieselben
+                Top-3 (OVR/PPs/MVS) prominenter, und Top MW ist im Analyse-Hub-
+                Leaderboard (MW-Kennzahl) abgedeckt. Kein "Volle Rangliste"-/
+                Ranking-Drawer-Einstieg lebte hier (der sitzt im Hub), daher gibt
+                es nichts umzuquartieren. */}
             <div className="nl-players-brackets nl-ptable-bracket-strip" role="group" aria-label="Marktwert-Brackets der Auswahl — Balken anklicken filtert die Spielerliste">
               <div className="nl-players-bracket-bars">
                 {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => {
@@ -1425,9 +1446,9 @@ export default function FoundationPlayersTableNewLook({
                   );
                 })}
               </div>
-              <p className="nl-ptable-bracket-legend">
-                {NL_PLAYERS_BRACKETS.map(({ bracket, range }) => `B${bracket} ${range}`).join(" · ")}
-              </p>
+              {/* De-Dup (Phase 0): Die lange Bracket-Legenden-Zeile ("B1 <12,5M · …")
+                  wurde entfernt — dieselbe Range steht bereits im `title`-Tooltip
+                  jedes Histogramm-Balkens ("B{n} · {range} · {count} Spieler"). */}
               {selectedMwBracket != null ? (
                 <div className="nl-players-bracket-filter-chip">
                   <span>
@@ -1441,7 +1462,7 @@ export default function FoundationPlayersTableNewLook({
                     aria-label="Marktwert-Filter zurücksetzen"
                     title="Marktwert-Filter zurücksetzen"
                   >
-                    ×
+                    <NlCloseGlyph />
                   </button>
                 </div>
               ) : null}
@@ -1477,7 +1498,7 @@ export default function FoundationPlayersTableNewLook({
                   aria-label="Vertrags-Filter zurücksetzen"
                   title="Vertrags-Filter zurücksetzen"
                 >
-                  ×
+                  <NlCloseGlyph />
                 </button>
               ) : null}
             </div>
@@ -1495,34 +1516,43 @@ export default function FoundationPlayersTableNewLook({
       ) : null}
 
       {playersView === "hub" ? (
+        // Korrektheits-Fix (Phase 0): Der Hub bekommt jetzt EXAKT die im Verzeichnis
+        // gerenderte, gefilterte Liste (`queryChipFilteredRows` — Bracket/Vertrag/
+        // Query-Chips) statt der rohen `rows`. Vorher gingen diese Filter beim
+        // Ansichtswechsel still verloren. `filterActive` blendet im Hub-Kopf einen
+        // "Filter aktiv"-Hinweis ein, sobald der Filter die Auswahl wirklich einschränkt.
         <FoundationPlayersHub
-          rows={rows}
+          rows={queryChipFilteredRows}
           gameState={gameState}
           leaguePlayerHeatPools={leaguePlayerHeatPools}
+          filterActive={hubFilterNarrows}
           openPlayerDrawerById={openPlayerDrawerById}
           openTeamProfileById={openTeamProfileById}
         />
       ) : queryChipFilteredRows.length === 0 ? (
-        <NlCard className="nl-players-empty-card">
-          <p className="nl-players-empty-text">
-            {selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0
+        // Kit-Leerzustand statt bespoke `nl-players-empty-card`-Paragraph + Button
+        // (die alte Card-Klasse bewusst weggelassen — `.nl-empty-state` trägt eine
+        // eigene Oberfläche, sonst gäbe es Card-in-Card-Chrome).
+        <NlEmptyState
+          title="Keine Spieler"
+          message={
+            hasExtraDirectoryFilters
               ? "Keine Spieler bei diesen Filtern — MW-/Vertrags-Filter oder Query-Chips zurücksetzen oder Umfang/Team/Klasse anpassen."
-              : "Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen."}
-          </p>
-          {selectedMwBracket != null || selectedExpiryBucket != null || queryChips.length > 0 ? (
-            <button
-              type="button"
-              className="nl-players-more-button"
-              onClick={() => {
-                setSelectedMwBracket(null);
-                setSelectedExpiryBucket(null);
-                setQueryChips([]);
-              }}
-            >
-              Alle Zusatzfilter zurücksetzen
-            </button>
-          ) : null}
-        </NlCard>
+              : "Keine Spieler in der aktuellen Auswahl — Umfang, Team- oder Klassen-Filter anpassen."
+          }
+          action={
+            hasExtraDirectoryFilters
+              ? {
+                  label: "Alle Zusatzfilter zurücksetzen",
+                  onClick: () => {
+                    setSelectedMwBracket(null);
+                    setSelectedExpiryBucket(null);
+                    setQueryChips([]);
+                  },
+                }
+              : undefined
+          }
+        />
       ) : (
         <NlCard
           className="nl-players-table-card"
@@ -1594,7 +1624,7 @@ export default function FoundationPlayersTableNewLook({
             aria-label="Vergleichsauswahl aufheben"
             title="Vergleichsauswahl aufheben"
           >
-            ×
+            <NlCloseGlyph />
           </button>
         </div>
       ) : null}
@@ -1645,12 +1675,15 @@ function FoundationPlayersHub({
   rows,
   gameState,
   leaguePlayerHeatPools,
+  filterActive = false,
   openPlayerDrawerById,
   openTeamProfileById,
 }: {
   rows: FoundationPlayerScopeRow[];
   gameState: GameState;
   leaguePlayerHeatPools: LeaguePlayerHeatPools;
+  /** Verzeichnis-Zusatzfilter (Bracket/Vertrag/Query) schränken die übergebenen `rows` ein. */
+  filterActive?: boolean;
   openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
   openTeamProfileById: (teamId: string) => void;
 }) {
@@ -1793,8 +1826,19 @@ function FoundationPlayersHub({
         eyebrow="Ranking · aktuelle Auswahl"
         title="Liga-Leaderboard"
         actions={
-          <div className="nl-phub-metric-bar" role="group" aria-label="Kennzahl wählen">
-            {NL_PHUB_METRICS.map((entry) => (
+          <>
+            {/* "Filter aktiv"-Hinweis: die Verzeichnis-Zusatzfilter schränken diese
+                Hub-Auswahl gerade wirklich ein (Phase-0-Korrektheits-Fix). */}
+            {filterActive ? (
+              <StatChip
+                label="Filter"
+                value="aktiv"
+                tone="warn"
+                title="Bracket-/Vertrags-/Query-Filter aus dem Verzeichnis sind hier aktiv und schränken die Auswahl ein."
+              />
+            ) : null}
+            <div className="nl-phub-metric-bar" role="group" aria-label="Kennzahl wählen">
+              {NL_PHUB_METRICS.map((entry) => (
               <button
                 key={entry.key}
                 type="button"
@@ -1804,8 +1848,9 @@ function FoundationPlayersHub({
               >
                 {entry.label}
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         }
       >
         {topBoardRows.length === 0 ? (

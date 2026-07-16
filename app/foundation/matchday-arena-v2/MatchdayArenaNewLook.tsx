@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlCard,
+  NlCountUpValue,
   NlDeltaChip,
   NlMedalBadge,
   NlSubTabs,
@@ -13,6 +14,7 @@ import {
   formatNlNumber,
   nlToneClass,
 } from "@/components/foundation/new-look";
+import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import type { MatchdayArenaV2ClientProps } from "@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client";
 import {
   MATCHDAY_ARENA_PHASES,
@@ -779,6 +781,9 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
           const isOwnTeam = row.teamId === params.teamId;
           const isExpanded = expandedTeamId === row.teamId;
           const breakdown = isExpanded ? getMatchdayArenaPhaseBreakdown(row, activePhase) : [];
+          // Gold-Glow für die Führung, sobald das Board die Finale-/Ergebnis-Phase
+          // erreicht (reine CSS-Deko über `.is-leader`).
+          const isLeaderGlow = rank === 1 && (activePhase === "final" || isResultPhase);
 
           return (
             <div
@@ -792,7 +797,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
               }}
               role="listitem"
               aria-current={isOwnTeam ? "true" : undefined}
-              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}`}
+              className={`nl-arena-row${isOwnTeam ? " is-own-team" : ""}${rankDelta != null && rankDelta !== 0 ? (rankDelta > 0 ? " is-moving-up" : " is-moving-down") : ""}${isExpanded ? " is-expanded" : ""}${isLeaderGlow ? " is-leader" : ""}`}
               style={{
                 ...(team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined),
                 top: Math.max(0, rank - 1) * NL_ARENA_ROW_STRIDE,
@@ -853,8 +858,15 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   title="Score-Herkunft aufklappen"
                   onClick={() => setExpandedTeamId((current) => (current === row.teamId ? null : row.teamId))}
                 >
+                  {/* Score als Count-Up (~400 ms) — konsistent mit dem Ergebnis-Screen.
+                      `key` je Phase erzwingt Re-Mount, damit der Zähler bei jedem
+                      Phasenwechsel neu hochläuft. */}
                   <strong key={`nl-arena-score-${activePhase}`} className="nl-arena-score nl-tnum">
-                    {formatNlNumber(phaseScore, 1)}
+                    <NlCountUpValue
+                      value={phaseScore}
+                      opts={{ durationMs: 400 }}
+                      format={(value) => formatNlNumber(value, 1)}
+                    />
                   </strong>
                 </button>
                 {isResultPhase && row.points != null ? (
@@ -864,13 +876,18 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 ) : null}
               </span>
               {isExpanded ? (
+                // Phasen-Breakdown (Slots/Push/Form/Mut/Cap/Pow) über die Kit-Komponente
+                // `VeloImpactStrip` statt eigener Breakdown-Spans (siehe velo-ui/index.ts).
+                // Der Wrapper behält role/aria-label für die Score-Herkunft.
                 <div className="nl-arena-row-breakdown" role="group" aria-label={`Score-Herkunft ${row.teamName}`}>
-                  {breakdown.map((item) => (
-                    <span key={item.id} className={`nl-arena-row-breakdown-item is-${item.tone}`}>
-                      <span className="nl-arena-row-breakdown-label">{item.label}</span>
-                      <span className="nl-arena-row-breakdown-value">{item.valueLabel}</span>
-                    </span>
-                  ))}
+                  <VeloImpactStrip
+                    items={breakdown.map((item) => ({
+                      key: item.id,
+                      label: item.label,
+                      value: item.valueLabel,
+                      tone: item.tone,
+                    }))}
+                  />
                 </div>
               ) : null}
             </div>
@@ -897,7 +914,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   rowNodesRef.current.delete(row.teamId);
                 }
               }}
-              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}`}
+              className={`nl-arena-totalrow${isOwnTeam ? " is-own-team" : ""}${row.medal === "gold" ? " is-leader" : ""}`}
               style={team ? getSeasonV2TeamTagStyle(team.shortCode) : undefined}
             >
               <span className="nl-arena-rank">
@@ -916,7 +933,12 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   {formatNlNumber(row.d1Points, 1)} · {formatNlNumber(row.d2Points, 1)}
                 </span>
                 <strong className="nl-arena-score nl-tnum" title="Gesamtscore beider Disziplinen">
-                  {formatNlNumber(row.totalScore, 1)}
+                  {/* Gesamtscore ebenfalls als Count-Up (~400 ms) — gleiche Behandlung wie das Disziplin-Board. */}
+                  <NlCountUpValue
+                    value={row.totalScore}
+                    opts={{ durationMs: 400 }}
+                    format={(value) => formatNlNumber(value, 1)}
+                  />
                 </strong>
                 <span className="nl-arena-points nl-tnum" title="Tagespunkte gesamt">
                   {row.totalPoints != null ? `${formatNlNumber(row.totalPoints, 1)} PPs` : "—"}
@@ -1053,7 +1075,66 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
     );
   }
 
-  const phaseItems = MATCHDAY_ARENA_PHASES.map((phase) => ({ id: phase.id, label: phase.label }));
+  // Wiederverwendbarer "Details & Diagnose"-Block: Pre-Race- und Post-Race-Zweig
+  // waren zuvor fast identisch dupliziert. `showResolveDetails` blendet die nur
+  // nach dem Resolve sinnvollen Zusatz-Infos (Auto-Lineups-Chip + Reveal-Sources-
+  // Zeile) ein; `totalTeamsFallback` deckt die unterschiedliche Readiness-Basis ab.
+  function renderDiagnose(showResolveDetails: boolean, totalTeamsFallback: number) {
+    return (
+      <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
+        <summary>
+          Details &amp; Diagnose
+          {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
+        </summary>
+        <div className="nl-arena-diagnose-body">
+          <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
+            <StatChip
+              label="Readiness"
+              value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? totalTeamsFallback}`}
+              tone={blockedTeams > 0 ? "warn" : "good"}
+              title="Teams mit vorhandener Einsatzliste"
+            />
+            {showResolveDetails ? (
+              <StatChip
+                label="Auto-Lineups"
+                value={autoLineups}
+                tone={autoLineups > 0 ? "warn" : "good"}
+                sub={`${blockedTeams} blockiert`}
+                title="Automatisch erzeugte Einsatzlisten"
+              />
+            ) : null}
+            <StatChip
+              label="Status"
+              value={scoreFeed?.status ?? (showResolveDetails ? "—" : "wartet")}
+              tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
+            />
+          </StatChipRow>
+          {showResolveDetails && scoreFeed ? (
+            <p className="nl-arena-diagnose-line">
+              Reveal-Sources: Form {scoreFeed.resolveSources.formCardSourceLabel ?? scoreFeed.resolveSources.formCardSourceStatus}{" "}
+              · Mutator {scoreFeed.resolveSources.mutatorSourceLabel ?? scoreFeed.resolveSources.mutatorSourceStatus} · Captain{" "}
+              {scoreFeed.resolveSources.captainSourceStatus} · Fatigue {scoreFeed.resolveSources.fatigueSourceStatus} · Team-PPs{" "}
+              {scoreFeed.resolveSources.teamPpsSourceStatus} · Team-Power{" "}
+              {scoreFeed.resolveSources.teamPowerSourceLabel ?? scoreFeed.resolveSources.teamPowerSourceStatus}
+            </p>
+          ) : null}
+          <p className="nl-arena-diagnose-line">
+            Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
+          </p>
+          {feedWarnings.length > 0 ? (
+            <ul className="nl-arena-diagnose-list">
+              {feedWarnings.slice(0, 20).map((warning, index) => (
+                <li key={`nl-arena-warning-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
+          )}
+        </div>
+      </details>
+    );
+  }
+
   const sideItems = [
     { id: "d1", label: d1Label },
     { id: "d2", label: d2Label },
@@ -1236,39 +1317,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             {renderPreRaceBoard()}
           </NlCard>
 
-          <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
-            <summary>
-              Details &amp; Diagnose
-              {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
-            </summary>
-            <div className="nl-arena-diagnose-body">
-              <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
-                <StatChip
-                  label="Readiness"
-                  value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? totalTeamsCount}`}
-                  tone={blockedTeams > 0 ? "warn" : "good"}
-                  title="Teams mit vorhandener Einsatzliste"
-                />
-                <StatChip
-                  label="Status"
-                  value={scoreFeed?.status ?? "wartet"}
-                  tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
-                />
-              </StatChipRow>
-              <p className="nl-arena-diagnose-line">
-                Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
-              </p>
-              {feedWarnings.length > 0 ? (
-                <ul className="nl-arena-diagnose-list">
-                  {feedWarnings.slice(0, 20).map((warning, index) => (
-                    <li key={`nl-arena-prerace-warning-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
-              )}
-            </div>
-          </details>
+          {renderDiagnose(false, totalTeamsCount)}
         </>
       ) : (
         <>
@@ -1329,19 +1378,10 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   >
                     Zurück
                   </button>
-                  <NlSubTabs
-                    items={phaseItems}
-                    activeId={activePhase}
-                    onSelect={(id) => {
-                      if (arenaControlsLocked) {
-                        return;
-                      }
-                      setIsAutoPlaying(false);
-                      setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === id)));
-                    }}
-                    aria-label="Reveal-Phase"
-                    className="nl-arena-phase-tabs"
-                  />
+                  {/* De-Dup: die eigenständige Phasen-Tab-Leiste (NlSubTabs) war ein
+                      Near-1:1-Duplikat der "Dein Lauf"-Schiene unten, die zusätzlich
+                      den eigenen Rang trägt. Phasen-Navigation läuft weiter über
+                      Zurück/Weiter (+ "Dein Lauf"-Schritte). */}
                   <button
                     className="nl-arena-button"
                     type="button"
@@ -1560,7 +1600,10 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                 ) : null}
               </>
             ) : null}
-            {ownTeamRank != null && ownTeamName ? (
+            {/* De-Dup: im Disziplin-Board übernimmt der "Dein Team"-Bühnen-Chip den
+                Sprung zum eigenen Team; der Owncall-Button bleibt daher nur für das
+                Gesamt-Board (dort gibt es keinen Bühnen-Chip). */}
+            {boardSide === "total" && ownTeamRank != null && ownTeamName ? (
               <div className="nl-arena-owncall">
                 <button type="button" className="nl-arena-owncall-btn" onClick={scrollToOwnTeam}>
                   Zu meinem Team · {ownTeamName}
@@ -1606,55 +1649,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
             )}
           </NlCard>
 
-          <details className="nl-arena-diagnose" data-testid="nl-arena-diagnose">
-            <summary>
-              Details &amp; Diagnose
-              {feedWarnings.length > 0 ? ` (${feedWarnings.length} Hinweise)` : ""}
-            </summary>
-            <div className="nl-arena-diagnose-body">
-              <StatChipRow aria-label="Arena-Telemetrie" className="nl-arena-diagnose-chips">
-                <StatChip
-                  label="Readiness"
-                  value={`${scoreFeed?.lineupSummary.existingLineups ?? 0}/${scoreFeed?.lineupSummary.totalTeams ?? 0}`}
-                  tone={blockedTeams > 0 ? "warn" : "good"}
-                  title="Teams mit vorhandener Einsatzliste"
-                />
-                <StatChip
-                  label="Auto-Lineups"
-                  value={autoLineups}
-                  tone={autoLineups > 0 ? "warn" : "good"}
-                  sub={`${blockedTeams} blockiert`}
-                  title="Automatisch erzeugte Einsatzlisten"
-                />
-                <StatChip
-                  label="Status"
-                  value={scoreFeed?.status ?? "—"}
-                  tone={scoreFeed?.status === "blocked" ? "risk" : scoreFeed?.status === "warning" ? "warn" : "good"}
-                />
-              </StatChipRow>
-              {scoreFeed ? (
-                <p className="nl-arena-diagnose-line">
-                  Reveal-Sources: Form {scoreFeed.resolveSources.formCardSourceLabel ?? scoreFeed.resolveSources.formCardSourceStatus}{" "}
-                  · Mutator {scoreFeed.resolveSources.mutatorSourceLabel ?? scoreFeed.resolveSources.mutatorSourceStatus} · Captain{" "}
-                  {scoreFeed.resolveSources.captainSourceStatus} · Fatigue {scoreFeed.resolveSources.fatigueSourceStatus} · Team-PPs{" "}
-                  {scoreFeed.resolveSources.teamPpsSourceStatus} · Team-Power{" "}
-                  {scoreFeed.resolveSources.teamPowerSourceLabel ?? scoreFeed.resolveSources.teamPowerSourceStatus}
-                </p>
-              ) : null}
-              <p className="nl-arena-diagnose-line">
-                Scope: {params.saveId} / {params.seasonId} / {params.matchdayId} · Quelle: {source}
-              </p>
-              {feedWarnings.length > 0 ? (
-                <ul className="nl-arena-diagnose-list">
-                  {feedWarnings.slice(0, 20).map((warning, index) => (
-                    <li key={`nl-arena-warning-${index}`}>{warning}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="nl-arena-diagnose-line">Keine offenen Warnungen.</p>
-              )}
-            </div>
-          </details>
+          {renderDiagnose(true, 0)}
         </>
       )}
     </div>
