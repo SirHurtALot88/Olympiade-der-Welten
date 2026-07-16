@@ -1869,6 +1869,16 @@ describe("player detail drawer", () => {
   it("exposes transfer history and full progression events with source labels", () => {
     const player = createPlayer({ id: "player-transfer-history" });
     const gameState = createGameState({ player, withRoster: true });
+    // Live season must be at least Season 2 so the Season-2 sell transfer below is
+    // not a future-season row (career/history builders drop future seasons).
+    gameState.season = {
+      id: "season-2",
+      name: "Season 2",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-2";
     gameState.transferHistory = [
       {
         id: "history-buy-1",

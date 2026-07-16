@@ -37,6 +37,10 @@ import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-type
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import {
+  clampSeasonSnapshotsToCurrentSeason,
+  clampTransferHistoryToCurrentSeason,
+} from "@/lib/foundation/season-history-clamp";
 import { buildPlayerAttributeHistoryRows, type PlayerAttributeHistoryRow } from "@/lib/foundation/player-attribute-history";
 import {
   aggregatePlayerInjuryHistoryBySeason,
@@ -630,7 +634,7 @@ function buildDisciplineGlobalRankMaps(
   const currentSeasonTotalsByDiscipline = new Map<string, Map<string, number>>();
   const allTimeTotalsByDiscipline = new Map<string, Map<string, number>>();
 
-  for (const snapshot of gameState.seasonState.seasonSnapshots ?? []) {
+  for (const snapshot of clampSeasonSnapshotsToCurrentSeason(gameState)) {
     for (const playerPerformance of snapshot.playerPerformances ?? []) {
       for (const entry of playerPerformance.disciplineBreakdown ?? []) {
         addDisciplinePoints(allTimeTotalsByDiscipline, entry.disciplineId, playerPerformance.playerId, entry.totalContribution ?? null);
@@ -963,7 +967,7 @@ function buildDisciplineValuesFromPlayer(
   const seasonPlayerCountByDisciplineId = gameState ? buildSeasonDisciplinePlayerCountMap(gameState) : null;
 
   if (gameState) {
-    for (const snapshot of gameState.seasonState.seasonSnapshots ?? []) {
+    for (const snapshot of clampSeasonSnapshotsToCurrentSeason(gameState)) {
       const snapshotPerformance = resolveSnapshotPlayerPerformanceRow(gameState, snapshot, player.id);
       if (!snapshotPerformance) continue;
       for (const entry of snapshotPerformance.disciplineBreakdown ?? []) {
@@ -1173,7 +1177,7 @@ function buildAxisRankContext(input: {
   playerId: string;
   referenceSeasonId: string | null | undefined;
 }) {
-  const snapshots = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
+  const snapshots = clampSeasonSnapshotsToCurrentSeason(input.gameState)
     .filter((snapshot) => snapshotHasPlayerPerformance(input.gameState, snapshot, input.playerId))
     .sort(compareSeasonSnapshotsDesc);
   const currentSnapshot = input.referenceSeasonId
@@ -1446,14 +1450,14 @@ function buildSnapshotSaleProjection(
 function buildSeasonHistory(gameState: GameState, playerId: string, player: Player) {
   const rosterPurchasePrice =
     gameState.rosters.find((entry) => entry.playerId === playerId)?.purchasePrice ??
-    gameState.transferHistory.find((entry) => entry.playerId === playerId && entry.transferType === "buy")?.fee ??
+    clampTransferHistoryToCurrentSeason(gameState).find((entry) => entry.playerId === playerId && entry.transferType === "buy")?.fee ??
     null;
   const signingReference = resolvePlayerMarketValueReference({
     player,
     gameState,
     rosterPurchasePrice,
   });
-  const sortedSnapshots = [...(gameState.seasonState.seasonSnapshots ?? [])].sort((left, right) =>
+  const sortedSnapshots = clampSeasonSnapshotsToCurrentSeason(gameState).sort((left, right) =>
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
   let previousSeasonEndMarketValue: number | null = null;
@@ -1573,7 +1577,7 @@ function mergeSeasonHistoryWithTransferFallback(
 ): PlayerDetailDrawerData["seasonHistory"] {
   const bySeasonId = new Map(snapshotHistory.map((entry) => [entry.seasonId, entry] as const));
 
-  for (const transfer of gameState.transferHistory) {
+  for (const transfer of clampTransferHistoryToCurrentSeason(gameState)) {
     if (transfer.playerId !== player.id) {
       continue;
     }
@@ -1683,7 +1687,7 @@ function mergeSeasonHistoryWithTransferFallback(
 }
 
 function findLatestArchivedPlayerPerformance(gameState: GameState, playerId: string) {
-  return [...(gameState.seasonState.seasonSnapshots ?? [])]
+  return clampSeasonSnapshotsToCurrentSeason(gameState)
     .filter((snapshot) => snapshot.seasonId !== gameState.season.id)
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
     .map((snapshot) => {
@@ -1765,7 +1769,7 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
       .map((row) => [row.seasonId as string, row] as const),
   );
 
-  const snapshotSeasons = [...(input.gameState.seasonState.seasonSnapshots ?? [])].sort((left, right) =>
+  const snapshotSeasons = clampSeasonSnapshotsToCurrentSeason(input.gameState).sort((left, right) =>
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
 
@@ -1985,7 +1989,7 @@ function buildHistoryRows(input: {
 }
 
 function buildTransferContext(gameState: GameState, playerId: string, rosterEntry: RosterEntry | null) {
-  const lastTransfer = [...gameState.transferHistory]
+  const lastTransfer = clampTransferHistoryToCurrentSeason(gameState)
     .filter((entry) => entry.playerId === playerId)
     .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))[0] ?? null;
 
@@ -2015,7 +2019,7 @@ function buildTransferContext(gameState: GameState, playerId: string, rosterEntr
 function buildTransferHistory(gameState: GameState, playerId: string) {
   const teamNamesById = new Map(gameState.teams.map((team) => [team.teamId, team.name] as const));
 
-  return [...gameState.transferHistory]
+  return clampTransferHistoryToCurrentSeason(gameState)
     .filter((entry) => entry.playerId === playerId)
     .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))
     .map((entry) => ({

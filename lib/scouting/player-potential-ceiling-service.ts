@@ -10,6 +10,11 @@ import {
   derivePlayerPotentialCeilingProfileFromAttributeCeilings,
   getPlayerAttributeValue,
 } from "@/lib/scouting/player-attribute-ceiling-service";
+// Same non-saturating CA/PO percentile curve used for current-ability stars. Imported
+// for the PO ceiling recalibration below. (Runtime-only use inside functions — the
+// module cycle with player-potential-service is safe because the binding is a live
+// export resolved at call time, never at module-init time.)
+import { potentialScoreToStars } from "@/lib/progression/player-potential-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 export type PlayerPotentialCeilingProfile = {
@@ -107,6 +112,92 @@ function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
   );
 }
 
+// Single-axis specialist protection: a player whose strongest CURRENT axis sits at
+// least this many stars above his second axis is treated as a specialist, and that one
+// axis keeps an above-ceiling upside so weak-overall / high-single-axis prospects still
+// read as high-potential on that axis (matches the "kohan-like" prospect case).
+const SPECIALIST_AXIS_GAP_STARS = 1;
+const SPECIALIST_AXIS_UPSIDE_STARS = 1;
+
+/**
+ * Score → PO ceiling star on the shared CA/PO percentile curve, with the top segment
+ * stretched for the potential-score distribution.
+ *
+ * The hidden potential score is generated ~uniformly on 35..99 (mean ~66), i.e. much
+ * higher and denser at the top than the CA-score distribution the CA curve was fitted to
+ * (CA clusters ~30..68, 5★ ≈ score 78, above p95). Feeding potential scores straight into
+ * `potentialScoreToStars` therefore saturates: ~a third of players exceed the 78→5★ anchor
+ * and read as 5★. So we keep the CA curve VERBATIM for weak/mid potential (score ≤ 70 →
+ * identical stars, so ~p10 lands ~2★, the median ~4★) and stretch only the top rung
+ * `[70,99] → [4.5,5.0]` — continuous at 70 (the curve's 4.5★ anchor) — so 5★ stays reserved
+ * for genuine top potential (~p95+, score ≈ 96) instead of a third of the league.
+ */
+function potentialCeilingOverallStars(hiddenPotentialScore: number): number {
+  const score = clamp(hiddenPotentialScore, 0, 99);
+  if (score <= 70) return potentialScoreToStars(score);
+  const t = (score - 70) / (99 - 70);
+  return Number((4.5 + t * 0.5).toFixed(2));
+}
+
+/**
+ * Recalibrates a raw attribute-derived ceiling profile onto the SAME non-saturating
+ * percentile curve the CA stars use (`potentialScoreToStars`).
+ *
+ * Why: the per-attribute upside budget in `buildHiddenAttributeCeilingsFromPotentialScore`
+ * pushes nearly every axis ceiling to ~90–99 → every axis maps to 5★ → `ceiling.overall`
+ * saturates at 5★ for ~97% of players, so every roster card showed "5★ potential". The
+ * hidden potential score (35..99) shares CA's absolute 0..99 scale, so mapping it through
+ * the CA/PO curve gives a PO overall that SPREADS like CA: weak potential ~1.5–2.5★,
+ * typical ~3–4.5★, only genuine top potential reaches 5★.
+ *
+ * Mechanics: every axis is hard-capped at the score-justified ceiling `poCeilStar`
+ * (a weak axis already below it is left untouched — we never inflate it up to the cap),
+ * then floored at the player's current axis star so PO can never drop below CA. Genuine
+ * single-axis specialists keep one axis above the cap.
+ *
+ * The OVERALL is the crux: CA axis stars are generous (many players carry two or three
+ * 4.5–5★ axes even at a mid CA overall), and because PO axes must stay ≥ CA axes, the
+ * peak-weighted axis overall rounds back up to 5★ for a low-potential player who merely
+ * has strong current axes. So for BALANCED players the overall is additionally capped at
+ * the score-justified `poCeilStar` (floored at CA overall — a finished product with
+ * CA > potential-score legitimately shows PO ≈ CA and no headroom). SPECIALISTS keep the
+ * uncapped, peak-weighted overall so a weak-overall / one-elite-axis prospect still shows
+ * real overall upside. `finalizePotentialCeilingProfile` preserves this overall (it no
+ * longer forces it back up to the axis-peak overall), so the profile is idempotent.
+ */
+function recalibratePotentialCeilingToPotentialScore(
+  currentStars: PlayerAxisStarProfile,
+  ceiling: PlayerPotentialCeilingProfile,
+  hiddenPotentialScore: number,
+): PlayerPotentialCeilingProfile {
+  const poCeilStar = potentialCeilingOverallStars(hiddenPotentialScore);
+  const currentByAxisDesc = [...AXIS_KEYS].sort((left, right) => currentStars[right] - currentStars[left]);
+  const strongestCurrentAxis = currentByAxisDesc[0]!;
+  const isSpecialist =
+    currentStars[strongestCurrentAxis] - currentStars[currentByAxisDesc[1]!] >= SPECIALIST_AXIS_GAP_STARS;
+
+  const recalibratedAxis = {} as Record<PlayerAxisKey, number>;
+  for (const axis of AXIS_KEYS) {
+    const cappedToScore = Math.min(ceiling[axis], poCeilStar);
+    const floor =
+      isSpecialist && axis === strongestCurrentAxis
+        ? currentStars[axis] + SPECIALIST_AXIS_UPSIDE_STARS
+        : currentStars[axis];
+    recalibratedAxis[axis] = roundHalfStar(clamp(Math.max(cappedToScore, floor), currentStars[axis], 5));
+  }
+
+  const axisOverall = computeOverallFromAxisStars(recalibratedAxis);
+  // Balanced players: cap the overall at the score-justified ceiling (never below CA).
+  // Specialists: keep the full peak-weighted overall so single-axis upside shows.
+  const overallCap = isSpecialist ? 5 : Math.max(roundHalfStar(poCeilStar), currentStars.overall);
+  const overall = roundHalfStar(clamp(Math.min(axisOverall, overallCap), currentStars.overall, 5));
+
+  return {
+    ...recalibratedAxis,
+    overall,
+  };
+}
+
 export function resolveEffectiveAxisPoStars(
   currentStars: PlayerAxisStarProfile,
   poStars: Partial<Record<PlayerAxisKey, number>> | null | undefined,
@@ -135,9 +226,14 @@ export function clampPotentialCeilingToCurrentStars(
   }
   return {
     ...clampedAxis,
+    // Preserve the profile's own `overall` (only floored at CA overall). A DERIVED profile
+    // already carries `overall === computeOverallFromAxisStars(clampedAxis)`, so this is a
+    // no-op for it; a RECALIBRATED profile intentionally carries an overall BELOW the
+    // axis-peak value (see recalibratePotentialCeilingToPotentialScore) and must keep it,
+    // otherwise generous CA axes would force every capped PO overall back up to 5★.
     overall: clampPotentialOverallToCurrent(
       currentStars.overall,
-      Math.max(computeOverallFromAxisStars(clampedAxis), ceiling.overall),
+      Math.max(ceiling.overall, currentStars.overall),
     ),
   };
 }
@@ -183,22 +279,21 @@ export function buildPlayerPotentialCeilingProfile(input: {
   hiddenPotentialScore?: number | null;
   existing?: PlayerPotentialRecord | null;
 }): PlayerPotentialCeilingProfile {
+  const effectiveScore = input.hiddenPotentialScore ?? input.existing?.hiddenPotentialScore ?? null;
   const attributeCeilings = buildHiddenAttributeCeilingsFromPotentialScore({
     saveId: input.saveId,
     player: input.player,
     currentStars: input.currentStars,
-    hiddenPotentialScore:
-      input.hiddenPotentialScore ??
-      input.existing?.hiddenPotentialScore ??
-      null,
+    hiddenPotentialScore: effectiveScore,
   });
-  return finalizePotentialCeilingProfile(
-    input.currentStars,
-    derivePlayerPotentialCeilingProfileFromAttributeCeilings({
-      attributeCeilings,
-      currentStars: input.currentStars,
-    }),
-  );
+  const derived = derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+    attributeCeilings,
+    currentStars: input.currentStars,
+  });
+  const recalibrated = isFiniteNumber(effectiveScore)
+    ? recalibratePotentialCeilingToPotentialScore(input.currentStars, derived, effectiveScore)
+    : derived;
+  return finalizePotentialCeilingProfile(input.currentStars, recalibrated);
 }
 
 function finalizePotentialCeilingProfile(
@@ -311,7 +406,7 @@ export function attachPotentialCeilingToRecord(input: {
           })
         : input.record.hiddenAttributeCeiling);
 
-  const ceiling =
+  const derivedCeiling =
     attributeCeiling && input.currentStars
       ? derivePlayerPotentialCeilingProfileFromAttributeCeilings({
           attributeCeilings: attributeCeiling,
@@ -319,9 +414,20 @@ export function attachPotentialCeilingToRecord(input: {
         })
       : input.ceiling ?? null;
 
-  if (!ceiling || !attributeCeiling) {
+  if (!derivedCeiling || !attributeCeiling) {
     return input.record;
   }
+
+  // Persist the SAME non-saturating recalibration the display path uses, so stored
+  // axis/overall PO stars match the roster snapshot (and season-end drift stays bounded).
+  const ceiling =
+    input.currentStars && isFiniteNumber(input.record.hiddenPotentialScore)
+      ? recalibratePotentialCeilingToPotentialScore(
+          input.currentStars,
+          derivedCeiling,
+          input.record.hiddenPotentialScore,
+        )
+      : derivedCeiling;
 
   return {
     ...input.record,
@@ -483,12 +589,19 @@ export function reconcilePlayerPotentialRecordToCurrentAbility(input: {
       : Math.min(99, currentRounded + 12);
   }
 
+  const derivedCeilingProfile = derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+    attributeCeilings: attributeCeiling,
+    currentStars: input.currentStars,
+  });
   const ceilingProfile = finalizePotentialCeilingProfile(
     input.currentStars,
-    derivePlayerPotentialCeilingProfileFromAttributeCeilings({
-      attributeCeilings: attributeCeiling,
-      currentStars: input.currentStars,
-    }),
+    isFiniteNumber(input.record.hiddenPotentialScore)
+      ? recalibratePotentialCeilingToPotentialScore(
+          input.currentStars,
+          derivedCeilingProfile,
+          input.record.hiddenPotentialScore,
+        )
+      : derivedCeilingProfile,
   );
 
   return {
