@@ -55,7 +55,12 @@ function makeIdempotent(stmt: string): string {
 export async function createTestDb(): Promise<TestDb> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lec-test-"));
   const dbPath = path.join(dir, "test.sqlite");
-  const prisma = new PrismaClient({ datasourceUrl: `file:${dbPath}` });
+  // connection_limit=1: mit mehreren gepoolten SQLite-Verbindungen kam es beim
+  // sequenziellen Ausfuehren der Migrations-DDL-Statements (CREATE/DROP/RENAME
+  // TABLE) vereinzelt zu Ordnungs-Race-Conditions ("already exists"/"no such
+  // table"), weil einzelne Statements offenbar ueber unterschiedliche
+  // Verbindungen liefen. Eine einzige Verbindung erzwingt die Reihenfolge.
+  const prisma = new PrismaClient({ datasourceUrl: `file:${dbPath}?connection_limit=1` });
 
   const sql = findMigrationSql();
   // Statements sind einfache CREATE TABLE/INDEX-Anweisungen (kein ";" innerhalb).

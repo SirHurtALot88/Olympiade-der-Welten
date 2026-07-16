@@ -67,6 +67,18 @@ export function computeMarketEk(priceFrom: number, packQty: number, buyShipping:
   return priceFrom * Math.max(1, packQty) + buyShipping;
 }
 
+/**
+ * Cardmarket-Produktsuche als Basis-URL fuer `buildCardmarketUrl` (KONZEPT §7.1):
+ * Chris pflegt keine Produkt-Slug-Datenbank, daher verlinkt die App auf die
+ * Cardmarket-SUCHE mit Name/Set-Code als `searchString` -- Chris klickt sich
+ * von dort zum exakten Produkt durch. Die harten DE/DE-Parameter gelten auch
+ * fuer die Suchergebnisliste.
+ */
+export function buildCardmarketSearchUrl(nameOrSetCode: string, packQty: number): string {
+  const base = `https://www.cardmarket.com/de/YuGiOh/Products/Search?searchString=${encodeURIComponent(nameOrSetCode)}`;
+  return buildCardmarketUrl(base, packQty);
+}
+
 export type MarketStatus = "zu_guenstig" | "im_korridor" | "zu_teuer";
 
 /**

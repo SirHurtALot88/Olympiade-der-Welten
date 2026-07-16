@@ -108,7 +108,15 @@ export function MicroVelocity({ values, max }: { values: [number, number, number
   );
 }
 
-export function Corridor({ min, good, vk }: { min: number; good: number; vk: number }) {
+interface CorridorProps {
+  min: number;
+  good: number;
+  vk: number;
+  /** Optionaler Cardmarket-Preistrend -- rendert einen zusaetzlichen blauen Markt-Marker (PAGES_CONCEPT §3). */
+  marketValue?: number | null;
+}
+
+export function Corridor({ min, good, vk, marketValue }: CorridorProps) {
   const rangeMin = min * 0.7;
   const rangeMax = good * 1.25;
   const range = rangeMax - rangeMin || 1;
@@ -124,6 +132,9 @@ export function Corridor({ min, good, vk }: { min: number; good: number; vk: num
         />
         <div className="mn" style={{ left: `${pos(min)}%` }} />
         <div className="gx" style={{ left: `${pos(good)}%` }} />
+        {marketValue !== undefined && marketValue !== null && marketValue > 0 && (
+          <div className="mk" style={{ left: `${pos(marketValue)}%` }} title={`Markt-Trend ${marketValue.toFixed(2)} €`} />
+        )}
         {vk > 0 && <div className="me" style={{ left: `${pos(vk)}%`, background: meColor }} />}
       </div>
       <div className="clabels">

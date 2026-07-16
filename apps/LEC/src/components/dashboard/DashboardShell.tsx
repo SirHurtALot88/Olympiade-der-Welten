@@ -54,7 +54,7 @@ export function DashboardShell({ viewModel }: Props) {
       />
 
       <section className="grid-2">
-        <CardmarketPlaceholder />
+        <CardmarketPlaceholder count={viewModel.totals.marketPriceCount} />
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <OperatingQuotas quotas={viewModel.quotas} />
           <Recommendations

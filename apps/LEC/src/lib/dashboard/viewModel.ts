@@ -143,7 +143,7 @@ export interface DashboardViewModel {
   sortiment: SortimentRow[];
   quotas: OperatingQuotas;
   recommendations: Recommendation[];
-  totals: { articleCount: number; cardArticleCount: number };
+  totals: { articleCount: number; cardArticleCount: number; marketPriceCount: number };
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -251,7 +251,11 @@ export function buildDashboardViewModel(
     sortiment,
     quotas,
     recommendations,
-    totals: { articleCount: articles.length, cardArticleCount: articles.length },
+    totals: {
+      articleCount: articles.length,
+      cardArticleCount: articles.length,
+      marketPriceCount: articles.filter((a) => a.latestMarketTrend !== null).length,
+    },
   };
 }
 
