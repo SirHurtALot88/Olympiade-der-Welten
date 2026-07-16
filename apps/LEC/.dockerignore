@@ -1,0 +1,9 @@
+node_modules
+.next
+data
+*.sqlite
+.env
+.env.local
+.local-fixtures
+npm-debug.log*
+.git

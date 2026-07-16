@@ -3,7 +3,10 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-const IGNORE_DIRS = new Set(["node_modules", ".next", "dist", "coverage", ".git", "outputs"]);
+// "apps" enthaelt eigenstaendige Apps (z. B. apps/LEC) mit eigener tsconfig und
+// eigenem "@/"-Alias -> dieser Oly-Root-Check darf sie nicht scannen (sie haben
+// eigene CI/Tests). Sonst werden ihre "@/"-Imports faelschlich als fehlend gemeldet.
+const IGNORE_DIRS = new Set(["node_modules", ".next", "dist", "coverage", ".git", "outputs", "apps"]);
 
 function walk(dir: string, files: string[] = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

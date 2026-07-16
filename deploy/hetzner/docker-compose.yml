@@ -23,13 +23,38 @@ services:
     expose:
       - "3000"
 
+  # Lord Enterich Cards — Shop-Analytics. Eigenstaendige App (apps/LEC), eigene
+  # DB, eigener Login. Bewusst getrennt von der Oly, eigene Subdomain (siehe
+  # Caddyfile + KONZEPT §4.2). Baut unabhaengig; ein LEC-Build-Fehler betrifft
+  # den bereits laufenden oly-app-Container nicht.
+  lec-app:
+    build:
+      context: ../../apps/LEC
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      LEC_SQLITE_PATH: /app/data/lec.sqlite
+      # Zugangsschutz (Single-User). In Produktion ist der Login PFLICHT — ohne
+      # Passwort/Secret sperrt sich die App (fail closed). Werte aus .env.
+      LEC_AUTH_ENABLED: ${LEC_AUTH_ENABLED:-1}
+      LEC_PASSWORD: ${LEC_PASSWORD:-}
+      LEC_AUTH_SECRET: ${LEC_AUTH_SECRET:-}
+    volumes:
+      - lec-data:/app/data
+    expose:
+      - "3000"
+
   caddy:
     image: caddy:2
     restart: unless-stopped
     depends_on:
       - oly-app
+      - lec-app
     environment:
       OLY_DOMAIN: ${OLY_DOMAIN}
+      LEC_DOMAIN: ${LEC_DOMAIN}
     ports:
       - "80:80"
       - "443:443"
@@ -40,6 +65,7 @@ services:
 
 volumes:
   oly-data:
+  lec-data:
   caddy-data:
   caddy-config:
 
