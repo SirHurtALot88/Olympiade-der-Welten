@@ -418,6 +418,15 @@ export type TeamProfileNewLookProps = {
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
   onOpenContracts?: () => void;
   leagueHeatPools?: LeaguePlayerHeatPools;
+  /**
+   * Voller GameState direkt als Prop. Die Team-Profil-Seite wird im Shell nicht
+   * innerhalb des `FoundationStateProvider` gemountet, deshalb liefert der
+   * optionale Kontext dort `null` — was RANG-/CASH-/MW-/GEHALT-Hover und das
+   * volle Squad-Depth-Chart auf "Kein Ligakontext" degradieren ließ. Wird der
+   * GameState als Prop durchgereicht (Shell hat ihn im Scope), nutzen wir ihn
+   * bevorzugt und der Kontext bleibt nur Fallback.
+   */
+  gameState?: GameState | null;
 };
 
 export default function TeamProfileNewLook({
@@ -426,6 +435,7 @@ export default function TeamProfileNewLook({
   onOpenPlayer,
   onOpenContracts,
   leagueHeatPools,
+  gameState: gameStateProp = null,
 }: TeamProfileNewLookProps) {
   const [rosterMode, setRosterMode] = useState<NlTeamProfileRosterMode>("portraits");
 
@@ -440,7 +450,7 @@ export default function TeamProfileNewLook({
   // Liga-Radar) und den GameState für den Werdegang. Fehlt der Kontext,
   // fallen Radar/Werdegang einfach weg — kein Fake.
   const foundationState = useFoundationStateOptional();
-  const foundationGameState = foundationState?.gameState ?? null;
+  const foundationGameState = gameStateProp ?? foundationState?.gameState ?? null;
   const teamCount = foundationGameState?.teams.length ?? 0;
 
   const werdegangSeries = useMemo(
