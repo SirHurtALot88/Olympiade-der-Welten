@@ -46021,6 +46021,14 @@ button.foundation-team-portrait-card {
   background: var(--nl-panel-2);
 }
 
+/* A11y-Fix (T-080): Zeile ist jetzt per Tastatur fokussierbar
+   (tabIndex/role="button") — sichtbarer Fokusring analog zu den übrigen
+   interaktiven Elementen im neuen Look. */
+.is-new-look .nl-teams-table-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
+}
+
 .is-new-look .nl-teams-table-row.is-contract-expiring .nl-teams-playername {
   color: var(--nl-warn);
 }
@@ -46095,6 +46103,32 @@ button.foundation-team-portrait-card {
 .is-new-look .nl-teams-action:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* T-036: „Verkaufen" ist destruktiv (öffnet die Verkaufs-Vorschau) und
+   stand bislang optisch ununterscheidbar direkt neben „Verlängern" →
+   Fehlklick-Gefahr. Eigene Gruppe mit sichtbarem Abstand (`margin-left`)
+   trennt sie von den unkritischen Aktionen; die Warnfarbe (`--nl-risk`)
+   macht die Destruktivität zusätzlich sichtbar. */
+.is-new-look .nl-teams-action-danger-group {
+  display: inline-flex;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-teams-action-danger {
+  margin-right: 0;
+  color: var(--nl-risk);
+  border-color: color-mix(in srgb, var(--nl-risk) 45%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-risk) 8%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-teams-action-danger:hover:not(:disabled),
+.is-new-look .nl-teams-action-danger:focus-visible {
+  color: var(--nl-risk);
+  border-color: var(--nl-risk);
+  background: color-mix(in srgb, var(--nl-risk) 14%, var(--nl-panel-2));
 }
 
 /* --- Liga-Board (Teamtabelle als Board-Zeilen) ----------------------- */
@@ -59269,6 +59303,11 @@ button.is-new-look .nl-thist-season-pill,
   display: inline-flex;
 }
 
+/* A11y-Fix (T-079): Sichtbarkeit wird jetzt vom `hidden`-Attribut (React-
+   State in `TeamsKpiHoverPortal`, gesetzt via Hover UND Fokus) gesteuert
+   statt über `:hover`/`:focus-within` — so bleibt CSS-Sichtbarkeit und
+   Accessibility-Tree-Zugehörigkeit (kein `aria-hidden="true"` mehr) immer
+   synchron. Spiegelt `.nl-kpipop-panel`/`[hidden]` im Team-Profil. */
 .is-new-look .nl-teams-rank-preview {
   position: absolute;
   top: calc(100% + 6px);
@@ -59283,21 +59322,23 @@ button.is-new-look .nl-thist-season-pill,
   border-radius: var(--nl-r-md);
   background: var(--nl-panel);
   box-shadow: var(--nl-e3);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-4px);
-  transition:
-    opacity var(--nl-t-fast) var(--nl-ease),
-    transform var(--nl-t-fast) var(--nl-ease),
-    visibility var(--nl-t-fast) var(--nl-ease);
   pointer-events: none;
+  animation: nl-teams-rank-preview-in var(--nl-t-fast, 0.14s) var(--nl-ease, ease-out);
 }
 
-.is-new-look .nl-teams-rank-portal:hover .nl-teams-rank-preview,
-.is-new-look .nl-teams-rank-portal:focus-within .nl-teams-rank-preview {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+.is-new-look .nl-teams-rank-preview[hidden] {
+  display: none;
+}
+
+@keyframes nl-teams-rank-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .is-new-look .nl-teams-rank-preview-title {
@@ -59359,8 +59400,7 @@ button.is-new-look .nl-thist-season-pill,
 
 @media (prefers-reduced-motion: reduce) {
   .is-new-look .nl-teams-rank-preview {
-    transition: none;
-    transform: none;
+    animation: none;
   }
 }
 
@@ -60621,6 +60661,14 @@ button.nl-players-axis:focus-visible {
 
 .is-new-look .nl-teamprofile-table-row:hover {
   background: var(--nl-panel-2);
+}
+
+/* A11y-Fix (T-080): Zeile ist jetzt per Tastatur fokussierbar
+   (tabIndex/role="button") — sichtbarer Fokusring analog zu den übrigen
+   interaktiven Elementen im neuen Look. */
+.is-new-look .nl-teamprofile-table-row:focus-visible {
+  outline: 2px solid var(--nl-accent);
+  outline-offset: -2px;
 }
 
 .is-new-look .nl-teamprofile-table-row.is-contract-expiring td {

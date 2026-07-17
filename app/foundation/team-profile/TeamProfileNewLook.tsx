@@ -921,6 +921,23 @@ export default function TeamProfileNewLook({
                   key={player.activePlayerId}
                   className={`nl-teamprofile-table-row${isContractExpiring ? " is-contract-expiring" : ""}`}
                   onClick={() => onOpenPlayer(player.playerId, player.activePlayerId)}
+                  // A11y-Fix (T-080): Die Zeile war nur per Maus-Klick bedienbar
+                  // (kein tabIndex/role/onKeyDown). `target === currentTarget`
+                  // verhindert, dass Enter/Space auf dem verschachtelten
+                  // Spielerlink-Button die Zeilen-Aktion zusätzlich auslöst —
+                  // der Button hat sein eigenes Verhalten bereits (inkl.
+                  // `stopPropagation` bei Klick).
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onOpenPlayer(player.playerId, player.activePlayerId);
+                    }
+                  }}
                   title={`${player.name} öffnen${player.issueTags.length > 0 ? ` · Hinweise: ${player.issueTags.join(", ")}` : ""}`}
                 >
                   <td className="nl-teamprofile-td-player">

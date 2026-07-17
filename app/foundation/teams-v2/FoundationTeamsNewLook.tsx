@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
@@ -563,6 +564,87 @@ function compareBoardRows(left: TeamsViewRow, right: TeamsViewRow): number {
     return pointsDelta;
   }
   return left.teamName.localeCompare(right.teamName, "de-DE");
+}
+
+type TeamsKpiHoverPortalProps = {
+  panelId: string;
+  ariaLabel: string;
+  /** Der eigentliche Stat-Chip — bleibt selbst interaktiv (Sortierung/Navigation). */
+  chip: ReactNode;
+  children: ReactNode;
+};
+
+/**
+ * A11y-Fix (T-079): Hover-/Fokus-Vorschau für die Header-KPI-Chips der
+ * Teams-Übersicht. Die Chips (RANG/CASH/MW/GEHALT) sind selbst Buttons
+ * (Sortierung/Sprung), daher kann hier — anders als `HeaderKpiHover` im
+ * Team-Profil — kein zusätzlicher umschließender Trigger-Button verwendet
+ * werden (verschachtelte Buttons sind ungültiges HTML). Stattdessen trägt
+ * dieser Wrapper selbst die Hover-/Fokus-/Escape-Logik und exponiert das
+ * Panel nur dann für Screenreader (`hidden`-Attribut statt permanentem
+ * `aria-hidden="true"`), wenn es durch Maus-Hover ODER Tastatur-Fokus
+ * tatsächlich sichtbar ist. Sichtbarkeit wird komplett über React-State
+ * gesteuert (siehe `.nl-teams-rank-preview[hidden]` in globals.css) —
+ * kein CSS-`:hover`/`:focus-within` mehr, das mit diesem State kollidieren
+ * könnte.
+ */
+function TeamsKpiHoverPortal({ panelId, ariaLabel, chip, children }: TeamsKpiHoverPortalProps) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Kein Panel-Inhalt (z. B. noch keine Vergleichsdaten geladen) → nur den
+  // Chip rendern, kein leerer Dialog im DOM/Accessibility-Tree.
+  if (children == null || children === false) {
+    return <>{chip}</>;
+  }
+
+  function cancelClose() {
+    if (closeTimer.current != null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function openNow() {
+    cancelClose();
+    setOpen(true);
+  }
+
+  function closeSoon() {
+    cancelClose();
+    // kleine Verzögerung, damit der Zeiger die Lücke zum Panel überbrücken kann
+    closeTimer.current = setTimeout(() => setOpen(false), 90);
+  }
+
+  return (
+    <span
+      ref={wrapRef}
+      className="nl-teams-rank-portal"
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
+      onFocus={openNow}
+      onBlur={(event) => {
+        if (!wrapRef.current?.contains(event.relatedTarget as Node | null)) {
+          cancelClose();
+          setOpen(false);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open) {
+          event.stopPropagation();
+          cancelClose();
+          setOpen(false);
+          wrapRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+        }
+      }}
+    >
+      {chip}
+      <div id={panelId} role="dialog" aria-label={ariaLabel} className="nl-teams-rank-preview" hidden={!open}>
+        {children}
+      </div>
+    </span>
+  );
 }
 
 export default function FoundationTeamsNewLook({
@@ -1138,6 +1220,23 @@ export default function FoundationTeamsNewLook({
                   key={entry.id}
                   className={`nl-teams-table-row${isContractExpiring ? " is-contract-expiring" : ""}`}
                   onClick={() => void openPlayerDrawerById(player.id, entry.id)}
+                  // A11y-Fix (T-080): Die Zeile war nur per Maus-Klick bedienbar
+                  // (kein tabIndex/role/onKeyDown). `target === currentTarget`
+                  // verhindert, dass Enter/Space auf einem verschachtelten
+                  // Button (Spielerlink, Verkaufen, Verlängern) die Zeilen-
+                  // Aktion zusätzlich auslöst — die Buttons haben ihr eigenes
+                  // Verhalten bereits (inkl. `stopPropagation` bei Klick).
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      void openPlayerDrawerById(player.id, entry.id);
+                    }
+                  }}
                   title={`${player.name} öffnen`}
                 >
                   <td className="nl-teams-td-player">
@@ -1183,29 +1282,14 @@ export default function FoundationTeamsNewLook({
                   </td>
                   {showActions ? (
                     <td className="nl-teams-td-actions" onClick={(event) => event.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="nl-teams-action"
-                        disabled={marketSellBusy}
-                        title="Verkaufen"
-                        aria-label={`${player.name} verkaufen`}
-                        onClick={() =>
-                          void openMarketSellModal(
-                            {
-                              activePlayerId: entry.id,
-                              playerId: player.id,
-                              playerName: player.name,
-                              className: player.className,
-                              race: player.race ?? "—",
-                              portraitUrl:
-                                getPlayerPortraitModel(player).previewSrc ?? getPlayerPortraitModel(player).src,
-                            },
-                            selectedTeam.teamId,
-                          )
-                        }
-                      >
-                        Verkaufen
-                      </button>
+                      {/* T-036: „Verkaufen" ist destruktiv und stand bisher direkt
+                          neben „Verlängern" in identischer Optik → Fehlklick-Gefahr.
+                          Fix: eigene Gruppe mit sichtbarem Abstand + Warnstil
+                          (`nl-teams-action-danger`), „Verlängern" (unkritisch)
+                          zuerst. Der eigentliche Verkauf bleibt zusätzlich durch
+                          den Vorschau-/Bestätigungsschritt in `openMarketSellModal`
+                          abgesichert (öffnet nur ein Preview-Panel, verkauft nicht
+                          sofort). */}
                       {isContractExpiring ? (
                         <button
                           type="button"
@@ -1225,6 +1309,31 @@ export default function FoundationTeamsNewLook({
                           Verlängern
                         </button>
                       ) : null}
+                      <span className="nl-teams-action-danger-group">
+                        <button
+                          type="button"
+                          className="nl-teams-action nl-teams-action-danger"
+                          disabled={marketSellBusy}
+                          title="Verkaufen — öffnet die Verkaufs-Vorschau"
+                          aria-label={`${player.name} verkaufen`}
+                          onClick={() =>
+                            void openMarketSellModal(
+                              {
+                                activePlayerId: entry.id,
+                                playerId: player.id,
+                                playerName: player.name,
+                                className: player.className,
+                                race: player.race ?? "—",
+                                portraitUrl:
+                                  getPlayerPortraitModel(player).previewSrc ?? getPlayerPortraitModel(player).src,
+                              },
+                              selectedTeam.teamId,
+                            )
+                          }
+                        >
+                          Verkaufen
+                        </button>
+                      </span>
                     </td>
                   ) : null}
                 </tr>
@@ -1279,7 +1388,13 @@ export default function FoundationTeamsNewLook({
       return null;
     }
     return (
-      <div className="nl-teams-board-hover" aria-hidden="true">
+      // A11y-Fix (T-079): war fest `aria-hidden="true"`, obwohl die Karte
+      // per Tastatur-Fokus (`onFocusCapture` auf `.nl-teams-boardrow`, s.u.)
+      // genauso geöffnet wird wie per Maus-Hover — SR bekam den Inhalt nie.
+      // Da die Karte ohnehin nur bei `hoveredBoardTeamId === row.team.teamId`
+      // gemountet wird (siehe `renderBoardRow`), reicht ein aussagekräftiges
+      // `role`/`aria-label` ohne zusätzliches `hidden`-Attribut.
+      <div className="nl-teams-board-hover" role="dialog" aria-label={`${row.teamName} — Formkurve`}>
         <span className="nl-teams-board-hover-title">{row.teamName}</span>
         <div className="nl-teams-board-hover-body">
           {radarAxes.length > 0 ? (
@@ -1454,7 +1569,7 @@ export default function FoundationTeamsNewLook({
       </li>
     );
     return (
-      <div className="nl-teams-rank-preview" aria-hidden="true">
+      <>
         <span className="nl-teams-rank-preview-title">Cash · GuV (Projektion)</span>
         <ol className="nl-teams-rank-preview-list nl-tnum">
           {cash != null ? guvLine("cash", "", "Cash", cash) : null}
@@ -1464,7 +1579,7 @@ export default function FoundationTeamsNewLook({
           {sponsorBase != null ? guvLine("sponsor", "+", "Sponsoren (Basis)", sponsorBase) : null}
           {projected != null ? guvLine("projected", "", "≈ Saison-Ende", projected, true) : null}
         </ol>
-      </div>
+      </>
     );
   }
 
@@ -1478,7 +1593,7 @@ export default function FoundationTeamsNewLook({
     const shown = heroMarketValueRows.slice(0, NL_TEAMS_HERO_HOVER_MAX_ROWS);
     const rest = heroMarketValueRows.length - shown.length;
     return (
-      <div className="nl-teams-rank-preview" aria-hidden="true">
+      <>
         <span className="nl-teams-rank-preview-title">Marktwert · Kader</span>
         <ol className="nl-teams-rank-preview-list nl-tnum">
           {shown.map((row, index) => (
@@ -1508,7 +1623,7 @@ export default function FoundationTeamsNewLook({
         {!heroIsOwnTeam ? (
           <span className="nl-teams-rank-preview-title">Einzel-Marktwerte verdeckt (fremdes Team)</span>
         ) : null}
-      </div>
+      </>
     );
   }
 
@@ -1522,7 +1637,7 @@ export default function FoundationTeamsNewLook({
     const shown = heroSalaryRows.slice(0, NL_TEAMS_HERO_HOVER_MAX_ROWS);
     const rest = heroSalaryRows.length - shown.length;
     return (
-      <div className="nl-teams-rank-preview" aria-hidden="true">
+      <>
         <span className="nl-teams-rank-preview-title">Gehalt · Kader</span>
         <ol className="nl-teams-rank-preview-list nl-tnum">
           {shown.map((row, index) => (
@@ -1555,7 +1670,7 @@ export default function FoundationTeamsNewLook({
         {!heroIsOwnTeam ? (
           <span className="nl-teams-rank-preview-title">Einzel-Gehälter verdeckt (fremdes Team)</span>
         ) : null}
-      </div>
+      </>
     );
   }
 
@@ -1579,16 +1694,21 @@ export default function FoundationTeamsNewLook({
               <span className="nl-teams-hero-eyebrow">Team Fokus</span>
               <h2 className="nl-teams-hero-name">{selectedTeam.name}</h2>
               <StatChipRow className="nl-teams-hero-chips" aria-label={`Kennzahlen ${selectedTeam.name}`}>
-                <span className="nl-teams-rank-portal">
-                  <StatChip
-                    label="Rang"
-                    value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
-                    tone="accent"
-                    onClick={onOpenSeason ?? (() => openTeamProfileById(selectedTeam.teamId))}
-                    title={onOpenSeason ? "Zum Saisonstand springen" : `${selectedTeam.name} Profil öffnen`}
-                  />
+                <TeamsKpiHoverPortal
+                  panelId="nl-teams-hero-rang-pop"
+                  ariaLabel={`Rang ${selectedTeam.name} — Saisonstand`}
+                  chip={
+                    <StatChip
+                      label="Rang"
+                      value={heroRow?.rank != null ? `#${heroRow.rank}` : "—"}
+                      tone="accent"
+                      onClick={onOpenSeason ?? (() => openTeamProfileById(selectedTeam.teamId))}
+                      title={onOpenSeason ? "Zum Saisonstand springen" : `${selectedTeam.name} Profil öffnen`}
+                    />
+                  }
+                >
                   {rankPreviewRows.length > 0 ? (
-                    <div className="nl-teams-rank-preview" aria-hidden="true">
+                    <>
                       <span className="nl-teams-rank-preview-title">Saisonstand</span>
                       <ol className="nl-teams-rank-preview-list nl-tnum">
                         {rankPreviewRows.map((row) => {
@@ -1608,9 +1728,9 @@ export default function FoundationTeamsNewLook({
                           );
                         })}
                       </ol>
-                    </div>
+                    </>
                   ) : null}
-                </span>
+                </TeamsKpiHoverPortal>
                 <StatChip
                   label="Punkte"
                   value={formatNlNumber(heroRow?.points, 1)}
@@ -1626,37 +1746,52 @@ export default function FoundationTeamsNewLook({
                   }}
                   title="Zur Kadertabelle springen"
                 />
-                <span className="nl-teams-rank-portal">
-                  <StatChip
-                    label="Cash"
-                    value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
-                    tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
-                    title="Cash — sortiert die Teamtabelle nach Cash"
-                    onClick={() => handleHeroBoardSortSelect("cash", "desc")}
-                  />
+                <TeamsKpiHoverPortal
+                  panelId="nl-teams-hero-cash-pop"
+                  ariaLabel={`Cash ${selectedTeam.name} — GuV-Projektion`}
+                  chip={
+                    <StatChip
+                      label="Cash"
+                      value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
+                      tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
+                      title="Cash — sortiert die Teamtabelle nach Cash"
+                      onClick={() => handleHeroBoardSortSelect("cash", "desc")}
+                    />
+                  }
+                >
                   {renderCashPreview()}
-                </span>
-                <span className="nl-teams-rank-portal">
-                  <StatChip
-                    label="MW"
-                    value={formatNlMoney(heroRow?.marketValueTotal)}
-                    title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
-                    onClick={() => handleHeroBoardSortSelect("mw", "desc")}
-                  />
+                </TeamsKpiHoverPortal>
+                <TeamsKpiHoverPortal
+                  panelId="nl-teams-hero-mw-pop"
+                  ariaLabel={`Marktwert ${selectedTeam.name} — Kader`}
+                  chip={
+                    <StatChip
+                      label="MW"
+                      value={formatNlMoney(heroRow?.marketValueTotal)}
+                      title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
+                      onClick={() => handleHeroBoardSortSelect("mw", "desc")}
+                    />
+                  }
+                >
                   {renderMwPreview()}
-                </span>
-                <span className="nl-teams-rank-portal">
-                  <StatChip
-                    label="Gehalt"
-                    value={heroRow != null ? formatNlMoney(heroRow.salaryTotal) : "—"}
-                    title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
-                    onClick={() => {
-                      setRosterMode("tabelle");
-                      scrollToSection(rosterCardRef);
-                    }}
-                  />
+                </TeamsKpiHoverPortal>
+                <TeamsKpiHoverPortal
+                  panelId="nl-teams-hero-gehalt-pop"
+                  ariaLabel={`Gehalt ${selectedTeam.name} — Kader`}
+                  chip={
+                    <StatChip
+                      label="Gehalt"
+                      value={heroRow != null ? formatNlMoney(heroRow.salaryTotal) : "—"}
+                      title="Gehaltsblock des aktiven Kaders — öffnet die Kadertabelle"
+                      onClick={() => {
+                        setRosterMode("tabelle");
+                        scrollToSection(rosterCardRef);
+                      }}
+                    />
+                  }
+                >
                   {renderGehaltPreview()}
-                </span>
+                </TeamsKpiHoverPortal>
                 {heroRow?.needScore != null ? (
                   <StatChip
                     label="Transferbedarf"
