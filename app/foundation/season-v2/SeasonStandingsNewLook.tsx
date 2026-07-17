@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { Fragment, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
@@ -8,6 +8,7 @@ import {
   NlCard,
   NlCountUpValue,
   NlDeltaChip,
+  NlEmptyState,
   NlMedalBadge,
   NlProgressBar,
   NlRadar,
@@ -59,11 +60,12 @@ import {
  * bewusst getrennt.
  */
 
-type NlStandingsMode = "board" | "daten";
+type NlStandingsMode = "board" | "daten" | "vereine";
 
 const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string }> = [
   { id: "board", label: "Board" },
   { id: "daten", label: "Daten" },
+  { id: "vereine", label: "Vereine" },
 ];
 
 /** Board-Sortierung: nach Rang oder nach einem der vier Bereiche. */
@@ -100,6 +102,20 @@ function getTableSortValue(row: SeasonV2StandingsRow, key: NlTableSortKey): numb
   }
 }
 
+/** Zeilentypen für den "Vereine"-Modus — von den Client-Props abgeleitet (#T-098),
+ * damit hier keine zweite Typdefinition entsteht. */
+type SeasonV2GmRow = SeasonStandingsV2ClientProps["gmRows"][number];
+type SeasonV2ArchiveRow = SeasonStandingsV2ClientProps["archiveRows"][number];
+type SeasonV2DisciplineLeaderRow = SeasonStandingsV2ClientProps["disciplineLeaders"][number];
+
+function formatArchivedAt(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString("de-DE");
+}
+
 function getAreaValue(row: SeasonV2StandingsRow, areaId: SeasonDisciplineAreaId): number | null {
   const ledgerValue = areaId === "pow" ? row.pow : areaId === "spe" ? row.spe : areaId === "men" ? row.men : row.soc;
   return resolveSeasonDisciplineAreaTotal(row.disciplineValues, areaId, ledgerValue);
@@ -133,11 +149,19 @@ export default function SeasonStandingsNewLook({
   isArchived,
   seasonOptions,
   selectedTeamSummary,
+  leaderTeam,
+  momentumTeam,
+  pressureTeam,
   standingsRows,
   topPlayers,
+  gmRows,
+  archiveRows,
+  disciplineLeaders,
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
+  onOpenRanks,
+  onOpenPrize,
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const [mode, setMode] = useState<NlStandingsMode>("board");
@@ -147,6 +171,12 @@ export default function SeasonStandingsNewLook({
     key: "rank",
     dir: "asc",
   });
+  // T-101: "Zu meinem Team springen" — scrollt die `.is-selected`-Zeile im
+  // Board/in der Tabelle in den sichtbaren Bereich. Root-Ref statt globalem
+  // `document.querySelector`, damit nur innerhalb dieser Komponente gesucht wird.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // T-085: Fokus-Ziel für die Pfeiltasten-Navigation der Sortier-Radiogroup.
+  const sortBarButtonRefs = useRef<Partial<Record<NlBoardSortKey, HTMLButtonElement | null>>>({});
   // "Neuer Look" (#37, flag-gated, additiv): KPI-Ranking-Drawer statt voller
   // Navigation beim Klick auf Punkte-/MW-Chips — Zeilen kommen aus `boardRows`,
   // das hier schon existiert, es wird nichts neu berechnet.
@@ -304,6 +334,26 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
+   * T-101 "Zu meinem Team springen": scrollt die aktuell sichtbare
+   * `.is-selected`-Zeile (Board-Zeile ODER Tabellenzeile, je nach Modus) in
+   * den sichtbaren Bereich. Kein neuer State — reine DOM-Navigation, respektiert
+   * `prefers-reduced-motion` (kein Smooth-Scroll bei reduzierter Bewegung).
+   */
+  function scrollToOwnTeam() {
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+    const target = root.querySelector<HTMLElement>(".is-selected");
+    if (!target) {
+      return;
+    }
+    const prefersReducedMotion =
+      typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" });
+  }
+
+  /**
    * Rangliste für den KPI-Ranking-Drawer (#37): "points" folgt derselben
    * Reihenfolge wie das Board (`boardRows`, bereits nach Rang sortiert),
    * "mw" sortiert dieselben Zeilen nach Marktwert neu. Keine neue
@@ -427,6 +477,7 @@ export default function SeasonStandingsNewLook({
               key={group.id}
               className={`nl-standings-area ${nlToneClass(group.id)}`}
               title={`${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`}
+              aria-label={`${group.label}: ${formatNlNumber(value, 1)} Bereichspunkte`}
             >
               <span className="nl-standings-area-label">{group.label}</span>
               <NlProgressBar
@@ -464,7 +515,12 @@ export default function SeasonStandingsNewLook({
                 {group.keys.map((key) => {
                   const value = row.disciplineValues[key];
                   return (
-                    <li key={key} className="nl-standings-disc" title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}>
+                    <li
+                      key={key}
+                      className="nl-standings-disc"
+                      title={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}
+                      aria-label={`${SEASON_DISCIPLINE_LABELS[key]}: ${formatNlNumber(value, 1)}`}
+                    >
                       <span className="nl-standings-disc-label">{SEASON_DISCIPLINE_LABELS[key]}</span>
                       <NlProgressBar
                         className="nl-standings-disc-bar"
@@ -925,44 +981,294 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * T-098: "Im Fokus"-Chips für Spitzenreiter/Momentum/Druck-Team — dieselben
+   * Zeilen, die `useSeasonV2PanelModel` schon berechnet (`leaderTeam`,
+   * `momentumTeam`, `pressureTeam`), bislang aber nirgends im "Neuer Look"
+   * gerendert wurden.
+   */
+  function renderVereineHighlights() {
+    const items: Array<{ key: string; label: string; row: SeasonV2StandingsRow | null; tone: NlTone }> = [
+      { key: "leader", label: "Spitzenreiter", row: leaderTeam, tone: "good" },
+      { key: "momentum", label: "Bestes Momentum", row: momentumTeam, tone: "accent" },
+      { key: "pressure", label: "Unter Druck", row: pressureTeam, tone: "risk" },
+    ];
+    const visible = items.filter(
+      (item): item is { key: string; label: string; row: SeasonV2StandingsRow; tone: NlTone } => item.row != null,
+    );
+    if (visible.length === 0) {
+      return null;
+    }
+    return (
+      <StatChipRow label="Im Fokus" className="nl-standings-vereine-focus" aria-label="Teams im Fokus dieser Saison">
+        {visible.map((item) => (
+          <StatChip
+            key={item.key}
+            label={item.label}
+            value={item.row.teamCode}
+            sub={item.row.teamName}
+            tone={item.tone}
+            onClick={() => onOpenTeam(item.row.teamId)}
+            title={`${item.row.teamName} öffnen`}
+          />
+        ))}
+      </StatChipRow>
+    );
+  }
+
+  /**
+   * T-098: GM-Büro — ein Team-Steckbrief je Verein (Name, GM, Board-Vertrauen)
+   * statt der bisherigen Roh-Tabellen-Optik. Reicht dieselbe
+   * `nl-standings-player`-Pillen-Optik wie der Top-Spieler-Streifen weiter,
+   * damit keine neuen CSS-Regeln nötig sind.
+   */
+  function renderGmSection() {
+    if (gmRows.length === 0) {
+      return null;
+    }
+    return (
+      <NlCard className="nl-standings-players-card" eyebrow="Verwaltungsrat" title="GM-Büro je Verein">
+        <ol className="nl-standings-players nl-standings-gm-list" aria-label="General Manager je Verein">
+          {gmRows.map((row: SeasonV2GmRow, index: number) => {
+            const confidenceLabel =
+              row.boardConfidenceValue != null && Number.isFinite(row.boardConfidenceValue)
+                ? `${formatNlNumber(row.boardConfidenceValue, 1)}/10`
+                : "—";
+            return (
+              <li key={row.teamId} className="nl-reveal" style={{ "--nl-reveal-i": Math.min(index, 14) } as CSSProperties}>
+                <button
+                  type="button"
+                  className="nl-standings-player"
+                  onClick={() => onOpenTeam(row.teamId)}
+                  title={`${row.teamName} öffnen`}
+                >
+                  <BudgetedMediaImage
+                    src={row.logoUrl}
+                    alt={`${row.teamName} Logo`}
+                    className="nl-standings-player-portrait"
+                    width={30}
+                    height={30}
+                    loading="lazy"
+                    fallback={
+                      <span className="nl-standings-player-portrait nl-standings-player-portrait-fallback" aria-hidden="true">
+                        {row.logoInitials}
+                      </span>
+                    }
+                  />
+                  <span className="nl-standings-player-copy">
+                    <span className="nl-standings-player-name">{row.gmName ?? "Kein GM berufen"}</span>
+                    <span className="nl-standings-player-team">
+                      {row.teamCode}
+                      {row.gmTitle ? ` · ${row.gmTitle}` : ""}
+                    </span>
+                  </span>
+                  <span className="nl-standings-player-pps nl-tnum" title="Board-Vertrauen (0–10)">
+                    {confidenceLabel}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </NlCard>
+    );
+  }
+
+  /**
+   * T-098: Disziplin-Rekordhalter (`disciplineLeaders`) — führt zum
+   * bestehenden `onOpenPlayer`-Handler, keine neue Navigation nötig.
+   */
+  function renderDisciplineLeadersSection() {
+    if (disciplineLeaders.length === 0) {
+      return null;
+    }
+    return (
+      <NlCard className="nl-standings-players-card" eyebrow="Rekorde" title="Disziplin-Rekordhalter">
+        <ol className="nl-standings-players nl-standings-discleader-list" aria-label="Disziplin-Rekordhalter der Saison">
+          {disciplineLeaders.map((leader: SeasonV2DisciplineLeaderRow, index: number) => (
+            <li key={leader.disciplineId} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+              <button
+                type="button"
+                className="nl-standings-player"
+                onClick={() => onOpenPlayer(leader.playerId)}
+                title={`${leader.playerName} öffnen`}
+              >
+                <span className="nl-standings-player-portrait nl-standings-player-portrait-fallback" aria-hidden="true">
+                  {leader.teamCode ?? "—"}
+                </span>
+                <span className="nl-standings-player-copy">
+                  <span className="nl-standings-player-name">{leader.playerName}</span>
+                  <span className="nl-standings-player-team">
+                    {leader.disciplineName} · {leader.appearances}×
+                  </span>
+                </span>
+                <span className="nl-standings-player-pps nl-tnum">
+                  {leader.totalContribution != null ? formatNlNumber(leader.totalContribution, 1) : "—"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </NlCard>
+    );
+  }
+
+  /**
+   * T-098: Saison-Archiv — Klick springt über den bereits vorhandenen
+   * `onChangeSeason`-Handler direkt in die archivierte Saison (keine neue
+   * Navigation, nur eine weitere Ansicht auf `seasonOptions`/`onChangeSeason`).
+   */
+  function renderArchiveSection() {
+    if (archiveRows.length === 0) {
+      return null;
+    }
+    return (
+      <NlCard className="nl-standings-players-card" eyebrow="Historie" title="Archivierte Saisons">
+        <ol className="nl-standings-players nl-standings-archive-list" aria-label="Archivierte Saisons">
+          {archiveRows.map((row: SeasonV2ArchiveRow, index: number) => {
+            const archivedLabel = formatArchivedAt(row.archivedAt);
+            return (
+              <li key={row.seasonId} className="nl-reveal" style={{ "--nl-reveal-i": index } as CSSProperties}>
+                <button
+                  type="button"
+                  className="nl-standings-player"
+                  onClick={() => onChangeSeason(row.seasonId)}
+                  title={`${row.seasonName} öffnen`}
+                >
+                  <span className="nl-standings-player-portrait nl-standings-player-portrait-fallback" aria-hidden="true">
+                    {row.seasonName.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="nl-standings-player-copy">
+                    <span className="nl-standings-player-name">{row.seasonName}</span>
+                    <span className="nl-standings-player-team">
+                      {archivedLabel ? `Archiviert ${archivedLabel}` : "Archiviert"} · {row.teamCount} Teams
+                    </span>
+                  </span>
+                  <span className="nl-standings-player-pps nl-tnum" title="Spieler in dieser Saison">
+                    {formatNlNumber(row.playerCount, 0)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </NlCard>
+    );
+  }
+
+  function renderVereineMode() {
+    const hasContent = gmRows.length > 0 || archiveRows.length > 0 || disciplineLeaders.length > 0;
+    if (!hasContent) {
+      return (
+        <NlEmptyState
+          title="Noch keine Vereinsdaten"
+          message="Für diese Saison liegen noch keine GM-, Archiv- oder Rekorddaten vor."
+        />
+      );
+    }
+    return (
+      <>
+        {renderVereineHighlights()}
+        {renderGmSection()}
+        {renderDisciplineLeadersSection()}
+        {renderArchiveSection()}
+      </>
+    );
+  }
+
+  /**
+   * T-085: die Sortier-Leiste ist eine exklusive Auswahl (genau ein aktiver
+   * Sort-Key), also `role="radiogroup"` mit `role="radio"`-Items statt
+   * `aria-pressed`-Buttons ohne Tastatur-Navigation. Pfeil-/Home-/End-Tasten
+   * bewegen Auswahl UND Fokus gemeinsam (Roving-Tabindex-Muster).
+   */
+  function handleBoardSortKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const currentIndex = NL_BOARD_SORT_ITEMS.findIndex((item) => item.id === boardSort);
+    if (currentIndex === -1) {
+      return;
+    }
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % NL_BOARD_SORT_ITEMS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + NL_BOARD_SORT_ITEMS.length) % NL_BOARD_SORT_ITEMS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = NL_BOARD_SORT_ITEMS.length - 1;
+    }
+    if (nextIndex == null) {
+      return;
+    }
+    event.preventDefault();
+    const nextItem = NL_BOARD_SORT_ITEMS[nextIndex];
+    setBoardSort(nextItem.id);
+    sortBarButtonRefs.current[nextItem.id]?.focus();
+  }
+
   function renderBoardSortBar() {
     return (
-      <div className="nl-standings-sortbar" role="group" aria-label="Board sortieren">
+      <div
+        className="nl-standings-sortbar"
+        role="radiogroup"
+        aria-label="Board sortieren"
+        onKeyDown={handleBoardSortKeyDown}
+      >
         <span className="nl-standings-sortbar-label">Sortieren</span>
-        {NL_BOARD_SORT_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`nl-standings-sortchip ${nlToneClass(item.id === "rank" ? "accent" : item.id)}${
-              boardSort === item.id ? " is-active" : ""
-            }`}
-            onClick={() => setBoardSort(item.id)}
-            aria-pressed={boardSort === item.id}
-          >
-            {item.label}
-          </button>
-        ))}
+        {NL_BOARD_SORT_ITEMS.map((item) => {
+          const isActive = boardSort === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              ref={(el) => {
+                sortBarButtonRefs.current[item.id] = el;
+              }}
+              className={`nl-standings-sortchip ${nlToneClass(item.id === "rank" ? "accent" : item.id)}${
+                isActive ? " is-active" : ""
+              }`}
+              onClick={() => setBoardSort(item.id)}
+              role="radio"
+              aria-checked={isActive}
+              tabIndex={isActive ? 0 : -1}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </div>
     );
   }
 
   return (
-    <div className="nl-standings" data-testid="nl-season-standings" data-new-look="true">
+    <div className="nl-standings" data-testid="nl-season-standings" data-new-look="true" ref={rootRef}>
       <NlCard
         className="nl-standings-header-card"
         eyebrow={`${sourceBadgeLabel} · ${isArchived ? "Archiv" : "Live"} · ${sourceLabel}`}
         title={`Saisonstand — ${selectedSeasonLabel}`}
         actions={
-          <label className="nl-standings-season-select">
-            <span>Saison</span>
-            <select value={selectedSeasonId} onChange={(event) => onChangeSeason(event.target.value)}>
-              {seasonOptions.map((option) => (
-                <option key={option.seasonId} value={option.seasonId}>
-                  {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            {onOpenRanks || onOpenPrize ? (
+              <StatChipRow className="nl-standings-quicklinks" aria-label="Weitere Übersichten">
+                {onOpenRanks ? (
+                  <StatChip label="Ränge" value="Öffnen" onClick={onOpenRanks} title="Zur Rangliste wechseln" />
+                ) : null}
+                {onOpenPrize ? (
+                  <StatChip label="Preisgeld" value="Öffnen" onClick={onOpenPrize} title="Preisgeld-Übersicht öffnen" />
+                ) : null}
+              </StatChipRow>
+            ) : null}
+            <label className="nl-standings-season-select">
+              <span>Saison</span>
+              <select value={selectedSeasonId} onChange={(event) => onChangeSeason(event.target.value)}>
+                {seasonOptions.map((option) => (
+                  <option key={option.seasonId} value={option.seasonId}>
+                    {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
         }
       >
         <div className="nl-standings-header-row">
@@ -998,6 +1304,14 @@ export default function SeasonStandingsNewLook({
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
                 title="Marktwert-Rangliste"
               />
+              {mode !== "vereine" ? (
+                <StatChip
+                  label="Team"
+                  value="Springen"
+                  onClick={scrollToOwnTeam}
+                  title="Zu deinem Team im Board springen"
+                />
+              ) : null}
             </StatChipRow>
           ) : null}
         </div>
@@ -1023,6 +1337,8 @@ export default function SeasonStandingsNewLook({
             {displayBoardRows.map((row, index) => renderBoardRow(row, index))}
           </ol>
         </>
+      ) : mode === "vereine" ? (
+        renderVereineMode()
       ) : (
         renderDatenMode()
       )}
