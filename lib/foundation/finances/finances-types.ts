@@ -93,3 +93,24 @@ export type TeamFinancesState = {
 
 /** Discriminated view model consumed by the Finanzen UI. */
 export type FinancesViewModel = { status: "not_ready" } | { status: "ready"; team: TeamFinancesState };
+
+/**
+ * Eine kompakte Liga-weite Finanzzeile — bewusste Balancing-Transparenz
+ * (analog zur Liga-Kreditübersicht in `FoundationCreditsNewLook`, #182),
+ * KEIN Fog-of-War-Verstoß: siehe `buildFinancesLeagueTable` in
+ * `use-finances-league-table.ts`.
+ */
+export type FinanceLeagueTableRow = {
+  teamId: string;
+  teamName: string;
+  teamCode: string;
+  cash: number;
+  /** Sponsor + Preisgeld p.a. (Näherungswert, ohne Transfer-Saldo). */
+  incomeAnnual: number;
+  /** Gehälter + Gebäude-Unterhalt + Kreditraten p.a. (Näherungswert, ohne Transfer-Saldo). */
+  expensesAnnual: number;
+  /** `incomeAnnual - expensesAnnual`. */
+  guv: number;
+  /** Kader-Marktwert-Summe (`TeamManagementSnapshotRow.marketValueTotal`) — `null` ohne Kader. */
+  marketValue: number | null;
+};

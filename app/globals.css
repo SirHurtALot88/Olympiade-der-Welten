@@ -68553,6 +68553,57 @@ button.nl-players-axis:focus-visible {
   }
 }
 
+/* --- Liga · Finanzvergleich (unten in der Finanzen-View) ------------ */
+.is-new-look .nl-fin-league-hint {
+  margin: 0 0 var(--nl-s3);
+  font-size: 12px;
+}
+
+.is-new-look .nl-fin-league-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-fin-league-code {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line-2);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-league-name {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.is-new-look .nl-fin-league-you {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+  color: var(--nl-accent);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* GuV-Zelle: Ton kommt von `nlToneClass` (good/risk), Farbe via `--nl-tone`. */
+.is-new-look .nl-fin-league-card .nl-table td .nl-tone-good,
+.is-new-look .nl-fin-league-card .nl-table td .nl-tone-risk {
+  color: var(--nl-tone);
+  font-weight: 700;
+}
+
 /* ============================================================
    NEUER LOOK — Spielplan / Diszis (nl-diszis-*)
    Saison-Spielplan als Hero: Achsen-Farblegende + Spieltag-Kartenraster,

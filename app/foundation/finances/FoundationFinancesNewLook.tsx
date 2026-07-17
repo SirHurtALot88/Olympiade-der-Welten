@@ -1,21 +1,35 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import { EmptyState } from "@/components/foundation/EmptyState";
 import {
   NL_TONE_VAR,
   NlCard,
   NlEmptyState,
+  NlTable,
   StatChip,
   StatChipRow,
   formatNlMoney,
+  nlToneClass,
   useCountUp,
+  type NlTableColumn,
+  type NlTableSortDirection,
   type NlTone,
 } from "@/components/foundation/new-look";
-import type { FinancesViewModel, TeamFinancesState } from "@/lib/foundation/finances/finances-types";
+import type {
+  FinanceLeagueTableRow,
+  FinancesViewModel,
+  TeamFinancesState,
+} from "@/lib/foundation/finances/finances-types";
 
 export type FoundationFinancesNewLookProps = {
   teamName: string;
   model: FinancesViewModel;
+  /** Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — siehe `use-finances-league-table.ts`. */
+  leagueTable: FinanceLeagueTableRow[];
+  /** Active manager's own team id — hebt "Dein Team" in der Liga-Tabelle hervor. */
+  activeManagerTeamId: string | null;
 };
 
 /** Grün bei GuV ≥ 0, sonst Rot — gleiche binäre Ton-Regel wie andere GuV-Chips im neuen Look. */
@@ -257,6 +271,127 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
   );
 }
 
+// --- Liga · Finanzvergleich (unten in der View) -------------------------
+// Sortierbare `NlTable` über `leagueTable` (jede Team-Zeile ist eine reine
+// p.a.-Näherung, siehe `use-finances-league-table.ts`). Gleiches
+// Sort-Header-Muster wie `LegendaryPlayersPanel` (league-leaders-v2) /
+// `AllTimeTableNewLook`: lokaler `sortState`, Klick auf denselben Key
+// dreht die Richtung, Klick auf einen neuen Key startet absteigend.
+
+type LeagueSortKey = "cash" | "incomeAnnual" | "expensesAnnual" | "guv" | "marketValue";
+
+const NL_FIN_LEAGUE_COLUMNS: NlTableColumn<FinanceLeagueTableRow>[] = [
+  { key: "rank", label: "#", align: "right", width: "36px" },
+  { key: "team", label: "Team" },
+  { key: "cash", label: "Cash", align: "right", sortable: true },
+  {
+    key: "incomeAnnual",
+    label: "Einnahmen p.a.",
+    align: "right",
+    sortable: true,
+    tooltip: "Sponsor + Preisgeld (Näherungswert)",
+  },
+  {
+    key: "expensesAnnual",
+    label: "Ausgaben p.a.",
+    align: "right",
+    sortable: true,
+    tooltip: "Gehälter + Gebäude-Unterhalt + Kreditraten (Näherungswert)",
+  },
+  { key: "guv", label: "GuV p.a.", align: "right", sortable: true, tooltip: "Einnahmen p.a. minus Ausgaben p.a." },
+  { key: "marketValue", label: "MW", align: "right", sortable: true, tooltip: "Kader-Marktwert-Summe" },
+];
+
+function renderLeagueCell(
+  row: FinanceLeagueTableRow,
+  column: NlTableColumn<FinanceLeagueTableRow>,
+  rank: number,
+  isOwnTeam: boolean,
+) {
+  switch (column.key) {
+    case "rank":
+      return rank;
+    case "team":
+      return (
+        <span className="nl-fin-league-team">
+          <span className="nl-fin-league-code">{row.teamCode}</span>
+          <span className="nl-fin-league-name" title={row.teamName}>
+            {row.teamName}
+          </span>
+          {isOwnTeam ? <span className="nl-fin-league-you">Dein Team</span> : null}
+        </span>
+      );
+    case "cash":
+      return formatNlMoney(row.cash);
+    case "incomeAnnual":
+      return formatNlMoney(row.incomeAnnual);
+    case "expensesAnnual":
+      return formatNlMoney(row.expensesAnnual);
+    case "guv":
+      return <span className={nlToneClass(guvTone(row.guv))}>{formatNlMoney(row.guv)}</span>;
+    case "marketValue":
+      return row.marketValue != null ? formatNlMoney(row.marketValue) : "—";
+    default:
+      return null;
+  }
+}
+
+function FinanceLeagueTable({
+  leagueTable,
+  activeManagerTeamId,
+}: {
+  leagueTable: FinanceLeagueTableRow[];
+  activeManagerTeamId: string | null;
+}) {
+  const [sort, setSort] = useState<{ key: LeagueSortKey; direction: NlTableSortDirection }>({
+    key: "cash",
+    direction: "desc",
+  });
+
+  const sortedRows = useMemo(() => {
+    const factor = sort.direction === "asc" ? 1 : -1;
+    return [...leagueTable].sort((left, right) => ((left[sort.key] ?? 0) - (right[sort.key] ?? 0)) * factor);
+  }, [leagueTable, sort]);
+
+  function handleSort(key: string) {
+    setSort((current) => {
+      if (current.key === key) {
+        return { key: key as LeagueSortKey, direction: current.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key: key as LeagueSortKey, direction: "desc" };
+    });
+  }
+
+  return (
+    <NlCard
+      className="nl-fin-league-card"
+      eyebrow="Liga"
+      title={`Finanzvergleich · ${leagueTable.length} Team${leagueTable.length === 1 ? "" : "s"}`}
+      data-testid="nl-fin-league-card"
+    >
+      <p className="nl-fin-league-hint muted">
+        Näherungswerte p.a. fürs Balancing/Feeling — wie die anderen Teams der Liga finanziell dastehen. Ohne
+        Saison-Transfersaldo (Einmal-Ereignis), gleiche Herleitung wie deine eigene Finanzübersicht oben.
+      </p>
+      {sortedRows.length > 0 ? (
+        <NlTable
+          columns={NL_FIN_LEAGUE_COLUMNS}
+          rows={sortedRows}
+          rowKey={(row) => row.teamId}
+          sortState={{ key: sort.key, direction: sort.direction }}
+          onSort={handleSort}
+          rowClassName={(row) => (row.teamId === activeManagerTeamId ? "is-active-row" : undefined)}
+          renderCell={(row, column) => renderLeagueCell(row, column, sortedRows.indexOf(row) + 1, row.teamId === activeManagerTeamId)}
+          data-testid="nl-fin-league-table"
+          aria-label="Finanzvergleich aller Teams"
+        />
+      ) : (
+        <NlEmptyState title="Aktuell sind keine Teams bekannt." />
+      )}
+    </NlCard>
+  );
+}
+
 /**
  * "Neuer Look" Finanzen — Saison-Einnahmen/Ausgaben-Übersicht des eigenen
  * Teams. Read-only: kein Formular, keine Mutation (im Unterschied zu
@@ -264,8 +399,18 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
  * berechneten Cashflow-Quellen (Sponsor-Vertrag, Preisgeld, Gehälter,
  * Gebäude-Unterhalt, Kreditraten, Transfer-Saldo), siehe
  * `use-finances-view-model.ts` für die Herleitung jeder Zeile.
+ *
+ * Unten zusätzlich die Liga-weite Finanzübersicht (`FinanceLeagueTable`,
+ * `use-finances-league-table.ts`) — bewusste Balancing-Transparenz, analog
+ * zur Liga-Kreditübersicht in `FoundationCreditsNewLook` (Story Liga-Kredit-
+ * übersicht, siehe dort).
  */
-export default function FoundationFinancesNewLook({ teamName, model }: FoundationFinancesNewLookProps) {
+export default function FoundationFinancesNewLook({
+  teamName,
+  model,
+  leagueTable,
+  activeManagerTeamId,
+}: FoundationFinancesNewLookProps) {
   const team = model.status === "ready" ? model.team : null;
   const incomeLines = team ? buildIncomeLines(team) : [];
   const expenseLines = team ? buildExpenseLines(team) : [];
@@ -368,6 +513,8 @@ export default function FoundationFinancesNewLook({ teamName, model }: Foundatio
           </NlCard>
         </div>
       ) : null}
+
+      <FinanceLeagueTable leagueTable={leagueTable} activeManagerTeamId={activeManagerTeamId} />
     </div>
   );
 }
