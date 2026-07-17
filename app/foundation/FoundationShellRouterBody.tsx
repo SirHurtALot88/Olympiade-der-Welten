@@ -259,6 +259,10 @@ const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/Fou
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
 });
+const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/FoundationFinancesHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
+});
 
 // Derived render-only types for callback params below. These mirror the real
 // producer shapes (leaf hooks under lib/foundation/tabs/*) even though the
@@ -3416,6 +3420,8 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onEarlyPayoff={repayLoanEarlyForActiveTeam}
             />
           ) : null}
+
+          {activeView === "finances" ? <FoundationFinancesHost gameState={gameState} teamId={activeManagerTeamId} /> : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

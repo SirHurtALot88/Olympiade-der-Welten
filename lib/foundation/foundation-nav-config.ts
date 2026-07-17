@@ -56,6 +56,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       ...(CREDITS_TAB_ENABLED
         ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
         : []),
+      { id: "finances", label: "Finanzen", tooltip: "Einnahmen, Ausgaben und GuV deines Teams.", icon: "◧" },
     ],
   },
   {

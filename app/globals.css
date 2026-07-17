@@ -68295,3 +68295,163 @@ button.nl-players-axis:focus-visible {
   font-size: 13px;
   color: var(--nl-ink);
 }
+
+/* ============================================================
+   Finanzen (Neuer Look) — Saison-Einnahmen/Ausgaben-Übersicht
+   des eigenen Teams. Read-only, gleicher Karten-/Chip-Wortschatz
+   wie Kredite (siehe .nl-credits-* weiter oben), eigener Namespace
+   `.nl-fin-*`.
+   ============================================================ */
+.is-new-look .nl-fin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s4);
+  color: var(--nl-ink);
+  font-family: var(--nl-sans);
+}
+
+.is-new-look .nl-fin-kpi-hero {
+  margin-top: var(--nl-s2);
+}
+
+/* --- Cashflow-Balken: Einnahmen- und Ausgaben-Bar übereinander --- */
+.is-new-look .nl-fin-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-flow-chart {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  /* Feste, schlanke Balkenhoehe (wie .nl-credits-burden-chart): der
+     Balken soll die Kartenbreite fuellen, aber nicht mit ihr mitwachsen. */
+  height: 60px;
+}
+
+.is-new-look .nl-fin-flow-track {
+  fill: var(--nl-bg-2);
+  stroke: var(--nl-line);
+}
+
+.is-new-look .nl-fin-flow-seg {
+  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+.is-new-look .nl-fin-flow-empty {
+  margin: 0;
+  font-size: 13px;
+}
+
+.is-new-look .nl-fin-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-fin-flow-legend-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-flow-legend-heading {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-flow-legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.is-new-look .nl-fin-flow-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+.is-new-look .nl-fin-flow-legend-label {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-fin-flow-legend-value {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+/* --- Einnahmen-/Ausgaben-Spalten ------------------------------------ */
+.is-new-look .nl-fin-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nl-s4);
+}
+
+@media (max-width: 720px) {
+  .is-new-look .nl-fin-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.is-new-look .nl-fin-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-fin-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: help;
+}
+
+.is-new-look .nl-fin-line-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-fin-line-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-fin-line-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-fin-line-bartrack {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nl-line) 60%, transparent);
+  overflow: hidden;
+}
+
+.is-new-look .nl-fin-line-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-fin-flow-seg,
+  .is-new-look .nl-fin-line-bar {
+    transition: none;
+  }
+}

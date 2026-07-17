@@ -36,6 +36,7 @@ export const FOUNDATION_VIEW_IDS = [
   "encyclopedia",
   "admin",
   "credits",
+  "finances",
 ] as const;
 
 export type FoundationViewId = (typeof FOUNDATION_VIEW_IDS)[number];
@@ -92,6 +93,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "kredite" || view === "credit" || view === "loans" || view === "credits-v2") {
     return "credits";
+  }
+  if (view === "finanzen" || view === "finance" || view === "finances-v2") {
+    return "finances";
   }
   if (view === "facilities-overview-v2" || view === "facilities-v2-overview") {
     return "facilitiesOverviewV2";
