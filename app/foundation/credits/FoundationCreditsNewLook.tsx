@@ -813,7 +813,7 @@ export default function FoundationCreditsNewLook({
   const maxAmount = Math.max(0, team?.maxOfferAmount ?? 0);
 
   const [amount, setAmount] = useState<number>(() => Math.round((maxAmount / 2) * 10) / 10);
-  const [amountInput, setAmountInput] = useState<string>(() => String(Math.round((maxAmount / 2) * 10) / 10));
+  const [amountInput, setAmountInput] = useState<string>(() => formatNlNumber(Math.round((maxAmount / 2) * 10) / 10, 1));
   const [termSeasons, setTermSeasons] = useState<number>(team?.minTermSeasons ?? 1);
 
   // Anders als früher (die Slider-Form mountete erst, sobald `team.canBorrow`
@@ -828,12 +828,12 @@ export default function FoundationCreditsNewLook({
       didInitializeAmountRef.current = true;
       const initial = Math.round((maxAmount / 2) * 10) / 10;
       setAmount(initial);
-      setAmountInput(String(initial));
+      setAmountInput(formatNlNumber(initial, 1));
       return;
     }
     setAmount((current) => {
       const clamped = Math.min(Math.max(0, current), maxAmount);
-      setAmountInput(String(clamped));
+      setAmountInput(formatNlNumber(clamped, 1));
       return clamped;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -842,7 +842,7 @@ export default function FoundationCreditsNewLook({
   function applyAmount(next: number) {
     const clamped = Math.min(Math.max(0, next), maxAmount);
     setAmount(clamped);
-    setAmountInput(String(clamped));
+    setAmountInput(formatNlNumber(clamped, 1));
   }
 
   // #182: Liga-Kreditübersicht — welche Teams aktuell wie viel Kredit laufen

@@ -5,6 +5,7 @@ import {
   SPONSOR_RANK_MILESTONES,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import {
   getTeamAxisRank,
   parseAxisTargetValue,
@@ -137,7 +138,7 @@ function buildSpecialPresentation(input: {
       difficultyLabel: DIFFICULTY_LABELS[difficulty],
       detail:
         currentSalary > 0
-          ? `Aktuell ${currentSalary.toFixed(1)} C · Deckel ${Number.isFinite(target) ? target.toFixed(1) : "—"} C`
+          ? `Aktuell ${formatNlNumber(currentSalary, 1)} C · Deckel ${Number.isFinite(target) ? formatNlNumber(target, 1) : "—"} C`
           : "Gehaltsdeckel einhalten",
     };
   }

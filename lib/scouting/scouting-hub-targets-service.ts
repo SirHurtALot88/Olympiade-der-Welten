@@ -12,6 +12,7 @@ import {
   getWishlistEntryPriorityRank,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
+import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 
 export type ScoutingHubTargetDraft = {
   playerId: string;
@@ -75,7 +76,7 @@ export function buildScoutingHubTargetSections(input: {
       playerId,
       playerName: player?.name ?? marketEntry?.playerName ?? playerId,
       className: player?.className ?? marketEntry?.className ?? "—",
-      marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? String(player.marketValue) : "—"),
+      marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? formatTransfermarktCurrency(player.marketValue) : "—"),
       baseInfoSummary:
         scoutStatus === "active"
           ? certainty != null
@@ -160,7 +161,7 @@ export function buildScoutingQueueEntries(input: {
         playerName: player?.name ?? marketEntry?.playerName ?? entry.playerId,
         className: player?.className ?? marketEntry?.className ?? entry.className ?? "—",
         race: player?.race ?? marketEntry?.race ?? entry.race ?? "—",
-        marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? String(player.marketValue) : "—"),
+        marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? formatTransfermarktCurrency(player.marketValue) : "—"),
         certainty,
         effectiveScoutingLevel,
         isActiveSlot: slotLimit == null || activePlayerIds.has(entry.playerId),
