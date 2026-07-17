@@ -19,6 +19,7 @@ import {
 } from "@/components/foundation/new-look";
 import type {
   FinanceLeagueTableRow,
+  FinanceSeasonHistoryPoint,
   FinancesViewModel,
   TeamFinancesState,
 } from "@/lib/foundation/finances/finances-types";
@@ -43,7 +44,14 @@ function guvTone(value: number): NlTone {
 
 function buildSponsorTooltip(team: TeamFinancesState): string | undefined {
   const sponsor = team.income.sponsor;
-  if (!sponsor || sponsor.components.length === 0) return undefined;
+  if (!sponsor) return undefined;
+  // T-030: wenn `total` mangels aktueller Vertragskomponenten auf den
+  // Payout-Log-Proxy zurückfällt, macht der Hover das explizit statt eine
+  // exakte Aufschlüsselung vorzutäuschen, die es in dem Fall nicht gibt.
+  if (sponsor.totalIsEstimate) {
+    return "Geschätzt aus der letzten abgerechneten Sponsor-Auszahlung — kein aktueller Vertrag mit Komponenten-Aufschlüsselung.";
+  }
+  if (sponsor.components.length === 0) return undefined;
   return sponsor.components.map((component) => `${component.label}: ${formatNlMoney(component.rewardCash)}`).join(" · ");
 }
 
@@ -98,7 +106,13 @@ type FinanceLineItem = { key: string; label: string; amount: number; tone: NlTon
 function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
   const lines: FinanceLineItem[] = [];
   if (team.income.sponsor) {
-    lines.push({ key: "sponsor", label: "Sponsor", amount: team.income.sponsor.total, tone: "accent", title: buildSponsorTooltip(team) });
+    lines.push({
+      key: "sponsor",
+      label: team.income.sponsor.totalIsEstimate ? "Sponsor (geschätzt)" : "Sponsor",
+      amount: team.income.sponsor.total,
+      tone: "accent",
+      title: buildSponsorTooltip(team),
+    });
   }
   if (team.income.prize) {
     lines.push({ key: "prize", label: "Preisgeld", amount: team.income.prize.total, tone: "good", title: buildPrizeTooltip(team) });
@@ -255,6 +269,97 @@ function FinanceFlowChart({ incomeLines, expenseLines }: { incomeLines: FinanceL
   );
 }
 
+// --- Saison-Verlauf (T-107) ---------------------------------------------
+// Schlanke GuV-Sparkline über bis zu 4 archivierte Vorsaisons +
+// laufende Saison (`team.history`, siehe `use-finances-view-model.ts`) —
+// echte Season-End-Werte aus `seasonSnapshots`, KEIN Forecast (anders als
+// der 5-Saisons-Ausblick in prize-v2). Gleiche Bauart wie `FinanceFlowChart`
+// (fixe Höhe, preserveAspectRatio="none", `title`-Hover statt Tooltip-Card).
+// Nutzt bewusst nur bereits vorhandene `.nl-fin-flow*`-Klassen + Inline-
+// Styles für die neuen Balken/Labels, statt globals.css anzufassen.
+const HISTORY_W = 320;
+const HISTORY_H = 96;
+const HISTORY_PAD_X = 10;
+const HISTORY_PAD_TOP = 8;
+const HISTORY_LABEL_H = 20;
+const HISTORY_BASELINE_Y = HISTORY_H - HISTORY_LABEL_H;
+const HISTORY_BAR_MAX_H = HISTORY_BASELINE_Y - HISTORY_PAD_TOP;
+
+function FinanceHistoryTrend({ history }: { history: FinanceSeasonHistoryPoint[] }) {
+  const points = history.filter((point) => point.guv != null);
+
+  if (points.length <= 1) {
+    return (
+      <NlEmptyState
+        className="nl-fin-flow-empty"
+        title="Saison-Verlauf ab der zweiten Saison verfügbar."
+        message="Für dieses Team liegt noch keine abgeschlossene Vorsaison vor."
+      />
+    );
+  }
+
+  const maxAbsGuv = Math.max(...points.map((point) => Math.abs(point.guv ?? 0)), 0.0001);
+  const barSlot = (HISTORY_W - HISTORY_PAD_X * 2) / points.length;
+  const barWidth = Math.min(28, barSlot * 0.6);
+  const ariaLabel = points
+    .map((point) => `${point.seasonName}${point.isCurrent ? " (aktuell)" : ""}: GuV ${formatNlMoney(point.guv ?? 0)}`)
+    .join(", ");
+
+  return (
+    <div className="nl-fin-flow" data-testid="nl-fin-history-trend">
+      <svg
+        className="nl-fin-flow-chart"
+        viewBox={`0 0 ${HISTORY_W} ${HISTORY_H}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={ariaLabel}
+      >
+        <rect
+          x={HISTORY_PAD_X}
+          y={HISTORY_BASELINE_Y - 1}
+          width={HISTORY_W - HISTORY_PAD_X * 2}
+          height={1}
+          className="nl-fin-flow-track"
+        />
+        {points.map((point, index) => {
+          const guv = point.guv ?? 0;
+          const barHeight = Math.max(2, (Math.abs(guv) / maxAbsGuv) * HISTORY_BAR_MAX_H);
+          const x = HISTORY_PAD_X + barSlot * index + (barSlot - barWidth) / 2;
+          const y = guv >= 0 ? HISTORY_BASELINE_Y - barHeight : HISTORY_BASELINE_Y;
+          return (
+            <g key={point.seasonId}>
+              <rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barHeight}
+                rx={3}
+                fill={NL_TONE_VAR[guvTone(guv)]}
+                opacity={point.isCurrent ? 1 : 0.65}
+              >
+                <title>
+                  {point.seasonName}
+                  {point.isCurrent ? " (aktuell)" : ""}: GuV {formatNlMoney(guv)}
+                  {point.cash != null ? ` · Cash ${formatNlMoney(point.cash)}` : ""}
+                </title>
+              </rect>
+              <text
+                x={x + barWidth / 2}
+                y={HISTORY_H - 6}
+                textAnchor="middle"
+                fill={NL_TONE_VAR.neutral}
+                style={{ fontSize: 9, fontWeight: point.isCurrent ? 700 : 400 }}
+              >
+                {point.isCurrent ? "Aktuell" : point.seasonName}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 /** Eine Zeile in der Einnahmen-/Ausgaben-Liste: Label, Betrag, Anteils-Balken, `title`-Hover mit der Aufschlüsselung. */
 function FinanceLine({ label, amount, share, tone, title }: { label: string; amount: number; share: number; tone: NlTone; title?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, share)) * 1000) / 10;
@@ -268,6 +373,42 @@ function FinanceLine({ label, amount, share, tone, title }: { label: string; amo
         <span className="nl-fin-line-bar" style={{ width: `${pct}%`, background: NL_TONE_VAR[tone] }} />
       </span>
     </div>
+  );
+}
+
+// --- Cash-Abgleich (T-031) -----------------------------------------------
+// Die GuV oben erklärt NICHT die tatsächliche Cash-Veränderung der Saison
+// (Kredit-Auszahlungen/Vorfälligkeitsentschädigung, Baukosten, u. Ä. fehlen).
+// Diese Zeile schließt die Lücke sichtbar: Cash Saisonstart + GuV + Sonstige
+// Cash-Bewegungen (reine Restdifferenz, siehe `use-finances-view-model.ts`)
+// = Cash aktuell — reine Anzeige, reused `StatChip`/`StatChipRow`.
+function CashReconciliation({ team }: { team: TeamFinancesState }) {
+  if (team.cashSeasonStart == null) {
+    return (
+      <p className="nl-fin-league-hint muted">
+        Cash-Abgleich ab der zweiten Saison verfügbar — für Season 1 ist kein Saison-Start-Cash
+        archiviert.
+      </p>
+    );
+  }
+
+  return (
+    <StatChipRow className="nl-fin-kpi-hero" aria-label="Cash-Abgleich">
+      <StatChip
+        label="Cash (Saisonstart)"
+        value={formatNlMoney(team.cashSeasonStart)}
+        tone="neutral"
+        title="Cash-Endstand der Vorsaison (archivierter Season-Snapshot)"
+      />
+      <StatChip label="+ GuV" value={formatNlMoney(team.guv)} tone={guvTone(team.guv)} />
+      <StatChip
+        label="+ Sonstige Cash-Bewegungen"
+        value={formatNlMoney(team.otherCashMovements ?? 0)}
+        tone="neutral"
+        title="Rest-Differenz, die die GuV nicht erklärt (Kredit-Auszahlungen/Vorfälligkeitsentschädigung, Baukosten, sonstige Cash-Events dieser Saison)"
+      />
+      <StatChip label="= Cash aktuell" value={formatNlMoney(team.cash)} tone="neutral" />
+    </StatChipRow>
   );
 }
 
@@ -459,6 +600,30 @@ export default function FoundationFinancesNewLook({
       {team ? (
         <NlCard className="nl-fin-flow-card" eyebrow="Cashflow" title="Einnahmen vs. Ausgaben" data-testid="nl-fin-flow-card">
           <FinanceFlowChart incomeLines={incomeLines} expenseLines={expenseLines} />
+        </NlCard>
+      ) : null}
+
+      {/* T-031: schließt die Lücke zwischen der GuV oben und dem tatsächlichen Cash-Delta der Saison. */}
+      {team ? (
+        <NlCard
+          className="nl-fin-reconciliation-card"
+          eyebrow="Cash-Abgleich"
+          title="Saisonstart → Cash aktuell"
+          data-testid="nl-fin-reconciliation-card"
+        >
+          <CashReconciliation team={team} />
+        </NlCard>
+      ) : null}
+
+      {/* T-107: Saison-für-Saison-Trend statt nur der laufenden Saison. */}
+      {team ? (
+        <NlCard
+          className="nl-fin-history-card"
+          eyebrow="Verlauf"
+          title="GuV je Saison"
+          data-testid="nl-fin-history-card"
+        >
+          <FinanceHistoryTrend history={team.history} />
         </NlCard>
       ) : null}
 

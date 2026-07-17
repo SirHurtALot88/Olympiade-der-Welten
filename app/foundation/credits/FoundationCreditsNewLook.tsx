@@ -858,6 +858,43 @@ export default function FoundationCreditsNewLook({
   const leagueCreditMaxOutstanding = leagueCreditRows[0]?.outstanding ?? 0;
   const leagueCreditTotal = leagueCreditRows.reduce((sum, row) => sum + row.outstanding, 0);
 
+  // T-106: Kredit-Historie — abgelöste/ausgelaufene Kredite verschwinden
+  // sonst spurlos, sobald sie auf `status !== "active"` wechseln (siehe
+  // `applyLoanSettlement`/`applyEarlyPayoff` in `lib/finance/loan-service.ts`,
+  // die den Kredit im selben `gameState.seasonState.loans`-Array auf "paid"/
+  // "defaulted" setzen statt ihn zu entfernen). Gezahlte Zinsen kommen aus
+  // `loanApplyLogs` (Saison-End-Ratenbuchungen je `loanId`, über die gesamte
+  // Kredit-Laufzeit summiert) — keine neue Persistenz, nur bereits
+  // vorhandene Ledger-Daten gelesen.
+  const loanHistoryRows = useMemo(() => {
+    if (!teamId) return [];
+    const loans = gameState.seasonState.loans ?? [];
+    const applyLogs = gameState.seasonState.loanApplyLogs ?? [];
+    return loans
+      .filter(
+        (loan): loan is typeof loan & { status: "paid" | "defaulted" } =>
+          loan.borrowerTeamId === teamId && loan.status !== "active",
+      )
+      .map((loan) => {
+        const interestPaid = applyLogs
+          .filter((log) => log.loanId === loan.loanId)
+          .reduce((sum, log) => sum + log.interestPortion, 0);
+        const lenderName =
+          loan.lenderType === "team"
+            ? (gameState.teams.find((candidate) => candidate.teamId === loan.lenderTeamId)?.name ?? "Team")
+            : "Bank";
+        return {
+          id: loan.loanId,
+          originatedSeasonId: loan.originatedSeasonId,
+          lenderName,
+          principal: loan.principalOriginal,
+          interestPaid: Number(interestPaid.toFixed(1)),
+          status: loan.status,
+        };
+      })
+      .sort((left, right) => right.originatedSeasonId.localeCompare(left.originatedSeasonId, "de", { numeric: true }));
+  }, [gameState.seasonState.loans, gameState.seasonState.loanApplyLogs, gameState.teams, teamId]);
+
   // Live offer recompute on every filter change — pure/derived, no mutation,
   // never cached across renders so team cards appear/disappear immediately
   // as the amount/Laufzeit filter moves. Empty until a real team is known
@@ -1098,6 +1135,24 @@ export default function FoundationCreditsNewLook({
         </NlCard>
       )}
 
+      {/* T-106: abgelöste/ausgelaufene Kredite verschwinden sonst spurlos, sobald sie aktiv nicht mehr sind. */}
+      {showVaultEmptyState ? null : (
+        <NlCard className="nl-credits-history-card" eyebrow="Kredite" title="Kredit-Historie" data-testid="nl-credits-history-card">
+          {loanHistoryRows.length > 0 ? (
+            <NlTable
+              columns={NL_CREDITS_HISTORY_COLUMNS}
+              rows={loanHistoryRows}
+              rowKey={(row) => row.id}
+              renderCell={renderCreditsHistoryCell}
+              data-testid="nl-credits-history-table"
+              aria-label="Kredit-Historie"
+            />
+          ) : (
+            <NlEmptyState title="Noch keine abgelösten oder ausgelaufenen Kredite." />
+          )}
+        </NlCard>
+      )}
+
       {/* Issue 182: Liga-Kreditübersicht — welche Teams wie viel Kredit laufen haben. */}
       <NlCard
         className="nl-credits-league-card"
@@ -1161,4 +1216,52 @@ export default function FoundationCreditsNewLook({
       </NlCard>
     </div>
   );
+}
+
+// --- Kredit-Historie (T-106) ---------------------------------------------
+// Am Dateiende deklariert (statt neben `NL_CREDITS_LOAN_COLUMNS` oben), damit
+// bestehende Design-Token-Baseline-Zeilen (`scripts/design-token-baseline.json`)
+// weiter oben im File nicht durch Einfügungen verschoben werden — reine
+// Bauform-Entscheidung, keine funktionale Notwendigkeit.
+
+type NlCreditsHistoryRow = {
+  id: string;
+  originatedSeasonId: string;
+  lenderName: string;
+  principal: number;
+  interestPaid: number;
+  status: "paid" | "defaulted";
+};
+
+function loanHistoryStatusLabel(status: NlCreditsHistoryRow["status"]): string {
+  return status === "paid" ? "Getilgt" : "Ausgefallen";
+}
+
+const NL_CREDITS_HISTORY_COLUMNS: NlTableColumn<NlCreditsHistoryRow>[] = [
+  { key: "season", label: "Saison" },
+  { key: "lender", label: "Kreditgeber" },
+  { key: "principal", label: "Aufgenommen", align: "right" },
+  { key: "interestPaid", label: "Gezahlte Zinsen", align: "right", tooltip: "Summe der Zinsanteile aller Raten dieses Kredits" },
+  { key: "status", label: "Status" },
+];
+
+function renderCreditsHistoryCell(row: NlCreditsHistoryRow, column: NlTableColumn<NlCreditsHistoryRow>) {
+  switch (column.key) {
+    case "season":
+      return row.originatedSeasonId;
+    case "lender":
+      return row.lenderName;
+    case "principal":
+      return formatNlMoney(row.principal);
+    case "interestPaid":
+      return formatNlMoney(row.interestPaid);
+    case "status":
+      return row.status === "defaulted" ? (
+        <span className="nl-tone-risk">{loanHistoryStatusLabel(row.status)}</span>
+      ) : (
+        loanHistoryStatusLabel(row.status)
+      );
+    default:
+      return null;
+  }
 }

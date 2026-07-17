@@ -38,10 +38,19 @@ export type FinanceLoanInstallmentRow = {
   outstanding: number;
 };
 
-/** Sponsor-Vertrag: Gesamtsumme (`estimateTeamAnnualRevenue`) + Komponenten-Aufschlüsselung. `null` ohne Vertrag/Auszahlung. */
+/**
+ * Sponsor-Vertrag: Gesamtsumme + Komponenten-Aufschlüsselung. `null` ohne Vertrag/Auszahlung.
+ *
+ * `total` ist vorrangig die Summe der `components` (gleiche Quelle, kein Auseinanderlaufen,
+ * siehe T-030). Nur wenn der aktuelle Vertrag keine (positiven) Komponenten mehr liefert — z. B.
+ * Vertrag ausgelaufen, aber `estimateTeamAnnualRevenue` findet noch ein Payout-Log der Vorsaison —
+ * fällt `total` auf diesen Log-Proxy zurück; `totalIsEstimate` markiert genau diesen Fall.
+ */
 export type FinanceSponsorIncome = {
   total: number;
   components: FinanceSponsorComponentRow[];
+  /** `true`, wenn `total` NICHT aus `components` stammt, sondern aus dem `estimateTeamAnnualRevenue`-Payout-Log-Proxy (siehe T-030). */
+  totalIsEstimate: boolean;
 };
 
 /** Preisgeld (Liga-Pool, Rang-Basis + Saison-Anteil + Platzierungsbonus), siehe `buildTeamPrizeSummary`. `null` wenn kein Standing vorliegt. */
@@ -77,6 +86,24 @@ export type TeamFinancesExpenses = {
   transferDeficit: number | null;
 };
 
+/**
+ * Ein Saison-Datenpunkt für den GuV-/Cash-Verlauf (T-107) — vergangene Saisons kommen aus
+ * `gameState.seasonState.seasonSnapshots` (echte archivierte Season-End-Werte,
+ * `SeasonSnapshotTeamRecord.guv`/`.cashTotal`/`.cashEnd`), die laufende Saison ist der
+ * live berechnete Wert dieser View (kein Forecast, reine Historie — anders als der
+ * 5-Saisons-FORECAST in prize-v2, der auf projizierten Zukunftswerten basiert).
+ */
+export type FinanceSeasonHistoryPoint = {
+  seasonId: string;
+  seasonName: string;
+  /** `true` für den laufenden (noch nicht archivierten) Saison-Datenpunkt. */
+  isCurrent: boolean;
+  /** `SeasonSnapshotTeamRecord.guv` bzw. der live `guv` der laufenden Saison. `null` wenn im Snapshot nicht erfasst. */
+  guv: number | null;
+  /** `cashTotal ?? cashEnd` bzw. live `cash`. `null` wenn im Snapshot nicht erfasst. */
+  cash: number | null;
+};
+
 /** Ein menschliches Team's Finanzen-Gesamtbild für die laufende Saison — nur das eigene Team (Fog of War). */
 export type TeamFinancesState = {
   teamId: string;
@@ -89,6 +116,23 @@ export type TeamFinancesState = {
   totalExpenses: number;
   /** `totalIncome - totalExpenses` — live berechnet, Quelle der Wahrheit (siehe auch `TeamManagementSnapshotRow.guv` als Cross-Check). */
   guv: number;
+  /**
+   * Cash zu Saisonbeginn — `cashTotal ?? cashEnd` aus dem archivierten Snapshot der UNMITTELBAR
+   * vorangegangenen Saison (`gameState.seasonState.seasonSnapshots`, siehe T-031). `null` in
+   * Season 1 bzw. wenn keine Vorsaison archiviert ist (kein Season-Start-Wert bekannt — dann bleibt
+   * auch `otherCashMovements` `null`, statt einen falschen Wert vorzutäuschen).
+   */
+  cashSeasonStart: number | null;
+  /**
+   * Rest-Differenz, die GuV NICHT erklärt: `cash - cashSeasonStart - guv` (Kredit-Auszahlungen/
+   * Vorfälligkeitsentschädigung, Baukosten, sonstige Cash-Events dieser Saison, siehe T-031).
+   * Bewusst als reine Differenz statt einzeln aufgeschlüsselter Posten — reicht aus, damit die
+   * GuV zum tatsächlichen Cash-Delta der Saison abgleichbar wird, ohne neue Buchungskategorien zu
+   * erfinden. `null`, wenn `cashSeasonStart` `null` ist.
+   */
+  otherCashMovements: number | null;
+  /** Saison-für-Saison-Verlauf (bis zu 4 vergangene Saisons + laufende Saison), siehe `FinanceSeasonHistoryPoint`. */
+  history: FinanceSeasonHistoryPoint[];
 };
 
 /** Discriminated view model consumed by the Finanzen UI. */

@@ -12,6 +12,7 @@ import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/found
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import type {
   FinancePrizeIncome,
+  FinanceSeasonHistoryPoint,
   FinanceSponsorIncome,
   FinanceTransferBalance,
   FinancesViewModel,
@@ -25,6 +26,9 @@ function round1(value: number): number {
 
 /** Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in FoundationSponsorsNewLook). */
 const SPONSOR_COMPONENT_KIND_ORDER: SponsorOfferComponentKind[] = ["base", "rank", "improvement", "special"];
+
+/** Wie viele vergangene (archivierte) Saisons der GuV-/Cash-Verlauf zusätzlich zur laufenden Saison zeigt (T-107). */
+const HISTORY_PAST_SEASONS = 4;
 
 /**
  * Builds the Finanzen view model for one human team's current-season
@@ -48,13 +52,15 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   }
 
   // --- Sponsor (Vertrag) ------------------------------------------------
-  // Gesamtsumme wie im Kredit-Belastungs-Chart (`estimateTeamAnnualRevenue`),
-  // 0 ohne Vertrag/Auszahlung (siehe dort) — dann als "kein Sponsor" (`null`)
-  // statt einer irreführenden 0-Zeile behandelt. Die Komponenten-Aufschlüsselung
-  // kommt separat aus dem laufenden Vertrag (kann von der Gesamtsumme
-  // abweichen, siehe `estimateTeamAnnualRevenue`-Doku: Proxy aus dem letzten
-  // abgerechneten Payout-Log, Komponenten sind der AKTUELLE Vertrag).
-  const estimatedSponsorRevenue = estimateTeamAnnualRevenue(gameState, teamId);
+  // T-030: `total` und die `components`-Aufschlüsselung müssen aus derselben
+  // Quelle stammen, sonst laufen Summe und Aufschlüsselung sichtbar
+  // auseinander (wirkt wie ein UI-Rechenfehler). Bevorzugt daher IMMER die
+  // Summe der aktuellen Vertragskomponenten (identische Quelle wie die
+  // Aufschlüsselung darunter). Nur wenn der aktuelle Vertrag keine
+  // (positiven) Komponenten mehr liefert (z. B. Vertrag ausgelaufen, aber es
+  // gibt noch ein abgerechnetes Payout-Log der Vorsaison) fällt `total` auf
+  // den `estimateTeamAnnualRevenue`-Proxy zurück — dann `totalIsEstimate:
+  // true`, siehe `FinanceSponsorIncome`-Doku.
   const sponsorContract = getTeamSponsorContract(gameState, teamId);
   const sponsorComponents = sponsorContract
     ? SPONSOR_COMPONENT_KIND_ORDER.flatMap((kind) => {
@@ -63,8 +69,14 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
         return [{ kind, label: getSponsorComponentKindLabel(kind), rewardCash: round1(component.rewardCash) }];
       })
     : [];
+  const sponsorComponentsTotal = round1(sponsorComponents.reduce((sum, component) => sum + component.rewardCash, 0));
+  const estimatedSponsorRevenue = estimateTeamAnnualRevenue(gameState, teamId);
+  const sponsorTotalIsEstimate = sponsorComponentsTotal <= 0 && estimatedSponsorRevenue > 0;
+  const sponsorTotal = sponsorComponentsTotal > 0 ? sponsorComponentsTotal : estimatedSponsorRevenue;
   const sponsor: FinanceSponsorIncome | null =
-    estimatedSponsorRevenue > 0 ? { total: round1(estimatedSponsorRevenue), components: sponsorComponents } : null;
+    sponsorTotal > 0
+      ? { total: round1(sponsorTotal), components: sponsorComponents, totalIsEstimate: sponsorTotalIsEstimate }
+      : null;
 
   // --- Preisgeld (Liga-Pool) ---------------------------------------------
   // Gleiche Herleitung wie die Preisgeld-/Saisonstand-Views (`buildTeamPrizeSummary`
@@ -149,6 +161,39 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const totalExpenses = round1(salaryTotal + facilityUpkeepTotal + loanInstallmentTotal + (transferDeficit ?? 0));
   const guv = round1(totalIncome - totalExpenses);
 
+  // --- Saison-Verlauf + Cash-Abgleich (T-107, T-031) -----------------------
+  // Echte archivierte Season-End-Werte aus `gameState.seasonState.seasonSnapshots`
+  // (`SeasonSnapshotTeamRecord.guv`/`.cashTotal`/`.cashEnd`) — KEIN Forecast wie
+  // der 5-Saisons-Ausblick in prize-v2, reine Historie, keine neue Persistenz.
+  // Cash trägt sich unverändert über den Saisonwechsel fort (siehe
+  // `preseason-workflow-service.ts`, kein Cash-Reset), daher ist das Cash-Ende
+  // der unmittelbar vorangegangenen Saison zugleich der Season-Start-Wert
+  // dieser Saison.
+  const pastSeasonPoints: FinanceSeasonHistoryPoint[] = (gameState.seasonState.seasonSnapshots ?? [])
+    .map((snapshot): FinanceSeasonHistoryPoint | null => {
+      const row = snapshot.finalStandings.find((entry) => entry.teamId === teamId) ?? null;
+      if (!row) return null;
+      const cash = row.cashTotal ?? row.cashEnd ?? null;
+      return {
+        seasonId: snapshot.seasonId,
+        seasonName: snapshot.seasonName,
+        isCurrent: false,
+        guv: row.guv != null && Number.isFinite(row.guv) ? round1(row.guv) : null,
+        cash: cash != null && Number.isFinite(cash) ? round1(cash) : null,
+      };
+    })
+    .filter((point): point is FinanceSeasonHistoryPoint => point != null)
+    .sort((left, right) => left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }))
+    .slice(-HISTORY_PAST_SEASONS);
+
+  const cashSeasonStart = pastSeasonPoints.at(-1)?.cash ?? null;
+  const otherCashMovements = cashSeasonStart != null ? round1(team.cash - cashSeasonStart - guv) : null;
+
+  const history: FinanceSeasonHistoryPoint[] = [
+    ...pastSeasonPoints,
+    { seasonId: gameState.season.id, seasonName: gameState.season.name, isCurrent: true, guv, cash: team.cash },
+  ];
+
   const teamFinances: TeamFinancesState = {
     teamId,
     cash: team.cash,
@@ -163,6 +208,9 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     totalIncome,
     totalExpenses,
     guv,
+    cashSeasonStart,
+    otherCashMovements,
+    history,
   };
 
   return { status: "ready", team: teamFinances };
