@@ -114,7 +114,7 @@ type PlayerDisciplineDrawerDetail = {
   slotLabels: string[];
 };
 
-type AttributeVisibility = "exact" | "scouted";
+export type AttributeVisibility = "exact" | "scouted";
 
 type DisciplineGlobalRankMaps = {
   valueRanksByDiscipline: Map<string, Map<string, number | null>>;
@@ -880,7 +880,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
   });
 }
 
-function resolveAttributeVisibility(input: {
+export function resolveAttributeVisibility(input: {
   teamId: string | null | undefined;
   teamHumanControlled: boolean | null | undefined;
   manageableTeamIds?: string[] | null;
@@ -1338,7 +1338,7 @@ function buildPlayerRatingWithSeasonFallback(
   };
 }
 
-function resolveRosterEntry(
+export function resolveRosterEntry(
   rosters: RosterEntry[],
   playerId: string,
   activePlayerId?: string | null,
@@ -1350,7 +1350,7 @@ function resolveRosterEntry(
   return rosters.find((entry) => entry.playerId === playerId) ?? null;
 }
 
-function resolveTeam(
+export function resolveTeam(
   teams: Team[],
   rosterEntry: Pick<RosterEntry, "teamId"> | null,
 ) {

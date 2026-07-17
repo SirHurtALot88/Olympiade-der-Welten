@@ -7,8 +7,10 @@ import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-sea
 import { ratingsSliceRowsFromPersisted } from "@/lib/foundation/resolve-slice-save-context";
 import {
   buildSeasonRatingsSlice,
+  maskRatingsRowForVisibility,
   type SeasonRatingsSlicePlayerRow,
 } from "@/lib/foundation/season-ratings-slice";
+import { buildPlayerAttributeVisibilityResolver } from "@/lib/foundation/server-player-visibility";
 
 export type PlayerDirectoryPerformanceRow = Pick<
   PlayerSeasonPerformanceSummary,
@@ -47,6 +49,77 @@ function toPerformanceRow(summary: PlayerSeasonPerformanceSummary): PlayerDirect
     bestDisciplineScore: summary.bestDisciplineScore,
     latestMatchdayId: summary.latestMatchdayId,
     latestFinalScore: summary.latestFinalScore,
+  };
+}
+
+type PlayerDirectoryCareerStatsRow = PlayerDirectorySliceResponse["careerStatsByPlayerId"][string];
+
+/** Fog-of-War-Maskierung (T-022): exakte Season-Performance eines nicht
+ * gescouteten/fremden Spielers nullen — analog zu `maskAxisCardsForVisibility`
+ * im Player-Detail-Drawer, das seasonPoints/allTimePoints bei `"scouted"`
+ * ebenfalls entfernt. */
+function maskPerformanceRow(): PlayerDirectoryPerformanceRow {
+  return {
+    appearances: 0,
+    totalPoints: null,
+    bestDisciplineLabel: null,
+    bestDisciplineScore: null,
+    latestMatchdayId: null,
+    latestFinalScore: null,
+  };
+}
+
+function maskCareerStatsRow(): PlayerDirectoryCareerStatsRow {
+  return {
+    appearances: 0,
+    totalPps: 0,
+    seasonsPlayed: 0,
+  };
+}
+
+/**
+ * Maskiert eine bereits gebaute Player-Directory-Slice-Antwort anhand des
+ * anfragenden Teams (T-022). Läuft unabhängig davon, ob der Payload aus dem
+ * Live-GameState- oder dem persisted-Projektions-Pfad stammt — beide liefern
+ * denselben `PlayerDirectorySliceResponse`-Shape, und der Aufrufer hat in
+ * beiden Fällen bereits einen `GameState` mit Roster-/Team-/Scouting-Kontext
+ * zur Hand (siehe `resolveSliceSave`, das auch im projectionOnly-Zweig einen
+ * materialisierten Slice-GameState zurückgibt).
+ */
+export function maskPlayerDirectorySliceForRequestingTeam(input: {
+  payload: PlayerDirectorySliceResponse;
+  gameState: GameState;
+  requestingTeamId?: string | null;
+}): PlayerDirectorySliceResponse {
+  const resolveVisibility = buildPlayerAttributeVisibilityResolver({
+    gameState: input.gameState,
+    requestingTeamId: input.requestingTeamId,
+  });
+
+  const ratingsByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.ratingsByPlayerId).map(([playerId, row]) => [
+      playerId,
+      maskRatingsRowForVisibility(row, resolveVisibility(playerId)),
+    ]),
+  );
+  const performanceByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.performanceByPlayerId).map(([playerId, row]) => [
+      playerId,
+      resolveVisibility(playerId) === "exact" ? row : maskPerformanceRow(),
+    ]),
+  );
+  const careerStatsByPlayerId = Object.fromEntries(
+    Object.entries(input.payload.careerStatsByPlayerId).map(([playerId, row]) => [
+      playerId,
+      resolveVisibility(playerId) === "exact" ? row : maskCareerStatsRow(),
+    ]),
+  );
+
+  return {
+    ...input.payload,
+    ratingsByPlayerId,
+    performanceByPlayerId,
+    careerStatsByPlayerId,
   };
 }
 
