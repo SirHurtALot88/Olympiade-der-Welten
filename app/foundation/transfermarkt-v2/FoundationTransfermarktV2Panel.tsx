@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 
-import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import type { TransfermarktV2ClientProps } from "@/app/foundation/transfermarkt-v2/TransfermarktV2Client";
 
 const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), {
@@ -35,12 +34,6 @@ export type FoundationTransfermarktV2PanelProps = {
 export default function FoundationTransfermarktV2Panel({
   active,
   transferWindowStatus,
-  marketVisibleFeedCount,
-  marketActiveFreeAgentCount,
-  sourceBadgeLabel,
-  activeSaveName,
-  seasonId,
-  selectedTeamLabel,
   formatGamePhaseLabel,
   clientKey,
   client,
@@ -51,25 +44,12 @@ export default function FoundationTransfermarktV2Panel({
 
   return (
     <section className="panel transfer-market-panel foundation-transfermarkt-v2-panel" data-testid="transfer-market" id="transfer-market">
-      <div className="panel-header">
-        <TooltipHeading
-          as="h2"
-          tooltip={`Sortierung: Marktwert ↓ · sichtbarer Feed ${marketVisibleFeedCount} / aktive Free Agents ${marketActiveFreeAgentCount}.`}
-        >
-          Transfermarkt
-        </TooltipHeading>
-        <span className="pill foundation-source-pill">source: active local save</span>
-      </div>
-      {/* Der Transferfenster-Status wird jetzt einzig vom Neuer-Look-Client
-          (marketWindowNotice) angezeigt — das fruehere Legacy-Callout hier war
-          ein zweites, redundantes "Transferfenster geschlossen"-Banner direkt
-          darueber. */}
-      <div className="foundation-view-source-row">
-        <span className="pill foundation-source-pill">{sourceBadgeLabel}</span>
-        <span className="muted">
-          {activeSaveName} · {seasonId} · Aktives Team {selectedTeamLabel}
-        </span>
-      </div>
+      {/* Die frühere Legacy-Kopfzeile (panel-header mit "Transfermarkt"-Heading
+          + source-Pill, plus foundation-view-source-row) ist entfernt — der
+          Neuer-Look-Client (TransfermarktV2Client) rendert bereits seine eigene
+          velo Kopfkarte, die doppelte Legacy-Chrome darüber war redundant.
+          Der Transferfenster-Status wird ebenfalls einzig vom Neuer-Look-Client
+          (marketWindowNotice) angezeigt. */}
       <TransfermarktV2Client
         key={clientKey}
         {...client}

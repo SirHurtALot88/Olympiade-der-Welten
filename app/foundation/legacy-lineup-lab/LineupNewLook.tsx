@@ -1521,8 +1521,13 @@ export default function LineupNewLook({
                       <span className="nl-lineup-slot-score">
                         {/* Nur noch die projizierte Slot-Punktzahl — die redundante
                             "Basis"-Zweitzahl entfernt. Fatigue jetzt als Mini-Gauge
-                            (Feature 2) statt bloßem "F N"-Text. */}
-                        <em className="nl-tnum">{formatNullableScore(projected)}</em>
+                            (Feature 2) statt bloßem "F N"-Text. "Pkt"-Einheit macht
+                            klar, dass dies die erwartete Punktzahl ist (nicht die
+                            danebenstehende Fatigue-Gauge) — siehe .nl-lineup-slot-score-unit. */}
+                        <em className="nl-tnum">
+                          {formatNullableScore(projected)}
+                          <small className="nl-lineup-slot-score-unit">Pkt</small>
+                        </em>
                         {fatigue != null ? (
                           <NlFatigueGauge value={fatigue} label="F" title={`Fatigue ${Math.round(fatigue)}/100`} />
                         ) : null}

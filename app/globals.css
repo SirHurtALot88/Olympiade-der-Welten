@@ -54453,11 +54453,40 @@ button.foundation-team-portrait-card {
   font-size: 16px;
   font-weight: 700;
   color: var(--nl-ink);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
 }
 
 .is-new-look .nl-lineup-slot-score small {
   font-size: 10px;
   color: var(--nl-mut);
+}
+
+/* "Pkt"-Einheit an der projizierten Punktzahl: macht sie eindeutig als
+   erwartete Punktzahl lesbar, ohne auf eine zweite Zeile umzubrechen. */
+.is-new-look .nl-lineup-slot-score-unit {
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--nl-mut);
+}
+
+/* Punktzahl ist die primäre Kennzahl der Karte, die Fatigue-Gauge daneben
+   nur zweitrangiger Kontext — kleiner & gedämpft, damit sie das Auge nicht
+   mehr auf sich zieht als die Punktzahl (Tooltip/Titel bleibt erhalten). */
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge {
+  width: 40px;
+  opacity: 0.72;
+}
+
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge .nl-gauge-value {
+  font-size: 11px;
+}
+
+.is-new-look .nl-lineup-slot-score .nl-fatigue-gauge .nl-gauge-label {
+  font-size: 7.5px;
 }
 
 .is-new-look .nl-lineup-captain-badge {
@@ -67318,6 +67347,10 @@ button.nl-players-axis:focus-visible {
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
+  /* Klemmt jeden Broken-Image-Alt-Text (falls das native <img>-Fehlerbild
+     kurz vor dem React-`fallback`-Swap aufblitzt) hart an den Ring — sonst
+     kann Name-Text aus dem runden Portrait herauslaufen/abgeschnitten wirken. */
+  overflow: hidden;
   border: 3px solid var(--nl-line-2);
   background: var(--nl-panel-2);
   box-shadow: var(--nl-e2);
@@ -67415,9 +67448,14 @@ button.nl-players-axis:focus-visible {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--nl-tone, var(--nl-accent));
+}
+
+/* Platz 1 bekommt — wie schon Portrait & Sockel — die auffälligste Kennzahl. */
+.is-new-look .nl-podium-plinth.is-rank-1 .nl-podium-value {
+  font-size: 28px;
 }
 
 .is-new-look .nl-podium-value-label {

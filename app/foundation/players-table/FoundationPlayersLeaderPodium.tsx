@@ -174,7 +174,12 @@ export default function FoundationPlayersLeaderPodium({
                       <BudgetedMediaImage
                         className="nl-podium-portrait"
                         src={portrait.src}
-                        alt={row.player.name}
+                        // Dekorativ (leerer alt): der Name steht bereits sichtbar/erreichbar
+                        // im `nl-podium-name-btn` darunter. Ein voller Name als alt-Text
+                        // würde sonst — bis das 404-`onError` greift und den `fallback`
+                        // (Initialen) einblendet — als abgeschnittener Klartext im runden
+                        // Portrait-Ring aufblitzen (z. B. "Wildhe…").
+                        alt=""
                         width={72}
                         height={72}
                         loading="lazy"
