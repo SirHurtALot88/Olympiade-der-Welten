@@ -43,4 +43,19 @@ describe("sponsor offer presenter", () => {
     expect(top16?.absolutePayout).toBeGreaterThan(top24?.absolutePayout ?? 0);
     expect(top16?.absolutePayout).toBeGreaterThan(32);
   });
+
+  it("prepends a guaranteed floor rung (last place, base only) when opted in", () => {
+    const rows = buildSponsorRankTierRows({ baseCash: 32, rankCash: 20.5, includeFloorRung: true });
+    // Boden-Stufe zusätzlich zu den 8 Meilensteinen, ganz unten (schwierigster zuerst).
+    expect(rows).toHaveLength(9);
+    expect(rows[0]?.label).toBe("Platz 32");
+    expect(rows[0]?.rankAt).toBe(32);
+    // Nur Basis — keine Gewinnstufe freigeschaltet.
+    expect(rows[0]?.absolutePayout).toBe(32);
+    expect(rows[1]?.label).toBe("Top 28");
+    // weiterhin streng monoton steigend über die gesamte Leiter.
+    for (let index = 1; index < rows.length; index += 1) {
+      expect(rows[index]!.absolutePayout).toBeGreaterThan(rows[index - 1]!.absolutePayout);
+    }
+  });
 });

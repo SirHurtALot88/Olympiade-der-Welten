@@ -115,8 +115,10 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         baseAnchorSalary,
         contract.archetype,
         contract.teamQualityRankAtSign,
-        // expectedRank (Feed 2) folgt in der Anzeige-gekoppelten Phase; hier bewusst undefined.
-        undefined,
+        // Feed 2: expectedRank = Vorsaison-Stärkerang beim Vertragsabschluss (teamQualityRankAtSign). Für den
+        // performance-Archetyp belohnt getSponsorPayoutForFinalRankAndTier so das Übertreffen der Erwartung
+        // als max(absolut, erwartungs-relativ) — ein schwaches Team, das klettert, schlägt damit security.
+        contract.teamQualityRankAtSign,
         // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
         contract.isGolden ?? false,
       );

@@ -375,14 +375,21 @@ describe("sponsor economy balance", () => {
     expect(bottom.baseCash).toBeGreaterThanOrEqual(top.baseCash * 0.95);
     expect(bottom.rankCash).toBeGreaterThan(16);
 
-    const rank32Bottom = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 30);
-    const rank28Bottom = getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", 30);
-    const rank32Top = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 3);
-    const rank28Top = getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", 3);
+    // Real-Settlement-Pfad: performance bekommt expectedRank = teamQualityRankAtSign. Die Kletter-/
+    // Überperformance-Belohnung schwacher Teams läuft jetzt über die erwartungs-relative Leiter (Feed 2,
+    // max(absolut, erwartungs-relativ)), nicht mehr über den bewusst reduzierten Milestone-Rebalance.
+    const rank32Bottom = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 30, 30);
+    const rank24Bottom = getSponsorPayoutForFinalRankAndTier(24, 1, 2, leagueMin, "performance", 30, 30);
+    const rank32Top = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 3, 3);
+    const rank24Top = getSponsorPayoutForFinalRankAndTier(24, 1, 2, leagueMin, "performance", 3, 3);
 
+    // Schwaches Team behält den (leicht) höheren Sockel-Schutz am Boden.
     expect(rank32Bottom).toBeGreaterThanOrEqual(rank32Top * 0.95);
-    expect(rank28Bottom - rank32Bottom).toBeGreaterThan(rank28Top - rank32Top);
-    expect(rank28Top).toBeLessThan(getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", undefined));
+    // Überperformung zahlt: das schwache Team (exp 30 → 24, +6 über Erwartung) gewinnt durch den Aufstieg
+    // deutlich mehr dazu als das starke Team (exp 3 → 24, unter Erwartung → nur die absolute Leiter).
+    expect(rank24Bottom - rank32Bottom).toBeGreaterThan(rank24Top - rank32Top);
+    // Ein starkes Team, das seine Erwartung verfehlt (exp 3, Rang 24), bekommt weniger als der neutrale Fall.
+    expect(rank24Top).toBeLessThan(getSponsorPayoutForFinalRankAndTier(24, 1, 2, leagueMin, "performance", undefined));
   });
 
   it("pays bottom teams at least league minimum salary without rank milestones", () => {
