@@ -589,4 +589,41 @@ describe("season snapshot service", () => {
     expect(teamB?.rosterEnd).toBe(1);
     expect(seasonOne?.entryRosterPatchedFromSeasonId).toBe("season-2");
   });
+
+  it("preserves the TRUE season-end cash when patching after preseason spend", () => {
+    // Season-1 snapshot archives the real season-end cash (A-A 244.5, B-B 144.5).
+    const seasonOneSnapshot = buildSeasonSnapshot(createGameState());
+    expect(seasonOneSnapshot.finalStandings.find((team) => team.teamId === "A-A")?.cashEnd).toBe(244.5);
+    expect(seasonOneSnapshot.finalStandings.find((team) => team.teamId === "B-B")?.cashEnd).toBe(144.5);
+
+    const base = createGameState();
+    const gameState: GameState = {
+      ...base,
+      season: { ...base.season, id: "season-2", name: "Season 2" },
+      seasonState: {
+        ...base.seasonState,
+        seasonId: "season-2",
+        seasonSnapshots: [seasonOneSnapshot],
+      },
+      // Current cash is LOWER than the archived season-end cash — the teams spent it on the
+      // next season's preseason buys. This is exactly the value that used to clobber cashEnd.
+      teams: [
+        { ...base.teams[0]!, cash: 12.5 },
+        { ...base.teams[1]!, cash: 30 },
+      ],
+    };
+
+    const result = patchCompletedSeasonSnapshotAfterPreseasonBuy(gameState, "season-2");
+    expect(result.patched).toBe(true);
+
+    const seasonOne = result.gameState.seasonState.seasonSnapshots?.find((entry) => entry.seasonId === "season-1");
+    const teamA = seasonOne?.finalStandings.find((team) => team.teamId === "A-A");
+    const teamB = seasonOne?.finalStandings.find((team) => team.teamId === "B-B");
+    // cashEnd must stay the TRUE season-end cash, NOT the post-preseason-spend current cash.
+    expect(teamA?.cashEnd).toBe(244.5);
+    expect(teamB?.cashEnd).toBe(144.5);
+    // The roster/salary refresh (the patch's real job) still happens.
+    expect(teamA?.rosterEnd).toBe(1);
+    expect(teamA?.salaryTotalEnd).toBe(10);
+  });
 });

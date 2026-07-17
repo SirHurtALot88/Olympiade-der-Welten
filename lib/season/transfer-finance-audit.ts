@@ -14,6 +14,8 @@ export type TransferFinanceTeamSeasonRow = {
   sponsorCashIn: number;
   salaryPaidOut: number;
   netSponsorCash: number;
+  /** Mid-Season-Sponsor-Event-Cash (auto-settle `sponsorEvents`, nicht in sponsorPayoutLogs). */
+  netSponsorEventCash: number;
   /** T-029: Kredit-Cashflows der Saison (loanOriginationLogs + loanApplyLogs, beide Seiten bei Team-Krediten). */
   netLoanCash: number;
   /** T-029: Gebäude-Cashflows der Saison (facilityEvents-Ledger, `-cost` je Event). */
@@ -152,6 +154,25 @@ function getSeasonFacilityCashByTeam(gameState: GameState, seasonId: string) {
   return map;
 }
 
+/**
+ * Sponsor-EVENT-Cashflows einer Saison, pro Team aggregiert. Mid-Season-Sponsor-Events
+ * (`sponsorEvents`) werden beim Matchday-Advance sofort verrechnet (Auto-Settle): der `cashDelta`
+ * landet direkt auf `team.cash` und der Datensatz wird mit Status `resolved` abgelegt (siehe
+ * `sponsor-event-service.ts`). Dieses Cash ist BEWUSST NICHT in `sponsorPayoutLogs` (das
+ * Season-End-Settlement arbeitet nur auf Vertragskomponenten), fehlte damit aber komplett in der
+ * Cash-Reconciliation und tauchte als echtes (kleines) Rest-Delta auf. Nur `resolved`-Events sind
+ * cash-wirksam — `open` (noch nicht eingelöst) und `dismissed` (abgelehnt) belasten `team.cash`
+ * nicht.
+ */
+function getSeasonSponsorEventCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const event of gameState.seasonState.sponsorEvents ?? []) {
+    if (event.seasonId !== seasonId || event.status !== "resolved") continue;
+    map.set(event.teamId, round((map.get(event.teamId) ?? 0) + event.cashDelta));
+  }
+  return map;
+}
+
 export function buildBuyEconomics(gameState: GameState) {
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
   return gameState.transferHistory
@@ -188,6 +209,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const sponsorLogs = (gameState.seasonState.sponsorPayoutLogs ?? []).filter((log) => log.seasonId === seasonId);
     const loanCashByTeam = getSeasonLoanCashByTeam(gameState, seasonId);
     const facilityCashByTeam = getSeasonFacilityCashByTeam(gameState, seasonId);
+    const sponsorEventCashByTeam = getSeasonSponsorEventCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
@@ -209,6 +231,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netSponsorCash = round(teamSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0));
       const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
       const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
+      const netSponsorEventCash = sponsorEventCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
         cashEndByTeam.get(teamId) ??
@@ -216,9 +239,19 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       // T-029: vorher nur netTransferCash + netSponsorCash — Kredit- und Gebäude-Cashflows fehlten,
       // wodurch echte Lecks in dieser Größenordnung von der (künstlich großen) Toleranz verschluckt
       // wurden. Jetzt vollständig, Toleranz s.u. entsprechend auf Rundungsrauschen gesenkt.
+      // Zusätzlich: mid-season Sponsor-Event-Cash (auto-settle `sponsorEvents`, NICHT in
+      // sponsorPayoutLogs) — sonst blieb dieser reale Einnahmekanal als kleines Rest-Delta übrig.
       const cashReconciliationDelta =
         cashStart != null && cashEnd != null
-          ? round(cashEnd - cashStart - netTransferCash - netSponsorCash - netLoanCash - netFacilityCash)
+          ? round(
+              cashEnd -
+                cashStart -
+                netTransferCash -
+                netSponsorCash -
+                netSponsorEventCash -
+                netLoanCash -
+                netFacilityCash,
+            )
           : null;
 
       rows.push({
@@ -233,6 +266,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         sponsorCashIn,
         salaryPaidOut,
         netSponsorCash,
+        netSponsorEventCash,
         netLoanCash,
         netFacilityCash,
         buyCount: marketBuys.length,
