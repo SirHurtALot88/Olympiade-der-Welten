@@ -927,6 +927,17 @@ a {
   display: grid;
   gap: 12px;
   min-width: 0;
+  /* Die implizite Grid-Spalte darf nie über die verfügbare Breite wachsen —
+     sonst zwingt ein breites Kind (z. B. eine Tabelle) die Spalte auf sein
+     max-content und die Seite scrollt seitlich (Header/Strip/Content wurden
+     sonst 741px in einer 696px-Spalte). */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Grid-Kinder mit `min-width: 0`, damit breiter Inhalt intern scrollt statt
+   die Spalte (und damit die Seite) aufzuweiten. */
+.foundation-shell-main > * {
+  min-width: 0;
 }
 
 .foundation-activity-strip {
@@ -44679,6 +44690,24 @@ button.foundation-team-portrait-card {
   text-align: left;
   cursor: pointer;
   transition: background-color var(--nl-t-fast) var(--nl-ease);
+}
+
+/* Laptop/1024: engere Spaltenminima, damit die Ranking-Zeile in die
+   Content-Spalte passt statt die Seite seitlich zu schieben. Summaryrow teilt
+   dasselbe Raster; die Scroll-Container werden auf die Elternbreite geklemmt,
+   damit ihr overflow-x tatsächlich greift (Flex-Column-Cross-Axis). */
+@media (max-width: 1080px) {
+  .is-new-look .nl-ranks-row,
+  .is-new-look .nl-ranks-summaryrow {
+    grid-template-columns: 44px minmax(104px, 1.2fr) minmax(150px, 1.4fr) auto;
+    gap: var(--nl-s2);
+  }
+}
+
+.is-new-look .nl-ranks-board-scroll,
+.is-new-look .nl-ranks-metric-chart-scroll {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .is-new-look .nl-ranks-row:hover,
