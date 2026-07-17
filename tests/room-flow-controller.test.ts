@@ -29,7 +29,7 @@ describe("room flow controller", () => {
       "sell_players",
       "buy_players",
       "facilities",
-      "xp_spend",
+      // XP-System abgeschafft: Flow-Step "xp_spend" entfernt — Facilities → Training direkt.
       "training",
       "finalize_transfers",
       "lineup",

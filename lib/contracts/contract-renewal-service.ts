@@ -857,7 +857,7 @@ function buildPreviewRow(input: {
       ovr: rating?.ovrNormalized ?? null,
       mvs: rating?.mvs ?? null,
       pps: rating?.ppsSeason ?? null,
-      xpAvailable: typeof player?.currentXP === "number" ? player.currentXP : null,
+      xpAvailable: null, // XP-System abgeschafft: kein currentXP-Read mehr (Feld deprecated, immer null).
       teamFit: null,
       warnings: [],
       blockingReasons: [],
@@ -1074,7 +1074,7 @@ function buildPreviewRow(input: {
     ovr: rating?.ovrNormalized ?? null,
     mvs: rating?.mvs ?? null,
     pps: rating?.ppsSeason ?? null,
-    xpAvailable: typeof player?.currentXP === "number" ? player.currentXP : null,
+    xpAvailable: null, // XP-System abgeschafft: kein currentXP-Read mehr (Feld deprecated, immer null).
     teamFit: negotiationPreview.teamFit,
     warnings: Array.from(new Set(warnings)),
     blockingReasons: negotiationPreview.blockingReasons,

@@ -141,7 +141,7 @@ function titles(items: GameInboxItem[]) {
 }
 
 describe("game inbox service", () => {
-  it("creates tasks for missing lineup, XP, expiring contracts and missing training", () => {
+  it("creates tasks for missing lineup, expiring contracts and missing training (XP-System abgeschafft: kein XP-Task mehr)", () => {
     const gameState = makeGameState({
       players: [makePlayer("p-1", { currentXP: 25, trainingMode: null })],
     });
@@ -149,7 +149,8 @@ describe("game inbox service", () => {
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
 
     expect(titles(items)).toContain("Lineup fehlt");
-    expect(titles(items)).toContain("XP verfügbar");
+    // XP-System abgeschafft: Trotz currentXP=25 wird kein „XP verfügbar"-Task mehr erzeugt.
+    expect(titles(items)).not.toContain("XP verfügbar");
     expect(titles(items)).toContain("Verträge laufen aus");
     expect(titles(items)).toContain("Training nicht gesetzt");
   });

@@ -140,8 +140,9 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
       return row.playerPps != null && row.playerPps > 0 && salary != null && salary > 0;
     }).length;
     const expiringCount = input.selectedRosterTableRows.filter((row) => row.entry.contractLength <= 1).length;
+    // XP-System abgeschafft: Training-Fokus gruppiert nur noch nach Fatigue (currentXP ist immer 0).
     const trainingCount = input.selectedRosterTableRows.filter(
-      (row) => (row.player.currentXP ?? 0) > 0 || (row.player.fatigue ?? 0) > 0,
+      (row) => (row.player.fatigue ?? 0) > 0,
     ).length;
     return [
       { id: "default" as const, label: "Standard", count: input.selectedRosterTableRows.length },
@@ -187,9 +188,10 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
     if (input.teamRosterFocusMode === "contracts") {
       return rows.sort((left, right) => left.entry.contractLength - right.entry.contractLength);
     }
+    // XP-System abgeschafft: Training-Fokus sortiert nur noch nach Fatigue (currentXP ist immer 0).
     return rows.sort((left, right) => {
-      const rightScore = (right.player.currentXP ?? 0) * 100 + (right.player.fatigue ?? 0);
-      const leftScore = (left.player.currentXP ?? 0) * 100 + (left.player.fatigue ?? 0);
+      const rightScore = right.player.fatigue ?? 0;
+      const leftScore = left.player.fatigue ?? 0;
       return rightScore - leftScore;
     });
   }, [

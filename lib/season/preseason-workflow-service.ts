@@ -996,9 +996,10 @@ export async function buildPreSeasonWorkflowPreview(
           playerRating: null,
           seasonPerformance: null,
           trainingModeByPlayerId: {},
-          currentXP: player.currentXP ?? 0,
-          spentXP: player.spentXP ?? 0,
-          lifetimeXP: player.lifetimeXP ?? null,
+          // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch).
+          currentXP: 0,
+          spentXP: 0,
+          lifetimeXP: null,
         }),
       ] as const;
     }).filter((entry) => Boolean(entry[1])),

@@ -631,7 +631,8 @@ export function buildDoctrineSeasonReview(gameState: GameState) {
         pps,
         mvs: player.marketValue ?? null,
         moraleNote: "nicht im Doctrine-Block geschrieben",
-        xp: player.currentXP ?? 0,
+        // XP-System abgeschafft: kein currentXP-Signal mehr im Doctrine-Review (immer 0).
+        xp: 0,
         regressionRisk: player.potential < rating ? "high" : player.potential - rating < 10 ? "medium" : "low",
         contractStatus: roster.contractStatus ?? "active",
         keepSellRenew: valueRatio < 2 ? "watch" : roster.contractLength <= 1 ? "renew" : "keep",

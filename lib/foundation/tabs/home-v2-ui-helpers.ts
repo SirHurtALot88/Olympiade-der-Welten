@@ -155,7 +155,8 @@ export function buildHomePlayerCardsFromRoster(input: {
           gameState,
         }),
         salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player, gameState),
-        xp: row.player.currentXP ?? 0,
+        // XP-System abgeschafft: XP-Badge/Kachel entfällt (currentXP ist immer 0).
+        xp: 0,
         fatigue: row.player.fatigue ?? 0,
         ppPow: rating?.ppPow ?? seasonPerformance?.pointsByArea.pow ?? null,
         ppSpe: rating?.ppSpe ?? seasonPerformance?.pointsByArea.spe ?? null,

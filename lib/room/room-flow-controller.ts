@@ -31,7 +31,10 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   { stepId: "sell_players", label: "Verkäufe entscheiden", cta: "Weiter: Team/Kader", targetView: "teams", aiAutoStep: true },
   { stepId: "buy_players", label: "Käufe entscheiden", cta: "Weiter: Transfermarkt", targetView: "market", aiAutoStep: true },
   { stepId: "facilities", label: "Facilities entscheiden", cta: "Weiter: Training & Gebäude", targetView: "trainingV2", aiAutoStep: true },
-  { stepId: "xp_spend", label: "XP verteilen", cta: "Weiter: Entwicklung", targetView: "trainingV2", aiAutoStep: true },
+  // XP-System abgeschafft: Room-Flow-Step "xp_spend" ("XP verteilen") entfernt.
+  // Die Entwicklung läuft organisch am Saison-Ende; der Flow geht von Facilities
+  // direkt zu "training". Der Step-Literal-Typ (online-room-model TeamWriteAction /
+  // RoomFlowStepId) bleibt für Alt-Reads bestehen, wird aber nicht mehr erzeugt.
   { stepId: "training", label: "Training prüfen", cta: "Weiter: Training prüfen", targetView: "trainingV2", aiAutoStep: true },
   { stepId: "finalize_transfers", label: "Transfers finalisieren", cta: "Transfers finalisieren", targetView: "cockpit", aiAutoStep: true },
   { stepId: "lineup", label: "Einsatzliste setzen", cta: "Weiter: Einsatzliste", targetView: "lineup", aiAutoStep: true },
