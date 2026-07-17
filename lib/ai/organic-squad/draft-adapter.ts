@@ -35,7 +35,7 @@ import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
-import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
   applyGmBiasToLaneAppetite,
@@ -46,6 +46,12 @@ import {
   derivePlayerThemeTags,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import {
+  applySellPricingPolicyToBreakdown,
+  isBigHaircut,
+  isSellerDistressed,
+} from "@/lib/market/transfermarkt-sell-pricing-policy";
 
 /** Small flat solvency buffer (MW) — the floor of the cash hard blocker; spend above it is emergent. */
 const ORGANIC_CASH_BUFFER = 5;
@@ -612,6 +618,46 @@ export type OrganicSellPlanResult = {
 };
 
 /**
+ * Estimate the REALIZED (Stage-B, pre-floor) sale price for one rostered player — the natural market
+ * price including the sell-pricing multiplier (seasonStart × timing × liquidation × identityFit), NOT
+ * the rosier base-only MW the greedy loop credits to cash. Used by the "think twice" floor gate to
+ * detect a voluntary sale that would eat a big haircut (loss > max(25 % MW, 5 mio)).
+ *
+ * Reads only the passed gameState (no mutation). Returns null when the price cannot be estimated —
+ * missing market value, no live roster entry (partial test fixtures), or any pricing error — so the
+ * gate degrades to a no-op and prior behaviour is preserved rather than crashing the pure planner.
+ */
+function estimateRealizedSellPrice(
+  gameState: GameState,
+  teamId: string,
+  player: Player | null,
+  rosterEntry: RosterEntry | null,
+  rosterAfter: number,
+): number | null {
+  if (!player || !rosterEntry) {
+    return null;
+  }
+  try {
+    const base = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry);
+    if (base.baseMarketValue == null) {
+      return null;
+    }
+    const priced = applySellPricingPolicyToBreakdown({
+      gameState,
+      teamId,
+      player,
+      rosterEntry,
+      baseBreakdown: base,
+      rosterAfter,
+    });
+    const realized = priced.preFloorSalePrice ?? priced.breakdown.salePrice ?? null;
+    return realized != null && Number.isFinite(realized) ? realized : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Greedy organic SELL plan for one team (in-season / season-end sell-only path). Mirror of
  * planOrganicDraftForTeam but for shedding: repeatedly scores sellUtility for every still-held roster
  * player, sells the highest-utility one while it clears SELL_THRESHOLD and the roster stays >=
@@ -637,6 +683,19 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
   const decisions: OrganicSellDecision[] = [];
+
+  // THINK-TWICE floor gate (Part 2): a NON-distressed club prefers to KEEP a surplus body rather than
+  // realize a big haircut on a voluntary sale (loss > max(25 % MW, 5 mio)). Distressed clubs (cash < 0)
+  // bypass the gate so genuine liquidity/wage-relief fire-sales still fire. Players the gate blocks are
+  // parked here and excluded from further selection this run (they are kept, not sold).
+  const teamDistressed = isSellerDistressed(input.gameState, input.team.teamId);
+  const playerById = new Map(input.roster.map((player) => [player.id, player]));
+  const rosterEntryByPlayerId = new Map(
+    (input.gameState.rosters ?? [])
+      .filter((entry) => entry.teamId === input.team.teamId)
+      .map((entry) => [entry.playerId, entry] as const),
+  );
+  const blockedFloorPlayerIds = new Set<string>();
 
   const buildState = (): OrganicTeamState => {
     const disciplineNeeds = computeDisciplineNeeds(held, ctx.identityAxisWeights, ctx.disciplines);
@@ -671,6 +730,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const view of held) {
+      if (blockedFloorPlayerIds.has(view.playerId)) continue; // kept by the think-twice floor gate
       const jitter =
         input.draftSeed && ORGANIC_SELL_JITTER > 0
           ? ORGANIC_SELL_JITTER * (draftUnit(`${input.draftSeed}:${view.playerId}`) - 0.5)
@@ -689,6 +749,24 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     // opt on this pressure — refilling below opt is the buy side's job, not this loop's.
     const threshold = held.length > ctx.weights.optTarget ? OPT_SURPLUS_SELL_THRESHOLD : SELL_THRESHOLD;
     if (!best || bestUtility <= threshold) break;
+
+    // THINK-TWICE gate: for a non-distressed (voluntary) club, skip this sale when the market would only
+    // pay a big haircut (loss > max(25 % MW, 5 mio)) — prefer to keep the body. Park it as blocked and
+    // reconsider the rest of the roster (the loop re-scans excluding blocked players until none qualify).
+    // Distressed clubs bypass this entirely so liquidity/wage-relief sells still clear.
+    if (!teamDistressed) {
+      const realized = estimateRealizedSellPrice(
+        input.gameState,
+        input.team.teamId,
+        playerById.get(best.playerId) ?? null,
+        rosterEntryByPlayerId.get(best.playerId) ?? null,
+        Math.max(0, held.length - 1),
+      );
+      if (realized != null && isBigHaircut(best.marketValue, realized)) {
+        blockedFloorPlayerIds.add(best.playerId);
+        continue;
+      }
+    }
 
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, best.marketValue);

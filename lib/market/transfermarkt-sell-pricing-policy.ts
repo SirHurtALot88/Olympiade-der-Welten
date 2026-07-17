@@ -21,6 +21,71 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * Absolute-loss cap (in MW units — same units as market value / fees; "5 mio" = 5) tolerated on ANY
+ * sale before the value-aware floor bites. See resolveValueAwareSellFloor.
+ */
+export const VALUE_AWARE_SELL_MAX_ABS_LOSS = 5;
+/** Percentage-loss cap on a sale (25 % of MW). See resolveValueAwareSellFloor. */
+export const VALUE_AWARE_SELL_MAX_PCT_LOSS = 0.25;
+
+/**
+ * Owner rule: a player should never lose more than max(25 % of MW, 5 mio) on a sale. Expressed as a
+ * realized-sale-price FLOOR that is the higher of the two allowances (whichever LOSES LESS money):
+ *
+ *     floor = min(0.75 × MW, MW − 5)
+ *
+ * - MW > 20 → the 25 % term wins (0.75 × MW), capping the loss at a quarter of the value.
+ * - MW ≤ 20 → the absolute term wins (MW − 5), capping the loss at 5 mio (a larger % is tolerated
+ *   because the absolute money at stake is small).
+ * - MW ≤ 5 → MW − 5 ≤ 0 ⇒ floor ≤ 0 ⇒ no effective protection (a trivial-value sale can go to ~0).
+ *
+ * Applies to NON-distressed (voluntary) sells only; distressed sellers (cash < 0) retain the lower
+ * base-0.65 behaviour so forced sales can still clear. PURE.
+ */
+export function resolveValueAwareSellFloor(marketValue: number | null | undefined): number {
+  if (marketValue == null || !Number.isFinite(marketValue) || marketValue <= 0) {
+    return 0;
+  }
+  return Math.min(
+    (1 - VALUE_AWARE_SELL_MAX_PCT_LOSS) * marketValue,
+    marketValue - VALUE_AWARE_SELL_MAX_ABS_LOSS,
+  );
+}
+
+/**
+ * True when a realized sale price breaches the value-aware floor — i.e. the loss vs MW exceeds
+ * max(25 % of MW, 5 mio). Shared by the mechanical price floor (Part 1) and the organic "think twice"
+ * decision gate (Part 2) so both use identical math. PURE.
+ */
+export function isBigHaircut(
+  marketValue: number | null | undefined,
+  realizedPrice: number | null | undefined,
+): boolean {
+  if (marketValue == null || !Number.isFinite(marketValue) || marketValue <= 0) {
+    return false;
+  }
+  if (realizedPrice == null || !Number.isFinite(realizedPrice)) {
+    return false;
+  }
+  // 1e-6 tolerance so a price sitting exactly on the floor (rounding noise) is not treated as a breach.
+  return realizedPrice < resolveValueAwareSellFloor(marketValue) - 1e-6;
+}
+
+/**
+ * Distress signal for the sell-pricing stage: a seller is DISTRESSED when its cash is negative — the
+ * exact input Stage-B's liquidationMalus already keys off (getLiquidationMalus checks team.cash < 0).
+ * Distressed sellers are exempt from the raised value-aware floor so forced fire-sales can still clear
+ * (they retain the lower base-0.65 behaviour). PURE.
+ */
+export function isSellerDistressed(gameState: GameState, teamId: string): boolean {
+  const team = gameState.teams?.find((entry) => entry.teamId === teamId);
+  if (!team) {
+    return false;
+  }
+  return Number.isFinite(team.cash) && team.cash < 0;
+}
+
 function getIdentityFitMultiplier(gameState: GameState, teamId: string, player: Player | null | undefined) {
   if (!player) {
     return 1;
@@ -133,14 +198,42 @@ export function applySellPricingPolicyToBreakdown(input: {
   const baseFactor = input.baseBreakdown.saleFactor ?? 1;
   const basePrice = input.baseBreakdown.salePrice ?? input.baseBreakdown.baseMarketValue;
   const saleFactor = round(baseFactor * policy.combinedMultiplier, 3);
-  const salePrice =
+  // Stage-B price BEFORE the value-aware floor — the natural market price. Kept on the result so the
+  // organic "think twice" gate (Part 2) can see the true haircut the floor would otherwise mask.
+  const preFloorSalePrice =
     basePrice != null ? round(basePrice * policy.combinedMultiplier, 2) : input.baseBreakdown.salePrice;
+
+  // VALUE-AWARE FLOOR (Part 1): for NON-distressed (voluntary) sells, never realize below
+  // min(0.75 × MW, MW − 5) — cap the loss at max(25 % of MW, 5 mio). Distressed sellers (cash < 0) are
+  // exempt so forced fire-sales still clear at the lower base-0.65 price. Never LOWERS a price that is
+  // already above the floor (Math.max semantics).
+  const marketValue = input.baseBreakdown.baseMarketValue;
+  const distressed = isSellerDistressed(input.gameState, input.teamId);
+  let salePrice = preFloorSalePrice;
+  let flooredSaleFactor = saleFactor;
+  let floorApplied = false;
+  if (
+    !distressed &&
+    marketValue != null &&
+    marketValue > 0 &&
+    preFloorSalePrice != null &&
+    Number.isFinite(preFloorSalePrice)
+  ) {
+    const floor = resolveValueAwareSellFloor(marketValue);
+    if (floor > preFloorSalePrice) {
+      salePrice = round(floor, 2);
+      flooredSaleFactor = round(salePrice / marketValue, 3);
+      floorApplied = true;
+    }
+  }
 
   return {
     policy,
+    preFloorSalePrice,
+    floorApplied,
     breakdown: {
       ...input.baseBreakdown,
-      saleFactor,
+      saleFactor: flooredSaleFactor,
       salePrice,
     },
   };
