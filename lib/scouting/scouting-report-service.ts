@@ -22,6 +22,7 @@ import {
 import { getScoutingIntelMilestone } from "@/lib/scouting/scouting-hub-targets-service";
 import { buildPlayerAxisStarProfile, revealAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
+import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 
 export type ScoutingReportDisciplineTier = {
   disciplineId: string;
@@ -102,9 +103,19 @@ export function buildScoutingReport(input: {
   }
 
   const facilityLevel = getFacilityLevel(getTeamFacilityState(input.gameState, input.teamId), "scouting_office");
-  const certainty = getPlayerScoutCertainty(input.gameState, input.teamId, input.playerId);
-  const effectiveScoutingLevel = getEffectiveScoutingLevel(input.gameState, input.teamId, input.playerId);
   const neededCertainty = getFullRevealCertaintyThreshold(facilityLevel);
+  // Build-Phase-Override: `DEBUG_FORCE_PLAYER_VISIBILITY` überbrückt den Fog of
+  // War auch hier — solange der Schalter AN ist, wird JEDER Report als
+  // vollständig gescoutet behandelt (Level 5 / 100% Intel), damit die
+  // Scouting-Mitte exakte Werte statt gestreuter Bänder zeigt. Alles unten
+  // (Tiers, Achsen-Orbit, Traits, PO-Range) leitet sich aus diesen beiden
+  // Größen ab, daher genügt es, sie an der Wurzel zu forcieren.
+  const certainty = DEBUG_FORCE_PLAYER_VISIBILITY
+    ? Math.max(neededCertainty, 100)
+    : getPlayerScoutCertainty(input.gameState, input.teamId, input.playerId);
+  const effectiveScoutingLevel = DEBUG_FORCE_PLAYER_VISIBILITY
+    ? 5
+    : getEffectiveScoutingLevel(input.gameState, input.teamId, input.playerId);
   const isFullyScouted = effectiveScoutingLevel >= 5;
   const focusSummary = getScoutFocusSummary(input.gameState, input.teamId);
   const isFocusTarget = focusSummary?.playerId === input.playerId;
