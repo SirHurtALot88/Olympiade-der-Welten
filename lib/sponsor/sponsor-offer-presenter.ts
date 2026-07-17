@@ -221,13 +221,26 @@ function roundOfferCash(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+/**
+ * Letzter Liga-Rang = garantierter Boden: hier ist keine Gewinnstufe freigeschaltet,
+ * der Sponsor zahlt nur die Basis. Sichtbar gemacht, damit Teams auch den Worst-Case
+ * (Tabellen-Letzter, Platz 32) auf der Leiter sehen — nicht nur ab „Top 28".
+ */
+export const SPONSOR_RANK_FLOOR_AT = 32;
+export const SPONSOR_RANK_FLOOR_LABEL = `Platz ${SPONSOR_RANK_FLOOR_AT}`;
+
 /** Absolute sponsor cash (basis + unlocked rank share) at each Gewinnstufe threshold. */
 export function buildSponsorRankTierRows(input: {
   baseCash: number;
   rankCash: number;
+  /**
+   * Zeigt die garantierte Boden-Stufe (letzter Rang, nur Basis) als unterste Sprosse an.
+   * Opt-in, damit der bestehende Milestone-Contract (8 Stufen ab „Top 28") stabil bleibt.
+   */
+  includeFloorRung?: boolean;
 }): SponsorRankTierRow[] {
   const totalMilestoneBonus = SPONSOR_RANK_MILESTONES.reduce((sum, milestone) => sum + milestone.bonusC, 0);
-  return SPONSOR_RANK_MILESTONES.map((milestone) => {
+  const milestoneRows = SPONSOR_RANK_MILESTONES.map((milestone) => {
     const unlockedBonus = getRankMilestoneBonus(milestone.maxRank, 1);
     const rankPortion =
       totalMilestoneBonus > 0 && input.rankCash > 0
@@ -239,4 +252,13 @@ export function buildSponsorRankTierRows(input: {
       absolutePayout: roundOfferCash(input.baseCash + rankPortion),
     };
   });
+  if (!input.includeFloorRung) {
+    return milestoneRows;
+  }
+  // Boden-Stufe (garantierte Basis, keine Gewinnstufe) an den Anfang — die Leiter
+  // ist aufsteigend nach Schwierigkeit (schlechtester Rang zuerst).
+  return [
+    { label: SPONSOR_RANK_FLOOR_LABEL, rankAt: SPONSOR_RANK_FLOOR_AT, absolutePayout: roundOfferCash(input.baseCash) },
+    ...milestoneRows,
+  ];
 }

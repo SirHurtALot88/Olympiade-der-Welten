@@ -143,6 +143,48 @@ function SponsorRewardIcon({ kind }: { kind: SponsorRewardKind }) {
   }
 }
 
+/**
+ * Kompakte Anzeige eines mehrstufigen Bonusziels (TEIL B): Stufen-Leiter mit
+ * anteiliger Auszahlung je Stufe (`fraction` × Bonus) plus optionaler
+ * Spotlight-Hinweis (Beliebtheits-Impuls bei Erfüllung). Rein additiv — fehlt
+ * `stages`, wird nichts gerendert (binäres Ziel bleibt wie gehabt).
+ */
+function SponsorStageLadder({
+  component,
+  formatCash,
+}: {
+  component: SponsorOfferComponent;
+  formatCash: (value: number) => string;
+}) {
+  const stages = component.stages;
+  const hasStages = Array.isArray(stages) && stages.length > 0;
+  const hasSpotlight = typeof component.spotlightBonus === "number" && component.spotlightBonus > 0;
+  if (!hasStages && !hasSpotlight) {
+    return null;
+  }
+  return (
+    <div className="nl-sponsor-stage-ladder" data-testid="sponsor-stage-ladder">
+      {hasStages ? (
+        <ul className="nl-sponsor-stage-list">
+          {stages!.map((stage) => (
+            <li key={stage.label} className="nl-sponsor-stage-rung">
+              <span className="nl-sponsor-stage-rung-label">{stage.label}</span>
+              <span className="nl-sponsor-stage-rung-payout nl-tnum">
+                {Math.round(stage.fraction * 100)}% · {formatCash(component.rewardCash * stage.fraction)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {hasSpotlight ? (
+        <span className="nl-sponsor-stage-spotlight" title="Erfüllung gibt zusätzlich einen Beliebtheits-Impuls (Spotlight) für die Folge-Saison.">
+          ✦ Spotlight bei Erfüllung
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function SponsorOfferCardNewLook({
   offer,
   gameState,
@@ -176,9 +218,10 @@ export function SponsorOfferCardNewLook({
 
   return (
     <article
-      className={`nl-sponsor-offer is-${offer.archetype}${presentation.isChallenge ? " is-challenge" : ""}`}
+      className={`nl-sponsor-offer is-${offer.archetype}${presentation.isChallenge ? " is-challenge" : ""}${presentation.isGolden ? " is-golden" : ""}`}
       data-testid={`sponsor-offer-${offer.archetype}`}
       data-challenge={presentation.isChallenge ? "true" : "false"}
+      data-golden={presentation.isGolden ? "true" : "false"}
     >
       <header className="nl-sponsor-offer-head">
         <SponsorCrest name={offer.name} archetype={offer.archetype} />
@@ -192,7 +235,19 @@ export function SponsorOfferCardNewLook({
           <small>{offer.flavor}</small>
         </div>
         <div className="nl-sponsor-offer-badges">
-          {presentation.offerBadge ? <span className="nl-sponsor-offer-badge">{presentation.offerBadge}</span> : null}
+          {presentation.offerBadge ? (
+            <span
+              className={`nl-sponsor-offer-badge${presentation.isGolden ? " is-golden" : ""}`}
+              title={
+                presentation.isGolden
+                  ? "Golden Card — seltener Glücks-Sponsor mit geboostetem Rang-Payout und Bonus-Ziel."
+                  : undefined
+              }
+            >
+              {presentation.isGolden ? "★ " : ""}
+              {presentation.offerBadge}
+            </span>
+          ) : null}
           {isBestCashOffer ? (
             <span className="nl-sponsor-offer-badge is-cash-best" title="Höchste Cash-Summe im aktuellen Angebotsvergleich">
               Bestes Cash-Angebot
@@ -229,6 +284,7 @@ export function SponsorOfferCardNewLook({
               {specialComponent.penaltyCash ? ` · Malus −${formatCash(specialComponent.penaltyCash)}` : ""}
             </div>
           ) : null}
+          {specialComponent ? <SponsorStageLadder component={specialComponent} formatCash={formatCash} /> : null}
         </div>
       ) : null}
 
@@ -260,7 +316,11 @@ export function SponsorOfferCardNewLook({
       <div className="nl-sponsor-reward-tiles" aria-label="Vertragskomponenten">
         {standardComponents.map((component) => {
           if (component.kind === "rank") {
-            const tierRows = buildSponsorRankTierRows({ baseCash, rankCash: component.rewardCash });
+            const tierRows = buildSponsorRankTierRows({
+              baseCash,
+              rankCash: component.rewardCash,
+              includeFloorRung: true,
+            });
             // #79: höchste Stufe, deren Rang-Schwelle der aktuelle Liga-Rang
             // erfüllt (Meilensteine sind aufsteigend schwerer sortiert).
             let currentTierIndex = -1;
@@ -328,6 +388,7 @@ export function SponsorOfferCardNewLook({
               <strong className="nl-tnum">{formatCash(specialComponent.rewardCash)}</strong>
             </div>
             <small>{specialComponent.label}</small>
+            <SponsorStageLadder component={specialComponent} formatCash={formatCash} />
             {specialComponent.penaltyCash ? (
               <NlDeltaChip
                 value={-specialComponent.penaltyCash}
