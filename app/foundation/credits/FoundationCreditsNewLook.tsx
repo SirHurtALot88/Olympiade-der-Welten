@@ -262,7 +262,7 @@ function LoanBurdenChart({
       <svg
         className="nl-credits-burden-chart"
         viewBox={`0 0 ${BURDEN_W} ${BURDEN_H}`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
         role="img"
         aria-label={ariaLabel}
       >

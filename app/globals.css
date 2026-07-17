@@ -58544,7 +58544,12 @@ button.is-new-look .nl-thist-season-pill,
   display: block;
   width: 100%;
   max-width: 100%;
-  height: auto;
+  /* Feste, schlanke Balkenhoehe: der Balken soll die Kartenbreite fuellen, aber
+     nicht proportional mitwachsen (sonst wurde er auf breiten Karten zu einem
+     ~70px hohen Vollblock, vor allem wenn nur ein Segment Wert hat). Zusammen
+     mit preserveAspectRatio="none" streckt sich der 320x60-Viewport auf 100%
+     Breite bei fixer 60px Hoehe (vertikal 1:1, keine Hoehenverzerrung). */
+  height: 60px;
 }
 
 .is-new-look .nl-credits-burden-track {

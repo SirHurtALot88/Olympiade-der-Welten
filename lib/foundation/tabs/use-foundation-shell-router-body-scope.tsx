@@ -9175,18 +9175,36 @@ export function useFoundationShellRouterBodyScope({
     if (!shouldBuildAllTimeTable || !seasonStandingsFeed) {
       return undefined;
     }
+    // Der Standings-Feed liefert den Team-Marktwert nicht immer (z. B. an MD1) —
+    // dann zeigte die Ewige-Tabelle-Live-Sicht bei allen Teams "—". Fallback auf
+    // den live aus dem Kader summierten Marktwert (identisch zur Teams-Tabelle).
+    // Client-sicher inline berechnet (kein Import aus AI-/Persistenz-Services,
+    // die better-sqlite3/fs ins Client-Bundle ziehen wuerden).
+    const playerMwById = new Map(
+      gameState.players.map((player) => [
+        player.id,
+        player.displayMarketValue ?? player.marketValue ?? 0,
+      ]),
+    );
+    const rosterMwByTeamId = new Map<string, number>();
+    for (const entry of gameState.rosters ?? []) {
+      rosterMwByTeamId.set(
+        entry.teamId,
+        (rosterMwByTeamId.get(entry.teamId) ?? 0) + (playerMwById.get(entry.playerId) ?? 0),
+      );
+    }
     return Object.fromEntries(
       seasonStandingsFeed.items.map((item) => [
         item.teamId,
         {
           rank: item.rank ?? null,
           points: item.points ?? null,
-          marketValue: item.marketValueTotal ?? null,
+          marketValue: item.marketValueTotal ?? rosterMwByTeamId.get(item.teamId) ?? null,
           cash: item.cashTotal ?? item.cash ?? null,
         },
       ]),
     );
-  }, [seasonStandingsFeed, shouldBuildAllTimeTable]);
+  }, [gameState, seasonStandingsFeed, shouldBuildAllTimeTable]);
 
   const allTimeTableModel = useMemo(() => {
     if (!shouldBuildAllTimeTable) {
