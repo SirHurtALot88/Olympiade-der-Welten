@@ -220,6 +220,10 @@ export function buildSponsorOffersForTeam(input: {
   const beliebtheit = input.gameState.seasonState.beliebtheitByTeamId?.[input.teamId]?.value ?? null;
   const hadGoldenLastSeason =
     input.gameState.seasonState.goldenSponsorHistoryByTeamId?.[input.teamId] === true;
+  // 5 Angebote statt 3: alle 3 Archetypen garantiert + 2 Extra (1 safe-lastig, 1 aggressiv-lastig),
+  // als Risiko-Rampe von sicher → aggressiv. Jeder Slot bekommt eigenen Stern-Roll + Golden + Varianz,
+  // und über usedParentBrandIds (unten) unterschiedliche Marken für die doppelten Typen.
+  const archetypes: SponsorArchetype[] = ["security", "security", "identity", "performance", "performance"];
   const tierRoll = rollSponsorStarTiers({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
@@ -227,14 +231,14 @@ export function buildSponsorOffersForTeam(input: {
     beliebtheit,
     hadGoldenLastSeason,
     teamCount: rows.length,
+    slotCount: archetypes.length,
   });
-  const archetypes: SponsorArchetype[] = ["security", "performance", "identity"];
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
   const salaryFactor = getCurrentSalaryFactor(input.gameState);
   const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
-  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId);
+  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId, archetypes.length);
 
   return archetypes.map((archetype, slotIndex) => {
     const starTier = tierRoll.tiers[slotIndex] ?? 2;
@@ -386,7 +390,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     }
     const currentOffers = existingOffers[team.teamId] ?? [];
     const hasCurrentSeasonOffers =
-      currentOffers.length === 3 && currentOffers.every((offer) => offer.seasonId === seasonId);
+      currentOffers.length === 5 && currentOffers.every((offer) => offer.seasonId === seasonId);
     if (!hasCurrentSeasonOffers) {
       nextOffers[team.teamId] = buildSponsorOffersForTeam({ gameState, teamId: team.teamId });
       changed = true;
