@@ -322,34 +322,14 @@ function applyQualityRebalanceToPayout(input: {
 }
 
 /**
- * Feed 2 (TEIL A) — erwartungs-relative Meilenstein-Leiter für den performance-Archetyp. Belohnt
- * `overRankSteps = expectedRank − finalRank` (positiv = besser als erwartet). Ein UNTERES Team, das
- * seine Kaderstärke-Erwartung übertrifft, zahlt so schon bei WENIGEN Rang-Anstiegen gut — unabhängig
- * vom absoluten Endrang. ENV-tunebar (Sockel-Schutz Bottom-5 bleibt davon unberührt, siehe unten).
- */
-export const SPONSOR_EXPECT_STEP_C = Number(process.env.OLY_SPONSOR_EXPECT_STEP_C ?? 4) || 4;
-export const SPONSOR_EXPECT_MAX_STEPS = Number(process.env.OLY_SPONSOR_EXPECT_MAX_STEPS ?? 8) || 8;
-
-/**
- * Anteil der GEWONNENEN Meilenstein-Schwierigkeit (absMile(final) − absMile(expected)), den der
+ * Feed 2 — Anteil der GEWONNENEN Meilenstein-Schwierigkeit (absMile(final) − absMile(expected)), den der
  * performance-Archetyp als Überperformance-Bonus ZUSÄTZLICH zur absoluten Rang-Leiter bekommt. Da die
  * Belohnung an die (konkave) Meilenstein-Leiter gekoppelt ist, springt sie im gepackten unteren Bereich
  * bewusst wenig und die Gesamt-Auszahlung bleibt streng monoton im Endrang. ENV-tunebar.
+ * (Ersetzt die frühere lineare erwartungs-relative Schritt-Leiter SPONSOR_EXPECT_STEP_C/MAX_STEPS, die die
+ *  Monotonie brach und daher entfernt wurde.)
  */
 export const SPONSOR_OVERPERFORMANCE_SHARE = Number(process.env.OLY_SPONSOR_OVERPERF_SHARE ?? 0.6) || 0.6;
-
-export function getExpectationRelativeMilestoneBonus(
-  finalRank: number | null | undefined,
-  expectedRank: number | null | undefined,
-  salaryFactor = 1,
-): number {
-  if (finalRank == null || expectedRank == null || !Number.isFinite(finalRank) || !Number.isFinite(expectedRank)) {
-    return 0;
-  }
-  const overRankSteps = Math.round(expectedRank) - Math.round(finalRank);
-  const rewardedSteps = Math.max(0, Math.min(SPONSOR_EXPECT_MAX_STEPS, overRankSteps));
-  return round1(rewardedSteps * SPONSOR_EXPECT_STEP_C * salaryFactor);
-}
 
 /**
  * Golden-Sponsor Rang-Payout-Boost (Wave-1-schonend). Ein golden markierter Vertrag hebt NUR die
@@ -456,7 +436,7 @@ export function buildOfferCashAmounts(input: {
 
   if (input.archetype === "security") {
     // Bottom-Schutz: der GARANTIERTE Sockel-Floor (effectiveBaseFloor) bleibt eine harte Untergrenze für
-    // den "sicheren" Typ. Da ARCHETYPE_BASE_MULT.security = 1.12 > 1 liegt, bindet dieser Floor faktisch
+    // den "sicheren" Typ. Da ARCHETYPE_BASE_MULT.security = 1.07 > 1 liegt, bindet dieser Floor faktisch
     // nie, sichert die schwächsten Teams aber archetyp-eindeutig ab (bewusst an security gekoppelt).
     baseCash = round1(Math.max(baseCash, effectiveBaseFloor * rebalance.baseScale));
   }

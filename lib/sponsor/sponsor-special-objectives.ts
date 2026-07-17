@@ -845,3 +845,24 @@ export function getAvailableBonusObjectiveKeys(
   );
   return keys.filter((key) => key !== "transfer_trader" || isTransferTraderAvailableForSeason(seasonId));
 }
+
+/**
+ * Deterministische Auswahl EINES Standard-Bonusziels für einen Angebots-Slot (season/team/archetype/slot).
+ * `transfer_trader` ist im Live-Pool vorerst ausgeschlossen: sein Fenster (Verkäufe S(n-1)+Käufe S(n)) zählt
+ * aktuell nur im Sim-Runner korrekt, im interaktiven Übergang werden die Fenster-Transfers keiner Abrechnung
+ * zugeordnet — bis das gefixt ist, wird das Ziel nicht live vergeben (Code + Tests bleiben erhalten).
+ * Liefert null, wenn für den Archetyp kein Ziel verfügbar ist (Fallback auf Legacy-Sonderziel im Aufrufer).
+ */
+export function pickBonusObjective(
+  seasonId: string,
+  teamId: string,
+  archetype: SponsorArchetype,
+  slotIndex: number,
+): SponsorBonusObjectiveKey | null {
+  const keys = getAvailableBonusObjectiveKeys(archetype, seasonId).filter((key) => key !== "transfer_trader");
+  if (keys.length === 0) {
+    return null;
+  }
+  const index = Math.floor(getStableUnitHash(`${seasonId}:${teamId}:${archetype}:${slotIndex}:bonus-objective`) * keys.length);
+  return keys[Math.min(keys.length - 1, index)] ?? keys[0]!;
+}

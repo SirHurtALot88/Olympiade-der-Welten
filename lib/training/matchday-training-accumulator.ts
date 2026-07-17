@@ -15,7 +15,10 @@ import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation"
  * fatigue is advanced by `FATIGUE_LOAD_BY_MODE[mode] / totalMatchdays`.
  *
  * Idempotency / forceReplace (keyed on `matchdayId`):
- *  - Same matchday + same mode already recorded → no change at all (accumulator is returned untouched).
+ *  - Same matchday + same mode already recorded → the accumulator is returned untouched, but the
+ *    already-accumulated training-fatigue share is re-layered onto `player.fatigue` (which the
+ *    preceding `applyFatigueAndInjuryAfterMatchday` just reset to the pure match fatigue). This keeps
+ *    a `forceReplace` with an unchanged mode from silently dropping the training-fatigue layer.
  *  - Same matchday + different mode (a forced re-apply of a corrected result) → the old matchday's
  *    contribution is rolled back via the stored `modeByMatchday` entry and the new one applied;
  *    `matchdaysCounted` stays constant.
@@ -67,8 +70,18 @@ export function accumulateMatchdayTrainingProgress(input: {
     const priorMode = previousAccumulator?.modeByMatchday[matchdayId] ?? null;
     const mode = normalizeMode(player.trainingMode);
 
-    // Exact idempotency: replaying the same matchday with the same mode changes nothing.
-    if (priorMode === mode && previousAccumulator) return player;
+    // Exact idempotency: replaying the same matchday with the same mode does not change the
+    // accumulator itself, BUT `player.fatigue` was just re-derived to the pure match fatigue by
+    // `applyFatigueAndInjuryAfterMatchday` (which carries no training fatigue). We must therefore
+    // re-layer the already-accumulated training-fatigue share on top — exactly as the main path
+    // below does — so a `forceReplace` with an unchanged mode does not silently drop it.
+    // This stays idempotent because `player.fatigue` is the fresh pure match fatigue on every apply.
+    if (priorMode === mode && previousAccumulator) {
+      const relayered = clampFatigue((player.fatigue ?? 0) + previousAccumulator.accumulatedTrainingFatigue);
+      if (relayered === (player.fatigue ?? 0)) return player;
+      mutated = true;
+      return { ...player, fatigue: relayered };
+    }
 
     const modeByMatchday = { ...(previousAccumulator?.modeByMatchday ?? {}) };
     let matchdaysCounted = previousAccumulator?.matchdaysCounted ?? 0;

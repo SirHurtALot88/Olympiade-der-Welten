@@ -47,7 +47,11 @@ import {
 } from "@/lib/sponsor/sponsor-tier-pool";
 import {
   buildBeatExpectedRankSpecialComponent,
+  buildBonusObjectiveComponent,
   buildFanInfrastructureSpecialComponent,
+  buildGoldenObjectiveComponent,
+  pickBonusObjective,
+  pickGoldenObjective,
   resolveChallengeSlotIndex,
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -136,6 +140,43 @@ function buildOffer(input: {
     rewardCash: overachieveReward,
   });
 
+  // TEIL B: das Saison-Sonderziel ist jetzt ein echtes Bonusziel aus dem 14+6-Pool (staged, anteilige
+  // Auszahlung + Spotlight-Impuls in die Beliebtheit) statt des Legacy-Templates. Golden-Angebote bekommen
+  // ein Golden-Ziel, Challenge-Angebote behalten ihr Achsen-Rang-Sonderziel (eigenes UI-Panel), Standard-
+  // Angebote ziehen deterministisch ein archetyp-passendes Bonusziel. Fällt der Pool aus (kein Ziel für den
+  // Archetyp), bleibt das Legacy-Sonderziel. `specialCash` (an den Gebäude-Unterhalt gekoppelt) bleibt der
+  // Reward-Betrag. Teil-B-Ziele sind staged (kein Malus); die Legacy-/Challenge-Variante behält ihren Malus.
+  const legacySpecialComponent: SponsorOfferComponent = {
+    ...special,
+    rewardCash: specialCash,
+    penaltyCash:
+      special.penaltyCash != null
+        ? clampCash((specialCash * 0.4) / demandMult, 0.5, specialCash * 0.5)
+        : undefined,
+  };
+  const bonusObjectiveInput = {
+    gameState,
+    team,
+    identity,
+    profile,
+    rewardCash: specialCash,
+    starTier,
+    seasonId: gameState.season.id,
+    teamQualityRank,
+  };
+  let specialComponent: SponsorOfferComponent = legacySpecialComponent;
+  if (isGolden) {
+    specialComponent = buildGoldenObjectiveComponent(
+      pickGoldenObjective(gameState.season.id, team.teamId, archetype),
+      bonusObjectiveInput,
+    );
+  } else if (specialMode !== "challenge") {
+    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, archetype, slotIndex);
+    if (bonusKey) {
+      specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
+    }
+  }
+
   const components: SponsorOfferComponent[] = [
     {
       componentId: "base-cash",
@@ -162,15 +203,7 @@ function buildOffer(input: {
       targetValue: improvementTarget,
       rewardCash: improvementCash,
     },
-    {
-      ...special,
-      rewardCash: specialCash,
-      // WAVE 1 (Punkt 3): Special-Malus 0.25→0.4, ebenfalls relativ zur Upside gedeckelt (max halber Reward).
-      penaltyCash:
-        special.penaltyCash != null
-          ? clampCash(specialCash * 0.4 / demandMult, 0.5, specialCash * 0.5)
-          : undefined,
-    },
+    specialComponent,
     buildFanInfrastructureSpecialComponent({ rewardCash: fanInfraReward }),
     ...(beatExpectedComponent ? [beatExpectedComponent] : []),
   ];

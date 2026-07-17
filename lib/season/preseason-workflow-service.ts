@@ -458,14 +458,27 @@ function getSalaryTotal(gameState: GameState, teamId: string) {
 }
 
 function buildZeroStandings(gameState: GameState): Record<string, StandingRecord> {
+  // Endrang der ABGESCHLOSSENEN Saison (gameState = save.gameState mit finalen Standings) als `startplatz`
+  // in die neue Saison tragen. Ohne diesen Carry fällt ab Season 2 (a) der Auf-/Absteiger-Bonus im Preisgeld
+  // aus (start_rank_source_missing) UND (b) das Sponsor-Verbesserungsziel wird gegen den statischen
+  // Budget-Rang statt den echten Vorsaison-Endrang gemessen → kumulierender Economy-Skew. rankDiff startet
+  // bei 0 (noch kein Spieltag in der neuen Saison).
+  const previousStandings = gameState.seasonState.standings ?? {};
   return Object.fromEntries(
-    gameState.teams.map((team, index) => [
-      team.teamId,
-      {
-        points: 0,
-        rank: index + 1,
-      } satisfies StandingRecord,
-    ]),
+    gameState.teams.map((team, index) => {
+      const previousRank = previousStandings[team.teamId]?.rank;
+      const startplatz =
+        typeof previousRank === "number" && Number.isFinite(previousRank) ? previousRank : index + 1;
+      return [
+        team.teamId,
+        {
+          points: 0,
+          rank: startplatz,
+          startplatz,
+          rankDiff: 0,
+        } satisfies StandingRecord,
+      ];
+    }),
   );
 }
 

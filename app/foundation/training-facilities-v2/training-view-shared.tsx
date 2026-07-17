@@ -816,7 +816,7 @@ export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProp
         <article
           className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
           key={`mode-guide-${option.value}`}
-          title={`Trainingsbudget vor Trait-, Potential- und Facility-Boni. Separat fliessen +${formatNlNumber(option.baseXp, 0)} Entwicklungs-XP automatisch in Formkurve und Regressionsschutz ein — kein manuelles Ausgeben.`}
+          title={"Trainingsbudget vor Trait-, Potential- und Facility-Boni. Die Entwicklung erfolgt rein organisch über Formkurve und Regressionsschutz — es gibt kein manuelles Ausgeben von Entwicklungspunkten."}
         >
           <span>{option.label}</span>
           <strong>+{formatNlNumber(option.trainingSetpoints, 1)} Trainingsbudget · Fatigue {formatNlNumber(option.fatigueLoad, 0)}</strong>
