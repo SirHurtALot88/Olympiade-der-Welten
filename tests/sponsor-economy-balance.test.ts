@@ -317,9 +317,12 @@ describe("sponsor economy balance", () => {
     const twoStar = getSponsorPayoutForFinalRankAndTier(1, factor, 2, leagueMin);
     const oneStar = getSponsorPayoutForFinalRankAndTier(1, factor, 1, leagueMin);
 
-    // Milestone ladder compressed (SPONSOR_MILESTONE_LADDER_SCALE) so the 5★ champion no longer
-    // over-pays: still a strong ~2× base-floor premium, but capped well below the old steep curve.
-    expect(fiveStar).toBeGreaterThan(80);
+    // #56 Gehalts-Kalibrierung: der flache Basis-Sockel wurde an die Liga-Gehälter gestrafft
+    // (Building-Offset 15.6→7), und die Meilenstein-Leiter angehoben (0.6→0.8). Diese Messung nutzt den
+    // Default-Archetyp (security = FLACH), dessen absoluter 5★-Champion dadurch bewusst tiefer liegt (~74);
+    // die eigentliche Top-Auszahlung kommt jetzt über performance+Rang (siehe Kreuzungs-Test). Kernaussage
+    // hier bleibt: scharfe Stern-Skalierung (5★ ≫ 1★), nur nicht mehr die alte überhöhte Absolut-Höhe.
+    expect(fiveStar).toBeGreaterThan(72);
     expect(twoStar).toBeLessThan(fiveStar * 0.92);
     expect(oneStar).toBeLessThan(twoStar);
     expect(fiveStar / oneStar).toBeGreaterThan(1.12);

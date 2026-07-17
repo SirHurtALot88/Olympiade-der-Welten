@@ -109,7 +109,8 @@ function buildOffer(input: {
     specialMode: specialMode ?? "standard",
     gameState,
   });
-  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank });
+  const isGolden = input.forcePremiumElite === true;
+  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank, isGolden });
   const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
   const baseSpecialCash =
     specialMode === "challenge"
@@ -191,6 +192,7 @@ function buildOffer(input: {
     demandProfile: getDemandProfile(starTier),
     teamQualityRank: teamQualityRank ?? undefined,
     isChallengeOffer: specialMode === "challenge",
+    isGolden,
   };
 }
 
@@ -214,10 +216,17 @@ export function buildSponsorOffersForTeam(input: {
   if (!qualityRank) {
     return [];
   }
+  // Golden-Los (Abschnitt 2.2): Beliebtheit hebt die Wahrscheinlichkeit, der Cooldown senkt sie.
+  const beliebtheit = input.gameState.seasonState.beliebtheitByTeamId?.[input.teamId]?.value ?? null;
+  const hadGoldenLastSeason =
+    input.gameState.seasonState.goldenSponsorHistoryByTeamId?.[input.teamId] === true;
   const tierRoll = rollSponsorStarTiers({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
     qualityRank,
+    beliebtheit,
+    hadGoldenLastSeason,
+    teamCount: rows.length,
   });
   const archetypes: SponsorArchetype[] = ["security", "performance", "identity"];
   const usedParentBrandIds: string[] = [];
@@ -495,6 +504,7 @@ export function chooseSponsorOffer(input: {
     negotiationProfile,
     demandProfile: offer.demandProfile,
     teamQualityRankAtSign: offer.teamQualityRank,
+    isGolden: offer.isGolden,
   };
   contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 

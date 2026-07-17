@@ -116,6 +116,10 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         baseAnchorSalary,
         contract.archetype,
         contract.teamQualityRankAtSign,
+        // expectedRank (Feed 2) folgt in der Anzeige-gekoppelten Phase; hier bewusst undefined.
+        undefined,
+        // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
+        contract.isGolden ?? false,
       );
       const payout = roundCash(Math.max(0, targetTotal - baseTotal));
       const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);
