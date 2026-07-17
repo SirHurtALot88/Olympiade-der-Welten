@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import type { Dispatch, SetStateAction } from "react";
 
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import type { GameState, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { MatchdayArenaBlockerSummary } from "@/lib/foundation/matchday-arena-blocker-summary";
 import type { MatchdaySummary } from "@/lib/foundation/matchday-summary";
@@ -169,7 +170,7 @@ export default function FoundationMatchdayArenaShellHost({
                 <span>Aktives Team</span>
                 <strong>{activeTeamMatchdaySummaryRow?.teamShortCode ?? selectedTeam?.shortCode ?? "—"}</strong>
                 <small>
-                  Tagesrang {activeTeamMatchdaySummaryRow?.matchdayRank ?? "—"} · {activeTeamMatchdaySummaryRow?.matchdayPoints ?? "—"} Pkt
+                  Tagesrang {activeTeamMatchdaySummaryRow?.matchdayRank ?? "—"} · {activeTeamMatchdaySummaryRow?.matchdayPoints != null ? formatNlNumber(activeTeamMatchdaySummaryRow.matchdayPoints, 1) : "—"} Pkt
                 </small>
               </article>
               <article className="metric-card">

@@ -127,7 +127,8 @@ function formatNullableScore(value: number | null | undefined) {
 
 function formatSignedScore(value: number | null | undefined, digits = 1) {
   if (value == null || Number.isNaN(value)) return "—";
-  return `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
+  // formatNlNumber liefert de-DE ("-35,8"); Plus für Positive vorne dran.
+  return `${value > 0 ? "+" : ""}${formatNlNumber(value, digits)}`;
 }
 
 function formatIntensityLabel(intensity: MatchdayIntensityStage) {

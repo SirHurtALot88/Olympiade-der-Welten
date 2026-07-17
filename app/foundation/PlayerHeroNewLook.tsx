@@ -21,6 +21,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlNumber,
+  formatNlMoney,
   type NlRadarAxis,
 } from "@/components/foundation/new-look";
 import {
@@ -296,14 +297,14 @@ export default function PlayerHeroNewLook({
             />
             <StatChip
               label="MW"
-              value={formatNlNumber(data.marketValue, 1)}
+              value={formatNlMoney(data.marketValue)}
               tone="neutral"
               sub="Marktwert"
               title="Marktwert"
             />
             <StatChip
               label="GEHALT"
-              value={formatNlNumber(heroSalary, 1)}
+              value={formatNlMoney(heroSalary)}
               tone="neutral"
               sub="pro Saison"
               title="Gehalt pro Saison"
