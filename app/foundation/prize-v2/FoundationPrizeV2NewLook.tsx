@@ -583,21 +583,33 @@ export default function FoundationPrizeV2NewLook({
       <NlCard className="nl-prize-table-card" eyebrow="Haupttabelle" title="Preisgeld-Tabelle">
         {prizePreviewHardBlocked.length > 0 ? (
           <div className="nl-prize-warning-box is-blocked">
-            <strong>Blocker</strong>
+            <strong>Blocker{prizePreviewHardBlocked.length > 4 ? ` (${prizePreviewHardBlocked.length})` : ""}</strong>
             <ul>
               {prizePreviewHardBlocked.slice(0, 4).map((rule) => (
                 <li key={rule}>{rule}</li>
               ))}
+              {/* T-039: die Liste wurde zuvor still auf 4 Einträge gekürzt — Titel
+                  nennt jetzt die Gesamtanzahl, diese Zeile ergänzt "+N weitere". */}
+              {prizePreviewHardBlocked.length > 4 ? (
+                <li style={{ opacity: 0.75, fontStyle: "italic" }}>
+                  +{prizePreviewHardBlocked.length - 4} weitere
+                </li>
+              ) : null}
             </ul>
           </div>
         ) : null}
         {prizePreviewGlobalWarnings.length > 0 ? (
           <div className="nl-prize-warning-box">
-            <strong>Hinweise</strong>
+            <strong>Hinweise{prizePreviewGlobalWarnings.length > 4 ? ` (${prizePreviewGlobalWarnings.length})` : ""}</strong>
             <ul>
               {prizePreviewGlobalWarnings.slice(0, 4).map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
+              {prizePreviewGlobalWarnings.length > 4 ? (
+                <li style={{ opacity: 0.75, fontStyle: "italic" }}>
+                  +{prizePreviewGlobalWarnings.length - 4} weitere
+                </li>
+              ) : null}
             </ul>
           </div>
         ) : null}
@@ -624,6 +636,22 @@ export default function FoundationPrizeV2NewLook({
                     key={row.teamId}
                     className={`nl-prize-table-row${row.teamId === selectedTeamId ? " is-selected" : ""}`}
                     onClick={() => openTeamProfileById(row.teamId)}
+                    // A11y-Fix (T-080-Prize): Die Zeile war nur per Maus-Klick bedienbar
+                    // (kein tabIndex/role/onKeyDown) — analog zum Muster in
+                    // FoundationTeamsNewLook.tsx (T-080). `target === currentTarget`
+                    // verhindert, dass Enter/Space auf verschachtelten Elementen die
+                    // Zeilen-Aktion zusätzlich auslöst.
+                    tabIndex={0}
+                    role="button"
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) {
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openTeamProfileById(row.teamId);
+                      }
+                    }}
                     title={`${row.teamName} öffnen`}
                   >
                     <td className="nl-prize-td-rank">

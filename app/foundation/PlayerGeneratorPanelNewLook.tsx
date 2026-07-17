@@ -587,6 +587,12 @@ export default function PlayerGeneratorPanelNewLook({
       setMessage("Prisma / Referenzmodus bleibt read-only. Drafts können hier nicht gelöscht werden.");
       return;
     }
+    // T-040: Draft-Löschen war zuvor ohne Bestätigung sofort wirksam —
+    // inkonsistent zur Save-Löschung (siehe FoundationTeamSettingsNewLook.tsx
+    // `deleteSaves`). Gleiches window.confirm-Pattern für Konsistenz.
+    if (!window.confirm("Draft wirklich löschen? Das kann nicht rückgängig gemacht werden.")) {
+      return;
+    }
 
     const nextDrafts = drafts.filter((entry) => entry.draftId !== draftId);
     onSaveDrafts(nextDrafts);
