@@ -460,7 +460,7 @@ export function useFoundationPageState({
     playersTable: { key: "ovr", direction: "desc" },
     teamsView: { key: "overallRank", direction: "asc" },
     disciplineRanks: { key: "totalRank", direction: "asc" },
-    disciplineConfig: { key: "originalOrder", direction: "asc" },
+    disciplineConfig: { key: "displayOrder", direction: "asc" },
     ppArea: { key: "rank", direction: "asc" },
     seasonTopPlayers: { key: "rank", direction: "asc" },
     prizeMoney: { key: "rank", direction: "asc" },
