@@ -365,7 +365,7 @@ function getDisciplineAreaClass(category: "power" | "speed" | "mental" | "social
 }
 
 function formatRankLabel(rank: number | null | undefined) {
-  return rank == null ? "#" : `#${rank}`;
+  return rank == null ? "—" : `#${rank}`;
 }
 
 function buildAxisChipTooltip(card: PlayerDetailDrawerData["axisCards"][number]) {

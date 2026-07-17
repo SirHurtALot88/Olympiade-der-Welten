@@ -842,11 +842,14 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // Layout-Reorganisation, sämtliche Filter-States/Handler bleiben unverändert.
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   // Anzahl aktiver Erweitert-Filter für die Kopfzeile ("Erweitert · N aktiv"):
-  // je Achs-Mindestwert > 0, plus Ratio-Filter und aktiver Fit-Filter.
+  // je Achs-Mindestwert > 0, plus Ratio-Filter und Fit-Filter — hidePoorFit
+  // startet als true (Default), zählt also nur, wenn davon abgewichen wurde
+  // (d.h. der Nutzer ihn explizit ausgeschaltet hat), sonst würde die Badge
+  // schon beim Laden fälschlich "1 aktiv" zeigen.
   const advancedActiveCount =
     NL_MARKET_AXES.reduce((sum, axis) => sum + (axisMinimums[axis] > 0 ? 1 : 0), 0) +
     (minRatioFilter > 0 ? 1 : 0) +
-    (hidePoorFit ? 1 : 0);
+    (hidePoorFit ? 0 : 1);
 
   // F(neu) — Pin & Vergleich: ein angehefteter Kandidat bleibt gemerkt; sobald
   // ein ANDERER Kandidat fokussiert wird, erscheint ein Zwei-Spieler-Vergleich

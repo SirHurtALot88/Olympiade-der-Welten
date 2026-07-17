@@ -1276,9 +1276,15 @@ export default function PlayerGeneratorPanelNewLook({
                             <span>Draft speichern</span>
                             <strong>{readOnly ? "Read-only in Prisma" : "Aktiv für lokalen Entwurf"}</strong>
                           </article>
-                          <article className={`nl-gen-status-card ${nlToneClass("warn")}`}>
+                          <article className={`nl-gen-status-card ${nlToneClass(commitDisabled ? "warn" : "good")}`}>
                             <span>Free-Agent-Commit</span>
-                            <strong>Deaktiviert</strong>
+                            <strong>
+                              {readOnly
+                                ? "Deaktiviert (Read-only)"
+                                : commitBlockers.length > 0
+                                  ? "Blockiert"
+                                  : "Aktiv"}
+                            </strong>
                           </article>
                         </div>
                         <ul className="nl-gen-list">

@@ -171,7 +171,6 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     selectedTeamGmBiasHighlights,
     selectedTeamHasUnsavedChanges,
     selectedTeamId,
-    selectedTeamSettingsIndex,
     selectedTeamStrategyDraft,
     selectedTeamStrategyProfile,
     setActiveView,
@@ -1160,6 +1159,12 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
   }
 
   function renderTeamSection() {
+    // T-014: Prev/Next muss über die gefilterte Liste laufen, nicht über
+    // gameState.teams — sonst springt der Wechsel zu Teams, die das Grid
+    // (filteredTeamSettingsTeams) wegen des Suchfilters gar nicht anzeigt.
+    const filteredSelectedTeamSettingsIndex = filteredTeamSettingsTeams.findIndex(
+      (team: Team) => team.teamId === selectedTeamId,
+    );
     return (
       <>
         <NlCard
@@ -1193,14 +1198,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <button
               type="button"
               className="nl-teamsettings-btn"
-              disabled={selectedTeamSettingsIndex <= 0}
+              disabled={filteredSelectedTeamSettingsIndex <= 0}
               title={
-                selectedTeamSettingsIndex <= 0
-                  ? "Du bist bereits beim ersten Team der Liste."
-                  : "Springt zum vorherigen Team in der aktuellen Liste."
+                filteredSelectedTeamSettingsIndex <= 0
+                  ? "Du bist bereits beim ersten Team der gefilterten Liste."
+                  : "Springt zum vorherigen Team in der gefilterten Liste."
               }
               onClick={() => {
-                const previousTeam = gameState.teams[selectedTeamSettingsIndex - 1];
+                const previousTeam = filteredTeamSettingsTeams[filteredSelectedTeamSettingsIndex - 1];
                 if (previousTeam) {
                   selectTeamSettingsTeam(previousTeam.teamId);
                 }
@@ -1211,14 +1216,18 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             <button
               type="button"
               className="nl-teamsettings-btn"
-              disabled={selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1}
+              disabled={
+                filteredSelectedTeamSettingsIndex < 0 ||
+                filteredSelectedTeamSettingsIndex >= filteredTeamSettingsTeams.length - 1
+              }
               title={
-                selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1
-                  ? "Du bist bereits beim letzten Team der Liste."
-                  : "Springt zum nächsten Team in der aktuellen Liste."
+                filteredSelectedTeamSettingsIndex < 0 ||
+                filteredSelectedTeamSettingsIndex >= filteredTeamSettingsTeams.length - 1
+                  ? "Du bist bereits beim letzten Team der gefilterten Liste."
+                  : "Springt zum nächsten Team in der gefilterten Liste."
               }
               onClick={() => {
-                const nextTeam = gameState.teams[selectedTeamSettingsIndex + 1];
+                const nextTeam = filteredTeamSettingsTeams[filteredSelectedTeamSettingsIndex + 1];
                 if (nextTeam) {
                   selectTeamSettingsTeam(nextTeam.teamId);
                 }
