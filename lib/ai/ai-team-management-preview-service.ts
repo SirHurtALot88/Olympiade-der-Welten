@@ -783,10 +783,19 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       score += context.injuryCount * 18 + context.fatigueCriticalCount * 14 + context.fatigueHighCount * 6;
       score += countTeamHardTrainingDemandPressure(gameState, context.team.teamId) * 8;
       if (context.injuryCount >= 3) score += 22;
-      if (context.prevSeasonInjuryCount >= 8) score += 20;
-      if (context.prevSeasonAvgMatchdayFatigue >= 55) score += 18;
+      // Vorausschauendes Fatigue-/Injury-Signal GRADUIERT (statt binär): die Bau-Entscheidung fällt im
+      // Preseason, wo die aktuelle Fatigue ~0 ist (alle ausgeruht) — die Vorsaison ist daher der einzige
+      // verlässliche Indikator, dass ein Team wieder heiß läuft. Das binäre +18/+20 blieb knapp unter der
+      // (bereits auf 28 gesenkten) Bauschwelle, weshalb heiß gelaufene Teams trotz Druck NICHT bauten. Jetzt
+      // skaliert das Signal mit der tatsächlichen Vorsaison-Belastung, sodass heiße Teams die Schwelle
+      // zuverlässig knacken, kühl gelaufene aber weiter nichts bauen.
+      score += Math.max(0, context.prevSeasonAvgMatchdayFatigue - 30) * 1.2; // Fatigue 55→+30, 66→+43
+      score += Math.max(0, context.prevSeasonInjuryCount - 4) * 3; // 8 Verletzungen→+12, 12→+24
       if (context.fatigueAvg >= 60) score += 12;
       if (context.chronicInjuryPlayerCount >= 2) score += 10;
+      // Dünner Kader = keine Rotationsluft → läuft garantiert heiß. Recovery-Infrastruktur ist der Gegen-
+      // Hebel für Teams, die (bewusst) nahe am Minimum laufen, statt sie in die Fatigue-Spirale zu schicken.
+      if (context.rosterCount <= context.identity.playerOpt) score += 8;
       if (context.rosterCount >= context.identity.playerOpt + 2) score -= 6;
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
