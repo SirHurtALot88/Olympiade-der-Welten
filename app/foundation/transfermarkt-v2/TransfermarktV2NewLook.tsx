@@ -15,7 +15,6 @@ import {
   NlWhatIfSlider,
   StatChip,
   StatChipRow,
-  formatNlMoney,
   formatNlNumber,
   NL_AXIS_LABELS,
   nlToneClass,
@@ -27,12 +26,10 @@ import type { ContractYearSalary, Discipline, DisciplineCategory, TransferWishli
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
-import { formatTransfermarktRatio } from "@/lib/market/transfermarkt-formatting-contract";
-
-// Geldbeträge im Velo-Transfermarkt folgen der app-weiten "Mio"-Konvention
-// (formatNlMoney), damit derselbe Marktwert nicht auf einer Seite "506,4 Mio"
-// und im Markt "506,4 €" heißt. Werte liegen bereits in Mio-Einheit vor.
-const formatTransfermarktCurrency = (value: number | null | undefined) => formatNlMoney(value);
+import {
+  formatTransfermarktCurrency,
+  formatTransfermarktRatio,
+} from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { getAttributeTierClass, getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";

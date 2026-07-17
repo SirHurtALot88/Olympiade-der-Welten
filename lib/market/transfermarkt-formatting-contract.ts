@@ -48,16 +48,26 @@ export const TRANSFERMARKT_UNKNOWN_COLOR_RULES: TransfermarktColorRule[] = [
 ];
 
 export function formatTransfermarktCurrency(value: number | null) {
-  if (value == null) {
+  if (value == null || !Number.isFinite(value)) {
     return "—";
   }
 
-  // Clamp a magnitude that rounds to zero so we never render "-0,0 €".
+  // Beträge liegen in Mio-Einheit vor. Konsistent zur app-weiten
+  // formatNlMoney-Darstellung ("506,4 Mio", "750k"), damit derselbe Marktwert
+  // nicht auf einer Seite "506,4 Mio" und im Markt "506,4 €" heißt.
+  if (Math.abs(value) < 1 && value !== 0) {
+    const thousands = value * 1000;
+    // Clamp a magnitude that rounds to zero so we never render "-0k".
+    const normalizedThousands = Math.round(thousands) === 0 ? 0 : thousands;
+    return `${new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(normalizedThousands)}k`;
+  }
+
+  // Clamp a magnitude that rounds to zero so we never render "-0,0 Mio".
   const normalized = Math.round(value * 10) === 0 ? 0 : value;
   return `${new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  }).format(normalized)} €`;
+  }).format(normalized)} Mio`;
 }
 
 export function formatTransfermarktRatio(value: number | null) {
