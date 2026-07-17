@@ -84,10 +84,18 @@ export function isSoftOpenTechnicalBug(bug: string) {
 }
 
 export function filterHardOpenTechnicalBugs(bugs: string[]) {
-  return bugs.filter(
-    (bug) =>
-      !isSoftOpenTechnicalBug(bug) &&
-      !bug.startsWith("transfer_finance:cash_reconciliation_delta:") &&
-      !bug.includes("transfer_finance_clean:cash_reconciliation_delta"),
-  );
+  return bugs.filter((bug) => {
+    if (isSoftOpenTechnicalBug(bug)) return false;
+    // T-028: `cash_reconciliation_delta_hard:` (Delta über der harten Schwelle in
+    // transfer-finance-audit.ts, siehe reconciliationHardBlockerThreshold) MUSS als echter Blocker
+    // durchschlagen. Bewusst VOR den beiden Filtern unten geprüft und mit `return true` kurzgeschlossen:
+    // "cash_reconciliation_delta_hard:" enthält "cash_reconciliation_delta" als Substring, würde vom
+    // `.includes("transfer_finance_clean:cash_reconciliation_delta")`-Filter unten also fälschlich
+    // mitgefiltert, wenn diese Prüfung hier fehlte.
+    if (bug.includes("cash_reconciliation_delta_hard:")) return true;
+    // Soft-Variante (unter der harten Schwelle) bleibt wie bisher toleriertes In-Season-Opex-Rauschen.
+    if (bug.startsWith("transfer_finance:cash_reconciliation_delta:")) return false;
+    if (bug.includes("transfer_finance_clean:cash_reconciliation_delta:")) return false;
+    return true;
+  });
 }

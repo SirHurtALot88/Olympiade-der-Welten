@@ -14,6 +14,10 @@ export type TransferFinanceTeamSeasonRow = {
   sponsorCashIn: number;
   salaryPaidOut: number;
   netSponsorCash: number;
+  /** T-029: Kredit-Cashflows der Saison (loanOriginationLogs + loanApplyLogs, beide Seiten bei Team-Krediten). */
+  netLoanCash: number;
+  /** T-029: Gebäude-Cashflows der Saison (facilityEvents-Ledger, `-cost` je Event). */
+  netFacilityCash: number;
   buyCount: number;
   draftBuyCount: number;
   marketBuyCount: number;
@@ -38,10 +42,35 @@ export type TransferFinanceAuditResult = {
   }>;
 };
 
+/**
+ * T-028: harte Schwelle, ab der ein `cash_reconciliation_delta` kein tolerierbares In-Season-Opex-
+ * Rauschen mehr ist, sondern ein echtes Cash-Leck (wird als `cash_reconciliation_delta_hard:`
+ * getaggt statt `cash_reconciliation_delta:`, siehe `buildTransferFinanceAudit`). Bewusst als
+ * benannte, exportierte Konstanten gehalten, damit sie leicht justierbar sind, ohne die Formel
+ * suchen zu müssen.
+ */
+export const RECONCILIATION_HARD_BLOCKER_MIN_ABS = 1;
+export const RECONCILIATION_HARD_BLOCKER_CASH_START_RATIO = 0.05;
+
+export function reconciliationHardBlockerThreshold(cashStart: number) {
+  return Math.max(RECONCILIATION_HARD_BLOCKER_MIN_ABS, round(RECONCILIATION_HARD_BLOCKER_CASH_START_RATIO * Math.abs(cashStart)));
+}
+
+/**
+ * T-029: Nachdem Kredit- und Gebäude-Cashflows jetzt in `cashReconciliationDelta` einfließen
+ * (siehe `buildTransferFinanceAudit`), sollte im Normalfall nur noch Rundungsrauschen (roundCash/
+ * roundValue auf 1-2 Nachkommastellen, mehrere Buchungen pro Team/Saison) übrig bleiben. Bewusst
+ * < 1 gehalten, siehe tests/economy-cashflow-invariant.test.ts (SINGLE_BOOKING_TOLERANCE=0.05,
+ * AGGREGATE_TOLERANCE=0.2 über mehrere Systeme) für die dort verifizierten Größenordnungen.
+ */
+export const RECONCILIATION_ROUNDING_TOLERANCE = 0.5;
+
 /** Match transfer-finance violation strings to a specific season (avoids prior-season false positives). */
 export function isTransferFinanceViolationForSeason(violation: string, seasonId: string) {
   if (violation.startsWith("cash_reconciliation_delta:")) return false;
-  const tagged = violation.match(/^(?:negative_cash_end|zero_fee_buy|repair_buy_fee_not_mw):(season-\d+):/);
+  const tagged = violation.match(
+    /^(?:negative_cash_end|zero_fee_buy|repair_buy_fee_not_mw|cash_reconciliation_delta_hard):(season-\d+):/,
+  );
   if (tagged) return tagged[1] === seasonId;
   return violation.startsWith(`${seasonId}:`) || violation.includes(`:${seasonId}:`);
 }
@@ -69,6 +98,58 @@ function getSnapshotCashByTeam(gameState: GameState, seasonId: string) {
 
 function getTeamName(gameState: GameState, teamId: string) {
   return gameState.teams.find((team) => team.teamId === teamId)?.name ?? teamId;
+}
+
+/**
+ * T-029: Kredit-Cashflows einer Saison, pro Team aggregiert — Auszahlung (`loanOriginationLogs`)
+ * UND Saison-End-Tilgung (`loanApplyLogs`). `loanApplyLogs`-Einträge tragen selbst keine
+ * Team-ID/Lender-Info (nur `loanId`), deshalb wird über `gameState.seasonState.loans` auf
+ * `borrowerTeamId`/`lenderType`/`lenderTeamId` aufgelöst — exakt dasselbe Muster wie in
+ * tests/economy-cashflow-invariant.test.ts (Phase 4a/4b) verifiziert.
+ */
+function getSeasonLoanCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  const add = (teamId: string | null | undefined, amount: number | null | undefined) => {
+    if (!teamId || !amount) return;
+    map.set(teamId, round((map.get(teamId) ?? 0) + amount));
+  };
+  const loansById = new Map((gameState.seasonState.loans ?? []).map((loan) => [loan.loanId, loan] as const));
+
+  for (const log of gameState.seasonState.loanOriginationLogs ?? []) {
+    if (log.seasonId !== seasonId) continue;
+    add(log.borrowerTeamId, log.borrowerCashDelta);
+    if (log.lenderType === "team" && log.lenderTeamId) {
+      add(log.lenderTeamId, log.lenderCashDelta);
+    }
+  }
+
+  for (const log of gameState.seasonState.loanApplyLogs ?? []) {
+    if (log.seasonId !== seasonId) continue;
+    const loan = loansById.get(log.loanId);
+    if (!loan) continue;
+    add(loan.borrowerTeamId, -log.installmentCharged);
+    if (loan.lenderType === "team" && loan.lenderTeamId) {
+      add(loan.lenderTeamId, log.installmentCharged);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * T-029: Gebäude-Cashflows einer Saison, pro Team aggregiert, aus dem `facilityEvents`-Ledger.
+ * `cost` ist dort so gepolt, dass der tatsächliche Cash-Effekt `-cost` ist (positive `cost` =
+ * Ausgabe/Upkeep, negative `cost` = Einnahme/Refund — siehe facility-upgrade-service.ts und
+ * facility-season-end-service.ts, wo `team.cash - cost` bzw. `-preview.facilityIncomeTotal`
+ * geschrieben wird).
+ */
+function getSeasonFacilityCashByTeam(gameState: GameState, seasonId: string) {
+  const map = new Map<string, number>();
+  for (const event of gameState.seasonState.facilityEvents ?? []) {
+    if (event.seasonId !== seasonId) continue;
+    map.set(event.teamId, round((map.get(event.teamId) ?? 0) - event.cost));
+  }
+  return map;
 }
 
 export function buildBuyEconomics(gameState: GameState) {
@@ -105,6 +186,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const cashEndByTeam = getSnapshotCashByTeam(gameState, seasonId);
     const transfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
     const sponsorLogs = (gameState.seasonState.sponsorPayoutLogs ?? []).filter((log) => log.seasonId === seasonId);
+    const loanCashByTeam = getSeasonLoanCashByTeam(gameState, seasonId);
+    const facilityCashByTeam = getSeasonFacilityCashByTeam(gameState, seasonId);
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
@@ -124,12 +207,19 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const sponsorCashIn = round(teamSponsorLogs.filter((log) => log.cashDelta > 0).reduce((sum, log) => sum + log.cashDelta, 0));
       const salaryPaidOut = round(Math.abs(teamSponsorLogs.filter((log) => log.cashDelta < 0).reduce((sum, log) => sum + log.cashDelta, 0)));
       const netSponsorCash = round(teamSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0));
+      const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
+      const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
         cashEndByTeam.get(teamId) ??
         (seasonId === gameState.season.id ? gameState.teams.find((team) => team.teamId === teamId)?.cash ?? null : null);
+      // T-029: vorher nur netTransferCash + netSponsorCash — Kredit- und Gebäude-Cashflows fehlten,
+      // wodurch echte Lecks in dieser Größenordnung von der (künstlich großen) Toleranz verschluckt
+      // wurden. Jetzt vollständig, Toleranz s.u. entsprechend auf Rundungsrauschen gesenkt.
       const cashReconciliationDelta =
-        cashStart != null && cashEnd != null ? round(cashEnd - cashStart - netTransferCash - netSponsorCash) : null;
+        cashStart != null && cashEnd != null
+          ? round(cashEnd - cashStart - netTransferCash - netSponsorCash - netLoanCash - netFacilityCash)
+          : null;
 
       rows.push({
         seasonId,
@@ -143,6 +233,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         sponsorCashIn,
         salaryPaidOut,
         netSponsorCash,
+        netLoanCash,
+        netFacilityCash,
         buyCount: marketBuys.length,
         draftBuyCount: draftBuys.length,
         marketBuyCount: marketBuys.length,
@@ -153,13 +245,20 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       if (cashEnd != null && cashEnd < -0.01) {
         violations.push(`negative_cash_end:${seasonId}:${teamId}:${cashEnd}`);
       }
-      const reconciliationTolerance = Math.max(12, round(salaryPaidOut * 0.15 + buyFeesPaid * 0.04));
+      // T-028: unterhalb RECONCILIATION_ROUNDING_TOLERANCE wird gar nichts geloggt (reines
+      // Rundungsrauschen). Darüber wird geloggt, aber erst oberhalb der harten Schwelle
+      // (reconciliationHardBlockerThreshold) als `..._hard:` getaggt — nur DIESE Tag-Variante wird
+      // von den Konsumstellen (isTransferFinanceViolationForSeason, long-run-phase-audit.ts,
+      // long-run-soft-blockers.ts) als echter Blocker gewertet statt toleriert.
       if (
         cashReconciliationDelta != null &&
-        Math.abs(cashReconciliationDelta) > reconciliationTolerance &&
-        cashStart != null
+        cashStart != null &&
+        Math.abs(cashReconciliationDelta) > RECONCILIATION_ROUNDING_TOLERANCE
       ) {
-        violations.push(`cash_reconciliation_delta:${seasonId}:${teamId}:${cashReconciliationDelta}`);
+        const hardThreshold = reconciliationHardBlockerThreshold(cashStart);
+        const tag =
+          Math.abs(cashReconciliationDelta) > hardThreshold ? "cash_reconciliation_delta_hard" : "cash_reconciliation_delta";
+        violations.push(`${tag}:${seasonId}:${teamId}:${cashReconciliationDelta}`);
       }
       for (const buy of buys) {
         if ((buy.fee ?? 0) <= 0 && buy.source !== "preseason_roster_repair_buy") {

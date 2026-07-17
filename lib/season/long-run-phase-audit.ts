@@ -408,6 +408,13 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
   );
 
   const finance = buildTransferFinanceAudit(gameState);
+  // T-028: `cash_reconciliation_delta:` (soft, unter der harten Schwelle) bleibt hier bewusst
+  // ausgefiltert — reines In-Season-Opex-Rauschen, siehe transfer-finance-audit.ts. Der neue Tag
+  // `cash_reconciliation_delta_hard:` (Delta über reconciliationHardBlockerThreshold, siehe dort)
+  // startet NICHT mit "cash_reconciliation_delta:" (Unterstrich statt Doppelpunkt nach "delta") und
+  // rutscht deshalb korrekt durch dieses `!startsWith(...)` in `hardFinanceViolations` — echte
+  // Cash-Lecks werden damit erstmals als RED-Blocker gewertet statt überall stillschweigend
+  // toleriert.
   const hardFinanceViolations = finance.violations.filter(
     (entry) => !entry.startsWith("cash_reconciliation_delta:") && isTransferFinanceViolationForSeason(entry, seasonId),
   );
