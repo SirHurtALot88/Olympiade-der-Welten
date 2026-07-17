@@ -45,6 +45,7 @@
     "save:repair-team-control": "tsx scripts/repair-save-team-control.ts",
     "app:smoke-multiplayer-e2e": "tsx scripts/smoke-multiplayer-e2e.ts",
     "ci:client-bundle-lint": "tsx scripts/lint-client-bundle-boundaries.ts",
+    "ci:design-tokens": "tsx scripts/lint-design-tokens.ts",
     "ci:import-exists": "tsx scripts/check-import-exists.ts",
     "ci:ensure-gameplay-smoke-save": "tsx scripts/ensure-ci-gameplay-smoke-save.ts",
     "db:check-foundation-projection": "tsx scripts/check-foundation-projection.ts",
