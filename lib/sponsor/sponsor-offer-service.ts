@@ -173,11 +173,11 @@ function buildOffer(input: {
   let specialComponent: SponsorOfferComponent = legacySpecialComponent;
   if (isGolden) {
     specialComponent = buildGoldenObjectiveComponent(
-      pickGoldenObjective(gameState.season.id, team.teamId, archetype),
+      pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank),
       bonusObjectiveInput,
     );
   } else if (specialMode !== "challenge") {
-    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, archetype, slotIndex);
+    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, archetype, slotIndex, teamQualityRank);
     if (bonusKey) {
       specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
     }
