@@ -55,3 +55,6 @@ public/team-logos-src/
 
 # Local balancing/diagnostic run artifacts (temp, do not commit)
 scratchpad/
+
+# Claude Code agent worktrees (transient, harness-managed)
+.claude/worktrees/
