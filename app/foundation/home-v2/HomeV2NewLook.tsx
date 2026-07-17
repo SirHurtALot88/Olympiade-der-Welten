@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useEffect, useRef } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { HomeV2ClientProps, HomeV2TodayCard, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
@@ -296,6 +297,15 @@ export default function HomeV2NewLook({
   // already the display-ready list.
   const relevantWarnings = warnings;
 
+  // T-103: Spieltag-Rail war rein dekorativ (kein Auto-Scroll auf den
+  // aktuellen Spieltag). Beim Mount auf `.is-current` scrollen, damit lange
+  // Saisons nicht am linken Rand (erster Spieltag) starten. `block: "nearest"`
+  // vermeidet vertikales Scrollen der Seite, nur die horizontale Rail scrollt.
+  const currentScheduleNodeRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    currentScheduleNodeRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, []);
+
   // D2 Feld-relative Rang-KPI: "#{rank} von {total} · Top {pct}%". Perzentil aus
   // Rang/Feldgröße (Beispiel: #31 von 32 → Top 97%). Fog-sicher — nur die
   // öffentliche Feldgröße und der eigene Rang, keine fremden Werte.
@@ -506,10 +516,29 @@ export default function HomeV2NewLook({
           {relevantWarnings.slice(0, 3).map((warning) => (
             <span key={warning} className={`nl-home-warning-chip ${nlToneClass("warn")}`}>{warning}</span>
           ))}
+          {relevantWarnings.length > 3 ? (
+            <button
+              type="button"
+              className={`nl-home-warning-chip ${nlToneClass("warn")}`}
+              onClick={onOpenInbox}
+              title="Alle Hinweise in der Inbox ansehen"
+              aria-label={`${relevantWarnings.length - 3} weitere Hinweise — zur Inbox`}
+            >
+              +{relevantWarnings.length - 3} weitere
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {/* --- Spieltag-Rail: Saisonpfad (vergangen · aktuell · kommend) --- */}
+      {/* --- Spieltag-Rail: Saisonpfad (vergangen · aktuell · kommend) ---
+          T-103/T-083 (koordiniert): Knoten sind echte <button>s (fokussierbar,
+          klickbar) statt nicht-interaktiver <li> — löst sowohl das fehlende
+          onClick/Auto-Scroll (T-103) als auch die a11y-Lücke „nav-Landmark
+          ohne fokussierbaren Inhalt" (T-083) in einer Lösung. Es gibt keinen
+          Handler/keine Route für einen einzelnen Spieltag in HomeV2ClientProps
+          (nur `onOpenSeason` für die gesamte Saisonansicht) — Klick auf einen
+          Knoten springt daher zur Saisonübersicht, in der die Spieltage liegen.
+          Auto-Scroll auf `.is-current` läuft separat beim Mount (Ref oben). --- */}
       {scheduleItems.length > 0 ? (
         <nav className="nl-home-schedule-rail nl-bento-item nl-bento-span-12" aria-label="Saisonpfad">
           <ol className="nl-home-schedule-track">
@@ -519,13 +548,20 @@ export default function HomeV2NewLook({
               return (
                 <li
                   key={item.matchdayId}
+                  ref={item.isCurrent ? currentScheduleNodeRef : undefined}
                   className={`nl-home-schedule-node ${state}`}
-                  aria-current={item.isCurrent ? "step" : undefined}
-                  title={`${item.label} · ${stateLabel}`}
                 >
-                  <span className="nl-home-schedule-dot" aria-hidden="true" />
-                  <span className="nl-home-schedule-label">{item.label}</span>
-                  <span className="sr-only">{stateLabel}</span>
+                  <button
+                    type="button"
+                    className="nl-home-schedule-node-button"
+                    aria-current={item.isCurrent ? "step" : undefined}
+                    title={`${item.label} · ${stateLabel}`}
+                    onClick={onOpenSeason}
+                  >
+                    <span className="nl-home-schedule-dot" aria-hidden="true" />
+                    <span className="nl-home-schedule-label">{item.label}</span>
+                    <span className="sr-only">{stateLabel}</span>
+                  </button>
                 </li>
               );
             })}

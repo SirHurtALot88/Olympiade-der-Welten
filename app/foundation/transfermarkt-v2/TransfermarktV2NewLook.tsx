@@ -200,8 +200,18 @@ function getNlAttributeRatings(item: TransfermarktFreeAgentItem): TransfermarktA
   };
 }
 
-/** Enter/Space aktiviert die Kandidaten-Karte wie ein Klick (role="button"-Div, kein verschachteltes <button>). */
+/**
+ * Enter/Space aktiviert die Kandidaten-Karte (role="button"-Div) wie ein Klick. Die Karte
+ * enthält bewusst zwei eigenständige <button>-Elemente (Name → Profil öffnen, Expand-Toggle) —
+ * der `target === currentTarget`-Guard (gleiches Muster wie `NlCard`s eigener Keydown-Handler)
+ * verhindert, dass Enter/Space auf einem dieser verschachtelten Buttons zusätzlich die
+ * Karten-Auswahl (`onSelectCandidate`) auslöst; nur ein direkt auf der Karte fokussiertes
+ * Enter/Space aktiviert die Auswahl.
+ */
 function handleNlSelectKeyDown(event: KeyboardEvent<HTMLDivElement>, onActivate: () => void) {
+  if (event.target !== event.currentTarget) {
+    return;
+  }
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     onActivate();
@@ -355,6 +365,8 @@ export type TransfermarktV2NewLookProps = {
   onSellRow: ((row: TransfermarktV2RosterRow) => void) | null;
   // Letzte Deals
   historyItems: TransferHistoryItem[];
+  /** Öffnet die vollständige Transferhistorie (transfer-history-v2 mit Filter/CSV/Timeline). */
+  onOpenHistory?: (() => void) | null;
   // Kauf-Modal (bestehender Flow, unverändert eingehängt)
   buyModalOpen: boolean;
   buyModalSlot: ReactNode;
@@ -802,6 +814,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     readinessStatusLabel,
     onSellRow,
     historyItems,
+    onOpenHistory,
     buyModalOpen,
     buyModalSlot,
   } = props;
@@ -2556,8 +2569,24 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         </NlCard>
       </div>
 
-      {historyItems.length > 0 ? (
-        <NlCard className="nl-market-history-card" eyebrow="Letzte Deals" title={`${historyItems.length} sichtbar (alle Seasons)`}>
+      <NlCard
+        className="nl-market-history-card"
+        eyebrow="Letzte Deals"
+        title={historyItems.length > 0 ? `${historyItems.length} sichtbar (alle Seasons)` : "Noch keine Deals"}
+        actions={
+          onOpenHistory ? (
+            <button
+              type="button"
+              className="nl-market-inline-action"
+              data-testid="transfer-history-open-link"
+              onClick={onOpenHistory}
+            >
+              Vollständige Historie öffnen
+            </button>
+          ) : null
+        }
+      >
+        {historyItems.length > 0 ? (
           <div className="nl-market-history-list">
             {historyItems.map((entry) => (
               <button
@@ -2581,8 +2610,10 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               </button>
             ))}
           </div>
-        </NlCard>
-      ) : null}
+        ) : (
+          <p className="nl-market-muted">Noch keine Deals in dieser Season.</p>
+        )}
+      </NlCard>
 
       {buyModalSlot}
     </section>
