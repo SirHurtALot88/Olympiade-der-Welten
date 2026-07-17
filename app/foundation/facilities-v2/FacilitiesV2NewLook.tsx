@@ -228,6 +228,7 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
           aria-current="step"
         >
           L0
+          <span className="sr-only"> · aktuell</span>
         </span>
       ) : null}
       {Array.from({ length: FACILITY_MAX_LEVEL }, (_, index) => {
@@ -236,17 +237,24 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
         // Nur der tatsächlich erreichte Stand wird markiert — kein amber "is-next"
         // (nächstes Ziel) mehr, das wurde als aktueller Stand missverstanden.
         const state = targetLevel <= level ? "is-reached" : "is-locked";
+        // Der tatsächliche aktuelle Stand ist genau die höchste erreichte Stufe —
+        // nicht jede "is-reached"-Stufe. Vorher nur per Hover/`title` erkennbar
+        // (T-081): jetzt zusätzlich `aria-current="step"` + sichtbarer, aber
+        // visuell versteckter Text, statt sich allein auf `title` zu verlassen.
+        const isCurrent = targetLevel === level;
         return (
           <span
             key={`${facilityId}-ladder-${targetLevel}`}
             className={`nl-facility-ladder-step ${state}`}
             title={
               definition
-                ? `L${targetLevel}: ${definition.effectDescription} · Kosten ${formatTransfermarktCurrency(definition.upgradeCost)}`
-                : `L${targetLevel}`
+                ? `L${targetLevel}: ${definition.effectDescription} · Kosten ${formatTransfermarktCurrency(definition.upgradeCost)}${isCurrent ? " · Aktuell" : ""}`
+                : `L${targetLevel}${isCurrent ? " · Aktuell" : ""}`
             }
+            aria-current={isCurrent ? "step" : undefined}
           >
             L{targetLevel}
+            {isCurrent ? <span className="sr-only"> · aktuell</span> : null}
           </span>
         );
       })}
@@ -368,6 +376,155 @@ function FacilityEffectDeltaChip({
       );
     }
   }
+}
+
+type FacilityUpgradeCandidate = {
+  facility: FacilityRowView;
+  effectDescription: string;
+  upgradeCost: number;
+  /** Nur für Einnahmen-Gebäude (`effectType === "season_income"`): Einnahmen-Zuwachs der nächsten Stufe pro Saison. */
+  incomeGain: number | null;
+  /** Nur wenn der Netto-Zuwachs (Einnahmen minus Mehr-Unterhalt) positiv ist. */
+  paybackSeasons: number | null;
+};
+
+/**
+ * T-099: „Nächstes bestes Upgrade"-Ranking nach Amortisation — dieselbe Logik
+ * wie `buildFacilityPortfolio`/`NextBestUpgradeCard` in
+ * `FacilitiesOverviewV2NewLook.tsx`, hier aber direkt auf `FacilityRowView`
+ * (keine geteilte Datei: beide Funktionen dort sind lokal/nicht exportiert,
+ * und die Overview arbeitet auf einem anderen Snapshot-Typ ohne Katalog-Refetch;
+ * diese Seite hat `nextIncome`/`nextUpkeep`/`nextLevelEffect`/`upgradeCost`
+ * bereits fertig berechnet in `facilityRows` — also dieselbe Quelle, kein
+ * zweiter Katalog-Lookup nötig). Ranking-Formel 1:1 identisch übernommen.
+ */
+function buildFacilityUpgradeCandidates(
+  facilityRows: FacilityRowView[],
+  beliebtheit: FacilitiesV2ClientProps["beliebtheit"],
+): FacilityUpgradeCandidate[] {
+  const candidates: FacilityUpgradeCandidate[] = [];
+
+  for (const facility of facilityRows) {
+    if (facility.upgradeCost == null) continue;
+
+    const isIncomeFacility = FACILITY_CATALOG_BY_ID[facility.id].effectType === "season_income";
+    const incomeGain = isIncomeFacility
+      ? effectiveIncomeFor(facility.id, facility.nextIncome, beliebtheit) - effectiveSeasonIncome(facility, beliebtheit)
+      : null;
+    const upkeepDelta = facility.nextUpkeep - facility.currentUpkeep;
+    const netGain = incomeGain != null ? incomeGain - upkeepDelta : null;
+
+    candidates.push({
+      facility,
+      effectDescription: facility.nextLevelEffect,
+      upgradeCost: facility.upgradeCost,
+      incomeGain,
+      paybackSeasons: netGain != null && netGain > 0 && facility.upgradeCost > 0 ? facility.upgradeCost / netGain : null,
+    });
+  }
+
+  // Ranking: Einnahmen-Upgrades nach Amortisationszeit (Kosten / Netto-Zuwachs),
+  // alle übrigen nach günstigsten Ausbaukosten — beides echte Katalogzahlen.
+  candidates.sort((left, right) => {
+    if (left.paybackSeasons != null && right.paybackSeasons != null) {
+      return left.paybackSeasons - right.paybackSeasons;
+    }
+    if (left.paybackSeasons != null) return -1;
+    if (right.paybackSeasons != null) return 1;
+    return left.upgradeCost - right.upgradeCost;
+  });
+
+  return candidates;
+}
+
+/**
+ * T-099: fehlte bisher auf dieser Seite (nur die Übersicht hatte sie) —
+ * obwohl genau hier die echten Upgrade-Buttons/-Flows liegen. Klick auf
+ * „Zum Upgrade" springt direkt in denselben Dialog wie der Footer-Upgrade-
+ * Button (`openFacilityDialog`), kein toter Link.
+ */
+function FacilityNextBestUpgradeCard({
+  candidates,
+  cashAvailable,
+  onSelectUpgrade,
+}: {
+  candidates: FacilityUpgradeCandidate[];
+  cashAvailable: number | null;
+  onSelectUpgrade: (facilityId: FacilityId) => void;
+}) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return (
+    <NlCard
+      className="nl-facility-overview-next"
+      eyebrow="Investitions-Radar"
+      title="Nächstes bestes Upgrade"
+      data-testid="nl-facility-next-upgrade"
+    >
+      <ol className="nl-facility-overview-next-list" aria-label="Beste nächste Upgrades">
+        {candidates.slice(0, 3).map((candidate, index) => {
+          const { facility } = candidate;
+          const affordable = cashAvailable != null ? candidate.upgradeCost <= cashAvailable : null;
+          return (
+            <li
+              key={facility.id}
+              className={`nl-facility-overview-next-item${index === 0 ? " is-top" : ""}`}
+            >
+              <span className="nl-facility-overview-next-rank nl-tnum" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span className="nl-facility-overview-next-copy">
+                <strong>
+                  {facility.name}
+                  <span className="nl-facility-overview-next-levels nl-tnum">
+                    {" "}
+                    · L{formatNlNumber(facility.level, 0)} → L{formatNlNumber(facility.nextLevel, 0)}
+                  </span>
+                </strong>
+                <span className="nl-facility-overview-next-effect">{candidate.effectDescription}</span>
+                <small className="nl-tnum">
+                  Kosten {formatTransfermarktCurrency(candidate.upgradeCost)}
+                  {candidate.incomeGain != null
+                    ? ` · ${candidate.incomeGain >= 0 ? "+" : ""}${formatTransfermarktCurrency(candidate.incomeGain)}/Saison`
+                    : ""}
+                  {candidate.paybackSeasons != null
+                    ? ` · amortisiert in ~${formatNlNumber(candidate.paybackSeasons, 1)} Saisons`
+                    : ""}
+                </small>
+              </span>
+              <span className="nl-facility-overview-next-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                {affordable != null ? (
+                  <span
+                    className={`nl-facility-overview-next-badge ${affordable ? "is-affordable" : "is-over"}`}
+                    title={
+                      affordable
+                        ? "Kosten liegen im aktuell verfügbaren Cash"
+                        : "Kosten übersteigen das aktuell verfügbare Cash"
+                    }
+                  >
+                    {affordable ? "Im Budget" : "Über Budget"}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="nl-facility-inline-button"
+                  data-testid={`nl-facility-next-upgrade-jump-${facility.id}`}
+                  onClick={() => onSelectUpgrade(facility.id)}
+                >
+                  Zum Upgrade
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="nl-facility-overview-next-hint">
+        Rangfolge: Einnahmen-Gebäude nach Amortisationszeit, übrige Upgrades nach günstigsten Ausbaukosten.
+      </p>
+    </NlCard>
+  );
 }
 
 function getWearTone(facility: FacilityRowView) {
@@ -540,6 +697,13 @@ export default function FacilitiesV2NewLook({
       builtCount,
     };
   }, [facilityRows, beliebtheit]);
+
+  // T-099: gleiche Amortisations-Rangfolge wie in der Übersicht, hier aber
+  // mit echtem Klick-Through in den Upgrade-Flow dieser Seite.
+  const facilityUpgradeCandidates = useMemo(
+    () => buildFacilityUpgradeCandidates(facilityRows, beliebtheit),
+    [facilityRows, beliebtheit],
+  );
 
   const visibleFacilityRows = useMemo(() => {
     const filtered =
@@ -761,6 +925,12 @@ export default function FacilitiesV2NewLook({
           ) : null}
         </StatChipRow>
       </NlCard>
+
+      <FacilityNextBestUpgradeCard
+        candidates={facilityUpgradeCandidates}
+        cashAvailable={summary.cashCurrent}
+        onSelectUpgrade={(facilityId) => openFacilityDialog(facilityId, "upgrade")}
+      />
 
       <div className="nl-facility-toolbar">
         <div className="nl-facility-ampel" role="group" aria-label="Portfolio-Zustand">

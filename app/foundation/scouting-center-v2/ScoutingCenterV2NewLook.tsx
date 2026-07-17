@@ -36,8 +36,11 @@ import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data
  * der Report-Panel werden als bestehende Komponenten wiederverwendet.
  *
  * Bewusst weggelassen (keine echten Daten in den Props):
- * - keine Preis-/MW-Angaben auf den Empfehlungs-Karten (ScoutingQueueRow trägt
- *   keinen Marktwert) — dafür Intel-Ring + Scouting-Sterne aus echten Feldern.
+ * - kein Gehalt auf den Empfehlungs-Karten (weder ScoutingQueueRow noch
+ *   ScoutingHubV2WatchTarget führen ein Gehaltsfeld — nur ScoutingReportData
+ *   hat `salary`, aber nur für den aktuell gewählten Report-Spieler, nicht
+ *   für alle Wishlist-Einträge). Marktwert ist dagegen vorhanden (siehe
+ *   T-100 unten) — dafür Intel-Ring + Scouting-Sterne aus echten Feldern.
  */
 
 const NL_SCOUT_REVEAL_STEP_LABELS = ["Basis", "Range", "Trait+", "Sterne", "Diszi", "Exakt"];
@@ -69,6 +72,12 @@ function NlScoutPortraitCard({
   statusTone,
   etaLabel,
   radarAxes,
+  /** #T-100: Marktwert aus den Wishlist-/Watch-Target-Daten — bereits fog-sicher
+   *  vorformatiert (formatTransfermarktCurrency lief upstream in
+   *  scouting-hub-targets-service.ts / use-foundation-cross-tab-market-filters.ts),
+   *  daher hier NICHT erneut formatieren. "—" bzw. fehlender Wert wird nicht
+   *  gerendert, um keine falsche Zahl vorzutäuschen. */
+  marketValueLabel,
   onOpenPlayer,
   onOpenReport,
 }: {
@@ -78,6 +87,7 @@ function NlScoutPortraitCard({
   etaLabel?: string | null;
   /** Fog-of-War-safe: nur für voll gescoutete Ziele gesetzt (Achsen dann real freigegeben). */
   radarAxes?: NlRadarAxis[];
+  marketValueLabel?: string | null;
   onOpenPlayer: (playerId: string) => void;
   onOpenReport: () => void;
 }) {
@@ -123,6 +133,9 @@ function NlScoutPortraitCard({
           <small>
             {entry.className} · {entry.race}
           </small>
+          {marketValueLabel ? (
+            <small className="nl-scout-player-marketvalue nl-tnum">MW {marketValueLabel}</small>
+          ) : null}
           <VeloStarRating
             value={entry.effectiveScoutingLevel}
             label="Scouting"
@@ -218,6 +231,18 @@ export default function ScoutingCenterV2NewLook({
       }
     }
     return axes.length === 4 ? axes : [];
+  };
+  // #T-100 — Marktwert für die "Kaufbereit"-Karten aus den bereits geladenen
+  // Watch-Target-Daten (ScoutingQueueRow selbst führt keinen Marktwert).
+  // Aus shortlistTargets (aktiv + gemerkt) statt nur axisTargetById, da ein
+  // voll gescoutetes Ziel auch nur "gemerkt" (bookmarked) sein kann — die
+  // Radar-Achsen-Map oben ist bewusst auf aktive Ziele beschränkt, der
+  // Marktwert hängt aber nicht vom Pipeline-Status ab.
+  // "—" (kein/unbekannter Wert) wird als "kein Label" behandelt statt geraten.
+  const marketValueByPlayerId = new Map(shortlistTargets.map((target) => [target.playerId, target.marketValue] as const));
+  const getReadyMarketValueLabel = (playerId: string): string | null => {
+    const marketValue = marketValueByPlayerId.get(playerId);
+    return marketValue && marketValue !== "—" ? marketValue : null;
   };
 
   return (
@@ -561,6 +586,7 @@ export default function ScoutingCenterV2NewLook({
                     statusLabel="Kaufbereit"
                     statusTone="ready"
                     radarAxes={getReadyRadarAxes(entry.playerId)}
+                    marketValueLabel={getReadyMarketValueLabel(entry.playerId)}
                     onOpenPlayer={onOpenPlayer}
                     onOpenReport={() => {
                       onSelectReportPlayer?.(entry.playerId);
