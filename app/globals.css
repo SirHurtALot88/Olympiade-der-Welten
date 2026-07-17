@@ -75,6 +75,21 @@ body {
   font-weight: 700;
 }
 
+/* Velo (Neuer Look) ist der permanente Look. Der dunkle Shell fuellt nicht
+   immer die ganze Viewport-Breite/-Hoehe (z. B. im Standard-Breitenmodus auf
+   breiten Monitoren), sodass frueher der helle Legacy-Body-Verlauf rechts und
+   unten neben dem Shell durchschien. Sobald der Neuer-Look-Shell im Dokument
+   ist, faerben wir den Body-Void im gleichen dunklen Velo-Ton wie den Shell.
+   Werte spiegeln --nl-bg-2/--nl-bg + --nl-accent/--nl-ink (die Tokens liegen
+   auf .is-new-look, nicht auf :root, und sind hier daher nicht referenzierbar). */
+body:has(.foundation-app.is-new-look) {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(91, 155, 255, 0.06), transparent 36%),
+    linear-gradient(180deg, #0e131d 0%, #0b0f17 100%);
+  background-attachment: fixed;
+  color: #eaf0fa;
+}
+
 .foundation-app,
 .foundation-app .foundation-shell {
   font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
