@@ -48,8 +48,8 @@ function getStableUnitHash(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-export function resolveChallengeSlotIndex(seasonId: string, teamId: string) {
-  return Math.floor(getStableUnitHash(`${seasonId}:${teamId}:sponsor-challenge-slot`) * 3);
+export function resolveChallengeSlotIndex(seasonId: string, teamId: string, slotCount = 5) {
+  return Math.floor(getStableUnitHash(`${seasonId}:${teamId}:sponsor-challenge-slot`) * slotCount);
 }
 
 const HISTORICAL_AXIS_ROW_KEY: Record<

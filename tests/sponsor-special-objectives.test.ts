@@ -49,15 +49,15 @@ describe("sponsor special objectives", () => {
     }
   }, 60000);
 
-  it("offers exactly one challenge sponsor among three choices", () => {
+  it("offers exactly one challenge sponsor among five choices", () => {
     const gameState = createSingleplayerGameState();
     const teamId = gameState.teams.find((entry) => entry.shortCode === "R-R")?.teamId ?? gameState.teams[0]!.teamId;
     const offers = buildSponsorOffersForTeam({ gameState, teamId });
     const challengeOffers = offers.filter((offer) => offer.isChallengeOffer === true);
-    expect(offers).toHaveLength(3);
+    expect(offers).toHaveLength(5);
     expect(challengeOffers).toHaveLength(1);
-    expect(resolveChallengeSlotIndex(gameState.season.id, teamId)).toBeGreaterThanOrEqual(0);
-    expect(resolveChallengeSlotIndex(gameState.season.id, teamId)).toBeLessThanOrEqual(2);
+    expect(resolveChallengeSlotIndex(gameState.season.id, teamId, offers.length)).toBeGreaterThanOrEqual(0);
+    expect(resolveChallengeSlotIndex(gameState.season.id, teamId, offers.length)).toBeLessThanOrEqual(4);
   }, 180000);
 
   it("evaluates axis rank special against league axis ranks", () => {

@@ -97,7 +97,8 @@ describe("sponsor offer service", () => {
   it("generates three distinct sponsor archetypes per team", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
-    expect(offers).toHaveLength(3);
+    expect(offers).toHaveLength(5);
+    // 5 Angebote aus 3 Typen (2× security, 1× identity, 2× performance) → weiterhin genau 3 distinkte Archetypen.
     expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
     expect(offers.every((offer) => offer.starTier != null && offer.starTier >= 1 && offer.starTier <= 5)).toBe(true);
     expect(offers.find((offer) => offer.archetype === "security")?.components.find((c) => c.kind === "base")?.rewardCash).toBeGreaterThan(
