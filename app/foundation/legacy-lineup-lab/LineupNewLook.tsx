@@ -1695,13 +1695,16 @@ export default function LineupNewLook({
           >
             Automatisch füllen
           </button>
-          {/* Optimieren (Feature 1): blendet die Upgrade-Karte ein/aus. */}
+          {/* Optimieren (Feature 1): blendet die Upgrade-Karte ein/aus. Der
+              Panel-Inhalt selbst bleibt im Read-Only-Modus rein informativ
+              lesbar (T-034) — nur die „Übernehmen"-Buttons innerhalb der
+              Karte sind per !isReadOnly ausgeblendet, daher darf dieser
+              Toggle NICHT über isReadOnly gesperrt werden. */}
           <button
             type="button"
             className={`nl-lineup-btn is-ghost${optimizeOpen ? " is-selected" : ""}`}
             aria-expanded={optimizeOpen}
             onClick={() => setOptimizeOpen((current) => !current)}
-            disabled={isReadOnly}
             title="Bessere Kandidaten für belegte Slots vorschlagen"
           >
             Optimieren

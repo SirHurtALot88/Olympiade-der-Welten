@@ -215,6 +215,15 @@ export default function FoundationRanksNewLook({
               sub={`${formatNlNumber(metricStats.min, 1)} – ${formatNlNumber(metricStats.max, 1)}`}
               title={`Abstand zwischen stärkstem und schwächstem Team (${activeMetric.label})`}
             />
+            {!ownEntry ? (
+              <StatChip
+                label="Dein Team"
+                value="—"
+                sub="nicht in dieser Ansicht"
+                tone="neutral"
+                title="Dein Team ist in dieser Liga/Saison nicht vertreten"
+              />
+            ) : null}
             {ownEntry && ownValue != null ? (
               <StatChip
                 label={`Dein Team · ${ownEntry.row.team.shortCode}`}

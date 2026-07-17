@@ -1021,7 +1021,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
       >
         <BudgetedMediaImage
           src={logo?.src ?? null}
-          alt={`${teamName} Logo`}
+          alt=""
           className="nl-arena-crest"
           width={26}
           height={26}
