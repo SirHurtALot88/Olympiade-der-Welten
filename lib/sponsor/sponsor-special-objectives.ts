@@ -1,5 +1,7 @@
 import type {
   GameState,
+  SponsorArchetype,
+  SponsorObjectiveStage,
   SponsorOfferComponent,
   SponsorStarTier,
   Team,
@@ -392,4 +394,454 @@ export function buildBeatExpectedRankSpecialComponent(input: {
     rewardCash: input.rewardCash,
     specialKey: "beat_expected_rank",
   };
+}
+
+// =====================================================================================================
+// TEIL B — Sponsor-Bonusziele (14 Standard + 6 Golden) + stages/spotlightBonus-Framework.
+//
+// Jedes Bonusziel ist ein `special`-Komponententyp mit einem `specialKey`, optional `stages` (mehrstufige,
+// anteilige Auszahlung) und optional `spotlightBonus` (Beliebtheits-Impuls bei Erfüllung). Der Evaluator
+// (sponsor-objective-evaluator) liefert für jeden Key eine ERREICHTE STUFE (Fraction 0..1); die Settlement
+// zahlt `rewardCash * fraction`. Bestehende binäre Keys (ohne `stages`) bleiben unberührt (Fraction 0/1).
+//
+// Alle Schwellen sind ENV-tunebar (OLY_SPONSOR_OBJ_*). Die Startwerte sind plausibel gesetzt und werden
+// final kalibriert.
+// =====================================================================================================
+
+function objEnvNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/** Der neue Bonusziel-Katalog (14 Standard). Bestehende Keys (axis/salary/transfer/discipline/form/…) bleiben separat. */
+export type SponsorBonusObjectiveKey =
+  // Performance-Archetyp
+  | "underdog_story"
+  | "momentum_series"
+  | "discipline_dominance"
+  | "axis_ascension"
+  // Identity-Archetyp
+  | "fan_cult_player"
+  | "homegrown_elevation"
+  | "rival_humiliation"
+  | "fan_infrastructure"
+  | "roster_diversity"
+  // Security-Archetyp
+  | "solvency_series"
+  | "salary_discipline"
+  | "transfer_trader"
+  | "sustainability_architect"
+  | "fatigue_management";
+
+/** Die 6 Golden-Bonusziele (nur bei isGolden-Angeboten). */
+export type SponsorGoldenObjectiveKey =
+  | "golden_fairytale"
+  | "golden_crowd_favorites"
+  | "golden_talent_forge"
+  | "golden_discipline_monopoly"
+  | "golden_title_shock"
+  | "golden_rival_deluxe";
+
+export type SponsorObjectiveKey = SponsorBonusObjectiveKey | SponsorGoldenObjectiveKey;
+
+/** Roh-Magnitude des Spotlight-Impulses (grob 0..1) — Standard klein, Golden höher. ENV-tunebar. */
+export const SPONSOR_OBJ_SPOTLIGHT_STD = objEnvNumber("OLY_SPONSOR_OBJ_SPOTLIGHT_STD", 0.5);
+export const SPONSOR_OBJ_SPOTLIGHT_SECURITY = objEnvNumber("OLY_SPONSOR_OBJ_SPOTLIGHT_SECURITY", 0.25);
+export const SPONSOR_OBJ_SPOTLIGHT_GOLDEN = objEnvNumber("OLY_SPONSOR_OBJ_SPOTLIGHT_GOLDEN", 1.0);
+
+/** Transfer-Händler (#12): Netto-Cash-Stufen der Wechselperiode (>0 / >X / >2X). */
+export const SPONSOR_OBJ_TRANSFER_TRADER_X = objEnvNumber("OLY_SPONSOR_OBJ_TRANSFER_X", 12);
+/** Disziplin-Dominanz (#3): guter rankInDiscipline ≤ dieser Rang zählt. */
+export const SPONSOR_OBJ_DISCIPLINE_GOOD_RANK = objEnvNumber("OLY_SPONSOR_OBJ_DISCIPLINE_GOOD_RANK", 5);
+/** Golden Disziplin-Monopol (G4): Top-K der Disziplin (K = 5, NICHT 3). */
+export const SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK = objEnvNumber("OLY_SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK", 5);
+/** Bracket-Held-Schwelle (bracketScore, 0..1) für Fan-Kult / Publikumsliebling. */
+export const SPONSOR_OBJ_BRACKET_HERO = objEnvNumber("OLY_SPONSOR_OBJ_BRACKET_HERO", 0.85);
+/** Talentschmiede (G3): Marktwert-Zuwachs eines Spielers in EINER Saison, ab dem ein "großer Sprung" zählt. */
+export const SPONSOR_OBJ_TALENT_JUMP_MV = objEnvNumber("OLY_SPONSOR_OBJ_TALENT_JUMP_MV", 6);
+/** Titel-Schock (G5): teamQualityRankAtSign ≥ dieser Wert = "schwaches" Team (Eignung). */
+export const SPONSOR_OBJ_TITLE_SHOCK_WEAK_RANK = objEnvNumber("OLY_SPONSOR_OBJ_TITLE_SHOCK_WEAK_RANK", 18);
+/** Fatigue-Management (#14): Kader-Fatigue ≤ diese Schwelle zählt als "frisch". */
+export const SPONSOR_OBJ_FATIGUE_CAP = objEnvNumber("OLY_SPONSOR_OBJ_FATIGUE_CAP", 45);
+
+function stage(threshold: number, fraction: number, label: string): SponsorObjectiveStage {
+  return { threshold, fraction, label };
+}
+
+/** Standard-3-Stufen-Leiter 40/70/100 %. */
+function threeStage(t1: number, t2: number, t3: number, unit: string): SponsorObjectiveStage[] {
+  return [
+    stage(t1, 0.4, `${unit} ${t1}`),
+    stage(t2, 0.7, `${unit} ${t2}`),
+    stage(t3, 1.0, `${unit} ${t3}`),
+  ];
+}
+
+/**
+ * Archetyp-Zuordnung der 14 Standard-Bonusziele. Bestimmt, aus welchem Pool ein Archetyp seine Bonusziele
+ * ziehen kann (die tatsächliche Angebots-Verdrahtung liegt außerhalb dieses Frameworks).
+ */
+export const SPONSOR_BONUS_OBJECTIVE_ARCHETYPE: Record<SponsorBonusObjectiveKey, SponsorArchetype> = {
+  underdog_story: "performance",
+  momentum_series: "performance",
+  discipline_dominance: "performance",
+  axis_ascension: "performance",
+  fan_cult_player: "identity",
+  homegrown_elevation: "identity",
+  rival_humiliation: "identity",
+  fan_infrastructure: "identity",
+  roster_diversity: "identity",
+  solvency_series: "security",
+  salary_discipline: "security",
+  transfer_trader: "security",
+  sustainability_architect: "security",
+  fatigue_management: "security",
+};
+
+export const SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE: Record<SponsorGoldenObjectiveKey, SponsorArchetype> = {
+  golden_fairytale: "performance",
+  golden_talent_forge: "performance",
+  golden_crowd_favorites: "identity",
+  golden_rival_deluxe: "identity",
+  golden_discipline_monopoly: "performance",
+  golden_title_shock: "security",
+};
+
+function spotlightForArchetype(archetype: SponsorArchetype): number {
+  return archetype === "security" ? SPONSOR_OBJ_SPOTLIGHT_SECURITY : SPONSOR_OBJ_SPOTLIGHT_STD;
+}
+
+export type BonusObjectiveBuildInput = {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+  rewardCash: number;
+  starTier: SponsorStarTier;
+  seasonId: string;
+  /** Optionaler expliziter Rival-Team (für rival_humiliation); sonst wird über den Snapshot heuristisch gewählt. */
+  rivalTeamId?: string | null;
+  /** Beim Signing eingefrorene Qualitäts-Platzierung (für Titel-Schock G5). */
+  teamQualityRank?: number | null;
+};
+
+function primaryAxisBaseline(input: BonusObjectiveBuildInput): { axis: SponsorAxisKey; baselineRank: number } {
+  const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
+  const axis = pickPrimaryAxisForTeam({ team: input.team, identity: input.identity, profile: input.profile });
+  const axisRank = getTeamAxisRank(rows, input.team.teamId, axis, input.gameState);
+  return { axis, baselineRank: axisRank.rank ?? rows.length };
+}
+
+/**
+ * Wählt heuristisch einen Rivalen: das im Snapshot direkt vor dem Team platzierte Team (nächststärkerer
+ * Nachbar). Deterministisch, ohne eigene Rival-Datenquelle.
+ */
+export function resolveDefaultRivalTeamId(gameState: GameState, teamId: string): string | null {
+  const rows = buildTeamSeasonOverviewRows({ gameState });
+  const ordered = [...rows].sort((left, right) => (left.rank ?? 99) - (right.rank ?? 99));
+  const index = ordered.findIndex((row) => row.teamId === teamId);
+  if (index <= 0) {
+    return ordered[1]?.teamId ?? null;
+  }
+  return ordered[index - 1]?.teamId ?? null;
+}
+
+/**
+ * Baut die special-Komponente eines der 14 Standard-Bonusziele. `targetValue` encodiert dabei die für die
+ * Auswertung nötige Kontext-Information (Achse+Baseline, Rival-Id, eingefrorene Qualitäts-Platzierung, …).
+ */
+export function buildBonusObjectiveComponent(
+  key: SponsorBonusObjectiveKey,
+  input: BonusObjectiveBuildInput,
+): SponsorOfferComponent {
+  const archetype = SPONSOR_BONUS_OBJECTIVE_ARCHETYPE[key];
+  const spotlightBonus = spotlightForArchetype(archetype);
+  const base = {
+    kind: "special" as const,
+    rewardCash: input.rewardCash,
+    spotlightBonus,
+  };
+
+  switch (key) {
+    case "underdog_story":
+      return {
+        ...base,
+        componentId: "special-underdog-story",
+        label: "Underdog-Story (über Erwartung abschneiden)",
+        targetValue: "underdog",
+        specialKey: "underdog_story",
+        stages: threeStage(3, 6, 9, "+"),
+      };
+    case "momentum_series":
+      return {
+        ...base,
+        componentId: "special-momentum-series",
+        label: "Momentum-Serie (starke Spieltage)",
+        targetValue: "momentum",
+        specialKey: "momentum_series",
+        stages: threeStage(3, 5, 7, "Spieltage"),
+      };
+    case "discipline_dominance":
+      return {
+        ...base,
+        componentId: "special-discipline-dominance",
+        label: `Disziplin-Dominanz (Kaderanteil Top-${SPONSOR_OBJ_DISCIPLINE_GOOD_RANK})`,
+        targetValue: SPONSOR_OBJ_DISCIPLINE_GOOD_RANK,
+        specialKey: "discipline_dominance",
+        stages: threeStage(20, 35, 50, "% Kader"),
+      };
+    case "axis_ascension": {
+      const { axis, baselineRank } = primaryAxisBaseline(input);
+      return {
+        ...base,
+        componentId: `special-axis-ascension-${axis}`,
+        label: `Achsen-Aufstieg (${AXIS_META[axis].label} verbessern)`,
+        targetValue: encodeAxisTarget(axis, baselineRank),
+        specialKey: "axis_ascension",
+        stages: threeStage(2, 4, 6, "+Ränge"),
+      };
+    }
+    case "fan_cult_player":
+      return {
+        ...base,
+        componentId: "special-fan-cult-player",
+        label: "Fan-Kult um einen Spieler",
+        targetValue: "fan_cult",
+        specialKey: "fan_cult_player",
+        stages: [stage(80, 0.5, "Star ≥80"), stage(90, 0.8, "Star ≥90"), stage(100, 1.0, "Star =100")],
+      };
+    case "homegrown_elevation":
+      return {
+        ...base,
+        componentId: "special-homegrown-elevation",
+        label: "Eigengewächs-Veredelung (Nachwuchs → Bracket-Elite)",
+        targetValue: "homegrown",
+        specialKey: "homegrown_elevation",
+        stages: [stage(80, 0.5, "Bracket ≥80"), stage(92, 1.0, "Bracket-Elite")],
+      };
+    case "rival_humiliation": {
+      const rivalTeamId = input.rivalTeamId ?? resolveDefaultRivalTeamId(input.gameState, input.team.teamId);
+      return {
+        ...base,
+        componentId: "special-rival-humiliation",
+        label: "Rivalen-Demütigung (Rival hinter sich lassen)",
+        targetValue: `rival:${rivalTeamId ?? ""}`,
+        specialKey: "rival_humiliation",
+        stages: threeStage(1, 4, 8, "+Ränge vor Rival"),
+      };
+    }
+    case "fan_infrastructure":
+      return {
+        ...base,
+        componentId: "special-fan-infrastructure",
+        label: "Fan-Infrastruktur (Fan-Shop / Arena)",
+        targetValue: 1,
+        specialKey: "fan_infrastructure",
+      };
+    case "roster_diversity": {
+      const colors = input.starTier >= 4 ? 5 : 4;
+      return {
+        ...base,
+        componentId: "special-roster-diversity",
+        label: `Kader-Vielfalt (${colors} Farben)`,
+        targetValue: `${colors} Farben`,
+        specialKey: "form_color_cover",
+        stages: [stage(3, 0.4, "3 Farben"), stage(4, 0.7, "4 Farben"), stage(5, 1.0, "5 Farben")],
+      };
+    }
+    case "solvency_series":
+      return {
+        ...base,
+        componentId: "special-solvency-series",
+        label: "Solvenz-Serie (Kasse positiv halten)",
+        targetValue: "solvency",
+        specialKey: "solvency_series",
+        stages: [stage(0.01, 1.0, "Kasse positiv")],
+      };
+    case "salary_discipline": {
+      const salaryTotal = getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
+      const targetSalary = round1(Math.max(20, salaryTotal * (input.starTier >= 4 ? 0.9 : 0.93)));
+      return {
+        ...base,
+        componentId: "special-salary-discipline",
+        label: `Gehaltsdisziplin ≤ ${targetSalary} C`,
+        targetValue: targetSalary,
+        specialKey: "salary_pressure_max",
+      };
+    }
+    case "transfer_trader": {
+      const x = SPONSOR_OBJ_TRANSFER_TRADER_X;
+      return {
+        ...base,
+        componentId: "special-transfer-trader",
+        label: "Transfer-Händler (Bilanz dieser Wechselperiode)",
+        targetValue: "transfer_window",
+        specialKey: "transfer_trader",
+        stages: [stage(0.01, 0.4, "Netto >0"), stage(x, 0.7, `Netto >${x}`), stage(2 * x, 1.0, `Netto >${2 * x}`)],
+      };
+    }
+    case "sustainability_architect":
+      return {
+        ...base,
+        componentId: "special-sustainability-architect",
+        label: "Nachhaltigkeits-Architekt (Facilities netto ≥ 0)",
+        targetValue: "net_facility",
+        specialKey: "sustainability_architect",
+        stages: [stage(0, 1.0, "Netto ≥ 0")],
+      };
+    case "fatigue_management":
+      return {
+        ...base,
+        componentId: "special-fatigue-management",
+        label: `Fatigue-Management (Kader frisch, ≤ ${SPONSOR_OBJ_FATIGUE_CAP})`,
+        targetValue: SPONSOR_OBJ_FATIGUE_CAP,
+        specialKey: "fatigue_management",
+        stages: threeStage(50, 75, 95, "% frisch"),
+      };
+  }
+}
+
+/**
+ * Baut die special-Komponente eines der 6 Golden-Bonusziele (mehrstufig, mit erhöhtem spotlightBonus). Das
+ * Golden-Ziel ERSETZT das Standard-Special eines golden Angebots (kein Payout-Bloat).
+ */
+export function buildGoldenObjectiveComponent(
+  key: SponsorGoldenObjectiveKey,
+  input: BonusObjectiveBuildInput,
+): SponsorOfferComponent {
+  const base = {
+    kind: "special" as const,
+    rewardCash: input.rewardCash,
+    spotlightBonus: SPONSOR_OBJ_SPOTLIGHT_GOLDEN,
+  };
+  switch (key) {
+    case "golden_fairytale":
+      return {
+        ...base,
+        componentId: "special-golden-fairytale",
+        label: "Die Märchensaison (weit über Erwartung)",
+        targetValue: "underdog",
+        specialKey: "golden_fairytale",
+        stages: threeStage(3, 6, 9, "+"),
+      };
+    case "golden_crowd_favorites":
+      return {
+        ...base,
+        componentId: "special-golden-crowd-favorites",
+        label: "Publikumsliebling-Explosion (Bracket-Helden)",
+        targetValue: "bracket_heroes",
+        specialKey: "golden_crowd_favorites",
+        stages: [stage(1, 0.4, "1 Held"), stage(2, 0.7, "2 Helden"), stage(3, 1.0, "3 Helden")],
+      };
+    case "golden_talent_forge":
+      return {
+        ...base,
+        componentId: "special-golden-talent-forge",
+        label: "Die Talentschmiede (3 Spieler stark entwickeln)",
+        targetValue: SPONSOR_OBJ_TALENT_JUMP_MV,
+        specialKey: "golden_talent_forge",
+        stages: [stage(1, 0.4, "1 Sprung"), stage(2, 0.7, "2 Sprünge"), stage(3, 1.0, "3 Sprünge")],
+      };
+    case "golden_discipline_monopoly":
+      return {
+        ...base,
+        componentId: "special-golden-discipline-monopoly",
+        label: `Disziplin-Monopol (Spieler in Top-${SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK})`,
+        targetValue: SPONSOR_OBJ_GOLDEN_DISCIPLINE_RANK,
+        specialKey: "golden_discipline_monopoly",
+        stages: [stage(2, 0.4, "2 Spieler"), stage(3, 0.7, "3 Spieler"), stage(4, 1.0, "4 Spieler")],
+      };
+    case "golden_title_shock": {
+      const qualityRank = input.teamQualityRank ?? input.gameState.teams.length;
+      return {
+        ...base,
+        componentId: "special-golden-title-shock",
+        label: "Der Titel-Schock (schwaches Team, ganz nach oben)",
+        targetValue: `title_shock:${Math.round(qualityRank)}`,
+        specialKey: "golden_title_shock",
+        stages: [stage(1, 0.5, "Top-3"), stage(2, 0.75, "Top-2"), stage(3, 1.0, "Meister")],
+      };
+    }
+    case "golden_rival_deluxe": {
+      const rivalTeamId = input.rivalTeamId ?? resolveDefaultRivalTeamId(input.gameState, input.team.teamId);
+      return {
+        ...base,
+        componentId: "special-golden-rival-deluxe",
+        label: "Rivalen-Demütigung deluxe",
+        targetValue: `rival:${rivalTeamId ?? ""}`,
+        specialKey: "golden_rival_deluxe",
+        stages: [stage(5, 0.5, "+5 Ränge"), stage(10, 1.0, "+10 Ränge")],
+      };
+    }
+  }
+}
+
+/**
+ * Wählt deterministisch (Season-Hash) EIN Golden-Bonusziel, archetyp-gefiltert. Fällt zurück auf den
+ * gesamten Golden-Pool, falls der Archetyp keinen eigenen Golden-Eintrag hat.
+ */
+export function pickGoldenObjective(
+  seasonId: string,
+  teamId: string,
+  archetype: SponsorArchetype,
+): SponsorGoldenObjectiveKey {
+  const all = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
+  const filtered = all.filter((key) => SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE[key] === archetype);
+  const pool = filtered.length > 0 ? filtered : all;
+  const index = Math.floor(getStableUnitHash(`${seasonId}:${teamId}:golden-objective`) * pool.length);
+  return pool[Math.min(pool.length - 1, index)] ?? pool[0]!;
+}
+
+/**
+ * Transfer-Händler (#12) — Fenster-Query. TAG-ZUORDNUNG (im Code verifiziert): jede transferHistory-Zeile
+ * trägt `seasonId = gameState.season.id` zum Ausführungszeitpunkt und `phase = "manual_transfer_window"`
+ * (LOCAL_TRANSFER_WINDOW_PHASE) — die SESSION-Phase "season_end"/"preseason" wird NICHT auf die Zeile
+ * geschrieben. Im kanonischen Ablauf (season-simulation-runner PHASES) laufen innerhalb EINER Saison-
+ * Iteration von S zuerst `sell_contract_exits` (Verkäufe) und `buy_draft` (Käufe) — beide VOR jedem
+ * Matchday, beide getaggt mit `seasonId = S`. Die Übergangs-Wechselperiode in Saison S ist damit vollständig
+ * über `seasonId === S` erfasst und zum Abrechnungszeitpunkt (Saison-Ende, nach allen Matchdays) fertig
+ * gebucht. Netto = Σ Verkaufserlöse − Σ Kaufkosten (jeweils netCashImpact ?? fee) für diese Saison.
+ */
+export function computeTransferWindowNet(gameState: GameState, teamId: string, seasonId: string): number {
+  let sells = 0;
+  let buys = 0;
+  for (const entry of gameState.transferHistory ?? []) {
+    if (entry.seasonId !== seasonId) continue;
+    const value = typeof entry.netCashImpact === "number" && Number.isFinite(entry.netCashImpact)
+      ? entry.netCashImpact
+      : typeof entry.fee === "number" && Number.isFinite(entry.fee)
+        ? entry.fee
+        : 0;
+    if (entry.transferType === "sell" && entry.fromTeamId === teamId) {
+      sells += value;
+    } else if (entry.transferType === "buy" && entry.toTeamId === teamId) {
+      buys += value;
+    }
+  }
+  return round1(sells - buys);
+}
+
+/**
+ * Season-1-Ausschluss für den Transfer-Händler: in Saison 1 gibt es keine Vorsaison-Verkäufe (Teams starten
+ * bei 0, nur Draft-Käufe) → das Ziel wird gar nicht angeboten. Ab S2 verfügbar.
+ */
+export function isTransferTraderAvailableForSeason(seasonId: string): boolean {
+  // seasonId ist typischerweise "season-1", "season-2", … — der numerische Suffix ist die Saison-Nummer.
+  const match = /(\d+)\s*$/.exec(String(seasonId));
+  const seasonNumber = match ? Number.parseInt(match[1]!, 10) : Number.NaN;
+  // Kein verlässlicher Suffix → konservativ NICHT ausschließen (nur S1 hart ausschließen).
+  return !(Number.isFinite(seasonNumber) && seasonNumber <= 1);
+}
+
+/**
+ * Pool der Standard-Bonusziele eines Archetyps, saison-gefiltert (Transfer-Händler in S1 ausgeschlossen).
+ */
+export function getAvailableBonusObjectiveKeys(
+  archetype: SponsorArchetype,
+  seasonId: string,
+): SponsorBonusObjectiveKey[] {
+  const keys = (Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE) as SponsorBonusObjectiveKey[]).filter(
+    (key) => SPONSOR_BONUS_OBJECTIVE_ARCHETYPE[key] === archetype,
+  );
+  return keys.filter((key) => key !== "transfer_trader" || isTransferTraderAvailableForSeason(seasonId));
 }

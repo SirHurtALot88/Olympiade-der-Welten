@@ -263,6 +263,11 @@ export type TeamBeliebtheitRecord = {
     discipline: number;
     /** FanFavorites + Kosmetik-Trait-Term (bestehende weiche Effekte). */
     fanFavorites: number;
+    /**
+     * TEIL B — erfüllte Sponsor-Bonusziele mit spotlightBonus (liga-zentriert). Rückwärtskompatibel
+     * optional: fehlt der Beitrag (Alt-Saves, keine Ziele), zählt er als 0.
+     */
+    objective?: number;
   };
 };
 
@@ -1143,6 +1148,17 @@ export type SponsorArchetype = "security" | "performance" | "identity";
 
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
 
+/**
+ * Eine Stufe eines mehrstufigen Sonderziels (TEIL B). `threshold` ist die (aufsteigend sortierte)
+ * Mindest-Metrik, ab der die Stufe erreicht ist; `fraction` der Anteil des `rewardCash`, der bei dieser
+ * Stufe ausgezahlt wird (z. B. 0.4 / 0.7 / 1.0 für 40/70/100 %). `label` ist die UI-Beschriftung der Stufe.
+ */
+export type SponsorObjectiveStage = {
+  threshold: number;
+  fraction: number;
+  label: string;
+};
+
 export type SponsorOfferComponent = {
   componentId: string;
   kind: SponsorOfferComponentKind;
@@ -1151,6 +1167,19 @@ export type SponsorOfferComponent = {
   rewardCash: number;
   penaltyCash?: number;
   specialKey?: string | null;
+  /**
+   * TEIL B — mehrstufiges Sonderziel: anteilige Auszahlung je erreichter Stufe. Rückwärtskompatibel
+   * optional: fehlt `stages`, bleibt das Sonderziel binär (Fraction 0 oder 1 über den bestehenden
+   * Evaluator-Pfad). Stufen sind aufsteigend nach `threshold` zu lesen; der Evaluator liefert die höchste
+   * erreichte Stufen-Fraction, die Settlement zahlt `rewardCash * fraction`.
+   */
+  stages?: SponsorObjectiveStage[];
+  /**
+   * TEIL B — Beliebtheits-Impuls (Spotlight) bei Erfüllung. Roh-Magnitude (grob 0..1), die als
+   * ZUSÄTZLICHES, LIGA-ZENTRIERTES Signal in die Beliebtheits-Fortschreibung der Folge-Saison einfließt
+   * (Σ über die Liga ≈ 0). Skaliert mit der erreichten Stufen-Fraction. Rückwärtskompatibel optional.
+   */
+  spotlightBonus?: number;
 };
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";

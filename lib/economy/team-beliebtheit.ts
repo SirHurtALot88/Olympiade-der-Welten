@@ -4,6 +4,7 @@ import { computeCosmeticTraitPopularityBonus } from "@/lib/traits/cosmetic-trait
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 
 /**
  * Beliebtheitsfaktor (team popularity) — real game rule, not a cosmetic flag.
@@ -308,6 +309,11 @@ export const BELIEBTHEIT_SPOTLIGHT_WEIGHTS = {
   jump: envNumber("OLY_BELIEBTHEIT_W_JUMP", 0.15),
   discipline: envNumber("OLY_BELIEBTHEIT_W_DISCIPLINE", 0.1),
   fanFavorites: envNumber("OLY_BELIEBTHEIT_W_FANFAV", 0.05),
+  /**
+   * TEIL B — erfüllte Sponsor-Bonusziele mit spotlightBonus. Liga-zentriert wie alle übrigen Signale (Σ
+   * über die Liga ≈ 0). Bewusst moderat gewichtet, damit der Bonus-Spotlight die KPI nicht dominiert.
+   */
+  objective: envNumber("OLY_BELIEBTHEIT_W_OBJECTIVE", 0.1),
 } as const;
 
 /** bracketScore ab dem ein Spieler als "Bracket-Held" (Bester seiner Marktwert-Klasse) zählt. */
@@ -353,6 +359,12 @@ export type TeamSpotlightSignals = {
   disciplineTop3Share: number;
   /** FanFavorites-Anteil + kleiner Kosmetik-Trait-Term. */
   fanFavoriteTerm: number;
+  /**
+   * TEIL B — Roh-Spotlight aus erfüllten Sponsor-Bonuszielen: Σ(fraction × spotlightBonus) über die
+   * special-Komponenten des (abgeschlossenen) Sponsor-Vertrags. Größen-neutral (rosterunabhängig),
+   * wird wie alle Signale liga-zentriert.
+   */
+  objectiveSpotlight: number;
 };
 
 export type TeamSpotlightResult = {
@@ -368,6 +380,7 @@ const NEUTRAL_SPOTLIGHT_COMPONENTS: TeamBeliebtheitRecord["components"] = {
   jump: 0,
   discipline: 0,
   fanFavorites: 0,
+  objective: 0,
 };
 
 function centerAroundLeagueMean(values: number[]): number[] {
@@ -407,6 +420,7 @@ export function computeLeagueSpotlightDeltas(
   );
   const disciplineRaw = signals.map((signal) => signal.disciplineTop3Share);
   const fanRaw = signals.map((signal) => signal.fanFavoriteTerm);
+  const objectiveRaw = signals.map((signal) => signal.objectiveSpotlight);
 
   const overperf = centerAroundLeagueMean(overperfRaw);
   const bracket = centerAroundLeagueMean(bracketRaw);
@@ -414,6 +428,7 @@ export function computeLeagueSpotlightDeltas(
   const jump = centerAroundLeagueMean(jumpRaw);
   const discipline = centerAroundLeagueMean(disciplineRaw);
   const fan = centerAroundLeagueMean(fanRaw);
+  const objective = centerAroundLeagueMean(objectiveRaw);
 
   const weights = BELIEBTHEIT_SPOTLIGHT_WEIGHTS;
   signals.forEach((signal, index) => {
@@ -424,6 +439,7 @@ export function computeLeagueSpotlightDeltas(
       jump: roundValue(weights.jump * jump[index]!),
       discipline: roundValue(weights.discipline * discipline[index]!),
       fanFavorites: roundValue(weights.fanFavorites * fan[index]!),
+      objective: roundValue(weights.objective * objective[index]!),
     };
     const spotlightDelta = roundValue(
       components.overperf +
@@ -431,7 +447,8 @@ export function computeLeagueSpotlightDeltas(
         components.upset +
         components.jump +
         components.discipline +
-        components.fanFavorites,
+        components.fanFavorites +
+        (components.objective ?? 0),
     );
     result.set(signal.teamId, { teamId: signal.teamId, spotlightDelta, components });
   });
@@ -451,6 +468,34 @@ export function advanceBeliebtheitValue(previousValue: number, spotlightDelta: n
  * Extrahiert die größen-neutralen Spotlight-Signale aus einem ABGESCHLOSSENEN GameState (finale Tabelle,
  * Disziplin-Ergebnisse, Kader). Reine Ableitung, keine Seiteneffekte.
  */
+/**
+ * TEIL B — Roh-Spotlight aus erfüllten Sponsor-Bonuszielen eines Teams am Saison-Ende: Σ über die
+ * special-Komponenten des Sponsor-Vertrags von (erreichte Stufen-Fraction × spotlightBonus). Reine
+ * Ableitung aus dem abgeschlossenen GameState; fehlt der Vertrag oder haben die Komponenten keinen
+ * spotlightBonus, ist der Beitrag 0. Größen-neutral (rosterunabhängig).
+ */
+export function computeTeamObjectiveSpotlightRaw(gameState: GameState, teamId: string): number {
+  const contract = gameState.seasonState.sponsorContractsByTeamId?.[teamId] ?? null;
+  if (!contract) {
+    return 0;
+  }
+  let sum = 0;
+  for (const component of contract.components ?? []) {
+    if (component.kind !== "special") {
+      continue;
+    }
+    const bonus = typeof component.spotlightBonus === "number" && Number.isFinite(component.spotlightBonus)
+      ? component.spotlightBonus
+      : 0;
+    if (bonus === 0) {
+      continue;
+    }
+    const stageResult = evaluateSpecialComponentStage(gameState, teamId, component);
+    sum += stageResult.fraction * bonus;
+  }
+  return sum;
+}
+
 export function buildTeamSpotlightSignalsFromGameState(gameState: GameState): TeamSpotlightSignals[] {
   const rows = buildTeamSeasonOverviewRows({ gameState });
   const rowsByTeamId = new Map(rows.map((row) => [row.teamId, row] as const));
@@ -589,6 +634,7 @@ export function buildTeamSpotlightSignalsFromGameState(gameState: GameState): Te
     const favShare = rosterSize > 0 ? favCount / rosterSize : 0;
     const cosmeticTraitBonus = computeCosmeticTraitPopularityBonus(rosterPlayers);
     const fanFavoriteTerm = favShare + cosmeticTraitBonus;
+    const objectiveSpotlight = computeTeamObjectiveSpotlightRaw(gameState, teamId);
 
     return {
       teamId,
@@ -600,6 +646,7 @@ export function buildTeamSpotlightSignalsFromGameState(gameState: GameState): Te
       historicalAvgRank,
       disciplineTop3Share,
       fanFavoriteTerm,
+      objectiveSpotlight,
     } satisfies TeamSpotlightSignals;
   });
 }
