@@ -3,11 +3,10 @@
 import {
   buildTrainingImpactItems,
   buildTrainingModeSegments,
-  formatVeloNumber,
-  formatVeloSignedNumber,
   VeloImpactStrip,
   VeloIntensityRail,
 } from "@/components/foundation/velo-ui";
+import { formatNlNumber, formatNlSignedNumber } from "@/components/foundation/new-look/nl-tones";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -53,14 +52,14 @@ function buildStatForecastTooltip(row: TrainingPlayerRowView) {
   const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
   return [
     "Netto = Summe aller Attribut-Deltas nach Regression, Training und Performance.",
-    `Angewendet: Training ${formatVeloSignedNumber(appliedTraining, 1)} · Performance ${formatVeloSignedNumber(appliedPerformance, 1)} · Regression ${formatVeloSignedNumber(appliedRegression, 1)}`,
-    `Trainingsbudget +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitäts- und Potential-Multiplikatoren. Schritt-für-Schritt unten unter "Wie kommt das zustande?".`,
+    `Angewendet: Training ${formatNlSignedNumber(appliedTraining, 1)} · Performance ${formatNlSignedNumber(appliedPerformance, 1)} · Regression ${formatNlSignedNumber(appliedRegression, 1)}`,
+    `Trainingsbudget +${formatNlNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitäts- und Potential-Multiplikatoren. Schritt-für-Schritt unten unter "Wie kommt das zustande?".`,
   ].join("\n");
 }
 
 function buildMatchdayRealityNote(row: TrainingPlayerRowView) {
-  const pps = row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—";
-  const mvs = row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—";
+  const pps = row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—";
+  const mvs = row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—";
   return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Matchday Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt.`;
 }
 
@@ -137,26 +136,26 @@ export default function PlayerTrainingControls({
           </TooltipHeading>
           <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
             {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-            {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
+            {formatNlNumber(row.organicForecast.netSetpoints, 1)}
           </strong>
         </div>
         <div title="Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet). Details unter 'Wie kommt das zustande?'.">
           <span>Training</span>
-          <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+          <strong>+{formatNlNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
         </div>
         <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training. Vergleich zu Saison-PPs/MVS unten.">
           <span>Performance</span>
-          <strong>+{formatVeloNumber(appliedPerformanceSetpoints, 1)}</strong>
+          <strong>+{formatNlNumber(appliedPerformanceSetpoints, 1)}</strong>
         </div>
         <div>
           <span>Fatigue</span>
-          <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
+          <strong>+{formatNlNumber(row.organicForecast.fatigueLoad, 1)}</strong>
         </div>
       </div>
 
       <p className="muted player-training-controls-reality-note" title={buildMatchdayRealityNote(row)}>
-        Trainingsfleiss vs. echte Spielpraxis: Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
-        {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
+        Trainingsfleiss vs. echte Spielpraxis: Saison-PPs {row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—"} · MVS{" "}
+        {row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—"}
       </p>
 
       <VeloImpactStrip
@@ -206,7 +205,7 @@ export default function PlayerTrainingControls({
       <div className="training-v2-player-foot training-v2-modifier-row">
         <small>
           Traits {formatSignedPercent(row.modifiers.traitModifierPct)} · Facility {formatSignedPercent(row.modifiers.facilityModifierPct)} · Potential x
-          {formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}
+          {formatNlNumber(row.modifiers.potentialTrainingMultiplier, 2)}
         </small>
         {row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? (
           <small className={`training-v2-mode-demand-foot is-${row.trainingDemand.status}`}>

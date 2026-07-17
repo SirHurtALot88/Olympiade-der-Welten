@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
-import { NlEmptyState } from "@/components/foundation/new-look";
+import { NlEmptyState, NlProgressBar } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 
 export type ScoutingQueueRow = {
@@ -166,14 +166,15 @@ export default function ScoutingPriorityQueue({
                   {entry.className} · {entry.race}
                 </small>
                 {entry.isFocusTarget ? (
-                  <div className="scouting-queue-progress" aria-label={`Fokus-Ziel, ${entry.certainty}% Intel`}>
-                    <div className="scouting-queue-progress-track">
-                      <div className="scouting-queue-progress-fill" style={{ width: `${Math.min(100, entry.certainty)}%` }} />
-                    </div>
-                    <span className="scouting-queue-progress-label">
-                      {entry.certainty}% Intel{focusEtaLabel ? ` · ${focusEtaLabel}` : ""}
-                    </span>
-                  </div>
+                  <NlProgressBar
+                    className="scouting-queue-progress-bar"
+                    value={entry.certainty}
+                    max={100}
+                    tone="accent"
+                    label="Fokus"
+                    format={(v) => `${Math.round(v)}% Intel${focusEtaLabel ? ` · ${focusEtaLabel}` : ""}`}
+                    title={`Fokus-Ziel, ${entry.certainty}% Intel`}
+                  />
                 ) : (
                   <span className="scouting-queue-status muted">
                     {entry.isFullyScouted

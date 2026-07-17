@@ -30,7 +30,7 @@
  * `potentialScoreToStars`). Styling: `.nl-ability-*` in `app/globals.css`.
  */
 
-import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import {
   buildAbilityStarRangeSlots,
   potentialScoreToStars,
@@ -185,13 +185,13 @@ export function NlAbilityStars(props: NlAbilityStarsProps) {
   const ariaParts: string[] = [];
   if (label) ariaParts.push(label);
   if (caStars != null) {
-    ariaParts.push(`Aktuell ${formatVeloNumber(caStars, 1)} Sterne`);
+    ariaParts.push(`Aktuell ${formatNlNumber(caStars, 1)} Sterne`);
   }
   if (poRange != null) {
     ariaParts.push(
       poUncertain
-        ? `Potenzial ${formatVeloNumber(poRange.min, 1)} bis ${formatVeloNumber(poRange.max, 1)} Sterne (geschätzt)`
-        : `Potenzial ${formatVeloNumber(poRange.max, 1)} Sterne`,
+        ? `Potenzial ${formatNlNumber(poRange.min, 1)} bis ${formatNlNumber(poRange.max, 1)} Sterne (geschätzt)`
+        : `Potenzial ${formatNlNumber(poRange.max, 1)} Sterne`,
     );
   }
   ariaParts.push(known ? "bekannt" : "geschätzt");

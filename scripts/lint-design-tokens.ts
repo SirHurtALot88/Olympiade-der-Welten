@@ -8,7 +8,7 @@
  *   - EUR:    rohes "€"-Zeichen statt eines Formatters
  *   - LOCALE: `.toLocaleString(` oder `new Intl.NumberFormat(` statt der
  *             geteilten Formatter (`formatNlMoney`, `formatNlNumber`,
- *             `formatVeloNumber`, ...)
+ *             `formatNlSignedNumber`, `formatNlSignedPercent`, ...)
  *   - HEX:    hartkodierte Hex-Farben (`#rgb` / `#rrggbb`) statt CSS-Tokens
  *             (`var(--nl-*)`, `NL_TONE_VAR`)
  *
@@ -65,8 +65,6 @@ const ALLOWED_FILES = new Set<string>([
   // Hex-Fallbacks für `var(--nl-*, #hex)` (Storybook/Isolation-Rendering
   // außerhalb von `.is-new-look`).
   "components/foundation/new-look/nl-tones.ts",
-  // Geteilte Zahl-Formatter "velo" Design-System.
-  "components/foundation/velo-ui/formatters.ts",
 ]);
 
 // CSS-Dateien definieren die Tokens selbst (z.B. `--nl-pow: #ff6b6b;` in
@@ -219,7 +217,7 @@ function main() {
     printViolationList("Design-Token-Lint: neue Verstoesse (nicht in Baseline):", newViolations);
     console.error(
       `\n${newViolations.length} neue(r) Design-Token-Verstoss/Verstoesse gefunden. ` +
-        "Bitte geteilte Formatter (formatNlMoney/formatNlNumber/formatVeloNumber) bzw. CSS-Tokens " +
+        "Bitte geteilte Formatter (formatNlMoney/formatNlNumber/formatNlSignedNumber) bzw. CSS-Tokens " +
         "(var(--nl-*), NL_TONE_VAR) verwenden, oder falls es sich um einen bewusst geduldeten " +
         "Altbestand handelt: npx tsx scripts/lint-design-tokens.ts --update-baseline",
     );

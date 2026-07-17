@@ -24,17 +24,6 @@ function formatPpsValue(value: number | null | undefined) {
   return formatLocalePoints(value, 1);
 }
 
-function formatSignedDisplayMoney(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value)} €`;
-}
-
 function formatSignedTransfermarktCurrency(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
@@ -346,7 +335,7 @@ export default function FoundationMarketSellShellHost({
                     }
                   >
                     {marketSellPlayerContext?.marketValueDelta != null
-                      ? formatSignedDisplayMoney(marketSellPlayerContext.marketValueDelta)
+                      ? formatSignedTransfermarktCurrency(marketSellPlayerContext.marketValueDelta)
                       : "—"}
                   </strong>
                   <small>aktuell vs. Kaderwert</small>
@@ -371,7 +360,7 @@ export default function FoundationMarketSellShellHost({
                         : undefined
                     }
                   >
-                    {marketSellPlayerContext?.saleProfit != null ? formatSignedDisplayMoney(marketSellPlayerContext.saleProfit) : "—"}
+                    {marketSellPlayerContext?.saleProfit != null ? formatSignedTransfermarktCurrency(marketSellPlayerContext.saleProfit) : "—"}
                   </strong>
                   <small>Preis minus Einstieg</small>
                 </article>
@@ -390,7 +379,7 @@ export default function FoundationMarketSellShellHost({
                     }
                   >
                     vs. normal{" "}
-                    {marketSellPlayerContext?.salaryDelta != null ? formatSignedDisplayMoney(marketSellPlayerContext.salaryDelta) : "—"}
+                    {marketSellPlayerContext?.salaryDelta != null ? formatSignedTransfermarktCurrency(marketSellPlayerContext.salaryDelta) : "—"}
                   </small>
                 </article>
                 <article className="metric-card">

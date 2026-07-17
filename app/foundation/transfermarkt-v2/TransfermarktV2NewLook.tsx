@@ -965,13 +965,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
         <StatChipRow className="nl-market-board" aria-label="Transfer-Entscheidungsboard">
           <StatChip
             label="Cash"
-            value={teamCash != null ? formatNlNumber(teamCash, 1) : "—"}
+            value={teamCash != null ? formatTransfermarktCurrency(teamCash) : "—"}
             tone="good"
             onClick={() => scrollToNlMarketSection(".nl-market-deal-card")}
             title="Zum Deal-Desk springen"
-            ariaLabel={`Cash ${teamCash != null ? formatNlNumber(teamCash, 1) : "—"} — zum Deal-Desk springen`}
+            ariaLabel={`Cash ${teamCash != null ? formatTransfermarktCurrency(teamCash) : "—"} — zum Deal-Desk springen`}
           />
-          <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatNlNumber(teamSalaryTotal, 1) : "—"} tone="accent" />
+          <StatChip label="Gehalt" value={teamSalaryTotal != null ? formatTransfermarktCurrency(teamSalaryTotal) : "—"} tone="accent" />
           <StatChip
             label="Kader"
             value={`${effectiveRosterCount ?? "—"} / ${rosterLimit ?? "—"}`}

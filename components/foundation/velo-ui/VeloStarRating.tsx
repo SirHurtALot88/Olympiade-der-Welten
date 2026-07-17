@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 function parseStarValue(value: string | number | null | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -40,8 +40,8 @@ export function VeloStarRating({
   return (
     <span
       className={`velo-star-rating is-${tone}${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`}
-      aria-label={`${label ? `${label}: ` : ""}${formatVeloNumber(rating, 1)} von 5 Sternen`}
-      title={`${label ? `${label}: ` : ""}${formatVeloNumber(rating, 1)} / 5`}
+      aria-label={`${label ? `${label}: ` : ""}${formatNlNumber(rating, 1)} von 5 Sternen`}
+      title={`${label ? `${label}: ` : ""}${formatNlNumber(rating, 1)} / 5`}
     >
       {label ? <span className="velo-star-label">{label}</span> : null}
       <span className="velo-stars" aria-hidden="true">

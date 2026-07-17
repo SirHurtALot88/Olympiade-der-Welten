@@ -87,6 +87,8 @@ export {
 } from "@/components/foundation/new-look/useCountUp";
 export {
   formatNlNumber,
+  formatNlSignedNumber,
+  formatNlSignedPercent,
   NL_AXIS_LABELS,
   NL_TONE_VAR,
   nlToneClass,

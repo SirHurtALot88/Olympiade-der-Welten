@@ -9,12 +9,11 @@ import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   buildTrainingImpactItems,
   buildTrainingModeSegments,
-  formatVeloNumber,
-  formatVeloSignedNumber,
   VeloAttributeFocusTags,
   VeloImpactStrip,
   VeloIntensityRail,
 } from "@/components/foundation/velo-ui";
+import { formatNlNumber, formatNlSignedNumber, formatNlSignedPercent } from "@/components/foundation/new-look/nl-tones";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { getTrainingModePresentation, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
@@ -42,13 +41,11 @@ import type {
 import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 
 export function formatLocaleNumber(value: number | null | undefined, digits = 0) {
-  return formatVeloNumber(value, digits);
+  return formatNlNumber(value, digits);
 }
 
 export function formatSignedPercent(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatVeloNumber(value, 0)}%`;
+  return formatNlSignedPercent(value);
 }
 
 const TRAINING_FOCUS_AXIS_LABEL: Record<"pow" | "spe" | "men" | "soc", string> = {
@@ -319,7 +316,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       key: "base",
       operator: "base",
       label: `Basis-Training (${modePresentation.label})`,
-      value: `+${formatVeloNumber(baseBudget, 2)}`,
+      value: `+${formatNlNumber(baseBudget, 2)}`,
       detail: "Fixer Startwert je Trainingsintensität, noch ohne Boni.",
     },
     {
@@ -333,7 +330,7 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       key: "potential",
       operator: "add",
       label: "Potential-Multiplikator",
-      value: `x${formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}`,
+      value: `x${formatNlNumber(row.modifiers.potentialTrainingMultiplier, 2)}`,
       detail: "Wie viel Luft zum gescouteten Potential noch nach oben offen ist.",
     },
     {
@@ -371,37 +368,37 @@ export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): Traini
       key: "budget",
       operator: "result",
       label: "= Trainingsbudget",
-      value: `+${formatVeloNumber(row.organicForecast.trainingSetpoints, 2)}`,
+      value: `+${formatNlNumber(row.organicForecast.trainingSetpoints, 2)}`,
       detail: "Gesamtbudget, das über alle 12 Attribute verteilt wird (Klassenprofil + Affinität).",
     },
     {
       key: "applied-training",
       operator: "add",
       label: "Angewendet auf Stats",
-      value: `+${formatVeloNumber(appliedTraining, 2)}`,
+      value: `+${formatNlNumber(appliedTraining, 2)}`,
       detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinität und Attribut-Decke.",
     },
     {
       key: "performance",
       operator: "add",
       label: "+ Performance-Anteil",
-      value: `+${formatVeloNumber(appliedPerformance, 2)}`,
+      value: `+${formatNlNumber(appliedPerformance, 2)}`,
       detail: `Aus echten Matchday-Ergebnissen (Score, Rang, Beitrag). Zum Vergleich: Saison-PPs ${
-        row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"
-      } · MVS ${row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}.`,
+        row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—"
+      } · MVS ${row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—"}.`,
     },
     {
       key: "regression",
       operator: "subtract",
       label: "− Regression",
-      value: formatVeloNumber(appliedRegression, 2),
+      value: formatNlNumber(appliedRegression, 2),
       detail: "Laufende Basis-Abnutzung plus zusätzlicher Marktwert-Druck bei teuren Spielern.",
     },
     {
       key: "net",
       operator: "result",
       label: "= Netto-Forecast",
-      value: formatVeloSignedNumber(row.organicForecast.netSetpoints, 2),
+      value: formatNlSignedNumber(row.organicForecast.netSetpoints, 2),
       detail: "Summe aller 12 Attribut-Deltas: Training + Performance − Regression.",
     },
   );
@@ -510,10 +507,10 @@ function TrainingTraitBoostRow({ row }: { row: TrainingPlayerRowView }) {
           <span
             key={`${row.player.id}-${entry.trait}`}
             className={`training-v2-trait-chip is-${entry.tone}`}
-            title={`${entry.trait}: ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}% Legacy Training Signal`}
+            title={`${entry.trait}: ${entry.pct >= 0 ? "+" : ""}${formatNlNumber(entry.pct, 1)}% Legacy Training Signal`}
           >
             {entry.tone === "positive" ? "★" : entry.tone === "negative" ? "▼" : "•"} {entry.trait} {entry.pct >= 0 ? "+" : ""}
-            {formatVeloNumber(entry.pct, 1)}%
+            {formatNlNumber(entry.pct, 1)}%
           </span>
         ))}
       </div>
@@ -576,7 +573,7 @@ function TrainingCardCompactBadges({ row }: { row: TrainingPlayerRowView }) {
           className={`training-v2-card-badge is-trait${row.modifiers.traitModifierPct >= 0 ? " is-positive" : " is-negative"}`}
           title={
             row.traitBoosts
-              .map((entry) => `${entry.trait} ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}%`)
+              .map((entry) => `${entry.trait} ${entry.pct >= 0 ? "+" : ""}${formatNlNumber(entry.pct, 1)}%`)
               .join(" · ") || "Trait Training Boost"
           }
         >
@@ -646,20 +643,20 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
               <span>Stat Forecast</span>
               <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
                 {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-                {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
+                {formatNlNumber(row.organicForecast.netSetpoints, 1)}
               </strong>
             </div>
             <div>
               <span>Training</span>
-              <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+              <strong>+{formatNlNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
             </div>
             <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
               <span>Performance</span>
-              <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
+              <strong>+{formatNlNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
             </div>
             <div>
               <span>Fatigue</span>
-              <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
+              <strong>+{formatNlNumber(row.organicForecast.fatigueLoad, 1)}</strong>
             </div>
           </div>
 
@@ -668,23 +665,23 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
               className="muted training-v2-accumulator-forecast"
               title="Anti-Cheese: Das Saison-End-Trainingsbudget akkumuliert pro Spieltag aus dem jeweils aktiven Modus. Bisher = bereits gesammelt; Rest projiziert die verbleibenden Spieltage im aktuell gewaehlten Modus."
             >
-              Bisher {formatVeloNumber(row.trainingAccumulatorForecast.accumulatedBudget, 2)} SP (
+              Bisher {formatNlNumber(row.trainingAccumulatorForecast.accumulatedBudget, 2)} SP (
               {row.trainingAccumulatorForecast.matchdaysCounted} Spieltage) · Rest bei{" "}
               {getTrainingModePresentation(row.mode).label} →{" "}
-              {formatVeloNumber(row.trainingAccumulatorForecast.forecastBudget, 2)} SP
+              {formatNlNumber(row.trainingAccumulatorForecast.forecastBudget, 2)} SP
             </p>
           ) : null}
 
           <p className="muted training-v2-fatigue-current" title="Aktuelle Ermüdung inkl. pro Spieltag akkumulierter Trainings-Fatigue.">
-            Aktuell {formatVeloNumber(row.player.fatigue, 0)}/100 Fatigue
+            Aktuell {formatNlNumber(row.player.fatigue, 0)}/100 Fatigue
           </p>
 
           <p
             className="muted training-v2-reality-note"
             title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt."
           >
-            Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
-            {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
+            Saison-PPs {row.playerPps != null ? formatNlNumber(row.playerPps, 1) : "—"} · MVS{" "}
+            {row.playerMvs != null ? formatNlNumber(row.playerMvs, 1) : "—"}
           </p>
 
           <VeloImpactStrip
@@ -711,7 +708,7 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
             <small>
               Traits {formatSignedPercent(row.modifiers.traitModifierPct)} · Facility{" "}
               {formatSignedPercent(row.modifiers.facilityModifierPct)} · Potential x
-              {formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}
+              {formatNlNumber(row.modifiers.potentialTrainingMultiplier, 2)}
             </small>
             {row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? (
               <small className={`training-v2-mode-demand-foot is-${row.trainingDemand.status}`}>
@@ -793,13 +790,13 @@ export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowV
               ) : null}
             </div>
             <strong>
-              {formatVeloNumber(entry.before, 1)} → {formatVeloNumber(entry.after, 1)}
+              {formatNlNumber(entry.before, 1)} → {formatNlNumber(entry.after, 1)}
             </strong>
-            <em>{formatVeloSignedNumber(entry.delta, 1)}</em>
+            <em>{formatNlSignedNumber(entry.delta, 1)}</em>
             <div className="training-v2-attribute-forecast-split">
-              <span>T {formatVeloSignedNumber(entry.training, 1)}</span>
-              <span>P {formatVeloSignedNumber(entry.performance, 1)}</span>
-              <span>R {formatVeloSignedNumber(entry.regression, 1)}</span>
+              <span>T {formatNlSignedNumber(entry.training, 1)}</span>
+              <span>P {formatNlSignedNumber(entry.performance, 1)}</span>
+              <span>R {formatNlSignedNumber(entry.regression, 1)}</span>
             </div>
           </article>
         ))}
@@ -819,10 +816,10 @@ export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProp
         <article
           className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
           key={`mode-guide-${option.value}`}
-          title={`Trainingsbudget vor Trait-, Potential- und Facility-Boni. Separat fliessen +${formatVeloNumber(option.baseXp, 0)} Entwicklungs-XP automatisch in Formkurve und Regressionsschutz ein — kein manuelles Ausgeben.`}
+          title={`Trainingsbudget vor Trait-, Potential- und Facility-Boni. Separat fliessen +${formatNlNumber(option.baseXp, 0)} Entwicklungs-XP automatisch in Formkurve und Regressionsschutz ein — kein manuelles Ausgeben.`}
         >
           <span>{option.label}</span>
-          <strong>+{formatVeloNumber(option.trainingSetpoints, 1)} Trainingsbudget · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
+          <strong>+{formatNlNumber(option.trainingSetpoints, 1)} Trainingsbudget · Fatigue {formatNlNumber(option.fatigueLoad, 0)}</strong>
           <small>
             {option.recoveryDeltaPct > 0 ? `+${option.recoveryDeltaPct}% Reg` : option.recoveryDeltaPct < 0 ? `${option.recoveryDeltaPct}% Reg` : "±0 Reg"} · {option.note}
           </small>
@@ -988,7 +985,7 @@ export function TrainingPlayerLane({
                 contextData={{
                   training: {
                     caRating: row.developmentStars.currentAbilityRating,
-                    poDisplay: row.developmentStars.potentialStars ?? formatVeloNumber(row.developmentStars.potentialRating, 0),
+                    poDisplay: row.developmentStars.potentialStars ?? formatNlNumber(row.developmentStars.potentialRating, 0),
                     netSetpoints: row.organicForecast.netSetpoints,
                     regressionRisk: row.forecast.regressionRisk,
                     trainingModeLabel: modePresentation.label,
@@ -1051,11 +1048,11 @@ export function TrainingPlayerLane({
                   <span className="eyebrow">Rückschritt sichtbar</span>
                   <strong>
                     {row.organicForecast.netSetpoints < 0
-                      ? `Forecast ${formatVeloSignedNumber(row.organicForecast.netSetpoints, 1)}`
+                      ? `Forecast ${formatNlSignedNumber(row.organicForecast.netSetpoints, 1)}`
                       : `Risiko ${row.forecast.regressionRisk}`}
                   </strong>
                   <p className="muted">
-                    {row.fatigueWarning} · Marktwert-Druck {formatVeloNumber(row.forecast.regressionPressure, 0)}
+                    {row.fatigueWarning} · Marktwert-Druck {formatNlNumber(row.forecast.regressionPressure, 0)}
                   </p>
                 </FoundationCard>
               ) : null}

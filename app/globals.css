@@ -38914,33 +38914,17 @@ button.foundation-team-portrait-card {
   font-size: 0.72rem;
 }
 
-.scouting-queue-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* T-059: ersetzt die vormals handgerollte scouting-queue-progress-*-Bar
+   durch die geteilte `NlProgressBar` (siehe ScoutingPriorityQueue.tsx) —
+   nur noch die kompakte Track-Höhe für den dichten Listen-Kontext bleibt
+   als lokaler Override. */
+.is-new-look .scouting-queue-progress-bar {
   width: 100%;
   margin-top: 2px;
 }
-
-.scouting-queue-progress-track {
-  flex: 1 1 auto;
+.is-new-look .scouting-queue-progress-bar .nl-progress-track {
   max-width: 140px;
   height: 6px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
-  overflow: hidden;
-}
-
-.scouting-queue-progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--heat-yellow-dark), var(--heat-green-light));
-}
-
-.scouting-queue-progress-label {
-  font-size: 0.7rem;
-  color: rgba(226, 232, 240, 0.7);
-  white-space: nowrap;
 }
 
 .scouting-queue-badge.is-focus {

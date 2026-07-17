@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { getArenaAxisValueTier, getCoreStatGrade } from "@/lib/matchday-arena/arena-stat-visuals";
 
-import { formatVeloNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
 export type VeloAxisKey = "pow" | "spe" | "men" | "soc";
 
@@ -30,7 +30,7 @@ export function VeloStatOrbitChip({ axis, value, showGrade = false, showIcon = f
   return (
     <span
       className={`velo-stat-orbit-chip training-v2-rider-orbit-chip ${meta.tone} is-tier-${tier}${className ? ` ${className}` : ""}`}
-      title={`${meta.label} ${formatVeloNumber(value, 0)}${grade ? ` (${grade})` : ""}`}
+      title={`${meta.label} ${formatNlNumber(value, 0)}${grade ? ` (${grade})` : ""}`}
     >
       {showIcon ? (
         <Image
@@ -44,7 +44,7 @@ export function VeloStatOrbitChip({ axis, value, showGrade = false, showIcon = f
       ) : (
         <small>{meta.label}</small>
       )}
-      <strong>{formatVeloNumber(value, 0)}</strong>
+      <strong>{formatNlNumber(value, 0)}</strong>
       {grade ? <span className="velo-stat-orbit-grade">{grade}</span> : null}
     </span>
   );

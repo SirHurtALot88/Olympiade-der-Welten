@@ -53,5 +53,25 @@ export function formatNlNumber(value: number | null | undefined, maximumFraction
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
-  return new Intl.NumberFormat("de-DE", { maximumFractionDigits }).format(value);
+  // Clamp a magnitude that rounds to zero so we never render a stray "-0".
+  const normalized = Math.round(value * 10 ** maximumFractionDigits) === 0 ? 0 : value;
+  return new Intl.NumberFormat("de-DE", { maximumFractionDigits }).format(normalized);
+}
+
+/** Vorzeichenbehaftetes Zahlformat ("+4,2" / "-4,2" / "0"), null-sicher. */
+export function formatNlSignedNumber(value: number | null | undefined, digits = 1): string {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatNlNumber(value, digits)}`;
+}
+
+/** Vorzeichenbehaftetes Prozentformat ("+4%" / "-4%" / "0%"), null-sicher. */
+export function formatNlSignedPercent(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatNlNumber(value, 0)}%`;
 }

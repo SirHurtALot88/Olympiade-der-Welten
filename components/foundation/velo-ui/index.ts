@@ -11,7 +11,6 @@
  * Avoid parallel chip styles (`arena-v2-axis-chip`, custom breakdown spans) — use components here.
  */
 export { VeloScoutMetric } from "@/components/foundation/velo-ui/VeloScoutMetric";
-export { formatTrainingAttributeWeight, formatVeloNumber, formatVeloSignedNumber, formatVeloSignedPercent } from "@/components/foundation/velo-ui/formatters";
 export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/components/foundation/velo-ui/VeloAttributeFocusTags";
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";
 export { buildTrainingModeSegments, VeloIntensityRail, type VeloIntensitySegment } from "@/components/foundation/velo-ui/VeloIntensityRail";

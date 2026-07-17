@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVeloSignedNumber } from "@/components/foundation/velo-ui/formatters";
+import { formatNlSignedNumber } from "@/components/foundation/new-look/nl-tones";
 
 export type VeloAttributeFocusEntry = {
   attribute: string;
@@ -25,8 +25,8 @@ export function VeloAttributeFocusTags({ primary, risks, className = "" }: VeloA
           <span>Signature</span>
           <div className="velo-class-focus-tags">
             {primary.map((entry) => (
-              <span className="velo-class-focus-tag is-gain" key={`primary-${entry.attribute}`} title={`Prognose ${formatVeloSignedNumber(entry.weight, 1)} Setpoints`}>
-                {entry.attribute} {formatVeloSignedNumber(entry.weight, 1)}
+              <span className="velo-class-focus-tag is-gain" key={`primary-${entry.attribute}`} title={`Prognose ${formatNlSignedNumber(entry.weight, 1)} Setpoints`}>
+                {entry.attribute} {formatNlSignedNumber(entry.weight, 1)}
               </span>
             ))}
           </div>
@@ -37,8 +37,8 @@ export function VeloAttributeFocusTags({ primary, risks, className = "" }: VeloA
           <span>Weak</span>
           <div className="velo-class-focus-tags">
             {risks.map((entry) => (
-              <span className="velo-class-focus-tag is-loss" key={`risk-${entry.attribute}`} title={`Prognose ${formatVeloSignedNumber(entry.weight, 1)} Setpoints`}>
-                {entry.attribute} {formatVeloSignedNumber(entry.weight, 1)}
+              <span className="velo-class-focus-tag is-loss" key={`risk-${entry.attribute}`} title={`Prognose ${formatNlSignedNumber(entry.weight, 1)} Setpoints`}>
+                {entry.attribute} {formatNlSignedNumber(entry.weight, 1)}
               </span>
             ))}
           </div>

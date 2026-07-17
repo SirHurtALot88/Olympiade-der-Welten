@@ -12,6 +12,7 @@ import {
   NlProgressBar,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   useCountUp,
   type NlBarChartBar,
@@ -42,6 +43,15 @@ import { getCockpitStatusPillClass } from "@/lib/foundation/tabs/cockpit-ui-help
  */
 
 const NL_PRIZE_MAX_RANK = 32;
+
+/** Vorzeichenbehaftetes `formatNlMoney` — hält GuV/Bonus-Malus-Spalten konsistent mit den Mio/k-formatierten Geldzellen in derselben Tabelle. */
+function formatSignedNlMoney(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatNlMoney(value)}`;
+}
 
 function compareByRank(left: FoundationPrizePreviewItem, right: FoundationPrizePreviewItem): number {
   const leftRank = left.rank != null && Number.isFinite(left.rank) ? left.rank : Number.POSITIVE_INFINITY;
@@ -544,23 +554,23 @@ export default function FoundationPrizeV2NewLook({
                     <tr key={row.label}>
                       <td>{row.label}</td>
                       <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
-                      <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
-                      <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                      <td>{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</td>
+                      <td>{row.salaryTotal != null ? formatNlMoney(row.salaryTotal) : "—"}</td>
                       {outlookLoanInstallment != null ? (
-                        <td>{row.loanInstallment != null ? formatLocalePoints(row.loanInstallment, 1) : "—"}</td>
+                        <td>{row.loanInstallment != null ? formatNlMoney(row.loanInstallment) : "—"}</td>
                       ) : null}
                       <td>
                         {row.guv != null ? (
                           <NlDeltaChip
                             value={row.guv}
-                            format={(n) => formatSignedDisplayMoney(n)}
+                            format={(n) => formatSignedNlMoney(n)}
                             title={outlookLoanInstallment != null ? "Gewinn und Verlust — inkl. Kreditrate" : "Gewinn und Verlust"}
                           />
                         ) : (
                           "—"
                         )}
                       </td>
-                      <td>{row.cashAfter != null ? formatLocalePoints(row.cashAfter, 1) : "—"}</td>
+                      <td>{row.cashAfter != null ? formatNlMoney(row.cashAfter) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -640,9 +650,9 @@ export default function FoundationPrizeV2NewLook({
                         </span>
                       </span>
                     </td>
-                    <td>{row.currentCash != null ? formatLocalePoints(row.currentCash, 1) : "—"}</td>
+                    <td>{row.currentCash != null ? formatNlMoney(row.currentCash) : "—"}</td>
                     <td className="nl-prize-td-money">
-                      <span className="nl-prize-money-value">{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</span>
+                      <span className="nl-prize-money-value">{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</span>
                       {row.prizeMoney != null && Number.isFinite(row.prizeMoney) ? (
                         <NlProgressBar
                           value={row.prizeMoney}
@@ -650,7 +660,7 @@ export default function FoundationPrizeV2NewLook({
                           tone="accent"
                           showValue={false}
                           className="nl-prize-money-bar"
-                          title={`Preisgeld relativ zur Top-Auszahlung (${formatLocalePoints(maxPrizeMoney, 1)})`}
+                          title={`Preisgeld relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
                         />
                       ) : null}
                     </td>
@@ -658,7 +668,7 @@ export default function FoundationPrizeV2NewLook({
                       {row.rankChangePrize?.bonusMalus != null ? (
                         <NlDeltaChip
                           value={row.rankChangePrize.bonusMalus}
-                          format={(n) => formatSignedDisplayMoney(n)}
+                          format={(n) => formatSignedNlMoney(n)}
                           title="Rank-Bonus/-Malus"
                         />
                       ) : (
@@ -666,7 +676,7 @@ export default function FoundationPrizeV2NewLook({
                       )}
                     </td>
                     <td className={row.projectedCash != null && row.projectedCash < 0 ? "nl-prize-cash-risk" : undefined}>
-                      {row.projectedCash != null ? formatLocalePoints(row.projectedCash, 1) : "—"}
+                      {row.projectedCash != null ? formatNlMoney(row.projectedCash) : "—"}
                     </td>
                     <td className="nl-prize-td-warnings">{row.warnings.length > 0 ? row.warnings.join(", ") : "—"}</td>
                   </tr>

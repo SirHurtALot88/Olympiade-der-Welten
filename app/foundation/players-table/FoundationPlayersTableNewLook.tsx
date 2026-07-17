@@ -1440,7 +1440,7 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("mw") ? (
         <td className={`nl-players-td-money${sortCellClass("mw")}`}>
           <span className="nl-players-money">
-            <span className="nl-tnum">{formatLocalePoints(marketValue, 2)}</span>
+            <span className="nl-tnum">{formatNlMoney(marketValue)}</span>
             {marketValueDelta != null && marketValueDelta !== 0 ? (
               <NlDeltaChip
                 value={marketValueDelta}
@@ -1454,7 +1454,7 @@ export default function FoundationPlayersTableNewLook({
         {isColumnVisible("salary") ? (
         <td className={`nl-players-td-money${sortCellClass("salary")}`}>
           <span className="nl-players-money">
-            <span className="nl-tnum">{formatLocalePoints(annualSalary, 2)}</span>
+            <span className="nl-tnum">{formatNlMoney(annualSalary)}</span>
             {salaryDelta != null && salaryDelta !== 0 ? (
               <NlDeltaChip
                 value={salaryDelta}
@@ -1465,7 +1465,7 @@ export default function FoundationPlayersTableNewLook({
             ) : null}
             {showSeasonSalarySubline ? (
               <small className="nl-players-salary-season" title="Gehalt diese Saison (Vertragsjahr 1)">
-                Saison: {formatLocalePoints(currentSeasonSalary, 2)}
+                Saison: {formatNlMoney(currentSeasonSalary)}
               </small>
             ) : null}
           </span>

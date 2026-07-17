@@ -1352,7 +1352,7 @@ export default function LineupNewLook({
                     Slots mit dem Pflicht-Minimum und ergab z. B. "6/2" (6 belegte
                     von 6 verfügbaren Slots, davon 2 Pflicht). Pflicht-Minimum
                     steht jetzt separat als "min. N". */}
-                Rank {rank ?? "—"} · {sideSelected}/{sideSlots.length || "—"} belegt · min. {sideRequired || "—"}
+                Rang {rank ?? "—"} · {sideSelected}/{sideSlots.length || "—"} belegt · min. {sideRequired || "—"}
               </small>
             </div>
           </div>
