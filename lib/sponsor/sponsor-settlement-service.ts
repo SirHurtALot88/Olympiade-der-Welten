@@ -10,8 +10,7 @@ import {
   getUnlockedMilestones,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
-import { evaluateSpecialComponentForObjective } from "@/lib/sponsor/sponsor-objective-evaluator";
-import { FAN_INFRASTRUCTURE_LEVEL_CAP, fanInfrastructureLevelSum } from "@/lib/sponsor/sponsor-special-objectives";
+import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 
 export type SponsorSettlementPhase = "season_end";
 
@@ -161,18 +160,18 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
     }
 
     if (component.kind === "special") {
-      const completed = evaluateSpecialComponentForObjective(gameState, contract.teamId, component) === "completed";
-      // Fan-Infrastruktur-Klausel: die Auszahlung skaliert mit der Income-Gebäude-Gesamtstufe (mehr
-      // fan_shop/arena-Level → höherer Bonus, gedeckelt), statt binär den vollen rewardCash zu zahlen.
-      // Alle anderen Sonderziele bleiben binär (voller rewardCash oder 0).
-      let cashDelta = completed ? component.rewardCash : 0;
-      let reason = completed ? "Sonderziel erfüllt" : "Sonderziel offen";
-      if (completed && component.specialKey === "fan_infrastructure") {
-        const levelSum = fanInfrastructureLevelSum(gameState, contract.teamId);
-        const scale = Math.min(1, levelSum / FAN_INFRASTRUCTURE_LEVEL_CAP);
-        cashDelta = roundCash(component.rewardCash * scale);
-        reason = `Fan-Infrastruktur Stufe ${levelSum}/${FAN_INFRASTRUCTURE_LEVEL_CAP}`;
-      }
+      // TEIL B — generalisierter Skalier-Pfad: der Evaluator liefert eine ERREICHTE STUFE (Fraction 0..1),
+      // die Settlement zahlt `rewardCash * fraction`. Bestehende binäre Sonderziele (ohne `stages`) liefern
+      // Fraction 0 oder 1 und verhalten sich damit exakt wie zuvor; die Fan-Infrastruktur-Skalierung
+      // (levelSum/CAP) und die mehrstufigen Bonusziele laufen über denselben Pfad.
+      const stageResult = evaluateSpecialComponentStage(gameState, contract.teamId, component);
+      const cashDelta = roundCash(component.rewardCash * stageResult.fraction);
+      const reason =
+        stageResult.fraction >= 1
+          ? "Sonderziel voll erfüllt"
+          : stageResult.fraction > 0
+            ? `Sonderziel Teilstufe (${Math.round(stageResult.fraction * 100)}% — ${stageResult.reachedLabel})`
+            : "Sonderziel offen";
       rows.push({
         teamId: contract.teamId,
         teamName: team?.name ?? contract.teamId,
