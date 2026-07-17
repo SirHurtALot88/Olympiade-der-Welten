@@ -567,7 +567,7 @@ export default function FoundationSponsorsNewLook({
                     />
                   ) : null}
                   {selectedTeamCommercialRating.inputs.qualityRank != null ? (
-                    <StatChip label="Qualitäts-Rang" value={`#${selectedTeamCommercialRating.inputs.qualityRank}`} tone="neutral" />
+                    <StatChip label="Qualitäts-Rang" value={`#${Math.round(selectedTeamCommercialRating.inputs.qualityRank)}`} tone="neutral" />
                   ) : null}
                   <StatChip
                     label="MW-Perzentil"

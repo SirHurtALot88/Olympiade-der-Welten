@@ -375,7 +375,7 @@ export function SponsorOfferCardNewLook({
                     <span>
                       <strong>Überperformance zahlt extra.</strong>{" "}
                       {offer.teamQualityRank != null
-                        ? `Übertriffst du deinen Erwartungsrang #${offer.teamQualityRank}, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr (ein Sprung nahe der Spitze zählt mehr als im gepackten Mittelfeld).`
+                        ? `Übertriffst du deinen Erwartungsrang #${Math.round(offer.teamQualityRank)}, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr (ein Sprung nahe der Spitze zählt mehr als im gepackten Mittelfeld).`
                         : "Übertriffst du deine Saison-Erwartung, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr."}
                     </span>
                   </div>
