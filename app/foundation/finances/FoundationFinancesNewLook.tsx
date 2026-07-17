@@ -56,13 +56,19 @@ function buildSponsorTooltip(team: TeamFinancesState): string | undefined {
 }
 
 function buildPrizeTooltip(team: TeamFinancesState): string | undefined {
-  const prize = team.income.prize;
+  const prize = team.income.prizeBenchmark;
   if (!prize) return undefined;
   return [
     `Basis: ${formatNlMoney(prize.basis)}`,
     `Saison-Anteil: ${formatNlMoney(prize.seasonShare)}`,
     `Platzierungsbonus: ${formatNlMoney(prize.placementBonus)}`,
   ].join(" · ");
+}
+
+function buildFacilityIncomeTooltip(team: TeamFinancesState): string | undefined {
+  const facilities = team.income.facilityIncome?.facilities ?? [];
+  if (facilities.length === 0) return undefined;
+  return facilities.map((facility) => `${facility.label}: ${formatNlMoney(facility.income)}`).join("\n");
 }
 
 function buildTransferTooltip(team: TeamFinancesState): string | undefined {
@@ -114,8 +120,14 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
       title: buildSponsorTooltip(team),
     });
   }
-  if (team.income.prize) {
-    lines.push({ key: "prize", label: "Preisgeld", amount: team.income.prize.total, tone: "good", title: buildPrizeTooltip(team) });
+  if (team.income.facilityIncome) {
+    lines.push({
+      key: "facilityIncome",
+      label: "Gebäude-Einnahmen",
+      amount: team.income.facilityIncome.total,
+      tone: "good",
+      title: buildFacilityIncomeTooltip(team),
+    });
   }
   if (team.income.transferSurplus != null) {
     lines.push({
@@ -124,6 +136,15 @@ function buildIncomeLines(team: TeamFinancesState): FinanceLineItem[] {
       amount: team.income.transferSurplus,
       tone: "spe",
       title: buildTransferTooltip(team),
+    });
+  }
+  if (team.income.objectiveReward != null) {
+    lines.push({
+      key: "objective",
+      label: "Vorstandsziele (Prämie)",
+      amount: team.income.objectiveReward,
+      tone: "accent",
+      title: "Netto-Prämie erfüllter Vorstandsziele (Board-Objective-Settlement).",
     });
   }
   return lines;
@@ -159,6 +180,15 @@ function buildExpenseLines(team: TeamFinancesState): FinanceLineItem[] {
       amount: team.expenses.transferDeficit,
       tone: "warn",
       title: buildTransferTooltip(team),
+    });
+  }
+  if (team.expenses.objectivePenalty != null) {
+    lines.push({
+      key: "objective",
+      label: "Vorstandsziele (Strafe)",
+      amount: team.expenses.objectivePenalty,
+      tone: "warn",
+      title: "Netto-Strafe verfehlter Vorstandsziele (Board-Objective-Settlement).",
     });
   }
   return lines;
@@ -571,13 +601,13 @@ export default function FoundationFinancesNewLook({
               label="Einnahmen (Saison)"
               value={formatNlMoney(animatedIncome ?? team.totalIncome)}
               tone="good"
-              title="Sponsor + Preisgeld + Transfer-Überschuss der laufenden Saison"
+              title="Sponsor + Gebäude-Einnahmen + Transfer-Überschuss + Vorstandsziel-Prämien der laufenden Saison (Preisgeld ist reiner Benchmark, nicht enthalten)"
             />
             <StatChip
               label="Ausgaben (Saison)"
               value={formatNlMoney(animatedExpenses ?? team.totalExpenses)}
               tone="risk"
-              title="Gehälter + Gebäude-Unterhalt + Kreditraten + Transfer-Defizit der laufenden Saison"
+              title="Gehälter + bezahlter Gebäude-Unterhalt + Kreditraten + Transfer-Defizit + Vorstandsziel-Strafen der laufenden Saison"
             />
             <StatChip
               label="GuV"
@@ -651,6 +681,16 @@ export default function FoundationFinancesNewLook({
             ) : (
               <NlEmptyState title="Keine Einnahmen für diese Saison bekannt." />
             )}
+            {team.income.prizeBenchmark ? (
+              <p
+                className="nl-fin-league-hint muted"
+                title={buildPrizeTooltip(team)}
+                data-testid="nl-fin-prize-benchmark"
+              >
+                Benchmark (nicht ausgezahlt): Preisgeld {formatNlMoney(team.income.prizeBenchmark.total)} — reiner
+                Vergleichswert, fließt NICHT in Einnahmen/GuV.
+              </p>
+            ) : null}
           </NlCard>
 
           <NlCard

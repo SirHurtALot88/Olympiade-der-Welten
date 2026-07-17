@@ -6,11 +6,21 @@ import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTyp
 import { estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
-import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
-import { calculateFacilitySeasonUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
+import {
+  calculateFacilitySeasonUpkeep,
+  getFacilityEfficiency,
+  getFacilityLevel,
+  getTeamFacilityState,
+} from "@/lib/facilities/facility-effects";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
+import { buildTeamSeasonObjectiveSettlement } from "@/lib/board/team-season-objectives-service";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import type {
+  FinanceFacilityIncome,
+  FinanceFacilityIncomeRow,
+  FinanceFacilityUpkeepRow,
   FinancePrizeIncome,
   FinanceSeasonHistoryPoint,
   FinanceSponsorIncome,
@@ -22,6 +32,77 @@ import type {
 /** Gleiche Rundung wie Cash-Werte im Kredit-/Sponsor-Service (1 Nachkommastelle). */
 function round1(value: number): number {
   return Number(value.toFixed(1));
+}
+
+/** 2-Nachkommastellen-Rundung — spiegelt `roundValue(x, 2)` im `facility-season-end-service`, damit die
+ *  „paid vs. unpaid"-Schwelle (Cash + Einnahmen ≥ Upkeep) bit-genau zur echten Season-End-Resolution passt. */
+function round2(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+type FacilitySeasonEndCash = {
+  income: FinanceFacilityIncome | null;
+  /** Nur die tatsächlich BEZAHLTEN Upkeep-Zeilen (Season-End-Settlement-Semantik). */
+  paidUpkeep: { total: number; facilities: FinanceFacilityUpkeepRow[] };
+};
+
+/**
+ * Client-safe Nachbau von `previewFacilitySeasonEndFinance` (facility-season-end-service) — bewusst
+ * OHNE dessen node:crypto/better-sqlite3-Importe (die sonst ins Client-Bundle gezogen würden). Nutzt
+ * nur die client-safen Helfer `getFacilityLevel`/`getFacilityEfficiency`/`getFacilityLevelDefinition`/
+ * `calculateFacilitySeasonUpkeep` und `computeTeamBeliebtheitFromGameState` (Arena-Skalierung),
+ * exakt wie `buildRows`/`previewFacilitySeasonEndFinance` dort:
+ *   - income = seasonIncome × efficiency × (Arena? Beliebtheit : 1) / 100
+ *   - Upkeep gilt nur als BEZAHLT, wenn (Cash + Gesamteinnahmen − bisher bezahlt) ≥ Upkeep und nicht
+ *     schon in dieser Saison bezahlt — sonst „will_disable_unpaid" (nicht cash-wirksam).
+ * Der reale Cash-Effekt der Season-End-Resolution ist damit `income.total − paidUpkeep.total`.
+ */
+function computeFacilitySeasonEndCash(gameState: GameState, teamId: string, cashBefore: number | null): FacilitySeasonEndCash {
+  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  const seasonId = gameState.season.id;
+  const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
+
+  // Reihenfolge = FACILITY_CATALOG (identisch zu buildRows), damit die Cash-gedeckelte
+  // „paid"-Entscheidung dieselben Gebäude in derselben Reihenfolge abarbeitet.
+  const rows = FACILITY_CATALOG.map((facility) => {
+    const effectLevel = getFacilityLevel(teamFacilities, facility.facilityId);
+    const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
+    const definition = getFacilityLevelDefinition(facility.facilityId, effectLevel);
+    const popularityFactor = facility.facilityId === "arena_upgrade" ? arenaPopularityFactor : 1;
+    return {
+      label: facility.label,
+      income: round2(((definition?.seasonIncome ?? 0) * efficiencyPct * popularityFactor) / 100),
+      upkeep: round2(calculateFacilitySeasonUpkeep(facility.facilityId, teamFacilities)),
+      alreadyPaid: teamFacilities.facilities[facility.facilityId]?.lastPaidSeasonId === seasonId,
+    };
+  });
+
+  const incomeTotalRaw = round2(rows.reduce((sum, row) => sum + row.income, 0));
+  let cashAvailableForUpkeep = cashBefore == null ? null : round2(cashBefore + incomeTotalRaw);
+
+  const paidUpkeepRows: FinanceFacilityUpkeepRow[] = [];
+  let paidUpkeepTotalRaw = 0;
+  for (const row of rows) {
+    if (row.upkeep <= 0 || row.alreadyPaid) continue;
+    if (cashAvailableForUpkeep != null && cashAvailableForUpkeep < row.upkeep) continue; // will_disable_unpaid
+    if (cashAvailableForUpkeep != null) cashAvailableForUpkeep = round2(cashAvailableForUpkeep - row.upkeep);
+    paidUpkeepRows.push({ label: row.label, upkeep: round1(row.upkeep) });
+    paidUpkeepTotalRaw += row.upkeep;
+  }
+
+  const incomeRows: FinanceFacilityIncomeRow[] = rows
+    .filter((row) => row.income > 0)
+    .map((row) => ({ label: row.label, income: round1(row.income) }))
+    .sort((left, right) => right.income - left.income);
+  const incomeTotal = round1(incomeTotalRaw);
+
+  return {
+    income: incomeTotal > 0 ? { total: incomeTotal, facilities: incomeRows } : null,
+    paidUpkeep: {
+      total: round1(paidUpkeepTotalRaw),
+      facilities: paidUpkeepRows.sort((left, right) => right.upkeep - left.upkeep),
+    },
+  };
 }
 
 /** Anzeige-Reihenfolge der Sponsor-Vertragskomponenten (mirrors `SPONSOR_STACK_SEGMENTS` in FoundationSponsorsNewLook). */
@@ -115,31 +196,34 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const transferDeficit = transfer != null && transfer.net < 0 ? round1(-transfer.net) : null;
 
   // --- Gehälter (Kader) ---------------------------------------------------
-  // Gleiche Auflösung wie `getTeamDisplaySalaryTotal` (siehe
-  // `lib/sponsor/sponsor-team-salary-display.ts`, das auch die Kredite-Ansicht
-  // nutzt), nur zusätzlich pro Spieler statt nur summiert.
+  // T-108 (c): Quelle ist `contract.salary` — EXAKT das Feld, das die echte Season-End-Resolution
+  // abbucht (`sponsor-settlement-service.ts`: `resolvePlayerEconomyContract(...).salary ?? 0`).
+  // NICHT `contract.expectedSalary` (ein abweichender Erwartungswert), sonst laufen angezeigte
+  // Gehaltsausgabe und tatsächliche Cash-Belastung auseinander und die GuV stimmt nicht mit dem
+  // realen Cash-Delta überein.
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const salaryRows = gameState.rosters
     .filter((entry) => entry.teamId === teamId)
     .map((entry) => {
       const player = playerById.get(entry.playerId) ?? null;
       const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      const salary = contract.expectedSalary ?? normalizeEconomyMoney(contract.salary) ?? 0;
+      const salary = normalizeEconomyMoney(contract.salary) ?? 0;
       return { playerName: player?.name ?? "Unbekannter Spieler", salary: round1(salary) };
     })
     .filter((row) => row.salary > 0)
     .sort((left, right) => right.salary - left.salary);
   const salaryTotal = round1(salaryRows.reduce((sum, row) => sum + row.salary, 0));
 
-  // --- Gebäude-Unterhalt ---------------------------------------------------
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
-  const facilityRows = FACILITY_CATALOG.map((entry) => ({
-    label: entry.label,
-    upkeep: round1(calculateFacilitySeasonUpkeep(entry.facilityId, teamFacilities)),
-  }))
-    .filter((row) => row.upkeep > 0)
-    .sort((left, right) => right.upkeep - left.upkeep);
-  const facilityUpkeepTotal = round1(facilityRows.reduce((sum, row) => sum + row.upkeep, 0));
+  // --- Gebäude: Einnahmen + BEZAHLTER Unterhalt (T-108 b) ------------------
+  // Symmetrisch cash-wirksam: der Season-End-Service schreibt sowohl den Facility-INCOME gut als
+  // auch NUR den tatsächlich bezahlten Upkeep ab. Vorher fehlte die Einnahmenseite komplett und
+  // der Brutto-Upkeep stand asymmetrisch als Ausgabe. `computeFacilitySeasonEndCash` bildet beides
+  // client-safe nach (siehe Helfer oben). `cashBefore = team.cash` — identisch zu
+  // `previewFacilitySeasonEndFinance`, das ebenfalls den aktuellen Team-Cash als Ausgangswert nimmt.
+  const facilityCash = computeFacilitySeasonEndCash(gameState, teamId, team.cash);
+  const facilityIncome = facilityCash.income;
+  const facilityRows = facilityCash.paidUpkeep.facilities;
+  const facilityUpkeepTotal = facilityCash.paidUpkeep.total;
 
   // --- Kreditraten ----------------------------------------------------------
   const activeLoans = (gameState.seasonState.loans ?? []).filter(
@@ -157,8 +241,25 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     .sort((left, right) => right.installment - left.installment);
   const loanInstallmentTotal = getTeamAnnualLoanInstallment(gameState, teamId);
 
-  const totalIncome = round1((sponsor?.total ?? 0) + (prize?.total ?? 0) + (transferSurplus ?? 0));
-  const totalExpenses = round1(salaryTotal + facilityUpkeepTotal + loanInstallmentTotal + (transferDeficit ?? 0));
+  // --- Board-Objective-cashDelta (T-108 c) --------------------------------
+  // Netto-cashDelta, den die Engine über `buildTeamSeasonObjectiveSettlement` tatsächlich verbucht
+  // (Prämien completed − Strafen failed). Wir ZEIGEN nur diesen Netto-Wert und duplizieren die
+  // Objective-Logik NICHT (der Board-Service ist die einzige Quelle; ein separater Doppelzahlungs-
+  // Bug in den Sponsor-Komponenten wird andernorts im Service selbst behoben, nicht hier gespiegelt).
+  const objectiveCashDelta = round1(
+    buildTeamSeasonObjectiveSettlement(gameState).byTeamId[teamId]?.cashDelta ?? 0,
+  );
+  const objectiveReward = objectiveCashDelta > 0 ? objectiveCashDelta : null;
+  const objectivePenalty = objectiveCashDelta < 0 ? round1(-objectiveCashDelta) : null;
+
+  // Preisgeld ist NIE cash-wirksam (Benchmark) → NICHT in totalIncome. Facility-Income und
+  // Objective-Prämie sind es → dazu. Symmetrisch: bezahlter Upkeep + Objective-Strafe als Ausgabe.
+  const totalIncome = round1(
+    (sponsor?.total ?? 0) + (facilityIncome?.total ?? 0) + (transferSurplus ?? 0) + (objectiveReward ?? 0),
+  );
+  const totalExpenses = round1(
+    salaryTotal + facilityUpkeepTotal + loanInstallmentTotal + (transferDeficit ?? 0) + (objectivePenalty ?? 0),
+  );
   const guv = round1(totalIncome - totalExpenses);
 
   // --- Saison-Verlauf + Cash-Abgleich (T-107, T-031) -----------------------
@@ -173,12 +274,17 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     .map((snapshot): FinanceSeasonHistoryPoint | null => {
       const row = snapshot.finalStandings.find((entry) => entry.teamId === teamId) ?? null;
       if (!row) return null;
-      const cash = row.cashTotal ?? row.cashEnd ?? null;
+      // T-108 (d): reales fortgeschriebenes Cash-Ende BEVORZUGEN (`cashEnd`), NICHT das
+      // benchmark-`cashTotal` (= projiziertes `projectedCash` aus `writeLocalCashPrizeApply`,
+      // kein reales Cash). Der archivierte `guv` wurde mit der alten prize-als-Einnahme-Formel
+      // gebildet und ist nicht mit der korrigierten GuV vergleichbar → bewusst `null`, damit die
+      // Sparkline ehrlich in den Empty-State degradiert statt Phantomwerte zu zeigen.
+      const cash = row.cashEnd ?? row.cashTotal ?? null;
       return {
         seasonId: snapshot.seasonId,
         seasonName: snapshot.seasonName,
         isCurrent: false,
-        guv: row.guv != null && Number.isFinite(row.guv) ? round1(row.guv) : null,
+        guv: null,
         cash: cash != null && Number.isFinite(cash) ? round1(cash) : null,
       };
     })
@@ -197,12 +303,13 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const teamFinances: TeamFinancesState = {
     teamId,
     cash: team.cash,
-    income: { sponsor, prize, transferSurplus },
+    income: { sponsor, facilityIncome, transferSurplus, objectiveReward, prizeBenchmark: prize },
     expenses: {
       salaries: { total: salaryTotal, players: salaryRows },
       facilityUpkeep: { total: facilityUpkeepTotal, facilities: facilityRows },
       loanInstallments: { total: loanInstallmentTotal, loans: loanRows },
       transferDeficit,
+      objectivePenalty,
     },
     transfer,
     totalIncome,
