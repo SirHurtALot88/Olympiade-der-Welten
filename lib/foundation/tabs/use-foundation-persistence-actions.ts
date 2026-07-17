@@ -239,6 +239,16 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   const persistRequestVersionRef = useRef(0);
   const persistSnapshotRef = useRef<{ requestVersion: number; snapshot: GameState } | null>(null);
   const loadedWithCompactInitialRef = useRef(true);
+  // Serialisiert ALLE lokalen Save-PUTs (Sofort-Persist + Auto-Save), damit
+  // zwei schnelle Schreibaktionen sich nicht selbst einen 409-Konflikt bauen
+  // (die zweite würde sonst mit veralteter saveVersion abschicken, bevor die
+  // erste die Version hochgezählt hat). `lastKnownSaveVersionRef` hält die
+  // zuletzt vom Server bestätigte Version synchron vor, sodass ein in der
+  // Queue wartender Write seine expectedSaveVersion auf den frischen Stand
+  // heben kann. Ein echter Fremdkonflikt (Version steigt serverseitig, ohne
+  // dass wir das über einen Load erfahren) führt weiterhin zu 409 + Reload.
+  const saveWriteChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const lastKnownSaveVersionRef = useRef(0);
 
   const feedSettersRef = useRef(feedSetters);
   feedSettersRef.current = feedSetters;
@@ -403,6 +413,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         loadedWithCompactInitialRef.current = options.compactInitial ?? true;
         autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
         setGameState(nextGameState);
+        noteKnownSaveVersion(nextGameState.saveVersion);
         setPersistenceError(null);
         // Ein erfolgreicher Load räumt AUCH einen evtl. hängengebliebenen
         // Bootstrap-Fehler weg (beide Pfade setzen sonst nur ihren eigenen
@@ -470,6 +481,32 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
   }
 
+  // Merkt sich die zuletzt server-bestätigte saveVersion (nur aus eigenen
+  // erfolgreichen Writes und aus Loads — nicht künstlich hochzählen, sonst
+  // würden echte Fremdkonflikte verschluckt).
+  function noteKnownSaveVersion(version: number | null | undefined) {
+    if (typeof version === "number" && version > lastKnownSaveVersionRef.current) {
+      lastKnownSaveVersionRef.current = version;
+    }
+  }
+
+  // Hebt die expectedSaveVersion eines wartenden Writes auf den zuletzt
+  // bekannten Stand — der Inhalt (kumulativer React-State) bleibt gültig.
+  function withFreshSaveVersion(snapshot: GameState): GameState {
+    const fresh = Math.max(snapshot.saveVersion ?? 0, lastKnownSaveVersionRef.current);
+    return (snapshot.saveVersion ?? 0) === fresh ? snapshot : { ...snapshot, saveVersion: fresh };
+  }
+
+  // Serialisiert einen Save-Write hinter allen bereits laufenden/wartenden.
+  function enqueueSaveWrite<T>(task: () => Promise<T>): Promise<T> {
+    const result = saveWriteChainRef.current.then(task, task);
+    saveWriteChainRef.current = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   async function persistLocalGameStateImmediately(
     nextGameState: GameState,
     options?: { materializeSeasonDerivations?: boolean },
@@ -477,10 +514,18 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     const requestVersion = ++persistRequestVersionRef.current;
     persistSnapshotRef.current = { requestVersion, snapshot: nextGameState };
 
+    return enqueueSaveWrite(() => persistLocalGameStateImmediatelyInner(nextGameState, requestVersion, options));
+  }
+
+  async function persistLocalGameStateImmediatelyInner(
+    nextGameState: GameState,
+    requestVersion: number,
+    options?: { materializeSeasonDerivations?: boolean },
+  ): Promise<GameState> {
     const response = await putFoundationGameState(
       buildFoundationPersistPutBody({
         saveId: activeSaveId,
-        gameState: nextGameState,
+        gameState: withFreshSaveVersion(nextGameState),
         compactPut: loadedWithCompactInitialRef.current,
         materializeSeasonDerivations: options?.materializeSeasonDerivations,
       }),
@@ -513,6 +558,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     if (payload.save?.saveVersion != null) {
       onFetchSlowClear?.();
       const newSaveVersion = payload.save.saveVersion;
+      noteKnownSaveVersion(newSaveVersion);
       autoPersistContentSignatureRef.current = buildAutoPersistContentSignature({
         ...nextGameState,
         saveVersion: newSaveVersion,
@@ -692,6 +738,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       hasLoadedPersistentState.current = true;
       autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
       setGameState(nextGameState);
+      noteKnownSaveVersion(nextGameState.saveVersion);
       setActiveSaveId(payload.save.saveId);
       setActiveSaveName(payload.save.name ?? "Oly Save");
       setSaveSummaries(payload.saves ?? []);
@@ -783,12 +830,14 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       autoPersistInFlightRef.current = true;
-      void putFoundationGameState(
-        buildFoundationPersistPutBody({
-          saveId: activeSaveId,
-          gameState: snapshot,
-          compactPut: loadedWithCompactInitialRef.current,
-        }),
+      void enqueueSaveWrite(() =>
+        putFoundationGameState(
+          buildFoundationPersistPutBody({
+            saveId: activeSaveId,
+            gameState: withFreshSaveVersion(snapshot),
+            compactPut: loadedWithCompactInitialRef.current,
+          }),
+        ),
       )
         .then(async (response) => {
           if (response.status === 409) {
@@ -816,6 +865,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
           }
 
           autoPersistContentSignatureRef.current = persistSignature;
+          noteKnownSaveVersion(payload.save?.saveVersion);
 
           if (payload.save?.name) {
             setActiveSaveName(payload.save.name);
