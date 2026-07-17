@@ -60,31 +60,10 @@ export default function FoundationTransfermarktV2Panel({
         </TooltipHeading>
         <span className="pill foundation-source-pill">source: active local save</span>
       </div>
-      <div
-        className={`transfer-callout ${transferWindowStatus.open ? "is-info" : "is-blocked"}`}
-        data-testid="foundation-transfer-window-status"
-        style={{ marginBottom: 12 }}
-      >
-        <div className="transfer-callout-title">
-          <strong>{transferWindowStatus.label}</strong>
-          <span className={`transfer-status-pill ${transferWindowStatus.open ? "is-ready" : "is-blocked"}`}>
-            {transferWindowStatus.open ? "offen" : "geschlossen"}
-          </span>
-        </div>
-        <span>
-          {transferWindowStatus.open
-            ? "Markt-Timing ist aktiv: Verkauf und Kauf folgen getrennten Fenstern."
-            : `Der Transfermarkt bleibt zur Ansicht geöffnet — Käufe und Verkäufe sind in der Phase „${formatGamePhaseLabel(transferWindowStatus.phase)}“ jedoch gesperrt.`}
-        </span>
-        <div className="room-meta foundation-admin-meta">
-          <span className={`transfer-status-pill ${transferWindowStatus.canSell ? "is-ready" : "is-blocked"}`}>
-            Verkauf {transferWindowStatus.canSell ? "erlaubt" : "gesperrt"}
-          </span>
-          <span className={`transfer-status-pill ${transferWindowStatus.canBuy ? "is-ready" : "is-blocked"}`}>
-            Kauf {transferWindowStatus.canBuy ? "erlaubt" : "gesperrt"}
-          </span>
-        </div>
-      </div>
+      {/* Der Transferfenster-Status wird jetzt einzig vom Neuer-Look-Client
+          (marketWindowNotice) angezeigt — das fruehere Legacy-Callout hier war
+          ein zweites, redundantes "Transferfenster geschlossen"-Banner direkt
+          darueber. */}
       <div className="foundation-view-source-row">
         <span className="pill foundation-source-pill">{sourceBadgeLabel}</span>
         <span className="muted">

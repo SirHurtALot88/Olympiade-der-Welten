@@ -15,6 +15,7 @@ import {
   NlWhatIfSlider,
   StatChip,
   StatChipRow,
+  formatNlMoney,
   formatNlNumber,
   NL_AXIS_LABELS,
   nlToneClass,
@@ -23,12 +24,15 @@ import {
 } from "@/components/foundation/new-look";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractYearSalary, Discipline, DisciplineCategory, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getGameTermShort } from "@/lib/ui/game-encyclopedia";
-import {
-  formatTransfermarktCurrency,
-  formatTransfermarktRatio,
-} from "@/lib/market/transfermarkt-formatting-contract";
+import { formatTransfermarktRatio } from "@/lib/market/transfermarkt-formatting-contract";
+
+// Geldbeträge im Velo-Transfermarkt folgen der app-weiten "Mio"-Konvention
+// (formatNlMoney), damit derselbe Marktwert nicht auf einer Seite "506,4 Mio"
+// und im Markt "506,4 €" heißt. Werte liegen bereits in Mio-Einheit vor.
+const formatTransfermarktCurrency = (value: number | null | undefined) => formatNlMoney(value);
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { getAttributeTierClass, getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
@@ -1916,7 +1920,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               </span>
             }
           >
-            {previewError ? <p className="nl-market-error">{previewError}</p> : null}
+            {previewError ? <p className="nl-market-error">{formatGameFlowBlocker(previewError)}</p> : null}
             <div className="nl-market-pill-group" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
               {[1, 2, 3].map((length) => (
                 <button
