@@ -19,15 +19,19 @@ function isEditableTarget(target: EventTarget | null) {
 // open, Escape/Backspace must dismiss *that* overlay (its own handler) instead
 // of navigating the shell back to the previous tab — otherwise the user gets
 // yanked to Home while a dialog is still open (a keyboard trap).
+// `:not([hidden])` is essential: several KPI hover panels are permanently
+// mounted with `hidden={!open}` (Teams/Team-Profil headers) — without the guard
+// they would count as "open" the whole time that view is shown and dead-lock
+// Escape/Backspace back-navigation on those views.
 const OPEN_OVERLAY_SELECTOR = [
-  '[role="dialog"]',
-  '[aria-modal="true"]',
-  '[role="menu"]',
-  '[role="listbox"]',
+  '[role="dialog"]:not([hidden])',
+  '[aria-modal="true"]:not([hidden])',
+  '[role="menu"]:not([hidden])',
+  '[role="listbox"]:not([hidden])',
   "dialog[open]",
-  "[data-nl-overlay-open]",
-  ".nl-rankdrawer",
-  ".nl-rankdrawer-backdrop",
+  "[data-nl-overlay-open]:not([hidden])",
+  ".nl-rankdrawer:not([hidden])",
+  ".nl-rankdrawer-backdrop:not([hidden])",
 ].join(",");
 
 function hasOpenDismissibleOverlay() {

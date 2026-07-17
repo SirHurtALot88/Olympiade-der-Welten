@@ -830,42 +830,44 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       autoPersistInFlightRef.current = true;
-      void enqueueSaveWrite(() =>
-        putFoundationGameState(
+      // Das GANZE Response-Handling (inkl. json() + noteKnownSaveVersion + der
+      // 409-Reload) läuft INNERHALB der Queue-Task — sonst könnte ein danach
+      // eingereihter Write sein withFreshSaveVersion berechnen, bevor diese
+      // Version notiert ist, und sich erneut selbst einen 409 bauen.
+      void enqueueSaveWrite(async () => {
+        const response = await putFoundationGameState(
           buildFoundationPersistPutBody({
             saveId: activeSaveId,
             gameState: withFreshSaveVersion(snapshot),
             compactPut: loadedWithCompactInitialRef.current,
           }),
-        ),
-      )
-        .then(async (response) => {
-          if (response.status === 409) {
-            setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
-            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
-            if (reloaded) {
-              await applySaveConflictReload(reloaded);
-            }
-            return null;
+        );
+        if (response.status === 409) {
+          setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+          const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+          if (reloaded) {
+            await applySaveConflictReload(reloaded);
           }
-          if (!response.ok) {
-            setPersistenceError("Auto-Save fehlgeschlagen.");
-            return null;
-          }
-
-          setPersistenceError(null);
-          return (await response.json()) as {
-            save?: { saveId: string; name?: string; saveVersion?: number };
-            saves?: SaveSummary[];
-          };
-        })
+          return null;
+        }
+        if (!response.ok) {
+          setPersistenceError("Auto-Save fehlgeschlagen.");
+          return null;
+        }
+        setPersistenceError(null);
+        const payload = (await response.json()) as {
+          save?: { saveId: string; name?: string; saveVersion?: number };
+          saves?: SaveSummary[];
+        };
+        noteKnownSaveVersion(payload.save?.saveVersion);
+        return payload;
+      })
         .then((payload) => {
           if (!payload) {
             return;
           }
 
           autoPersistContentSignatureRef.current = persistSignature;
-          noteKnownSaveVersion(payload.save?.saveVersion);
 
           if (payload.save?.name) {
             setActiveSaveName(payload.save.name);
