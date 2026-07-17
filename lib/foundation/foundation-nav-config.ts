@@ -56,7 +56,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       ...(CREDITS_TAB_ENABLED
         ? [{ id: "credits", label: "Kredite", tooltip: "Kreditrahmen, laufende Kredite und Angebote.", icon: "₤" } as FoundationNavItem]
         : []),
-      { id: "finances", label: "Finanzen", tooltip: "Einnahmen, Ausgaben und GuV deines Teams.", icon: "◧" },
+      { id: "finances", label: "Finanzen", tooltip: "Einnahmen, Ausgaben und GuV deines Teams.", icon: "€" },
     ],
   },
   {
@@ -66,7 +66,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
       { id: "diszis", label: "Diszis", tooltip: "Disziplinen und Mutatoren.", icon: "◫" },
       { id: "leagueLeaders", label: "Leaders", tooltip: "Liga-Leaders je Kategorie plus Rekorde, Trophäenschrank und legendäre Spieler.", icon: "★" },
-      { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "€" },
+      { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "$" },
       { id: "encyclopedia", label: "Lexikon", tooltip: "Spielbegriffe und Regeln.", icon: "?" },
     ],
   },
