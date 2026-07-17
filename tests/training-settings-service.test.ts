@@ -184,7 +184,7 @@ describe("training-settings-service: season-long training intensity lock", () =>
     expect(persistence.current.gameState.players[0]?.trainingMode).toBe("hart");
   });
 
-  it("blocks team-level training intensity changes once the season's first matchday result exists", () => {
+  it("no longer blocks team-level training intensity changes mid-season (anti-cheese Teil B)", () => {
     const source = save(
       gameState({
         gamePhase: "season_active",
@@ -193,15 +193,16 @@ describe("training-settings-service: season-long training intensity lock", () =>
       }),
     );
     const preview = previewTeamTrainingSettings({ save: source, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" });
-    expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
+    expect(preview.ok).toBe(true);
+    expect(preview.blockingReasons).not.toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
 
-    const result = applyTeamTrainingSettings(source, "T-1", "BALANCED", "hard", preview.confirmToken);
-    expect(result.applied).toBe(false);
-    expect(result.blockingReasons).toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
+    const persistence = inMemoryPersistence(source);
+    const result = applyTeamTrainingSettings(persistence.current, "T-1", "BALANCED", "hard", preview.confirmToken, "manual_training_settings", persistence);
+    expect(result.applied).toBe(true);
+    expect(result.blockingReasons).not.toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
   });
 
-  it("blocks per-player training mode changes once the season's first matchday result exists", () => {
+  it("no longer blocks per-player training mode changes mid-season (anti-cheese Teil B)", () => {
     const source = save(
       gameState({
         gamePhase: "season_active",
@@ -211,24 +212,26 @@ describe("training-settings-service: season-long training intensity lock", () =>
     );
     const assignments = [{ playerId: "p-1", trainingMode: "hart" as const }];
     const preview = previewPlayerTrainingModes({ save: source, teamId: "T-1", assignments });
-    expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
+    expect(preview.ok).toBe(true);
+    expect(preview.blockingReasons).not.toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
 
-    const result = applyPlayerTrainingModes(source, "T-1", assignments, preview.confirmToken);
-    expect(result.applied).toBe(false);
-    expect(result.blockingReasons).toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
-    expect(source.gameState.players.find((entry) => entry.id === "p-1")?.trainingMode).toBe("mittel");
+    const persistence = inMemoryPersistence(source);
+    const result = applyPlayerTrainingModes(persistence.current, "T-1", assignments, preview.confirmToken, persistence);
+    expect(result.applied).toBe(true);
+    expect(result.blockingReasons).not.toContain(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
+    expect(persistence.current.gameState.players.find((entry) => entry.id === "p-1")?.trainingMode).toBe("hart");
   });
 
-  it("allows the very first setting again in a brand-new season", () => {
-    const lockedSeasonOne = save(
+  it("allows setting training in a brand-new season (unchanged)", () => {
+    const seasonOne = save(
       gameState({
         gamePhase: "season_active",
         matchdayStatus: "resolved",
         matchdayResults: [matchdayResult()],
       }),
     );
-    expect(previewTeamTrainingSettings({ save: lockedSeasonOne, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" }).ok).toBe(false);
+    // Mid-season is no longer blocked (anti-cheese Teil B).
+    expect(previewTeamTrainingSettings({ save: seasonOne, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" }).ok).toBe(true);
 
     const seasonTwo = save(gameState({ seasonId: "season-2", gamePhase: "preseason_management" }));
     const preview = previewTeamTrainingSettings({ save: seasonTwo, teamId: "T-1", trainingFocus: "BALANCED", trainingIntensity: "hard" });

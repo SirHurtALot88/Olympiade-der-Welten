@@ -298,7 +298,8 @@ export function useFoundationCrossTabMarketFilters(input: {
     () =>
       shouldBuildHqTransferMarkers
         ? input.selectedRosterTableRows.filter(
-            (row) => (row.player.currentXP ?? 0) > 0 || (row.player.fatigue ?? 0) > 0,
+            // XP-System abgeschafft: nur noch Fatigue (currentXP ist immer 0).
+            (row) => (row.player.fatigue ?? 0) > 0,
           ).length
         : 0,
     [input.selectedRosterTableRows, shouldBuildHqTransferMarkers],

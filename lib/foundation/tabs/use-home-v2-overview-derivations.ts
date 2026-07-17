@@ -222,9 +222,11 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
             player: row.player,
             playerRating: rating,
             seasonPerformance,
-            currentXP: row.player.currentXP ?? 0,
-            spentXP: row.player.spentXP ?? 0,
-            lifetimeXP: row.player.lifetimeXP ?? null,
+            // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch). Der Forecast
+            // liefert weiterhin Sterne/Ratings/Tiers/Regression aus dem organischen Modell.
+            currentXP: 0,
+            spentXP: 0,
+            lifetimeXP: null,
           })
         : null;
       const developmentInsight = enableTopPlayerForecasts

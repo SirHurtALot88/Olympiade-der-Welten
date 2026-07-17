@@ -23,6 +23,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
 import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
+import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 
@@ -706,8 +707,16 @@ export class LegacyMatchdayResultApplyService {
           precomputedInjuryRolls: injuryRollMap,
         });
 
+    // Anti-cheese Teil B (B.4): record this matchday's per-player training mode and advance the
+    // per-matchday training-fatigue share AFTER the injury roll (never inside `fatigueBeforeRoll`).
+    const accumulatedGameState = accumulateMatchdayTrainingProgress({
+      gameState: injuryResult.gameState,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+    });
+
     const objectiveStartedAt = performance.now();
-    const refreshedGameState = refreshTeamObjectiveState(injuryResult.gameState);
+    const refreshedGameState = refreshTeamObjectiveState(accumulatedGameState);
     const standingsObjectiveRefreshMs = elapsedSince(objectiveStartedAt);
     const saveStartedAt = performance.now();
     persistGameStateWithMaterializedDerivations(this.persistence, save.saveId, refreshedGameState);

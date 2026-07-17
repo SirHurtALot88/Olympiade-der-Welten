@@ -193,6 +193,51 @@ export const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, n
   hart: 1.0,
 };
 
+const TRAINING_MODES: PlayerTrainingMode[] = ["leicht", "mittel", "hart"];
+
+/**
+ * Anti-cheese: derive the season-end training budget and performance-weight multiplier from the
+ * player's per-matchday mode accumulator (see `Player["seasonTrainingAccumulator"]`) instead of the
+ * single `trainingMode` that happens to be set at season end.
+ *
+ * Both terms are computed from the EXACT integer per-mode matchday COUNTS — no per-matchday iterative
+ * float sum (that would drift). Each term is a share-weighted sum over the ≤3 modes, which is bit-exact
+ * for a single-mode full season (e.g. 10× "hart" → `SETPOINTS.hart * (10/10)` === `SETPOINTS.hart`):
+ *
+ *  - accumulatedBaseTrainingBudget = Σ_m SETPOINTS[m] · (count(m) / totalMatchdays)
+ *      denominator = full season length, so a partial/cheesed season yields a proportionally lower
+ *      budget (a "hart"-only run over 1 of 10 matchdays does NOT get the full hart budget).
+ *  - performanceWeightMultiplier   = Σ_m WEIGHT[m] · (count(m) / matchdaysCounted)
+ *      arithmetic mean of the per-matchday multipliers (NOT the multiplier of the "average mode" —
+ *      `mittel` is the maximum here, so an average-mode lookup would be wrong; see B.2).
+ *
+ * Returns null when there is no usable accumulator (→ caller falls back to mode-at-season-end).
+ */
+export function resolveSeasonTrainingAccumulatorInputs(input: {
+  accumulator: Player["seasonTrainingAccumulator"] | undefined;
+  seasonId: string;
+  totalMatchdays: number;
+}): { accumulatedBaseTrainingBudget: number; performanceWeightMultiplier: number } | null {
+  const accumulator = input.accumulator;
+  if (!accumulator || accumulator.seasonId !== input.seasonId) return null;
+  const counts: Record<PlayerTrainingMode, number> = { leicht: 0, mittel: 0, hart: 0 };
+  for (const matchdayId of Object.keys(accumulator.modeByMatchday)) {
+    const mode = accumulator.modeByMatchday[matchdayId];
+    if (mode === "leicht" || mode === "mittel" || mode === "hart") counts[mode] += 1;
+  }
+  const countedMatchdays = counts.leicht + counts.mittel + counts.hart;
+  if (countedMatchdays <= 0) return null;
+  const totalMatchdays = Math.max(1, Math.floor(input.totalMatchdays) || 0);
+  let accumulatedBaseTrainingBudget = 0;
+  let performanceWeightMultiplier = 0;
+  for (const mode of TRAINING_MODES) {
+    if (counts[mode] === 0) continue;
+    accumulatedBaseTrainingBudget += TRAINING_SETPOINTS_BY_MODE[mode] * (counts[mode] / totalMatchdays);
+    performanceWeightMultiplier += PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[mode] * (counts[mode] / countedMatchdays);
+  }
+  return { accumulatedBaseTrainingBudget, performanceWeightMultiplier };
+}
+
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
@@ -566,6 +611,19 @@ export function buildOrganicSeasonProgression(input: {
   gameState: GameState;
   player: Player;
   facilities?: TeamFacilityCollection | null;
+  /**
+   * Anti-cheese override: base training budget derived from the per-matchday mode accumulator
+   * (see `resolveSeasonTrainingAccumulatorInputs`). When provided, REPLACES the mode-at-season-end
+   * `TRAINING_SETPOINTS_BY_MODE[trainingMode]` lookup. Absent → legacy behaviour.
+   */
+  accumulatedBaseTrainingBudget?: number;
+  /**
+   * Anti-cheese override: arithmetic mean of the per-matchday performance-weight multipliers.
+   * When provided, REPLACES the mode-at-season-end `PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[trainingMode]`
+   * lookup. Absent → legacy behaviour. (Must NOT be looked up from the "average mode": `mittel` is the
+   * maximum, so averaging modes then looking up would over-reward mixed schedules — see B.2.)
+   */
+  performanceWeightMultiplier?: number;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
   if (!attributesBefore) {
@@ -672,7 +730,14 @@ export function buildOrganicSeasonProgression(input: {
       : 1;
   const potentialTrainingMultiplier =
     getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor * talentBuilderPotentialFactor;
-  const baseTrainingBudget = TRAINING_SETPOINTS_BY_MODE[trainingMode];
+  const baseTrainingBudget =
+    input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
+      ? input.accumulatedBaseTrainingBudget
+      : TRAINING_SETPOINTS_BY_MODE[trainingMode];
+  const performanceWeightMultiplier =
+    input.performanceWeightMultiplier != null && Number.isFinite(input.performanceWeightMultiplier)
+      ? input.performanceWeightMultiplier
+      : PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[trainingMode];
   const routeBonusMultiplier = getDevelopmentRouteBonusMultiplier(
     classNameToDevelopmentRoute(primaryTrainingClass),
     resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
@@ -753,7 +818,7 @@ export function buildOrganicSeasonProgression(input: {
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
     const performanceDelta =
       applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
-      PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[trainingMode];
+      performanceWeightMultiplier;
     const delta = roundValue(regression + training + performanceDelta, 2);
     const before = attributesBefore[attribute];
     const after = roundValue(clamp(before + delta, 1, 99), 1);

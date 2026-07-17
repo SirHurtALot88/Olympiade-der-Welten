@@ -595,30 +595,8 @@ function TrainingCardCompactBadges({ row }: { row: TrainingPlayerRowView }) {
   );
 }
 
-function TrainingAttributeUpgradeStrip({ row }: { row: TrainingPlayerRowView }) {
-  const upgrades = useMemo(
-    () =>
-      [...row.attributeForecast]
-        .filter((entry) => entry.delta > 0)
-        .sort((left, right) => right.delta - left.delta)
-        .slice(0, 4),
-    [row.attributeForecast],
-  );
-  if (upgrades.length === 0) {
-    return null;
-  }
-  return (
-    <div className="training-v2-upgrade-strip" data-testid="training-attribute-upgrade-strip" aria-label="Attribut-Upgrades">
-      {upgrades.map((entry) => (
-        <button key={`upgrade-${row.player.id}-${entry.attributeKey}`} type="button" className="training-v2-upgrade-tile" title={`${entry.attribute} +1 · ca. 40 SP`}>
-          <span>{entry.attribute}</span>
-          <strong>+1</strong>
-          <small>~40 SP</small>
-        </button>
-      ))}
-    </div>
-  );
-}
+// XP-System abgeschafft: TrainingAttributeUpgradeStrip (dekorativer „+1 · ~40 SP"-Streifen)
+// entfernt — er suggerierte manuelle XP-/SP-Attribut-Upgrades, die es nicht mehr gibt.
 
 function TrainingWhyDisclosure({ row }: { row: TrainingPlayerRowView }) {
   const reasons = [
@@ -684,6 +662,22 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
               <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
             </div>
           </div>
+
+          {row.trainingAccumulatorForecast ? (
+            <p
+              className="muted training-v2-accumulator-forecast"
+              title="Anti-Cheese: Das Saison-End-Trainingsbudget akkumuliert pro Spieltag aus dem jeweils aktiven Modus. Bisher = bereits gesammelt; Rest projiziert die verbleibenden Spieltage im aktuell gewaehlten Modus."
+            >
+              Bisher {formatVeloNumber(row.trainingAccumulatorForecast.accumulatedBudget, 2)} SP (
+              {row.trainingAccumulatorForecast.matchdaysCounted} Spieltage) · Rest bei{" "}
+              {getTrainingModePresentation(row.mode).label} →{" "}
+              {formatVeloNumber(row.trainingAccumulatorForecast.forecastBudget, 2)} SP
+            </p>
+          ) : null}
+
+          <p className="muted training-v2-fatigue-current" title="Aktuelle Ermüdung inkl. pro Spieltag akkumulierter Trainings-Fatigue.">
+            Aktuell {formatVeloNumber(row.player.fatigue, 0)}/100 Fatigue
+          </p>
 
           <p
             className="muted training-v2-reality-note"
@@ -1065,7 +1059,6 @@ export function TrainingPlayerLane({
                   </p>
                 </FoundationCard>
               ) : null}
-              <TrainingAttributeUpgradeStrip row={row} />
               <TrainingCardDetails row={row} />
             </article>
           );

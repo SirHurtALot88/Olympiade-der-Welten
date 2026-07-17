@@ -195,7 +195,7 @@ export const homeTaskLabelContract = [
   "Spieler verkaufen",
   "Spieler kaufen",
   "Training prüfen",
-  "XP verteilen",
+  // XP-System abgeschafft: Home-Task „XP verteilen" entfernt.
   "Facility Upgrade möglich",
   "Formkarten setzen",
   "Arena starten",

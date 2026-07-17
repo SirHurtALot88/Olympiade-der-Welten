@@ -8683,7 +8683,8 @@ export function useFoundationShellRouterBodyScope({
             marketValue,
             marketValueDelta: getPlayerDisplayMarketValueDelta(row.player, row.entry, gameState),
             salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player, gameState),
-            xp: row.player.currentXP ?? 0,
+            // XP-System abgeschafft: XP-Badge/Kachel entfällt (currentXP ist immer 0).
+            xp: 0,
             fatigue: row.player.fatigue ?? 0,
             ppPow: rating?.ppPow ?? seasonPerformance?.pointsByArea.pow ?? null,
             ppSpe: rating?.ppSpe ?? seasonPerformance?.pointsByArea.spe ?? null,
@@ -8841,9 +8842,10 @@ export function useFoundationShellRouterBodyScope({
           player: row.player,
           playerRating: rating,
           seasonPerformance,
-          currentXP: row.player.currentXP ?? 0,
-          spentXP: row.player.spentXP ?? 0,
-          lifetimeXP: row.player.lifetimeXP ?? null,
+          // XP-System abgeschafft: XP-Inputs neutralisiert (0/organisch).
+          currentXP: 0,
+          spentXP: 0,
+          lifetimeXP: null,
         });
         const developmentInsight = buildPlayerDevelopmentInsight({
           gameState,

@@ -739,28 +739,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    const xpPlayers = roster
-      .map((entry) => playerById.get(entry.playerId))
-      .filter((player) => (player?.currentXP ?? 0) > 0);
-    if (xpPlayers.length > 0) {
-      items.push(
-        createItem({
-          itemId: `xp_available:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
-          saveId: input.saveId,
-          seasonId: input.gameState.season.id,
-          teamId: team.teamId,
-          category: "training",
-          severity: "info",
-          title: "XP verfügbar",
-          description: `${team.shortCode}: ${xpPlayers.length} Spieler können entwickelt werden.`,
-          targetView: "trainingV2",
-          targetParams: { team: team.teamId, panel: "season-end-development" },
-          ctaLabel: "XP ausgeben",
-          source: "player_current_xp",
-          createdAt,
-        }),
-      );
-    }
+    // XP-System abgeschafft: Der Inbox-Hinweis „XP verfügbar / XP ausgeben"
+    // (gegated auf player.currentXP > 0) entfällt — Entwicklung läuft organisch.
 
     const expiring = roster.filter(
       (entry) => (entry.contractLength ?? 0) <= 1 || entry.contractStatus === "expiring" || entry.contractStatus === "renewal_pending",

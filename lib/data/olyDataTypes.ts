@@ -801,6 +801,21 @@ export type Player = {
   lifetimeXP?: number | null;
   trainingMode?: "leicht" | "mittel" | "hart" | null;
   trainingClass?: string | null;
+  /**
+   * Per-matchday training accumulation for the current season (anti-cheese). Instead of a single
+   * season-end training budget derived from whatever `trainingMode` happens to be set at season end,
+   * each resolved matchday records the mode that was active for that matchday. The season-end organic
+   * progression then derives its base training budget + performance-weight from the EXACT per-mode
+   * matchday counts (see `resolveSeasonTrainingAccumulatorInputs`). Additive/optional: absent/null →
+   * legacy behaviour (mode-at-season-end). Reset to null every preseason baseline pass.
+   */
+  seasonTrainingAccumulator?: {
+    seasonId: string;
+    matchdaysCounted: number;
+    modeByMatchday: Record<string, "leicht" | "mittel" | "hart">;
+    accumulatedTrainingFatigue: number;
+    updatedAt: string;
+  } | null;
   cost?: number;
   upkeepBase?: number;
   className: string;
