@@ -2,6 +2,8 @@
 
 import { Fragment, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
+import "@/app/foundation/season-v2/season-standings-new-look.css";
+
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
   NlBarChart,
@@ -1024,11 +1026,18 @@ export default function SeasonStandingsNewLook({
    */
   function renderGmSection() {
     if (gmRows.length === 0) {
-      return null;
+      return (
+        <NlCard className="nl-standings-players-card" eyebrow="Verwaltungsrat" title="GM-Büro je Verein">
+          <NlEmptyState
+            title="Kein GM-Büro besetzt"
+            message="Für diese Saison sind noch keine General Manager hinterlegt."
+          />
+        </NlCard>
+      );
     }
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Verwaltungsrat" title="GM-Büro je Verein">
-        <ol className="nl-standings-players nl-standings-gm-list" aria-label="General Manager je Verein">
+        <ol className="nl-standings-players nl-standings-gm-list nl-standings-gm-grid" aria-label="General Manager je Verein">
           {gmRows.map((row: SeasonV2GmRow, index: number) => {
             const confidenceLabel =
               row.boardConfidenceValue != null && Number.isFinite(row.boardConfidenceValue)
@@ -1080,7 +1089,14 @@ export default function SeasonStandingsNewLook({
    */
   function renderDisciplineLeadersSection() {
     if (disciplineLeaders.length === 0) {
-      return null;
+      return (
+        <NlCard className="nl-standings-players-card" eyebrow="Rekorde" title="Disziplin-Rekordhalter">
+          <NlEmptyState
+            title="Noch keine Rekordhalter"
+            message="Noch keine Disziplin-Rekorde in dieser Saison."
+          />
+        </NlCard>
+      );
     }
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Rekorde" title="Disziplin-Rekordhalter">
@@ -1120,7 +1136,11 @@ export default function SeasonStandingsNewLook({
    */
   function renderArchiveSection() {
     if (archiveRows.length === 0) {
-      return null;
+      return (
+        <NlCard className="nl-standings-players-card" eyebrow="Historie" title="Archivierte Saisons">
+          <NlEmptyState title="Kein Saison-Archiv" message="Kein Saison-Archiv vorhanden." />
+        </NlCard>
+      );
     }
     return (
       <NlCard className="nl-standings-players-card" eyebrow="Historie" title="Archivierte Saisons">
@@ -1157,15 +1177,9 @@ export default function SeasonStandingsNewLook({
   }
 
   function renderVereineMode() {
-    const hasContent = gmRows.length > 0 || archiveRows.length > 0 || disciplineLeaders.length > 0;
-    if (!hasContent) {
-      return (
-        <NlEmptyState
-          title="Noch keine Vereinsdaten"
-          message="Für diese Saison liegen noch keine GM-, Archiv- oder Rekorddaten vor."
-        />
-      );
-    }
+    // T-098: Alle vier Vereine-Blöcke rendern immer — GM-Büro, Disziplin-
+    // Rekordhalter und Archiv zeigen bei fehlenden Daten einen eigenen
+    // `NlEmptyState` (Header + Hinweis) statt still zu verschwinden.
     return (
       <>
         {renderVereineHighlights()}

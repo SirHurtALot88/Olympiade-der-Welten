@@ -22,6 +22,7 @@ import {
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
 import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
 import type { FoundationSponsorsPanelProps } from "@/app/foundation/sponsors-v2/FoundationSponsorsPanel";
@@ -30,6 +31,18 @@ import type { FoundationSponsorsPanelProps } from "@/app/foundation/sponsors-v2/
 function formatSignedCash(formatCash: (value: number) => string, value: number) {
   const abs = formatCash(Math.abs(value));
   return `${value > 0 ? "+" : value < 0 ? "-" : ""}${abs}`;
+}
+
+/**
+ * Sponsor-Choice-Meldungen können entweder freundliche Sätze sein oder ein
+ * roher Reason-Slug aus dem API-Fehlerpfad (z. B.
+ * `phase_blocked:sponsor_choice:season_active`). Slug-artige Meldungen (ohne
+ * Leerzeichen, aber mit `:`/`_`) werden durch den geteilten Blocker-Labeler in
+ * freundliches Deutsch übersetzt; echte Sätze bleiben unverändert.
+ */
+function formatSponsorChoiceMessage(message: string): string {
+  const looksLikeReasonSlug = !/\s/.test(message) && /[:_]/.test(message);
+  return looksLikeReasonSlug ? formatGameFlowBlocker(message) : message;
 }
 
 type SponsorComponentKind = SponsorOffer["components"][number]["kind"];
@@ -580,7 +593,7 @@ export default function FoundationSponsorsNewLook({
 
         {sponsorChoiceMessage ? (
           <div className="nl-sponsor-banner" role="status">
-            {sponsorChoiceMessage}
+            {formatSponsorChoiceMessage(sponsorChoiceMessage)}
           </div>
         ) : null}
 

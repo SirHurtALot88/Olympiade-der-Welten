@@ -2131,7 +2131,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   FACILITY_CATALOG.find((entry) => entry.facilityId === "scouting_office")?.label ?? "Scouting Office"
                 }
                 recruitmentBudget={selectedStandingRow?.cash != null ? formatNlMoney(selectedStandingRow.cash) : "—"}
-                rosterCount={selectedRosterTableRows.length}
+                rosterCount={selectedStandingRow?.rosterCount ?? (Array.isArray(selectedRoster) ? selectedRoster.length : 0)}
                 rosterMinimum={selectedStandingRow?.playerMin ?? null}
                 rosterOptimum={selectedStandingRow?.playerOpt ?? null}
                 draftContextNote="Teams starten mit Budget und leerem Kader. Base-Infos im Transfermarkt reichen für den ersten Draft — Scouting verfeinert die Sicht, ersetzt aber nicht den Markt."

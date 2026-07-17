@@ -667,7 +667,7 @@ function FoundationTeamsDetailPanel({
                       </div>
                     ) : null}
                     <div className="team-focus-layout">
-                      <div className="table-shell team-focus-table-shell">
+                      <div className="table-shell team-focus-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
                         <table
                           className={`team-table selected-team-roster-table${showTeamDisciplines ? "" : " is-compact"}`}
                         >
@@ -1030,7 +1030,7 @@ function FoundationTeamsDetailPanel({
                             <StatChip
                               className="teams-v2-duel-card"
                               label="Duell"
-                              value={`#${selectedStandingRow?.rank ?? "—"} ${selectedTeam.shortCode} vs #${duelRival.rank ?? "—"} ${duelRival.shortCode}`}
+                              value={`#${selectedStandingRow?.rank ?? "—"} ${selectedTeam.shortCode} vs #${duelRival.rank ?? "—"} ${duelRival.team?.shortCode ?? duelRival.teamCode ?? duelRival.team?.name ?? duelRival.teamName ?? "—"}`}
                               sub={`${formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs ${formatLocalePoints(duelRival.points ?? 0, 1)} Punkte`}
                             />
                           ) : null}
@@ -1629,7 +1629,7 @@ function FoundationTeamsDetailPanel({
                         <strong>Teamtabelle</strong>
                       </div>
                     </div>
-                    <div className="table-shell teams-overview-shell">
+                    <div className="table-shell teams-overview-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
                       <table className="team-table teams-overview-table">
                         <colgroup>
                           {visibleTeamsViewColumns.map((column) => (

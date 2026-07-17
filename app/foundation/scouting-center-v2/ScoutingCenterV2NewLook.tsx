@@ -17,6 +17,7 @@ import {
   StatChip,
   StatChipRow,
   NL_AXIS_LABELS,
+  formatNlNumber,
   type NlAxisKey,
   type NlRadarAxis,
   type NlTone,
@@ -468,7 +469,7 @@ export default function ScoutingCenterV2NewLook({
                 <span className="nl-scout-eyebrow">Top-6 Achsen-Impact (dein Team)</span>
                 {report.axisImpactComposite.before != null && report.axisImpactComposite.after != null ? (
                   <span className="nl-scout-impact-summary nl-tnum">
-                    Ø {report.axisImpactComposite.before.toFixed(1)} → {report.axisImpactComposite.after.toFixed(1)}
+                    Ø {formatNlNumber(report.axisImpactComposite.before, 1)} → {formatNlNumber(report.axisImpactComposite.after, 1)}
                   </span>
                 ) : null}
               </div>
@@ -482,7 +483,7 @@ export default function ScoutingCenterV2NewLook({
                       tone: row.axis as NlTone,
                     }))}
                     max={100}
-                    format={(value) => value.toFixed(1)}
+                    format={(value) => formatNlNumber(value, 1)}
                     aria-label="Top-6 Achsen-Schnitt vorher"
                   />
                 </div>
@@ -495,7 +496,7 @@ export default function ScoutingCenterV2NewLook({
                       tone: row.axis as NlTone,
                     }))}
                     max={100}
-                    format={(value) => value.toFixed(1)}
+                    format={(value) => formatNlNumber(value, 1)}
                     aria-label="Top-6 Achsen-Schnitt mit Kauf"
                   />
                 </div>

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import type { ScoutingHubV2WatchTarget } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import type { ScoutingQueueRow } from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
-import { NlDeltaChip, NlEmptyState, NlTable, type NlTableColumn } from "@/components/foundation/new-look";
+import { NlDeltaChip, NlEmptyState, NlTable, formatNlNumber, type NlTableColumn } from "@/components/foundation/new-look";
 import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 
 /**
@@ -252,7 +252,7 @@ export default function ScoutingShortlistBoard({
         return row.target?.marketValue ?? "—";
       case "impact":
         return row.impactDelta != null ? (
-          <NlDeltaChip value={row.impactDelta} format={(n) => n.toFixed(1)} title="Top-6-Achsen-Schnitt Δ mit Kauf" />
+          <NlDeltaChip value={row.impactDelta} format={(n) => formatNlNumber(n, 1)} title="Top-6-Achsen-Schnitt Δ mit Kauf" />
         ) : (
           <button
             type="button"

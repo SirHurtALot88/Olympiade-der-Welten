@@ -50,7 +50,7 @@ import {
   NlSparkline,
   NlSubTabs,
   NlTable,
-  formatNlNumber,
+  formatNlNumber, formatNlMoney,
   type NlRadarAxis,
   type NlTableColumn,
 } from "@/components/foundation/new-look";
@@ -94,10 +94,10 @@ function formatMoney(value: number | null | undefined) {
     return "—";
   }
 
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  }).format(value);
+  // Route through the canonical New-Look money formatter so economy values
+  // render with the "Mio"/"k" unit suffix (previously a bare de-DE number),
+  // consistent with the rest of the app.
+  return formatNlMoney(value);
 }
 
 function formatSignedMoney(value: number | null | undefined) {
@@ -1524,7 +1524,7 @@ function PlayerComparePanel({
             <div className="nl-compare-metrics" role="group" aria-label="Kennzahlen-Vergleich">
               {compareMetrics.map((metric) => (
                 <div className="nl-compare-metric-row" key={metric.key}>
-                  <span className="nl-compare-metric-a nl-tnum">{formatNlNumber(metric.aValue, 1)}</span>
+                  <span className="nl-compare-metric-a nl-tnum">{metric.key === "mw" ? formatNlMoney(metric.aValue) : formatNlNumber(metric.aValue, 1)}</span>
                   <span className="nl-compare-metric-label">{metric.label}</span>
                   {metric.aValue != null && metric.bValue != null ? (
                     <NlDeltaChip
@@ -1534,7 +1534,7 @@ function PlayerComparePanel({
                   ) : (
                     <span className="nl-compare-metric-gap">—</span>
                   )}
-                  <span className="nl-compare-metric-b nl-tnum">{formatNlNumber(metric.bValue, 1)}</span>
+                  <span className="nl-compare-metric-b nl-tnum">{metric.key === "mw" ? formatNlMoney(metric.bValue) : formatNlNumber(metric.bValue, 1)}</span>
                 </div>
               ))}
             </div>

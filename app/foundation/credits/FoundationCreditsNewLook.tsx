@@ -12,6 +12,7 @@ import {
   StatChip,
   StatChipRow,
   formatNlMoney,
+  formatNlNumber,
   useCountUp,
   type NlTableColumn,
   type NlTone,
@@ -39,7 +40,7 @@ function formatRate(rate: number | null | undefined): string {
   if (rate == null || !Number.isFinite(rate)) {
     return "—";
   }
-  return `${(rate * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+  return `${formatNlNumber(rate * 100, 1)}%`;
 }
 
 function formatRateRange(minRate: number, maxRate: number): string {
@@ -51,6 +52,23 @@ function formatRateRange(minRate: number, maxRate: number): string {
   const low = Math.min(minRate, maxRate);
   const high = Math.max(minRate, maxRate);
   return `${formatRate(low)} – ${formatRate(high)}`;
+}
+
+/**
+ * German-decimal parse for the loan-amount field. Users type the amount in
+ * German notation: "," is the decimal separator ("3,5" = 3.5) and "." may
+ * appear as a thousands separator ("1.250,5" = 1250.5). Plain `Number("3,5")`
+ * is NaN and a native <input type="number"> would strip the comma entirely
+ * ("3,5" → 35), so normalize the raw string first: only when a decimal comma
+ * is present do the dots count as thousands separators (drop them), then turn
+ * the comma into a "." for parseFloat. A string without a comma is left as-is,
+ * so plain integer input ("5") and English-style dot input ("3.5") keep working.
+ * Returns NaN for empty/partial input so callers can leave it untouched while typing.
+ */
+function parseGermanDecimalAmount(raw: string): number {
+  const trimmed = raw.trim();
+  const normalized = trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
+  return Number.parseFloat(normalized);
 }
 
 /** Eine Zeile der Aktive-Kredite-Tabelle — `index` wird für das "Kredit N"-Label gebraucht. */
@@ -152,7 +170,7 @@ function CreditUtilizationGauge({ outstanding, capacity, ratio }: { outstanding:
   const needle = gaugePolarPoint(endDeg);
   const pct = Math.round(safeRatio * 1000) / 10;
   const zoneBounds = [0, GAUGE_WARN_RATIO, GAUGE_DANGER_RATIO, 1];
-  const ariaLabel = `Kreditrahmen-Auslastung: ${formatNlMoney(outstanding)} Schulden von ${formatNlMoney(capacity)} Bank-Rahmen, ${pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%`;
+  const ariaLabel = `Kreditrahmen-Auslastung: ${formatNlMoney(outstanding)} Schulden von ${formatNlMoney(capacity)} Bank-Rahmen, ${formatNlNumber(pct, 1)}%`;
 
   return (
     <div className="nl-credits-gauge" role="img" aria-label={ariaLabel} title={ariaLabel}>
@@ -178,7 +196,7 @@ function CreditUtilizationGauge({ outstanding, capacity, ratio }: { outstanding:
         <circle cx={needle.x} cy={needle.y} r={GAUGE_STROKE * 0.55} className="nl-credits-gauge-needle" fill={NL_TONE_VAR[tone]} />
       </svg>
       <div className="nl-credits-gauge-copy">
-        <span className="nl-credits-gauge-value nl-tnum">{pct.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%</span>
+        <span className="nl-credits-gauge-value nl-tnum">{formatNlNumber(pct, 1)}%</span>
         <span className="nl-credits-gauge-label">Auslastung</span>
         <span className="nl-credits-gauge-sub nl-tnum">
           {formatNlMoney(outstanding)} / {formatNlMoney(capacity)}
@@ -596,11 +614,14 @@ function LoanOfferFilterPanel({
           />
           <div className="nl-credits-amount-field" style={{ borderColor: maxAmount > 0 ? amountToneColor : undefined }}>
             <input
-              type="number"
+              // Text + inputMode="decimal" statt type="number": ein natives
+              // Zahlenfeld verschluckt bei deutscher Eingabe das Dezimalkomma
+              // ("3,5" → 35), bevor der Handler es sieht. Als Textfeld erreicht
+              // der Rohtext den Handler unverändert und wird dort deutsch geparst
+              // (siehe parseGermanDecimalAmount); geklemmt wird ohnehin in JS.
+              type="text"
+              inputMode="decimal"
               className="nl-credits-amount-input nl-tnum"
-              min={0}
-              max={maxAmount}
-              step={0.1}
               value={amountInput}
               disabled={maxAmount <= 0}
               onChange={(event) => onAmountInputChange(event.target.value)}
@@ -1041,8 +1062,11 @@ export default function FoundationCreditsNewLook({
             termSeasons={termSeasons}
             onAmountChange={applyAmount}
             onAmountInputChange={(raw) => {
-              const parsed = Number(raw);
-              // Zwischenstände (leer, nur "-", …) beim Tippen unangetastet lassen — aber sobald der
+              // Deutsches Dezimalkomma korrekt parsen: "3,5" → 3.5 (nicht 35).
+              // `parseGermanDecimalAmount` wandelt Komma→Punkt und ignoriert
+              // Tausenderpunkte; siehe Helper oben.
+              const parsed = parseGermanDecimalAmount(raw);
+              // Zwischenstände (leer, nur "-", "3,", …) beim Tippen unangetastet lassen — aber sobald der
               // Rohtext eine gültige Zahl ergibt, sofort auf [0, maxAmount] klemmen, damit Feld &
               // Slider/Chip nie auseinanderlaufen (vorher: nur `amount` geklemmt, Feld zeigte
               // unbegrenzt weiter den Rohwert bis zum onBlur).
@@ -1052,7 +1076,10 @@ export default function FoundationCreditsNewLook({
               }
               const clamped = Math.min(Math.max(0, parsed), maxAmount);
               setAmount(clamped);
-              setAmountInput(String(clamped));
+              // Rohtext beibehalten, solange er im Rahmen liegt (klemmt nichts), damit ein gerade
+              // getipptes Komma nicht sofort zu "3.5"/"3" umgeschrieben wird; nur bei echter
+              // Klemmung das Feld auf den geklemmten Wert setzen. onBlur normalisiert die Anzeige.
+              setAmountInput(clamped === parsed ? raw : String(clamped));
             }}
             onAmountBlur={() => applyAmount(amount)}
             onTermSeasonsChange={setTermSeasons}

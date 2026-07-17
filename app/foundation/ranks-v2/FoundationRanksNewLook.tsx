@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import {
@@ -21,6 +21,7 @@ import {
 import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 import type { FoundationRanksPanelProps } from "@/app/foundation/ranks-v2/FoundationRanksPanel";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 
 /**
  * "Neuer Look" Ranks — PPs pro Bereich als Leaderboard (flag-gated, additiv).
@@ -66,6 +67,7 @@ function getMetricFormBonus(row: NlRanksRow, metric: NlRanksMetric): number {
 export default function FoundationRanksNewLook({
   sortedPpAreaRows,
   openTeamProfileById,
+  ownTeamId,
 }: FoundationRanksPanelProps) {
   const [metric, setMetric] = useState<NlRanksMetric>("total");
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
@@ -76,6 +78,38 @@ export default function FoundationRanksNewLook({
   const [rankingDrawerHighlightId, setRankingDrawerHighlightId] = useState<string | null>(null);
 
   const activeMetric = NL_RANKS_METRICS.find((entry) => entry.id === metric) ?? NL_RANKS_METRICS[0];
+
+  // Eigenes/gesteuertes Team — EIN robustes Prädikat für alle Stellen
+  // (Chip, Balken-Highlight, Zeilen-Tag, Ranking-Drawer). App-weit wird das
+  // aktive Manager-Team über `activeManagerTeamId`/`selectedTeamId` bzw. die
+  // `foundationManageableTeamIds` identifiziert (dieselbe Quelle wie z. B.
+  // Season-Preview & All-Time-Table); der `humanControlled`-Marker auf dem Team
+  // bleibt als kanonischer Fallback erhalten. Fehlt jedes Signal (kein aktives
+  // Team ODER der FoundationState-Context ist nicht gemountet), bleibt die Menge
+  // leer und die "Dein Team"-Chip zeigt ehrlich "nicht vertreten" — keine
+  // Erfindung/Hardcodierung eines Teams.
+  const foundationState = useFoundationStateOptional();
+  const ownTeamIds = useMemo(() => {
+    const ids = new Set<string>();
+    const push = (id: string | null | undefined) => {
+      if (id && id !== "loading-team") {
+        ids.add(id);
+      }
+    };
+    // Explizit vom Shell-Host durchgereichtes Team (primäre Quelle, da der
+    // Context im Shell nicht gemountet ist), plus Context-Signale als Fallback.
+    push(ownTeamId);
+    push(foundationState?.activeManagerTeamId);
+    push(foundationState?.selectedTeamId);
+    for (const id of foundationState?.foundationManageableTeamIds ?? []) {
+      push(id);
+    }
+    return ids;
+  }, [foundationState, ownTeamId]);
+  const isRowOwnTeam = useCallback(
+    (row: NlRanksRow) => row.team.humanControlled || ownTeamIds.has(row.team.teamId),
+    [ownTeamIds],
+  );
 
   const areaRadarMax = useMemo(() => {
     let max = 1;
@@ -127,25 +161,25 @@ export default function FoundationRanksNewLook({
     return { mean, median, min, max, count: values.length };
   }, [metric, sortedPpAreaRows]);
 
-  // Eigenes Team: bester (rang-höchster) Eintrag mit `humanControlled`-Marker.
+  // Eigenes Team: bester (rang-höchster) Eintrag laut `isRowOwnTeam`-Prädikat.
   const ownEntry = useMemo(
-    () => rankedRows.find((entry) => entry.row.team.humanControlled) ?? null,
-    [rankedRows],
+    () => rankedRows.find((entry) => isRowOwnTeam(entry.row)) ?? null,
+    [rankedRows, isRowOwnTeam],
   );
   const ownValue = ownEntry ? getMetricValue(ownEntry.row, metric) : null;
   const gapToTop = ownValue != null ? topValue - ownValue : null;
 
   // Ein Balken je Team für die aktive Metrik, bereits nach `rankedRows`
-  // (rang-)sortiert; eigenes Team über `humanControlled` hervorgehoben.
+  // (rang-)sortiert; eigenes Team über `isRowOwnTeam` hervorgehoben.
   // Kein Verlauf/History hier — die Props liefern keine Vor-Werte.
   const metricBars = useMemo(
     () =>
       rankedRows.map(({ row }) => ({
         label: row.team.shortCode,
         value: getMetricValue(row, metric),
-        tone: row.team.humanControlled ? ("accent" as const) : ("neutral" as const),
+        tone: isRowOwnTeam(row) ? ("accent" as const) : ("neutral" as const),
       })),
-    [rankedRows, metric],
+    [rankedRows, metric, isRowOwnTeam],
   );
 
   const rankingDrawerRows = useMemo<NlRankingDrawerRow[]>(
@@ -157,9 +191,9 @@ export default function FoundationRanksNewLook({
         sub: row.team.shortCode,
         value: getMetricValue(row, metric),
         tone: activeMetric.tone,
-        isOwn: row.team.humanControlled,
+        isOwn: isRowOwnTeam(row),
       })),
-    [rankedRows, metric, activeMetric.tone],
+    [rankedRows, metric, activeMetric.tone, isRowOwnTeam],
   );
 
   function openRankingDrawer(highlightTeamId?: string | null) {
@@ -280,7 +314,7 @@ export default function FoundationRanksNewLook({
               displayRank === 1 ? "gold" : displayRank === 2 ? "silver" : displayRank === 3 ? "bronze" : null;
 
             const isExpanded = expandedTeamId === row.team.teamId;
-            const isOwnTeam = row.team.humanControlled;
+            const isOwnTeam = isRowOwnTeam(row);
             const radarAxes = (["pow", "spe", "men", "soc"] as const).map((areaId) => ({
               key: areaId,
               value: row.pps[areaId],

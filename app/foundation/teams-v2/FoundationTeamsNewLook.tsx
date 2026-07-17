@@ -1191,7 +1191,7 @@ export default function FoundationTeamsNewLook({
   function renderRosterTable() {
     const showActions = selectedTeamRosterActionsAvailable;
     return (
-      <div className="nl-teams-table-shell">
+      <div className="nl-teams-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
         <table className="nl-teams-table nl-tnum">
           <thead>
             <tr>

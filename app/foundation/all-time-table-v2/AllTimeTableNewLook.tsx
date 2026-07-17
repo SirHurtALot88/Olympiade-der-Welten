@@ -131,7 +131,12 @@ const LIVE_ONLY_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
   { key: "liveRank", label: "Rang", align: "right" },
   { key: "cumulativePoints", label: "Punkte", align: "right" },
   { key: "mwNow", label: "MW", align: "right" },
-  { key: "cashNow", label: "Cash", align: "right" },
+  {
+    key: "cashNow",
+    label: "Cash (Saison-Stand)",
+    align: "right",
+    tooltip: "Cash-Stand aus der Saison-Tabelle — kann vom Live-Kontostand in Finanzen/Kredite abweichen.",
+  },
 ];
 
 function isFiniteNumber(value: number | null | undefined): value is number {

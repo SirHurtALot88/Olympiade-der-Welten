@@ -137,6 +137,22 @@ function getObjectiveStatusLabel(status: "open" | "completed" | "failed" | "at_r
   return "offen";
 }
 
+/**
+ * Board-Vertrauen-Warnungen kommen als rohe Token-Keys aus
+ * `computeTeamSeasonBoardConfidence` (lib/board/team-season-objectives-service.ts,
+ * Feld `warnings`) und dürfen nicht als roher Text erscheinen. Bekannte Keys
+ * werden auf knappe deutsche Labels gemappt, unbekannte fallen lesbar zurück.
+ */
+function formatBoardConfidenceWarning(warning: string): string {
+  const mapped: Record<string, string> = {
+    board_confidence_source_saved_state: "Board-Vertrauen: gespeicherter Stand",
+    board_objectives_failed: "Board-Ziele verfehlt",
+    board_objectives_at_risk: "Board-Ziele gefährdet",
+    high_board_pressure: "Hoher Board-Druck",
+  };
+  return mapped[warning] ?? warning.replaceAll("_", " ");
+}
+
 function getObjectiveStatusTone(status: "open" | "completed" | "failed" | "at_risk"): string {
   if (status === "completed") return "is-good";
   if (status === "failed") return "is-risk";
@@ -1246,7 +1262,7 @@ export default function TeamProfileNewLook({
                   chip={
                     <StatChip
                       label="Cash"
-                      value={formatNlNumber(data.cash, 1)}
+                      value={formatNlMoney(data.cash)}
                       tone={data.cash != null && data.cash < 0 ? "risk" : "neutral"}
                       title="Liquide Mittel — GuV im Hover"
                     />
@@ -1259,7 +1275,7 @@ export default function TeamProfileNewLook({
                   ariaLabel={`Marktwert ${data.teamName} — Zusammensetzung`}
                   align="end"
                   chip={
-                    <StatChip label="MW" value={formatNlNumber(data.marketValueTotal, 2)} title="Marktwert gesamt — Aufschlüsselung im Hover" />
+                    <StatChip label="MW" value={formatNlMoney(data.marketValueTotal)} title="Marktwert gesamt — Aufschlüsselung im Hover" />
                   }
                 >
                   {renderMwPanel()}
@@ -1269,7 +1285,7 @@ export default function TeamProfileNewLook({
                   ariaLabel={`Gehalt ${data.teamName} — Aufschlüsselung`}
                   align="end"
                   chip={
-                    <StatChip label="Gehalt" value={formatNlNumber(data.salaryTotal, 2)} title="Gehaltsblock des Kaders — Aufschlüsselung im Hover" />
+                    <StatChip label="Gehalt" value={formatNlMoney(data.salaryTotal)} title="Gehaltsblock des Kaders — Aufschlüsselung im Hover" />
                   }
                 >
                   {renderGehaltPanel()}
@@ -1860,7 +1876,7 @@ export default function TeamProfileNewLook({
                 {data.boardConfidence.warnings.length > 0 ? (
                   <ul className="nl-teamprofile-board-warnings">
                     {data.boardConfidence.warnings.slice(0, 3).map((warning, index) => (
-                      <li key={index}>{warning}</li>
+                      <li key={index}>{formatBoardConfidenceWarning(warning)}</li>
                     ))}
                   </ul>
                 ) : null}

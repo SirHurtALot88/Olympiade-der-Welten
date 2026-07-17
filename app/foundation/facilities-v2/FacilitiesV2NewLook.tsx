@@ -24,7 +24,7 @@ import {
 import { getRecoveryFlatBonusAtLevel } from "@/lib/facilities/facility-effects";
 
 import type { FacilitiesV2ClientProps, FacilityDialogState, FacilityRowView } from "@/app/foundation/facilities-v2/facilities-v2-types";
-import { FacilityDecisionModal, formatFacilityActionReason } from "@/app/foundation/facilities-v2/facility-ui-shared";
+import { FacilityDecisionModal, formatFacilityActionReason, formatFacilityEffectText } from "@/app/foundation/facilities-v2/facility-ui-shared";
 
 /**
  * "Neuer Look" Gebäude — flag-gated, additiv (nur wenn `useNewLook` aktiv ist).
@@ -248,7 +248,7 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
             className={`nl-facility-ladder-step ${state}`}
             title={
               definition
-                ? `L${targetLevel}: ${definition.effectDescription} · Kosten ${formatTransfermarktCurrency(definition.upgradeCost)}${isCurrent ? " · Aktuell" : ""}`
+                ? `L${targetLevel}: ${formatFacilityEffectText(definition.effectDescription)} · Kosten ${formatTransfermarktCurrency(definition.upgradeCost)}${isCurrent ? " · Aktuell" : ""}`
                 : `L${targetLevel}${isCurrent ? " · Aktuell" : ""}`
             }
             aria-current={isCurrent ? "step" : undefined}
@@ -305,14 +305,14 @@ function FacilityEffectDeltaChip({
       <NlDeltaChip
         value={0}
         format={() => `${label} · Max-Level`}
-        title={`${catalog.effectDescription}: aktuell ${facility.currentEffect} · Max-Level erreicht`}
+        title={`${catalog.effectDescription}: aktuell ${formatFacilityEffectText(facility.currentEffect)} · Max-Level erreicht`}
       />
     );
   }
 
   const currentDef = getFacilityLevelDefinition(facility.id, facility.level);
   const nextDef = getFacilityLevelDefinition(facility.id, facility.nextLevel);
-  const effectTitle = `${catalog.effectDescription}: ${facility.currentEffect} → ${facility.nextLevelEffect} (nächste Stufe)`;
+  const effectTitle = `${catalog.effectDescription}: ${formatFacilityEffectText(facility.currentEffect)} → ${formatFacilityEffectText(facility.nextLevelEffect)} (nächste Stufe)`;
 
   switch (catalog.effectType) {
     case "training_xp": {
@@ -372,7 +372,7 @@ function FacilityEffectDeltaChip({
       // Qualitativer Effekt (keine numerische Stufe) — nächste Stufe als Klartext,
       // value=1 erzwingt den grünen „Verbesserung"-Ton (die 1 wird nie gezeigt).
       return (
-        <NlDeltaChip value={1} format={() => `${label}: ${facility.nextLevelEffect}`} title={effectTitle} />
+        <NlDeltaChip value={1} format={() => `${label}: ${formatFacilityEffectText(facility.nextLevelEffect)}`} title={effectTitle} />
       );
     }
   }
@@ -483,7 +483,7 @@ function FacilityNextBestUpgradeCard({
                     · L{formatNlNumber(facility.level, 0)} → L{formatNlNumber(facility.nextLevel, 0)}
                   </span>
                 </strong>
-                <span className="nl-facility-overview-next-effect">{candidate.effectDescription}</span>
+                <span className="nl-facility-overview-next-effect">{formatFacilityEffectText(candidate.effectDescription)}</span>
                 <small className="nl-tnum">
                   Kosten {formatTransfermarktCurrency(candidate.upgradeCost)}
                   {candidate.incomeGain != null

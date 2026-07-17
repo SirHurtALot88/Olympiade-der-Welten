@@ -494,7 +494,7 @@ export default function HomeV2NewLook({
 
       {showTeamPickerCta ? (
         <NlCard
-          className="nl-home-team-picker-cta"
+          className="nl-home-team-picker-cta nl-bento-item nl-bento-span-12"
           data-testid="home-team-picker-cta"
           eyebrow="Erster Schritt"
           title="Wähle dein Team"

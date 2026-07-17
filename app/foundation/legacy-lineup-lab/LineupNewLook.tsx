@@ -117,7 +117,7 @@ export type LineupNewLookProps = Pick<
 /* --- Format-Helfer (lokal, präsentational) --------------------------- */
 
 function formatScore(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value) ? String(value) : formatNlNumber(value, 1);
 }
 
 function formatNullableScore(value: number | null | undefined) {

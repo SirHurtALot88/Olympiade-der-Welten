@@ -5541,7 +5541,11 @@ export function useFoundationShellRouterBodyScope({
     if (typeof gameState.season.currentMatchday === "number" && Number.isFinite(gameState.season.currentMatchday)) {
       return `Spieltag ${gameState.season.currentMatchday}`;
     }
-    return gameState.matchdayState.matchdayId;
+    // Fallback: never surface the raw slug (e.g. "matchday-1") as a user-facing
+    // label — extract the trailing number so it still reads "Spieltag N".
+    const matchdayId = gameState.matchdayState.matchdayId;
+    const slugNumber = matchdayId.match(/(\d+)\s*$/);
+    return slugNumber ? `Spieltag ${slugNumber[1]}` : matchdayId;
   }, [gameState.matchdayState.matchdayId, gameState.season.currentMatchday]);
   const {
     gameFlowState,
@@ -10388,6 +10392,7 @@ export function useFoundationShellRouterBodyScope({
     tableSorts: { ppArea: tableSorts.ppArea },
     toggleTableSort,
     openTeamProfileById,
+    ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
     renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
       renderMetricBar(value, {
         tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],

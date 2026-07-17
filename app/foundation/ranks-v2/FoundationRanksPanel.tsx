@@ -30,6 +30,13 @@ export interface FoundationRanksPanelProps {
   tableSorts: { ppArea: SortState };
   toggleTableSort: (tableId: string, columnKey: string) => void;
   openTeamProfileById: (teamId: string) => void;
+  /**
+   * Aktives/gesteuertes Manager-Team (für die "Dein Team"-Hervorhebung, T-035).
+   * Vom Shell-Host durchgereicht, weil der FoundationState-Context im Shell
+   * nicht mehr gemountet ist. Fehlt der Wert, greift nur der humanControlled-
+   * Fallback.
+   */
+  ownTeamId?: string | null;
   renderPpAreaMetricCell: (
     value: number,
     formBonus: number,
