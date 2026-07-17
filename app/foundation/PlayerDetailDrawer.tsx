@@ -570,24 +570,6 @@ function getFogSeedValue(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-// Mischt eine Liste für Fog-of-War-Anzeigen deterministisch per Spieler-Seed,
-// sodass die WAHRE (best-first) Rangfolge nicht ablesbar ist — analog zur
-// Transfermarkt-Scouting-Anzeige, die die Attribut-/Diszi-Reihenfolge ebenfalls
-// per Seed verschiebt (`buildTransfermarktScoutedAttributeRows`).
-function shuffleFoggedByPlayer<T>(items: T[], playerId: string, keyOf: (item: T) => string): T[] {
-  return [...items].sort((left, right) => {
-    const leftKey = keyOf(left);
-    const rightKey = keyOf(right);
-    const leftSeed = getFogSeedValue(`${playerId}:${leftKey}`);
-    const rightSeed = getFogSeedValue(`${playerId}:${rightKey}`);
-    if (leftSeed !== rightSeed) {
-      return leftSeed - rightSeed;
-    }
-    return leftKey.localeCompare(rightKey, "de");
-  });
-}
-
-
 function HelpLabel({
   children,
   title,
@@ -2048,27 +2030,24 @@ export default function PlayerDetailDrawer({
   // exakten Attributwerte. Für verdeckte Spieler (Free Agent / gescoutet / nicht
   // im eigenen Kader) darf KEINE exakte Zahl durchsickern — stattdessen ein
   // grobes Klassen-Band (Balkenhöhe ≈ Band, Beschriftung = Klasse, s.
-  // `attributeTierBandValue`/`formatDisciplineTier`), und die Reihenfolge wird
-  // per Spieler-Seed gemischt (`shuffleFoggedByPlayer`), damit die wahre
-  // Bestenreihenfolge nicht ablesbar ist. Labels: konsistent 3-buchstabig
+  // `attributeTierBandValue`/`formatDisciplineTier`). Die Reihenfolge bleibt in
+  // BEIDEN Fällen die kanonische Attribut-Reihenfolge (POW zuerst) — identisch
+  // zur Attribut-Liste direkt unter dem Chart —, damit Chart und Liste sich
+  // decken. Labels: konsistent 3-buchstabig
   // (POW/HEA/STA/INT/AWA/DET/SPE/DEX/CHA/WIL/SPI/TOR).
   const attributeChartFogged = !abilitiesKnown;
   const attributeBarChartBars = abilitiesKnown
     ? data.attributeStats
         .filter((entry) => entry.value != null && Number.isFinite(entry.value))
         .map((entry) => ({ label: entry.label.slice(0, 3).toUpperCase(), value: entry.value as number }))
-    : shuffleFoggedByPlayer(
-        data.attributeStats
-          .map((entry) => {
-            const bandValue = attributeTierBandValue(entry.ratingLabel);
-            return bandValue != null
-              ? { key: entry.key, label: entry.label.slice(0, 3).toUpperCase(), value: bandValue }
-              : null;
-          })
-          .filter((bar): bar is { key: string; label: string; value: number } => bar != null),
-        data.playerId,
-        (bar) => bar.key,
-      );
+    : data.attributeStats
+        .map((entry) => {
+          const bandValue = attributeTierBandValue(entry.ratingLabel);
+          return bandValue != null
+            ? { key: entry.key, label: entry.label.slice(0, 3).toUpperCase(), value: bandValue }
+            : null;
+        })
+        .filter((bar): bar is { key: string; label: string; value: number } => bar != null);
   const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
