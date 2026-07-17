@@ -81,7 +81,14 @@ export default function FoundationShell({
           <div className="foundation-shell-header-actions">{headerActions}</div>
         </header>
         {subNav}
-        <div className="foundation-shell-content">{children}</div>
+        {/* key={activeView}: der Content-Wrapper wird bei jedem echten
+            View-Wechsel neu gemountet, damit die `foundation-view-enter`-
+            Animation (Fade + sanftes Aufsteigen) erneut spielt und sich mit
+            dem panelinternen `.nl-reveal`-Stagger überlagert. Reduced-Motion
+            schaltet das per CSS ab. */}
+        <div key={activeView} className="foundation-shell-content foundation-view-enter">
+          {children}
+        </div>
       </div>
     </div>
   );
