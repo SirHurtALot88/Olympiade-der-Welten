@@ -1469,8 +1469,32 @@ function FoundationTeamsDetailPanel({
                               );
                             }
                             case "actions":
+                              /* T-036-Follow-up: „Verkaufen" ist destruktiv (öffnet die
+                                 Verkaufs-Vorschau) und stand bislang optisch ununterscheidbar
+                                 direkt neben „Verlängern" → Fehlklick-Gefahr, analog zum
+                                 bereits behobenen Fall in FoundationTeamsNewLook.tsx.
+                                 Fix nach demselben Muster: „Verlängern" (unkritisch) zuerst,
+                                 „Verkaufen" in eigener Danger-Gruppe mit Abstand/Trennlinie
+                                 und Warnstil (`nl-teams-action-danger-group` /
+                                 `nl-teams-action-danger`, bereits vorhanden). */
                               return row.status === "active" && selectedTeamRosterActionsAvailable ? (
                                 <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
+                                  {row.contractLength <= 1 && selectedTeam ? (
+                                    <button
+                                      className="nl-teams-action"
+                                      type="button"
+                                      disabled={contractRenewalBusy != null}
+                                      onClick={() =>
+                                        void openContractRenewalNegotiation({
+                                          teamId: selectedTeam.teamId,
+                                          playerId: row.playerId,
+                                          playerName: row.playerName,
+                                        })
+                                      }
+                                    >
+                                      Verlängern
+                                    </button>
+                                  ) : null}
                                   {selectedTeam ? (
                                     <button
                                       className="nl-teams-action"
@@ -1490,44 +1514,31 @@ function FoundationTeamsDetailPanel({
                                       {isSellMarked ? "VK gemerkt" : "VK vormerken"}
                                     </button>
                                   ) : null}
-                                  <button
-                                    className="nl-teams-action"
-                                    type="button"
-                                    disabled={marketSellBusy}
-                                    onClick={() =>
-                                      void openMarketSellModal(
-                                        {
-                                          activePlayerId: row.rowId,
-                                          playerId: row.playerId,
-                                          playerName: row.playerName,
-                                          className:
-                                            gameState.players.find((candidate) => candidate.id === row.playerId)?.className ?? "—",
-                                          race: gameState.players.find((candidate) => candidate.id === row.playerId)?.race ?? "—",
-                                          portraitUrl:
-                                            gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ?? null,
-                                        },
-                                        selectedTeam?.teamId,
-                                      )
-                                    }
-                                  >
-                                    Verkaufen
-                                  </button>
-                                  {row.contractLength <= 1 && selectedTeam ? (
+                                  <span className="nl-teams-action-danger-group">
                                     <button
-                                      className="nl-teams-action"
+                                      className="nl-teams-action nl-teams-action-danger"
                                       type="button"
-                                      disabled={contractRenewalBusy != null}
+                                      disabled={marketSellBusy}
+                                      title="Verkaufen — öffnet die Verkaufs-Vorschau"
                                       onClick={() =>
-                                        void openContractRenewalNegotiation({
-                                          teamId: selectedTeam.teamId,
-                                          playerId: row.playerId,
-                                          playerName: row.playerName,
-                                        })
+                                        void openMarketSellModal(
+                                          {
+                                            activePlayerId: row.rowId,
+                                            playerId: row.playerId,
+                                            playerName: row.playerName,
+                                            className:
+                                              gameState.players.find((candidate) => candidate.id === row.playerId)?.className ?? "—",
+                                            race: gameState.players.find((candidate) => candidate.id === row.playerId)?.race ?? "—",
+                                            portraitUrl:
+                                              gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ?? null,
+                                          },
+                                          selectedTeam?.teamId,
+                                        )
                                       }
                                     >
-                                      Verlängern
+                                      Verkaufen
                                     </button>
-                                  ) : null}
+                                  </span>
                                 </div>
                               ) : (
                                 "—"
