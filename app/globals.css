@@ -913,6 +913,16 @@ a {
   opacity: 0.75;
 }
 
+.foundation-sidebar-icon-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.foundation-sidebar-icon-svg svg {
+  display: block;
+}
+
 .foundation-shell-main {
   display: grid;
   gap: 12px;

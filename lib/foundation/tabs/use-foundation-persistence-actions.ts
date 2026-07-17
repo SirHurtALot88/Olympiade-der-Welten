@@ -366,7 +366,11 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         }>(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {}, fetchRetryOptions);
         if (!fetchResult.ok) {
           console.warn("Save konnte gerade nicht geladen werden.", fetchResult.error, fetchResult.cause);
-          if (saveId || !hasLoadedPersistentState.current) {
+          // Nur melden, wenn tatsächlich ein ANDERER Save geladen werden sollte
+          // oder noch gar kein Stand geladen wurde. Ein transienter Re-Load des
+          // bereits aktiven Saves (dev slow-compile/timeout) soll die Meldung
+          // nicht dauerhaft stehen lassen, obwohl der Stand angezeigt wird.
+          if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
             setPersistenceError("Der Spielstand konnte nicht geladen werden.");
           }
           return null;
@@ -374,7 +378,11 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         const payload = fetchResult.data;
 
         if (!payload.save?.gameState) {
-          if (saveId || !hasLoadedPersistentState.current) {
+          // Nur melden, wenn tatsächlich ein ANDERER Save geladen werden sollte
+          // oder noch gar kein Stand geladen wurde. Ein transienter Re-Load des
+          // bereits aktiven Saves (dev slow-compile/timeout) soll die Meldung
+          // nicht dauerhaft stehen lassen, obwohl der Stand angezeigt wird.
+          if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
             setPersistenceError("Der Spielstand konnte nicht geladen werden.");
           }
           return null;
@@ -396,6 +404,11 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
         setGameState(nextGameState);
         setPersistenceError(null);
+        // Ein erfolgreicher Load räumt AUCH einen evtl. hängengebliebenen
+        // Bootstrap-Fehler weg (beide Pfade setzen sonst nur ihren eigenen
+        // State → sonst blieb "konnte nicht geladen werden" stehen, obwohl der
+        // Spielstand längst geladen ist).
+        setBootstrapError(null);
         onFetchSlowClear?.();
         if (
           sponsorOffersHydrated &&
@@ -450,7 +463,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         return nextGameState;
       } catch (error) {
         console.warn("Save konnte gerade nicht geladen werden.", error);
-        if (saveId || !hasLoadedPersistentState.current) {
+        if ((saveId && saveId !== activeSaveId) || !hasLoadedPersistentState.current) {
           setPersistenceError("Der Spielstand konnte nicht geladen werden.");
         }
         return null;
@@ -667,6 +680,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       }
 
       setBootstrapError(null);
+      setPersistenceError(null);
       onFetchSlowClear?.();
 
       const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(

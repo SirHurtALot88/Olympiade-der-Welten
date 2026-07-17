@@ -16,6 +16,38 @@ import {
 import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { useViewWidth, type ViewWidthMode } from "@/lib/ui/view-width-preference";
 
+// Monochrome line-icons (currentColor) für Views, bei denen ein bildhaftes Icon
+// klarer ist als ein Unicode-Glyph. Fällt auf item.icon (Glyph) zurück, wenn
+// keine SVG hinterlegt ist. viewBox 0 0 16 16, damit sie zum 14px-Slot passen.
+const NAV_VIEW_ICON_SVGS: Partial<Record<FoundationViewId, ReactNode>> = {
+  // Hantel — Training
+  trainingCompact: (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" focusable="false" aria-hidden="true">
+      <line x1="5.2" y1="8" x2="10.8" y2="8" />
+      <line x1="3.4" y1="5.4" x2="3.4" y2="10.6" />
+      <line x1="1.7" y1="6.4" x2="1.7" y2="9.6" />
+      <line x1="12.6" y1="5.4" x2="12.6" y2="10.6" />
+      <line x1="14.3" y1="6.4" x2="14.3" y2="9.6" />
+    </svg>
+  ),
+  // Stadion — Arena
+  matchdayArena: (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" focusable="false" aria-hidden="true">
+      <ellipse cx="8" cy="8" rx="6.6" ry="4.3" />
+      <rect x="5" y="6.1" width="6" height="3.8" rx="1.3" />
+    </svg>
+  ),
+  // Tabelle — Saisonstand
+  seasonV2: (
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" focusable="false" aria-hidden="true">
+      <rect x="2.5" y="3" width="11" height="10" rx="1.2" />
+      <line x1="2.5" y1="6.3" x2="13.5" y2="6.3" />
+      <line x1="2.5" y1="9.7" x2="13.5" y2="9.7" />
+      <line x1="8" y1="6.3" x2="8" y2="13" />
+    </svg>
+  ),
+};
+
 type FoundationSidebarProps = {
   activeView: FoundationViewId;
   onNavigate: (view: FoundationViewId) => void;
@@ -265,7 +297,13 @@ export default function FoundationSidebar({
                       <circle cx="9" cy="10" r="1" />
                     </svg>
                   </span>
-                  {item.icon ? <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span> : null}
+                  {NAV_VIEW_ICON_SVGS[item.id] ? (
+                    <span className="foundation-sidebar-icon foundation-sidebar-icon-svg" aria-hidden="true">
+                      {NAV_VIEW_ICON_SVGS[item.id]}
+                    </span>
+                  ) : item.icon ? (
+                    <span className="foundation-sidebar-icon" aria-hidden="true">{item.icon}</span>
+                  ) : null}
                   <span>{item.label}</span>
                 </button>
               );
