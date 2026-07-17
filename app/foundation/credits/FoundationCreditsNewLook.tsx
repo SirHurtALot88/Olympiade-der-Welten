@@ -824,6 +824,40 @@ export default function FoundationCreditsNewLook({
     setAmountInput(String(clamped));
   }
 
+  // #182: Liga-Kreditübersicht — welche Teams aktuell wie viel Kredit laufen
+  // haben. Aggregiert aktive Kredite (`gameState.loans`) je Borrower-Team;
+  // Rest reines Read-Modell, absteigend nach Restschuld sortiert.
+  const leagueCreditRows = useMemo(() => {
+    const loans = gameState.seasonState.loans ?? [];
+    const byTeam = new Map<string, { outstanding: number; installment: number; count: number; missed: number }>();
+    for (const loan of loans) {
+      if (loan.status !== "active") continue;
+      const agg = byTeam.get(loan.borrowerTeamId) ?? { outstanding: 0, installment: 0, count: 0, missed: 0 };
+      agg.outstanding += loan.principalOutstanding;
+      agg.installment += loan.installmentPerSeason;
+      agg.count += 1;
+      agg.missed += loan.missedPayments;
+      byTeam.set(loan.borrowerTeamId, agg);
+    }
+    return gameState.teams
+      .map((team) => {
+        const agg = byTeam.get(team.teamId) ?? null;
+        return {
+          teamId: team.teamId,
+          teamName: team.name,
+          shortCode: team.shortCode,
+          outstanding: agg?.outstanding ?? 0,
+          installment: agg?.installment ?? 0,
+          count: agg?.count ?? 0,
+          missed: agg?.missed ?? 0,
+        };
+      })
+      .filter((row) => row.count > 0)
+      .sort((left, right) => right.outstanding - left.outstanding);
+  }, [gameState.seasonState.loans, gameState.teams]);
+  const leagueCreditMaxOutstanding = leagueCreditRows[0]?.outstanding ?? 0;
+  const leagueCreditTotal = leagueCreditRows.reduce((sum, row) => sum + row.outstanding, 0);
+
   // Live offer recompute on every filter change — pure/derived, no mutation,
   // never cached across renders so team cards appear/disappear immediately
   // as the amount/Laufzeit filter moves. Empty until a real team is known
@@ -1056,6 +1090,68 @@ export default function FoundationCreditsNewLook({
           )}
         </NlCard>
       )}
+
+      {/* #182: Liga-Kreditübersicht — welche Teams wie viel Kredit laufen haben. */}
+      <NlCard
+        className="nl-credits-league-card"
+        eyebrow="Liga"
+        title={`Kreditübersicht · ${leagueCreditRows.length} Team${leagueCreditRows.length === 1 ? "" : "s"} mit Kredit`}
+        actions={
+          leagueCreditRows.length > 0 ? (
+            <span className="nl-credits-league-total nl-tnum" title="Gesamte Restschuld aller Teams">
+              Σ {formatNlMoney(leagueCreditTotal)}
+            </span>
+          ) : undefined
+        }
+      >
+        {leagueCreditRows.length > 0 ? (
+          <div className="nl-credits-league-list" role="list" aria-label="Kredite aller Teams">
+            {leagueCreditRows.map((row) => {
+              const isCurrent = row.teamId === teamId;
+              const barPct =
+                leagueCreditMaxOutstanding > 0
+                  ? Math.max(4, (row.outstanding / leagueCreditMaxOutstanding) * 100)
+                  : 0;
+              const classes = [
+                "nl-credits-league-row",
+                isCurrent ? "is-current" : "",
+                row.missed > 0 ? "is-risk" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              return (
+                <div key={row.teamId} role="listitem" className={classes}>
+                  <span className="nl-credits-league-team">
+                    <span className="nl-credits-league-code">{row.shortCode}</span>
+                    <span className="nl-credits-league-name" title={row.teamName}>
+                      {row.teamName}
+                    </span>
+                    {isCurrent ? <span className="nl-credits-league-you">Dein Team</span> : null}
+                    {row.missed > 0 ? (
+                      <span className="nl-credits-league-missed" title={`${row.missed} verpasste Rate(n)`}>
+                        ⚠ {row.missed}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="nl-credits-league-bartrack" aria-hidden="true">
+                    <span className="nl-credits-league-bar" style={{ width: `${barPct}%` }} />
+                  </span>
+                  <span className="nl-credits-league-figures">
+                    <span className="nl-credits-league-outstanding nl-tnum" title="Restschuld">
+                      {formatNlMoney(row.outstanding)}
+                    </span>
+                    <span className="nl-credits-league-sub nl-tnum">
+                      {formatNlMoney(row.installment)}/Saison · {row.count} Kredit{row.count === 1 ? "" : "e"}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <NlEmptyState title="Aktuell hat kein Team einen laufenden Kredit." />
+        )}
+      </NlCard>
     </div>
   );
 }
