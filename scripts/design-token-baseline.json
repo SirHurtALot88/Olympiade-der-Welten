@@ -1,9 +1,9 @@
 {
   "_comment": "Ratchet-Baseline fuer scripts/lint-design-tokens.ts. Key-Format: '<datei>:<zeile>:<regel>'. Regel-IDs: EUR (rohes Euro-Zeichen), LOCALE (toLocaleString/Intl.NumberFormat), HEX (hartkodierte Hex-Farbe). Neu generieren mit: npx tsx scripts/lint-design-tokens.ts --update-baseline",
-  "generatedAt": "2026-07-17T18:14:36.088Z",
+  "generatedAt": "2026-07-17T18:33:24.703Z",
   "count": 104,
   "violations": [
-    "app/foundation/FoundationShellRouterBody.tsx:3459:LOCALE",
+    "app/foundation/FoundationShellRouterBody.tsx:3475:LOCALE",
     "app/foundation/PlayerDetailDrawer.tsx:2218:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:242:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:2834:HEX",

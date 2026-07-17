@@ -12,6 +12,7 @@ import { NlCard, StatChip, NlCountUpValue, nlToneClass, type NlTone } from "@/co
 import type { CSSProperties } from "react";
 import { getTeamAnnualLoanInstallment, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
 import { useViewWidth } from "@/lib/ui/view-width-preference";
+import { groupGameEncyclopediaEntriesByCategory } from "@/lib/ui/game-encyclopedia";
 import { getFoundationBreadcrumb } from "@/lib/foundation/foundation-breadcrumb";
 import { RanksRankCell } from "@/components/foundation/RanksRankCell";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
@@ -1771,18 +1772,33 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
             <div className="foundation-encyclopedia-layout">
               <nav className="foundation-encyclopedia-index" aria-label="Lexikon-Themen">
-                {GAME_ENCYCLOPEDIA_ENTRIES.map((entry) => (
-                  <button
-                    key={entry.id}
-                    className={`foundation-encyclopedia-index-item${selectedEncyclopediaEntry?.id === entry.id ? " is-active" : ""}`}
-                    type="button"
-                    onClick={() => setSelectedEncyclopediaEntryId(entry.id)}
-                    title={entry.short}
-                  >
-                    <span>{entry.category}</span>
-                    <strong>{entry.term}</strong>
-                    <small>{entry.short}</small>
-                  </button>
+                {groupGameEncyclopediaEntriesByCategory(GAME_ENCYCLOPEDIA_ENTRIES).map((group) => (
+                  <div key={group.category} role="group" aria-label={group.category} style={{ display: "grid", gap: 8 }}>
+                    <div
+                      className="eyebrow"
+                      style={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 1,
+                        padding: "4px 2px",
+                        background: "var(--nl-panel-2, rgba(15, 22, 33, 0.96))",
+                      }}
+                    >
+                      {group.category}
+                    </div>
+                    {group.entries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        className={`foundation-encyclopedia-index-item${selectedEncyclopediaEntry?.id === entry.id ? " is-active" : ""}`}
+                        type="button"
+                        onClick={() => setSelectedEncyclopediaEntryId(entry.id)}
+                        title={entry.short}
+                      >
+                        <strong>{entry.term}</strong>
+                        <small>{entry.short}</small>
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </nav>
 
