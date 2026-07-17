@@ -18,22 +18,25 @@ export const SPONSOR_BASE_FLOOR_C = 32;
  * Deflation relativ sogar mehr hilft. ENV-tunebar. Fließt über effectiveBaseFloor konsistent in Angebot
  * UND Settlement (getSponsorPayoutForFinalRankAndTier nutzt denselben Anker).
  */
-export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 7) || 7;
+export const SPONSOR_BUILDING_COST_OFFSET_C = Number(process.env.OLY_SPONSOR_BUILDING_OFFSET_C ?? 4) || 4;
 
 /**
- * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). NEGATIV ⇒
- * der Sockel liegt ÜBER dem 4.-niedrigsten Gehalt, sodass die ~4 gehaltsschwächsten Teams strukturell
- * abgesichert sind und ein kleines Plus machen (Design-Regel). Vorher +5, was mit der Gehalts-Inflation
- * (salaryFactor > 1) den Sockel unter die realen Gehälter zog und die Schwächsten ins Minus rutschen ließ.
+ * Offset vom Referenz-Gehalt für den Rang-32-Basis-Anker (4.-niedrigstes Gehalt − Buffer). POSITIV ⇒ der
+ * Anker liegt UNTER dem 4.-niedrigsten Gehalt; die Deckung der Schwächsten kommt dann über
+ * SPONSOR_BUILDING_COST_OFFSET_C + Archetyp-Base-Mult (security 1.07) + Bottom-Schutz (baseScale 1.2),
+ * nicht mehr über den rohen Anker. Auf +11 kalibriert, damit der effektive Sockel (Anker + Offset) den
+ * Rang-32-Boden ins Zielband 38-44 legt statt bei ~54 zu kleben (die Sponsor-Kurve war viel zu flach
+ * gegenüber der Preisgeld-Referenz). Nebeneffekt: Anker-Elevation < Threshold ⇒ Meilenstein-Kompression
+ * aus (msScale 1.0), die Leiter wird ~11 % steiler ohne LADDER_SCALE anzufassen.
  */
-export const SPONSOR_BASE_SALARY_BUFFER_C = -2;
+export const SPONSOR_BASE_SALARY_BUFFER_C = Number(process.env.OLY_SPONSOR_BASE_SALARY_BUFFER_C ?? 11) || 11;
 
 /**
  * Globale Stauchung der kumulativen Rang-Meilenstein-Leiter im Sponsor-Payout. <1 ⇒ die Spitze (die alle
  * Meilensteine stapelt) zahlt nicht mehr komplett über: sie kappt den Top-Bonus, ohne den Sockel (der die
  * Kleinen absichert) anzutasten. So sinkt die Rang-Spreizung Richtung der funktionierenden Preisgeld-Kurve.
  */
-export const SPONSOR_MILESTONE_LADDER_SCALE = Number(process.env.OLY_SPONSOR_MILESTONE_LADDER ?? 0.8) || 0.8;
+export const SPONSOR_MILESTONE_LADDER_SCALE = Number(process.env.OLY_SPONSOR_MILESTONE_LADDER ?? 0.92) || 0.92;
 
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
@@ -83,24 +86,25 @@ export function getPrizeMoneyReference(rank: number, salaryFactor = 1): number {
  * getSponsorPayoutForFinalRankAndTier (Settlement) UND buildOfferCashAmounts (Anzeige) genutzt — dadurch
  * ist die Anzeige exakt das Settlement. ENV-tunebar analog zu den übrigen OLY_SPONSOR_*-Knobs.
  *
- * Hinweis zu ARCHETYPE_MILESTONE_MULT.security: konzeptionell wäre ~0.62 (deutlich unter performance)
- * wünschenswert, damit security "wenig Upside" hat. Der Balance-Test "preserves payout spread between
- * bottom and championship security offers" verlangt aber weiterhin top/bottom > 1.65 für REINE security-
- * Angebote. Da der auf 1.12 angehobene Sockel den Rang-32-Boden (bottom) hebt, komprimiert sich die
- * security-Eigenspreizung; um den 1.65-Boden zu halten, muss die security-Meilenstein-Leiter höher liegen
- * als der ursprünglich geschätzte 0.7 (rechnerisches Minimum ~0.95). 0.97 hält den Spread-Test mit Marge
- * UND lässt performance an der Spitze weiterhin klar vor security (Kreuzung). ENV: OLY_SPONSOR_ARCH_MS_*.
+ * Kalibrierung (an die Preisgeld-Referenzkurve angenähert): Boden R32 aller Archetypen liegt eng im
+ * Survival-Band 38-44, die Kreuzung wandert KOMPLETT in die Upside (Meilenstein-Mults), NICHT in die Basis.
+ * Deshalb liegen die BASE_MULT eng beieinander (security 1.07 / identity 1.0 / performance 0.96 → Böden
+ * ~43 / 41 / 39), während die MILESTONE_MULT die Spitze auffächern (security 0.85 flach → id 1.0 → perf 1.14
+ * steil; ★5-Meister ~85 / 90 / 95). security-BASE_MULT bleibt bei 1.07, weil die Anzeige==Settlement-Bindung
+ * security × Tier-Base(2) > 1 verlangt (1.07 × 0.98 = 1.049). Hinweis: der früher hier zitierte Spread-Test
+ * "> 1.65" existiert nicht mehr; die realen Constraints stehen in tests/sponsor-economy-balance.test.ts.
+ * ENV: OLY_SPONSOR_ARCH_BASE_* / OLY_SPONSOR_ARCH_MS_*.
  */
 export const SPONSOR_ARCHETYPE_BASE_MULT: Record<SponsorArchetype, number> = {
-  security: Number(process.env.OLY_SPONSOR_ARCH_BASE_SECURITY ?? 1.08) || 1.08,
+  security: Number(process.env.OLY_SPONSOR_ARCH_BASE_SECURITY ?? 1.07) || 1.07,
   identity: Number(process.env.OLY_SPONSOR_ARCH_BASE_IDENTITY ?? 1.0) || 1.0,
-  performance: Number(process.env.OLY_SPONSOR_ARCH_BASE_PERFORMANCE ?? 0.9) || 0.9,
+  performance: Number(process.env.OLY_SPONSOR_ARCH_BASE_PERFORMANCE ?? 0.96) || 0.96,
 };
 
 export const SPONSOR_ARCHETYPE_MILESTONE_MULT: Record<SponsorArchetype, number> = {
-  security: Number(process.env.OLY_SPONSOR_ARCH_MS_SECURITY ?? 0.5) || 0.5,
+  security: Number(process.env.OLY_SPONSOR_ARCH_MS_SECURITY ?? 0.85) || 0.85,
   identity: Number(process.env.OLY_SPONSOR_ARCH_MS_IDENTITY ?? 1.0) || 1.0,
-  performance: Number(process.env.OLY_SPONSOR_ARCH_MS_PERFORMANCE ?? 1.45) || 1.45,
+  performance: Number(process.env.OLY_SPONSOR_ARCH_MS_PERFORMANCE ?? 1.14) || 1.14,
 };
 
 export function getArchetypeBaseMultiplier(archetype: SponsorArchetype): number {
@@ -165,21 +169,30 @@ export function getArchetypeRankShare(archetype: SponsorArchetype): number {
   return round1(1 - getArchetypeBaseShare(archetype));
 }
 
+/**
+ * Stern-Tier-Skalierung des BASIS-Sockels — bewusst eng komprimiert (0.96..1.0). Die Basis ist "tier-nah",
+ * damit der Boden aller Tiers im 38-44-Band bleibt (perf-★2-Boden ≥ 38 ist mit dem alten 0.94 unlösbar).
+ * Die volle Stern-Differenzierung lebt in SPONSOR_TIER_MILESTONE_MULT (0.28..1.0) — schwache Sterne schalten
+ * die Rang-Upside kaum frei, nicht den Sockel.
+ */
 export const SPONSOR_TIER_BASE_MULT: Record<SponsorStarTier, number> = {
-  1: 0.9,
-  2: 0.94,
-  3: 0.97,
-  4: 0.99,
-  5: 1,
+  1: Number(process.env.OLY_SPONSOR_TIER_BASE_1 ?? 0.97) || 0.97,
+  2: Number(process.env.OLY_SPONSOR_TIER_BASE_2 ?? 0.98) || 0.98,
+  3: Number(process.env.OLY_SPONSOR_TIER_BASE_3 ?? 1.0) || 1.0,
+  4: Number(process.env.OLY_SPONSOR_TIER_BASE_4 ?? 1.02) || 1.02,
+  5: Number(process.env.OLY_SPONSOR_TIER_BASE_5 ?? 1.04) || 1.04,
 };
 
 /** Low-star sponsors unlock far less of the Gewinnstufen ladder (big jumps 1★→5★). */
+// Gedämpft (früher 0.28..1.0 → ★1-★5-Spitzen-Spread ~43 C, zu krass): ★1 schaltet jetzt gut die Hälfte der
+// Rang-Leiter frei statt nur ~28 %. Star-Tier differenziert die Spitze weiterhin klar, aber ein ★1-Sponsor
+// ist auch bei Erfolg "nicht zu schlecht" (Spitzen-Spread ~20-25 C). ENV-tunebar.
 export const SPONSOR_TIER_MILESTONE_MULT: Record<SponsorStarTier, number> = {
-  1: 0.28,
-  2: 0.48,
-  3: 0.66,
-  4: 0.82,
-  5: 1,
+  1: Number(process.env.OLY_SPONSOR_TIER_MS_1 ?? 0.6) || 0.6,
+  2: Number(process.env.OLY_SPONSOR_TIER_MS_2 ?? 0.72) || 0.72,
+  3: Number(process.env.OLY_SPONSOR_TIER_MS_3 ?? 0.82) || 0.82,
+  4: Number(process.env.OLY_SPONSOR_TIER_MS_4 ?? 0.91) || 0.91,
+  5: Number(process.env.OLY_SPONSOR_TIER_MS_5 ?? 1) || 1,
 };
 
 export function getStarTierBaseMultiplier(starTier: SponsorStarTier): number {
@@ -273,8 +286,14 @@ export function getScaledRankMilestoneBonus(
  *    stützt das die Bottom-5-Einnahmen jede Season und bremst ihre Erosion (Schere öffnet nicht auf 2.4×).
  * ENV-tunebar zum Kalibrieren gegen das Schere-Ziel.
  */
-const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.2) || 0.2;
-const SPONSOR_QUALITY_MILESTONE_BALANCE_C = Number(process.env.OLY_SPONSOR_WEAK_MS_BALANCE ?? 0.1) || 0.1;
+// Deutlich reduziert (0.2 → 0.06 / 0.1 → 0.03): die frühere starke Bottom-Protektion/Top-Dämpfung
+// KOMPRIMIERTE die Rang→Payout-Kurve für typische Teams (Boden ×1.2 → ~52, Spitze ×0.8 → ~72) und war der
+// eigentliche Flachheits-Verursacher. Der Boden-Schutz läuft jetzt über den gehaltsgeankerten Sockel, die
+// Überperformance-Belohnung schwacher Teams über die erwartungs-relative performance-Leiter (Feed 2). Mit
+// der milden Rebalance landen die Bänder bei 38-48 (Boden) / 85-95 (Spitze). ACHTUNG: reduziert die
+// Schere-Stützung → im S1-S2-Messlauf gegen das Schere-Ziel (<2×) bestätigen. ENV-tunebar.
+const SPONSOR_QUALITY_BASE_PROTECT_C = Number(process.env.OLY_SPONSOR_WEAK_BASE_PROTECT ?? 0.06) || 0.06;
+const SPONSOR_QUALITY_MILESTONE_BALANCE_C = Number(process.env.OLY_SPONSOR_WEAK_MS_BALANCE ?? 0.03) || 0.03;
 export function getQualityRebalanceProfile(teamQualityRank: number | null | undefined): {
   milestoneScale: number;
   baseScale: number;
@@ -310,6 +329,14 @@ function applyQualityRebalanceToPayout(input: {
  */
 export const SPONSOR_EXPECT_STEP_C = Number(process.env.OLY_SPONSOR_EXPECT_STEP_C ?? 4) || 4;
 export const SPONSOR_EXPECT_MAX_STEPS = Number(process.env.OLY_SPONSOR_EXPECT_MAX_STEPS ?? 8) || 8;
+
+/**
+ * Anteil der GEWONNENEN Meilenstein-Schwierigkeit (absMile(final) − absMile(expected)), den der
+ * performance-Archetyp als Überperformance-Bonus ZUSÄTZLICH zur absoluten Rang-Leiter bekommt. Da die
+ * Belohnung an die (konkave) Meilenstein-Leiter gekoppelt ist, springt sie im gepackten unteren Bereich
+ * bewusst wenig und die Gesamt-Auszahlung bleibt streng monoton im Endrang. ENV-tunebar.
+ */
+export const SPONSOR_OVERPERFORMANCE_SHARE = Number(process.env.OLY_SPONSOR_OVERPERF_SHARE ?? 0.6) || 0.6;
 
 export function getExpectationRelativeMilestoneBonus(
   finalRank: number | null | undefined,
@@ -355,42 +382,42 @@ export function getSponsorPayoutForFinalRankAndTier(
   isGolden = false,
 ): number {
   const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
-  // Archetyp-Kreuzung (WAVE 1): base UND milestone laufen über dieselben Tabellen — KEIN security-Sonderpfad
-  // mehr. Security bekommt einen hohen Sockel (base 1.12) aber gedämpfte Upside, performance umgekehrt.
+  // Archetyp-Kreuzung: base UND milestone laufen über dieselben Tabellen. Security = hoher Sockel, flache
+  // Upside; performance = schlanker Sockel, steile Upside. Die Kreuzung liegt komplett in der Milestone-Mult.
   const rawBase = round1(
     effectiveBaseFloor * getArchetypeBaseMultiplier(archetype) * getStarTierBaseMultiplier(starTier),
   );
 
-  // Feed 2: für performance MIT bekannter Erwartung ersetzt die erwartungs-relative Leiter den statischen
-  // Rang-Milestone-Bump. Ohne expectedRank bleibt das Verhalten byte-identisch zu vorher (Rückwärtskompat,
-  // Wave-1-Tests unberührt).
+  // Gemeinsame Skalierung der Meilenstein-Leiter (Anker-Pool × globale Stauchung × Stern × Archetyp).
+  const milestoneCommonScale =
+    milestoneScale *
+    SPONSOR_MILESTONE_LADDER_SCALE *
+    getStarTierMilestoneMultiplier(starTier) *
+    getArchetypeMilestoneMultiplier(archetype);
+
+  const rebalance = getQualityRebalanceProfile(teamQualityRank);
+  const absoluteMilestoneRaw = getRankMilestoneBonus(finalRank, salaryFactor);
+
+  // Feed 2: performance mit bekannter Erwartung (teamQualityRankAtSign) bekommt einen KONKAVEN
+  // Überperformance-Bonus, gemessen in GEWONNENER MEILENSTEIN-SCHWIERIGKEIT
+  // (absMile(finalRank) − absMile(expectedRank)), NICHT in flachen Rang-Schritten. Da die Meilenstein-Leiter
+  // oben dicht und unten dünn ist, ist ein Aufstieg im gepackten Mittelfeld/unteren Bereich (leicht)
+  // automatisch wenig wert, ein Aufstieg nahe der Spitze (schwer) viel. Der Bonus ist ein Anteil
+  // (SPONSOR_OVERPERFORMANCE_SHARE) der gewonnenen Schwierigkeit → die Auszahlung bleibt STRIKT MONOTON im
+  // Endrang: ein besserer Endrang zahlt IMMER mehr, ein Rang-24-Überperformer überholt NIE einen
+  // Rang-16-Halter. Ohne expectedRank ist der Bonus 0 (byte-identisch zu vorher, Wave-1-Tests unberührt).
   const useExpectationLadder =
     archetype === "performance" && expectedRank != null && Number.isFinite(expectedRank);
-  const rawMilestoneBase = useExpectationLadder
-    ? getExpectationRelativeMilestoneBonus(finalRank, expectedRank, salaryFactor)
-    : getRankMilestoneBonus(finalRank, salaryFactor);
-  const rawMilestone = round1(
-    rawMilestoneBase *
-      milestoneScale *
-      SPONSOR_MILESTONE_LADDER_SCALE *
-      getStarTierMilestoneMultiplier(starTier) *
-      getArchetypeMilestoneMultiplier(archetype),
+  const overperformanceDifficulty = useExpectationLadder
+    ? Math.max(0, absoluteMilestoneRaw - getRankMilestoneBonus(expectedRank, salaryFactor))
+    : 0;
+  const milestoneBonus = round1(
+    (absoluteMilestoneRaw + SPONSOR_OVERPERFORMANCE_SHARE * overperformanceDifficulty) *
+      milestoneCommonScale *
+      rebalance.milestoneScale,
   );
-
-  if (useExpectationLadder) {
-    // Der statische getQualityRebalanceProfile-MILESTONE-Bump wird durch die Erwartung ERSETZT; der
-    // baseScale-SOCKEL-SCHUTZ (Bottom-5) bleibt zwingend erhalten.
-    const base = round1(rawBase * getQualityRebalanceProfile(teamQualityRank).baseScale);
-    const goldenBonus = isGolden ? getGoldenMilestoneBonus(rawMilestone, salaryFactor) : 0;
-    return round1(base + rawMilestone + goldenBonus);
-  }
-
-  const { base, milestoneBonus } = applyQualityRebalanceToPayout({
-    base: rawBase,
-    milestoneBonus: rawMilestone,
-    teamQualityRank,
-  });
-  // Golden hebt NUR die (bereits rebalancierte) Rang-Komponente, gedeckelt — der Sockel bleibt unberührt.
+  const base = round1(rawBase * rebalance.baseScale);
+  // Golden hebt NUR die (bereits gewählte) Rang-Komponente, gedeckelt — der Sockel bleibt unberührt.
   const goldenBonus = isGolden ? getGoldenMilestoneBonus(milestoneBonus, salaryFactor) : 0;
   return round1(base + milestoneBonus + goldenBonus);
 }
