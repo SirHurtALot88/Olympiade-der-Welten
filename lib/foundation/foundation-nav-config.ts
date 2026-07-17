@@ -71,12 +71,10 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
   },
   {
     id: "admin",
-    label: "Admin",
+    label: "Verwaltung",
     items: [
-      { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern.", icon: "⏵" },
       { id: "generator", label: "Generator", tooltip: "Spieler generieren.", icon: "+" },
-      { id: "teamSettings", label: "Settings", tooltip: "Team-Konfiguration.", icon: "⚙" },
-      { id: "admin", label: "Admin", tooltip: "Technische Steuerung.", icon: "⚒" },
+      { id: "teamSettings", label: "Settings", tooltip: "Team-Konfiguration und Speicherstände.", icon: "⚙" },
     ],
   },
 ];

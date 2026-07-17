@@ -429,6 +429,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
               currentTeamId: selectedTeamId,
               currentSource: activeManagerTeamSource,
               initialTeamId: initialSelectedTeamId,
+              savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+              activeSaveId: payload.save.saveId,
               settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
             });
         setSelectedTeamId(nextTeamContext.teamId);
@@ -692,6 +694,8 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
             currentTeamId: selectedTeamId,
             currentSource: activeManagerTeamSource,
             initialTeamId: initialSelectedTeamId,
+            savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+            activeSaveId: payload.save.saveId,
             settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
           });
       setSelectedTeamId(nextTeamContext.teamId);

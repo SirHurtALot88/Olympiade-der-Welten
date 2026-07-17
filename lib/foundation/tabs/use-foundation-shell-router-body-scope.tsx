@@ -4250,6 +4250,8 @@ export function useFoundationShellRouterBodyScope({
       currentTeamId: selectedTeamId,
       currentSource: activeManagerTeamSource,
       initialTeamId: initialSelectedTeamId,
+      savedTeamId: initialClientGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+      activeSaveId,
       settingsMap: buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
     });
     if (requestedTeamContext.teamId && requestedTeamContext.teamId !== "loading-team") {
@@ -4356,6 +4358,8 @@ export function useFoundationShellRouterBodyScope({
         currentTeamId: null,
         currentSource: activeManagerTeamSource,
         initialTeamId: initialSelectedTeamId,
+        savedTeamId: gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+        activeSaveId,
         settingsMap: buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
       });
       setSelectedTeamId(nextContext.teamId);

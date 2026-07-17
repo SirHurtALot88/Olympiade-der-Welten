@@ -465,7 +465,7 @@ export function getRawFoundationTeamParam() {
   return new URL(window.location.href).searchParams.get("team");
 }
 
-export function readStoredFoundationManagerTeamId(teams: Team[]) {
+export function readStoredFoundationManagerTeamId(teams: Team[], activeSaveId?: string | null) {
   if (typeof window === "undefined") {
     return null;
   }
@@ -475,7 +475,18 @@ export function readStoredFoundationManagerTeamId(teams: Team[]) {
     if (!raw) {
       return null;
     }
-    const parsed = JSON.parse(raw) as { teamId?: string | null };
+    const parsed = JSON.parse(raw) as { teamId?: string | null; saveId?: string | null };
+    // Save-scope the preference. It is written together with the save it belongs
+    // to (see persistFoundationManagerTeamId), but was previously read back for
+    // ANY save. Because every save shares the same 32-team league, a teamId
+    // remembered from a different save still validates here -- that is how
+    // starting fresh with team P-S ended up opening on M-M (the active team of a
+    // previously played save). Only honor the stored team for the save we are
+    // actually loading. When no saveId is supplied (legacy callers) keep the old
+    // permissive behavior.
+    if (activeSaveId != null && parsed.saveId !== activeSaveId) {
+      return null;
+    }
     return resolveFoundationTeamId(teams, parsed.teamId);
   } catch {
     return null;
@@ -632,6 +643,13 @@ export function resolvePreferredFoundationTeamContext(
     initialTeamId?: string | null;
     settingsMap?: Record<string, TeamControlSettings> | null;
     ignoreStoredPreference?: boolean;
+    // The team the human picked for THIS save (persisted in the save itself,
+    // typically newGameFlow.selectedTeamId). Outranks the browser-global
+    // localStorage preference so loading a save always restores its own
+    // controlled team instead of a team remembered from a different save.
+    savedTeamId?: string | null;
+    // Scopes the localStorage manager-team preference to a specific save.
+    activeSaveId?: string | null;
   },
 ): ActiveManagerTeamContext {
   const requestedFromUrl = parseFoundationTeamIdFromUrl(teams);
@@ -655,8 +673,13 @@ export function resolvePreferredFoundationTeamContext(
     return { teamId: currentTeamId, source: options?.currentSource ?? "manual_select", warning: invalidRouteWarning };
   }
 
+  const requestedFromSave = resolveFoundationTeamId(teams, options?.savedTeamId);
+  if (requestedFromSave) {
+    return { teamId: requestedFromSave, source: "saved_preference", warning: invalidRouteWarning };
+  }
+
   if (!options?.ignoreStoredPreference) {
-    const requestedFromStorage = readStoredFoundationManagerTeamId(teams);
+    const requestedFromStorage = readStoredFoundationManagerTeamId(teams, options?.activeSaveId);
     if (requestedFromStorage) {
       return { teamId: requestedFromStorage, source: "saved_preference", warning: invalidRouteWarning };
     }
