@@ -1104,7 +1104,7 @@ export default function TeamProfileNewLook({
                 <button
                   type="button"
                   className="nl-kpipop-playbtn"
-                  onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                  onClick={() => onOpenPlayer(row.playerId, row.id)}
                   title={`${row.name} öffnen`}
                 >
                   <span className="nl-kpipop-playname">{row.name}</span>
@@ -1147,7 +1147,7 @@ export default function TeamProfileNewLook({
                   <button
                     type="button"
                     className="nl-kpipop-playbtn"
-                    onClick={() => onOpenPlayer(row.playerId, row.playerId)}
+                    onClick={() => onOpenPlayer(row.playerId, row.id)}
                     title={`${row.name} öffnen · Vertrag: ${shape.label}`}
                   >
                     <span className="nl-kpipop-playname">

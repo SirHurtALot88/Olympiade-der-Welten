@@ -1,5 +1,20 @@
 # Trainingsintensitaet: Einmalige Festlegung pro Team+Season
 
+> **Status (2026-07, T-009): DIESE SPERRE IST ENTFERNT / DEAKTIVIERT.**
+> `isTrainingIntensityLockedForSeason()` (`lib/foundation/game-phase-action-policy.ts`)
+> liefert seit einer spaeteren Anti-Cheese-Ueberarbeitung (Teil B.5, siehe
+> Kommentar direkt an der Funktion) dauerhaft `false` — Training wird jetzt
+> PRO MATCHDAY akkumuliert statt in einer einzigen Season-End-Abrechnung, der
+> in Abschnitt 1 beschriebene Exploit existiert damit nicht mehr. Trainings-
+> intensitaet bleibt fuer das eigene (steuerbare) Team **immer** einstellbar;
+> `managementLocked` sperrt weiterhin nur fremde/nicht steuerbare Teams.
+> Die dazugehoerigen UI-Hinweise ("Trainingsmodus fuer diese Season
+> festgelegt…", "…sperrt danach fuer den Rest der Saison") wurden aus
+> `PlayerTrainingControls.tsx` entfernt, da sie nach der B.5-Aenderung falsche
+> Informationen angezeigt haetten. Der Rest dieses Dokuments beschreibt nur
+> noch die urspruengliche (inzwischen ueberholte) Design-Entscheidung als
+> historischen Kontext.
+
 ## 1. Das Problem (Exploit)
 
 Die Season-End-Berechnung (`lib/training/organic-season-progression.ts`,

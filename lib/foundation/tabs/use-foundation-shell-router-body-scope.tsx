@@ -192,7 +192,6 @@ import {
   getTeamTransferWishlistEntries,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { shouldAutoOpenSeasonBriefing, type GameFlowView } from "@/lib/foundation/game-flow-controller";
-import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
@@ -1903,14 +1902,11 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    if (isTrainingIntensityLockedForSeason(gameState)) {
-      setFoundationActionFeedback({
-        tone: "warning",
-        title: "Training gesperrt",
-        detail: "Trainingsintensität ist für diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Änderung erst zum nächsten Saisonstart möglich.",
-      });
-      return;
-    }
+    // T-009: Kein Season-Phasen-Lock mehr für Trainingsintensität — Training
+    // bleibt für das eigene (steuerbare) Team immer einstellbar. Siehe
+    // lib/foundation/game-phase-action-policy.ts (isTrainingIntensityLockedForSeason
+    // liefert dauerhaft `false`); readMeta.readOnly oben deckt weiterhin den
+    // "fremdes Team / reine Ansicht"-Fall ab.
 
     setTrainingModeDraft((current) => ({
       ...current,
@@ -5468,8 +5464,6 @@ export function useFoundationShellRouterBodyScope({
       canOwnerManageTeam(settings, effectiveActiveOwnerId) || isLocalUserManualTeam(settings),
     );
   }
-
-  const trainingIntensityLockedForSeason = isTrainingIntensityLockedForSeason(gameState);
 
   const playerProfileTrainingReadOnly =
     readMeta.readOnly ||
@@ -10435,14 +10429,15 @@ export function useFoundationShellRouterBodyScope({
     onSetTrainingDevelopmentFilter: setTrainingDevelopmentFilter,
     selectedTeamControlMode: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
     seasonLabel: canonicalSeasonLabel,
-    managementLocked: isSelectedTeamManagementLocked || trainingIntensityLockedForSeason,
+    // T-009: kein Season-Phasen-Lock mehr — `managementLocked` deckt nur noch
+    // den "fremdes Team / reine Ansicht"-Fall ab, Training bleibt fürs eigene
+    // Team immer einstellbar.
+    managementLocked: isSelectedTeamManagementLocked,
     managementLockedReason: isSelectedTeamManagementLocked
       ? selectedTeam
         ? `${selectedTeam.name} gehört nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
         : null
-      : trainingIntensityLockedForSeason
-        ? "Trainingsintensität für diese Season festgelegt — Änderung erst zum nächsten Saisonstart möglich (versiegelt seit dem ersten Spieltag)."
-        : null,
+      : null,
     trainingClassOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
     onSetTrainingMode: (playerId, mode) => {
       void setPlayerTrainingMode(playerId, mode);

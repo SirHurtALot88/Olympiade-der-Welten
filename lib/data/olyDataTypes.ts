@@ -1352,6 +1352,24 @@ export type LoanApplyLogRecord = {
   createdAt: string;
 };
 
+/**
+ * Ledger-Eintrag für die Kredit-AUSZAHLUNG (Origination), analog `loanApplyLogs` (die nur die
+ * Saison-End-Raten abdecken). Ohne diesen Log war der Cash-Sprung bei Kreditaufnahme aus dem
+ * Ledger nicht rekonstruierbar (siehe tests/economy-cashflow-invariant.test.ts, das die Auszahlung
+ * bislang selbst als "loan:origination(unlogged)" markiert hat).
+ */
+export type LoanOriginationLogRecord = {
+  loanId: string;
+  seasonId: string;
+  borrowerTeamId: string;
+  borrowerCashDelta: number; // = +principal
+  lenderType: LoanLenderType;
+  lenderTeamId?: string; // nur bei lenderType === "team"
+  lenderCashDelta?: number; // = -principal, nur bei lenderType === "team"
+  principal: number;
+  createdAt: string;
+};
+
 export type ScoutingWatchlistEntry = {
   playerId: string;
   teamId: string;
@@ -2429,6 +2447,7 @@ export type SeasonState = {
   goldenSponsorHistoryByTeamId?: Record<string, boolean>;
   loans?: LoanRecord[];
   loanApplyLogs?: LoanApplyLogRecord[]; // Idempotenz-Log analog objectiveRewardApplyLogs
+  loanOriginationLogs?: LoanOriginationLogRecord[]; // Ledger für Kredit-Auszahlung (Origination), siehe T-016
   scoutingWatchlist?: ScoutingWatchlistEntry[];
   scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;
   formCards?: FormCardRecord[];

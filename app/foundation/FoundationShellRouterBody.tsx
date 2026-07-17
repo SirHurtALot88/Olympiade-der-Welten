@@ -109,6 +109,7 @@ import {
   getTransferTypePillClass,
   getTransfermarktScoutingDisclosure,
   getViewSourceBadgeLabel,
+  HOME_HIDDEN_WARNING_KEYS,
   inferSaveTypeLabel,
   isTeamSetupDraftWishlistPhase,
   joinClassNames,
@@ -1872,7 +1873,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                   : gameFlowActionStep.warnings[0]
                     ? formatCockpitReason(gameFlowActionStep.warnings[0])
                     : "Flow bereit — weiter zum nächsten Schritt.",
-              warnings: homeWarnings.map(formatHomeWarningLabel),
+              warnings: (homeWarnings as string[])
+                .filter((warning: string) => !HOME_HIDDEN_WARNING_KEYS.includes(warning))
+                .map(formatHomeWarningLabel),
               // Friction fix (Generalprobe #2): a fresh save starts with no
               // human-controlled team and no flow-blocker routes there — surface
               // a dedicated CTA instead of the silently-hidden `no_active_team` chip.
@@ -2669,7 +2672,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               sortState={tableSorts.playersTable}
               onToggleSort={(columnKey: string) => toggleTableSort("playersTable", columnKey)}
               playerScope={playerScope}
-              onChangeScope={setPlayerScope}
+              onChangeScope={(scope: PlayerTableScope) => {
+                setPlayerScope(scope);
+                if (scope === "free_agents") {
+                  setPlayerTeamFilter("ALL");
+                }
+              }}
               teams={gameState.teams}
               playerTeamFilter={playerTeamFilter}
               onChangeTeamFilter={setPlayerTeamFilter}

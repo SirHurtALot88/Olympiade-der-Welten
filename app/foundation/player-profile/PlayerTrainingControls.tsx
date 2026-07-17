@@ -96,8 +96,12 @@ export default function PlayerTrainingControls({
   const tone = getDevelopmentTone(row);
   const appliedPerformanceSetpoints = row.organicForecast.performanceSetpoints;
   const statForecastTooltip = buildStatForecastTooltip(row);
-  const trainingIntensityLocked = Boolean(row.trainingIntensityLocked);
-  const intensityRailDisabled = readOnly || trainingIntensityLocked;
+  // T-009: Es gibt keinen Season-Phasen-Lock mehr für die Trainingsintensität
+  // (siehe lib/foundation/game-phase-action-policy.ts,
+  // isTrainingIntensityLockedForSeason() liefert dauerhaft `false`). Training
+  // bleibt für das eigene Team immer einstellbar — einzige verbleibende
+  // Sperre ist `readOnly` (fremdes/nicht steuerbares Team).
+  const intensityRailDisabled = readOnly;
   const modeSegments = buildTrainingModeSegments(
     trainingModeOptions.map((option) => ({
       value: option.value,
@@ -169,19 +173,6 @@ export default function PlayerTrainingControls({
       />
 
       <TrainingBudgetBreakdownDisclosure row={row} />
-
-      {row.trainingIntensityLockWarning && !trainingIntensityLocked && !readOnly ? (
-        <p className="muted training-v2-intensity-lock-note" role="status">
-          Vorsaisonfenster läuft noch: Trainingsmodus bleibt bis zum ersten Result offen und sperrt danach für den Rest der Saison.
-          Trainingsklasse bleibt weiter anpassbar.
-        </p>
-      ) : null}
-
-      {trainingIntensityLocked && !readOnly ? (
-        <p className="muted training-v2-intensity-lock-note" role="status">
-          Trainingsmodus für diese Season festgelegt — Änderung erst zum nächsten Saisonstart möglich. Trainingsklasse bleibt weiter anpassbar.
-        </p>
-      ) : null}
 
       <VeloIntensityRail
         ariaLabel={`${row.player.name} Trainingsmodus`}

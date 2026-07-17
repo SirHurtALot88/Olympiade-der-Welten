@@ -1175,7 +1175,7 @@ export default function MatchdayArenaNewLook(props: MatchdayArenaV2ClientProps) 
                   className="nl-arena-score-toggle"
                   aria-expanded={isExpanded}
                   aria-label={`Score-Herkunft von ${row.teamName} ${isExpanded ? "einklappen" : "aufklappen"}`}
-                  title="Score-Herkunft aufklappen"
+                  title={`Score-Herkunft ${isExpanded ? "einklappen" : "aufklappen"}`}
                   onClick={() => setExpandedTeamId((current) => (current === row.teamId ? null : row.teamId))}
                 >
                   {/* Score als Count-Up (~400 ms) — konsistent mit dem Ergebnis-Screen.

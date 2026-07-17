@@ -1,6 +1,6 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
-import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, LoanOriginationLogRecord, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
@@ -439,6 +439,19 @@ export function originateLoan(
     return { ok: true, loan, reason: null, capacity, terms, gameState };
   }
 
+  const originationLog: LoanOriginationLogRecord = {
+    loanId: loan.loanId,
+    seasonId: gameState.season.id,
+    borrowerTeamId: input.borrowerTeamId,
+    borrowerCashDelta: roundCash(input.principal),
+    lenderType,
+    ...(lenderType === "team" && input.lenderTeamId
+      ? { lenderTeamId: input.lenderTeamId, lenderCashDelta: roundCash(-input.principal) }
+      : {}),
+    principal: roundCash(input.principal),
+    createdAt: new Date().toISOString(),
+  };
+
   const nextGameState: GameState = {
     ...gameState,
     teams: gameState.teams.map((team) => {
@@ -453,6 +466,7 @@ export function originateLoan(
     seasonState: {
       ...gameState.seasonState,
       loans: [...(gameState.seasonState.loans ?? []), loan],
+      loanOriginationLogs: [...(gameState.seasonState.loanOriginationLogs ?? []), originationLog],
     },
   };
 
@@ -698,7 +712,17 @@ export function applyLoanSettlement(
     ...gameState,
     teams: gameState.teams.map((team) => {
       const delta = cashDeltaByTeamId.get(team.teamId) ?? 0;
-      return delta === 0 ? team : { ...team, cash: roundCash(Math.max(0, team.cash + delta)) };
+      if (delta === 0) return team;
+      const rawNext = roundCash(team.cash + delta);
+      if (rawNext < 0) {
+        // Sollte laut Settlement-Zeilen (jede Rate ist bereits auf verfügbares Cash begrenzt)
+        // eigentlich nie passieren — der Clamp bleibt aus Robustheit, aber ein stiller Unterlauf
+        // hier deutet auf ein Leck in der Ratenberechnung hin. Sichtbar machen statt verschlucken.
+        console.warn(
+          `[loan-settlement] team=${team.teamId} season=${seasonId} cash würde negativ (${rawNext}); auf 0 geklemmt. cashVorher=${team.cash} delta=${delta}`,
+        );
+      }
+      return { ...team, cash: roundCash(Math.max(0, rawNext)) };
     }),
     seasonState: {
       ...gameState.seasonState,

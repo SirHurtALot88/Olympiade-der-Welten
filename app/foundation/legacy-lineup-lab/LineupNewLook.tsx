@@ -1185,8 +1185,11 @@ export default function LineupNewLook({
     }
   };
 
+  // Bug T-002: KEIN Fallback auf filteredCandidates[0], falls alle Kandidaten
+  // blockiert sind — sonst würde "Top-Pick setzen" einen blockierten Spieler
+  // zuweisen (z.B. schon anderswo gesetzt / nicht spielberechtigt).
   const topPickForActiveSlot = useMemo(
-    () => filteredCandidates.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? filteredCandidates[0] ?? null,
+    () => filteredCandidates.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? null,
     [filteredCandidates],
   );
 

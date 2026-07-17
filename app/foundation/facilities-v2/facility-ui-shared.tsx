@@ -238,7 +238,11 @@ export function FacilityDecisionModal({
               onClick={() => onRunAction("downgrade")}
             >
               <span>Downgrade</span>
-              <strong>25%</strong>
+              <strong>
+                {facilityDialog.action === "downgrade" && matchingUpgradePreview?.refundAmount != null
+                  ? formatTransfermarktCurrency(matchingUpgradePreview.refundAmount)
+                  : "wird berechnet …"}
+              </strong>
             </button>
             <button
               className={`training-v2-facility-action-tab${facilityDialog.action === "maintenance" ? " is-active" : ""}`}

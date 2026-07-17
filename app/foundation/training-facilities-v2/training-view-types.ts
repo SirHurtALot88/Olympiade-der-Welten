@@ -141,19 +141,6 @@ export type TrainingPlayerRowView = {
    * `buildTrainingClassGainRanking` — null means no focus is set (bonus dormant everywhere).
    */
   trainingFocusAxis?: "pow" | "spe" | "men" | "soc" | null;
-  /**
-   * True once the team's training intensity is sealed for the current season
-   * (preseason setup window closed / first matchday result recorded). See
-   * `evaluateGamePhaseAction(gameState, "set_training")` and
-   * docs/training-intensity-season-lock.md.
-   */
-  trainingIntensityLocked?: boolean;
-  /**
-   * True during the short early-season grace window before the first result is
-   * recorded. Training mode can still be changed now, but the lock will snap
-   * shut as soon as the first matchday result exists.
-   */
-  trainingIntensityLockWarning?: boolean;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

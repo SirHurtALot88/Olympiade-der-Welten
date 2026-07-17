@@ -241,13 +241,6 @@ function getTodayCardIcon(key: string) {
   return <IconBolt />;
 }
 
-const NL_HOME_HIDDEN_WARNINGS = [
-  "no_active_team",
-  "season_started_no_results",
-  "Kein aktives Team",
-  "Saison ohne Ergebnis",
-];
-
 export default function HomeV2NewLook({
   teamName,
   teamCode,
@@ -297,7 +290,11 @@ export default function HomeV2NewLook({
   onOpenPlayer,
 }: HomeV2ClientProps) {
   const visibleTodayCards = todayCards.slice(0, 3);
-  const relevantWarnings = warnings.filter((warning) => !NL_HOME_HIDDEN_WARNINGS.includes(warning));
+  // `no_active_team` / `season_started_no_results` are filtered by the host
+  // (see HOME_HIDDEN_WARNING_KEYS in lib/foundation/tabs/cockpit-ui-helpers.ts)
+  // BEFORE the raw keys are mapped to German labels, so `warnings` here is
+  // already the display-ready list.
+  const relevantWarnings = warnings;
 
   // D2 Feld-relative Rang-KPI: "#{rank} von {total} · Top {pct}%". Perzentil aus
   // Rang/Feldgröße (Beispiel: #31 von 32 → Top 97%). Fog-sicher — nur die

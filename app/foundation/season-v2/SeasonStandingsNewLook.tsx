@@ -869,7 +869,11 @@ export default function SeasonStandingsNewLook({
                   </span>
                 </span>
                 <span className="nl-standings-podium-gap nl-tnum">
-                  {gap == null || gap >= 0 ? "Spitze" : `${formatNlNumber(gap, 1)} zum 1.`}
+                  {gap == null || gap >= 0
+                    ? index === 0
+                      ? "Spitze"
+                      : "Gleichauf"
+                    : `${formatNlNumber(gap, 1)} zum 1.`}
                 </span>
               </button>
             </li>

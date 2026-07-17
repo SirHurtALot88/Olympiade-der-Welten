@@ -1004,11 +1004,18 @@ export default function FoundationCreditsNewLook({
             termSeasons={termSeasons}
             onAmountChange={applyAmount}
             onAmountInputChange={(raw) => {
-              setAmountInput(raw);
               const parsed = Number(raw);
-              if (Number.isFinite(parsed)) {
-                setAmount(Math.min(Math.max(0, parsed), maxAmount));
+              // Zwischenstände (leer, nur "-", …) beim Tippen unangetastet lassen — aber sobald der
+              // Rohtext eine gültige Zahl ergibt, sofort auf [0, maxAmount] klemmen, damit Feld &
+              // Slider/Chip nie auseinanderlaufen (vorher: nur `amount` geklemmt, Feld zeigte
+              // unbegrenzt weiter den Rohwert bis zum onBlur).
+              if (raw.trim() === "" || !Number.isFinite(parsed)) {
+                setAmountInput(raw);
+                return;
               }
+              const clamped = Math.min(Math.max(0, parsed), maxAmount);
+              setAmount(clamped);
+              setAmountInput(String(clamped));
             }}
             onAmountBlur={() => applyAmount(amount)}
             onTermSeasonsChange={setTermSeasons}
@@ -1091,7 +1098,7 @@ export default function FoundationCreditsNewLook({
         </NlCard>
       )}
 
-      {/* #182: Liga-Kreditübersicht — welche Teams wie viel Kredit laufen haben. */}
+      {/* Issue 182: Liga-Kreditübersicht — welche Teams wie viel Kredit laufen haben. */}
       <NlCard
         className="nl-credits-league-card"
         eyebrow="Liga"
