@@ -396,6 +396,9 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       bracketLabel: baseline.bracket ?? player.bracketLabel,
       currentXP: isRostered ? player.currentXP : coolOffFreeAgentXp(player.currentXP),
       trainingMode: null,
+      // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
+      // fatigue so the new season starts a fresh mode-count/fatigue tally.
+      seasonTrainingAccumulator: null,
       fatigue: isRostered ? 0 : clamp(player.fatigue ?? 0, 0, 100),
     };
   });

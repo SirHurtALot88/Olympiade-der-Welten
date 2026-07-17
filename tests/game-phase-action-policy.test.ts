@@ -158,7 +158,7 @@ describe("game phase action policy", () => {
     expect(isTrainingIntensityLockedForSeason(gameState("season_active"))).toBe(false);
   });
 
-  it("locks training intensity for the rest of the season once the first matchday result is recorded", () => {
+  it("no longer locks training intensity mid-season (anti-cheese Teil B: per-matchday accumulation)", () => {
     const state: GameState = {
       ...gameState("season_active"),
       matchdayState: {
@@ -191,10 +191,12 @@ describe("game phase action policy", () => {
       },
     };
 
+    // The underlying preseason-management "set_training" phase gate still closes mid-season...
     const gate = evaluateGamePhaseAction(state, "set_training");
     expect(gate.allowed).toBe(false);
     expect(gate.reason).toBe("phase_blocked:set_training:season_active");
-    expect(isTrainingIntensityLockedForSeason(state)).toBe(true);
+    // ...but the training-intensity LOCK derived from it is now permanently open (never locked).
+    expect(isTrainingIntensityLockedForSeason(state)).toBe(false);
   });
 
   it("keeps the core UI language centralized", () => {

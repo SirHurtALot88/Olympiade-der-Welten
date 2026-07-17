@@ -27,7 +27,11 @@ import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-con
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
+import {
+  buildOrganicSeasonProgression,
+  resolveSeasonTrainingAccumulatorInputs,
+  type OrganicSeasonProgressionResult,
+} from "@/lib/training/organic-season-progression";
 import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildCoreStatsFromDisciplineRatings,
@@ -252,6 +256,28 @@ export function buildEconomyPreviewContext(gameState: GameState): EconomyPreview
   return getEconomyPreviewContext(gameState);
 }
 
+function resolveSeasonTotalMatchdays(gameState: GameState): number {
+  const declared = gameState.season.totalMatchdays;
+  if (typeof declared === "number" && Number.isFinite(declared) && declared > 0) return Math.floor(declared);
+  const fromIds = gameState.season.matchdayIds?.length ?? 0;
+  return fromIds > 0 ? fromIds : 10;
+}
+
+/**
+ * Anti-cheese (Teil B, B.1/B.2): resolves the per-matchday-accumulator overrides for
+ * `buildOrganicSeasonProgression`. Spread into the call — when there is no usable accumulator the
+ * result is `{}`, so both params stay undefined and the organic module falls back to mode-at-season-end.
+ */
+function accumulatorProgressionOverrides(gameState: GameState, player: Player) {
+  return (
+    resolveSeasonTrainingAccumulatorInputs({
+      accumulator: player.seasonTrainingAccumulator,
+      seasonId: gameState.season.id,
+      totalMatchdays: resolveSeasonTotalMatchdays(gameState),
+    }) ?? {}
+  );
+}
+
 /**
  * Pre-computes per-player season XP and organic progression for all rostered players
  * using the provided save's gameState. Call this ONCE before the team loop and pass the
@@ -276,7 +302,12 @@ export function buildPreComputedSeasonXpMap(save: PersistedSaveGame): Map<string
     const facilities = facilitiesByTeamId.get(rosterEntry.teamId)!;
 
     const seasonXp = getSeasonXp({ save, player, teamId: rosterEntry.teamId, facilities, playerRating: ratings.get(player.id) ?? null });
-    const organicProgression = buildOrganicSeasonProgression({ gameState, player, facilities });
+    const organicProgression = buildOrganicSeasonProgression({
+      gameState,
+      player,
+      facilities,
+      ...accumulatorProgressionOverrides(gameState, player),
+    });
     const seasonPerf = buildPlayerSeasonPerformance(gameState, player.id);
 
     result.set(player.id, { ...seasonXp, organicProgression, appearances: seasonPerf?.appearances ?? null });
@@ -543,6 +574,7 @@ function buildPreviewPlayer(input: {
         gameState: input.save.gameState,
         player: input.player,
         facilities: input.facilities,
+        ...accumulatorProgressionOverrides(input.save.gameState, input.player),
       }))
     : null;
   const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));
@@ -1039,7 +1071,10 @@ export function applySeasonEndXpSpend(
       currentXP: Math.max(0, playerPreview.remainingXP),
       spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
       lifetimeXP: playerPreview.lifetimeXPAfter,
-      fatigue: Math.min(100, Math.max(0, roundValue((player.fatigue ?? 0) + (playerPreview.organicProgression?.fatigueLoad ?? 0), 1))),
+      // Anti-cheese Teil B (B.3): training fatigue is accumulated per matchday (see
+      // `accumulateMatchdayTrainingProgress`), NOT booked in a lump at season end. `organicProgression
+      // .fatigueLoad` remains a forecast/preview field only. Fatigue carries as-is into the reset.
+      fatigue: Math.min(100, Math.max(0, roundValue(player.fatigue ?? 0, 1))),
       previousDisciplineRatings: baselineDisciplineRatings,
       lastSeasonDisciplineValues: baselineDisciplineRatings,
       currentDisciplineValues: nextDisciplineRatings,
@@ -1232,10 +1267,8 @@ export function applySeasonEndProgressionMutations(input: {
       currentXP: Math.max(0, playerPreview.remainingXP),
       spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
       lifetimeXP: playerPreview.lifetimeXPAfter,
-      fatigue: Math.min(
-        100,
-        Math.max(0, roundValue((player.fatigue ?? 0) + (playerPreview.organicProgression?.fatigueLoad ?? 0), 1)),
-      ),
+      // Anti-cheese Teil B (B.3): training fatigue accumulates per matchday, not at season end.
+      fatigue: Math.min(100, Math.max(0, roundValue(player.fatigue ?? 0, 1))),
       classHistory: playerPreview.organicProgression?.classChanged
         ? [
             ...(player.classHistory ?? []),

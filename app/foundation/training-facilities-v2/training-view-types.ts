@@ -44,6 +44,8 @@ export type TrainingPlayerRowView = {
       men: number;
       soc: number;
     };
+    /** Current in-season fatigue (0–100), including per-matchday accumulated training fatigue. */
+    fatigue: number;
   };
   mode: PlayerTrainingMode;
   trainingClass: string;
@@ -115,6 +117,20 @@ export type TrainingPlayerRowView = {
       label: "niedrig" | "mittel" | "hoch";
     };
   };
+  /**
+   * Anti-cheese Teil B (B.6): per-matchday training accumulation forecast. `accumulatedBudget` is the
+   * base training budget already locked in from the matchdays played so far; `forecastBudget` projects
+   * the season-end base budget if the remaining matchdays are trained at the currently-drafted `mode`
+   * (`accumulatedBudget + (totalMatchdays - matchdaysCounted) * share(currentMode)`). Null before the
+   * first matchday of the season (nothing accumulated yet).
+   */
+  trainingAccumulatorForecast?: {
+    matchdaysCounted: number;
+    totalMatchdays: number;
+    accumulatedBudget: number;
+    forecastBudget: number;
+    currentMode: PlayerTrainingMode;
+  } | null;
   recommendedTrainingMode?: PlayerTrainingMode | null;
   recommendedTrainingDetail?: string | null;
   recommendedTrainingMatchesCurrent?: boolean;

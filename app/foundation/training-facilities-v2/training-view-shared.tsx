@@ -663,6 +663,22 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
             </div>
           </div>
 
+          {row.trainingAccumulatorForecast ? (
+            <p
+              className="muted training-v2-accumulator-forecast"
+              title="Anti-Cheese: Das Saison-End-Trainingsbudget akkumuliert pro Spieltag aus dem jeweils aktiven Modus. Bisher = bereits gesammelt; Rest projiziert die verbleibenden Spieltage im aktuell gewaehlten Modus."
+            >
+              Bisher {formatVeloNumber(row.trainingAccumulatorForecast.accumulatedBudget, 2)} SP (
+              {row.trainingAccumulatorForecast.matchdaysCounted} Spieltage) · Rest bei{" "}
+              {getTrainingModePresentation(row.mode).label} →{" "}
+              {formatVeloNumber(row.trainingAccumulatorForecast.forecastBudget, 2)} SP
+            </p>
+          ) : null}
+
+          <p className="muted training-v2-fatigue-current" title="Aktuelle Ermüdung inkl. pro Spieltag akkumulierter Trainings-Fatigue.">
+            Aktuell {formatVeloNumber(row.player.fatigue, 0)}/100 Fatigue
+          </p>
+
           <p
             className="muted training-v2-reality-note"
             title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala übersetzt."
