@@ -1857,6 +1857,14 @@ a {
   white-space: nowrap;
 }
 
+/* Laptop/1024: der Shell-Header-Button darf die Zeile nicht über den Viewport
+   drücken — engere Kappung, der Mittel-Text ellipsiert weiterhin. */
+@media (max-width: 1080px) {
+  .foundation-global-next-button {
+    max-width: min(260px, 30vw);
+  }
+}
+
 .foundation-global-next-button strong {
   min-width: 0;
   overflow: hidden;
@@ -44498,6 +44506,15 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* --- Laptop/1024: engere Spaltenminima, damit die Board-Zeile nicht über
+   den Viewport läuft (die volle Kartenauflösung greift erst ≤900px). ----- */
+@media (max-width: 1080px) {
+  .is-new-look .nl-standings-rowmain {
+    grid-template-columns: 56px minmax(116px, 1.2fr) minmax(84px, 0.9fr) minmax(150px, 1.5fr) auto 18px;
+    gap: var(--nl-s2);
+  }
+}
+
 /* --- Mobile: Board-Zeilen werden zu Karten ------------------------- */
 @media (max-width: 900px) {
   .is-new-look .nl-standings-rowmain {
@@ -45413,6 +45430,14 @@ button.foundation-team-portrait-card {
   min-width: 720px;
   width: 100%;
   height: auto;
+}
+
+/* Laptop/1024: die 720px-Mindestbreite darf die Seite nicht seitlich sprengen —
+   das Chart ist width:100% und skaliert sauber mit. */
+@media (max-width: 1080px) {
+  .is-new-look .nl-prize-distribution-chart {
+    min-width: 0;
+  }
 }
 
 .is-new-look .nl-prize-forecast-chart {
