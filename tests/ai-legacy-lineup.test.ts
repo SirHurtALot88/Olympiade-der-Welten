@@ -14,6 +14,7 @@ function createContext(): LegacyLineupLoadedContext {
     seasonId: "season-1",
     matchdayId: "matchday-1",
     teamId: "A-A",
+    entries: [],
     disciplinePlayerCounts: {
       tdm: 2,
       "mini-dm": 2,
@@ -120,8 +121,8 @@ function createContext(): LegacyLineupLoadedContext {
       { id: "p5", name: "Player 5", coreStats: { pow: 10, spe: 10, men: 10, soc: 10 } },
     ],
     disciplines: [
-      { id: "tdm", name: "TDM", category: "tactics" },
-      { id: "mini-dm", name: "Mini DM", category: "tactics" },
+      { id: "tdm", name: "TDM", category: "power" },
+      { id: "mini-dm", name: "Mini DM", category: "power" },
     ],
     disciplineWeights: [
       { disciplineId: "tdm", attributeKey: "power", weightPct: 28 },
@@ -433,10 +434,9 @@ describe("legacy ai lineup suggestion", () => {
     };
     context.teamDisciplineRanks = {
       tdm: {
-        disciplineId: "tdm",
-        teamId: "A-A",
         rank: 5,
         score: 390,
+        sourceStatus: "mapped",
       },
     };
     context.activePlayers = [

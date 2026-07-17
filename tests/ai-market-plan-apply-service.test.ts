@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
 const buildAiMarketPlanPreview = vi.fn();
 const previewLocalTransfermarktSell = vi.fn();
@@ -17,11 +18,14 @@ const createLocalTransfermarktRunContext = vi.fn(() => ({
 }));
 const flushLocalTransfermarktRunContext = vi.fn();
 
-const persistenceState = {
-  save: {
-    saveId: "save-local",
-    gameState: {
-      season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["matchday-1"] },
+// NB: this is annotated `: GameState` (not `satisfies GameState`) on purpose. `satisfies` checks
+// compatibility but keeps the narrow *inferred* literal type — every empty array literal below
+// (`teams: []`, `rosters: []`, ...) would then be typed `never[]`, and every test case below that
+// later assigns a properly-typed array (e.g. `persistenceState.save.gameState.teams = [...]`)
+// would fail to typecheck against that frozen `never[]`. The explicit annotation widens each field
+// to its real GameState member type up front.
+const baseGameState: GameState = {
+  season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["matchday-1"] },
       seasonState: { seasonId: "season-1", schedule: [], standings: {}, teamControlSettings: {}, teamStrategyProfiles: {} },
       matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
       teams: [],
@@ -100,7 +104,12 @@ const persistenceState = {
         duplicateTeamCodes: [],
         warnings: [],
       },
-    } satisfies GameState,
+};
+
+const persistenceState = {
+  save: {
+    saveId: "save-local",
+    gameState: baseGameState,
   },
   saveCalls: [] as Array<{ saveId: string; gameState: GameState }>,
 };
@@ -109,14 +118,22 @@ vi.mock("@/lib/ai/ai-market-plan-preview-service", () => ({
   buildAiMarketPlanPreview,
 }));
 
-vi.mock("@/lib/market/transfermarkt-local-service", () => ({
-  createLocalTransfermarktRunContext,
-  previewLocalTransfermarktSell,
-  executeLocalTransfermarktSell,
-  previewLocalTransfermarktBuy,
-  executeLocalTransfermarktBuy,
-  flushLocalTransfermarktRunContext,
-}));
+// Only the six functions below are meant to be test doubles (they perform local-save I/O the test
+// wants to observe/control). Every other export of this module (e.g. pure cash/affordability
+// helpers like resolveTransferBuyAffordabilityCash) is passed through via importOriginal so newly
+// added exports don't crash this suite with "no export defined on the mock".
+vi.mock("@/lib/market/transfermarkt-local-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/market/transfermarkt-local-service")>();
+  return {
+    ...actual,
+    createLocalTransfermarktRunContext,
+    previewLocalTransfermarktSell,
+    executeLocalTransfermarktSell,
+    previewLocalTransfermarktBuy,
+    executeLocalTransfermarktBuy,
+    flushLocalTransfermarktRunContext,
+  };
+});
 
 vi.mock("@/lib/persistence/persistence-service", () => ({
   createPersistenceService: () => ({
@@ -156,18 +173,18 @@ describe("ai market plan apply service", () => {
 
   it("keeps dry-run write-free and skips manual/passive/disabled teams", async () => {
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 120, rosterLimit: 4, controlMode: "ai" },
-      { teamId: "M-A", name: "Manual Team", shortCode: "M-A", cash: 100, rosterLimit: 4, controlMode: "manual" },
-      { teamId: "P-A", name: "Passive Team", shortCode: "P-A", cash: 80, rosterLimit: 4, controlMode: "passive" },
-      { teamId: "D-I", name: "Disabled AI", shortCode: "D-I", cash: 70, rosterLimit: 4, controlMode: "ai" },
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 120, rosterLimit: 4 }),
+      makeTeam({ teamId: "M-A", name: "Manual Team", shortCode: "M-A", cash: 100, rosterLimit: 4 }),
+      makeTeam({ teamId: "P-A", name: "Passive Team", shortCode: "P-A", cash: 80, rosterLimit: 4 }),
+      makeTeam({ teamId: "D-I", name: "Disabled AI", shortCode: "D-I", cash: 70, rosterLimit: 4 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "A-I", playerMin: 3, playerOpt: 4 },
-      { teamId: "D-I", playerMin: 3, playerOpt: 4 },
+      makeTeamIdentity({ teamId: "A-I", playerMin: 3, playerOpt: 4 }),
+      makeTeamIdentity({ teamId: "D-I", playerMin: 3, playerOpt: 4 }),
     ] as GameState["teamIdentities"];
     persistenceState.save.gameState.rosters = [
-      { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
-      { teamId: "A-I", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18 },
+      makeRosterEntry({ id: "r-A-I-p-1", teamId: "A-I", playerId: "p-1", salary: 4, currentValue: 18 }),
+      makeRosterEntry({ id: "r-A-I-p-2", teamId: "A-I", playerId: "p-2", salary: 4, currentValue: 18 }),
     ] as GameState["rosters"];
 
     buildAiMarketPlanPreview.mockResolvedValue({
@@ -322,18 +339,20 @@ describe("ai market plan apply service", () => {
 
   it("fills AI buy plans up to playerOpt without overbuying the candidate window", async () => {
     persistenceState.save.gameState.teams = [
-      { teamId: "C-C", name: "Cash Creators", shortCode: "C-C", cash: 160, rosterLimit: 12, controlMode: "ai" },
+      makeTeam({ teamId: "C-C", name: "Cash Creators", shortCode: "C-C", cash: 160, rosterLimit: 12 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "C-C", playerMin: 7, playerOpt: 12 },
+      makeTeamIdentity({ teamId: "C-C", playerMin: 7, playerOpt: 12 }),
     ] as GameState["teamIdentities"];
-    persistenceState.save.gameState.rosters = Array.from({ length: 10 }, (_, index) => ({
-      teamId: "C-C",
-      playerId: `p-${index + 1}`,
-      activePlayerId: `ap-${index + 1}`,
-      salary: 2,
-      currentValue: 6,
-    })) as GameState["rosters"];
+    persistenceState.save.gameState.rosters = Array.from({ length: 10 }, (_, index) =>
+      makeRosterEntry({
+        id: `r-C-C-${index + 1}`,
+        teamId: "C-C",
+        playerId: `p-${index + 1}`,
+        salary: 2,
+        currentValue: 6,
+      }),
+    );
 
     const buildCandidate = (index: number) => ({
       playerId: `fa-${index}`,
@@ -423,18 +442,20 @@ describe("ai market plan apply service", () => {
 
   it("honors explicit Season 2+ candidate scan budgets", async () => {
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 120, rosterLimit: 10, controlMode: "ai" },
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 120, rosterLimit: 10 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "A-I", playerMin: 7, playerOpt: 10 },
+      makeTeamIdentity({ teamId: "A-I", playerMin: 7, playerOpt: 10 }),
     ] as GameState["teamIdentities"];
-    persistenceState.save.gameState.rosters = Array.from({ length: 9 }, (_, index) => ({
-      teamId: "A-I",
-      playerId: `p-${index + 1}`,
-      activePlayerId: `ap-${index + 1}`,
-      salary: 2,
-      currentValue: 6,
-    })) as GameState["rosters"];
+    persistenceState.save.gameState.rosters = Array.from({ length: 9 }, (_, index) =>
+      makeRosterEntry({
+        id: `r-A-I-${index + 1}`,
+        teamId: "A-I",
+        playerId: `p-${index + 1}`,
+        salary: 2,
+        currentValue: 6,
+      }),
+    );
 
     buildAiMarketPlanPreview.mockResolvedValue({
       readOnly: true,
@@ -512,19 +533,21 @@ describe("ai market plan apply service", () => {
     persistenceState.save.gameState.season = { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["matchday-1"] };
     persistenceState.save.gameState.seasonState.seasonId = "season-2";
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 4, rosterLimit: 10, controlMode: "ai" },
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 4, rosterLimit: 10 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "A-I", playerMin: 7, playerOpt: 10 },
+      makeTeamIdentity({ teamId: "A-I", playerMin: 7, playerOpt: 10 }),
     ] as GameState["teamIdentities"];
-    persistenceState.save.gameState.rosters = Array.from({ length: 10 }, (_, index) => ({
-      teamId: "A-I",
-      playerId: `p-${index + 1}`,
-      activePlayerId: `ap-${index + 1}`,
-      salary: 0.1,
-      currentValue: 6,
-      contractLength: 2,
-    })) as GameState["rosters"];
+    persistenceState.save.gameState.rosters = Array.from({ length: 10 }, (_, index) =>
+      makeRosterEntry({
+        id: `r-A-I-${index + 1}`,
+        teamId: "A-I",
+        playerId: `p-${index + 1}`,
+        salary: 0.1,
+        currentValue: 6,
+        contractLength: 2,
+      }),
+    );
 
     const { applyAiMarketPlanLocally } = await import("@/lib/ai/ai-market-plan-apply-service");
     const result = await applyAiMarketPlanLocally({
@@ -655,17 +678,17 @@ describe("ai market plan apply service", () => {
     persistenceState.save.gameState.season = { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["matchday-1"] };
     persistenceState.save.gameState.seasonState.seasonId = "season-2";
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 90, rosterLimit: 6, controlMode: "ai" },
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 90, rosterLimit: 6 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "A-I", playerMin: 3, playerOpt: 4 },
+      makeTeamIdentity({ teamId: "A-I", playerMin: 3, playerOpt: 4 }),
     ] as GameState["teamIdentities"];
     persistenceState.save.gameState.rosters = [
-      { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18, contractLength: 1 },
-      { teamId: "A-I", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18, contractLength: 1 },
-      { teamId: "A-I", playerId: "p-3", activePlayerId: "ap-3", salary: 4, currentValue: 18, contractLength: 1 },
-      { teamId: "A-I", playerId: "p-4", activePlayerId: "ap-4", salary: 4, currentValue: 18, contractLength: 1 },
-      { teamId: "A-I", playerId: "p-5", activePlayerId: "ap-5", salary: 4, currentValue: 18, contractLength: 1 },
+      makeRosterEntry({ id: "r-A-I-p-1", teamId: "A-I", playerId: "p-1", salary: 4, currentValue: 18, contractLength: 1 }),
+      makeRosterEntry({ id: "r-A-I-p-2", teamId: "A-I", playerId: "p-2", salary: 4, currentValue: 18, contractLength: 1 }),
+      makeRosterEntry({ id: "r-A-I-p-3", teamId: "A-I", playerId: "p-3", salary: 4, currentValue: 18, contractLength: 1 }),
+      makeRosterEntry({ id: "r-A-I-p-4", teamId: "A-I", playerId: "p-4", salary: 4, currentValue: 18, contractLength: 1 }),
+      makeRosterEntry({ id: "r-A-I-p-5", teamId: "A-I", playerId: "p-5", salary: 4, currentValue: 18, contractLength: 1 }),
     ] as GameState["rosters"];
     persistenceState.save.gameState.seasonState.teamControlSettings = {
       "A-I": {
@@ -850,14 +873,14 @@ describe("ai market plan apply service", () => {
     persistenceState.save.gameState.season = { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["matchday-1"] };
     persistenceState.save.gameState.seasonState.seasonId = "season-2";
     persistenceState.save.gameState.teams = [
-      { teamId: "D-E", name: "Debt Engines", shortCode: "D-E", cash: 10, rosterLimit: 4, controlMode: "ai" },
+      makeTeam({ teamId: "D-E", name: "Debt Engines", shortCode: "D-E", cash: 10, rosterLimit: 4 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "D-E", playerMin: 3, playerOpt: 3 },
+      makeTeamIdentity({ teamId: "D-E", playerMin: 3, playerOpt: 3 }),
     ] as GameState["teamIdentities"];
     persistenceState.save.gameState.rosters = [
-      { teamId: "D-E", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
-      { teamId: "D-E", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18 },
+      makeRosterEntry({ id: "r-D-E-p-1", teamId: "D-E", playerId: "p-1", salary: 4, currentValue: 18 }),
+      makeRosterEntry({ id: "r-D-E-p-2", teamId: "D-E", playerId: "p-2", salary: 4, currentValue: 18 }),
     ] as GameState["rosters"];
     persistenceState.save.gameState.seasonState.teamControlSettings = {
       "D-E": {
@@ -936,14 +959,14 @@ describe("ai market plan apply service", () => {
 
   it("rolls back an executed team plan when the saved cash ends negative", async () => {
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 20, rosterLimit: 4, controlMode: "ai" },
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 20, rosterLimit: 4 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
-      { teamId: "A-I", playerMin: 2, playerOpt: 3 },
+      makeTeamIdentity({ teamId: "A-I", playerMin: 2, playerOpt: 3 }),
     ] as GameState["teamIdentities"];
     persistenceState.save.gameState.rosters = [
-      { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
-      { teamId: "A-I", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18 },
+      makeRosterEntry({ id: "r-A-I-p-1", teamId: "A-I", playerId: "p-1", salary: 4, currentValue: 18 }),
+      makeRosterEntry({ id: "r-A-I-p-2", teamId: "A-I", playerId: "p-2", salary: 4, currentValue: 18 }),
     ] as GameState["rosters"];
 
     buildAiMarketPlanPreview.mockResolvedValue({
@@ -1668,22 +1691,22 @@ describe("ai market plan apply service", () => {
       gameState: {
         ...persistenceState.save.gameState,
         teams: [
-          { teamId: "A-I", name: "Alpha AI", shortCode: "A-I", cash: 90, rosterLimit: 4, controlMode: "ai" },
-          { teamId: "B-I", name: "Beta AI", shortCode: "B-I", cash: 95, rosterLimit: 4, controlMode: "ai" },
+          makeTeam({ teamId: "A-I", name: "Alpha AI", shortCode: "A-I", cash: 90, rosterLimit: 4 }),
+          makeTeam({ teamId: "B-I", name: "Beta AI", shortCode: "B-I", cash: 95, rosterLimit: 4 }),
         ] as GameState["teams"],
         teamIdentities: [
-          { teamId: "A-I", playerMin: 3, playerOpt: 4 },
-          { teamId: "B-I", playerMin: 3, playerOpt: 4 },
+          makeTeamIdentity({ teamId: "A-I", playerMin: 3, playerOpt: 4 }),
+          makeTeamIdentity({ teamId: "B-I", playerMin: 3, playerOpt: 4 }),
         ] as GameState["teamIdentities"],
         rosters: [
-          { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
-          { teamId: "A-I", playerId: "p-a2", activePlayerId: "ap-a2", salary: 4, currentValue: 18 },
-          { teamId: "A-I", playerId: "p-a3", activePlayerId: "ap-a3", salary: 4, currentValue: 18 },
-          { teamId: "A-I", playerId: "p-a4", activePlayerId: "ap-a4", salary: 4, currentValue: 18 },
-          { teamId: "B-I", playerId: "p-2", activePlayerId: "ap-2", salary: 5, currentValue: 16 },
-          { teamId: "B-I", playerId: "p-b2", activePlayerId: "ap-b2", salary: 5, currentValue: 16 },
-          { teamId: "B-I", playerId: "p-b3", activePlayerId: "ap-b3", salary: 5, currentValue: 16 },
-          { teamId: "B-I", playerId: "p-b4", activePlayerId: "ap-b4", salary: 5, currentValue: 16 },
+          makeRosterEntry({ id: "r-A-I-p-1", teamId: "A-I", playerId: "p-1", salary: 4, currentValue: 18 }),
+          makeRosterEntry({ id: "r-A-I-p-a2", teamId: "A-I", playerId: "p-a2", salary: 4, currentValue: 18 }),
+          makeRosterEntry({ id: "r-A-I-p-a3", teamId: "A-I", playerId: "p-a3", salary: 4, currentValue: 18 }),
+          makeRosterEntry({ id: "r-A-I-p-a4", teamId: "A-I", playerId: "p-a4", salary: 4, currentValue: 18 }),
+          makeRosterEntry({ id: "r-B-I-p-2", teamId: "B-I", playerId: "p-2", salary: 5, currentValue: 16 }),
+          makeRosterEntry({ id: "r-B-I-p-b2", teamId: "B-I", playerId: "p-b2", salary: 5, currentValue: 16 }),
+          makeRosterEntry({ id: "r-B-I-p-b3", teamId: "B-I", playerId: "p-b3", salary: 5, currentValue: 16 }),
+          makeRosterEntry({ id: "r-B-I-p-b4", teamId: "B-I", playerId: "p-b4", salary: 5, currentValue: 16 }),
         ] as GameState["rosters"],
         seasonState: {
           ...persistenceState.save.gameState.seasonState,

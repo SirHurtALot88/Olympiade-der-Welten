@@ -26,6 +26,13 @@ import {
   teamNeedsMarketConvergence,
   teamSkipsPreseasonMarketBuys,
 } from "@/lib/ai/ai-market-plan-convergence-service";
+import { makeRosterEntry, makeScheduleEntry, makeScheduleSlot, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
+
+function buildRoster(teamId: string, count: number, idPrefix: string) {
+  return Array.from({ length: count }, (_, index) =>
+    makeRosterEntry({ id: `r-${idPrefix}-${index}`, teamId, playerId: `p-${idPrefix}-${index}` }),
+  );
+}
 
 function buildGameState(overrides?: Partial<GameState>): GameState {
   return {
@@ -36,35 +43,46 @@ function buildGameState(overrides?: Partial<GameState>): GameState {
       standings: {},
       teamControlSettings: {},
       teamStrategyProfiles: {},
-      disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 4 }, discipline2: { playerCount: 4 } }],
+      disciplineSchedule: [
+        makeScheduleEntry({
+          seasonId: "season-2",
+          matchdayId: "md-1",
+          discipline1: makeScheduleSlot({ disciplineId: "d1", playerCount: 4 }),
+          discipline2: makeScheduleSlot({ disciplineId: "d2", playerCount: 4 }),
+        }),
+      ],
     },
     matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [
-      { teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 100, humanControlled: false },
-      { teamId: "team-b", name: "Team B", shortCode: "TMB", cash: 50, humanControlled: false },
+      makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 100 }),
+      makeTeam({ teamId: "team-b", name: "Team B", shortCode: "TMB", cash: 50 }),
     ],
     teamIdentities: [
-      { teamId: "team-a", playerMin: 8, playerMax: 14, playerOpt: 10 },
-      { teamId: "team-b", playerMin: 8, playerMax: 14, playerOpt: 10 },
+      makeTeamIdentity({ teamId: "team-a", playerMin: 8, playerOpt: 10 }),
+      makeTeamIdentity({ teamId: "team-b", playerMin: 8, playerOpt: 10 }),
     ],
-    rosters: [
-      ...Array.from({ length: 6 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
-      ...Array.from({ length: 8 }, (_, index) => ({
-        id: `r-b-${index}`,
-        teamId: "team-b",
-        playerId: `p-b-${index}`,
-        slot: index,
-      })),
-    ],
+    rosters: [...buildRoster("team-a", 6, "a"), ...buildRoster("team-b", 8, "b")],
     players: [],
+    disciplines: [],
     transferHistory: [],
     ...overrides,
   } as GameState;
+}
+
+// Minimal saveSingleplayerState stub: runTransferWindowSession may originate AI loans mid-session
+// (see ai-transfer-window-session-service.ts), which persists the post-loan gameState via
+// persistence.saveSingleplayerState. The test doubles below only implement getSaveById, so any
+// persistence object handed to runMarketPlanConvergence needs this stub to avoid a runtime
+// "not a function" crash whenever a scenario's cash pressure triggers an AI borrow decision.
+function stubSaveSingleplayerState(_saveId: string, nextGameState: GameState) {
+  return {
+    saveId: "save-1",
+    name: "Test Save",
+    status: "active" as const,
+    createdAt: "2027-01-01T00:00:00.000Z",
+    updatedAt: "2027-01-01T00:00:00.000Z",
+    gameState: nextGameState,
+  };
 }
 
 function buildApplyResult(input: {
@@ -120,15 +138,11 @@ describe("ai market plan convergence service", () => {
   // from a season_end sell-only session — see tests/ai-transfer-window-session.test.ts).
   it("keeps a below-Opt team exhausted (not blocked) when preseason buys don't land, and never attempts a sell", async () => {
     const gameState = buildGameState({
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      rosters: buildRoster("team-a", 9, "a"),
     });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     applyAiMarketPlanLocally.mockResolvedValue(
@@ -155,15 +169,11 @@ describe("ai market plan convergence service", () => {
 
   it("blocks teams when buys finish below playerMin", async () => {
     const gameState = buildGameState({
-      rosters: Array.from({ length: 7 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      rosters: buildRoster("team-a", 7, "a"),
     });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     applyAiMarketPlanLocally.mockResolvedValue(
@@ -196,14 +206,10 @@ describe("ai market plan convergence service", () => {
       getSaveById: () => ({
         saveId: "save-1",
         gameState: buildGameState({
-          rosters: Array.from({ length: rosterCount }, (_, index) => ({
-            id: `r-a-${index}`,
-            teamId: "team-a",
-            playerId: `p-a-${index}`,
-            slot: index,
-          })),
+          rosters: buildRoster("team-a", rosterCount, "a"),
         }),
       }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     applyAiMarketPlanLocally.mockImplementation(async (params) => {
@@ -221,12 +227,7 @@ describe("ai market plan convergence service", () => {
         params.localRunContext.save = {
           ...params.localRunContext.save,
           gameState: buildGameState({
-            rosters: Array.from({ length: rosterCount }, (_, index) => ({
-              id: `r-a-${index}`,
-              teamId: "team-a",
-              playerId: `p-a-${index}`,
-              slot: index,
-            })),
+            rosters: buildRoster("team-a", rosterCount, "a"),
           }),
         };
       }
@@ -254,6 +255,7 @@ describe("ai market plan convergence service", () => {
     const gameState = buildGameState();
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     applyAiMarketPlanLocally.mockImplementation(async () => {
@@ -282,15 +284,11 @@ describe("ai market plan convergence service", () => {
     // overridden below) implicitly has 0 rosters here and is below hardMin — both teams need
     // convergence and get their own buy-only preseason cycle.
     const gameState = buildGameState({
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      rosters: buildRoster("team-a", 9, "a"),
     });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     applyAiMarketPlanLocally
@@ -324,25 +322,28 @@ describe("ai market plan convergence service", () => {
 
   it("skips convergence for team already at identity opt even when below slot depth", async () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 5, humanControlled: false }],
-      teamIdentities: [{ teamId: "team-bp", playerMin: 8, playerMax: 14, playerOpt: 10 }],
-      rosters: Array.from({ length: 10 }, (_, index) => ({
-        id: `r-bp-${index}`,
-        teamId: "team-bp",
-        playerId: `p-bp-${index}`,
-        slot: index,
-      })),
+      teams: [makeTeam({ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 5 })],
+      teamIdentities: [makeTeamIdentity({ teamId: "team-bp", playerMin: 8, playerOpt: 10 })],
+      rosters: buildRoster("team-bp", 10, "bp"),
       seasonState: {
         seasonId: "season-2",
         schedule: [],
         standings: {},
         teamControlSettings: {},
         teamStrategyProfiles: {},
-        disciplineSchedule: [{ seasonId: "season-2", discipline1: { playerCount: 6 }, discipline2: { playerCount: 6 } }],
+        disciplineSchedule: [
+          makeScheduleEntry({
+            seasonId: "season-2",
+            matchdayId: "md-1",
+            discipline1: makeScheduleSlot({ disciplineId: "d1", playerCount: 6 }),
+            discipline2: makeScheduleSlot({ disciplineId: "d2", playerCount: 6 }),
+          }),
+        ],
       },
     });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
+      saveSingleplayerState: stubSaveSingleplayerState,
     };
 
     const result = await runMarketPlanConvergence({
@@ -364,14 +365,9 @@ describe("ai market plan convergence service", () => {
   it("tags exhausted teams for repair engine logging", async () => {
     process.env.OLY_UNIFIED_PICK = "1";
     const gameState = buildGameState({
-      rosters: Array.from({ length: 6 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      rosters: buildRoster("team-a", 6, "a"),
     });
-    const persistence = { getSaveById: () => ({ saveId: "save-1", gameState }) };
+    const persistence = { getSaveById: () => ({ saveId: "save-1", gameState }), saveSingleplayerState: stubSaveSingleplayerState };
     applyAiMarketPlanLocally.mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 6 }));
 
     const result = await runMarketPlanConvergence({
@@ -394,13 +390,8 @@ describe("ai market plan convergence service", () => {
 describe("teamNeedsMarketConvergence", () => {
   it("grants a buy pass to cash_recovery teams between hardMin and Opt (regression: gate used to block them)", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10, humanControlled: false }],
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      teams: [makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10 })],
+      rosters: buildRoster("team-a", 9, "a"),
     });
 
     // Roster (9) sits strictly between hardMin (8) and Opt (10); negative cash drives the
@@ -412,17 +403,12 @@ describe("teamNeedsMarketConvergence", () => {
 
   it("grants a buy pass to eco_round teams between hardMin and Opt (regression: gate used to freeze them out for the whole season)", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 100, humanControlled: false }],
+      teams: [makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 100 })],
       teamIdentities: [
-        { teamId: "team-a", playerMin: 8, playerMax: 14, playerOpt: 10, finances: 9 },
-        { teamId: "team-b", playerMin: 8, playerMax: 14, playerOpt: 10 },
-      ] as GameState["teamIdentities"],
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+        makeTeamIdentity({ teamId: "team-a", playerMin: 8, playerOpt: 10, finances: 9 }),
+        makeTeamIdentity({ teamId: "team-b", playerMin: 8, playerOpt: 10 }),
+      ],
+      rosters: buildRoster("team-a", 9, "a"),
     });
 
     // Roster (9) sits strictly between hardMin (8) and Opt (10), cash is healthy and positive —
@@ -436,13 +422,8 @@ describe("teamNeedsMarketConvergence", () => {
 
   it("grants a buy pass to balanced_growth teams between hardMin and Opt (regression: strategy gate used to stop at hardMin)", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40, humanControlled: false }],
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      teams: [makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40 })],
+      rosters: buildRoster("team-a", 9, "a"),
     });
 
     expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
@@ -450,13 +431,8 @@ describe("teamNeedsMarketConvergence", () => {
 
   it("still skips convergence once a team reaches Opt, regardless of cash pressure", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10, humanControlled: false }],
-      rosters: Array.from({ length: 10 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      teams: [makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10 })],
+      rosters: buildRoster("team-a", 10, "a"),
     });
 
     expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(false);
@@ -465,13 +441,8 @@ describe("teamNeedsMarketConvergence", () => {
 
   it("still allows market buys below Opt including emergency gap above hardMin", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40, humanControlled: false }],
-      rosters: Array.from({ length: 5 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+      teams: [makeTeam({ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40 })],
+      rosters: buildRoster("team-a", 5, "a"),
     });
 
     expect(teamSkipsPreseasonMarketBuys(gameState, "team-a")).toBe(false);
