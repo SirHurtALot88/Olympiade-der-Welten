@@ -358,13 +358,15 @@ export function applyOverspendReconciliation(
   for (let index = fromIndex; index < slots.length && remaining > 0.01; index += 1) {
     const slot = slots[index];
     if (slot.lane === "superstar") {
+      const before = slot.targetMw;
       reassignSlotLane(slot, "star", brackets);
-      remaining = round(remaining - Math.max(0, slot.targetMw - brackets.star.targetMw), 2);
+      remaining = round(remaining - Math.max(0, before - slot.targetMw), 2);
       continue;
     }
     if (slot.lane === "star" || slot.lane === "core" || slot.lane === "specialist") {
+      const before = slot.targetMw;
       reassignSlotLane(slot, "depth", brackets);
-      remaining = round(remaining - Math.max(0, slot.targetMw - brackets.depth.targetMw), 2);
+      remaining = round(remaining - Math.max(0, before - slot.targetMw), 2);
     }
   }
 }

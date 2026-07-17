@@ -533,7 +533,7 @@ describe("ai market plan apply service", () => {
     persistenceState.save.gameState.season = { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["matchday-1"] };
     persistenceState.save.gameState.seasonState.seasonId = "season-2";
     persistenceState.save.gameState.teams = [
-      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 4, rosterLimit: 10 }),
+      makeTeam({ teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 40, rosterLimit: 10 }),
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
       makeTeamIdentity({ teamId: "A-I", playerMin: 7, playerOpt: 10 }),
@@ -548,6 +548,25 @@ describe("ai market plan apply service", () => {
         contractLength: 2,
       }),
     );
+    // Unter der S2+-Single-Cash-Policy ist ein at-Opt-Team mit positivem Cash NICHT "nichts zu tun":
+    // das Post-Opt-Upgrade-Mandat will den Überschuss legitim in Upgrades stecken (→ Buy-Need, erzwingt
+    // den Preview-Scan). Der einzige wirklich idle Zustand, den die Engine kennt, ist ein Strategic-Hoard-
+    // Team — seine Transfer-/Building-Budgets sind auf 0 reserviert, sodass isStrategicHoardTeam() das
+    // Upgrade-Mandat unterdrückt. Genau dieser Fall soll den teuren Preview überspringen.
+    (persistenceState.save.gameState.seasonState as GameState["seasonState"]).aiManagerBudgetReservations = {
+      "A-I": {
+        teamId: "A-I",
+        seasonId: "season-2",
+        sourcePlanId: "test-plan",
+        cashReserve: 40,
+        salaryReserve: 0,
+        transferBudget: 0,
+        buildingBudget: 0,
+        maintenanceBudget: 0,
+        emergencyBudget: 0,
+        updatedAt: "2027-01-01T00:00:00.000Z",
+      },
+    };
 
     const { applyAiMarketPlanLocally } = await import("@/lib/ai/ai-market-plan-apply-service");
     const result = await applyAiMarketPlanLocally({

@@ -259,7 +259,10 @@ describe("ai market plan preview service", () => {
     expect(direLegion?.warnings.join(" ")).toContain("Kein belastbarer Verkaufswert");
     expect(direLegion?.planSteps[0]?.stepType).toBe("sell");
     expect(result.summary.sellOnly).toBe(1);
-  });
+    // First test to dynamically import the (heavy) preview service pays the full module
+    // transform/eval cost inside the test body, which alone can exceed the 5s default. The work
+    // itself completes in a few seconds — give the cold import headroom.
+  }, 20000);
 
   it("keeps manual and passive teams out of ai scope and reports disabled teams as blocked", async () => {
     buildAiTransfermarktPreview.mockResolvedValue({

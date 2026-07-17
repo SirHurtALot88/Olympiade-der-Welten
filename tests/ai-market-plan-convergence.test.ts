@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 
@@ -129,6 +129,14 @@ function buildApplyResult(input: {
 describe("ai market plan convergence service", () => {
   beforeEach(() => {
     applyAiMarketPlanLocally.mockReset();
+    // Diese Tests prüfen die (weiterhin unterstützte) Legacy-Convergence-Loop-Orchestrierung und mocken
+    // applyAiMarketPlanLocally. Der organische Squad-Builder ist inzwischen DEFAULT-ON und umgeht diesen
+    // Pfad — deshalb hier explizit auf Legacy pinnen, sonst wird der Mock nie aufgerufen.
+    vi.stubEnv("OLY_ORGANIC_SQUAD_BUILDER", "0");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   // Design correction (2026-07-04): runMarketPlanConvergence always drives runTransferWindowSession

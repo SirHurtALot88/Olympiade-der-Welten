@@ -353,7 +353,23 @@ function chooseSellCandidates(
     return [];
   }
   if (!gameState) {
-    return sourceCandidates.slice(0, 3);
+    // No loaded gameState (e.g. a preview driven purely off the mocked sub-previews, or a save that
+    // failed to load): we can't recompute composite sell scores from roster/player data, so fall back
+    // to the sell preview's own recommendation. Drop the players it explicitly flagged to keep, then
+    // order by descending sell priority so the highest-priority / cash-clearing sells lead — the same
+    // intent as the gameState-backed selection below, just using the pre-scored preview candidates.
+    // (The previous `slice(0, 3)` ignored both the keep flags and the priority order, so it neither
+    // sold enough to clear negative cash nor curated out keepers.)
+    return sourceCandidates
+      .filter(
+        (candidate) => (candidate.reasonsToKeep?.length ?? candidate.reasonToKeep?.length ?? 0) === 0,
+      )
+      .slice()
+      .sort(
+        (left, right) =>
+          (right.sellPriorityScore ?? right.sellPriority ?? 0) -
+          (left.sellPriorityScore ?? left.sellPriority ?? 0),
+      );
   }
 
   const teamState = gameState.teams.find((entry) => entry.teamId === team.teamId) ?? null;
