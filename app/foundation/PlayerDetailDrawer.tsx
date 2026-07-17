@@ -2342,8 +2342,18 @@ export default function PlayerDetailDrawer({
                     // würde die Bestenreihenfolge verraten. Stattdessen die
                     // Reihenfolge per Spieler-Seed mischen und erst dann 5 nehmen.
                     const axisCategoryDisciplines = data.disciplineValues.filter((entry) => entry.category === card.tone);
+                    // Fog: nach dem ANGEZEIGTEN (verwässerten) Band-Wert sortieren,
+                    // damit die Reihenfolge zur sichtbaren Balkenhöhe/Klasse passt —
+                    // der Scout sieht das Wahrgenommene als "Top", nicht die echte
+                    // Reihenfolge. Die Streuung (`scoutedTier`) verschleiert die
+                    // Wahrheit; bei Band-Gleichstand nach id (deterministisch, ohne
+                    // die echte Rangfolge innerhalb eines Bands zu verraten).
+                    const foggedBandValue = (entry: (typeof axisCategoryDisciplines)[number]) =>
+                      attributeTierBandValue(entry.scoutedTier ?? formatDisciplineTier(entry.value)) ?? -1;
                     const axisDisciplines = disciplineStatFogged
-                      ? shuffleFoggedByPlayer(axisCategoryDisciplines, data.playerId, (entry) => entry.id).slice(0, 5)
+                      ? [...axisCategoryDisciplines]
+                          .sort((a, b) => foggedBandValue(b) - foggedBandValue(a) || a.id.localeCompare(b.id))
+                          .slice(0, 5)
                       : axisCategoryDisciplines.slice(0, 5);
                     const disciplineListId = `player-drawer-axis-disciplines-${card.id}`;
                     const cardBody = (
