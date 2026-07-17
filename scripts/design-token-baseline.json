@@ -1,6 +1,6 @@
 {
   "_comment": "Ratchet-Baseline fuer scripts/lint-design-tokens.ts. Key-Format: '<datei>:<zeile>:<regel>'. Regel-IDs: EUR (rohes Euro-Zeichen), LOCALE (toLocaleString/Intl.NumberFormat), HEX (hartkodierte Hex-Farbe). Neu generieren mit: npx tsx scripts/lint-design-tokens.ts --update-baseline",
-  "generatedAt": "2026-07-17T17:33:23.338Z",
+  "generatedAt": "2026-07-17T18:14:36.088Z",
   "count": 104,
   "violations": [
     "app/foundation/FoundationShellRouterBody.tsx:3459:LOCALE",
@@ -12,7 +12,7 @@
     "app/foundation/PlayerGeneratorPanelNewLook.tsx:153:LOCALE",
     "app/foundation/PlayerGeneratorPanelNewLook.tsx:1547:LOCALE",
     "app/foundation/PlayerHeroNewLook.tsx:119:HEX",
-    "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx:967:LOCALE",
+    "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx:983:LOCALE",
     "app/foundation/credits/FoundationCreditsNewLook.tsx:155:LOCALE",
     "app/foundation/credits/FoundationCreditsNewLook.tsx:181:LOCALE",
     "app/foundation/credits/FoundationCreditsNewLook.tsx:42:LOCALE",
@@ -32,7 +32,7 @@
     "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx:1743:HEX",
     "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx:1746:HEX",
     "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx:1748:HEX",
-    "app/foundation/legacy-resolve-lab/LegacyResolveLabClient.tsx:202:LOCALE",
+    "app/foundation/legacy-resolve-lab/LegacyResolveLabClient.tsx:211:LOCALE",
     "app/foundation/player-profile/PlayerAttributeProgressChart.tsx:44:HEX",
     "app/foundation/player-profile/PlayerAttributeProgressChart.tsx:45:HEX",
     "app/foundation/player-profile/PlayerAttributeProgressChart.tsx:46:HEX",

@@ -1,8 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
-import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import { NlSubTabs } from "@/components/foundation/new-look";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
@@ -17,6 +17,16 @@ import type {
   TrainingPlayerRowView,
 } from "@/app/foundation/training-facilities-v2/training-view-types";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+
+// T-075 (Performance): PlayerDetailDrawer ist 3617 Zeilen und chart-schwer —
+// per next/dynamic laden statt statisch, damit der Chunk nicht in jedes
+// initiale Bundle wandert, das PlayerProfileClient einbindet. Verhalten
+// identisch: PlayerDetailDrawer selbst rendert `null`, solange `data` fehlt,
+// daher ist ein `null`-Ladefallback äquivalent zum bisherigen Sofort-Render.
+const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), {
+  ssr: false,
+  loading: () => null,
+});
 
 type PlayerProfileClientProps = {
   data: PlayerDetailDrawerData;

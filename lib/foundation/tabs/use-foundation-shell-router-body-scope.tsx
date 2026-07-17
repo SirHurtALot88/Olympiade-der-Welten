@@ -9293,10 +9293,18 @@ export function useFoundationShellRouterBodyScope({
       })),
     [sortedPpAreaRows],
   );
+  // T-073 (Performance): `seasonV2TopPlayers` und `seasonV2PlayerRows` bauten
+  // beide `new Map(gameState.players.map(...))` mit identischem Deps-Array —
+  // hier einmal extrahiert und in beiden Nachbar-Memos wiederverwendet.
+  // `seasonV2PlayerById` referenziert nur `gameState.players`, genau wie
+  // zuvor beide Inline-Maps, daher identische Invalidierung/Ergebnis.
+  const seasonV2PlayerById = useMemo(
+    () => new Map(gameState.players.map((player) => [player.id, player] as const)),
+    [gameState.players],
+  );
   const seasonV2TopPlayers = useMemo(() => {
-    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
-      const player = playerById.get(row.playerId) ?? null;
+      const player = seasonV2PlayerById.get(row.playerId) ?? null;
       const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
       return {
         playerId: row.playerId,
@@ -9317,11 +9325,10 @@ export function useFoundationShellRouterBodyScope({
         ppSoc: row.ppSoc ?? null,
       };
     });
-  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  }, [seasonV2PlayerById, sortedSeasonTopPlayerRows]);
   const seasonV2PlayerRows = useMemo(() => {
-    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     return sortedSeasonTopPlayerRows.map((row) => {
-      const player = playerById.get(row.playerId) ?? null;
+      const player = seasonV2PlayerById.get(row.playerId) ?? null;
       const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
       return {
         playerId: row.playerId,
@@ -9342,7 +9349,7 @@ export function useFoundationShellRouterBodyScope({
         ppSoc: row.ppSoc ?? null,
       };
     });
-  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  }, [seasonV2PlayerById, sortedSeasonTopPlayerRows]);
   const seasonV2SelectedTeamSummary = useMemo(
     () =>
       selectedStandingRow
