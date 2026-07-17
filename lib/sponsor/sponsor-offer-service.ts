@@ -56,6 +56,12 @@ import {
 } from "@/lib/sponsor/sponsor-special-objectives";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
+// Liga-weite Anzeige-Normalisierung der Sponsor-Angebote ist deaktiviert: der Anker basiert noch auf der
+// alten getSponsorPayoutForFinalRank-Kurve (+ Floor bei Rang 32), während das Settlement bereits die neue
+// getSponsorPayoutForFinalRankAndTier-Kurve nutzt. Die Normalisierung bricht dadurch die Invariante
+// Anzeige==Settlement. Erst wieder aktivieren, wenn der Anker auf die neue Kurve + effectiveBaseFloor läuft.
+const SPONSOR_LEAGUE_NORMALIZATION_ENABLED = false;
+
 function roundCash(value: number) {
   return Number(value.toFixed(1));
 }
@@ -342,6 +348,16 @@ function normalizeTeamSponsorOffers(input: {
 }): SponsorOffer[] {
   const { offers, referenceRank, salaryFactor, leagueMinSalary } = input;
   if (offers.length === 0) {
+    return offers;
+  }
+  // DEAKTIVIERT (Anzeige==Settlement): Diese Liga-Normalisierung skalierte die ANGEZEIGTEN Komponenten an
+  // einen Anker aus der ALTEN Payout-Kurve (getSponsorPayoutForFinalRank, statischer Floor 32), während das
+  // Settlement die NEUE Kalibrierung (getSponsorPayoutForFinalRankAndTier) unskaliert auszahlt — Ergebnis:
+  // die Karte zeigte +12–30 % andere Beträge als real gezahlt wurden (26/32 Teams). Die per-Angebot-
+  // Kalibrierung (buildOfferCashAmounts) trifft die Ziel-Bänder bereits und ist mit dem Settlement identisch;
+  // eine zusätzliche Anzeige-Skalierung bricht die Invariante nur. Reaktivieren erst, wenn der Anker auf die
+  // neue Kurve + effectiveBaseFloor umgestellt ist.
+  if (!SPONSOR_LEAGUE_NORMALIZATION_ENABLED) {
     return offers;
   }
   const prizeRef = getPrizeMoneyReference(referenceRank, salaryFactor);

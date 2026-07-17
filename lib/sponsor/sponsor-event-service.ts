@@ -16,12 +16,22 @@ function roundCash(value: number) {
   return Number(value.toFixed(1));
 }
 
+/**
+ * Mid-Season-Sponsor-Events (F5b). Events werden beim Matchday-Advance deterministisch gewürfelt und
+ * SOFORT verrechnet (Auto-Settle): der `cashDelta` landet direkt auf `team.cash` und der Datensatz wird
+ * mit Status `resolved` abgelegt. So gibt es KEINE hängenden `open`-Events mehr, für die keine UI je einen
+ * Einlöse-Weg hatte (früher eine tote CTA in der Inbox). Die Event-Historie bleibt als Auszahlungs-Timeline
+ * sichtbar. Das Event-Cash ist ein eigenständiges System und hat KEINE Überschneidung mit dem
+ * Season-End-Settlement (sponsor-settlement-service arbeitet auf sponsorPayoutLogs/Vertragskomponenten,
+ * nicht auf sponsorEvents) — daher keine Doppelzählung.
+ */
 export function maybeGenerateSponsorEvents(gameState: GameState, saveId: string): GameState {
   const seasonId = gameState.season.id;
   const matchday = gameState.season.currentMatchday;
   const existing = gameState.seasonState.sponsorEvents ?? [];
   const existingKeys = new Set(existing.map((entry) => `${entry.teamId}:${entry.eventType}:${entry.matchday}`));
   const nextEvents: SponsorEventRecord[] = [...existing];
+  const cashDeltaByTeamId = new Map<string, number>();
 
   for (const team of gameState.teams) {
     const contract = getTeamSponsorContract(gameState, team.teamId);
@@ -58,15 +68,19 @@ export function maybeGenerateSponsorEvents(gameState: GameState, saveId: string)
       eventType,
       sponsorName: contract.name,
       cashDelta,
-      status: "open",
+      // Auto-Settle: sofort verrechnet, nie 'open' — keine tote Einlöse-CTA mehr.
+      status: "resolved",
       createdAt: new Date().toISOString(),
       message:
         eventType === "activation_bonus"
-          ? `${contract.name} startet eine Medien-Aktion — Bonus-Cash verfügbar.`
+          ? `${contract.name} zahlt einen Medien-Aktions-Bonus aus.`
           : eventType === "clause_trigger"
-            ? `${contract.name} verschärft kurzfristig eine Vertragsklausel.`
-            : `${contract.name} meldet Partner-Reibung — Malus droht.`,
+            ? `${contract.name} verrechnet kurzfristig eine Vertragsklausel.`
+            : `${contract.name} meldet Partner-Reibung — Malus verrechnet.`,
     });
+    if (cashDelta !== 0) {
+      cashDeltaByTeamId.set(team.teamId, roundCash((cashDeltaByTeamId.get(team.teamId) ?? 0) + cashDelta));
+    }
     existingKeys.add(key);
   }
 
@@ -76,6 +90,13 @@ export function maybeGenerateSponsorEvents(gameState: GameState, saveId: string)
 
   return {
     ...gameState,
+    teams: cashDeltaByTeamId.size
+      ? gameState.teams.map((team) =>
+          cashDeltaByTeamId.has(team.teamId)
+            ? { ...team, cash: roundCash(team.cash + (cashDeltaByTeamId.get(team.teamId) ?? 0)) }
+            : team,
+        )
+      : gameState.teams,
     seasonState: {
       ...gameState.seasonState,
       sponsorEvents: nextEvents,

@@ -1978,8 +1978,15 @@ export function buildTeamSeasonObjectiveSettlement(gameState: GameState): TeamSe
   const overview = buildTeamObjectiveOverview(gameState);
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const rows: TeamSeasonObjectiveSettlementRow[] = overview.objectives.map((objective) => {
-    const cashDelta =
-      objective.status === "completed"
+    // KRITISCH (Doppelauszahlung): Objectives aus dem Sponsor-Vertrags-Spiegel (`sponsor_v2_contract`)
+    // tragen dieselben rewardCash/penaltyCash wie die echten Vertragskomponenten — die werden aber bereits
+    // im Sponsor-Settlement (sponsor-settlement-service.ts, VOR diesem Board-Settlement) auf team.cash
+    // gebucht. Hier NUR die Board-Confidence-Wirkung behalten, cashDelta = 0, sonst käme Sponsorgeld ~2×
+    // an (und verfehlte Rangziele würden doppelt bestraft). Nicht-Sponsor-Board-Ziele zahlen normal.
+    const isSponsorContractMirror = (objective.source ?? "").includes("sponsor_v2_contract");
+    const cashDelta = isSponsorContractMirror
+      ? 0
+      : objective.status === "completed"
         ? objective.rewardCash ?? 0
         : objective.status === "failed"
           ? -(objective.penaltyCash ?? 0)

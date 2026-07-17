@@ -553,9 +553,13 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         return right.snapshot.seasonId.localeCompare(left.snapshot.seasonId, "de");
       })[0] ?? null;
     const startBudgetRank = startBudgetRankByTeamId.get(team.teamId) ?? null;
+    // Preseason (points=0): den getragenen Vorsaison-Endrang (`standing.startplatz`, von buildZeroStandings
+    // fortgeschrieben) VOR dem statischen S1-Budget-Rang nutzen. Sonst friert ab S2 der Budget-Rang alle
+    // rang-abhängigen Sponsor-Größen ein (contract.startRank, Verbesserungsziel, rankTarget, Quality-'current')
+    // → Aufsteiger bekommen triviale, Absteiger unerreichbare Ziele.
     const activeRank =
       currentVisiblePoints == null
-        ? startBudgetRank
+        ? standing?.startplatz ?? startBudgetRank
         : standing?.rank ?? startBudgetRank;
 
     return {
@@ -598,7 +602,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       transferNet,
       transfersSeasonValue: transferNet,
       cashDelta,
-      startplatz: currentVisiblePoints == null ? startBudgetRank : standing?.startplatz ?? startBudgetRank,
+      startplatz: standing?.startplatz ?? startBudgetRank,
       rankDiff: standing?.rankDiff ?? null,
       sponsorBasis: standing?.sponsorBasis ?? null,
       sponsorRank: standing?.sponsorRank ?? null,

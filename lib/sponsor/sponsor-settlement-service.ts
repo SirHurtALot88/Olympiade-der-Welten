@@ -10,6 +10,7 @@ import {
   getUnlockedMilestones,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
+import { getSponsorProfileComponentFactors } from "@/lib/sponsor/sponsor-negotiation";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 
 export type SponsorSettlementPhase = "season_end";
@@ -123,7 +124,17 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
         contract.isGolden ?? false,
       );
-      const payout = roundCash(Math.max(0, targetTotal - baseTotal));
+      // F4 — Verhandlungsprofil zahlt jetzt auch am Rang-Upside (vorher zahlte das Settlement die
+      // Kurve MINUS negotiated-Base, wodurch die Summe unabhängig vom Profil immer = Kurve war: "Ambitioniert"
+      // bekam bei gutem Endrang KEIN Plus, nur bei schlechtem Endrang WENIGER Base + doppelte Strafe → reine
+      // Falle). Fix: das Rang-Residual gegen die BALANCED-Base messen (negotiated Base / baseMult rekonstruiert
+      // die balanced Base) und mit upsideMult skalieren. Für balanced (baseMult=1, upsideMult=1) exakt das
+      // alte max(0, targetTotal - baseTotal) — kein Verhalten geändert. Ambitioniert (0.88/1.25) zahlt bei
+      // hohem Endrang echt mehr, safe (1.05/0.85) weniger Upside gegen höheren garantierten Sockel.
+      const negotiationFactors = getSponsorProfileComponentFactors(contract.negotiationProfile ?? "balanced");
+      const neutralBaseTotal = negotiationFactors.baseMult !== 0 ? baseTotal / negotiationFactors.baseMult : baseTotal;
+      const rankResidual = Math.max(0, targetTotal - neutralBaseTotal);
+      const payout = roundCash(rankResidual * negotiationFactors.upsideMult);
       const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);
       const unlockedBonus = getRankMilestoneBonus(currentRank, salaryFactor);
       const completed = payout > 0;
