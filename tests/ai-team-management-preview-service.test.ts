@@ -331,6 +331,89 @@ describe("ai team management preview service", () => {
     expect(freeCash).toBeGreaterThan(0);
   });
 
+  function developerStrategyProfile(teamId: string) {
+    return {
+      teamId,
+      strategyVersion: "v1-local",
+      strategySummary: "Teacher/Mentor development core that invests in training and prospects.",
+      buyStyle: "Develops prospects around teachers and mentors.",
+      preferredArchetypes: ["teacher", "mentor", "leader", "captain"],
+      secondaryArchetypes: [] as string[],
+      preferredClasses: ["Teacher"],
+      prefersDepth: "high" as const,
+      bias: {
+        cashPriority: 6,
+        valuePriority: 6,
+        starPriority: 5,
+        riskTolerance: 4,
+        wageSensitivity: 5,
+        sellForProfitAggression: 4,
+        shortContractPreference: 5,
+        longContractPreference: 6,
+        loyaltyBias: 8,
+        harmonyStrictness: 8,
+        rosterDepthPreference: 5,
+        eliteSmallRosterPreference: 5,
+      },
+    };
+  }
+
+  function buildDeveloperGameState(cash: number) {
+    // Six senior (non-youth) players — the developer signal must come from IDENTITY, not a youth-heavy
+    // roster — and a training_center that is not yet built.
+    const players = Array.from({ length: 6 }, (_, index) => buildPlayer(`p${index + 1}`, { potential: 45 }));
+    const gameState = buildGameState({
+      team: { cash, rosterOptTarget: 6, rosterMinTarget: 4 },
+      identity: { pow: 55, spe: 55, men: 55, soc: 55, ambition: 6, playerOpt: 6, playerMin: 4 },
+      players,
+    }) as ReturnType<typeof buildGameState>;
+    gameState.seasonState.teamStrategyProfiles = {
+      "T-1": developerStrategyProfile("T-1"),
+    } as unknown as GameState["seasonState"]["teamStrategyProfiles"];
+    gameState.seasonState.teamFacilities = {
+      "T-1": {
+        facilities: {
+          training_center: { level: 0, enabled: false },
+          recovery_center: { level: 0, enabled: false },
+          scouting_office: { level: 0, enabled: false },
+          analytics_room: { level: 0, enabled: false },
+          fan_shop: { level: 0, enabled: false },
+          arena_upgrade: { level: 0, enabled: false },
+          academy: { level: 0, enabled: false },
+          specialist_wing: { level: 0, enabled: false },
+        },
+      },
+    } as unknown as GameState["seasonState"]["teamFacilities"];
+    return gameState;
+  }
+
+  it("a nurturing/developer-identity team with surplus cash builds a training center early (no youth overhang needed)", () => {
+    const gameState = buildDeveloperGameState(140);
+    const preview = buildAiTeamManagementPreview(gameState, "T-1");
+    const trainingCenter = preview?.buildingPlan.find((row) => row.buildingType === "training_center");
+    expect(trainingCenter?.action).toBe("build_new");
+    expect(trainingCenter?.reasonsPositive).toContain("Entwickler-/Mentor-Identität priorisiert Trainings-Infrastruktur");
+  });
+
+  it("the same developer-identity team does NOT build a training center when cash-tight", () => {
+    const gameState = buildDeveloperGameState(9);
+    const preview = buildAiTeamManagementPreview(gameState, "T-1");
+    const trainingCenter = preview?.buildingPlan.find((row) => row.buildingType === "training_center");
+    expect(trainingCenter?.action).not.toBe("build_new");
+    expect(trainingCenter?.action).not.toBe("upgrade_existing");
+  });
+
+  it("a commercial, cash-rich team scores income buildings higher than a cash-tight one (surplus-driven sink)", () => {
+    const rich = buildDeveloperGameState(160);
+    const tight = buildDeveloperGameState(9);
+    const richFanShop = buildAiTeamManagementPreview(rich, "T-1")?.buildingPlan.find((row) => row.buildingType === "fan_shop");
+    const tightFanShop = buildAiTeamManagementPreview(tight, "T-1")?.buildingPlan.find((row) => row.buildingType === "fan_shop");
+    expect(richFanShop?.score ?? 0).toBeGreaterThan(tightFanShop?.score ?? 0);
+    // The cash-tight team must not commit to an income build it cannot sustain.
+    expect(tightFanShop?.action).not.toBe("build_new");
+    expect(tightFanShop?.action).not.toBe("upgrade_existing");
+  });
+
   it("merges liquidity reserve during rebuild and caps building by cash rank", () => {
     const poorTeam = buildTeam({ teamId: "T-POOR", shortCode: "PO", cash: 40 });
     const midTeam = buildTeam({ teamId: "T-MID", shortCode: "MD", cash: 80 });
