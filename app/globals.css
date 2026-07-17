@@ -68552,3 +68552,122 @@ button.nl-players-axis:focus-visible {
     transition: none;
   }
 }
+
+/* ============================================================
+   NEUER LOOK — Spielplan / Diszis (nl-diszis-*)
+   Saison-Spielplan als Hero: Achsen-Farblegende + Spieltag-Kartenraster,
+   damit sofort klar ist, welche Achsen-Farbe (POW/SPE/MEN/SOC) welche
+   Disziplin trägt. Nur aktiv unterhalb von `.is-new-look` (Flag an).
+   ============================================================ */
+.is-new-look .nl-diszis-axis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2, 8px);
+  margin: 0 0 var(--nl-s3, 12px);
+}
+
+.is-new-look .nl-diszis-axis-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--nl-line-2);
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.is-new-look .nl-diszis-axis-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-ink) 12%, transparent);
+}
+
+.is-new-look .nl-diszis-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--nl-s3, 12px);
+  width: 100%;
+}
+
+.is-new-look .nl-diszis-md-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2, 8px);
+  padding: var(--nl-s3, 12px);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  box-shadow: var(--nl-e1);
+  min-width: 0;
+}
+
+.is-new-look .nl-diszis-md-card.is-current {
+  border-color: color-mix(in srgb, var(--nl-accent) 55%, var(--nl-line));
+  background: color-mix(in srgb, var(--nl-accent) 8%, var(--nl-panel));
+  box-shadow: var(--nl-e1), 0 0 0 1px color-mix(in srgb, var(--nl-accent) 45%, transparent);
+}
+
+.is-new-look .nl-diszis-md-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-diszis-md-current-tag {
+  color: var(--nl-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.is-new-look .nl-diszis-md-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-new-look .nl-diszis-md-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--slot-color, var(--nl-line-2));
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--slot-color, var(--nl-mut)) 10%, var(--nl-panel-2));
+  min-width: 0;
+}
+
+.is-new-look .nl-diszis-md-slot.is-empty {
+  border-left-color: var(--nl-line-2);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-diszis-md-slot-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-diszis-md-slot-meta {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .nl-diszis-md-slot-axis {
+  font-weight: 700;
+}
+
+.is-new-look .nl-diszis-md-card-foot {
+  font-size: 11px;
+}

@@ -15,23 +15,31 @@ import {
   nlToneClass,
   NL_AXIS_LABELS,
   NL_TONE_VAR,
+  type NlAxisKey,
   type NlTableColumn,
   type NlTone,
 } from "@/components/foundation/new-look";
 import type { DisciplineCategoryFilter, FoundationDiszisPanelProps } from "@/app/foundation/ranks-v2/FoundationDiszisPanel";
 
 /**
- * "Neuer Look" Diszis — bildet den Diszis-Reiter (Disziplin-Konfiguration +
- * Saison-Matchday-Plan) im neuen Design-System nach (flag-gated, additiv).
+ * "Neuer Look" Spielplan — bildet den Diszis-Reiter (jetzt "Spielplan")
+ * im neuen Design-System nach (flag-gated, additiv).
+ *
+ * Der Saison-Spielplan (Spieltag-Ablauf) ist die Hero-Sektion: eine
+ * Achsen-Farblegende plus ein Kartenraster über alle Spieltage, damit auf
+ * einen Blick klar ist, welche Achsen-Farbe (POW/SPE/MEN/SOC) welche
+ * Disziplin trägt. Die Disziplin-Konfiguration (Draftboard-Reihenfolge,
+ * Spieleranzahl, Mutatoren) bleibt darunter als sekundäre Sektion erhalten.
  *
  * Wird nur gerendert, wenn der Runtime-Flag (`useNewLook`) aktiv ist —
  * `FoundationDiszisPanel` fällt ohne Flag unverändert auf die bestehende
- * Tabelle zurück. Konsumiert dieselben Daten-Props wie die alte Tabelle
- * (`visibleDisciplineConfigRows`, `seasonDisciplineScheduleRows`, …); Sortierung
- * läuft weiterhin über `tableSorts.disciplineConfig` / `toggleTableSort`, Filter
- * über `disciplineCategoryFilter` / `setDisciplineCategoryFilter` — beides bereits
- * beim Aufrufer (useFoundationCrossTabDisciplineRanks) angewendet, die Zeilen
- * kommen also schon gefiltert/sortiert an.
+ * Tabelle zurück. Konsumiert dieselben Daten-Props wie zuvor
+ * (`visibleDisciplineConfigRows`, `seasonDisciplineScheduleRows`, …);
+ * Sortierung läuft weiterhin über `tableSorts.disciplineConfig` /
+ * `toggleTableSort`, Filter über `disciplineCategoryFilter` /
+ * `setDisciplineCategoryFilter` — beides bereits beim Aufrufer
+ * (useFoundationCrossTabDisciplineRanks) angewendet, die Zeilen kommen
+ * also schon gefiltert/sortiert an.
  *
  * Spaltenbreiten-/Reihenfolge-/Sichtbarkeits-Verwaltung (ColumnVisibilityManager,
  * `getTableColumnWidth`, `moveTableColumn`, Drag-Resize, …) ist bewusst NICHT
@@ -43,13 +51,21 @@ import type { DisciplineCategoryFilter, FoundationDiszisPanelProps } from "@/app
 
 type DisciplineRow = FoundationDiszisPanelProps["visibleDisciplineConfigRows"][number];
 type ScheduleRow = FoundationDiszisPanelProps["seasonDisciplineScheduleRows"][number];
+type ScheduleSlot = { disciplineId?: string; displayName?: string; order?: number | null; playerCount?: number | null; category?: string } | null | undefined;
 
-const CATEGORY_AXIS: Record<Exclude<DisciplineCategoryFilter, "all">, "pow" | "spe" | "men" | "soc"> = {
+const CATEGORY_AXIS: Record<Exclude<DisciplineCategoryFilter, "all">, NlAxisKey> = {
   power: "pow",
   speed: "spe",
   mental: "men",
   social: "soc",
 };
+
+const AXIS_LEGEND: Array<{ axis: NlAxisKey; label: string }> = [
+  { axis: "pow", label: NL_AXIS_LABELS.pow },
+  { axis: "spe", label: NL_AXIS_LABELS.spe },
+  { axis: "men", label: NL_AXIS_LABELS.men },
+  { axis: "soc", label: NL_AXIS_LABELS.soc },
+];
 
 const NL_DISZIS_FILTERS: Array<{ id: DisciplineCategoryFilter; label: string; tone: NlTone }> = [
   { id: "all", label: "Alle", tone: "accent" },
@@ -59,8 +75,14 @@ const NL_DISZIS_FILTERS: Array<{ id: DisciplineCategoryFilter; label: string; to
   { id: "social", label: NL_AXIS_LABELS.soc, tone: "soc" },
 ];
 
-function categoryAxis(row: DisciplineRow): "pow" | "spe" | "men" | "soc" | null {
+function categoryAxis(row: DisciplineRow): NlAxisKey | null {
   const category = row.category as DisciplineCategoryFilter | undefined;
+  if (!category || category === "all") return null;
+  return CATEGORY_AXIS[category] ?? null;
+}
+
+function slotAxis(slot: ScheduleSlot): NlAxisKey | null {
+  const category = slot?.category as DisciplineCategoryFilter | undefined;
   if (!category || category === "all") return null;
   return CATEGORY_AXIS[category] ?? null;
 }
@@ -74,14 +96,45 @@ const DISCIPLINE_CONFIG_COLUMNS: NlTableColumn<DisciplineRow>[] = [
   { key: "mutator2", label: "Mutator 2", sortable: true },
 ];
 
-const SCHEDULE_COLUMNS: NlTableColumn<ScheduleRow>[] = [
-  { key: "matchdayLabel", label: "Spieltag" },
-  { key: "d1", label: "D1" },
-  { key: "d1Players", label: "D1 Spieler", align: "right", width: "110px" },
-  { key: "d2", label: "D2" },
-  { key: "d2Players", label: "D2 Spieler", align: "right", width: "110px" },
-  { key: "sourceStatus", label: "Status" },
-];
+/** Ein Slot (D1/D2) innerhalb einer Spieltag-Karte — farbcodiert nach Achse. */
+function ScheduleSlotRow({ slot }: { slot: ScheduleSlot }) {
+  if (!slot) {
+    return (
+      <div className="nl-diszis-md-slot is-empty">
+        <span className="nl-diszis-md-slot-name muted">—</span>
+      </div>
+    );
+  }
+  const axis = slotAxis(slot);
+  const color = axis ? NL_TONE_VAR[axis] : NL_TONE_VAR.neutral;
+  return (
+    <div className="nl-diszis-md-slot" style={{ "--slot-color": color } as React.CSSProperties}>
+      <span className="nl-diszis-md-slot-name">{slot.displayName ?? "—"}</span>
+      <span className="nl-diszis-md-slot-meta">
+        {axis ? <span className="nl-diszis-md-slot-axis" style={{ color }}>{NL_AXIS_LABELS[axis]}</span> : null}
+        {slot.playerCount != null ? <span className="muted"> · {formatNlNumber(slot.playerCount, 0)} Spieler</span> : null}
+      </span>
+    </div>
+  );
+}
+
+function ScheduleMatchdayCard({ row, isCurrent }: { row: ScheduleRow; isCurrent: boolean }) {
+  const discipline1 = row.discipline1 as ScheduleSlot;
+  const discipline2 = row.discipline2 as ScheduleSlot;
+  return (
+    <article className={`nl-diszis-md-card${isCurrent ? " is-current" : ""}`}>
+      <header className="nl-diszis-md-card-head">
+        <strong>{row.matchdayLabel as React.ReactNode}</strong>
+        {isCurrent ? <span className="nl-diszis-md-current-tag">· läuft</span> : null}
+      </header>
+      <div className="nl-diszis-md-card-body">
+        <ScheduleSlotRow slot={discipline1} />
+        <ScheduleSlotRow slot={discipline2} />
+      </div>
+      {row.sourceStatus ? <footer className="nl-diszis-md-card-foot muted">{row.sourceStatus as React.ReactNode}</footer> : null}
+    </article>
+  );
+}
 
 export default function FoundationDiszisNewLook({
   disciplineCategoryFilter,
@@ -167,32 +220,6 @@ export default function FoundationDiszisNewLook({
     }
   }
 
-  function renderScheduleCell(row: ScheduleRow, column: NlTableColumn<ScheduleRow>): React.ReactNode {
-    const isCurrent = row.matchdayId === currentMatchdayId;
-    const discipline1 = row.discipline1 as { displayName?: string; playerCount?: number } | undefined;
-    const discipline2 = row.discipline2 as { displayName?: string; playerCount?: number } | undefined;
-    switch (column.key) {
-      case "matchdayLabel":
-        return isCurrent ? (
-          <strong style={{ color: NL_TONE_VAR.accent }}>{row.matchdayLabel as React.ReactNode} · läuft</strong>
-        ) : (
-          (row.matchdayLabel as React.ReactNode)
-        );
-      case "d1":
-        return discipline1?.displayName ?? "—";
-      case "d1Players":
-        return <span className="nl-tnum">{discipline1?.playerCount ?? "—"}</span>;
-      case "d2":
-        return discipline2?.displayName ?? "—";
-      case "d2Players":
-        return <span className="nl-tnum">{discipline2?.playerCount ?? "—"}</span>;
-      case "sourceStatus":
-        return (row.sourceStatus as React.ReactNode) ?? "—";
-      default:
-        return null;
-    }
-  }
-
   const scheduleSourceStatus = (seasonDisciplineScheduleRows[0]?.sourceStatus as string | undefined) ?? "legacy_seed";
   const scheduleSourceNote = seasonDisciplineScheduleRows[0]?.sourceNote as React.ReactNode | undefined;
 
@@ -204,6 +231,36 @@ export default function FoundationDiszisNewLook({
       data-new-look="true"
       style={{ display: "flex", flexDirection: "column", gap: "var(--nl-s4, 20px)" }}
     >
+      <NlCard
+        className="nl-diszis-schedule-card"
+        eyebrow="Saison-Spielplan"
+        title="Spieltag-Ablauf"
+        actions={<StatChip label="Quelle" value={scheduleSourceStatus} />}
+        data-testid="foundation-diszis-schedule"
+      >
+        <div id="foundation-diszis-schedule" style={{ scrollMarginTop: 16 }}>
+          <div className="nl-diszis-axis-legend" role="group" aria-label="Achsen-Farblegende">
+            {AXIS_LEGEND.map((entry) => (
+              <span key={entry.axis} className="nl-diszis-axis-legend-item">
+                <span className="nl-diszis-axis-legend-swatch" style={{ background: NL_TONE_VAR[entry.axis] }} aria-hidden="true" />
+                {entry.label}
+              </span>
+            ))}
+          </div>
+
+          {seasonDisciplineScheduleRows.length > 0 ? (
+            <div className="nl-diszis-schedule-grid" data-testid="nl-diszis-schedule-grid">
+              {seasonDisciplineScheduleRows.map((row) => (
+                <ScheduleMatchdayCard key={String(row.matchdayId)} row={row} isCurrent={row.matchdayId === currentMatchdayId} />
+              ))}
+            </div>
+          ) : (
+            <NlEmptyState title="Noch kein Saison-Matchday-Plan verfügbar." />
+          )}
+        </div>
+        {scheduleSourceNote ? <p className="muted">{scheduleSourceNote}</p> : null}
+      </NlCard>
+
       <NlCard
         className="nl-diszis-config-card"
         eyebrow="Draftboard"
@@ -283,32 +340,8 @@ export default function FoundationDiszisNewLook({
         <p className="muted">
           Mutatoren sind pro Disziplin (noch) nicht im Saison-Spielplan hinterlegt — die Spalten zeigen daher
           „kein Mutator&#8220;. Der vollständige Spieltag-Ablauf steht im{" "}
-          <a href="#foundation-diszis-schedule">Saison-Matchday-Plan</a> weiter unten.
+          <a href="#foundation-diszis-schedule">Saison-Spielplan</a> oben.
         </p>
-      </NlCard>
-
-      <NlCard
-        className="nl-diszis-schedule-card"
-        eyebrow="Saison-Matchday-Plan"
-        title="Spieltag-Ablauf"
-        actions={<StatChip label="Quelle" value={scheduleSourceStatus} />}
-        data-testid="foundation-diszis-schedule"
-      >
-        <div id="foundation-diszis-schedule" style={{ scrollMarginTop: 16 }}>
-          {seasonDisciplineScheduleRows.length > 0 ? (
-            <NlTable
-              columns={SCHEDULE_COLUMNS}
-              rows={seasonDisciplineScheduleRows}
-              rowKey={(row) => String(row.matchdayId)}
-              renderCell={renderScheduleCell}
-              aria-label="Saison-Matchday-Plan"
-              data-testid="nl-diszis-schedule-table"
-            />
-          ) : (
-            <NlEmptyState title="Noch kein Saison-Matchday-Plan verfügbar." />
-          )}
-        </div>
-        {scheduleSourceNote ? <p className="muted">{scheduleSourceNote}</p> : null}
       </NlCard>
     </section>
   );
