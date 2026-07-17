@@ -364,6 +364,22 @@ export function SponsorOfferCardNewLook({
                     );
                   })}
                 </ul>
+                {/* Feed 2: Performance zahlt einen konkaven Bonus fürs Übertreffen des Erwartungsrangs
+                    (teamQualityRankAtSign). Die Rang-Leiter oben ist der Basis-Fall; ein Aufstieg über die
+                    Erwartung legt oben drauf — je schwerer (näher an der Spitze), desto mehr. */}
+                {offer.archetype === "performance" ? (
+                  <div className="nl-sponsor-overperf-hint" data-testid="sponsor-overperf-hint">
+                    <span className="nl-sponsor-overperf-icon" aria-hidden="true">
+                      ✦
+                    </span>
+                    <span>
+                      <strong>Überperformance zahlt extra.</strong>{" "}
+                      {offer.teamQualityRank != null
+                        ? `Übertriffst du deinen Erwartungsrang #${offer.teamQualityRank}, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr (ein Sprung nahe der Spitze zählt mehr als im gepackten Mittelfeld).`
+                        : "Übertriffst du deine Saison-Erwartung, legt dieser Sponsor oben drauf — je schwerer der Aufstieg, desto mehr."}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             );
           }

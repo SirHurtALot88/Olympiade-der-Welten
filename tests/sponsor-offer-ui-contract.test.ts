@@ -32,6 +32,10 @@ describe("sponsor offer ui contract", () => {
     expect(cardText).toContain("includeFloorRung");
     expect(cardText).toContain("sponsor-stage-ladder");
 
+    // Feed 2: Performance-Überperformance-Hinweis auf der Karte.
+    expect(cardText).toContain("sponsor-overperf-hint");
+    expect(cssText).toContain(".nl-sponsor-overperf-hint");
+
     // CSS-Contract (New-Look-Selektoren).
     expect(cssText).toContain(".nl-sponsor-axis-chip.is-pow");
     expect(cssText).toContain(".nl-sponsor-difficulty.is-hart");

@@ -50340,6 +50340,32 @@ button.foundation-team-portrait-card {
   font-weight: 700;
 }
 
+/* Feed 2 — Performance-Überperformance-Hinweis (Angebotskarte). */
+.is-new-look .nl-sponsor-overperf-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-pow) 35%, transparent);
+  background: color-mix(in srgb, var(--nl-pow) 9%, transparent);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-sponsor-overperf-hint strong {
+  color: var(--nl-pow);
+}
+
+.is-new-look .nl-sponsor-overperf-icon {
+  flex-shrink: 0;
+  color: var(--nl-pow);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
 /* --- Verhandlungs-Segment ---------------------------------------- */
 .is-new-look .nl-sponsor-negotiation {
   display: flex;
