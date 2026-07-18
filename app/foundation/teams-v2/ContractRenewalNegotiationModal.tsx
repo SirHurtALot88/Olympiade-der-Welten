@@ -108,7 +108,50 @@ function translateRenewalReason(reason: string): string {
   if (reason === "offer_salary_missing") {
     return "Bitte ein Angebotsgehalt eintragen.";
   }
-  return reason;
+  if (reason === "market_bracket_factor_preview_pending") {
+    return "Marktwert-Einstufung wird noch berechnet — die Chancen können sich leicht verschieben.";
+  }
+  if (reason === "low_team_fit_reduces_acceptance") {
+    return "Passt schlecht ins Team — das drückt die Zusage-Bereitschaft.";
+  }
+  if (reason === "ego_lowball") {
+    return "Der Spieler fühlt sich vom niedrigen Angebot brüskiert.";
+  }
+  if (reason === "mercenary_lowball") {
+    return "Geld-orientierter Typ — reagiert empfindlich auf ein zu niedriges Angebot.";
+  }
+  if (reason === "board_confidence_risk") {
+    return "Die Vereinsführung sieht die Verlängerung kritisch.";
+  }
+  if (reason === "team_harmony_risk") {
+    return "Risiko fürs Team-Gefüge — die Verlängerung könnte die Harmonie stören.";
+  }
+  if (reason === "trait_culture_risk") {
+    return "Charakter passt nicht ganz zur Team-Kultur.";
+  }
+  if (reason === "market_value_missing" || reason === "salary_source_missing" || reason === "salary_demand_missing") {
+    return "Bewertungsdaten unvollständig — Angaben können ungenau sein.";
+  }
+  if (reason === "player_attribute_missing") {
+    return "Spielerdaten sind unvollständig.";
+  }
+  // Generische, spieltauglich formulierte Fallbacks für dynamisch
+  // zusammengesetzte Tokens (z. B. "<prio>_player_demand_failed").
+  if (reason.endsWith("_demand_failed") || reason.endsWith("_demand_pressure")) {
+    return "Der Spieler hat eine offene Forderung, die noch nicht erfüllt ist.";
+  }
+  if (reason.endsWith("_lowball")) {
+    return "Das Angebot liegt spürbar unter der Erwartung des Spielers.";
+  }
+  if (reason.endsWith("_risk")) {
+    return "Achtung: erhöhtes Risiko bei dieser Verlängerung.";
+  }
+  if (reason.endsWith("_missing") || reason.endsWith("_pending")) {
+    return "Einige Werte werden noch berechnet — Angaben können sich ändern.";
+  }
+  // Letzter Fallback: nie rohes snake_case zeigen — in lesbaren Satz wandeln.
+  const humanized = reason.replace(/_/g, " ").trim();
+  return humanized.length > 0 ? humanized.charAt(0).toUpperCase() + humanized.slice(1) : reason;
 }
 
 /** Server-Chancen/-Risiken sind bereits 0..100 (normalizeChances / moraleRenewalRisk). */
