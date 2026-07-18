@@ -6559,8 +6559,18 @@ a {
 
 .foundation-content {
   display: grid;
+  /* Grid-Spalte auf minmax(0,1fr) klemmen: sonst bekommt die implizite Spalte
+     das Default min-width:auto und wächst auf die max-content-Breite des
+     breitesten Panels (Teams/Ranks ~722-725px) → 14-17px H-Scroll auf schmalen
+     Viewports (1024px). Kinder duerfen unter ihre Inhalts-Mindestbreite
+     schrumpfen, damit innere Scroller/Ellipsis greifen statt die Seite zu weiten. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-self: start;
+}
+
+.foundation-content > * {
+  min-width: 0;
 }
 
 .foundation-encyclopedia-panel {
@@ -49248,7 +49258,13 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-training-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  /* Min-Track auf 372px: die dichte Intensitaets-Zeile (Label + Bar + 3 Wert-
+     Chips mit Einheiten) braucht ~312px Innenbreite + Padding. Bei 330px passten
+     im 696px-Lane 2 Spalten, deren Karten aber zu schmal fuers Zeilen-Raster
+     waren → ~24px H-Scroll. Ab 372px legt auto-fill im schmalen Lane nur EINE
+     Spalte (volle Breite, Inhalt passt locker) und auf breiten Screens weiter
+     mehrere — responsiv ohne Media-Query. */
+  grid-template-columns: repeat(auto-fill, minmax(372px, 1fr));
   gap: var(--nl-s4);
 }
 
@@ -49901,6 +49917,13 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Flex-Item: min-width:0 damit der lange Beschreibungs-Text umbricht statt
+     die Zeile (und die Seite) zu weiten. */
+  min-width: 0;
+}
+
+.is-new-look .nl-facility-action-copy small {
+  overflow-wrap: anywhere;
 }
 
 .is-new-look .nl-facility-action-copy small {
@@ -57255,6 +57278,9 @@ span.nl-facility-ampel-chip {
   display: flex;
   flex-wrap: wrap;
   gap: var(--nl-s4) var(--nl-s5);
+  /* Flex-Item der Card-Body: ohne min-width:0 zwingt der Inhalt (Kurven + Achsen-
+     Labels) die Breite auf und leckt auf schmalen Viewports (1024px) ~118px H-Scroll. */
+  min-width: 0;
 }
 
 .is-new-look .nl-facility-curve-col {
@@ -57263,7 +57289,11 @@ span.nl-facility-ampel-chip {
   flex-direction: column;
   gap: var(--nl-s2);
   flex: 1 1 260px;
-  min-width: 240px;
+  /* min-width:0 statt 240px-Boden: die Spalte darf unter ihre Inhaltsbreite
+     schrumpfen (Chart hat max-width, Kopf-Label darf umbrechen), damit im
+     schmalen Lane keine Seite-Breite erzwungen wird. flex-wrap sorgt weiter
+     dafuer, dass beide Kurven bei zu wenig Platz untereinander landen. */
+  min-width: 0;
   max-width: 360px;
 }
 
@@ -57277,6 +57307,8 @@ span.nl-facility-ampel-chip {
   display: flex;
   align-items: center;
   gap: var(--nl-s1);
+  min-width: 0;
+  flex-wrap: wrap;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -57340,15 +57372,29 @@ span.nl-facility-ampel-chip {
   text-align: left;
   white-space: normal;
   opacity: 0;
-  visibility: hidden;
+  /* display:none statt nur visibility:hidden: eine 260px breite, links-verankerte
+     Bubble mit visibility:hidden zaehlt weiterhin zur scrollWidth — an einem
+     rechtsstehenden Infotip (z.B. Gebäude-Kurvenkopf) leckt das ~118px H-Scroll
+     auf die Seite. display:none nimmt sie komplett aus dem Layout; per
+     allow-discrete + @starting-style bleibt das Einblenden trotzdem weich. */
+  display: none;
   pointer-events: none;
-  transition: opacity var(--nl-t-fast) var(--nl-ease), visibility var(--nl-t-fast) var(--nl-ease);
+  transition:
+    opacity var(--nl-t-fast) var(--nl-ease),
+    display var(--nl-t-fast) var(--nl-ease) allow-discrete;
 }
 
 .is-new-look .nl-facility-infotip:hover::after,
 .is-new-look .nl-facility-infotip:focus::after {
   opacity: 1;
-  visibility: visible;
+  display: block;
+}
+
+@starting-style {
+  .is-new-look .nl-facility-infotip:hover::after,
+  .is-new-look .nl-facility-infotip:focus::after {
+    opacity: 0;
+  }
 }
 
 /* In der sticky Aktionsleiste öffnet die Bubble nach oben. */
