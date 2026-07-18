@@ -21,6 +21,7 @@ import {
   injuryRiskBands,
   type InjuryRiskBand,
 } from "@/lib/fatigue/fatigue-calibration";
+import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
@@ -36,6 +37,39 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
 // die REHA-Recovery-Leiter designt war (L5 = 20 + 12 = 32 absolut, siehe RECOVERY_FLAT_BONUS_BY_LEVEL).
 export const MATCHDAY_FATIGUE_LOAD = 12;
 export const BASE_MATCHDAY_RECOVERY = 20;
+
+/**
+ * Discipline-side INTENSITY (Schonen/conserve, normal, Pushen/push) must scale the per-player
+ * matchday fatigue load, not just the match score. Conserve saves ~25 % load (a real reason to
+ * rotate down when leverage is low), push costs ~15 % more (a deliberate, sparing gamble that
+ * trades stamina + injury risk for score). Moderate + ENV-tunable so the fatigue-validation sim
+ * can retune without a code change (OLY_FATIGUE_INTENSITY_CONSERVE / OLY_FATIGUE_INTENSITY_PUSH).
+ * Normal stays exactly 1.0 so the standard path is byte-identical to the pre-change behaviour.
+ */
+function envMultiplier(name: string, fallback: number) {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const INTENSITY_FATIGUE_MULT: Record<MatchdayIntensityStage, number> = {
+  conserve: envMultiplier("OLY_FATIGUE_INTENSITY_CONSERVE", 0.75),
+  normal: 1.0,
+  push: envMultiplier("OLY_FATIGUE_INTENSITY_PUSH", 1.15),
+};
+
+/**
+ * Higher-load ordering (push > normal > conserve) used to dedup a player who appears on both
+ * discipline sides of the same team: the harsher intensity governs their fatigue accrual.
+ */
+const INTENSITY_LOAD_RANK: Record<MatchdayIntensityStage, number> = {
+  conserve: 0,
+  normal: 1,
+  push: 2,
+};
+
+function normalizeIntensityStage(value: unknown): MatchdayIntensityStage {
+  return value === "conserve" || value === "push" || value === "normal" ? value : "normal";
+}
 
 /**
  * Deterministische Phasendauern der Verletzungs-Timeline (in Spieltagen), gemessen relativ zum
@@ -72,6 +106,7 @@ export type InjuryRehearsalOptions = {
 type MatchdayUse = {
   teamId: string;
   playerId: string;
+  intensity: MatchdayIntensityStage;
 };
 
 export type MatchdayInjuryRollKey = `${string}::${string}`;
@@ -99,9 +134,16 @@ function round(value: number, digits = 2) {
  * `MATCHDAY_FATIGUE_LOAD` nudged by a small trait-driven multiplier (see
  * lib/traits/cosmetic-trait-soft-effects.ts). This is the single choke
  * point where cosmetic traits touch fatigue accrual.
+ *
+ * The player's discipline-side INTENSITY additionally scales the load (see
+ * INTENSITY_FATIGUE_MULT): conserve saves load, push costs more. Deterministic — no Math.random,
+ * so the forceReplace/replay path stays idempotent (same intensity -> same load ->
+ * same fatigueBeforeRoll). Defaults to "normal" (multiplier 1.0) when unspecified.
  */
-function getPlayerMatchdayFatigueLoad(player: Player) {
-  return round(MATCHDAY_FATIGUE_LOAD * getPlayerFatigueLoadMultiplier(player));
+function getPlayerMatchdayFatigueLoad(player: Player, intensity: MatchdayIntensityStage = "normal") {
+  return round(
+    MATCHDAY_FATIGUE_LOAD * getPlayerFatigueLoadMultiplier(player) * INTENSITY_FATIGUE_MULT[intensity],
+  );
 }
 
 function stableHash(input: string) {
@@ -352,8 +394,10 @@ export function normalizeAvailabilityForNewSeason(
 }
 
 function collectMatchdayUses(gameState: GameState, seasonId: string, matchdayId: string): MatchdayUse[] {
-  const unique = new Set<string>();
-  const uses: MatchdayUse[] = [];
+  // Insertion-ordered map so the returned order matches the previous Set-based dedup exactly
+  // (determinism for the injury roll loop). A player selected on BOTH discipline sides is deduped
+  // to a single use whose intensity is the HIGHER-load side (push > normal > conserve).
+  const byKey = new Map<string, MatchdayUse>();
   const drafts = (gameState.seasonState.lineupDrafts ?? []).filter(
     (draft) => draft.seasonId === seasonId && draft.matchdayId === matchdayId,
   );
@@ -361,12 +405,19 @@ function collectMatchdayUses(gameState: GameState, seasonId: string, matchdayId:
     for (const entry of draft.entries) {
       if (!isActiveRosterPlayer(gameState, entry.playerId, draft.teamId)) continue;
       const key = `${draft.teamId}::${entry.playerId}`;
-      if (unique.has(key)) continue;
-      unique.add(key);
-      uses.push({ teamId: draft.teamId, playerId: entry.playerId });
+      // Each entry carries its discipline side; the side's intensity lives in the draft modifiers.
+      const intensity = normalizeIntensityStage(draft.modifiers?.[entry.disciplineSide]?.intensity);
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, { teamId: draft.teamId, playerId: entry.playerId, intensity });
+        continue;
+      }
+      if (INTENSITY_LOAD_RANK[intensity] > INTENSITY_LOAD_RANK[existing.intensity]) {
+        existing.intensity = intensity;
+      }
     }
   }
-  return uses;
+  return [...byKey.values()];
 }
 
 function updateAvailability(
@@ -462,7 +513,7 @@ export function buildMatchdayInjuryRollMap(input: {
     const player = gameState.players.find((entry) => entry.id === use.playerId);
     if (!player) continue;
 
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
     const allowInjury = !injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries;
     const roll = resolveMatchdayInjuryRoll({
       saveId: input.saveId,
@@ -576,8 +627,12 @@ function restorePreMatchdayAvailability(input: {
   if (currentAvailability.length === 0) {
     return gameState;
   }
-  const usedKeys = new Set(
-    collectMatchdayUses(gameState, seasonId, matchdayId).map((use) => `${use.teamId}::${use.playerId}`),
+  // Key -> intensity, so the inversion subtracts the SAME intensity-scaled load the first apply
+  // added. Without this the replay would over/under-subtract and break idempotency.
+  const usedIntensityByKey = new Map<string, MatchdayIntensityStage>(
+    collectMatchdayUses(gameState, seasonId, matchdayId).map(
+      (use) => [`${use.teamId}::${use.playerId}`, use.intensity] as const,
+    ),
   );
 
   // Pass 1: Den einzigen Verletzungs-Status-Wechsel, den der Recovery-Loop an Spieltag N
@@ -617,10 +672,12 @@ function restorePreMatchdayAvailability(input: {
       return entry;
     }
     const view = getPlayerAvailabilityView(restoredGameState, entry.playerId, entry.teamId, matchdayId);
-    const wasUsedLoop = usedKeys.has(`${entry.teamId}::${entry.playerId}`) && !view.isUnavailable;
+    const useKey = `${entry.teamId}::${entry.playerId}`;
+    const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
-      // Einsatz-Spieler: erster Apply hat +Load gerechnet -> zurücknehmen.
-      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player)) };
+      // Einsatz-Spieler: erster Apply hat +Load (intensitätsskaliert) gerechnet -> zurücknehmen.
+      const intensity = usedIntensityByKey.get(useKey) ?? "normal";
+      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player, intensity)) };
     }
     // Bank oder verletzt/unavailable: erster Apply hat Recovery abgezogen -> wieder aufaddieren.
     const recovery = calculatePlayerRecovery(gameState, entry.teamId, player.trainingMode);
@@ -723,7 +780,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     if (availabilityView.isUnavailable) continue;
 
     const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player, use.intensity));
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({

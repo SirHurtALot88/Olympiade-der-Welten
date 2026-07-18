@@ -904,15 +904,38 @@ function getAiIntensityForSide(input: {
   const hasLargeDisciplineLeverage = requiredPlayers >= 5 && rank != null && rank <= 20 && strongestScore >= 72;
   const hasLateComebackWindow = isLateSeason && rank != null && rank <= 24 && strongestScore >= 78;
 
-  if (
+  // Fatigue awareness: since intensity now drives per-player fatigue + injury accrual (not just
+  // score), "push" is no longer a free bonus — it burns ~15% extra stamina and raises injury risk
+  // on exactly the players it engages. Read the side's current fatigue via the same accessor the
+  // score engine uses (context.fatigueByPlayerId[...].count) so the guard sees what the engine sees.
+  const sideFatigues = sideEntries
+    .map((entry) => input.context.fatigueByPlayerId?.[entry.playerId]?.count)
+    .filter((count): count is number => typeof count === "number" && Number.isFinite(count));
+  const avgSideFatigue =
+    sideFatigues.length > 0 ? sideFatigues.reduce((sum, count) => sum + count, 0) / sideFatigues.length : 0;
+  const pushFatigueCeiling = Number(process.env.OLY_AI_PUSH_FATIGUE_CEILING ?? 65) || 65;
+
+  const wantsPush =
     hasCaptain ||
     hasHighLeverageRank ||
     hasEliteSpecialistWindow ||
     hasTopHalfPressure ||
     hasLargeDisciplineLeverage ||
-    hasLateComebackWindow
-  ) {
-    return "push" as const;
+    hasLateComebackWindow;
+
+  if (wantsPush) {
+    // Push only when the side isn't already heavily fatigued — otherwise the extra load mostly
+    // buys injuries and a deeper recovery hole for a few score points. Above the ceiling, hold at
+    // normal so push stays a deliberate, sparing gamble rather than a constant.
+    if (avgSideFatigue <= pushFatigueCeiling) {
+      return "push" as const;
+    }
+    // Very fatigued AND not a genuine top-leverage window: actively conserve to bank recovery.
+    const isGenuineHighLeverage = hasCaptain || hasHighLeverageRank || hasEliteSpecialistWindow;
+    if (avgSideFatigue >= pushFatigueCeiling + 15 && !isGenuineHighLeverage) {
+      return "conserve" as const;
+    }
+    return "normal" as const;
   }
   if (matchdayIndex <= 2 && rank != null && rank >= 24 && strongestScore < 68) {
     return "conserve" as const;
