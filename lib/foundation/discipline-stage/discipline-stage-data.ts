@@ -36,9 +36,9 @@ function clamp(value: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, value));
 }
 
-// Deterministischer „Tagesform"-Swing in [-4, 4] pro Spieler+Disziplin:
-// stabil innerhalb einer Session, aber pro Spieler unterschiedlich — so ist
-// die Form echt (an player.form gekoppelt) UND nicht exakt vorhersehbar.
+// Deterministischer „Tagesform"-Swing in [-4, 4], fest pro Spieler+Disziplin
+// (reiner Hash aus player.id|disciplineId — für dieselbe Paarung immer gleich).
+// Gibt der Form einen kleinen individuellen Beiwert oben auf player.form.
 function seededJitter(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {
@@ -123,14 +123,4 @@ export function buildDisciplineStageModel(
   teams.sort((a, b) => b.total - a.total || a.shortCode.localeCompare(b.shortCode));
 
   return { disciplineId, disciplineName: discipline?.name ?? disciplineId, slotCount, teams };
-}
-
-// Teilsumme eines Teams, wenn nur die ersten `revealedSlots` Slots aufgedeckt sind.
-export function partialTotal(team: DisciplineStageTeam, revealedSlots: number): number {
-  let sum = 0;
-  const limit = Math.min(revealedSlots, team.slots.length);
-  for (let i = 0; i < limit; i += 1) {
-    sum += team.slots[i]!.net;
-  }
-  return sum;
 }

@@ -953,7 +953,9 @@
           }
         } catch (e) {}
         try {
-          if (d.mineCode && typeof teams !== "undefined") {
+          // Eigenes Team nur umschalten, wenn der Code wirklich existiert — sonst
+          // wäre KEIN Team "mine" und reset() (teams.find(t=>t.mine)) würfe.
+          if (d.mineCode && typeof teams !== "undefined" && teams.some(function(t){ return t.code === d.mineCode; })) {
             teams.forEach(function(t){ t.mine = (t.code === d.mineCode); });
           }
         } catch (e) {}
@@ -975,7 +977,10 @@
             });
           }
         } catch (e) {}
-        var ORIG_GEN = genPlayers;
+        // Original EINMALIG cachen — sonst wächst bei jedem Payload-Post eine
+        // verschachtelte Wrapper-Kette (Leak + unnötige rollMods-Würfe).
+        if (!window.__olyOrigGen) { window.__olyOrigGen = genPlayers; }
+        var ORIG_GEN = window.__olyOrigGen;
         genPlayers = function(t){
           var rt = byCode[t.code];
           var src = (rt && Array.isArray(rt.players)) ? rt.players : [];
@@ -1072,12 +1077,14 @@
           try {
             if (typeof updateRoundMedals !== "undefined" && typeof modSum !== "undefined") {
               updateRoundMedals = function(round){
-                var ranked = teams.map(function(t){
-                  var p = t.players[round];
-                  return { t: t, net: p ? Math.max(0, p.val + modSum(p)) : -1 };
-                }).sort(function(a, b){ return b.net - a.net || a.t.seasonRank - b.t.seasonRank; });
-                teams.forEach(function(t){ t.roundMedal = 0; });
-                ranked.slice(0, 3).forEach(function(o, idx){ if (o.t.thrownSlot === round) o.t.roundMedal = idx + 1; });
+                try {
+                  var ranked = teams.map(function(t){
+                    var p = t.players[round];
+                    return { t: t, net: p ? Math.max(0, p.val + modSum(p)) : -1 };
+                  }).sort(function(a, b){ return b.net - a.net || (a.t.seasonRank || 0) - (b.t.seasonRank || 0); });
+                  teams.forEach(function(t){ t.roundMedal = 0; });
+                  ranked.slice(0, 3).forEach(function(o, idx){ if (o.t.thrownSlot === round) o.t.roundMedal = idx + 1; });
+                } catch (e) { /* Medaillen niemals die Runde crashen lassen */ }
               };
             }
           } catch (e) {}
