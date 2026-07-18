@@ -278,7 +278,7 @@
       <div class="clickbar">
         <button class="cta" id="advance">▶ Feld läuft (Start Runner)</button>
         <div class="prog"><i id="progfill"></i></div>
-        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <div class="step">Etappe <b id="stepnum">0</b> / 5</div>
         <button class="cta small" id="persp" title="Perspektive: Übersicht ⟷ Zoom auf dein Team">🔍 1 Team-Zoom</button>
         <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
         <button class="cta small" id="replay">↻ Neu</button>
@@ -321,7 +321,7 @@
   const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
                  "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
   const MINE = "M-M";
-  const STAR_MIN = 85; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
+  const STAR_MIN = 80; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
   const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
                  "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
@@ -891,7 +891,7 @@
   // ---------- reveal flow ----------
   const SLOTS=["Start Runner","Tempo Link","Baton Tech","Curve Runner","Anchor"];
   let queue=[], stepIdx=0, busy=false, curSlot=-1;
-  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r}); } }
 
   function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
   function slotRank(si, team){
@@ -1098,48 +1098,40 @@
     const q=queue[stepIdx];
     curSlot=q.round;
     if(stepIdx===0){ gunSound(0.6); }
-    if(q.stage==='field'){ teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); resetRoundBest(); computeRoundStandings(q.round); }
-    if(q.stage==='field'){
-      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
-      let i=0;
-      const doOne=()=>{
-        if(i>=field.length){ endStage(q); return; }
-        const t=field[i++];
-        const sFrom=t.score*SCALE;
-        const res=applyReveal(t,q.round);
-        const sTo=t.score*SCALE;
-        const impact=noteReveal(t,q.round,res,false);
-        runner={team:t,player:res.player,net:res.net,sFrom,sTo};
-        quickRun(()=>{
-          scorePopAt(res.net,false,trackPoint(sTo, TW/2+laneVarFor(t.i)));
-          logRow(t,q.round,res,impact);
-          positionLadder(false); hotRow(t.code); updateMyTracker();
-          applyImpactFx(t,res,q.round,impact);
-          setTimeout(doOne, impact.tier===2?1550: impact.tier===1?240 :90);
-        });
-      };
-      doOne();
-    } else {
-      const t=teams.find(x=>x.mine);
+    teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); resetRoundBest(); computeRoundStandings(q.round);
+    // EIN Durchlauf über ALLE Teams (schlechtestes zuerst) — eigenes Team an natürlicher Position,
+    // nicht mehr separat ans Ende geschoben. Das beste Team kommt automatisch zuletzt (Höhepunkt).
+    const order=teams.slice().sort((a,b)=> b.rank-a.rank);
+    let i=0;
+    const doOne=()=>{
+      if(i>=order.length){ endStage(q); return; }
+      const t=order[i++];
+      const isMine=t.mine;
       const sFrom=t.score*SCALE;
       const res=applyReveal(t,q.round);
       const sTo=t.score*SCALE;
-      // final-leg slow-mo only if this leg changed our rank
-      const clutch = (q.round===4 && t.lastDelta!==0);
-      const impact=noteReveal(t,q.round,res,true);
-      runner={team:t,player:res.player,net:res.net,sFrom,sTo,slowmo:clutch};
-      document.getElementById('status').textContent= clutch?'★ ZIELSPRINT — Zeitlupe':'Lauf …';
-      animRun(()=>{
-        scorePopAt(res.net,true,trackPoint(sTo, TW/2+laneVarFor(t.i)));
+      const impact=noteReveal(t,q.round,res,isMine);
+      runner={team:t,player:res.player,net:res.net,sFrom,sTo,slowmo:isMine&&impact.tier===2};
+      const after=()=>{
+        scorePopAt(res.net,isMine,trackPoint(sTo, TW/2+laneVarFor(t.i)));
         logRow(t,q.round,res,impact);
         positionLadder(false); hotRow(t.code); updateMyTracker();
         applyImpactFx(t,res,q.round,impact);
-        if(impact.tier===2){ setTimeout(()=>endStage(q), 900); } else endStage(q);
-      });
-    }
+        if(isMine && impact.tier<2){ liteMineSpotlight(t,res,q.round); }
+        const delay = impact.tier===2 ? 1550 : isMine ? 750 : impact.tier===1 ? 240 : 90;
+        setTimeout(doOne, delay);
+      };
+      if(isMine){ document.getElementById('status').textContent='★ Dein Läufer'; animRun(after); }
+      else { quickRun(after); }
+    };
+    doOne();
+  }
+  // kurzer Hervorhebungs-Moment für das eigene Team, auch ohne Tier-2 (Rahmen hat es eh)
+  function liteMineSpotlight(t,res,slot){
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot], kick:'DEIN LÄUFER', chip:{text:`+${res.net}`, color:'gold'} });
   }
   function endStage(q){
-    if(q.stage==='mine'){ roundSummary(q.round); }
+    roundSummary(q.round);
     stepIdx++; updateControls();
     if(stepIdx>=queue.length){ setTimeout(showPodium, 700); }
     setTimeout(()=>busy=false, 200);
@@ -1153,8 +1145,8 @@
     const q=queue[stepIdx], round=q.round+1;
     document.getElementById('round').textContent=round;
     document.getElementById('slotlbl').textContent=SLOTS[q.round];
-    if(q.stage==='field'){ btn.textContent=`▶ Feld läuft (${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Feld`; }
-    else { btn.textContent=`★ Dein Läufer sprintet (${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Lauf`; }
+    btn.textContent=`▶ Etappe läuft (${SLOTS[q.round]})`;
+    document.getElementById('status').textContent=`Runde ${round}`;
   }
 
   function reset(){
