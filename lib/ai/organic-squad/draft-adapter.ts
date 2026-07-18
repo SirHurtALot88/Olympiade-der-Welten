@@ -43,7 +43,9 @@ import {
 } from "@/lib/ai/ai-needs-picks-compare-service";
 import {
   buildTeamThemeCompositionRuntimeContext,
+  classifyIdentityQuotaRole,
   derivePlayerThemeTags,
+  isQuotaScopedTarget,
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
@@ -169,6 +171,15 @@ const THEME_AVOID_PENALTY = 0.6;
 const THEME_STRICTNESS_MULT: Record<string, number> = { hard: 8.0, strong: 2.4, medium: 1.2, soft: 0.7 };
 
 /**
+ * Push (in rawFit units) applied to a QUOTA VIOLATOR while the roster is still below its hard quota
+ * floor (e.g. a non-Construct for S-S's ~50% Bot quota, a non-Pirate for P-C's ~50% Crew quota). Same
+ * magnitude as an avoid-tag hit, so a below-quota club actively prefers quota-fit bodies until the floor
+ * is met — then it vanishes and non-quota depth flows normally. Bounded, never a hard block (a much
+ * stronger off-quota player can still win), so the squad stays organic.
+ */
+const THEME_QUOTA_VIOLATE_PENALTY = 0.6;
+
+/**
  * Graded per-(team, player) theme-fit signal (0..1) from actual tag overlap between the player's
  * derived theme tags and the team's target tag sets. Reuses derivePlayerThemeTags (race/class/
  * subclass/gender/trait/alignment) — no reinvented theme rules. Callers build `runtimeContext` ONCE
@@ -185,10 +196,27 @@ export function computeThemeFit(
   const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
   const countMatches = (list: string[]) => list.reduce((n, tag) => (tags.has(tag) ? n + 1 : n), 0);
 
-  const primaryMatch = countMatches(target.primaryThemeTags) > 0 ? 1 : 0;
+  // Harte Rassen-/Tag-Quote (S-S ~50% Construct, P-C ~50% Pirate): eine "counts"-Rolle zaehlt wie ein
+  // Primary-Treffer (so wird der Top-/Bestpick garantiert quota-fit), ein "violates"-Kandidat wird
+  // unterhalb der Mindestquote wie ein Avoid-Tag nach hinten gedraengt. Oberhalb der Quote neutral.
+  const quotaScoped = isQuotaScopedTarget(target);
+  let quotaPrimary = 0;
+  let quotaViolatePenalty = 0;
+  if (quotaScoped) {
+    const role = classifyIdentityQuotaRole(player, target);
+    const currentShare = runtimeContext.rosterShare?.primaryShare ?? 0;
+    const belowMinimum = currentShare + 1e-9 < target.minimumShare;
+    if (role === "counts") quotaPrimary = 1;
+    else if (role === "violates" && belowMinimum) quotaViolatePenalty = 1;
+  }
+
+  const primaryMatch = countMatches(target.primaryThemeTags) > 0 || quotaPrimary > 0 ? 1 : 0;
   const secondaryMatches = Math.min(countMatches(target.secondaryThemeTags), THEME_SECONDARY_CAP);
   const softMatches = Math.min(countMatches(target.softPreferredTags), THEME_SOFT_CAP);
-  const avoidMatches = countMatches(target.avoidTags);
+  // Quoten-Kern-Spieler (role="counts", z.B. ein menschlicher Pirat, der ueber die "Royal"-Sammelregel
+  // zufaellig einen Avoid-Tag traegt) duerfen NICHT durch Avoid entwertet werden — sonst kanzelt der
+  // Kollateral-Avoid die Quote. Spiegelt hardIdentityOverride aus calculateThemeCompositionScore.
+  const avoidMatches = quotaPrimary > 0 ? 0 : countMatches(target.avoidTags);
   // Off-primary but explicitly allowed (e.g. a female-Amazon team's male animal pets): acceptable,
   // not preferred over themed primary players.
   const outsiderMatch = !primaryMatch && countMatches(target.allowedOutsiderTags) > 0 ? 1 : 0;
@@ -207,7 +235,8 @@ export function computeThemeFit(
     THEME_SECONDARY_WEIGHT * secondaryMatches * flavourCounts +
     THEME_SOFT_WEIGHT * softMatches * flavourCounts +
     THEME_OUTSIDER_WEIGHT * outsiderMatch -
-    THEME_AVOID_PENALTY * avoidMatches;
+    THEME_AVOID_PENALTY * avoidMatches -
+    THEME_QUOTA_VIOLATE_PENALTY * quotaViolatePenalty;
   const strictnessMult = THEME_STRICTNESS_MULT[target.strictness] ?? 1;
   // May be negative (avoid) for hard clubs, so buyUtility actively pushes those players out. Ceiling
   // is generous (×THEME_FIT_VALUE downstream) so a HARD-strictness quota club (V-V ~75% Viking, V-D
