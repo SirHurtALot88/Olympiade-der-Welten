@@ -61,6 +61,7 @@ import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/se
 import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetupToken } from "@/lib/season/preseason-workflow-service";
 import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
+import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { applyLoanSettlement } from "@/lib/finance/loan-service";
@@ -552,7 +553,7 @@ function runPhaseCheckpoint(
         (result) => result.seasonId === save.gameState.season.id && result.matchdayId === lastMatchdayId,
       );
     if (hasLastMatchdayResult && (save.gameState.gamePhase ?? "") !== "season_completed") {
-      persistence.saveSingleplayerState(saveId, {
+      persistence.saveSingleplayerState(saveId, withFrozenValuationSnapshot({
         ...save.gameState,
         gamePhase: "season_completed",
         matchdayState: {
@@ -562,7 +563,7 @@ function runPhaseCheckpoint(
           pendingTeamIds: [],
           resolvedFixtureIds: [],
         },
-      });
+      }));
       save = persistence.getSaveById(saveId) ?? save;
     }
   }
@@ -1964,6 +1965,27 @@ function buildRepairPerformanceRows(performanceRows: PhaseMetric[]) {
     }));
 }
 
+// MD10-Valuation-Freeze für den Sandbox-Season-End. Spiegelt production
+// (matchday-progress-service.writeLocalMatchdayAdvance), das den Snapshot beim MD10-Abschluss setzt.
+// Die Sandbox überspringt den letzten Matchday-Advance (runSeasonMatchdays: `if (!isLast)`) und wechselt
+// stattdessen über finalizeSeasonIfNeeded/Checkpoints direkt auf season_completed — ohne diesen Freeze
+// würden die Sell-/Buy-Gates im anschließenden Transferfenster LIVE rechnen, sodass sich die Angebote
+// (Verkaufspreise/Kaufliste) verschieben, sobald Spieler verkauft werden bzw. andere aufrücken.
+// Idempotent: nur setzen, wenn noch kein Snapshot existiert, und immer auf einem State OHNE Snapshot
+// berechnen (die Rating-/Sale-Factor-Gates rechnen dann pool-relativ live über den vollen MD10-Kader).
+function withFrozenValuationSnapshot(gameState: GameState): GameState {
+  if (gameState.seasonState.frozenValuationSnapshot != null) {
+    return gameState;
+  }
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      frozenValuationSnapshot: buildFrozenValuationSnapshot(gameState),
+    },
+  };
+}
+
 function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService) {
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared during season finalization.");
@@ -1979,7 +2001,7 @@ function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService)
     return false;
   }
   const now = new Date().toISOString();
-  persistence.saveSingleplayerState(save.saveId, {
+  persistence.saveSingleplayerState(save.saveId, withFrozenValuationSnapshot({
     ...save.gameState,
     gamePhase: "season_completed",
     season: save.gameState.season,
@@ -2009,7 +2031,7 @@ function finalizeSeasonIfNeeded(saveId: string, persistence: PersistenceService)
         createdAt: now,
       },
     ],
-  });
+  }));
   return true;
 }
 
@@ -2612,7 +2634,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       (result) => result.seasonId === save.gameState.season.id && result.matchdayId === lastMatchdayId,
     );
   if (hasLastMatchdayResult && (save.gameState.gamePhase ?? "") === "season_active") {
-    persistence.saveSingleplayerState(saveId, {
+    persistence.saveSingleplayerState(saveId, withFrozenValuationSnapshot({
       ...save.gameState,
       gamePhase: "season_completed",
       matchdayState: {
@@ -2622,7 +2644,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
         pendingTeamIds: [],
         resolvedFixtureIds: [],
       },
-    });
+    }));
     save = persistence.getSaveById(saveId) ?? save;
   }
   console.error(`[long-run] season-end ${seasonId}: ai-xp`);
