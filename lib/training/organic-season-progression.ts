@@ -322,10 +322,15 @@ function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: 
   // development plateau so genuine talents grow visibly, while mid/low potential develops
   // slowly (and sub-58 nets below 1.0 so the league median stays roughly flat). This band
   // structure is what widens peak-P90 vs the median instead of lifting the whole league.
-  if (potential >= 94) return 2.05;
-  if (potential >= 88) return 1.85;
-  if (potential >= 80) return 1.6;
-  if (potential >= 72) return 1.25;
+  // Selektiver Hochpotenzial-Entwicklungs-Buff: NUR die oberen Bänder (>=72) werden angehoben
+  // (~1,5x auf der Spitze, abklingend), damit ein starker Verbesserer netto ~13-15 Setpoints
+  // (≈2M MW) pro Saison erreicht, OHNE einen ligaweiten Buff (Liga-Ø bleibt am Boden, weil
+  // <=58 unverändert < 1,0 bleibt). Es findet KEIN Eingriff nahe der Potenzialgrenze statt:
+  // der Potenzial-Cap-Clamp bleibt intakt und deckelt Wachstum knapp unter dem Ceiling.
+  if (potential >= 94) return 3.2;
+  if (potential >= 88) return 2.8;
+  if (potential >= 80) return 2.2;
+  if (potential >= 72) return 1.55;
   if (potential >= 58) return 0.92;
   return 0.72;
 }
