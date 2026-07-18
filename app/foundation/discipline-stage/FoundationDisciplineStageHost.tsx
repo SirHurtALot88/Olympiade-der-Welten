@@ -2,12 +2,22 @@
 
 import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useFoundationGameState, useFoundationState } from "@/lib/foundation/foundation-state-context";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildDisciplineStageModel,
   partialTotal,
   type DisciplineStageTeam,
 } from "@/lib/foundation/discipline-stage/discipline-stage-data";
+
+// Die Disziplin-Bühne wird — wie Spieler-Detail und Team-Profil — AUSSERHALB
+// des (nirgends gemounteten) FoundationStateProvider gerendert. Deshalb kommt
+// der volle GameState + die Team-Auswahl über Props aus dem Router-Body, statt
+// über useFoundationState()/useFoundationGameState() (die hier immer werfen würden).
+export type FoundationDisciplineStageHostProps = {
+  gameState: GameState;
+  selectedTeamId: string;
+  activeManagerTeamId: string | null;
+};
 
 function hueFor(code: string): number {
   let h = 0;
@@ -61,17 +71,15 @@ class DisciplineStageErrorBoundary extends Component<{ children: ReactNode }, { 
   }
 }
 
-export default function FoundationDisciplineStageHost() {
+export default function FoundationDisciplineStageHost(props: FoundationDisciplineStageHostProps) {
   return (
     <DisciplineStageErrorBoundary>
-      <DisciplineStageInner />
+      <DisciplineStageInner {...props} />
     </DisciplineStageErrorBoundary>
   );
 }
 
-function DisciplineStageInner() {
-  const gameState = useFoundationGameState();
-  const { selectedTeamId, activeManagerTeamId } = useFoundationState();
+function DisciplineStageInner({ gameState, selectedTeamId, activeManagerTeamId }: FoundationDisciplineStageHostProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
   const disciplines = useMemo(() => {

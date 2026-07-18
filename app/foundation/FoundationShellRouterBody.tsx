@@ -2918,7 +2918,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
-          {activeView === "disciplineStage" ? <FoundationDisciplineStageHost /> : null}
+          {activeView === "disciplineStage" ? (
+            <FoundationDisciplineStageHost
+              gameState={gameState}
+              selectedTeamId={selectedTeamId}
+              activeManagerTeamId={activeManagerTeamId}
+            />
+          ) : null}
 
           <FoundationShellRouterPrize
             active={activeView === "prize"}
