@@ -23,10 +23,11 @@ export default function FoundationDisciplineStageHost() {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
   const disciplines = useMemo(() => {
-    return [...gameState.disciplines].sort(
+    // Bootstrap-/Teil-State: disciplines kann im Ladefenster (noch) fehlen.
+    return [...(gameState?.disciplines ?? [])].sort(
       (a, b) => (a.displayOrder ?? a.originalOrder ?? 0) - (b.displayOrder ?? b.originalOrder ?? 0),
     );
-  }, [gameState.disciplines]);
+  }, [gameState?.disciplines]);
 
   const defaultDisciplineId = useMemo(() => {
     if (disciplines.some((d) => d.id === "staffel")) {
@@ -50,7 +51,7 @@ export default function FoundationDisciplineStageHost() {
 
   const rows = useMemo(() => {
     const withShown = model.teams.map((team) => ({ team, shown: partialTotal(team, revealedSlots) }));
-    withShown.sort((a, b) => b.shown - a.shown || a.team.shortCode.localeCompare(b.team.shortCode));
+    withShown.sort((a, b) => b.shown - a.shown || (a.team.shortCode ?? "").localeCompare(b.team.shortCode ?? ""));
     return withShown;
   }, [model.teams, revealedSlots]);
 
@@ -85,6 +86,18 @@ export default function FoundationDisciplineStageHost() {
     borderRadius: 14,
     padding: 16,
   };
+
+  // Bootstrap-/Teil-State: noch keine Disziplinen geladen → freundlicher Hinweis statt Crash/Leerlauf.
+  if (disciplines.length === 0) {
+    return (
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: 40, textAlign: "center", opacity: 0.75 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Disziplin-Bühne</div>
+        <div style={{ fontSize: 14 }}>
+          Daten werden geladen … Falls dieser Hinweis bleibt, ist noch keine Saison mit Disziplinen aktiv.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: 20, color: "inherit" }}>

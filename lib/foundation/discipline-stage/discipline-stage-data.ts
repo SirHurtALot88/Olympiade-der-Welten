@@ -67,16 +67,18 @@ export function buildDisciplineStageModel(
   disciplineId: string,
   ownTeamId: string | null,
 ): DisciplineStageModel {
-  const discipline = gameState.disciplines.find((d) => d.id === disciplineId);
+  // Defensiv gegen Bootstrap-/Teil-States: im Ladefenster können diese Arrays
+  // (noch) fehlen. Dann bauen wir ein leeres Modell statt zu crashen.
+  const discipline = (gameState.disciplines ?? []).find((d) => d.id === disciplineId);
   const slotCount = discipline?.playerCount ?? 5;
 
   const playersById = new Map<string, Player>();
-  for (const player of gameState.players) {
+  for (const player of gameState.players ?? []) {
     playersById.set(player.id, player);
   }
 
   const rosterByTeam = new Map<string, Player[]>();
-  for (const entry of gameState.rosters) {
+  for (const entry of gameState.rosters ?? []) {
     const player = playersById.get(entry.playerId);
     if (!player) {
       continue;
@@ -86,7 +88,7 @@ export function buildDisciplineStageModel(
     rosterByTeam.set(entry.teamId, arr);
   }
 
-  const teams: DisciplineStageTeam[] = gameState.teams.map((team) => {
+  const teams: DisciplineStageTeam[] = (gameState.teams ?? []).map((team) => {
     const roster = rosterByTeam.get(team.teamId) ?? [];
     const sorted = [...roster].sort(
       (a, b) => (b.disciplineRatings?.[disciplineId] ?? 0) - (a.disciplineRatings?.[disciplineId] ?? 0),
