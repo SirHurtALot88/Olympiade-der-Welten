@@ -15,6 +15,7 @@ import {
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
 import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/DisciplineStageEndScreen";
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
+import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 
 export type DisciplineStageArenaProps = {
   gameState: GameState;
@@ -201,6 +202,14 @@ export default function DisciplineStageArena({
     const map = new Map<string, string | null>();
     for (const player of gameState?.players ?? []) {
       map.set(player.id, getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null));
+    }
+    return map;
+  }, [gameState?.players]);
+
+  const playerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const player of gameState?.players ?? []) {
+      map.set(player.id, player.name);
     }
     return map;
   }, [gameState?.players]);
@@ -560,6 +569,12 @@ export default function DisciplineStageArena({
             topPlayers={engineDiscipline.topPlayers}
             matchdayTeams={preview?.teamResults ?? null}
             teamMetaById={teamMetaById}
+            ownTeamId={ownTeamId}
+          />
+          <DisciplineStageHighlights
+            candidates={engineDiscipline.highlightCandidates}
+            teamMetaById={teamMetaById}
+            playerNameById={playerNameById}
             ownTeamId={ownTeamId}
           />
           {briefingItems.length > 0 ? (
