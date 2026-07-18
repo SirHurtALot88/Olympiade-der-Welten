@@ -3,15 +3,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import {
   buildDisciplineStageModel,
   type DisciplineStageSlot,
 } from "@/lib/foundation/discipline-stage/discipline-stage-data";
+import {
+  buildDisciplineStageTeamsFromPreview,
+  type StageTeamMeta,
+} from "@/lib/foundation/discipline-stage/discipline-stage-from-preview";
+import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/DisciplineStageEndScreen";
+import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 
 export type DisciplineStageArenaProps = {
   gameState: GameState;
   selectedTeamId: string;
   activeManagerTeamId: string | null;
+  saveId?: string | null;
+  seasonId?: string | null;
+  matchdayId?: string | null;
 };
 
 // Disziplin-ID → fertige Arena-Szene unter /public/discipline-scenes.
@@ -136,6 +147,9 @@ export default function DisciplineStageArena({
   gameState,
   selectedTeamId,
   activeManagerTeamId,
+  saveId,
+  seasonId,
+  matchdayId,
 }: DisciplineStageArenaProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
@@ -168,37 +182,131 @@ export default function DisciplineStageArena({
     [gameState, disciplineId, ownTeamId],
   );
 
+  // Lookups (Kürzel/Logo je Team, Portrait je Spieler) für das Engine-Mapping.
+  const teamMetaById = useMemo(() => {
+    const map = new Map<string, StageTeamMeta>();
+    for (const team of gameState?.teams ?? []) {
+      map.set(team.teamId, {
+        code: team.shortCode,
+        name: team.name,
+        logoUrl: getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null),
+      });
+    }
+    return map;
+  }, [gameState?.teams]);
+
+  const portraitById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const player of gameState?.players ?? []) {
+      map.set(player.id, getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null));
+    }
+    return map;
+  }, [gameState?.players]);
+
+  // Echte Resolve-Preview der Arena laden (nur wenn Matchday-Kontext vorhanden).
+  const [preview, setPreview] = useState<LegacyMatchdayResolvePreview | null>(null);
+  const [briefingItems, setBriefingItems] = useState<
+    { teamId: string; currentRank: number | null; projectedRank: number | null }[]
+  >([]);
+  const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+
+  useEffect(() => {
+    if (!saveId || !seasonId || !matchdayId) {
+      setPreviewState("unavailable");
+      return;
+    }
+    const controller = new AbortController();
+    setPreviewState("loading");
+    const query = new URLSearchParams({ saveId, seasonId, matchdayId, teamId: ownTeamId ?? "", source: "sqlite", includeDetails: "1" });
+    fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payloadJson) => {
+        const enginePreview = payloadJson?.resolvePreview?.preview ?? null;
+        setPreview(enginePreview);
+        setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
+        setPreviewState(enginePreview ? "ready" : "unavailable");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPreview(null);
+          setBriefingItems([]);
+          setPreviewState("unavailable");
+        }
+      });
+    return () => controller.abort();
+  }, [saveId, seasonId, matchdayId, ownTeamId]);
+
+  const engineDiscipline = useMemo(
+    () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
+    [preview, disciplineId],
+  );
+
+  // Engine-Teams für die gewählte Disziplin (nur wenn sie an diesem Spieltag läuft).
+  const engineTeams = useMemo(() => {
+    const disc = preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId);
+    if (!disc || disc.teamResults.length === 0) {
+      return null;
+    }
+    return buildDisciplineStageTeamsFromPreview(disc, teamMetaById, portraitById);
+  }, [preview, disciplineId, teamMetaById, portraitById]);
+
+  // Echt-Modus nutzt die Engine, wenn Daten für diese Disziplin vorliegen.
+  const useEngine = mode === "real" && engineTeams !== null;
+
   // Random-Test: 2 Mutator-Traits werden für die Disziplin bestimmt.
   const mutatorTraits = useMemo(
     () => (mode === "random" ? pickMutatorTraits(seed + hashStr(disciplineId)) : []),
     [mode, seed, disciplineId],
   );
 
+  const ownShortCode = useMemo(() => {
+    const own = (gameState?.teams ?? []).find((t) => t.teamId === ownTeamId);
+    return own?.shortCode ?? model.teams.find((t) => t.isOwn)?.shortCode ?? null;
+  }, [gameState?.teams, ownTeamId, model.teams]);
+
   const payload = useMemo(() => {
-    const mineCode = model.teams.find((t) => t.isOwn)?.shortCode ?? null;
+    const slotCount = useEngine
+      ? engineTeams!.reduce((max, t) => Math.max(max, t.players.length), 0) || model.slotCount
+      : model.slotCount;
+    const teams = useEngine
+      ? engineTeams!.map((t) => ({
+          code: t.code,
+          name: t.name,
+          logoUrl: t.logoUrl,
+          // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
+          players: t.players.map((p) => ({
+            val: p.val,
+            name: p.name,
+            portraitUrl: p.portraitUrl,
+            traits: [] as string[],
+            mods: p.mods,
+            traitMods: [] as { k: string; sign: 1 | -1; amt: number }[],
+          })),
+        }))
+      : model.teams.map((t) => ({
+          code: t.shortCode,
+          name: t.name,
+          logoUrl: t.logoUrl,
+          players: t.slots.map((s) => ({
+            val: s.base,
+            name: s.playerName,
+            portraitUrl: s.portraitUrl,
+            traits: s.traits,
+            mods: mode === "real" ? realMods(s) : [],
+            // Trait-Mutatoren (+6 je passendem Trait) — nur im Random-Test angewandt.
+            traitMods: mode === "random" ? traitMutatorMods(s.traits, mutatorTraits) : [],
+          })),
+        }));
     return {
       type: "olyStageData" as const,
       mode,
       seed,
-      slots: Array.from({ length: model.slotCount }, (_, i) => slotLabel(disciplineId, i, model.slotCount)),
-      mineCode,
+      slots: Array.from({ length: slotCount }, (_, i) => slotLabel(disciplineId, i, slotCount)),
+      mineCode: ownShortCode,
       mutatorTraits,
-      teams: model.teams.map((t) => ({
-        code: t.shortCode,
-        name: t.name,
-        logoUrl: t.logoUrl,
-        players: t.slots.map((s) => ({
-          val: s.base,
-          name: s.playerName,
-          portraitUrl: s.portraitUrl,
-          traits: s.traits,
-          mods: mode === "real" ? realMods(s) : [],
-          // Trait-Mutatoren (+6 je passendem Trait) — nur im Random-Test angewandt.
-          traitMods: mode === "random" ? traitMutatorMods(s.traits, mutatorTraits) : [],
-        })),
-      })),
+      teams,
     };
-  }, [model, mode, seed, disciplineId, mutatorTraits]);
+  }, [useEngine, engineTeams, model, mode, seed, disciplineId, mutatorTraits, ownShortCode]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
   const mutatorImpact = useMemo(() => {
@@ -307,6 +415,26 @@ export default function DisciplineStageArena({
             🎲 Random-Test
           </button>
         </div>
+        {mode === "real" ? (
+          <span
+            title={useEngine ? "Werte kommen 1:1 aus der Matchday-Resolve-Engine (arena-identisch)" : "Vereinfachte Ansicht: für diese Disziplin/diesen Spieltag liegt keine Engine-Aufstellung vor"}
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              padding: "4px 10px",
+              borderRadius: 99,
+              color: useEngine ? "var(--nl-good)" : "var(--nl-mut)",
+              background: useEngine ? "color-mix(in srgb, var(--nl-good) 15%, transparent)" : "transparent",
+              border: `1px solid ${useEngine ? "var(--nl-good)" : "var(--nl-line)"}`,
+            }}
+          >
+            {useEngine
+              ? "✓ Engine-echt"
+              : previewState === "loading"
+                ? "Engine lädt …"
+                : "Vereinfacht (kein Lineup)"}
+          </span>
+        ) : null}
         {mode === "random" ? (
           <button
             type="button"
@@ -362,7 +490,7 @@ export default function DisciplineStageArena({
           />
         </div>
       ) : (
-        <div style={{ padding: 40, textAlign: "center", opacity: 0.7, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 14 }}>
+        <div style={{ padding: 40, textAlign: "center", color: "var(--nl-mut)", border: "1px dashed var(--nl-line)", borderRadius: 14 }}>
           Für <b>{model.disciplineName}</b> ist die Arena-Szene noch nicht hinterlegt.
         </div>
       )}
@@ -419,6 +547,22 @@ export default function DisciplineStageArena({
             Im Random-Test rechnet die Arena mit denselben Grundwerten, aber gewürfelten Mods — die Netto-Werte
             dort weichen daher bewusst von dieser echten Referenz ab.
           </div>
+        </div>
+      ) : null}
+
+      {mode === "real" && engineDiscipline ? (
+        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+          <DisciplineStageEndScreen
+            disciplineName={engineDiscipline.disciplineName}
+            teamResults={engineDiscipline.teamResults}
+            topPlayers={engineDiscipline.topPlayers}
+            matchdayTeams={preview?.teamResults ?? null}
+            teamMetaById={teamMetaById}
+            ownTeamId={ownTeamId}
+          />
+          {briefingItems.length > 0 ? (
+            <DisciplineStageStandingsDelta items={briefingItems} teamMetaById={teamMetaById} ownTeamId={ownTeamId} />
+          ) : null}
         </div>
       ) : null}
     </div>

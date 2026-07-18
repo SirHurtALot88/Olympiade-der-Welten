@@ -2923,6 +2923,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               gameState={gameState}
               selectedTeamId={selectedTeamId}
               activeManagerTeamId={activeManagerTeamId}
+              saveId={activeSaveId}
+              seasonId={gameState.season.id}
+              matchdayId={gameState.matchdayState.matchdayId}
             />
           ) : null}
 

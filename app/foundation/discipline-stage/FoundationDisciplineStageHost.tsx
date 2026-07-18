@@ -13,6 +13,10 @@ export type FoundationDisciplineStageHostProps = {
   gameState: GameState;
   selectedTeamId: string;
   activeManagerTeamId: string | null;
+  // Für den Engine-Modus (echte Resolve-Preview der Arena):
+  saveId?: string | null;
+  seasonId?: string | null;
+  matchdayId?: string | null;
 };
 
 // Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,
