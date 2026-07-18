@@ -101,31 +101,10 @@ export function resolveGmPressureBehavior(gameState: GameState, teamId: string):
   };
 }
 
-export function evaluateGmTransferBalanceRisk(gameState: GameState, teamId: string) {
-  const seasonId = gameState.season.id;
-  const transfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
-  const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
-  const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
-  const buyFees = buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
-  const sellProceeds = sells.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
-  const netTransferCash = sellProceeds - buyFees;
-  const pressure = resolveGmPressureBehavior(gameState, teamId);
-
-  const atRisk =
-    pressure.isHotSeat &&
-    sells.length >= 2 &&
-    buys.length === 0 &&
-    netTransferCash > 0 &&
-    sells.some((entry) => (entry.fee ?? 0) >= 20);
-
-  return {
-    atRisk,
-    netTransferCash,
-    buyCount: buys.length,
-    sellCount: sells.length,
-    reason: atRisk ? "Churn ohne Ersatz unter Hot-Seat-Druck belastet das GM-Mandat." : null,
-  };
-}
+// Hinweis (Bug #3, Konsolidierung): Die frühere `evaluateGmTransferBalanceRisk` war verwaist —
+// ihre Logik ist als einzige Quelle der Wahrheit in team-general-managers.ts reimplementiert
+// (getTeamSeasonTransferStats + applyTransferBalanceRiskToReplacementProbability), das direkt in
+// die Rauswurf-Wahrscheinlichkeit fließt. Der Orphan hatte keinen Aufrufer und ist entfernt.
 
 export function applyGmPressureDemandConcession(input: {
   baseScore: number;

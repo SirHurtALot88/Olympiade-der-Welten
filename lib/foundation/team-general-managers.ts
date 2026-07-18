@@ -36,8 +36,6 @@ export function setGmAssignmentSeedSalt(salt: string | null | undefined) {
 export function getGmAssignmentSeedSalt() {
   return gmAssignmentSeedSalt;
 }
-export const GM_BOARD_REPLACEMENT_CONFIDENCE_THRESHOLD = 2.5;
-export const GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD = 9;
 
 type GmSeed = Omit<TeamGeneralManagerProfile, "gmId" | "name" | "description"> & {
   nameRoot: string;
@@ -739,17 +737,37 @@ type PickedGeneralManager = {
   source: TeamGeneralManagerAssignment["source"];
 };
 
+// Bug #4 fix: Der angezeigte Rauswurf-Grund muss zum TATSÄCHLICHEN Auslöser passen. Die Firing-
+// Entscheidung (getBoardReplacementProbability) liest die Wahrnehmungs-Ebene `perceivedPressure`
+// (Fallback: roher `pressure`) und feuert über feste Schwellen/Kurven. Dieser Grund leitet sich jetzt
+// aus DENSELBEN Werten ab — statt wie zuvor aus rohem `pressure` + veralteten Konstanten (2.5/9), die
+// zur echten Auslöse-Schwelle nicht mehr passten (fired-ohne-Grund bzw. falsch gelabelte Rauswürfe).
+// Wird ausschließlich im isFired-Pfad aufgerufen und liefert dort immer einen nicht-null Grund.
 function getBoardReplacementReason(board: TeamBoardConfidenceRecord | null | undefined): TeamGeneralManagerAssignment["dismissalReason"] {
   if (!board) return null;
   const confidence = Number(board.value ?? 5);
-  const pressure = Number(board.pressure ?? 0);
+  const pressure = Number(board.perceivedPressure ?? board.pressure ?? 0);
+
+  // Safe-Zone: kein Rauswurf → kein Grund (spiegelt getBoardReplacementProbability).
   if (confidence >= 6.5 && pressure <= 4) return null;
-  if (confidence <= GM_BOARD_REPLACEMENT_CONFIDENCE_THRESHOLD - 0.5) return "low_board_confidence";
-  if (pressure >= GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD + 0.5) return "high_board_pressure";
-  if (confidence <= GM_BOARD_REPLACEMENT_CONFIDENCE_THRESHOLD && pressure >= GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD - 0.5) {
-    return pressure >= GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD ? "high_board_pressure" : "low_board_confidence";
+
+  // Harte Auslöser (Hard-Floor der Firing-Kurve) dominieren das Narrativ.
+  if (pressure >= 9.5) return "high_board_pressure";
+  if (confidence <= 2.0) return "low_board_confidence";
+
+  // Sonst entscheidet die stärkere der beiden Firing-Kurven (gleiche Slopes/Schwellen wie im
+  // Wahrscheinlichkeits-Pfad). Gleichstand → Druck als Narrativ-Treiber.
+  const confidenceProb = confidence <= 4.5 ? Math.max(0, Math.min(0.9, (4.5 - confidence) / 2.5)) : 0;
+  const pressureProb = pressure >= 7.0 ? Math.max(0, Math.min(0.9, (pressure - 7.0) / 2.5)) : 0;
+  if (pressureProb > 0 || confidenceProb > 0) {
+    return pressureProb >= confidenceProb ? "high_board_pressure" : "low_board_confidence";
   }
-  return null;
+
+  // Rauswurf ohne Kurven-Treiber (nur Identity-Modifier haben prob>0 gedrückt): Grund nach größerer
+  // Abweichung von der jeweiligen "sicheren" Linie (confidence >= 6.5 bzw. pressure <= 4).
+  const confidenceSeverity = Math.max(0, 6.5 - confidence);
+  const pressureSeverity = Math.max(0, pressure - 4);
+  return pressureSeverity >= confidenceSeverity ? "high_board_pressure" : "low_board_confidence";
 }
 
 // Returns a probability (0–1) that the board will replace the GM this season rollover.
