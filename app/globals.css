@@ -6320,6 +6320,181 @@ a {
   color: rgba(147, 197, 253, 0.98);
 }
 
+/* PPs nach POW/SPE/MEN/SOC — kompakte Mini-Anzeige ("at a glance") plus
+   ausklappbare Disziplin-PPs je Zeile. Nur unter `.is-new-look`, Ton-Tokens
+   (--nl-pow/--nl-spe/--nl-men/--nl-soc via `.nl-tone-*` → --nl-tone). */
+.is-new-look .selected-roster-pps-axes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 6px;
+  margin-top: 6px;
+}
+
+.is-new-look .selected-roster-pps-axis {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 30%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 12%, transparent);
+}
+
+.is-new-look .selected-roster-pps-axis-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--nl-tone, rgba(203, 213, 225, 0.9));
+}
+
+.is-new-look .selected-roster-pps-axis-value {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.96);
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.08);
+  color: rgba(191, 219, 254, 0.92);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle:hover {
+  border-color: rgba(147, 197, 253, 0.4);
+  color: rgba(147, 197, 253, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-chevron {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 120ms ease;
+}
+
+.is-new-look .selected-roster-pps-diszi-toggle.is-open .selected-roster-pps-diszi-chevron {
+  transform: rotate(180deg);
+}
+
+.is-new-look .selected-roster-pps-diszi-row > td,
+.is-new-look .nl-table-expanded-row > td {
+  padding: 0;
+}
+
+.is-new-look .nl-table-expanded-row:hover > td {
+  background: transparent;
+}
+
+.is-new-look .selected-roster-pps-diszi-panel {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.is-new-look .selected-roster-pps-diszi-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.is-new-look .selected-roster-pps-diszi-head strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-head .muted {
+  font-size: 0.72rem;
+}
+
+.is-new-look .selected-roster-pps-diszi-axes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.is-new-look .selected-roster-pps-diszi-axis {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 26%, transparent);
+  background: color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 8%, transparent);
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--nl-tone, rgba(148, 163, 184, 0.6)) 22%, transparent);
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-label {
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--nl-tone, rgba(203, 213, 225, 0.92));
+}
+
+.is-new-look .selected-roster-pps-diszi-axis-total {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgba(241, 245, 249, 0.98);
+}
+
+.is-new-look .selected-roster-pps-diszi-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.is-new-look .selected-roster-pps-diszi-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.76rem;
+}
+
+.is-new-look .selected-roster-pps-diszi-item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(203, 213, 225, 0.88);
+}
+
+.is-new-look .selected-roster-pps-diszi-item-value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.is-new-look .selected-roster-pps-diszi-item.is-empty {
+  justify-content: flex-start;
+}
+
 .selected-team-roster-pps-pill {
   display: inline-flex;
   align-items: center;

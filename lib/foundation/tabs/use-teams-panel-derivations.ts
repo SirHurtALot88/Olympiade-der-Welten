@@ -139,7 +139,7 @@ export function useTeamsPanelDerivations(input: UseTeamsPanelDerivationsInput) {
       { id: "contract", label: "LZ", dataKey: "contract", defaultWidth: 76, minWidth: 64 },
       { id: "ovr", label: "OVR", dataKey: "ovr", defaultWidth: 90, minWidth: 72 },
       { id: "mvs", label: "MVS", dataKey: "mvs", defaultWidth: 90, minWidth: 72 },
-      { id: "pps", label: "PPs", dataKey: "pps", defaultWidth: 90, minWidth: 72 },
+      { id: "pps", label: "PPs", dataKey: "pps", defaultWidth: 140, minWidth: 116 },
       ...(input.showSelectedRosterPpsBreakdown
         ? [
             { id: "ppPow", label: "PP POW", dataKey: "ppPow", defaultWidth: 78, minWidth: 66 },

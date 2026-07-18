@@ -544,6 +544,71 @@ function FoundationTeamsDetailPanel({
   // Vertrags-Auslauf-Center: Sichtbarkeit umschalten zwischen nur auslaufenden
   // Verträgen (LZ ≤ 1) und dem ganzen aktiven Kader (für Buyout-und-Verkauf).
   const [auslaufScope, setAuslaufScope] = useState<"expiring" | "all">("expiring");
+  // Ausklappbare Disziplin-PPs je Roster-Zeile (POW/SPE/MEN/SOC → Einzel-
+  // disziplinen). Nur eine Zeile gleichzeitig offen (wie die Spieler-Tabelle),
+  // Zustand lokal — additive, entkoppelt vom globalen Achsen-Spalten-Umschalter.
+  const [expandedRosterPpsDisziId, setExpandedRosterPpsDisziId] = useState<string | null>(null);
+  // Dasselbe Ausklapp-Muster für die Verträge-Tabelle (NlTable), Zustand je Spieler-ID.
+  const [expandedContractPpsPlayerId, setExpandedContractPpsPlayerId] = useState<string | null>(null);
+  // Roster-Zeilen nach Spieler-ID (trägt ppPow/… + disciplinePpsByAxis) — Quelle
+  // für die Achsen-/Disziplin-PPs der Verträge-Tabelle (join über playerId).
+  const rosterRowByPlayerId = new Map(
+    (filteredSelectedRosterTableRows ?? []).map((row) => [row.player.id, row]),
+  );
+
+  // Kompakte "at a glance"-Achsen-PPs (POW/SPE/MEN/SOC) für eine Zelle.
+  const renderPpsAxisStrip = (axisValues, ariaName) => (
+    <div className="selected-roster-pps-axes" aria-label={`PPs nach Bereich für ${ariaName}`}>
+      {axisValues.map((axisItem) => (
+        <span
+          key={axisItem.axis}
+          className={`selected-roster-pps-axis nl-tone-${axisItem.axis}`}
+          title={`${axisItem.label}-PPs (Saison)`}
+        >
+          <span className="selected-roster-pps-axis-label">{axisItem.label}</span>
+          <span className="selected-roster-pps-axis-value nl-tnum">
+            {axisItem.value != null && Number.isFinite(axisItem.value) ? formatPpsValue(axisItem.value) : "—"}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+
+  // Ausklapp-Panel mit den echten Disziplin-PPs, gruppiert nach Achse.
+  const renderPpsDisziPanel = ({ name, axisGroups, panelId }) => (
+    <div className="selected-roster-pps-diszi-panel" id={panelId} role="region" aria-label={`Disziplin-PPs ${name}`}>
+      <div className="selected-roster-pps-diszi-head">
+        <strong>{name}</strong>
+        <span className="muted">Performance-Punkte je Disziplin (Saison), gruppiert nach Bereich</span>
+      </div>
+      <div className="selected-roster-pps-diszi-axes-grid">
+        {(Array.isArray(axisGroups) ? axisGroups : []).map((axisGroup) => (
+          <div key={axisGroup.axis} className={`selected-roster-pps-diszi-axis nl-tone-${axisGroup.axis}`}>
+            <div className="selected-roster-pps-diszi-axis-head">
+              <span className="selected-roster-pps-diszi-axis-label">{axisGroup.label}</span>
+              <span className="selected-roster-pps-diszi-axis-total nl-tnum">
+                {axisGroup.axisPps != null && Number.isFinite(axisGroup.axisPps) ? formatPpsValue(axisGroup.axisPps) : "—"}
+              </span>
+            </div>
+            <ul className="selected-roster-pps-diszi-list">
+              {axisGroup.disciplines.length === 0 ? (
+                <li className="selected-roster-pps-diszi-item is-empty">
+                  <span className="muted">Keine Disziplinen</span>
+                </li>
+              ) : (
+                axisGroup.disciplines.map((discipline) => (
+                  <li key={discipline.id} className="selected-roster-pps-diszi-item">
+                    <span className="selected-roster-pps-diszi-item-name">{discipline.name}</span>
+                    <span className="selected-roster-pps-diszi-item-value nl-tnum">{formatPpsValue(discipline.pps)}</span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     if (!showLeagueLogos) {
@@ -721,8 +786,18 @@ function FoundationTeamsDetailPanel({
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown, known: rowKnown, caStars: rowCaStars, poStarRange: rowPoStarRange, caScore: rowCaScore, poScoreRange: rowPoScoreRange }) => {
+                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, disciplinePpsByAxis, saleBreakdown, known: rowKnown, caStars: rowCaStars, poStarRange: rowPoStarRange, caScore: rowCaScore, poScoreRange: rowPoScoreRange }) => {
                               const hasPpsBreakdown = [ppPow, ppSpe, ppMen, ppSoc].some((value) => value != null && Number.isFinite(value));
+                              // "At a glance"-Achsenwerte (POW/SPE/MEN/SOC) für die kompakte Mini-Anzeige in der PPs-Zelle.
+                              const rosterPpsAxes = [
+                                { axis: "pow", label: "POW", value: ppPow },
+                                { axis: "spe", label: "SPE", value: ppSpe },
+                                { axis: "men", label: "MEN", value: ppMen },
+                                { axis: "soc", label: "SOC", value: ppSoc },
+                              ];
+                              const axisDisciplineGroups = Array.isArray(disciplinePpsByAxis) ? disciplinePpsByAxis : [];
+                              const isPpsDisziExpanded = expandedRosterPpsDisziId === entry.id;
+                              const ppsDisziPanelId = `roster-pps-diszi-${entry.id}`;
                               const isContractExpiring = entry.contractLength <= 1;
                               return (
                               <Fragment key={entry.id}>
@@ -937,7 +1012,10 @@ function FoundationTeamsDetailPanel({
                                             type="button"
                                             aria-expanded={showSelectedRosterPpsBreakdown}
                                             disabled={!hasPpsBreakdown}
-                                            onClick={() => setShowSelectedRosterPpsBreakdown((current) => !current)}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setShowSelectedRosterPpsBreakdown((current) => !current);
+                                            }}
                                           >
                                             {renderMetricBar(playerPps, {
                                               tone: "pps",
@@ -948,10 +1026,24 @@ function FoundationTeamsDetailPanel({
                                             <span className="selected-roster-pps-trigger-label">
                                               {hasPpsBreakdown
                                                 ? showSelectedRosterPpsBreakdown
-                                                  ? "Bereiche ausblenden"
-                                                  : "Bereiche anzeigen"
+                                                  ? "Spalten ausblenden"
+                                                  : "Als Spalten"
                                                 : "Keine Bereichs-PPs"}
                                             </span>
+                                          </button>
+                                          {renderPpsAxisStrip(rosterPpsAxes, player.name)}
+                                          <button
+                                            className={`selected-roster-pps-diszi-toggle${isPpsDisziExpanded ? " is-open" : ""}`}
+                                            type="button"
+                                            aria-expanded={isPpsDisziExpanded}
+                                            aria-controls={ppsDisziPanelId}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setExpandedRosterPpsDisziId((current) => (current === entry.id ? null : entry.id));
+                                            }}
+                                          >
+                                            <span className="selected-roster-pps-diszi-chevron" aria-hidden="true" />
+                                            <span>{isPpsDisziExpanded ? "Disziplinen schließen" : "Disziplin-PPs"}</span>
                                           </button>
                                         </div>
                                       </td>
@@ -968,6 +1060,17 @@ function FoundationTeamsDetailPanel({
                                   return <td key={column.id} className={getPoolHeatClass(player.disciplineRatings[column.id] ?? null, leaguePlayerHeatPools.disciplines[column.id] ?? [])}>{(player.disciplineRatings[column.id] ?? 0).toFixed(0)}</td>;
                                 })}
                               </tr>
+                              {isPpsDisziExpanded ? (
+                                <tr className="selected-roster-pps-diszi-row">
+                                  <td colSpan={visibleSelectedRosterColumns.length}>
+                                    {renderPpsDisziPanel({
+                                      name: player.name,
+                                      axisGroups: axisDisciplineGroups,
+                                      panelId: ppsDisziPanelId,
+                                    })}
+                                  </td>
+                                </tr>
+                              ) : null}
                               </Fragment>
                             )})}
                           </tbody>
@@ -1640,6 +1743,7 @@ function FoundationTeamsDetailPanel({
                           { key: "intent", label: "Intent" },
                           { key: "buyout", label: "Buyout", align: "right", sortable: true },
                           { key: "exit", label: "VK", align: "right", sortable: true },
+                          { key: "pps", label: "PPs", tooltip: "Season-Performance-Punkte nach Bereich (POW/SPE/MEN/SOC) — ausklappbar für die Disziplin-PPs.", width: 168 },
                           { key: "salary", label: "Gehaltsverlauf" },
                           { key: "actions", label: "Aktionen", align: "right" },
                         ];
@@ -1720,6 +1824,36 @@ function FoundationTeamsDetailPanel({
                               return row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—";
                             case "exit":
                               return row.exitValue != null ? formatNlMoney(row.exitValue) : "—";
+                            case "pps": {
+                              const rosterRow = rosterRowByPlayerId.get(row.playerId) ?? null;
+                              const contractPpsAxes = [
+                                { axis: "pow", label: "POW", value: rosterRow?.ppPow ?? null },
+                                { axis: "spe", label: "SPE", value: rosterRow?.ppSpe ?? null },
+                                { axis: "men", label: "MEN", value: rosterRow?.ppMen ?? null },
+                                { axis: "soc", label: "SOC", value: rosterRow?.ppSoc ?? null },
+                              ];
+                              const isContractPpsExpanded = expandedContractPpsPlayerId === row.playerId;
+                              return (
+                                <div className="selected-roster-pps-cell" onClick={(event) => event.stopPropagation()}>
+                                  {renderPpsAxisStrip(contractPpsAxes, row.playerName)}
+                                  <button
+                                    className={`selected-roster-pps-diszi-toggle${isContractPpsExpanded ? " is-open" : ""}`}
+                                    type="button"
+                                    aria-expanded={isContractPpsExpanded}
+                                    aria-controls={`contract-pps-diszi-${row.rowId}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setExpandedContractPpsPlayerId((current) =>
+                                        current === row.playerId ? null : row.playerId,
+                                      );
+                                    }}
+                                  >
+                                    <span className="selected-roster-pps-diszi-chevron" aria-hidden="true" />
+                                    <span>{isContractPpsExpanded ? "Disziplinen schließen" : "Disziplin-PPs"}</span>
+                                  </button>
+                                </div>
+                              );
+                            }
                             case "salary": {
                               const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
                               return (
@@ -1889,6 +2023,14 @@ function FoundationTeamsDetailPanel({
                               sortState={nlContractSort}
                               onSort={handleNlContractSort}
                               renderCell={renderNlContractCell}
+                              isRowExpanded={(row) => expandedContractPpsPlayerId === row.playerId}
+                              renderExpandedRow={(row) =>
+                                renderPpsDisziPanel({
+                                  name: row.playerName,
+                                  axisGroups: rosterRowByPlayerId.get(row.playerId)?.disciplinePpsByAxis ?? [],
+                                  panelId: `contract-pps-diszi-${row.rowId}`,
+                                })
+                              }
                             />
                             {selectedTeamContractTable ? (
                               <StatChipRow aria-label="Gehaltssumme je Saison">

@@ -1349,7 +1349,15 @@ export function useFoundationShellRouterBodyScope({
     seasonManagementFeed,
     teamOverviewSlice,
   });
+  // Teams-Detail (Verträge/Kader) zeigt pro Spieler ausklappbare Disziplin-PPs.
+  // Die dafür nötigen echten Pro-Disziplin-Punkte liegen NUR im Season-Ledger
+  // (aggregierte Achsen-PPs kommen aus dem Ratings-Slice) — daher wird das
+  // (gecachte) `useSeasonDerivations` hier zusätzlich aktiviert, sobald die
+  // Teams-Ansicht offen ist. Andere Ledger-Konsumenten bleiben über ihre
+  // eigenen `shouldLoad*`-Gates unberührt (Ratings kommen weiter aus dem Slice).
+  const shouldLoadTeamsRosterDisciplineLedger = shouldBuildTeamsView;
   const shouldLoadSeasonDerivations =
+    shouldLoadTeamsRosterDisciplineLedger ||
     (shouldLoadSeasonLedger && Boolean(playerDirectorySlice.error)) ||
     (shouldLoadSeasonRatings && (Boolean(seasonRatingsSlice.error) || seasonRatingsSlice.ratingsById.size === 0));
   const deferredGameState = useDeferredValue(gameState);
@@ -7094,7 +7102,8 @@ export function useFoundationShellRouterBodyScope({
     saveId: activeSaveId,
     contentSignature: seasonContentSignature,
   });
-  const seasonPointsLedger = shouldLoadSeasonLedger ? seasonDerivations.ledger : null;
+  const seasonPointsLedger =
+    shouldLoadSeasonLedger || shouldLoadTeamsRosterDisciplineLedger ? seasonDerivations.ledger : null;
 
   // Feld-Rennen-Ledger (Wave D · D1/D2/D4): geteilte, fog-sichere Datenquelle
   // für Feld-Form-Strip (letzte 5 Spieltage), feld-relative Home-KPIs und

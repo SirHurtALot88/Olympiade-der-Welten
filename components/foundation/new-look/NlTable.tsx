@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 export type NlTableAlign = "left" | "right" | "center";
 
@@ -37,6 +37,15 @@ export type NlTableProps<Row> = {
   renderCell?: (row: Row, column: NlTableColumn<Row>) => ReactNode;
   sortState?: NlTableSortState | null;
   onSort?: (key: string) => void;
+  /**
+   * Optional aufklappbare Detailzeile je Datenzeile (additiv). Ist
+   * `isRowExpanded(row)` wahr, wird direkt unter der Zeile eine zusätzliche
+   * `<tr class="nl-table-expanded-row">` mit `colSpan` über alle Spalten
+   * gerendert, deren Inhalt aus `renderExpandedRow(row)` stammt. Ohne beide
+   * Props verhält sich die Tabelle exakt wie bisher (kein Mehr-Markup).
+   */
+  renderExpandedRow?: (row: Row, index: number) => ReactNode;
+  isRowExpanded?: (row: Row, index: number) => boolean;
   /**
    * Optionaler Zeilen-Klick (z. B. "Team-/Spielerprofil öffnen"). Macht die
    * gesamte Zeile klick-/tastaturbedienbar (Enter/Space), ohne dass jede
@@ -87,6 +96,8 @@ export function NlTable<Row>({
   renderCell = defaultRenderCell,
   sortState,
   onSort,
+  renderExpandedRow,
+  isRowExpanded,
   onRowClick,
   zebra = true,
   hoverable = true,
@@ -153,9 +164,10 @@ export function NlTable<Row>({
           {rows.map((row, rowIndex) => {
             const rowExtra = rowClassName?.(row, rowIndex);
             const rowClasses = [rowExtra ?? "", onRowClick ? "is-clickable" : ""].filter(Boolean).join(" ");
+            const expanded = Boolean(renderExpandedRow && isRowExpanded?.(row, rowIndex));
             return (
+            <Fragment key={rowKey ? rowKey(row, rowIndex) : rowIndex}>
             <tr
-              key={rowKey ? rowKey(row, rowIndex) : rowIndex}
               className={rowClasses || undefined}
               onClick={
                 onRowClick
@@ -198,6 +210,12 @@ export function NlTable<Row>({
                 </td>
               ))}
             </tr>
+            {expanded ? (
+              <tr className="nl-table-expanded-row">
+                <td colSpan={columns.length}>{renderExpandedRow?.(row, rowIndex)}</td>
+              </tr>
+            ) : null}
+            </Fragment>
             );
           })}
         </tbody>
