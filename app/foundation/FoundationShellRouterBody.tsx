@@ -2927,6 +2927,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               seasonId={gameState.season.id}
               matchdayId={gameState.matchdayState.matchdayId}
               onAdvanceMatchday={triggerGlobalNext}
+              onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
             />
           ) : null}
 

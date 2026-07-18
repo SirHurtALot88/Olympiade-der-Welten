@@ -25,6 +25,7 @@ export type DisciplineStageArenaProps = {
   seasonId?: string | null;
   matchdayId?: string | null;
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
+  onOpenPlayer?: ((playerId: string) => void) | null;
 };
 
 // Disziplin-ID → fertige Arena-Szene unter /public/discipline-scenes.
@@ -153,6 +154,7 @@ export default function DisciplineStageArena({
   seasonId,
   matchdayId,
   onAdvanceMatchday,
+  onOpenPlayer,
 }: DisciplineStageArenaProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
@@ -376,7 +378,7 @@ export default function DisciplineStageArena({
   }
 
   return (
-    <div style={{ maxWidth: "min(1720px, 97vw)", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
+    <div style={{ width: "100%", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
@@ -426,6 +428,14 @@ export default function DisciplineStageArena({
             🎲 Random-Test
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "olyStageQuickSim" }, window.location.origin)}
+          title="Disziplin sofort komplett durchrechnen (ohne Animation) — Endstand + Podium"
+          style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
+        >
+          ⏩ Quick-Sim
+        </button>
         {mode === "real" ? (
           <span
             title={useEngine ? "Werte kommen 1:1 aus der Matchday-Resolve-Engine (arena-identisch)" : "Vereinfachte Ansicht: für diese Disziplin/diesen Spieltag liegt keine Engine-Aufstellung vor"}
@@ -518,7 +528,9 @@ export default function DisciplineStageArena({
               {ownTeam.slots.map((slot) => (
                 <div
                   key={slot.playerId}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13 }}
+                  onClick={onOpenPlayer ? () => onOpenPlayer(slot.playerId) : undefined}
+                  title={onOpenPlayer ? "Spieler-Karte öffnen" : undefined}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13, cursor: onOpenPlayer ? "pointer" : "default", borderRadius: 6 }}
                 >
                   <span style={{ width: 20, fontWeight: 800, color: "var(--nl-mut)" }}>{slot.slotIndex + 1}</span>
                   {slot.portraitUrl ? (

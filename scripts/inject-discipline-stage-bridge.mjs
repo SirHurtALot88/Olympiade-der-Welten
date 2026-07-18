@@ -2,16 +2,13 @@
 //
 // WANN NEU AUSFÜHREN: Immer wenn die Szenen unter public/discipline-scenes/
 // neu generiert werden (z.B. Kit-Sweep) — sonst fehlt die Anbindung an die
-// In-Game-Disziplin-Bühne (Portraits/Logos/1-Dezimal/Trait-Mutatoren/Engine-
-// Payload/„Dein Team"). Idempotent (ersetzt einen bereits vorhandenen Block).
-//
+// In-Game-Disziplin-Bühne. Idempotent (ersetzt einen bereits vorhandenen Block).
 //   npm run scenes:inject-bridge
 //
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Repo-relativ: scripts/ -> ../public/discipline-scenes
 const DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "discipline-scenes");
 const START = "/* ===== OLY-STAGE-BRIDGE START ===== */";
 const END = "/* ===== OLY-STAGE-BRIDGE END ===== */";
@@ -147,7 +144,7 @@ const BRIDGE = `
           // breiter als das native 1280er-Cap; die Canvas skaliert via width:100%).
           try {
             var wst = document.createElement("style");
-            wst.textContent = ".wrap{max-width:min(1600px,96vw)!important;}";
+            wst.textContent = ".wrap{max-width:min(2400px,96vw)!important;}";
             document.head.appendChild(wst);
           } catch (e) {}
           // Canvas-Tokens: echtes Logo statt prozeduralem Wappen.
@@ -230,6 +227,29 @@ const BRIDGE = `
               };
             }
           } catch (e) {}
+          // Lauf-Log: den angezeigten Rang auf den FINALEN Runden-Rang korrigieren
+          // (roundRankAfter, eindeutig 1..N) statt des flackernden Live-Rangs beim
+          // Reveal — sonst tragen mehrere Teams „#1".
+          try {
+            if (typeof logRow !== "undefined") {
+              var _logRow = logRow;
+              logRow = function(t, slot, res, impact){
+                _logRow(t, slot, res, impact);
+                try {
+                  var tk = document.getElementById("ticker");
+                  var row = tk && tk.firstElementChild;
+                  var dl = row && row.querySelector(".dl");
+                  if (dl && t.roundRankAfter != null) {
+                    var rc = (typeof ampelColor === "function") ? ampelColor(t.roundRankAfter) : "";
+                    var delta = (t.roundDelta != null) ? t.roundDelta : 0;
+                    var rankSpan = rc ? ("<span style='color:" + rc + "'>#" + t.roundRankAfter + "</span>") : ("<span>#" + t.roundRankAfter + "</span>");
+                    dl.className = "dl " + (delta > 0 ? "up" : delta < 0 ? "down" : "same");
+                    dl.innerHTML = delta !== 0 ? (rankSpan + " (" + (delta > 0 ? "▲" : "▼") + Math.abs(delta) + ")") : rankSpan;
+                  }
+                } catch (e) {}
+              };
+            }
+          } catch (e) {}
         }
         if (typeof reset === "function") { reset(); }
         // „Dein Team"-Label auf das ECHTE eigene Team setzen (Szene nutzt sonst
@@ -243,10 +263,37 @@ const BRIDGE = `
         } catch (e) {}
       } catch (e) { /* Szene niemals crashen lassen */ }
     }
+    // Quick-Sim: die ganze Disziplin ohne Animation sofort durchrechnen und die
+    // Endstände + Podium zeigen (nutzt die vorhandene Reveal-Logik pro Runde).
+    function quickSim(){
+      try {
+        if (typeof queue === "undefined" || typeof teams === "undefined") return;
+        if (typeof busy !== "undefined" && busy) return;
+        for (var si = (typeof stepIdx !== "undefined" ? stepIdx : 0); si < queue.length; si++) {
+          var r = queue[si].round;
+          if (typeof curSlot !== "undefined") { curSlot = r; }
+          if (typeof clearMedals === "function") clearMedals();
+          if (typeof resetRoundBest === "function") resetRoundBest();
+          teams.forEach(function(t){ t.roundStartRank = t.rank; t.roundStartScore = t.score; });
+          if (typeof computeRoundStandings === "function") computeRoundStandings(r);
+          teams.slice().sort(function(a, b){ return b.rank - a.rank; }).forEach(function(t){
+            if (typeof applyReveal === "function") applyReveal(t, r);
+          });
+          if (typeof recomputeRanksLive === "function") recomputeRanksLive();
+        }
+        stepIdx = queue.length;
+        if (typeof positionLadder === "function") positionLadder(true);
+        if (typeof updateControls === "function") updateControls();
+        if (typeof updateMyTracker === "function") updateMyTracker();
+        if (typeof drawScene === "function") drawScene();
+        setTimeout(function(){ try { if (typeof showPodium === "function") showPodium(); } catch (e) {} }, 150);
+      } catch (e) {}
+    }
     try {
       window.addEventListener("message", function(ev){
         var d = ev && ev.data;
         if (d && d.type === "olyStageData") { apply(d); }
+        else if (d && d.type === "olyStageQuickSim") { quickSim(); }
       }, false);
     } catch (e) {}
     try { (window.parent || window).postMessage({ type: "olyStageReady" }, "*"); } catch (e) {}
@@ -261,6 +308,12 @@ for (const f of files) {
   let src = readFileSync(p, "utf8");
   // Absicherung: SLOTS[k]-Labelzugriff gegen Unterlauf (kleinere echte Slot-Zahlen).
   src = src.replace(/SLOTS\[k\]\.toUpperCase\(\)/g, '(SLOTS[k]||"").toUpperCase()');
+  // Hover-Karte: Spieler-Portrait als Avatar statt Team-Farbbox (wo verfuegbar).
+  // String-Konkatenation statt verschachtelter Template-Literals (die brechen).
+  src = src.replace(
+    '<div class="av" style="background:${t.color}">${t.code.replace(\'-\',\'\')}</div>',
+    '<div class="av" style="${p.portraitUrl?(\'background-image:url(\'+p.portraitUrl+\');background-size:cover;background-position:center\'):(\'background:\'+t.color)}">${p.portraitUrl?\'\':t.code.replace(\'-\',\'\')}</div>'
+  );
   // Alten Bridge-Block (falls vorhanden) entfernen — idempotent.
   const s = src.indexOf(START);
   const e = src.indexOf(END);

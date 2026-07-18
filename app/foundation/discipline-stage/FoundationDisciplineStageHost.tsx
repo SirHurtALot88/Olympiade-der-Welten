@@ -19,6 +19,8 @@ export type FoundationDisciplineStageHostProps = {
   matchdayId?: string | null;
   // Kanonische „Weiter"-Aktion (identisch zur Arena) — wertet den Spieltag aus.
   onAdvanceMatchday?: (() => void | Promise<void>) | null;
+  // Öffnet die normale Spieler-Karte (PlayerDetailDrawer), wie im Rest der App.
+  onOpenPlayer?: ((playerId: string) => void) | null;
 };
 
 // Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,
