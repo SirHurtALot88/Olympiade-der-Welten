@@ -35,6 +35,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
   seasonStartResetBusy: boolean;
   newGameBusy: boolean;
   rosterFillBusy: boolean;
+  aiTeamsRefillBusy?: boolean;
   adminBalancingBusy: boolean;
   cockpitBusyKey: string | null;
   aiTeamsCount: number;
@@ -81,6 +82,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
         seasonStartResetBusy: input.seasonStartResetBusy,
         newGameBusy: input.newGameBusy,
         rosterFillBusy: input.rosterFillBusy,
+        aiTeamsRefillBusy: input.aiTeamsRefillBusy,
         adminBalancingBusy: input.adminBalancingBusy,
         cockpitBusyKey: input.cockpitBusyKey,
         aiTeamsCount: input.aiTeamsCount,
@@ -98,6 +100,7 @@ export function useFoundationCrossTabFoundationActivities(input: {
       }),
     [
       input.adminBalancingBusy,
+      input.aiTeamsRefillBusy,
       input.adminSimulationBusy,
       input.adminSimulationRun,
       input.aiLineupEnsureBusy,

@@ -75,4 +75,31 @@ describe("foundation activity registry", () => {
     expect(activities.find((entry) => entry.id === "admin-season-sim")?.progressPct).toBe(42);
     expect(activities.find((entry) => entry.id === "ai-preseason")?.progressPct).toBe(33);
   });
+
+  it("shows a running chip while AI teams are re-picking (Ranks Nachpicken)", () => {
+    const activities = buildFoundationActivities({
+      isSaveBusy: false,
+      aiPreseasonBusy: false,
+      aiPreseasonRun: null,
+      aiLineupEnsureBusy: false,
+      aiLineupEnsure: null,
+      adminSimulationBusy: false,
+      adminSimulationRun: null,
+      seasonTransitionBusy: false,
+      preSeasonWorkflowBusy: false,
+      seasonStartResetBusy: false,
+      newGameBusy: false,
+      rosterFillBusy: false,
+      aiTeamsRefillBusy: true,
+      adminBalancingBusy: false,
+      cockpitBusyKey: null,
+      aiTeamsCount: 12,
+      showIdleReady: true,
+    });
+
+    const chip = activities.find((entry) => entry.id === "ai-teams-refill");
+    expect(chip?.tone).toBe("running");
+    // The busy chip suppresses the idle "Bereit" chip while picking runs.
+    expect(activities.some((entry) => entry.id === "idle-ready")).toBe(false);
+  });
 });
