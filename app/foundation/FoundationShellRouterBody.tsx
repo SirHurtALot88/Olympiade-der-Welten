@@ -2828,14 +2828,25 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     <tr
                       key={row.team.teamId}
                       className={joinClassNames(
+                        "ranks-row-clickable",
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
                       onClick={() => openTeamProfileById(row.team.teamId)}
+                      title={`${row.team.name} — Teamprofil öffnen`}
                     >
                       {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
                         if (column.id === "team") {
-                          return <td key={column.id} className="ranks-sticky-team">{row.team.name}</td>;
+                          return (
+                            <td key={column.id} className="ranks-sticky-team">
+                              <span className="ranks-team-link">
+                                <span className="ranks-team-link-name">{row.team.name}</span>
+                                <span className="ranks-team-link-cue" aria-hidden="true">
+                                  Profil ›
+                                </span>
+                              </span>
+                            </td>
+                          );
                         }
                         if (column.id === "totalRank") {
                           return (
