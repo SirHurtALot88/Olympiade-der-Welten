@@ -405,7 +405,7 @@
     // Startaufstellung nach SAISONRANG statt alphabetisch: Nachbarn sind echte Positionsrivalen,
     // und man sieht sofort die Tabellenlage. (stabile Pseudo-Reihenfolge über Team-Hash)
     teams.slice().sort((a,b)=> fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
-    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; });
+    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0; });
   }
   // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
   function ampelColor(rank){
@@ -625,6 +625,15 @@
     const R = t.mine?24:13;
     paintCrest(ctx, px, py, R, t, true);
     hitboxes.push({code:t.code, x:px, y:py, r:R+4});
+    // Gold/Silber/Bronze-Ring = Top 3 der aktuellen Runde (nach Runden-Netto), nicht Total
+    const medal = t.roundMedal===1?'#e8c04a' : t.roundMedal===2?'#cfd3da' : t.roundMedal===3?'#cd7f32' : null;
+    if(medal){
+      ctx.save();
+      ctx.beginPath(); ctx.arc(px,py,R+3.5,0,Math.PI*2);
+      ctx.strokeStyle=medal; ctx.lineWidth=t.mine?4.5:3.5;
+      ctx.shadowColor=medal; ctx.shadowBlur=8; ctx.stroke();
+      ctx.restore();
+    }
     if(t.roundGlowUntil && Date.now()<t.roundGlowUntil){
       const remain=(t.roundGlowUntil-Date.now())/1500;
       const pulse=0.55+0.35*Math.sin(Date.now()/110);
@@ -799,6 +808,11 @@
       if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
       else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
       else { dd.className='dd'; dd.textContent=''; }
+      // Gold/Silber/Bronze = Rundensieger (Top 3 der aktuellen Runde)
+      row.classList.remove('rk-gold','rk-silver','rk-bronze');
+      if(t.roundMedal===1) row.classList.add('rk-gold');
+      else if(t.roundMedal===2) row.classList.add('rk-silver');
+      else if(t.roundMedal===3) row.classList.add('rk-bronze');
     });
   }
   function hotRow(code){
@@ -894,8 +908,12 @@
     teams.forEach(x=>x.prevRank=x.rank);
     recomputeRanksLive();
     teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
-    // Slot-Rang des Spielers + Team-Platzveränderung durch genau diesen Wurf merken (für Hovercard)
-    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: t.prevRank - t.rank };
+    // Slot-Rang des Spielers + INKREMENTELLE Team-Platzveränderung dieses Slots (relativ zum
+    // Stand nach dem vorherigen Slot, nicht zum Startplatz) — via settled Rang-Historie
+    const prevR = slot>0 ? (t.rankHist[slot-1] ?? t.seasonRank) : t.seasonRank;
+    const nowR = t.rankHist[slot] ?? t.rank;
+    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: prevR - nowR };
+    updateRoundMedals(slot);
     return {player:p,net};
   }
   // --- Impact-Klassifikation (geteilte Logik, jede Diszi rendert das Tier anders) ---
@@ -903,7 +921,15 @@
   let dayBest=null;       // bester Netto-Wert des ganzen Spieltags
   // Tier-Budget pro Runde: „dosiert" wird zur Regel statt zum Gefühl
   let tier2Budget=2, tier1Budget=4;
-  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; }
+  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; teams.forEach(t=>t.roundMedal=0); }
+  // Gold/Silber/Bronze = Top 3 der AKTUELLEN Runde (nach Runden-Netto, live pro Reveal aktualisiert)
+  function updateRoundMedals(round){
+    const withNet = teams.filter(t=> t.thrownSlot===round)
+      .map(t=>({t, net: Math.max(0, t.players[round].val+modSum(t.players[round]))}))
+      .sort((a,b)=> b.net-a.net || a.t.seasonRank-b.t.seasonRank);
+    teams.forEach(t=> t.roundMedal=0);
+    withNet.slice(0,3).forEach((o,idx)=> o.t.roundMedal=idx+1);
+  }
 
   // Echtes Gesamtranking der Runde: Stand NACHDEM alle Teams ihren Slot dieser Runde addiert
   // haben (deterministisch vorab berechenbar). Damit triggern Rang-Ereignisse gegen die
@@ -914,7 +940,7 @@
       return { t, after:s };
     });
     withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
-    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; });
+    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; t.rankHist[round]=t.roundRankAfter; });
   }
 
   // Impact-Klassifikation → Tier + Ursache (Rang-Ereignis schlägt Einzelwert).
@@ -1031,7 +1057,6 @@
   const MEDAL_CLASSES=['rk-gold','rk-silver','rk-bronze'];
   function roundSummary(round){
     const jumps = teams.map(t=>({t, d:(t.roundStartRank-t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
-    jumps.forEach(({t},idx)=>{ const row=rowEls[t.code]; if(row) row.classList.add(MEDAL_CLASSES[idx]); });
     const parts = jumps.map(({t,d})=>{ const p=t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${t.code} ▲${d} · ${p.name} ${net}`; });
     const el=document.createElement('div'); el.className='round-summary';
     el.innerHTML = jumps.length ? `Runde ${round+1} — Größte Sprünge: ${parts.join(' · ')}` : `Runde ${round+1} — keine Rangsprünge`;
