@@ -14,6 +14,7 @@ import {
   buildSponsorOfferPresentation,
   buildSponsorRankTierRows,
   getSponsorComponentKindLabel,
+  getSponsorRarityLabel,
   type SponsorChallengeDifficulty,
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { NlDeltaChip, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
@@ -228,9 +229,17 @@ export function SponsorOfferCardNewLook({
         <div className="nl-sponsor-offer-title">
           <span className="nl-sponsor-offer-kicker">
             {archetypeMeta.label}
-            {offer.starTier ? ` · ★${offer.starTier}` : ""}
             {offer.demandProfile ? ` · ${offer.demandProfile}` : ""}
           </span>
+          {offer.starTier ? (
+            <span
+              className={`nl-sponsor-rarity is-r${offer.starTier}`}
+              title={`Seltenheitsgrad: ${getSponsorRarityLabel(offer.starTier)} (Stufe ${offer.starTier} von 5)`}
+            >
+              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+              {getSponsorRarityLabel(offer.starTier)}
+            </span>
+          ) : null}
           <strong>{offer.name}</strong>
           <small>{offer.flavor}</small>
         </div>
@@ -244,7 +253,7 @@ export function SponsorOfferCardNewLook({
                   : undefined
               }
             >
-              {presentation.isGolden ? "★ " : ""}
+              {presentation.isGolden ? "✦ " : ""}
               {presentation.offerBadge}
             </span>
           ) : null}

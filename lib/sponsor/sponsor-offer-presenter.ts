@@ -212,6 +212,23 @@ export function getSponsorComponentKindLabel(kind: SponsorOfferComponent["kind"]
   return "Sonderziel";
 }
 
+/**
+ * Seltenheitsgrad-Label je Sponsor-Stufe (1–5). Ersetzt die frühere
+ * Stern-Anzeige (`★n`) durch eine benannte, farbcodierbare Rarität
+ * (Farben je Stufe: `.nl-sponsor-rarity.is-r{1..5}` in globals.css).
+ */
+export const SPONSOR_RARITY_LABELS: Record<number, string> = {
+  1: "Gewöhnlich",
+  2: "Solide",
+  3: "Selten",
+  4: "Episch",
+  5: "Legendär",
+};
+
+export function getSponsorRarityLabel(tier: number): string {
+  return SPONSOR_RARITY_LABELS[tier] ?? `Stufe ${tier}`;
+}
+
 export type SponsorRankTierRow = {
   label: string;
   rankAt: number;

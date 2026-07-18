@@ -50865,6 +50865,51 @@ button.foundation-team-portrait-card {
   color: var(--nl-mut);
 }
 
+/* Seltenheitsgrad-Chip — ersetzt die alte `★n`-Stern-Anzeige durch eine
+   Farbmarkierung nach Stufe (1 Gewöhnlich → 5 Legendär). Die Rang-Farben
+   (grau/grün/blau/violett/gold) leben nur hier in globals.css. */
+.is-new-look .nl-sponsor-rarity {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 1px 0 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.7;
+  color: var(--rarity, var(--nl-mut));
+  border: 1px solid color-mix(in srgb, var(--rarity, var(--nl-mut)) 55%, transparent);
+  background: color-mix(in srgb, var(--rarity, var(--nl-mut)) 14%, transparent);
+}
+
+.is-new-look .nl-sponsor-rarity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rarity, var(--nl-mut));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--rarity, var(--nl-mut)) 60%, transparent);
+}
+
+.is-new-look .nl-sponsor-rarity.is-r1 {
+  --rarity: #9aa7bd;
+}
+.is-new-look .nl-sponsor-rarity.is-r2 {
+  --rarity: #57d08a;
+}
+.is-new-look .nl-sponsor-rarity.is-r3 {
+  --rarity: #4ea1ff;
+}
+.is-new-look .nl-sponsor-rarity.is-r4 {
+  --rarity: #b57bff;
+}
+.is-new-look .nl-sponsor-rarity.is-r5 {
+  --rarity: #f4c150;
+}
+
 .is-new-look .nl-sponsor-offer-badges {
   display: flex;
   flex-direction: column;

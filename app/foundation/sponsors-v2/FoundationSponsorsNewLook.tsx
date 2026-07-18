@@ -21,7 +21,7 @@ import {
   SponsorCrest,
   SponsorOfferCardNewLook,
 } from "@/components/foundation/sponsor/SponsorOfferCardNewLook";
-import { buildSponsorOfferPresentation, getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
+import { buildSponsorOfferPresentation, getSponsorComponentKindLabel, getSponsorRarityLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 import type { GameState, SponsorOffer, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 
@@ -178,9 +178,17 @@ function ActiveContractHero({
         <div className="nl-sponsor-hero-copy">
           <span className="nl-sponsor-hero-kicker">
             Aktiver Vertrag · {archetypeMeta.label}
-            {contract.starTier ? ` · ★${contract.starTier}` : ""}
             {contract.negotiationProfile ? ` · Profil ${contract.negotiationProfile}` : ""}
           </span>
+          {contract.starTier ? (
+            <span
+              className={`nl-sponsor-rarity is-r${contract.starTier}`}
+              title={`Seltenheitsgrad: ${getSponsorRarityLabel(contract.starTier)} (Stufe ${contract.starTier} von 5)`}
+            >
+              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+              {getSponsorRarityLabel(contract.starTier)}
+            </span>
+          ) : null}
           <strong className="nl-sponsor-hero-name">{contract.name}</strong>
           <small>
             {contract.variantKey ? `${contract.variantKey.replace(/_/g, " ")} · ` : ""}
@@ -454,7 +462,7 @@ export default function FoundationSponsorsNewLook({
                 ? formatNlNumber(animatedKpiScore ?? selectedTeamCommercialRating.score, 0)
                 : "—"
             }
-            sub={selectedTeamCommercialRating ? `Erwartung ★${selectedTeamCommercialRating.tierHint}` : undefined}
+            sub={selectedTeamCommercialRating ? `Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}` : undefined}
             tone="accent"
           />
           <StatChip
@@ -491,7 +499,7 @@ export default function FoundationSponsorsNewLook({
                 label="Kommerz"
                 tone="accent"
                 format={(value) => `${formatNlNumber(value, 0)}`}
-                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung ★${selectedTeamCommercialRating.tierHint}`}
+                title={`Commercial Rating ${selectedTeamCommercialRating.score}/100 · Erwartung: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
               />
             ) : null
           }
@@ -525,7 +533,16 @@ export default function FoundationSponsorsNewLook({
                 format={(value) => formatNlNumber(value, 0)}
                 title="Prestige/Medaillenhistorie"
               />
-              <small className="nl-sponsor-rating-hint">Erwartung ★{selectedTeamCommercialRating.tierHint}</small>
+              <small className="nl-sponsor-rating-hint">
+                Erwartung{" "}
+                <span
+                  className={`nl-sponsor-rarity is-r${selectedTeamCommercialRating.tierHint}`}
+                  title={`Erwarteter Seltenheitsgrad: ${getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}`}
+                >
+                  <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+                  {getSponsorRarityLabel(selectedTeamCommercialRating.tierHint)}
+                </span>
+              </small>
 
               {/* #D12: Nudge zum schwächsten Rating-Treiber — echter Vergleich
                   über den Füllgrad (Wert/Max-Beitrag), eigene Team-Daten. */}
@@ -755,7 +772,7 @@ export default function FoundationSponsorsNewLook({
                 <div key={row.teamId} role="listitem" className={classes}>
                   {row.isGolden ? (
                     <span className="nl-sponsor-league-golden-badge" title="Golden Card — seltener Premium-Sponsor">
-                      ★ Golden Card
+                      ✦ Golden Card
                     </span>
                   ) : null}
                   <span className="nl-sponsor-league-crest">
@@ -786,12 +803,12 @@ export default function FoundationSponsorsNewLook({
                           ) : null}
                           {row.starTier ? (
                             <span
-                              className="nl-sponsor-league-stars"
-                              title={`Sterne-Tier ${row.starTier} von 5`}
-                              aria-label={`Sterne-Tier ${row.starTier} von 5`}
+                              className={`nl-sponsor-rarity is-r${row.starTier}`}
+                              title={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)} (Stufe ${row.starTier} von 5)`}
+                              aria-label={`Seltenheitsgrad: ${getSponsorRarityLabel(row.starTier)}`}
                             >
-                              {"★".repeat(row.starTier)}
-                              <span className="nl-sponsor-league-stars-dim">{"★".repeat(5 - row.starTier)}</span>
+                              <span className="nl-sponsor-rarity-dot" aria-hidden="true" />
+                              {getSponsorRarityLabel(row.starTier)}
                             </span>
                           ) : null}
                         </div>
