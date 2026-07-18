@@ -193,8 +193,13 @@ const DEPTH_CAPABLE_RATING_FLOOR = 60;
 const DEPTH_FATIGUE_WARN_THRESHOLD = 70;
 
 function getDepthRatingTone(rating: number): NlTone {
-  if (rating >= 80) return "good";
-  if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "accent";
+  // Aufsteigende Qualitäts-Skala: rot → gelb → grün → blau(elite). Vorher sprang
+  // sie von gelb (40–59) direkt auf blau (60–79) und zeigte grün erst ab 80 —
+  // die grüne "fähig"-Stufe fehlte damit praktisch immer. Jetzt ist die reale
+  // Fähig-Schwelle (`DEPTH_CAPABLE_RATING_FLOOR`, 60) grün, blau bleibt als
+  // oberste Elite-Stufe (≥80) erhalten.
+  if (rating >= 80) return "accent";
+  if (rating >= DEPTH_CAPABLE_RATING_FLOOR) return "good";
   if (rating >= 40) return "warn";
   return "risk";
 }
