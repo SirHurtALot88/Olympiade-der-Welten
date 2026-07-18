@@ -49,6 +49,14 @@ export const GOLDEN_P_MAX = envNum("OLY_SPONSOR_GOLDEN_P_MAX", 0.12);
 export const GOLDEN_STAR_VARIANCE_UP_P = envNum("OLY_SPONSOR_GOLDEN_STAR_VARIANCE_UP_P", 0.08);
 export const GOLDEN_STAR_VARIANCE_DOWN_P = envNum("OLY_SPONSOR_GOLDEN_STAR_VARIANCE_DOWN_P", 0.12);
 
+/**
+ * Draw weight of the single rarity ONE step above a team's cap in rollSponsorOfferSlate (the "lucky better
+ * sponsor" chance). Small vs the in-cap drawWeights (50/30/14/6), so the expected rarity stays near the cap
+ * but every team — including the gewöhnlich-capped bottom — occasionally sees a better tier. Beliebtheit lifts
+ * it. Set 0 to restore a hard cap.
+ */
+export const RARITY_OVERCAP_LUCK_WEIGHT = envNum("OLY_SPONSOR_RARITY_OVERCAP_W", 5);
+
 /** Zur Laufzeit gelesen (nicht als Modul-Konstante), damit Tests die Varianz deterministisch abschalten können. */
 function isStarVarianceOff(): boolean {
   const flag = process.env.OLY_SPONSOR_STAR_VARIANCE_OFF;
@@ -372,13 +380,21 @@ export function rollSponsorOfferSlate(input: {
   const maxOrder = SPONSOR_RARITIES[maxRarity].order;
   const beliebtheitLift = beliebtheitTerm(input.beliebtheit);
 
-  // Rarity pro Slot: gewichteter Zug (drawWeight), gedeckelt (order ≤ maxOrder). Beliebtheit hebt höhere
-  // Rarities leicht an, damit populäre Teams die Spitzen-Rarities etwas häufiger sehen.
+  // Rarity pro Slot: gewichteter Zug (drawWeight). Der maxStarTier→Rarity-Deckel ist der NORMALFALL, aber wie
+  // die frühere Sterne-Varianz darf SELTEN eine Rarity EINE Stufe ÜBER dem Deckel gezogen werden (kleines
+  // "Glücks"-Gewicht, beliebtheits-gehoben). Ohne diese Über-Deckel-Chance säße die schwache Liga-Hälfte
+  // (maxStarTier ≤ 2 → Deckel gewöhnlich) permanent auf reinen gewöhnlich-Slates ohne jede Loot-Varianz —
+  // genau die Teams, die der Rebalance schützen soll. ENV-tunebar über OLY_SPONSOR_RARITY_OVERCAP_W.
   const rarities: SponsorRarity[] = [];
   const candidates = SPONSOR_RARITY_KEYS.filter((r) => SPONSOR_RARITIES[r].order <= maxOrder);
   const weights = candidates.map(
     (r) => SPONSOR_RARITIES[r].drawWeight * (1 + beliebtheitLift * SPONSOR_RARITIES[r].order * 0.15),
   );
+  const overCapRarity = SPONSOR_RARITY_KEYS.find((r) => SPONSOR_RARITIES[r].order === maxOrder + 1);
+  if (overCapRarity) {
+    candidates.push(overCapRarity);
+    weights.push(RARITY_OVERCAP_LUCK_WEIGHT * (1 + beliebtheitLift));
+  }
   const weightTotal = weights.reduce((sum, w) => sum + w, 0);
   for (let slot = 0; slot < slotCount; slot += 1) {
     const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-rarity:${slot}`) * weightTotal;

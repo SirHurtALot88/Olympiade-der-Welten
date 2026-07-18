@@ -6,7 +6,6 @@ import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-ov
 import {
   getSponsorRank32BaseAnchorSalary,
   getRankMilestoneBonus,
-  getSponsorCurveShapePayout,
   getSponsorPayoutForFinalRankAndTier,
   getUnlockedMilestones,
   readLockedRankPayout,
@@ -128,22 +127,11 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         const targetTotalLocked = readLockedRankPayout(lockedLadder, currentRank);
         const baseFloorLocked = readLockedRankPayout(lockedLadder, 32);
         rankResidual = Math.max(0, targetTotalLocked - baseFloorLocked);
-      } else if (contract.rarity != null && contract.curveShape != null) {
-        // Neuer Kurven-Fallback (kein gelockter Ladder, aber rarity/curveShape vorhanden): Payout am Endrang
-        // direkt aus der Kurven-Payout-Kurve; Residual gegen die (rekonstruierte balanced) Base.
-        const targetTotal = getSponsorCurveShapePayout(
-          currentRank,
-          salaryFactor,
-          contract.rarity,
-          contract.curveShape,
-          baseAnchorSalary,
-          contract.teamQualityRankAtSign,
-          contract.isGolden ?? false,
-        );
-        const neutralBaseTotal =
-          negotiationFactors.baseMult !== 0 ? baseTotal / negotiationFactors.baseMult : baseTotal;
-        rankResidual = Math.max(0, targetTotal - neutralBaseTotal);
       } else {
+        // Kein gelockter Ladder ⇒ ALTVERTRAG (jeder NEUE Vertrag friert die Leiter bei der Unterschrift ein).
+        // Solche Verträge behalten ihre ursprünglichen Sterne-/Archetyp-Werte (die Migration lässt starTier/
+        // archetype unangetastet) und werden bewusst über den LEGACY-Pfad abgerechnet — der Kurven-Payout darf
+        // die Auszahlung eines vor dem Umbau unterschriebenen Vertrags NICHT nachträglich verändern.
         const targetTotal = getSponsorPayoutForFinalRankAndTier(
           currentRank,
           salaryFactor,

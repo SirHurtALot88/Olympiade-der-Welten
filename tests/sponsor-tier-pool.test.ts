@@ -163,25 +163,48 @@ describe("sponsor offer slate (rarity + curve shapes)", () => {
     }
   });
 
-  it("never lets a slate rarity exceed the team's quality-rank cap", () => {
-    // maxStarTier 3 → Rarity-Decke magisch (order 1): keine selten/legendär-Angebote.
-    const capped = rollSponsorOfferSlate({
-      seasonId: "season-cap",
-      teamId: "MID",
-      qualityRank: createQualityRank({ teamId: "MID", qualityRank: 16, maxStarTier: 3, targetStarTier: 3 }),
-    });
+  it("never lets a slate rarity exceed the team's quality-rank cap by more than the +1 luck step", () => {
+    // maxStarTier 3 → Rarity-Decke magisch (order 1). Der Cap ist der Normalfall, aber die Über-Cap-
+    // Glücksstufe (RARITY_OVERCAP_LUCK_WEIGHT) darf SELTEN eine Rarity EINE Stufe darüber ziehen (order+1),
+    // nie mehr. Über viele Teams: die Über-Cap-Stufe bleibt die Ausnahme, keine Rarity > maxOrder+1.
     const maxOrder = SPONSOR_RARITIES[mapStarTierToRarity(3)].order;
-    for (const entry of capped.entries) {
-      expect(SPONSOR_RARITIES[entry.rarity].order).toBeLessThanOrEqual(maxOrder);
+    let overCapCount = 0;
+    let total = 0;
+    for (let t = 0; t < 100; t += 1) {
+      const capped = rollSponsorOfferSlate({
+        seasonId: "season-cap",
+        teamId: `MID-${t}`,
+        qualityRank: createQualityRank({ teamId: `MID-${t}`, qualityRank: 16, maxStarTier: 3, targetStarTier: 3 }),
+      });
+      for (const entry of capped.entries) {
+        total += 1;
+        const order = SPONSOR_RARITIES[entry.rarity].order;
+        expect(order).toBeLessThanOrEqual(maxOrder + 1); // never more than one step over the cap
+        if (order > maxOrder) overCapCount += 1;
+      }
     }
+    // Over-cap draws are the rare exception, not the norm.
+    expect(overCapCount).toBeGreaterThan(0);
+    expect(overCapCount / total).toBeLessThan(0.2);
 
-    // Bottom-Team (maxStarTier 1) → Decke gewöhnlich (order 0): ausschließlich gewöhnliche Angebote.
-    const bottom = rollSponsorOfferSlate({
-      seasonId: "season-cap-bottom",
-      teamId: "R-R",
-      qualityRank: createQualityRank({ teamId: "R-R", qualityRank: 31, maxStarTier: 1, targetStarTier: 1, leaguePosition: 32 }),
-    });
-    expect(bottom.entries.every((entry) => entry.rarity === "gewöhnlich")).toBe(true);
+    // Bottom-Team (maxStarTier 1) → Decke gewöhnlich (order 0). Der Normalfall bleibt gewöhnlich, aber die
+    // Über-Cap-Glücksstufe darf SELTEN magisch (order 1) ziehen — nie höher. So bekommt auch die schwache
+    // Liga-Hälfte etwas Loot-Varianz, ohne im Schnitt überzahlt zu werden.
+    let bottomGewoehnlich = 0;
+    let bottomTotal = 0;
+    for (let t = 0; t < 100; t += 1) {
+      const bottom = rollSponsorOfferSlate({
+        seasonId: "season-cap-bottom",
+        teamId: `R-${t}`,
+        qualityRank: createQualityRank({ teamId: `R-${t}`, qualityRank: 31, maxStarTier: 1, targetStarTier: 1, leaguePosition: 32 }),
+      });
+      for (const entry of bottom.entries) {
+        bottomTotal += 1;
+        expect(SPONSOR_RARITIES[entry.rarity].order).toBeLessThanOrEqual(1); // gewöhnlich or the +1 magisch
+        if (entry.rarity === "gewöhnlich") bottomGewoehnlich += 1;
+      }
+    }
+    expect(bottomGewoehnlich / bottomTotal).toBeGreaterThan(0.7); // gewöhnlich stays the norm
   });
 
   it("is deterministic — identical input yields an identical slate", () => {

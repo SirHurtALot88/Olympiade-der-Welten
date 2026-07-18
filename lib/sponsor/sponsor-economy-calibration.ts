@@ -419,16 +419,22 @@ export function getSponsorCurveShapePayout(
   teamQualityRank?: number | null,
   isGolden = false,
 ): number {
-  const { effectiveBaseFloor } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
+  const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
   const rarityFactor = getSponsorRarityEtatFactor(rarity);
   const rebalance = getQualityRebalanceProfile(teamQualityRank);
   // Shapes already encode floor-vs-upside, so the weak-team rebalance is applied as a single blended scale
   // (mean of the old base/milestone scales) instead of splitting base vs milestone.
   const rebalanceScale = (rebalance.baseScale + rebalance.milestoneScale) / 2;
   const anchor = effectiveBaseFloor * rarityFactor * rebalanceScale;
-  const rankPayout = round1(anchor * getSponsorCurveShapeRankMultiplier(curveShape, finalRank ?? 32));
-  const floorPayout = round1(anchor * getSponsorCurveShapeRankMultiplier(curveShape, 32));
-  const goldenBonus = isGolden ? getGoldenMilestoneBonus(Math.max(0, rankPayout - floorPayout), salaryFactor) : 0;
+  const floorPayout = anchor * getSponsorCurveShapeRankMultiplier(curveShape, 32);
+  const rawRankPayout = anchor * getSponsorCurveShapeRankMultiplier(curveShape, finalRank ?? 32);
+  // Anker-Elevations-Kompression (wie im Legacy-Pfad): die Upside ÜBER dem garantierten Sockel wird gestaucht,
+  // sobald der gehaltsgeankerte Sockel über die statische Kalibrierung steigt — verhindert Top-End-Inflation
+  // bei mehrsaisonaler Gehaltsdrift. Bei kalibriertem Anker ist milestoneScale = 1 (byte-identisch). Der Sockel
+  // selbst bleibt ungestaucht (Bottom-Schutz).
+  const rankPayout = round1(floorPayout + (rawRankPayout - floorPayout) * milestoneScale);
+  const floorRounded = round1(floorPayout);
+  const goldenBonus = isGolden ? getGoldenMilestoneBonus(Math.max(0, rankPayout - floorRounded), salaryFactor) : 0;
   return round1(rankPayout + goldenBonus);
 }
 
