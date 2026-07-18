@@ -72,7 +72,7 @@ function roundHalfStar(value: number) {
 
 /** Inverse of {@link mapAxisPoStarsToNumericCeiling}. */
 export function mapNumericCeilingToAxisPoStars(numericCeiling: number) {
-  return roundHalfStar(clamp(0.5 + ((clamp(numericCeiling, 35, 99) - 35) / 55) * 4.5, 0.5, 5));
+  return roundHalfStar(clamp(((clamp(numericCeiling, 35, 99) - 35) / 55) * 5, 0.5, 5));
 }
 
 const CLASS_AXIS_AFFINITY: Record<PlayerAxisKey, string[]> = {

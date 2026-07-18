@@ -90,10 +90,29 @@ describe("player potential service", () => {
     // indistinguishable at max potential. The quantile-anchored generator tracks
     // the star curve's real-catalog percentile calibration (p50~47 -> 2.5 stars)
     // so elites are rare and earned. Sampled across many save-seed hashes.
+    //
+    // PO is now floored at the player's own current-ability (CA) score
+    // (`deriveHiddenPotentialScore` in player-potential-service.ts), since
+    // potential can never sit below current ability. `makePlayer`'s single
+    // fixed core-stat profile (CA ~65, a ~p90 player) would push every sampled
+    // PO up to that floor and collapse the distribution to ~4-star median. To
+    // exercise the generator itself (not the CA floor), each synthetic player
+    // below gets a realistic, low-centered CA drawn from a deterministic
+    // min-of-two-hashes distribution (median CA ~40, mirroring the real
+    // catalog), so the CA floor rarely binds and the underlying PO shape shows
+    // through.
     const N = 6000;
     const stars: number[] = [];
     for (let i = 0; i < N; i += 1) {
-      const player = makePlayer({ id: `dist-${i}`, traitsPositive: [], traitsNegative: [] });
+      const h1 = ((i * 2654435761) % 100000) / 100000;
+      const h2 = ((i * 40503 + 12345) % 100000) / 100000;
+      const base = 20 + Math.min(h1, h2) * 68;
+      const player = makePlayer({
+        id: `dist-${i}`,
+        coreStats: { pow: base, spe: base, men: base, soc: base },
+        traitsPositive: [],
+        traitsNegative: [],
+      });
       const record = buildPlayerPotentialRecord({ saveId: "dist-check", player });
       stars.push(potentialScoreToStars(record.hiddenPotentialScore!));
     }
@@ -113,7 +132,11 @@ describe("player potential service", () => {
   });
 
   it("generates stable save-specific hidden potential records", () => {
-    const player = makePlayer();
+    // Low-CA player: `makePlayer`'s default core stats (CA ~65) exceed the
+    // seed roll in both saves, so the new CA floor would clamp both records
+    // to the same value and hide the save-specific seed variation this test
+    // is meant to exercise. A low CA keeps the floor from binding.
+    const player = makePlayer({ coreStats: { pow: 22, spe: 24, men: 26, soc: 20 } });
     const first = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const second = buildPlayerPotentialRecord({ saveId: "save-a", player });
     const otherSave = buildPlayerPotentialRecord({ saveId: "save-b", player });

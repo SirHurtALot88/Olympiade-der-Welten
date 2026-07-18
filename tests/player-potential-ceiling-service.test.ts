@@ -100,6 +100,17 @@ describe("player potential ceiling service", () => {
     expect(revealed.overallMin).toBeLessThanOrEqual(revealed.overallMax ?? revealed.overallMin);
   });
 
+  it("computes overall from axis stars with weights summing to 1.0 (no duplicated term)", () => {
+    // Regression test for a copy/paste bug where sorted[3]*0.10 was added twice,
+    // making the weights sum to 1.10 instead of 1.0 and inflating overall by up to 0.5★.
+    // sorted desc [4,3,2,2]: 4*0.45 + 3*0.30 + 2*0.15 + 2*0.10 = 3.2 -> rounds to 3.0★.
+    // With the old duplicated-weight bug this would round to 3.5★ instead.
+    const current = { pow: 2, spe: 2, men: 2, soc: 2, overall: 2, disciplineTags: [] };
+    const staleCeiling = { pow: 4, spe: 3, men: 2, soc: 2, overall: 0 };
+    const clamped = clampPotentialCeilingToCurrentStars(current, staleCeiling);
+    expect(clamped.overall).toBe(3.0);
+  });
+
   it("raises stored overall ceiling when CA overall exceeds axis-derived PO overall", () => {
     const current = {
       pow: 3,

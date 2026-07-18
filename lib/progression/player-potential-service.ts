@@ -11,6 +11,7 @@ import type {
 const scoutPotentialCache = new WeakMap<GameState, Map<string, PlayerScoutPotential>>();
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { buildHiddenAttributeCeilingsFromPotentialScore } from "@/lib/scouting/player-attribute-ceiling-service";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import {
   attachPotentialCeilingToRecord,
   applyAxisCeilingSeasonDrift,
@@ -366,7 +367,11 @@ function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
   const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v4`);
   const rawRoll = roundValue(seedToPotentialScore(seed), 0);
   const traitBonus = getTalentTraitPotentialModifier(input.player);
-  return clamp(rawRoll + traitBonus, 35, 99);
+  // Potential is a ceiling: it must never sit below the player's current
+  // ability. Floor the (seed + trait) roll at CA on the same 1-100 scale
+  // before clamping to the generator's [35,99] band.
+  const currentAbilityScore = computeCurrentAbilityScore(input.player.coreStats) ?? 35;
+  return clamp(Math.max(rawRoll + traitBonus, currentAbilityScore), 35, 99);
 }
 
 export function buildPlayerPotentialRecord(input: {

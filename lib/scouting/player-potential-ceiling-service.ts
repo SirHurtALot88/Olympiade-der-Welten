@@ -108,7 +108,6 @@ function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
     sorted[0] * 0.45 +
       sorted[1] * 0.30 +
       sorted[2] * 0.15 +
-      sorted[3] * 0.10 +
       sorted[3] * 0.10,
   );
 }

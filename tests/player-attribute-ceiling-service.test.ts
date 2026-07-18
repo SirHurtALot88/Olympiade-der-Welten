@@ -8,6 +8,7 @@ import {
   getAttributeGrowthMultiplier,
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
+  mapAxisPoStarsToNumericCeiling,
   mapNumericCeilingToAxisPoStars,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerPotentialCeilingProfile } from "@/lib/scouting/player-potential-ceiling-service";
@@ -121,6 +122,18 @@ describe("player attribute ceiling service", () => {
     const axis = deriveAxisPoStarsFromAttributeCeilings(attributeCeiling);
     expect(axis.pow).toBe(mapNumericCeilingToAxisPoStars(88));
     expect(axis.spe).toBe(mapNumericCeilingToAxisPoStars(55));
+  });
+
+  it("round-trips stars -> numeric ceiling -> stars as true inverses", () => {
+    // Regression test: the forward and inverse maps used mismatched spans (a stray
+    // +0.5 offset and a /4.5 denominator on the inverse) causing a systematic +0.5★
+    // drift at low/mid ceilings. mapNumericCeilingToAxisPoStars must be the EXACT
+    // mathematical inverse of mapAxisPoStarsToNumericCeiling.
+    for (let stars = 0.5; stars <= 5; stars += 0.5) {
+      const numeric = mapAxisPoStarsToNumericCeiling(stars);
+      const roundTripped = mapNumericCeilingToAxisPoStars(numeric);
+      expect(roundTripped).toBeCloseTo(stars, 1);
+    }
   });
 
   it("caps attribute growth multiplier at 0.05 when at ceiling", () => {

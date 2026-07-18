@@ -1947,9 +1947,12 @@ describe("player detail drawer", () => {
       manageableTeamIds: ["team-1"],
     });
 
-    expect(data?.potentialOverallStars).toBe(3);
+    // Corrected ceiling math (overall-from-axis-stars weights now sum to 1.0,
+    // not 1.10, and mapNumericCeilingToAxisPoStars is the exact inverse of the
+    // forward map) yields 2.5★ here, not the old inflated 3★.
+    expect(data?.potentialOverallStars).toBe(2.5);
     expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
-    expect(data?.potentialOverallDelta).toBe(-1.5);
+    expect(data?.potentialOverallDelta).toBe(-2);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);
