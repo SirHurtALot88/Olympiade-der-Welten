@@ -223,6 +223,15 @@ export type TeamCaptainRecord = {
 export type StandingRecord = {
   points: number;
   rank?: number | null;
+  /**
+   * Idempotency baseline for standings-apply: the team's points BEFORE `matchdayBaselineId`'s delta
+   * was applied, plus which matchday that baseline belongs to. On a `forceReplace` re-apply of the
+   * same matchday, the projected points are recomputed from this baseline (baseline + delta) instead
+   * of the already-incremented live `points`, so the delta is not double-counted. Undefined until a
+   * matchday has been applied to this record.
+   */
+  matchdayBaselinePoints?: number | null;
+  matchdayBaselineId?: string | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;

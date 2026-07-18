@@ -255,11 +255,26 @@ function writeLocalStandingsApply(input: {
   const seasonState = save.gameState.seasonState;
   const nextStandings = { ...seasonState.standings };
 
+  const matchdayId = input.preview.scope.matchdayId;
   for (const item of input.preview.items) {
+    const previous = nextStandings[item.teamId] ?? { points: 0, rank: null };
+    const projectedPoints = item.projectedPoints ?? previous.points ?? 0;
+    // Persist the pre-matchday baseline (points before this matchday's delta) so a forceReplace
+    // re-apply of the same matchday recomputes from it instead of the incremented total. The preview
+    // already computed projected = baseline + delta, so baseline = projected − delta reconstructs it
+    // exactly (both are rounded to 1 decimal). This keeps standings-apply idempotent per matchday.
+    const baselinePoints =
+      item.projectedPoints != null && item.pointsDelta != null
+        ? Number((item.projectedPoints - item.pointsDelta).toFixed(1))
+        : previous.matchdayBaselineId === matchdayId
+          ? previous.matchdayBaselinePoints ?? previous.points ?? 0
+          : previous.points ?? 0;
     nextStandings[item.teamId] = {
-      ...(nextStandings[item.teamId] ?? { points: 0, rank: null }),
-      points: item.projectedPoints ?? nextStandings[item.teamId]?.points ?? 0,
+      ...previous,
+      points: projectedPoints,
       rank: item.projectedRank,
+      matchdayBaselinePoints: baselinePoints,
+      matchdayBaselineId: matchdayId,
     };
   }
 

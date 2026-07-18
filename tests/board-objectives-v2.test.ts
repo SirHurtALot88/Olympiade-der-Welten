@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateBoardConfidence,
+  getNetTransferBalanceObjective,
   getSportTargetV2,
   resolveBoardDisposition,
   selectBoardObjectiveDrafts,
@@ -208,4 +209,55 @@ describe("Board-Objectives V2 — disposition (F1) + dynamic slate (F4)", () => 
     expect(three.length).toBe(3);
     expect(five.length).toBe(5);
   });
+});
+
+describe("getNetTransferBalanceObjective (finance)", () => {
+  function financeRow(input: { transferNet: number; cash: number }): TeamManagementSnapshotRow {
+    return { teamId: "T", transferNet: input.transferNet, cash: input.cash } as TeamManagementSnapshotRow;
+  }
+  function profileWithCashPriority(cashPriority: number) {
+    return { bias: { cashPriority } } as unknown as Parameters<typeof getNetTransferBalanceObjective>[0]["profile"];
+  }
+
+  it("does not auto-fail a modest net-buy for a neutral/low cash-priority board (target 0)", () =>
+    withV2(() => {
+      // Regression for the net-transfer auto-fail bug: cashPriority 5 -> surplus target 0. A modest
+      // net-buy (transferNet -5) must NOT be an automatic failure; it becomes a soft overspend ceiling
+      // (max(8, cash*0.15) = 15) with netSpend 5 <= 15 -> completed.
+      const objective = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -5, cash: 100 }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(objective.targetValue).toBe(15);
+      expect(objective.status).toBe("completed");
+    }));
+
+  it("keeps an at_risk band and only fails reckless overspend past the ceiling (target 0)", () =>
+    withV2(() => {
+      const cash = 100; // ceiling = 15; at_risk up to 15 * 1.15 = 17.25
+      const atRisk = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -16, cash }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(atRisk.status).toBe("at_risk");
+      const failed = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: -30, cash }),
+        profile: profileWithCashPriority(5),
+        seasonNum: 1,
+      });
+      expect(failed.status).toBe("failed");
+    }));
+
+  it("still demands a real surplus for a cash-focused board (target > 0)", () =>
+    withV2(() => {
+      const objective = getNetTransferBalanceObjective({
+        row: financeRow({ transferNet: 12, cash: 100 }),
+        profile: profileWithCashPriority(8),
+        seasonNum: 1,
+      });
+      expect(objective.targetValue).toBe(3.6);
+      expect(objective.status).toBe("completed");
+    }));
 });

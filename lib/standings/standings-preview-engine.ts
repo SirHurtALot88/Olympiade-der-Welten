@@ -445,8 +445,17 @@ export async function buildStandingsPreview(
 
     const itemsBase: StandingsPreviewWorkingItem[] = scope.save.gameState.teams.map((team) => {
       const resultRow = disciplineByTeam.get(team.teamId) ?? null;
-      const currentPointsRaw = standings[team.teamId]?.points;
+      const standingRecord = standings[team.teamId];
+      const currentPointsRaw = standingRecord?.points;
       const currentPoints = typeof currentPointsRaw === "number" ? currentPointsRaw : null;
+      // Idempotency baseline: if this matchday was already applied, the live `points` already include
+      // its delta. Compute the projection from the stored pre-matchday baseline instead of the
+      // incremented live value so a forceReplace re-apply of the SAME matchday does not double-count.
+      const baselineRaw =
+        standingRecord?.matchdayBaselineId === scope.matchdayId
+          ? standingRecord?.matchdayBaselinePoints
+          : currentPoints;
+      const baselinePoints = typeof baselineRaw === "number" ? baselineRaw : currentPoints;
       const d1Score = resultRow?.d1Score ?? null;
       const d2Score = resultRow?.d2Score ?? null;
       const pointsDelta =
@@ -473,7 +482,7 @@ export async function buildStandingsPreview(
         projectedRank: null,
         currentPoints,
         projectedPoints:
-          currentPoints != null && pointsDelta != null ? roundValue(currentPoints + pointsDelta, 1) : null,
+          baselinePoints != null && pointsDelta != null ? roundValue(baselinePoints + pointsDelta, 1) : null,
         pointsDelta,
         matchdayRank: null,
         d1Score,

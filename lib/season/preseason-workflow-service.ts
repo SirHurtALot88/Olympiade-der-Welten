@@ -35,6 +35,9 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 
 export const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_SEASON_SETUP";
 
+/** Neutral felt-pressure the board's carried record is reset to at a season boundary (5/10 = neutral). */
+const NEUTRAL_BOARD_PERCEIVED_PRESSURE = 5;
+
 export type PreSeasonWorkflowStepId =
   | "season_review"
   | "season_rewards"
@@ -598,6 +601,22 @@ function buildNextSeasonGameState(
     standings: buildZeroStandings(save.gameState),
     // Snapshot the outgoing season's final confidence for carry-over into the next season.
     previousSeasonBoardConfidence: save.gameState.seasonState.boardConfidence ?? {},
+    // Reset the WITHIN-season board momentum/perception at the season boundary. The confidence VALUE
+    // continuity is provided by previousSeasonBoardConfidence above (calculateBoardConfidence blends
+    // that carried value); the transient EMA signals (pressureMomentum) and the felt-pressure
+    // (perceivedPressure) must start fresh, otherwise last season's END pressure seeds the new
+    // season's first slate/pressure and inflates early-season pressure until it decays. value/pressure
+    // are kept so the identity-seed fallback continuity holds.
+    boardConfidence: Object.fromEntries(
+      Object.entries(save.gameState.seasonState.boardConfidence ?? {}).map(([teamId, record]) => [
+        teamId,
+        {
+          ...record,
+          ...(record.pressureMomentum !== undefined ? { pressureMomentum: 0 } : {}),
+          ...(record.perceivedPressure !== undefined ? { perceivedPressure: NEUTRAL_BOARD_PERCEIVED_PRESSURE } : {}),
+        },
+      ]),
+    ),
     formCards: nextFormCards,
     lineupDrafts: [],
     matchdayResults: [],

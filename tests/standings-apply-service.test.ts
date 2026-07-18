@@ -207,8 +207,20 @@ describe("standings apply service", () => {
     expect(result.dryRun).toBe(false);
     expect(result.auditLogId).toContain("standings-apply-audit");
     expect(persistence.saveSingleplayerState).toHaveBeenCalledOnce();
-    expect(save.gameState.seasonState.standings["A-A"]).toEqual({ points: 18.6, rank: 1 });
-    expect(save.gameState.seasonState.standings["B-B"]).toEqual({ points: 20.2, rank: 2 });
+    // The persisted record carries the pre-matchday baseline (projected − delta) + the matchday id, so
+    // a forceReplace re-apply recomputes from the baseline instead of double-counting the delta.
+    expect(save.gameState.seasonState.standings["A-A"]).toEqual({
+      points: 18.6,
+      rank: 1,
+      matchdayBaselinePoints: 12,
+      matchdayBaselineId: "matchday-1",
+    });
+    expect(save.gameState.seasonState.standings["B-B"]).toEqual({
+      points: 20.2,
+      rank: 2,
+      matchdayBaselinePoints: 14,
+      matchdayBaselineId: "matchday-1",
+    });
     expect(save.gameState.seasonState.standingsApplyLogs).toHaveLength(1);
   });
 

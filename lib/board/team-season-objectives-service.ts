@@ -821,7 +821,7 @@ export function getSportTargetV2(input: {
  * V2 finance goal (replaces the tautological "cash > 0"): a net transfer-balance target scaled by
  * cash priority + season maturity — a real "run a sustainable transfer economy" objective.
  */
-function getNetTransferBalanceObjective(input: {
+export function getNetTransferBalanceObjective(input: {
   row: TeamManagementSnapshotRow;
   profile: TeamStrategyProfile | null;
   seasonNum: number;
@@ -833,17 +833,48 @@ function getNetTransferBalanceObjective(input: {
     1,
   );
   const current = roundValue(input.row.transferNet ?? 0, 1);
-  const status = statusForMin(input.row.transferNet ?? null, target);
+
+  if (target > 0) {
+    // Cash-focused board: it genuinely demands a transfer surplus. statusForMin keeps the at_risk band
+    // (>= 85% of target) so a near-miss is not a hard fail.
+    const status = statusForMin(input.row.transferNet ?? null, target);
+    return {
+      objectiveId: "finance-net-transfer-balance",
+      category: "finance",
+      label: `Transferbilanz ≥ ${target}M`,
+      targetValue: target,
+      currentValue: current,
+      status,
+      rewardCash: 4,
+      penaltyCash: 3,
+      boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+      source: "board_v2_net_transfer_balance",
+    };
+  }
+
+  // Neutral/low cash-priority board (target 0): a positive surplus is NOT demanded — normal
+  // squad-building net spend is expected. Instead of the old hard binary (any net-buy → failed), treat
+  // it as a soft ceiling on overspend via a statusForMax band with a real at_risk zone. A modest net-buy
+  // within the cash-scaled ceiling is completed; only reckless overspend past the ceiling+15% fails.
+  const netSpend = roundValue(Math.max(0, -(input.row.transferNet ?? 0)), 1);
+  const ceiling = roundValue(
+    Math.max(
+      BOARD_V2_NET_TRANSFER.overspendCeilingFloorM,
+      (input.row.cash ?? 0) * BOARD_V2_NET_TRANSFER.overspendCeilingCashFraction,
+    ),
+    1,
+  );
+  const status = statusForMax(netSpend, ceiling);
   return {
     objectiveId: "finance-net-transfer-balance",
     category: "finance",
-    label: target > 0 ? `Transferbilanz ≥ ${target}M` : "Transferbilanz stabil halten",
-    targetValue: target,
-    currentValue: current,
+    label: `Transferausgaben unter ${ceiling}M halten`,
+    detail: `Aktuelle Netto-Ausgaben ${netSpend}M (Netto-Transfer ${current}M).`,
+    targetValue: ceiling,
+    currentValue: netSpend,
     status,
-    rewardCash: target > 0 ? 4 : undefined,
-    penaltyCash: target > 0 ? 3 : undefined,
-    boardConfidenceDelta: status === "completed" ? 0.4 : status === "failed" ? -0.5 : status === "at_risk" ? -0.15 : 0,
+    penaltyCash: status === "failed" ? 3 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.2 : status === "failed" ? -0.4 : status === "at_risk" ? -0.1 : 0,
     source: "board_v2_net_transfer_balance",
   };
 }
