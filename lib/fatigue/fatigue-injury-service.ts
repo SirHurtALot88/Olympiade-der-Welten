@@ -341,26 +341,39 @@ export function buildMatchdayInjuryRollMap(input: {
   seasonId: string;
   matchdayId: string;
   injuryRehearsal?: InjuryRehearsalOptions | null;
+  /**
+   * forceReplace-Re-Apply desselben Spieltags: der übergebene `gameState` trägt in
+   * `playerAvailabilityState` bereits die NACH-Spieltags-Fatigue aus dem ersten Apply.
+   * Ist das Flag gesetzt, wird der Vor-Spieltags-Stand rekonstruiert, damit
+   * `fatigueBeforeRoll` (und damit riskPercent/roll) identisch zum ersten Apply bleibt.
+   */
+  isMatchdayReplay?: boolean;
 }): MatchdayInjuryRollMap {
+  const gameState = restorePreMatchdayAvailability({
+    gameState: input.gameState,
+    seasonId: input.seasonId,
+    matchdayId: input.matchdayId,
+    isMatchdayReplay: Boolean(input.isMatchdayReplay),
+  });
   const injuryRehearsal = input.injuryRehearsal?.enabled ? input.injuryRehearsal : null;
   const maxRehearsalInjuries = injuryRehearsal ? Math.max(0, injuryRehearsal.maxInjuries ?? 3) : Number.POSITIVE_INFINITY;
   let rehearsalInjuriesCreated = 0;
   const rollMap: MatchdayInjuryRollMap = new Map();
-  const usedPlayers = collectMatchdayUses(input.gameState, input.seasonId, input.matchdayId);
+  const usedPlayers = collectMatchdayUses(gameState, input.seasonId, input.matchdayId);
 
   for (const use of usedPlayers) {
     const availabilityView = getPlayerAvailabilityView(
-      input.gameState,
+      gameState,
       use.playerId,
       use.teamId,
       input.matchdayId,
     );
     if (availabilityView.isUnavailable) continue;
 
-    const player = input.gameState.players.find((entry) => entry.id === use.playerId);
+    const player = gameState.players.find((entry) => entry.id === use.playerId);
     if (!player) continue;
 
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
     const allowInjury = !injuryRehearsal || rehearsalInjuriesCreated < maxRehearsalInjuries;
     const roll = resolveMatchdayInjuryRoll({
       saveId: input.saveId,
@@ -445,6 +458,93 @@ function buildInjuryHighlight(event: InjuryEventRecord, playerName: string, matc
   };
 }
 
+/**
+ * Rekonstruiert den VOR-Spieltags-Stand der Fatigue (Ausdauer) je Spieler für einen
+ * forceReplace-Re-Apply desselben Spieltags.
+ *
+ * Hintergrund (Idempotenz): Der erste Apply von Spieltag N schreibt den NACH-Spieltags-Wert
+ * in `playerAvailabilityState` — Einsatz-Spieler: +Load, Bank/verletzt: -Recovery. Ein
+ * `forceReplace`-Re-Apply bekommt genau diesen bereits fortgeschriebenen Stand herein.
+ * Ohne Korrektur käme der Load/die Recovery ein zweites Mal drauf (F + 2*Load bzw. doppelte
+ * Erholung). Diese Funktion macht den Delta von Spieltag N rückgängig, sodass Roll,
+ * event.fatigueBefore und availability.fatigue exakt wie beim ersten Apply herauskommen.
+ *
+ * Beim NORMALEN Vorrücken (distinct matchdays, isMatchdayReplay=false) wird der State
+ * unverändert (identische Referenz) zurückgegeben -> byte-identisches Verhalten des
+ * Standard-Sim-Pfades.
+ */
+function restorePreMatchdayAvailability(input: {
+  gameState: GameState;
+  seasonId: string;
+  matchdayId: string;
+  isMatchdayReplay: boolean;
+}): GameState {
+  if (!input.isMatchdayReplay) {
+    return input.gameState;
+  }
+  const { gameState, seasonId, matchdayId } = input;
+  const currentAvailability = gameState.seasonState.playerAvailabilityState ?? [];
+  if (currentAvailability.length === 0) {
+    return gameState;
+  }
+  const usedKeys = new Set(
+    collectMatchdayUses(gameState, seasonId, matchdayId).map((use) => `${use.teamId}::${use.playerId}`),
+  );
+
+  // Pass 1: Den einzigen Verletzungs-Status-Wechsel, den der Recovery-Loop an Spieltag N
+  // vornimmt ("injured" -> "recovering", wenn `injuryUntilMatchday === matchdayId`),
+  // zurücksetzen. Nur so entspricht die Unavailable-Klassifikation exakt dem ersten Apply
+  // und die Fatigue-Inversion trifft denselben Zweig (Load vs. Recovery). Spieler, die AN
+  // Spieltag N verletzt wurden (injuredAtMatchdayId === matchdayId, until = nächster
+  // Spieltag), bleiben unangetastet: sie waren an N nicht unavailable und werden vom
+  // Einsatz-Loop identisch neu erzeugt.
+  const restoredInjuryRecords = currentAvailability.map((entry) => {
+    if (
+      entry.injuryStatus === "recovering" &&
+      entry.injuryUntilMatchday === matchdayId &&
+      entry.injuredAtMatchdayId &&
+      entry.injuredAtMatchdayId !== matchdayId
+    ) {
+      return { ...entry, injuryStatus: "injured" as const };
+    }
+    return entry;
+  });
+  const restoredGameState: GameState = {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, playerAvailabilityState: restoredInjuryRecords },
+  };
+
+  // Pass 2: Fatigue-Delta je Spieler invertieren, basierend auf der (rekonstruierten)
+  // Klassifikation des ersten Apply. Die Klemmung auf [0,100] ist unter der Inversion
+  // idempotent: clamp(clamp(F + Load) - Load) == clamp(F + Load) und
+  // clamp(clamp(F - Rec) + Rec) == clamp(F - Rec).
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const nextAvailability = restoredInjuryRecords.map((entry) => {
+    if (!isActiveRosterPlayer(gameState, entry.playerId, entry.teamId)) {
+      return entry;
+    }
+    const player = playerById.get(entry.playerId);
+    if (!player) {
+      return entry;
+    }
+    const view = getPlayerAvailabilityView(restoredGameState, entry.playerId, entry.teamId, matchdayId);
+    const wasUsedLoop = usedKeys.has(`${entry.teamId}::${entry.playerId}`) && !view.isUnavailable;
+    if (wasUsedLoop) {
+      // Einsatz-Spieler: erster Apply hat +Load gerechnet -> zurücknehmen.
+      return { ...entry, fatigue: clampFatigue(entry.fatigue - getPlayerMatchdayFatigueLoad(player)) };
+    }
+    // Bank oder verletzt/unavailable: erster Apply hat Recovery abgezogen -> wieder aufaddieren.
+    const recovery = calculatePlayerRecovery(gameState, entry.teamId, player.trainingMode);
+    const recoveryValue = view.isUnavailable ? recovery.injuryRecovery : recovery.normalRecovery;
+    return { ...entry, fatigue: clampFatigue(entry.fatigue + recoveryValue) };
+  });
+
+  return {
+    ...gameState,
+    seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability },
+  };
+}
+
 export function applyFatigueAndInjuryAfterMatchday(input: {
   gameState: GameState;
   saveId: string;
@@ -454,42 +554,54 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   timestamp: string;
   injuryRehearsal?: InjuryRehearsalOptions | null;
   precomputedInjuryRolls?: MatchdayInjuryRollMap | null;
+  /**
+   * forceReplace-Re-Apply desselben Spieltags: macht den bereits persistierten Fatigue-Delta
+   * von Spieltag N rückgängig, bevor Load/Recovery neu angewandt werden. Standard-Vorrücken
+   * (distinct matchdays) lässt dieses Flag weg -> unverändertes Verhalten.
+   */
+  isMatchdayReplay?: boolean;
 }): { gameState: GameState; injuryEvents: InjuryEventRecord[] } {
-  const usedPlayers = collectMatchdayUses(input.gameState, input.seasonId, input.matchdayId);
+  const gameState = restorePreMatchdayAvailability({
+    gameState: input.gameState,
+    seasonId: input.seasonId,
+    matchdayId: input.matchdayId,
+    isMatchdayReplay: Boolean(input.isMatchdayReplay),
+  });
+  const usedPlayers = collectMatchdayUses(gameState, input.seasonId, input.matchdayId);
   const usedPlayerKeys = new Set(usedPlayers.map((use) => `${use.teamId}::${use.playerId}`));
-  const nextMatchdayId = getNextMatchdayId(input.gameState, input.matchdayId);
+  const nextMatchdayId = getNextMatchdayId(gameState, input.matchdayId);
   const injuryRollMap =
     input.precomputedInjuryRolls ??
     buildMatchdayInjuryRollMap({
-      gameState: input.gameState,
+      gameState,
       saveId: input.saveId,
       seasonId: input.seasonId,
       matchdayId: input.matchdayId,
       injuryRehearsal: input.injuryRehearsal,
     });
-  let nextAvailability = (input.gameState.seasonState.playerAvailabilityState ?? []).filter((entry) =>
-    isActiveRosterPlayer(input.gameState, entry.playerId, entry.teamId),
+  let nextAvailability = (gameState.seasonState.playerAvailabilityState ?? []).filter((entry) =>
+    isActiveRosterPlayer(gameState, entry.playerId, entry.teamId),
   );
-  const nextPlayers = input.gameState.players.map((player) => ({ ...player }));
+  const nextPlayers = gameState.players.map((player) => ({ ...player }));
   const playerIndexById = new Map(nextPlayers.map((player, index) => [player.id, index] as const));
-  const playerNameById = new Map(input.gameState.players.map((player) => [player.id, player.name] as const));
+  const playerNameById = new Map(gameState.players.map((player) => [player.id, player.name] as const));
   const newEvents: InjuryEventRecord[] = [];
 
-  for (const roster of input.gameState.rosters) {
+  for (const roster of gameState.rosters) {
     const playerIndex = playerIndexById.get(roster.playerId);
     if (playerIndex == null) continue;
     const player = nextPlayers[playerIndex];
     const usedKey = `${roster.teamId}::${roster.playerId}`;
     const view = getPlayerAvailabilityView(
-      { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
+      { ...gameState, players: nextPlayers, seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability } },
       roster.playerId,
       roster.teamId,
       input.matchdayId,
     );
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
-    const recovery = calculatePlayerRecovery(input.gameState, roster.teamId, player.trainingMode);
+    const recovery = calculatePlayerRecovery(gameState, roster.teamId, player.trainingMode);
     const currentFatigue = getPlayerCurrentFatigue(
-      { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
+      { ...gameState, players: nextPlayers, seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability } },
       player,
       roster.teamId,
     );
@@ -514,15 +626,15 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     if (playerIndex == null) continue;
     const player = nextPlayers[playerIndex];
     const availabilityView = getPlayerAvailabilityView(
-      { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
+      { ...gameState, players: nextPlayers, seasonState: { ...gameState.seasonState, playerAvailabilityState: nextAvailability } },
       use.playerId,
       use.teamId,
       input.matchdayId,
     );
     if (availabilityView.isUnavailable) continue;
 
-    const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
-    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
+    const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
+    const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(gameState, player, use.teamId) + getPlayerMatchdayFatigueLoad(player));
     const roll =
       injuryRollMap.get(buildMatchdayUseKey(use.teamId, use.playerId)) ??
       resolveMatchdayInjuryRoll({
@@ -559,7 +671,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     };
     newEvents.push(event);
     if (roll.result === "injured") {
-      const historyRecord = injuryEventToPlayerHistoryRecord(event, input.gameState);
+      const historyRecord = injuryEventToPlayerHistoryRecord(event, gameState);
       if (historyRecord) {
         nextPlayers[playerIndex] = appendPlayerInjuryHistory(nextPlayers[playerIndex], historyRecord);
       }
@@ -585,19 +697,19 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   return {
     injuryEvents: newEvents,
     gameState: {
-      ...input.gameState,
+      ...gameState,
       players: nextPlayers,
       seasonState: {
-        ...input.gameState.seasonState,
+        ...gameState.seasonState,
         playerAvailabilityState: nextAvailability,
         injuryEvents: [
-          ...(input.gameState.seasonState.injuryEvents ?? []).filter(
+          ...(gameState.seasonState.injuryEvents ?? []).filter(
             (event) => !(event.seasonId === input.seasonId && event.matchdayId === input.matchdayId),
           ),
           ...newEvents,
         ],
         disciplineHighlights: [
-          ...(input.gameState.seasonState.disciplineHighlights ?? []),
+          ...(gameState.seasonState.disciplineHighlights ?? []),
           ...injuryHighlights,
         ],
       },

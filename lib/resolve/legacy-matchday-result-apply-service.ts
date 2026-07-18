@@ -382,11 +382,22 @@ export async function prepareLegacyMatchdayResultApply(
   const contextLoadMs = elapsedSince(contextStartedAt);
   if (source === "sqlite") {
     const save = resolveLocalSave(persistence, params.saveId);
+    // Idempotenz unter forceReplace: existiert bereits ein Ergebnis, trägt der Save die
+    // NACH-Spieltags-Fatigue -> Roll-Map muss den Vor-Spieltags-Stand rekonstruieren, damit
+    // die Injury-Performance-Multiplikatoren (und damit die Vorschau-Scores) beim Re-Apply
+    // identisch zum ersten Apply bleiben.
+    const hasExistingResultForReplay = (save.gameState.seasonState.matchdayResults ?? []).some(
+      (result) =>
+        result.saveId === params.saveId &&
+        result.seasonId === params.seasonId &&
+        result.matchdayId === params.matchdayId,
+    );
     const injuryRollMap = buildMatchdayInjuryRollMap({
       gameState: save.gameState,
       saveId: params.saveId,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
+      isMatchdayReplay: hasExistingResultForReplay,
     });
     attachMatchdayInjuryPerformanceToContexts(contexts, injuryRollMap);
   }
@@ -691,11 +702,18 @@ export class LegacyMatchdayResultApplyService {
     };
     const recordMapMs = elapsedSince(recordMapStartedAt);
 
+    // Idempotenz unter forceReplace: Existiert bereits ein Ergebnis für diesen Spieltag, so
+    // trägt `playerAvailabilityState` bereits die NACH-Spieltags-Fatigue aus dem ersten Apply.
+    // Das Flag lässt Roll-Map und Fatigue-Apply den Vor-Spieltags-Stand rekonstruieren, damit
+    // ein Re-Apply denselben Stand erzeugt (kein F + 2*Load). `existingResult` wurde aus dem
+    // ORIGINAL-Save (vor dem Einfügen von `nextMatchdayResult`) ermittelt.
+    const isMatchdayReplay = Boolean(existingResult);
     const injuryRollMap = buildMatchdayInjuryRollMap({
       gameState: nextGameState,
       saveId: params.saveId,
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
+      isMatchdayReplay,
     });
     const injuryResult = applyFatigueAndInjuryAfterMatchday({
           gameState: nextGameState,
@@ -705,6 +723,7 @@ export class LegacyMatchdayResultApplyService {
           matchdayResultId,
           timestamp: now,
           precomputedInjuryRolls: injuryRollMap,
+          isMatchdayReplay,
         });
 
     // Anti-cheese Teil B (B.4): record this matchday's per-player training mode and advance the

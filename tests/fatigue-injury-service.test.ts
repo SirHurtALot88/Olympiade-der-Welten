@@ -431,6 +431,124 @@ describe("fatigue injury service", () => {
     expect(benchAvailability.blocker).toBeNull();
   });
 
+  it("is idempotent under a forceReplace re-apply of the same matchday for used and benched players", () => {
+    // Vor-Spieltags-Stand: used-0 (Einsatz, fatigue 20), bench-0 (Bank, fatigue 60).
+    const gameState = createGameState("used-0", 20);
+    gameState.players.push({
+      id: "bench-0",
+      name: "Bench Runner",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 60,
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    gameState.rosters.push({
+      teamId: "A-A",
+      playerId: "bench-0",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    const recovery = calculateTeamRecovery(gameState, "A-A");
+    const load = 11;
+
+    const applyParams = {
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    };
+
+    const first = applyFatigueAndInjuryAfterMatchday({ gameState, ...applyParams });
+    const usedFirst = getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue;
+    const benchFirst = getPlayerAvailabilityView(first.gameState, "bench-0", "A-A", "md-1").fatigue;
+    const usedEventFirst = first.injuryEvents.find((event) => event.playerId === "used-0");
+
+    expect(usedFirst).toBe(20 + load);
+    expect(benchFirst).toBe(Math.max(0, Number((60 - recovery.normalRecovery).toFixed(2))));
+
+    // forceReplace: denselben Spieltag erneut auf dem bereits fortgeschriebenen State anwenden.
+    const second = applyFatigueAndInjuryAfterMatchday({
+      gameState: first.gameState,
+      ...applyParams,
+      isMatchdayReplay: true,
+    });
+    const usedSecond = getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-1").fatigue;
+    const benchSecond = getPlayerAvailabilityView(second.gameState, "bench-0", "A-A", "md-1").fatigue;
+    const usedEventSecond = second.injuryEvents.find((event) => event.playerId === "used-0");
+
+    // Idempotent: identisch zum ersten Apply, NICHT verdoppelt (kein F + 2*Load / doppelte Erholung).
+    expect(usedSecond).toBe(usedFirst);
+    expect(usedSecond).not.toBe(20 + 2 * load);
+    expect(benchSecond).toBe(benchFirst);
+    expect(benchSecond).not.toBe(Math.max(0, Number((60 - 2 * recovery.normalRecovery).toFixed(2))));
+
+    // event.fatigueBefore / riskPercent / roll bleiben ebenfalls identisch.
+    expect(usedEventSecond?.fatigueBefore).toBe(usedEventFirst?.fatigueBefore);
+    expect(usedEventSecond?.fatigueBefore).toBe(20 + load);
+    expect(usedEventSecond?.riskPercent).toBe(usedEventFirst?.riskPercent);
+    expect(usedEventSecond?.result).toBe(usedEventFirst?.result);
+
+    // Re-Apply darf keine doppelten Injury-Events für den Spieltag hinterlassen.
+    expect(
+      second.gameState.seasonState.injuryEvents?.filter(
+        (event) => event.seasonId === "season-1" && event.matchdayId === "md-1",
+      ).length,
+    ).toBe(
+      first.gameState.seasonState.injuryEvents?.filter(
+        (event) => event.seasonId === "season-1" && event.matchdayId === "md-1",
+      ).length,
+    );
+  });
+
+  it("still accumulates fatigue on a normal advance to the next distinct matchday", () => {
+    const gameState = createGameState("used-0", 20);
+    // md-2-Aufstellung: used-0 wird erneut eingesetzt.
+    gameState.seasonState.lineupDrafts?.push({
+      lineupId: "lineup-2",
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-2",
+      teamId: "A-A",
+      status: "submitted",
+      entries: [
+        {
+          disciplineId: "tdm",
+          disciplineSide: "d1",
+          slotIndex: 1,
+          playerId: "used-0",
+          activePlayerId: "active-used-0-md2",
+        },
+      ],
+      createdAt: "2026-06-13T00:00:00.000Z",
+      updatedAt: "2026-06-13T00:00:00.000Z",
+    } as never);
+
+    const first = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-md-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(31);
+
+    // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): akkumuliert weiter.
+    const second = applyFatigueAndInjuryAfterMatchday({
+      gameState: first.gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-2",
+      matchdayResultId: "result-md-2",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(42);
+  });
+
   it("blocks human lineups that still reference an injured player", () => {
     const context: LegacyLineupContext = {
       saveId: "save-1",
