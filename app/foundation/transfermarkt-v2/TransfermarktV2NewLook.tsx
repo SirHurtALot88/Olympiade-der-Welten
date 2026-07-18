@@ -32,6 +32,7 @@ import {
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { getAttributeTierClass, getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
+import { getCoreStatGrade } from "@/lib/matchday-arena/arena-stat-visuals";
 import type { TransferHistoryItem } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import {
@@ -281,6 +282,11 @@ export type TransfermarktV2NewLookProps = {
   /** Mindest-MW/Gehalt-Ratio (0 = aus). Range-Slider 0–8, Schritt 0,5. */
   minRatioFilter: number;
   onMinRatioFilterChange: (value: number) => void;
+  /** MW-Obergrenze (Budget-Deckel) in Mio; 0 = aus. */
+  maxValueFilter: number;
+  onMaxValueFilterChange: (value: number) => void;
+  /** Slider-Maximum = höchster MW im geladenen Pool (Mio). */
+  maxValueSliderMax: number;
   onResetFilters: () => void;
   activeFilterCount: number;
   // Gespeicherte Suchen (F2) — Persistenz liegt im Client; hier nur Anzeige/Trigger.
@@ -745,6 +751,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
     onToggleHidePoorFit,
     minRatioFilter,
     onMinRatioFilterChange,
+    maxValueFilter,
+    onMaxValueFilterChange,
+    maxValueSliderMax,
     onResetFilters,
     activeFilterCount,
     filterPresets,
@@ -853,14 +862,13 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
   // Fit-Toggle, Ratio-Slider) klappt als "Erweitert"-Akkordeon auf — gleiches
   // Disclosure-Muster wie das Kader-Achsen-Akkordeon weiter unten. Reine
   // Layout-Reorganisation, sämtliche Filter-States/Handler bleiben unverändert.
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   // Anzahl aktiver Erweitert-Filter für die Kopfzeile ("Erweitert · N aktiv"):
-  // je Achs-Mindestwert > 0, plus Ratio-Filter und Fit-Filter — hidePoorFit
-  // startet als true (Default), zählt also nur, wenn davon abgewichen wurde
-  // (d.h. der Nutzer ihn explizit ausgeschaltet hat), sonst würde die Badge
-  // schon beim Laden fälschlich "1 aktiv" zeigen.
+  // je Achs-Mindestwert > 0, plus MW-Deckel, Ratio-Filter und Fit-Filter —
+  // hidePoorFit startet als true (Default), zählt also nur, wenn davon
+  // abgewichen wurde (sonst würde die Badge schon beim Laden "1 aktiv" zeigen).
   const advancedActiveCount =
     NL_MARKET_AXES.reduce((sum, axis) => sum + (axisMinimums[axis] > 0 ? 1 : 0), 0) +
+    (maxValueFilter > 0 ? 1 : 0) +
     (minRatioFilter > 0 ? 1 : 0) +
     (hidePoorFit ? 0 : 1);
 
@@ -1039,44 +1047,22 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               </button>
             ))}
           </div>
-          <div className="nl-market-pill-group" role="group" aria-label="Klassen-Achsen filtern">
-            {NL_MARKET_AXES.map((axis) => (
-              <button
-                key={`nl-axis-filter-${axis}`}
-                type="button"
-                className={`nl-market-pill ${nlToneClass(axis)}${selectedClassAxes.includes(axis) ? " is-active" : ""}`}
-                aria-pressed={selectedClassAxes.includes(axis)}
-                onClick={() => onToggleClassAxis(axis)}
-                title={`Nur ${NL_AXIS_LABELS[axis]}-Klassen anzeigen`}
-              >
-                {NL_AXIS_LABELS[axis]}
-              </button>
-            ))}
+          {/* Achsen-Schnellchips (POW/SPE/MEN/SOC) bewusst entfernt — sie
+              duplizierten die Achs-Mindestwerte unten und stifteten Verwirrung.
+              Nur der Reset bleibt in der Quick-Zeile. */}
+          <div className="nl-market-pill-group" role="group" aria-label="Filter zurücksetzen">
             <button type="button" className="nl-market-pill is-reset" onClick={onResetFilters}>
               Reset
             </button>
           </div>
-          {/* F(neu) — Erweitert-Akkordeon: selten genutzte Feineinstellungen
-              (Achs-Mindestwerte, Fit-Toggle, Ratio-Slider) verstecken sich hier,
-              damit die Quick-Zeile (Suche/Sortierung/Achsen-Pills) schlank bleibt. */}
-          <div className="nl-market-advanced">
-            <button
-              type="button"
-              className="nl-market-advanced-toggle"
-              aria-expanded={advancedFiltersOpen}
-              aria-controls="nl-market-advanced-panel"
-              onClick={() => setAdvancedFiltersOpen((open) => !open)}
-            >
-              <span className="nl-market-advanced-title">Erweitert</span>
-              {advancedActiveCount > 0 ? (
-                <span className="nl-market-advanced-count">· {advancedActiveCount} aktiv</span>
-              ) : null}
-              <span className="nl-market-advanced-caret" aria-hidden="true">
-                {advancedFiltersOpen ? "▾" : "▸"}
-              </span>
-            </button>
-            {advancedFiltersOpen ? (
-              <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
+          {/* F(neu) — Erweitert: Feineinstellungen (Achs-Mindestwerte, Fit-Toggle,
+              MW-Deckel, Value-Ratio). Auf Wunsch dauerhaft sichtbar statt hinter
+              einem Akkordeon. */}
+          <div className="nl-market-advanced is-static">
+            <span className="nl-market-advanced-title nl-market-eyebrow">
+              Erweitert{advancedActiveCount > 0 ? ` · ${advancedActiveCount} aktiv` : ""}
+            </span>
+            <div className="nl-market-advanced-panel" id="nl-market-advanced-panel">
           <div className="nl-market-axis-min-group" role="group" aria-label="Mindestwerte je Achse">
             {NL_MARKET_AXES.map((axis) => {
               // Ein Mindestwert > 0 filtert eigenständig — kein separater Toggle mehr nötig.
@@ -1113,6 +1099,30 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               <input type="checkbox" checked={hidePoorFit} onChange={onToggleHidePoorFit} />
               <span>Nur passende (Fit ≥ 0) + Söldner</span>
             </label>
+            {/* MW-Deckel (Budget-Obergrenze): blendet zu teure Kandidaten aus.
+                Slider ganz rechts = "aus" (kein Deckel). Wert 0 clientseitig = aus. */}
+            <label className="nl-market-ratio-slider" title="Nur Kandidaten mit Marktwert ≤ Deckel anzeigen (0 = aus)">
+              <span className="nl-market-ratio-slider-label">
+                MW ≤{" "}
+                <strong className="nl-tnum">
+                  {maxValueFilter > 0 ? `${formatNlNumber(maxValueFilter, 1)} Mio` : "aus"}
+                </strong>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={maxValueSliderMax}
+                step={0.5}
+                value={maxValueFilter > 0 ? Math.min(maxValueFilter, maxValueSliderMax) : maxValueSliderMax}
+                aria-label="MW-Obergrenze in Mio"
+                aria-valuetext={maxValueFilter > 0 ? `MW ≤ ${formatNlNumber(maxValueFilter, 1)} Mio` : "aus"}
+                onChange={(event) => {
+                  const next = Number(event.target.value) || 0;
+                  // Ganz rechts (= Pool-Maximum) bedeutet "kein Deckel" → 0 an den Client.
+                  onMaxValueFilterChange(next >= maxValueSliderMax ? 0 : next);
+                }}
+              />
+            </label>
             <label className="nl-market-ratio-slider" title="Value = MW ÷ Gehalt (0 = aus)">
               <span className="nl-market-ratio-slider-label">
                 MW ÷ Gehalt ≥{" "}
@@ -1134,8 +1144,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
               />
             </label>
           </div>
-              </div>
-            ) : null}
+            </div>
           </div>
           {/* F2 — Gespeicherte Suchen: Chips zum Anwenden, Löschen je Preset,
               "Suche speichern" mit Inline-Namensfeld. Persistenz liegt im Client. */}
@@ -1511,22 +1520,25 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     </span>
                   </div>
 
-                  {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte. */}
+                  {/* Farbige Tier-Chips je Achse (POW/SPE/MEN/SOC) — nur fog-gated echte Werte.
+                      Note/Farbe über getCoreStatGrade: an die GEMESSENE Achs-Verteilung
+                      (Median ~42,5) verankert, damit ein Mittelwert wie 55 grün/„A" liest und
+                      nicht rot/„E" — Achswerte sind Disziplin-Durchschnitte, keine 0–100-Rohskala. */}
                   <div className="nl-market-attr-chips" aria-label="Attribut-Tiers">
                     {NL_MARKET_AXES.flatMap((axis) => {
                       const value = selectedPlayer[axis];
                       if (typeof value !== "number" || !Number.isFinite(value)) {
                         return [];
                       }
-                      const tier = getTransfermarktTierFromPoints(value);
+                      const grade = getCoreStatGrade(value);
                       return [
                         <span
                           key={`nl-attr-chip-${axis}`}
-                          className={`nl-market-attr-chip ${getAttributeTierClass(tier)}`}
+                          className={`nl-market-attr-chip ${getAttributeTierClass(grade)}`}
                         >
                           <b>{NL_AXIS_LABELS[axis]}</b>
                           <span className="nl-tnum">{formatNlNumber(value, 0)}</span>
-                          {tier ? <em>{tier}</em> : null}
+                          <em>{grade}</em>
                         </span>,
                       ];
                     })}
@@ -1970,7 +1982,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     offeredSalary != null && Number.isFinite(offeredSalary) ? offeredSalary : salaryBase;
                   // Regler-Spanne: 50 %–200 % des Erwartungswerts, oben immer das aktuelle Angebot einfassen.
                   const salaryMax = Math.max(Math.round(salaryBase * 2), Math.round(salaryValue));
-                  const salaryStep = Math.max(1, Math.round(salaryBase / 50));
+                  // Beträge liegen in Mio-Einheit vor → feine 0,5-Mio-Schritte statt grober
+                  // Rundung auf ganze Mio (salaryBase/50 lieferte bei kleinen Gehältern nur „1").
+                  const salaryStep = 0.5;
                   return (
                     <NlWhatIfSlider
                       className="nl-market-salary-whatif"
@@ -1988,7 +2002,6 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         formatTransfermarktCurrency(salaryMax),
                       ]}
                       accentColor="var(--nl-warn)"
-                      hint="Höheres Gehalt hebt die Zusage-Chance — Bar und Vorher→Nachher aktualisieren sich live."
                     />
                   );
                 })()

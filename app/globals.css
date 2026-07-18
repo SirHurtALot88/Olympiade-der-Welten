@@ -46968,6 +46968,15 @@ button.foundation-team-portrait-card {
   margin-top: var(--nl-s2);
 }
 
+/* Dauerhaft sichtbare "Erweitert"-Sektion (kein Akkordeon mehr):
+   Titel als eigenständiger Sektions-Header statt klickbarer Toggle-Button. */
+.is-new-look .nl-market-advanced.is-static .nl-market-advanced-title {
+  display: block;
+  color: var(--nl-mut);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* F(neu) — Head-to-Head-Vergleich (angeheftet vs. Fokus) in der Fokus-Karte:
    überlagerter Mehrserien-Radar + paarige StatChip-Zeilen. */
 .is-new-look .nl-market-compare {

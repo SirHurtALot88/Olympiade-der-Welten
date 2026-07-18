@@ -1576,18 +1576,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           in der Sidebar (siehe activeTeamPickerNode oben). data-testid bleibt
           erhalten, weil Screenshots/Smoke-Skripte darauf warten. */}
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
-        <div className="foundation-context-main">
-          {activeView !== "homeV2" ? (
-            <details className="foundation-save-compact-menu" data-testid="foundation-save-compact-menu">
-              <summary>{isSaveBusy ? "Save lädt…" : formatShortSaveId(activeSaveId)}</summary>
-              <strong className="foundation-save-compact-full">{activeSaveName}</strong>
-              <span className="muted">
-                {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-                {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
-              </span>
-            </details>
-          ) : null}
-        </div>
+        {/* Save-Chip (roher Save-ID-Aufklappmenü) entfernt — Save-Name, Season
+            und Spieltag leben bereits kompakt in der Sidebar; der abgeschnittene
+            "new-game…"-String oben stiftete nur Verwirrung. */}
+        <div className="foundation-context-main" data-testid="foundation-save-compact-menu" />
         {roomContext ? (
           (() => {
             // Kompakter Room-Chip statt großem zentralem Banner: die schlanke

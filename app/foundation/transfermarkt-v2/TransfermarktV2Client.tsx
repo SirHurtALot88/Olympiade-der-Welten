@@ -1866,6 +1866,9 @@ export default function TransfermarktV2Client({
         onToggleHidePoorFit={() => setHidePoorFit((current) => !current)}
         minRatioFilter={maxRatio}
         onMinRatioFilterChange={(value) => setMaxRatio(value)}
+        maxValueFilter={maxValue}
+        onMaxValueFilterChange={(value) => setMaxValue(value)}
+        maxValueSliderMax={valueSliderMax}
         onResetFilters={resetMarketFilters}
         activeFilterCount={
           selectedClassNames.length +

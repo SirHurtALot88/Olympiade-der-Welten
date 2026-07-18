@@ -227,7 +227,8 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(overviewDerivationsText).toContain("sortTodayCardsByUrgency");
 
     expect(shellText).toContain('data-testid="foundation-save-compact-menu"');
-    expect(shellText).toContain("formatShortSaveId(activeSaveId)");
+    // Der rohe Save-ID-Chip (formatShortSaveId(activeSaveId)) wurde bewusst
+    // entfernt — Save-Name/Season/Spieltag leben in der Sidebar.
     // HomeV2 is rendered inline in the shell via FoundationHomeV2Panel (deliberate: the
     // FoundationShellRouterHomeV2 wrapper was reverted in fd984c8 because it caused page-load
     // ReferenceErrors; the wrapper migration is tracked in docs/foundation-monolith-split-plan.md).

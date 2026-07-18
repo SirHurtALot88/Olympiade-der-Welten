@@ -3,7 +3,7 @@
   "generatedAt": "2026-07-17T19:53:55.295Z",
   "count": 100,
   "violations": [
-    "app/foundation/FoundationShellRouterBody.tsx:3475:LOCALE",
+    "app/foundation/FoundationShellRouterBody.tsx:3467:LOCALE",
     "app/foundation/PlayerDetailDrawer.tsx:2197:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:242:HEX",
     "app/foundation/PlayerDetailDrawer.tsx:2823:HEX",
