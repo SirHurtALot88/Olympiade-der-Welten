@@ -1089,7 +1089,7 @@ export function applyGeneralManagerStrategyProfileEffect(
   gmProfile: TeamGeneralManagerProfile | null,
   influencePct = GM_INFLUENCE_PCT,
 ): TeamStrategyProfile {
-  if (!gmProfile || profile.strategyVersion?.includes("+gm-v2")) {
+  if (!gmProfile || profile.strategyVersion?.includes(`+gm-v2:${gmProfile.gmId}`)) {
     return profile;
   }
 
@@ -1103,7 +1103,7 @@ export function applyGeneralManagerStrategyProfileEffect(
 
   return {
     ...profile,
-    strategyVersion: `${(profile.strategyVersion ?? "v1-local").replace(/\+gm-v\d+/g, "")}+gm-v2`,
+    strategyVersion: `${(profile.strategyVersion ?? "v1-local").replace(/\+gm-v\d+(:[^+]*)?/g, "")}+gm-v2:${gmProfile.gmId}`,
     strategySummary: `${profile.strategySummary} GM: ${gmProfile.title}.`,
     transferStyleNote: `${profile.transferStyleNote ?? profile.buyStyle} GM: ${gmProfile.marketDoctrine}`,
     lineupStyleNote: `${profile.lineupStyleNote ?? profile.rosterStyle} GM: ${gmProfile.lineupDoctrine}`,

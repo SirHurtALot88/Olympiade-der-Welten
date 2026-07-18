@@ -2930,7 +2930,7 @@ function runSeason1ExecuteEmergencyMinFill(input: {
 }
 
 /**
- * Organic-squad-builder execute path for ONE team (flag: OLY_ORGANIC_SQUAD_BUILDER, default OFF).
+ * Organic-squad-builder execute path for ONE team (flag: OLY_ORGANIC_SQUAD_BUILDER, default ON).
  *
  * SELF-CONTAINED: replaces the entire per-team execute body (frozenTrace loop + spend-down/emergency
  * fills + team-end flush + result push) when the flag is on, so the flag-off default path stays
