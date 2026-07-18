@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildBuyEconomics, buildTransferFinanceAudit } from "@/lib/season/transfer-finance-audit";
+import { applyEarlyPayoff } from "@/lib/finance/loan-service";
 
 function minimalGameState(overrides: Partial<GameState> = {}): GameState {
   return {
@@ -182,6 +183,56 @@ describe("transfer-finance-audit", () => {
     expect(season2?.netSponsorEventCash).toBe(4);
     // Delta is ~0 (not inflated by preseason spend, not left with a sponsor-event residual).
     expect(season2?.cashReconciliationDelta).toBe(0);
+    expect(audit.violations.some((entry) => entry.startsWith("cash_reconciliation_delta_hard:season-2"))).toBe(false);
+    expect(audit.violations.some((entry) => entry.startsWith("cash_reconciliation_delta:season-2"))).toBe(false);
+  });
+
+  it("reconciles a season to ~0 after an early loan payoff (applyEarlyPayoff emits a ledger entry)", () => {
+    // Season-1 true season-end cash = 100 (the reconciliation ANCHOR for season-2). During season-2 the
+    // team pays off a loan early: cash -15.6 (principal 15 + 0.2 * foregoneInterest 3). Before the fix
+    // applyEarlyPayoff moved cash WITHOUT any loan log, so getSeasonLoanCashByTeam missed it → a false
+    // cash_reconciliation_delta_hard. Now the early-payoff loanApplyLog makes netLoanCash = -15.6, so
+    // the season reconciles to 0.
+    const loan: LoanRecord = {
+      loanId: "loan-1",
+      borrowerTeamId: "T1",
+      lenderType: "bank",
+      principalOriginal: 20,
+      principalOutstanding: 15,
+      interestRatePerSeason: 0.152,
+      termSeasons: 3,
+      seasonsRemaining: 3,
+      installmentPerSeason: 6,
+      originatedSeasonId: "season-1",
+      status: "active",
+      missedPayments: 0,
+    };
+    const before = {
+      season: { id: "season-2" },
+      teams: [{ teamId: "T1", name: "Team One", cash: 100, shortCode: "T1" }],
+      players: [],
+      rosters: [],
+      transferHistory: [],
+      seasonState: {
+        seasonSnapshots: [
+          { seasonId: "season-1", finalStandings: [{ teamId: "T1", cashEnd: 100, cashTotal: 100 }] },
+        ],
+        loans: [loan],
+        loanApplyLogs: [],
+      },
+      teamIdentities: [],
+    } as unknown as GameState;
+
+    const payoff = applyEarlyPayoff(before, "loan-1", { execute: true });
+    expect(payoff.ok).toBe(true);
+    expect(payoff.payoff).toBeCloseTo(15.6, 1);
+
+    const audit = buildTransferFinanceAudit(payoff.gameState);
+    const season2 = audit.rows.find((row) => row.teamId === "T1" && row.seasonId === "season-2");
+    expect(season2?.cashStart).toBe(100);
+    expect(season2?.cashEnd).toBeCloseTo(84.4, 1); // live cash of the current season after payoff
+    expect(season2?.netLoanCash).toBeCloseTo(-15.6, 1);
+    expect(season2?.cashReconciliationDelta ?? 1).toBeCloseTo(0, 1);
     expect(audit.violations.some((entry) => entry.startsWith("cash_reconciliation_delta_hard:season-2"))).toBe(false);
     expect(audit.violations.some((entry) => entry.startsWith("cash_reconciliation_delta:season-2"))).toBe(false);
   });

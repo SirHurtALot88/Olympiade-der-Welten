@@ -499,4 +499,33 @@ describe("applyEarlyPayoff", () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("loan_not_found");
   });
+
+  it("emits an early_payoff loanApplyLog (reconciliation ledger) without blocking same-season settlement", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", cash: 50 }), createTeam({ teamId: "B-B", cash: 50 })],
+      loans: [
+        { ...baseLoan(), loanId: "loan-early", borrowerTeamId: "A-A", installmentPerSeason: 6, seasonsRemaining: 3, principalOutstanding: 15 },
+        { ...baseLoan(), loanId: "loan-active", borrowerTeamId: "B-B" },
+      ],
+      seasonId: "season-3",
+    });
+    const result = applyEarlyPayoff(gameState, "loan-early", { execute: true });
+    expect(result.ok).toBe(true);
+
+    // Ledger entry mirrors a season-end installment: installmentCharged = principal + prepayment fee,
+    // with the fee attributed as interestPortion (payoff 15.6 = principal 15 + 0.2 * foregoneInterest 3).
+    const log = result.gameState.seasonState.loanApplyLogs?.find((entry) => entry.loanId === "loan-early");
+    expect(log?.kind).toBe("early_payoff");
+    expect(log?.seasonId).toBe("season-3");
+    expect(log?.installmentCharged).toBeCloseTo(15.6, 1);
+    expect(log?.principalPortion).toBeCloseTo(15, 1);
+    expect(log?.interestPortion).toBeCloseTo(0.6, 1);
+    expect((log?.principalPortion ?? 0) + (log?.interestPortion ?? 0)).toBeCloseTo(log?.installmentCharged ?? 0, 1);
+
+    // The early-payoff entry must NOT trip the season-end settlement idempotency guard, so the still
+    // active loan-active is settled normally in the same season.
+    const preview = previewLoanSettlement(result.gameState, "season-3");
+    expect(preview.duplicateDetected).toBe(false);
+    expect(preview.canApply).toBe(true);
+  });
 });

@@ -42,7 +42,6 @@ import {
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
-import { countSeasonCaptains, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerAvailabilityByPlayerId,
@@ -1326,43 +1325,47 @@ function buildRosterTargetValidationRows(save: PersistedSaveGame) {
   });
 }
 
+// Durable captain source: `gameState.teamCaptains` persists exactly ONE season captain per
+// team/season (both writers — setTeamCaptain and applyAiTeamPlayerDemandFulfillment — dedup by
+// seasonId+teamId), so the per-completed-season expectation is 1. The previous audit reconstructed
+// usage from `seasonState.lineupDrafts`, which the preseason workflow resets to [] every season
+// (preseason-workflow-service.ts) — for every already-completed season that source was wiped, so
+// the audit reported false `missing_source`/`captain_budget_underused` rows.
+const SEASON_CAPTAIN_RECORD_SLOTS = 1;
+
 function buildCaptainBudgetAuditRows(save: PersistedSaveGame) {
   const currentSeasonNumber = parseSeasonNumber(save.gameState.season.id);
   const completedSeasonCount = (save.gameState.gamePhase ?? "") === "season_completed"
     ? currentSeasonNumber
     : Math.max(0, currentSeasonNumber - 1);
+  const teamCaptains = save.gameState.teamCaptains ?? [];
   const rows: Array<Record<string, unknown>> = [];
   for (const team of save.gameState.teams) {
     let totalCaptainUsesToDate = 0;
     for (let seasonNumber = 1; seasonNumber <= completedSeasonCount; seasonNumber += 1) {
       const seasonId = `season-${seasonNumber}`;
-      const teamSeasonDrafts = (save.gameState.seasonState.lineupDrafts ?? []).filter(
-        (draft) => draft.teamId === team.teamId && draft.seasonId === seasonId,
-      );
-      const sourceStatus = teamSeasonDrafts.length > 0 ? "mapped" : "missing_source";
-      const captainUsedThisSeason = countSeasonCaptains({
-        lineups: save.gameState.seasonState.lineupDrafts ?? [],
-        teamId: team.teamId,
-        seasonId,
-      });
+      const captainUsedThisSeason = teamCaptains.filter(
+        (entry) => entry.teamId === team.teamId && entry.seasonId === seasonId,
+      ).length;
+      const sourceStatus = captainUsedThisSeason > 0 ? "mapped" : "missing_source";
       totalCaptainUsesToDate += captainUsedThisSeason;
-      const expectedCaptainUsesToDate = seasonNumber * SEASON_CAPTAIN_SLOTS;
+      const expectedCaptainUsesToDate = seasonNumber * SEASON_CAPTAIN_RECORD_SLOTS;
       rows.push({
         teamId: team.teamId,
         teamName: team.name,
         season: seasonId,
         captainUsedThisSeason,
-        captainLimitThisSeason: SEASON_CAPTAIN_SLOTS,
-        missingCaptainUsesThisSeason: Math.max(0, SEASON_CAPTAIN_SLOTS - captainUsedThisSeason),
+        captainLimitThisSeason: SEASON_CAPTAIN_RECORD_SLOTS,
+        missingCaptainUsesThisSeason: Math.max(0, SEASON_CAPTAIN_RECORD_SLOTS - captainUsedThisSeason),
         totalCaptainUsesToDate,
         expectedCaptainUsesToDate,
         delta: totalCaptainUsesToDate - expectedCaptainUsesToDate,
         reasonIfMissing:
           sourceStatus === "missing_source"
             ? "missing_source"
-            : captainUsedThisSeason < SEASON_CAPTAIN_SLOTS
+            : captainUsedThisSeason < SEASON_CAPTAIN_RECORD_SLOTS
               ? "captain_budget_underused"
-              : captainUsedThisSeason > SEASON_CAPTAIN_SLOTS
+              : captainUsedThisSeason > SEASON_CAPTAIN_RECORD_SLOTS
                 ? "captain_budget_overused"
                 : "ok",
         captainHistoryMissingSource: sourceStatus === "missing_source",
@@ -4196,7 +4199,7 @@ async function main() {
       ),
       "",
       "## Captain Budget",
-      `- Erwartet pro abgeschlossener Season/Team: ${SEASON_CAPTAIN_SLOTS}`,
+      `- Erwartet pro abgeschlossener Season/Team: ${SEASON_CAPTAIN_RECORD_SLOTS}`,
       `- Missing Source Rows: ${captainBudgetAuditRows.filter((row) => row.captainHistoryMissingSource).length}`,
       `- Underused Rows: ${captainBudgetAuditRows.filter((row) => row.reasonIfMissing === "captain_budget_underused").length}`,
     ].join("\n"),

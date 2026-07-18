@@ -1,6 +1,6 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
-import type { GameState, LoanOriginationLogRecord, LoanRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, LoanApplyLogRecord, LoanOriginationLogRecord, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
@@ -594,7 +594,9 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
 
 export function previewLoanSettlement(gameState: GameState, seasonId?: string): LoanSettlementPreview {
   const resolvedSeasonId = seasonId ?? gameState.season.id;
-  const existingLog = (gameState.seasonState.loanApplyLogs ?? []).some((log) => log.seasonId === resolvedSeasonId);
+  const existingLog = (gameState.seasonState.loanApplyLogs ?? []).some(
+    (log) => log.seasonId === resolvedSeasonId && log.kind !== "early_payoff",
+  );
   const rows = buildSettlementRows(gameState, resolvedSeasonId);
   const totalCashDelta = roundCash(rows.reduce((sum, row) => sum + row.cashDelta, 0));
 
@@ -791,7 +793,7 @@ export function applyEarlyPayoff(
     return { ok: false, reason: "borrower_not_found", payoff: 0, gameState };
   }
 
-  const { payoff } = computeEarlyPayoff(loan);
+  const { payoff, principalPortion, feePortion } = computeEarlyPayoff(loan);
   if (borrower.cash < payoff) {
     return { ok: false, reason: "insufficient_cash", payoff, gameState };
   }
@@ -799,6 +801,23 @@ export function applyEarlyPayoff(
   if (!options?.execute) {
     return { ok: true, reason: null, payoff, gameState };
   }
+
+  // Ledger-Eintrag für die Reconciliation (transfer-finance-audit.ts:getSeasonLoanCashByTeam):
+  // ohne ihn belastet die Ablösung `team.cash` (Kreditnehmer −payoff, Team-Verleiher +payoff), ohne
+  // dass der Cash-Sprung aus den Logs rekonstruierbar wäre → falsches `cash_reconciliation_delta_hard`.
+  // Schema wie eine Saison-End-Rate: `installmentCharged === principalPortion + interestPortion`,
+  // wobei die Prepayment-Fee als Zinsanteil attribuiert wird. `kind: "early_payoff"` hält die
+  // Settlement-Idempotenz (previewLoanSettlement/season-completion-service) davon ab, diesen Eintrag
+  // als "Saison bereits abgerechnet" zu werten.
+  const earlyPayoffLog: LoanApplyLogRecord = {
+    seasonId: gameState.season.id,
+    loanId: loan.loanId,
+    installmentCharged: roundCash(payoff),
+    interestPortion: roundCash(feePortion),
+    principalPortion: roundCash(principalPortion),
+    createdAt: new Date().toISOString(),
+    kind: "early_payoff",
+  };
 
   const nextGameState: GameState = {
     ...gameState,
@@ -818,6 +837,7 @@ export function applyEarlyPayoff(
           ? { ...entry, status: "paid" as const, principalOutstanding: 0, seasonsRemaining: 0 }
           : entry,
       ),
+      loanApplyLogs: [...(gameState.seasonState.loanApplyLogs ?? []), earlyPayoffLog],
     },
   };
 

@@ -1298,6 +1298,17 @@ export type TeamSponsorContract = {
   teamQualityRankAtSign?: number;
   /** Golden-Sponsor-Vertrag (aus dem gewählten Offer mitkopiert) — Rang-Payout-Boost gedeckelt. */
   isGolden?: boolean;
+  /**
+   * LOCKED-AT-SIGNING Rang-Payout-Leiter: `lockedRankPayoutLadder[finalRank - 1]` = die volle
+   * getSponsorPayoutForFinalRankAndTier-Summe für diesen Endrang, berechnet mit dem Anker + salaryFactor
+   * ZUM ZEITPUNKT DER UNTERSCHRIFT. Das Settlement zahlt am erreichten Endrang aus dieser gespeicherten
+   * Leiter (statt die Kurve aus den Season-End-Ankern neu abzuleiten), sodass eine Anker-/salaryFactor-Drift
+   * über die Saison die Auszahlung eines bereits unterschriebenen Vertrags nicht mehr verändert. Fehlt das
+   * Feld (Altsaves vor diesem Fix), fällt das Settlement auf die alte Season-End-Ableitung zurück.
+   */
+  lockedRankPayoutLadder?: number[];
+  /** salaryFactor zum Zeitpunkt der Unterschrift — für konsistente Meilenstein-Anzeige im Settlement. */
+  salaryFactorAtSign?: number;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -1350,6 +1361,16 @@ export type LoanApplyLogRecord = {
   interestPortion: number;
   principalPortion: number;
   createdAt: string;
+  /**
+   * Ledger-Quelle des Eintrags. Fehlt/`"settlement"` = reguläre Saison-End-Ratenbuchung
+   * (`applyLoanSettlement`). `"early_payoff"` = vorzeitige Ablösung (`applyEarlyPayoff`), die
+   * denselben Cash-Effekt trägt (Kreditnehmer −payoff, Team-Verleiher +payoff) und deshalb hier
+   * geloggt wird, damit die Cash-Reconciliation (transfer-finance-audit.ts) sie nicht als Leck
+   * meldet. Die Saison-End-Settlement-Idempotenz (`previewLoanSettlement`/`season-completion-service`)
+   * ignoriert `"early_payoff"`-Einträge bewusst — eine In-Season-Ablösung darf das Settlement
+   * derselben Saison NICHT als "bereits gelaufen" markieren.
+   */
+  kind?: "settlement" | "early_payoff";
 };
 
 /**
