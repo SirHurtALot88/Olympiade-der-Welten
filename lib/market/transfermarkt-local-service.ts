@@ -16,7 +16,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { withIncrementalSeasonDerivationsAfterTransfer } from "@/lib/foundation/incremental-season-derivations";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
-import { buildContractNegotiationPreview, recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
+import { buildContractNegotiationPreview, recommendContractOfferForPlayer, resolveContractLengthSalaryFactor } from "@/lib/market/contract-negotiation-preview";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import {
   buildRecentlySoldByTeam,
@@ -2217,7 +2217,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
       ? Math.max(0, roundValue(params.purchasePriceOverride))
       : null;
   const purchasePrice = purchasePriceOverride ?? marketValueReference;
-  const salary = player ? getPlayerSalary(player) : null;
+  const baseSalary = player ? getPlayerSalary(player) : null;
   const teamStrategyProfile = team ? getTeamStrategyProfile(gameState, team.teamId) : null;
   const rosterBefore = rosterEntries.length;
   const salaryBeforeFast = roundValue(
@@ -2264,6 +2264,15 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   const contractLength = hasExplicitContractLength
     ? Math.max(1, Math.round(params.contractLength!))
     : recommendedContract?.contractLength ?? 1;
+  // "Länger für weniger Gehalt": der AI-Fast-Buy-Pfad schrieb bislang ein pauschales
+  // Flat-Gehalt (getPlayerSalary) unabhängig von der Laufzeit — der Vertragslängen-Rabatt
+  // lebte nur im langsamen buildContractNegotiationPreview (menschlicher Pfad). Wir ziehen
+  // jetzt denselben Längen-Anteil des Verhandlungs-DemandMultipliers auf das Basisgehalt,
+  // damit KI-Signings auf 5-Jahres-Deals ein niedrigeres Jahresgehalt zahlen als auf 1-Jahres.
+  const contractLengthSalaryFactor = player
+    ? resolveContractLengthSalaryFactor({ player, contractLength, teamFit: recommendedTeamFit })
+    : 1;
+  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
   const contractShape =
     params.contractShape != null
       ? normalizeContractShape(params.contractShape)

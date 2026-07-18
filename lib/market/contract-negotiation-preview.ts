@@ -1068,6 +1068,33 @@ function deriveRetoolContractSalarySignal(
   };
 }
 
+/**
+ * Länge-getriebener Gehaltsfaktor: der Vertragslängen-Anteil des vollen Verhandlungs-
+ * DemandMultipliers (contractFactor * shortTerm * longFit * fit25 — exakt die Terme, die
+ * buildContractNegotiationPreview bei 1356-1373 aus dem Vertragslängen-Signal zieht).
+ * Damit kann der AI-Fast-Buy-Pfad denselben "länger für weniger Gehalt"-Rabatt auf das
+ * Basisgehalt anwenden wie die volle (menschliche) Verhandlung, statt ein pauschales
+ * Flat-Gehalt unabhängig von der Laufzeit zu schreiben. Deterministisch (Hash über Spieler+Jahre).
+ */
+export function resolveContractLengthSalaryFactor(input: {
+  player: Player | null;
+  contractLength: number;
+  teamFit?: number | null;
+  salaryPreferenceAdjustmentPct?: number;
+}): number {
+  const signal = deriveRetoolContractSalarySignal(
+    input.contractLength,
+    input.player ?? null,
+    typeof input.teamFit === "number" && Number.isFinite(input.teamFit) ? input.teamFit : 0,
+    input.salaryPreferenceAdjustmentPct ?? 0,
+  );
+  return clamp(
+    signal.contractFactor * signal.shortTermMultiplier * signal.longFitMultiplier * signal.fit25Multiplier,
+    0.5,
+    1.45,
+  );
+}
+
 function deriveContractShapeDemandSignal(contractShape: ContractShape) {
   const entries: NegotiationDemandBreakdownEntry[] = [];
 
