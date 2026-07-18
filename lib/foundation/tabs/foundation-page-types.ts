@@ -71,6 +71,7 @@ export type FoundationView =
   | "lineup"
   | "lineupV2"
   | "matchdayArena"
+  | "disciplineStage"
   | "matchdayResult"
   | "teams"
   | "training"

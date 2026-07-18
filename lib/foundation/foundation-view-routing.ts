@@ -14,6 +14,7 @@ export const FOUNDATION_VIEW_IDS = [
   "lineup",
   "lineupV2",
   "matchdayArena",
+  "disciplineStage",
   "matchdayResult",
   "teams",
   "training",

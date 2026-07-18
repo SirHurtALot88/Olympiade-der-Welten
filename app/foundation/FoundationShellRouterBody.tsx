@@ -257,6 +257,10 @@ const FoundationDiszisHost = dynamic(() => import("@/app/foundation/ranks-v2/Fou
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Diszis werden geladen…" />,
 });
+const FoundationDisciplineStageHost = dynamic(() => import("@/app/foundation/discipline-stage/FoundationDisciplineStageHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Disziplin-Bühne wird geladen…" />,
+});
 const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
@@ -2914,6 +2918,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
+          {activeView === "disciplineStage" ? <FoundationDisciplineStageHost /> : null}
 
           <FoundationShellRouterPrize
             active={activeView === "prize"}
