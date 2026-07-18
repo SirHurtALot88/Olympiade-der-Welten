@@ -198,4 +198,56 @@ describe("player attribute ceiling service", () => {
       }),
     );
   });
+
+  it("reports an at/over-cap attribute as capped with 0 headroom (not open/0.80 multiplier)", () => {
+    // Bugfix: Ein bruchteilig ueber dem ganzzahligen Ceiling liegender Wert wurde frueher
+    // als state:"open"/headroom:2 gemeldet, was den Performance-Wachstumsmultiplikator von
+    // 0.55 (am Limit) auf 0.80 anhob und den Potenzial-Cap durchbrach.
+    const target = player({
+      id: "over-cap-player",
+      attributeSheetStats: {
+        power: 72.4, // gebrochen ueber dem ganzzahligen Ceiling 72
+        health: 70,
+        stamina: 68,
+        speed: 40,
+        dexterity: 38,
+        awareness: 36,
+        intelligence: 35,
+        will: 34,
+        charisma: 40,
+        spirit: 38,
+        determination: 42,
+        torment: 45,
+      },
+    });
+    const record: PlayerPotentialRecord = {
+      playerId: target.id,
+      potentialBand: "medium",
+      hiddenPotentialScore: 70,
+      confidence: 0,
+      source: "generated",
+      hiddenAttributeCeiling: {
+        power: 72,
+        health: 75,
+        stamina: 70,
+        speed: 80,
+        dexterity: 78,
+        awareness: 76,
+        intelligence: 74,
+        will: 72,
+        charisma: 78,
+        spirit: 76,
+        determination: 80,
+        torment: 73,
+      },
+    };
+
+    const headroom = getAttributeHeadroom({ player: target, attribute: "power", record });
+    expect(headroom.state).toBe("capped");
+    expect(headroom.headroom).toBe(0);
+    expect(headroom.ceiling).toBe(72); // echtes Ceiling, kein kuenstliches current+2
+    // At-cap Performance-Multiplikator = 0.55, NICHT 0.80.
+    expect(getPerformanceHeadroomGrowthMultiplier(headroom.headroom)).toBeCloseTo(0.55, 5);
+    expect(getPerformanceHeadroomGrowthMultiplier(headroom.headroom)).toBeLessThan(0.8);
+  });
 });

@@ -857,7 +857,16 @@ export function buildOrganicSeasonProgression(input: {
       performanceWeightMultiplier;
     const delta = roundValue(regression + training + performanceDelta, 2);
     const before = attributesBefore[attribute];
-    const after = roundValue(clamp(before + delta, 1, 99), 1);
+    // Harte Ceiling-Bindung: Attributwachstum darf das (reconciled) Attribut-Ceiling
+    // nie ueberschreiten. Damit bindet der Potenzial-Cap (v4) tatsaechlich als
+    // Obergrenze und ein Performer wird nicht ueber sein Limit gedrueckt (was sonst
+    // per Round-Over das Ceiling selbst anheben und den Cap aushebeln wuerde).
+    // Ohne bekanntes Ceiling bleibt es bei der bisherigen 99er-Grenze; Sub-Cap-
+    // Wachstum bleibt unveraendert.
+    const attributeCeilingCap = isFiniteNumber(attributeHeadroom.ceiling)
+      ? Math.min(99, attributeHeadroom.ceiling)
+      : 99;
+    const after = roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
     return {
       attribute,
       before,

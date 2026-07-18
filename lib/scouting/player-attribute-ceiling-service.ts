@@ -268,12 +268,18 @@ export function getAttributeHeadroom(input: {
     };
   }
   const headroom = ceiling - current;
-  if (headroom < 0) {
+  // Das gespeicherte Ceiling ist ganzzahlig, der aktuelle Wert kann gebrochen sein.
+  // Sobald current das Ceiling erreicht ODER (auch nur bruchteilig) ueberschreitet,
+  // ist das Attribut AM/UEBER Limit -> 0 Headroom, Zustand "capped". Frueher meldete
+  // ein negativer Headroom faelschlich "open"/Headroom 2 (kuenstliches Ceiling
+  // current+2), wodurch der Performance-Wachstumsmultiplikator von 0.55 (am Limit)
+  // auf 0.80 stieg und der Potenzial-Cap (v4) durchbrochen wurde.
+  if (headroom <= 0) {
     return {
       current,
-      ceiling: current + 2,
-      headroom: 2,
-      state: "open" as AttributeHeadroomState,
+      ceiling,
+      headroom: 0,
+      state: "capped" as AttributeHeadroomState,
     };
   }
   let state: AttributeHeadroomState = "open";

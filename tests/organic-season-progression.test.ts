@@ -277,6 +277,84 @@ describe("organic season progression", () => {
     expect(poor.netSetpoints).toBeLessThan(average.netSetpoints);
   });
 
+  it("binds the attribute ceiling as a hard cap: an at-cap performer does not grow past it", () => {
+    // Bugfix: Der Potenzial-Cap (v4) muss als harte Obergrenze wirken. Ein Performer, der
+    // sein Attribut-Ceiling erreicht hat, darf trotz starker Leistung nicht darueber wachsen –
+    // waehrend derselbe Spieler mit offenem Ceiling sehr wohl weiter waechst.
+    const cappedPlayer = player({ id: "capped-perf" });
+    const openPlayer = player({ id: "open-perf" });
+    const cappedState = gameState(cappedPlayer);
+    const openState = gameState(openPlayer);
+    // Sechs starke Power-Leistungen: appearances >= 4 aktiviert den High-Gap-Performance-Bailout.
+    const strongPerf = (playerId: string) => ({
+      matchdayResults: Array.from({ length: 6 }, (_, index) => ({
+        id: `sp-result-${index + 1}`,
+        seasonId: "season-1",
+        matchdayId: `sp-md-${index + 1}`,
+        status: "preview_applied" as const,
+      })),
+      perfs: Array.from({ length: 6 }, (_, index) => ({
+        id: `sp-perf-${index + 1}`,
+        matchdayResultId: `sp-result-${index + 1}`,
+        teamId: "team-1",
+        playerId,
+        activePlayerId: null,
+        disciplineId: "gewichtheben",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 70,
+        finalPlayerScore: 98,
+        scoreContribution: 30,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      })),
+    });
+    const cappedPerf = strongPerf(cappedPlayer.id);
+    cappedState.seasonState.matchdayResults = cappedPerf.matchdayResults;
+    cappedState.seasonState.playerDisciplinePerformances = cappedPerf.perfs;
+    const openPerf = strongPerf(openPlayer.id);
+    openState.seasonState.matchdayResults = openPerf.matchdayResults;
+    openState.seasonState.playerDisciplinePerformances = openPerf.perfs;
+
+    // power current = 70 (siehe attrs). Capped: Ceiling exakt am aktuellen Wert; Open: klar darueber.
+    cappedState.playerPotential = [
+      {
+        playerId: cappedPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 70,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: { power: 70 },
+      },
+    ];
+    openState.playerPotential = [
+      {
+        playerId: openPlayer.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 90,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: { power: 90 },
+      },
+    ];
+
+    const cappedResult = buildOrganicSeasonProgression({ gameState: cappedState, player: cappedPlayer });
+    const openResult = buildOrganicSeasonProgression({ gameState: openState, player: openPlayer });
+    const cappedPower = cappedResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+    const openPower = openResult.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+
+    // Harte Obergrenze: der at-cap Spieler ueberschreitet sein Ceiling (70) NICHT.
+    expect(cappedPower.after).toBeLessThanOrEqual(70);
+    // Der offene Spieler waechst mit derselben Leistung ueber 70 hinaus -> der Cap ist das,
+    // was hier bindet (kein Zero-Out legitimen Sub-Cap-Wachstums).
+    expect(openPower.after).toBeGreaterThan(70);
+    expect(openPower.after).toBeGreaterThan(cappedPower.after);
+  });
+
   it("lets signature attributes gain a little faster in organic progression", () => {
     const signaturePlayer = player({ id: "signature", className: "Badass" });
     const neutralPlayer = player({ id: "neutral", className: "Mage" });
