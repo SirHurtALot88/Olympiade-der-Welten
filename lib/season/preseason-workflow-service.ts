@@ -99,10 +99,6 @@ function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
 const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
   "power",
   "health",
@@ -198,14 +194,16 @@ function advancePlayerMoraleCarryState(gameState: GameState) {
   });
 }
 
-export function applySeasonBaselineProgression(gameState: GameState, options: { completedSeasonId?: string } = {}) {
+export function applySeasonBaselineProgression(
+  gameState: GameState,
+  // `completedSeasonId` bleibt in der Signatur (Aufrufer/Tests übergeben ihn), wird hier aber nicht
+  // mehr ausgewertet: Die Season-End-Progression rostered Spieler ist zu diesem Zeitpunkt bereits über
+  // runSeasonEndProgressionBatch (materializeSeasonEndProgressionBeforeNextSeason) auf die Attribute
+  // angewandt. Es gibt daher keinen "progressiert / nicht progressiert"-Fall mehr, der hier verzweigen
+  // müsste — rostered Spieler behalten schlicht ihren aktuellen Wert (siehe unten), Free Agents driften.
+  _options: { completedSeasonId?: string } = {},
+) {
   const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
-  const completedSeasonId = options.completedSeasonId ?? gameState.season.id;
-  const progressedThisSeasonPlayerIds = new Set(
-    (gameState.playerProgressionEvents ?? [])
-      .filter((event) => event.seasonId === completedSeasonId)
-      .map((event) => event.playerId),
-  );
   const baselineByPlayerId = new Map(
     (gameState.playerBaselines ?? []).map((baseline) => {
       const normalized = normalizePlayerBaselineRecord(baseline);
@@ -250,19 +248,15 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
     }
 
     const isRostered = rosterPlayerIds.has(player.id);
-    const hasSeasonEndProgression = progressedThisSeasonPlayerIds.has(player.id);
     const freeAgentRecoveryFraction = 0.12;
     // Unrostered players drift 12% per season toward playerBaselines (attrs, MW, salary).
+    // Rostered Spieler behalten ihren aktuellen (bereits per Season-End-Progression fortgeschriebenen)
+    // Wert; nur wenn der Attributwert fehlt, fällt er auf das Baseline zurück.
     const nextAttributePatch = Object.fromEntries(
       ATTRIBUTE_KEYS.map((attribute) => {
         const currentValue = toFiniteNumber(player.attributeSheetStats?.[attribute]);
         if (isRostered) {
-          return [
-            attribute,
-            hasSeasonEndProgression
-              ? (currentValue ?? baseline.attributes[attribute])
-              : (currentValue ?? baseline.attributes[attribute]),
-          ];
+          return [attribute, currentValue ?? baseline.attributes[attribute]];
         }
         return [
           attribute,
@@ -399,7 +393,13 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
       // fatigue so the new season starts a fresh mode-count/fatigue tally.
       seasonTrainingAccumulator: null,
-      fatigue: isRostered ? 0 : clamp(player.fatigue ?? 0, 0, 100),
+      // Fatigue an der Saisongrenze für ALLE Spieler auf 0 zurücksetzen — konsistent mit dem geleerten
+      // seasonTrainingAccumulator. player.fatigue ist zusammengesetzt aus Match-Fatigue + der
+      // aufgelaufenen Trainings-Fatigue-Schicht (siehe matchday-training-accumulator). Wird der
+      // Accumulator geleert, aber die volle Vorsaison-Fatigue eines Free Agents behalten, startete der
+      // Free Agent mit stale/aufgeblähter Fatigue OHNE zugehörigen Accumulator. Rostered Spieler wurden
+      // schon immer auf 0 gesetzt; Free Agents werden jetzt genauso normalisiert.
+      fatigue: 0,
     };
   });
 
@@ -705,7 +705,17 @@ function buildNextSeasonGameState(
   };
 
   const nextGameState = transferPipelineFast
-    ? refreshTeamObjectiveState(advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId))
+    ? // FAST-Pfad (Sims/Long-Run): die teuren Schritte (Season-End-Progression, FormCards, Sponsor-
+      // Angebots-Neugenerierung, Scout-Intel) bleiben übersprungen, ABER die Beliebtheits-KPI-
+      // Fortschreibung läuft AUCH hier — sonst friert die Arena-Kopplung (mean-reverting Beliebtheit)
+      // im Sim-/Fast-Pfad ein und driftet gegenüber dem normalen Übergang. Reihenfolge wie im Normal-
+      // pfad: abgeschlossene Saison lesen, in die frisch aktivierte Folge-Saison fortschreiben.
+      refreshTeamObjectiveState(
+        advanceTeamBeliebtheitForSeasonTransition({
+          completedGameState: save.gameState,
+          nextGameState: advanceSponsorContractsForNewSeason(baseGameState, nextSeasonId),
+        }),
+      )
     : refreshTeamObjectiveState(
         advanceScoutIntelTick({
           gameState: chooseSponsorOfferForAiTeams(
@@ -775,11 +785,19 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
 } {
   // Benchmark freeze integrity: the authoritative season snapshot is written at
   // season completion (season-completion-service), AFTER sponsor + facility
-  // settlement but BEFORE the transfer window — so its MW/Cash/roster are the
-  // "end of season, post-sponsors, pre-sales" values. This preseason path runs
-  // AFTER sales, so rebuilding + upserting from the current gameState would
-  // clobber those frozen values with post-sale numbers. If a `completed`
-  // snapshot for this season already exists, treat it as immutable and keep it.
+  // settlement but BEFORE the transfer window. The ONE value that must stay
+  // frozen is `cashEnd` — the TRUE, audit-only season-end cash (post-sponsors,
+  // pre-sale). It is deliberately NOT advanced by preseason cash movements:
+  // overwriting it with the current, post-preseason-spend cash would understate
+  // season N's cashStart in the reconciliation audit (getSnapshotCashByTeam) and
+  // double-count the preseason spend as a false-positive cash_reconciliation_delta_hard
+  // (see the NOTE in season-snapshot-service.buildTeamEntryEconomyFromGameState).
+  // Roster/salary/market-value are NOT frozen here — they are refreshed to the
+  // post-preseason-buy entry state separately via
+  // patchCompletedSeasonSnapshotAfterPreseasonBuy, which preserves `cashEnd`.
+  // Therefore: if a `completed` snapshot for this season already exists, keep it
+  // as-is (rebuilding + upserting from the current gameState would clobber the
+  // audit-only frozen `cashEnd` with a post-sale number).
   const existingCompletedSnapshot = (save.gameState.seasonState.seasonSnapshots ?? []).find(
     (snapshot) => snapshot.seasonId === save.gameState.season.id && snapshot.status === "completed",
   );

@@ -534,6 +534,72 @@ describe("pre-season workflow service", () => {
     }
   });
 
+  it("resets free-agent fatigue to 0 at the season boundary, consistently with rostered players", () => {
+    // Regression: der seasonTrainingAccumulator wird an der Saisongrenze für ALLE geleert, aber die
+    // Fatigue eines Free Agents wurde zuvor NUR geklemmt (volle Vorsaison-Fatigue inkl. Trainings-
+    // Schicht behalten) — der Free Agent startete also mit stale/aufgeblähter Fatigue OHNE passenden
+    // Accumulator. Jetzt wird sie wie bei rostered Spielern auf 0 zurückgesetzt.
+    const sourceSave = save();
+    const freeAgent = createPlayer({ id: "fa-fatigued", name: "Tired Free Agent", fatigue: 91 });
+    sourceSave.gameState.players.push(freeAgent);
+    sourceSave.gameState.playerBaselines = [
+      ...(sourceSave.gameState.playerBaselines ?? []),
+      createPlayerBaselineFromPlayer(freeAgent, { source: "seed", createdAt: "2026-06-11T00:00:00.000Z" }),
+    ];
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+
+    const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!savedState) throw new Error("Expected lightweight next season setup to persist state.");
+    const savedFreeAgent = savedState.players.find((player) => player.id === "fa-fatigued");
+    const rosterPlayerIds = new Set(savedState.rosters.map((entry) => entry.playerId));
+    expect(rosterPlayerIds.has("fa-fatigued")).toBe(false);
+    expect(savedFreeAgent?.fatigue ?? 0).toBe(0);
+    expect(savedFreeAgent?.seasonTrainingAccumulator ?? null).toBeNull();
+  });
+
+  it("advances the beliebtheit KPI even in transfer-pipeline FAST mode", () => {
+    // Regression: der FAST-Pfad übersprang advanceTeamBeliebtheitForSeasonTransition — dadurch fror die
+    // Arena-Kopplung (mean-reverting Beliebtheit) im Sim-/Fast-Übergang ein. Jetzt läuft die
+    // Fortschreibung auch im FAST-Pfad.
+    const previous = process.env.OLY_TRANSFER_PIPELINE_FAST;
+    process.env.OLY_TRANSFER_PIPELINE_FAST = "1";
+    try {
+      const sourceSave = save();
+      const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+      const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+
+      const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+      const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+      expect(result.applied).toBe(true);
+      if (!savedState) throw new Error("Expected fast-mode next season setup to persist state.");
+      // Wir sind tatsächlich im FAST-Pfad (teure Season-Prep übersprungen).
+      expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.warnings).toContain(
+        "transfer_pipeline_fast_skip_expensive_season_prep",
+      );
+      const beliebtheit = savedState.seasonState.beliebtheitByTeamId ?? {};
+      expect(Object.keys(beliebtheit).sort()).toEqual(["ai-1", "human-1"]);
+      for (const teamId of ["human-1", "ai-1"]) {
+        const value = beliebtheit[teamId]?.value;
+        expect(typeof value).toBe("number");
+        expect(value).toBeGreaterThanOrEqual(0.5);
+        expect(value).toBeLessThanOrEqual(1.5);
+      }
+      // Zeitreihe je Team fortgeschrieben.
+      expect(savedState.seasonState.beliebtheitHistoryByTeamId?.["human-1"]?.length ?? 0).toBeGreaterThan(0);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.OLY_TRANSFER_PIPELINE_FAST;
+      } else {
+        process.env.OLY_TRANSFER_PIPELINE_FAST = previous;
+      }
+    }
+  });
+
   it("pulls free agents gradually back toward their original baseline next season", () => {
     const sourceSave = save();
     const freeAgent = createPlayer({
