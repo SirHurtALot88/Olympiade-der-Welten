@@ -1,8 +1,9 @@
-import type { GameState, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import {
   buildTeamSeasonOverviewRows,
   type TeamManagementSnapshotRow,
 } from "@/lib/foundation/team-management-overview";
+import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 
 export type SponsorTeamQualityComponent = {
   key: string;
@@ -17,6 +18,10 @@ export type SponsorTeamQualityRank = {
   components: SponsorTeamQualityComponent[];
   maxStarTier: SponsorStarTier;
   targetStarTier: SponsorStarTier;
+  /** Rarity-Obergrenze (= mapStarTierToRarity(maxStarTier)); die Roller lesen die Rarity-Decke direkt. */
+  maxRarity: SponsorRarity;
+  /** Rarity-Ziel (= mapStarTierToRarity(targetStarTier)) — der Normalfall unter der Decke. */
+  targetRarity: SponsorRarity;
   leaguePosition: number;
   leaguePercentile: number;
 };
@@ -263,6 +268,8 @@ export function buildLeagueTeamQualityRanks(
       components: entry.components,
       maxStarTier: entry.maxStarTier,
       targetStarTier,
+      maxRarity: mapStarTierToRarity(entry.maxStarTier),
+      targetRarity: mapStarTierToRarity(targetStarTier),
       leaguePosition,
       leaguePercentile,
     });

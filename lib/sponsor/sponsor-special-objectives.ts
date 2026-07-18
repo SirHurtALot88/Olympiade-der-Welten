@@ -1,9 +1,10 @@
 import type {
   GameState,
   SponsorArchetype,
+  SponsorCurveShape,
   SponsorObjectiveStage,
   SponsorOfferComponent,
-  SponsorStarTier,
+  SponsorRarity,
   Team,
   TeamIdentity,
   TeamStrategyProfile,
@@ -11,7 +12,19 @@ import type {
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-variants";
+import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
+import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+
+/**
+ * Rarity-Ordnung (0..3, gewöhnlich..legendär) als neue Schwierigkeits-Achse anstelle des Sternrangs. Die
+ * Schwellwerte sind deckungsgleich zum alten Sternvergleich abgebildet (Legacy ★→Rarity: gew=2, mag=3,
+ * sel=4, leg=5): `starTier >= 4` ⇔ order >= 2 (selten/legendär), `>= 3` ⇔ order >= 1 (magisch), `>= 5` ⇔
+ * order >= 3 (legendär).
+ */
+function rarityOrder(rarity: SponsorRarity): number {
+  return SPONSOR_RARITIES[rarity].order;
+}
 
 export type SponsorAxisKey = "pow" | "spe" | "men" | "soc";
 
@@ -230,7 +243,7 @@ export function buildChallengeSpecialComponent(input: {
   team: Team;
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
-  starTier: SponsorStarTier;
+  rarity: SponsorRarity;
   rewardCash: number;
   seasonId: string;
 }): SponsorOfferComponent {
@@ -244,11 +257,12 @@ export function buildChallengeSpecialComponent(input: {
     profile: input.profile,
     rows,
   });
-  const demandBoost = input.starTier >= 4 ? 1 : input.starTier >= 3 ? 0 : -1;
+  const order = rarityOrder(input.rarity);
+  const demandBoost = order >= 2 ? 1 : order >= 1 ? 0 : -1;
 
   if (kind === "salary_pressure_max" && row) {
     const salaryTotal = row.salaryTotal ?? getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
-    const targetSalary = round1(Math.max(20, salaryTotal * (input.starTier >= 4 ? 0.9 : 0.93)));
+    const targetSalary = round1(Math.max(20, salaryTotal * (order >= 2 ? 0.9 : 0.93)));
     return {
       componentId: "special-salary-pressure",
       kind: "special",
@@ -261,7 +275,7 @@ export function buildChallengeSpecialComponent(input: {
   }
 
   if (kind === "transfer_profit_min" && row) {
-    const target = Math.max(3, 5 + demandBoost + (input.starTier >= 5 ? 2 : 0));
+    const target = Math.max(3, 5 + demandBoost + (order >= 3 ? 2 : 0));
     return {
       componentId: "special-transfer-profit",
       kind: "special",
@@ -298,12 +312,13 @@ export function buildChallengeSpecialComponent(input: {
 
 export function buildStandardSpecialComponent(input: {
   templateId: SponsorSpecialTemplateId;
-  starTier: SponsorStarTier;
+  rarity: SponsorRarity;
   rewardCash: number;
 }): SponsorOfferComponent {
-  const demandBoost = input.starTier >= 4 ? 1 : input.starTier >= 3 ? 0 : -1;
+  const order = rarityOrder(input.rarity);
+  const demandBoost = order >= 2 ? 1 : order >= 1 ? 0 : -1;
   if (input.templateId === "transfer_profit_min") {
-    const target = Math.max(3, 5 + demandBoost + (input.starTier >= 5 ? 2 : 0));
+    const target = Math.max(3, 5 + demandBoost + (order >= 3 ? 2 : 0));
     return {
       componentId: "special-transfer-profit",
       kind: "special",
@@ -314,7 +329,7 @@ export function buildStandardSpecialComponent(input: {
     };
   }
   if (input.templateId === "discipline_top3_count") {
-    const target = Math.max(1, 2 + demandBoost + (input.starTier >= 5 ? 1 : 0));
+    const target = Math.max(1, 2 + demandBoost + (order >= 3 ? 1 : 0));
     return {
       componentId: "special-discipline-top3",
       kind: "special",
@@ -324,7 +339,7 @@ export function buildStandardSpecialComponent(input: {
       specialKey: "discipline_top3_count",
     };
   }
-  const colors = input.starTier >= 4 ? 5 : 4;
+  const colors = order >= 2 ? 5 : 4;
   return {
     componentId: "special-roster-form",
     kind: "special",
@@ -533,7 +548,7 @@ export type BonusObjectiveBuildInput = {
   identity: TeamIdentity | null;
   profile: TeamStrategyProfile | null;
   rewardCash: number;
-  starTier: SponsorStarTier;
+  rarity: SponsorRarity;
   seasonId: string;
   /** Optionaler expliziter Rival-Team (für rival_humiliation); sonst wird über den Snapshot heuristisch gewählt. */
   rivalTeamId?: string | null;
@@ -655,7 +670,7 @@ export function buildBonusObjectiveComponent(
         specialKey: "fan_infrastructure",
       };
     case "roster_diversity": {
-      const colors = input.starTier >= 4 ? 5 : 4;
+      const colors = rarityOrder(input.rarity) >= 2 ? 5 : 4;
       return {
         ...base,
         componentId: "special-roster-diversity",
@@ -676,7 +691,7 @@ export function buildBonusObjectiveComponent(
       };
     case "salary_discipline": {
       const salaryTotal = getTeamDisplaySalaryTotal(input.gameState, input.team.teamId);
-      const targetSalary = round1(Math.max(20, salaryTotal * (input.starTier >= 4 ? 0.9 : 0.93)));
+      const targetSalary = round1(Math.max(20, salaryTotal * (rarityOrder(input.rarity) >= 2 ? 0.9 : 0.93)));
       return {
         ...base,
         componentId: "special-salary-discipline",
@@ -805,9 +820,11 @@ export function buildGoldenObjectiveComponent(
 export function pickGoldenObjective(
   seasonId: string,
   teamId: string,
-  archetype: SponsorArchetype,
+  curveShape: SponsorCurveShape,
   teamQualityRank?: number | null,
 ): SponsorGoldenObjectiveKey {
+  // Kurvenform → Familie → (Legacy-)Archetyp-Bucket: der Golden-Ziel-Katalog ist noch archetyp-verschlagwortet.
+  const archetype = mapCurveShapeToArchetype(curveShape);
   const all = Object.keys(SPONSOR_GOLDEN_OBJECTIVE_ARCHETYPE) as SponsorGoldenObjectiveKey[];
   const isTopStrength =
     teamQualityRank != null &&
@@ -865,9 +882,11 @@ export function isTransferTraderAvailableForSeason(seasonId: string): boolean {
  * Pool der Standard-Bonusziele eines Archetyps, saison-gefiltert (Transfer-Händler in S1 ausgeschlossen).
  */
 export function getAvailableBonusObjectiveKeys(
-  archetype: SponsorArchetype,
+  curveShape: SponsorCurveShape,
   seasonId: string,
 ): SponsorBonusObjectiveKey[] {
+  // Bucketing über die Kurvenform-Familie (→ Legacy-Archetyp), nicht mehr direkt über den Archetyp.
+  const archetype = mapCurveShapeToArchetype(curveShape);
   const keys = (Object.keys(SPONSOR_BONUS_OBJECTIVE_ARCHETYPE) as SponsorBonusObjectiveKey[]).filter(
     (key) => SPONSOR_BONUS_OBJECTIVE_ARCHETYPE[key] === archetype,
   );
@@ -914,12 +933,13 @@ export function filterBonusObjectivesByStrength(
 export function pickBonusObjective(
   seasonId: string,
   teamId: string,
-  archetype: SponsorArchetype,
+  curveShape: SponsorCurveShape,
   slotIndex: number,
   teamQualityRank?: number | null,
 ): SponsorBonusObjectiveKey | null {
+  const archetype = mapCurveShapeToArchetype(curveShape);
   const keys = filterBonusObjectivesByStrength(
-    getAvailableBonusObjectiveKeys(archetype, seasonId).filter((key) => key !== "transfer_trader"),
+    getAvailableBonusObjectiveKeys(curveShape, seasonId).filter((key) => key !== "transfer_trader"),
     teamQualityRank,
   );
   if (keys.length === 0) {

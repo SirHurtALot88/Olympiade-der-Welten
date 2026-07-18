@@ -1,7 +1,9 @@
-import type { SponsorArchetype, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { SponsorArchetype, SponsorCurveShape, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
 
 import type { SponsorBrandIndustry, SponsorBrandParent } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
+import { SPONSOR_RARITIES, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
+import { mapCurveShapeToArchetype } from "@/lib/sponsor/sponsor-tier-pool";
 
 export type SponsorSpecialTemplateId =
   | "transfer_profit_min"
@@ -181,30 +183,47 @@ function getStableUnitHash(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
+/**
+ * Der Legacy-Sternbereich einer Variante (`tierRange`, 1..5) in den Rarity-Ordnungsbereich (0..3) übersetzt.
+ * Deckungsgleich mit dem alten Sternvergleich: mapStarTierToRarity faltet ★→Rarity, deren order bildet die
+ * neue "Tier"-Achse. So filtert die Auswahl nach `SPONSOR_RARITIES[rarity].order` statt nach dem Sternrang,
+ * ohne den bestehenden Kanon (Sternbereiche der Blueprints) zu verändern.
+ */
+function tierRangeToRarityOrder(tierRange: [SponsorStarTier, SponsorStarTier]): [number, number] {
+  return [
+    SPONSOR_RARITIES[mapStarTierToRarity(tierRange[0])].order,
+    SPONSOR_RARITIES[mapStarTierToRarity(tierRange[1])].order,
+  ];
+}
+
 export function pickVariantForParent(input: {
   parentId: string;
-  archetype: SponsorArchetype;
-  starTier: SponsorStarTier;
+  /** Kurvenform statt Archetyp — die Familie bestimmt via mapCurveShapeToArchetype den Varianten-Archetyp. */
+  curveShape: SponsorCurveShape;
+  /** Rarität statt Sternrang — SPONSOR_RARITIES[rarity].order ist die neue Tier-Achse für das Range-Filter. */
+  rarity: SponsorRarity;
   seasonId: string;
   teamId: string;
   slotIndex: number;
 }): SponsorBrandTemplate | null {
   const variants = listVariantsForParent(input.parentId);
-  const matchesArchetypeAndTier = (variant: SponsorBrandTemplate) =>
-    variant.archetype === input.archetype &&
-    input.starTier >= variant.tierRange[0] &&
-    input.starTier <= variant.tierRange[1];
+  const archetype = mapCurveShapeToArchetype(input.curveShape);
+  const rarityOrder = SPONSOR_RARITIES[input.rarity].order;
+  const matchesArchetypeAndTier = (variant: SponsorBrandTemplate) => {
+    const [loOrder, hiOrder] = tierRangeToRarityOrder(variant.tierRange);
+    return variant.archetype === archetype && rarityOrder >= loOrder && rarityOrder <= hiOrder;
+  };
 
   let candidates = variants.filter((variant) => matchesArchetypeAndTier(variant));
   if (candidates.length === 0) {
-    candidates = variants.filter((variant) => variant.archetype === input.archetype);
+    candidates = variants.filter((variant) => variant.archetype === archetype);
   }
   if (candidates.length === 0) {
     return null;
   }
 
   const index = Math.floor(
-    getStableUnitHash(`${input.seasonId}:${input.teamId}:${input.parentId}:${input.archetype}:${input.slotIndex}:variant`) *
+    getStableUnitHash(`${input.seasonId}:${input.teamId}:${input.parentId}:${archetype}:${input.slotIndex}:variant`) *
       candidates.length,
   );
   return candidates[index] ?? candidates[0]!;

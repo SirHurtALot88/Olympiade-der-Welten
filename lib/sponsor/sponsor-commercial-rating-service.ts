@@ -1,5 +1,6 @@
-import type { GameState, SponsorCommercialRating, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorCommercialRating, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { computeSponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 function clamp(value: number, min: number, max: number) {
@@ -64,10 +65,15 @@ function scoreToTierHint(score: number): SponsorStarTier {
   return 1;
 }
 
+/** Native Rarity-Erwartung aus dem Kommerz-Score (der ★-Hint durch mapStarTierToRarity). */
+function scoreToRarityHint(score: number): SponsorRarity {
+  return mapStarTierToRarity(scoreToTierHint(score));
+}
+
 export function buildSponsorCommercialRating(input: {
   gameState: GameState;
   teamId: string;
-}): SponsorCommercialRating {
+}): SponsorCommercialRating & { rarityHint: SponsorRarity } {
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
@@ -104,6 +110,8 @@ export function buildSponsorCommercialRating(input: {
   return {
     score,
     tierHint: scoreToTierHint(score),
+    // Native Rarity-Erwartung (treibt "Erwartung: {rarity}" in der UI direkt); tierHint bleibt back-compat.
+    rarityHint: scoreToRarityHint(score),
     breakdown: {
       recentPerformance: Number(recentPerformance.toFixed(1)),
       rosterPotential: Number(rosterPotential.toFixed(1)),

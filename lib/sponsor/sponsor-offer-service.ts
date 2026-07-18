@@ -135,8 +135,8 @@ function buildOffer(input: {
     team,
     identity,
     profile,
-    archetype,
-    starTier,
+    curveShape,
+    rarity,
     slotIndex,
     usedParentBrandIds: input.usedParentBrandIds,
     recentParentBrandIds: input.recentParentBrandIds,
@@ -202,18 +202,18 @@ function buildOffer(input: {
     identity,
     profile,
     rewardCash: specialCash,
-    starTier,
+    rarity,
     seasonId: gameState.season.id,
     teamQualityRank,
   };
   let specialComponent: SponsorOfferComponent = legacySpecialComponent;
   if (isGolden) {
     specialComponent = buildGoldenObjectiveComponent(
-      pickGoldenObjective(gameState.season.id, team.teamId, archetype, teamQualityRank),
+      pickGoldenObjective(gameState.season.id, team.teamId, curveShape, teamQualityRank),
       bonusObjectiveInput,
     );
   } else if (specialMode !== "challenge") {
-    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, archetype, slotIndex, teamQualityRank);
+    const bonusKey = pickBonusObjective(gameState.season.id, team.teamId, curveShape, slotIndex, teamQualityRank);
     if (bonusKey) {
       specialComponent = buildBonusObjectiveComponent(bonusKey, bonusObjectiveInput);
     }
