@@ -534,6 +534,9 @@ function FoundationTeamsDetailPanel({
   // NlEmptyState), mit Flag AUS exakt die bisherige Struktur — reine
   // Hüllen-Umschaltung, keine Datenänderung.
   const [nlContractSort, setNlContractSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  // Vertrags-Auslauf-Center: Sichtbarkeit umschalten zwischen nur auslaufenden
+  // Verträgen (LZ ≤ 1) und dem ganzen aktiven Kader (für Buyout-und-Verkauf).
+  const [auslaufScope, setAuslaufScope] = useState<"expiring" | "all">("expiring");
 
   useEffect(() => {
     if (!showLeagueLogos) {
@@ -1126,30 +1129,53 @@ function FoundationTeamsDetailPanel({
                     {selectedTeam
                       ? (() => {
                           /* Vertrags-Auslauf-Center: fokussiertes „verlängern-oder-verkaufen"-
-                             Cockpit für alle Verträge mit LZ ≤ 1 (letzte Saison, endet nach
-                             MD10). Bewusst KEINE zweite Volltabelle — kompakte Entscheidungs-
-                             karten mit Performance (PPs/OVR) + Vertragsdaten nebeneinander,
-                             damit die Keep-/Sell-Entscheidung fundiert in einem Klick fällt. */
-                          const auslaufRows = (visibleSelectedTeamContractRows ?? []).filter(
-                            (row) => row.status === "active" && row.contractLength <= 1,
+                             Cockpit. Modus „Auslaufend" zeigt nur Verträge mit LZ ≤ 1 (letzte
+                             Saison, endet nach MD10); Modus „Ganzer Kader" zeigt alle aktiven
+                             Spieler — denn ein länger laufender Vertrag lässt sich per Buyout
+                             auflösen und der Spieler gewinnbringend verkaufen. Bewusst KEINE
+                             zweite Volltabelle — kompakte Entscheidungskarten mit Performance
+                             (PPs/OVR) + Vertragsdaten inkl. Netto-bei-Verkauf nebeneinander. */
+                          const auslaufActiveRows = (visibleSelectedTeamContractRows ?? []).filter(
+                            (row) => row.status === "active",
                           );
-                          if (auslaufRows.length === 0) {
+                          if (auslaufActiveRows.length === 0) {
                             return null;
                           }
+                          const auslaufRows =
+                            auslaufScope === "all"
+                              ? auslaufActiveRows
+                              : auslaufActiveRows.filter((row) => row.contractLength <= 1);
+                          const auslaufExpiringCount = auslaufActiveRows.filter(
+                            (row) => row.contractLength <= 1,
+                          ).length;
                           const auslaufPlayersById = new Map(
                             (gameState?.players ?? []).map((player) => [player.id, player]),
                           );
                           const auslaufDecorated = auslaufRows.map((row) => {
                             const ratings = playerRatingsById.get(row.playerId);
                             const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
+                            const netProceeds =
+                              row.exitValue != null &&
+                              Number.isFinite(row.exitValue) &&
+                              row.buyoutCost != null &&
+                              Number.isFinite(row.buyoutCost)
+                                ? row.exitValue - row.buyoutCost
+                                : null;
                             return {
                               row,
                               ratings,
                               currentSalary: staircase.lastActiveSalary,
                               ppsSeason: ratings?.ppsSeason ?? null,
+                              netProceeds,
                             };
                           });
                           const auslaufSorted = [...auslaufDecorated].sort((left, right) => {
+                            // Auslaufende (LZ ≤ 1) immer oben, dann PPs Saison desc, dann Name.
+                            const leftExpiring = left.row.contractLength <= 1 ? 0 : 1;
+                            const rightExpiring = right.row.contractLength <= 1 ? 0 : 1;
+                            if (leftExpiring !== rightExpiring) {
+                              return leftExpiring - rightExpiring;
+                            }
                             const leftPps = left.ppsSeason != null && Number.isFinite(left.ppsSeason) ? left.ppsSeason : Number.NEGATIVE_INFINITY;
                             const rightPps = right.ppsSeason != null && Number.isFinite(right.ppsSeason) ? right.ppsSeason : Number.NEGATIVE_INFINITY;
                             if (rightPps !== leftPps) {
@@ -1168,23 +1194,49 @@ function FoundationTeamsDetailPanel({
                             auslaufPpsValues.length > 0
                               ? auslaufPpsValues.reduce((sum, value) => sum + value, 0) / auslaufPpsValues.length
                               : null;
+                          const auslaufIsAll = auslaufScope === "all";
                           return (
                             <NlCard
                               className="team-auslauf-center"
                               eyebrow="Kaderplanung"
                               title="Vertrags-Auslauf-Center"
                               data-testid="team-auslauf-center"
+                              actions={
+                                <div
+                                  className="team-auslauf-scope"
+                                  role="group"
+                                  aria-label="Umfang wählen"
+                                >
+                                  <button
+                                    type="button"
+                                    className={`team-auslauf-scope-btn${auslaufIsAll ? "" : " is-active"}`}
+                                    aria-pressed={!auslaufIsAll}
+                                    onClick={() => setAuslaufScope("expiring")}
+                                  >
+                                    Auslaufend
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`team-auslauf-scope-btn${auslaufIsAll ? " is-active" : ""}`}
+                                    aria-pressed={auslaufIsAll}
+                                    onClick={() => setAuslaufScope("all")}
+                                  >
+                                    Ganzer Kader
+                                  </button>
+                                </div>
+                              }
                             >
                               <p className="team-auslauf-explainer">
-                                Diese Verträge enden nach MD10 dieser Saison. Verlängere jetzt — sonst wird der Spieler
-                                beim Verkauf auf den Transfermarkt gestellt.
+                                Verträge mit LZ ≤ 1 enden nach MD10 dieser Saison — verlängere jetzt, sonst wird der Spieler
+                                beim Verkauf auf den Transfermarkt gestellt. Auch länger laufende Verträge lassen sich per
+                                Buyout auflösen — liegt VK/Ablöse über dem Buyout, lohnt sich der Verkauf.
                               </p>
                               <StatChipRow aria-label="Auslauf-Kennzahlen">
                                 <StatChip
-                                  label="Auslaufend"
+                                  label={auslaufIsAll ? "Angezeigt" : "Auslaufend"}
                                   value={formatWholeNumber(auslaufDecorated.length)}
-                                  tone="warn"
-                                  sub="LZ läuft aus"
+                                  tone={auslaufIsAll ? undefined : "warn"}
+                                  sub={auslaufIsAll ? `davon ${formatWholeNumber(auslaufExpiringCount)} auslaufend` : "LZ läuft aus"}
                                 />
                                 <StatChip
                                   label="Gehalt frei"
@@ -1198,7 +1250,7 @@ function FoundationTeamsDetailPanel({
                                 />
                               </StatChipRow>
                               <div className="team-auslauf-grid" role="list">
-                                {auslaufSorted.map(({ row, ratings, currentSalary, ppsSeason }) => {
+                                {auslaufSorted.map(({ row, ratings, currentSalary, ppsSeason, netProceeds }) => {
                                   const auslaufPlayer = auslaufPlayersById.get(row.playerId);
                                   const auslaufPortrait = auslaufPlayer ? getPlayerPortraitModel(auslaufPlayer) : null;
                                   const auslaufShapeClass = (row.contractShape ?? "balanced").replace("_", "-");
@@ -1222,12 +1274,21 @@ function FoundationTeamsDetailPanel({
                                               {(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}
                                             </span>
                                           </button>
-                                          <span
-                                            className="team-contract-lz-chip is-expiring heat-band-1 team-auslauf-lz"
-                                            title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
-                                          >
-                                            läuft aus
-                                          </span>
+                                          {row.contractLength <= 1 ? (
+                                            <span
+                                              className="team-contract-lz-chip is-expiring heat-band-1 team-auslauf-lz"
+                                              title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
+                                            >
+                                              läuft aus
+                                            </span>
+                                          ) : (
+                                            <span
+                                              className="team-contract-lz-chip team-auslauf-lz team-auslauf-lz-neutral"
+                                              title={`Vertrag läuft noch ${formatWholeNumber(row.contractLength)} Saisons — per Buyout auflösbar.`}
+                                            >
+                                              {formatWholeNumber(row.contractLength)} Saisons
+                                            </span>
+                                          )}
                                         </div>
                                       </header>
                                       <div className="team-auslauf-perf" aria-label="Performance">
@@ -1256,6 +1317,18 @@ function FoundationTeamsDetailPanel({
                                           <dt>VK/Ablöse</dt>
                                           <dd>{row.exitValue != null ? formatNlMoney(row.exitValue) : "—"}</dd>
                                         </div>
+                                        {netProceeds != null ? (
+                                          <div>
+                                            <dt>Netto b. VK</dt>
+                                            <dd>
+                                              <span
+                                                className={`team-auslauf-net ${netProceeds >= 0 ? "is-good" : "is-bad"}`}
+                                              >
+                                                {formatNlMoney(netProceeds)}
+                                              </span>
+                                            </dd>
+                                          </div>
+                                        ) : null}
                                         <div>
                                           <dt>Form</dt>
                                           <dd>

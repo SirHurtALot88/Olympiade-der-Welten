@@ -46534,6 +46534,63 @@ button.foundation-team-portrait-card {
   text-align: center;
 }
 
+/* Umfang-Umschalter (Auslaufend / Ganzer Kader) im Kartenkopf. */
+.is-new-look .team-auslauf-scope {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .team-auslauf-scope-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: calc(var(--nl-r-sm) - 2px);
+  padding: var(--nl-s1) var(--nl-s2);
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.is-new-look .team-auslauf-scope-btn:hover {
+  color: var(--nl-ink);
+}
+
+.is-new-look .team-auslauf-scope-btn.is-active {
+  color: var(--nl-ink);
+  background: var(--nl-panel);
+  border-color: var(--nl-line);
+}
+
+/* Neutrale LZ-Chip-Variante für länger laufende Verträge (kein „läuft aus"). */
+.is-new-look .team-auslauf-lz-neutral {
+  white-space: nowrap;
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+}
+
+/* Netto-bei-Verkauf: gut (VK > Buyout) vs. Risiko (VK < Buyout). */
+.is-new-look .team-auslauf-net {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.is-new-look .team-auslauf-net.is-good {
+  color: var(--nl-good);
+}
+
+.is-new-look .team-auslauf-net.is-bad {
+  color: var(--nl-risk);
+}
+
 /* --- Liga-Board (Teamtabelle als Board-Zeilen) ----------------------- */
 .is-new-look .nl-teams-board {
   list-style: none;
