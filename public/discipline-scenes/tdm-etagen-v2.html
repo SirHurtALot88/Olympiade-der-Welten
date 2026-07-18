@@ -1085,6 +1085,100 @@
   const mq=window.matchMedia('(prefers-color-scheme: dark)');
   if(mq.addEventListener) mq.addEventListener('change',drawScene);
   reset();
+
+  /* ===== OLY-STAGE-BRIDGE START ===== */
+  // Echt-Daten-Injektion für die In-Game-Disziplin-Bühne (Test-Modus).
+  // Läuft INNERHALB der Szenen-IIFE. Nimmt die szenen-eigenen Spieler (behält
+  // alle szenenspezifischen Felder) und legt echte val/name/mods darüber.
+  (function olyStageBridge(){
+    function apply(d){
+      try {
+        if (!d || !Array.isArray(d.teams)) return;
+        var byCode = {};
+        d.teams.forEach(function(rt){ byCode[rt.code] = rt; });
+        var N = (Array.isArray(d.slots) && d.slots.length) ? d.slots.length : 5;
+        try {
+          var hasSlots = (typeof SLOTS !== "undefined" && SLOTS && typeof SLOTS.length === "number");
+          // SLOTS nur umschreiben, wenn es ein reines String-Label-Array ist
+          // (manche Szenen aliasen SLOTS auf Objekt-Rollen — die nicht anfassen).
+          var slotsAreStrings = hasSlots && SLOTS.length > 0 && SLOTS.every(function(x){ return typeof x === "string"; });
+          if (slotsAreStrings && Array.isArray(d.slots) && d.slots.length) {
+            // Slot-ZAHL auf die echte playerCount bringen, aber die szenen-eigenen
+            // Label-WERTE behalten (manche Szenen nutzen SLOTS-Werte als Lookup-Keys).
+            var target = d.slots.length;
+            if (target <= SLOTS.length) {
+              SLOTS.length = target;
+            } else {
+              while (SLOTS.length < target) {
+                SLOTS.push(d.slots[SLOTS.length] || ("Slot " + (SLOTS.length + 1)));
+              }
+            }
+            N = SLOTS.length;
+            if (typeof buildQueue !== "undefined") {
+              buildQueue = function(){ queue = []; for (var r = 0; r < SLOTS.length; r++) { queue.push({ round: r }); } };
+            }
+          } else if (hasSlots) {
+            // Szene behält ihre native Slot-Zahl; Spieler darauf auffüllen/kürzen.
+            N = SLOTS.length;
+          }
+        } catch (e) {}
+        try {
+          if (typeof TEAM_NAMES !== "undefined") {
+            d.teams.forEach(function(rt){ if (rt.name) TEAM_NAMES[rt.code] = rt.name; });
+          }
+        } catch (e) {}
+        try {
+          if (d.mineCode && typeof teams !== "undefined") {
+            teams.forEach(function(t){ t.mine = (t.code === d.mineCode); });
+          }
+        } catch (e) {}
+        var ORIG_GEN = genPlayers;
+        genPlayers = function(t){
+          var rt = byCode[t.code];
+          var src = (rt && Array.isArray(rt.players)) ? rt.players : [];
+          // Szenen-eigene Spieler erzeugen → behalten alle szenenspezifischen Felder.
+          var natives = [];
+          try { natives = ORIG_GEN(t) || []; } catch (e) { natives = []; }
+          var out = [];
+          for (var k = 0; k < N; k++) {
+            var base = (natives[k] && typeof natives[k] === "object") ? Object.assign({}, natives[k]) : {};
+            var p = src[k];
+            if (!p) {
+              base.val = 0;
+              if (base.name == null) base.name = "\u2014";
+              base.mods = [];
+              out.push(base);
+              continue;
+            }
+            base.val = (p.val || 0);
+            base.name = p.name || base.name || "\u2014";
+            if (d.mode === "random") {
+              var mods = (typeof rollMods === "function") ? rollMods() : [];
+              mods.forEach(function(m){ if (m.injury) m.amt = Math.max(1, Math.round((p.val || 0) * 0.5)); });
+              if (Array.isArray(d.discMutators)) {
+                d.discMutators.forEach(function(dm){ mods.push({ k: dm.k, sign: dm.sign, amt: dm.amt }); });
+              }
+              base.mods = mods;
+            } else {
+              base.mods = Array.isArray(p.mods) ? p.mods.map(function(m){ return { k: m.k, sign: m.sign, amt: m.amt, injury: !!m.injury }; }) : [];
+            }
+            out.push(base);
+          }
+          return out;
+        };
+        if (typeof reset === "function") { reset(); }
+      } catch (e) { /* Szene niemals crashen lassen */ }
+    }
+    try {
+      window.addEventListener("message", function(ev){
+        var d = ev && ev.data;
+        if (d && d.type === "olyStageData") { apply(d); }
+      }, false);
+    } catch (e) {}
+    try { (window.parent || window).postMessage({ type: "olyStageReady" }, "*"); } catch (e) {}
+  })();
+  /* ===== OLY-STAGE-BRIDGE END ===== */
+
 })();
 </script>
 
