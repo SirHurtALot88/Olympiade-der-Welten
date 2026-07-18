@@ -48808,6 +48808,38 @@ button.foundation-team-portrait-card {
   align-items: start;
 }
 
+/* Zwei-Fokus-Rework: eigene Tab-Leiste + zwei separate Layouts. */
+.is-new-look .nl-thist-focus-tabs {
+  margin: var(--nl-s1) 0 calc(var(--nl-s2) * -1);
+}
+
+/* Spieler-Fokus: Deal-Strom breit, Deal-Spotlight daneben. */
+.is-new-look .nl-thist-players-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+/* Teams-Fokus: Transferbilanzen + Season-Charts über die volle Breite. */
+.is-new-look .nl-thist-teams-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+.is-new-look .nl-thist-players-layout > *,
+.is-new-look .nl-thist-teams-layout > * {
+  min-width: 0;
+}
+
+@media (max-width: 1080px) {
+  .is-new-look .nl-thist-players-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Timeline */
 .is-new-look .nl-thist-timeline {
   display: flex;

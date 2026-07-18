@@ -188,6 +188,11 @@ export default function TransferHistoryV2NewLook({
   onSelectTransfer,
 }: TransferHistoryV2NewLookProps) {
   const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
+  // Zwei-Fokus-Rework: die Seite trennt jetzt "Spieler" (Deal-Strom + Spotlight
+  // eines Deals) sauber von "Teams" (Transferbilanzen + Season-Charts), statt
+  // beides gleichzeitig in einem 3-Spalten-Raster zu quetschen. Filter, Bilanz-
+  // KPIs und Season-Spotlights bleiben als geteilter Kopf über beiden Tabs.
+  const [focus, setFocus] = useState<"players" | "teams">("players");
   // #73: Teambewegungs-Liste sortierbar über Sub-Tabs.
   // #2: Ohne Verkäufe im Scope ist "Erlös" durchgehend 0 (nur Käufe) — dann
   // standardmässig auf "Volumen" starten, damit kein Null-Bildschirm erscheint.
@@ -607,7 +612,19 @@ export default function TransferHistoryV2NewLook({
         </NlCard>
       </div>
 
-      <div className="nl-thist-layout">
+      <NlSubTabs
+        className="nl-thist-focus-tabs"
+        aria-label="Transferhistorie-Fokus"
+        activeId={focus}
+        onSelect={(id) => setFocus(id as "players" | "teams")}
+        items={[
+          { id: "players", label: "Spieler" },
+          { id: "teams", label: "Teams" },
+        ]}
+      />
+
+      {focus === "players" ? (
+        <div className="nl-thist-players-layout">
         <NlCard
           className="nl-thist-stream-card"
           eyebrow="Deal-Strom"
@@ -928,7 +945,9 @@ export default function TransferHistoryV2NewLook({
             <p className="nl-thist-muted">Wähle links einen Deal für Profil, Zahlen und Teamweg.</p>
           )}
         </NlCard>
-
+        </div>
+      ) : (
+        <div className="nl-thist-teams-layout">
         <NlCard
           className="nl-thist-teams-card"
           eyebrow="Teambewegung"
@@ -1045,7 +1064,8 @@ export default function TransferHistoryV2NewLook({
             </div>
           ) : null}
         </NlCard>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
