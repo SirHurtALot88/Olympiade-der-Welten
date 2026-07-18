@@ -1,21 +1,16 @@
 "use client";
 
-export type DisciplineStageTopPlayer = {
-  rank: number;
-  name: string;
-  teamCode: string;
-  logoUrl: string | null;
-  portraitUrl: string | null;
-  score: number;
-  points: number | null;
-  isMvp: boolean;
-  isOwn: boolean;
-};
+import type { DisciplineStageTopPlayer } from "./DisciplineStageTopPlayers";
 
-export type DisciplineStageTopPlayersProps = {
+// Horizontale Top-Spieler-Zeile unter der Arena (statt linker Spalte), damit die
+// Arena die volle Breite bekommt. Sortiert nach Player-Points (kommt bereits
+// sortiert rein), pro Chip: Rang · Portrait · Name · PP groß, (Score) klein.
+
+export type DisciplineStageTopPlayersRowProps = {
   players: DisciplineStageTopPlayer[];
   onOpenPlayer?: ((playerId: string) => void) | null;
   playerIdByRow?: (string | null)[];
+  limit?: number;
 };
 
 function fmt1(x: number): string {
@@ -23,17 +18,18 @@ function fmt1(x: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
 
-export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playerIdByRow }: DisciplineStageTopPlayersProps) {
+export default function DisciplineStageTopPlayersRow({ players, onOpenPlayer, playerIdByRow, limit = 10 }: DisciplineStageTopPlayersRowProps) {
+  const shown = players.slice(0, limit);
   return (
-    <div style={{ background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 12, position: "sticky", top: 12 }}>
+    <div style={{ marginTop: 12, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 10 }}>
       <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
-        Top-Spieler · nach Player-Points
+        Top-{limit} Spieler · nach Player-Points
       </div>
-      {players.length === 0 ? (
+      {shown.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "var(--nl-mut)", fontStyle: "italic" }}>Noch keine Werte.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {players.map((p, index) => {
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", overscrollBehaviorX: "contain", paddingBottom: 2 }}>
+          {shown.map((p, index) => {
             const playerId = playerIdByRow?.[index] ?? null;
             const clickable = Boolean(onOpenPlayer && playerId);
             return (
@@ -45,23 +41,24 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
-                  padding: "5px 6px",
-                  borderRadius: 8,
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  flex: "0 0 auto",
                   fontVariantNumeric: "tabular-nums",
                   cursor: clickable ? "pointer" : "default",
-                  background: p.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "transparent",
-                  border: p.isOwn ? "1px solid var(--nl-accent)" : "1px solid transparent",
+                  background: p.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : "color-mix(in srgb, var(--nl-line) 22%, transparent)",
+                  border: p.isOwn ? "1px solid var(--nl-accent)" : "1px solid var(--nl-line)",
                 }}
               >
-                <span style={{ width: 20, textAlign: "right", fontWeight: 800, color: "var(--nl-mut)", fontSize: 12.5 }}>{p.rank}</span>
+                <span style={{ fontWeight: 800, color: "var(--nl-mut)", fontSize: 12.5, width: 18, textAlign: "right" }}>{p.rank}</span>
                 {p.portraitUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.portraitUrl} alt="" width={24} height={24} style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
+                  <img src={p.portraitUrl} alt="" width={28} height={28} style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }} />
                 ) : (
-                  <span aria-hidden style={{ width: 24, height: 24, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
+                  <span aria-hidden style={{ width: 28, height: 28, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
                 )}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" }}>
                     {p.isMvp ? "⭐ " : ""}
                     {p.name}
                   </div>
@@ -73,7 +70,7 @@ export default function DisciplineStageTopPlayers({ players, onOpenPlayer, playe
                     {p.teamCode}
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div style={{ textAlign: "right", flex: "none", paddingLeft: 4 }}>
                   {p.points != null ? (
                     <>
                       <div style={{ fontSize: 13, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(p.points)} PP</div>

@@ -285,16 +285,18 @@ export default function DisciplineStageArena({
   // Top-Spieler (links): aus der Engine-Preview oder — im Test/Modell-Modus —
   // die besten Netto-Werte über alle Teams.
   const topPlayers = useMemo(() => {
-    const rows: DisciplineStageTopPlayer[] = [];
-    const ids: (string | null)[] = [];
+    // Gebaut als (Zeile + playerId)-Paare, damit die IDs beim Umsortieren
+    // ausgerichtet bleiben. Sortierung: erhaltene Player-Points (PP) absteigend,
+    // Tiebreak beigetragener Score absteigend (Wunsch: "sortiert nach den PPs …
+    // in Klammern dahinter ihr Score").
+    const entries: { row: DisciplineStageTopPlayer; id: string | null }[] = [];
     if (useEngine && engineDiscipline) {
-      [...engineDiscipline.topPlayers]
-        .sort((a, b) => a.rankInDiscipline - b.rankInDiscipline)
-        .slice(0, 12)
-        .forEach((pp, i) => {
-          const meta = teamMetaById.get(pp.teamId);
-          rows.push({
-            rank: pp.rankInDiscipline ?? i + 1,
+      engineDiscipline.topPlayers.forEach((pp) => {
+        const meta = teamMetaById.get(pp.teamId);
+        entries.push({
+          id: pp.playerId,
+          row: {
+            rank: 0,
             name: pp.playerName,
             teamCode: meta?.code ?? pp.teamId,
             logoUrl: meta?.logoUrl ?? null,
@@ -303,28 +305,35 @@ export default function DisciplineStageArena({
             points: pp.pointsAwarded,
             isMvp: Boolean(pp.isMvpCandidate),
             isOwn: pp.teamId === ownTeamId,
-          });
-          ids.push(pp.playerId);
+          },
         });
+      });
     } else {
-      const flat = model.teams.flatMap((t) => t.slots.map((s) => ({ s, t })));
-      flat.sort((a, b) => b.s.net - a.s.net);
-      flat.slice(0, 12).forEach(({ s, t }, i) => {
-        rows.push({
-          rank: i + 1,
-          name: s.playerName,
-          teamCode: t.shortCode,
-          logoUrl: t.logoUrl,
-          portraitUrl: s.portraitUrl,
-          score: s.net,
-          points: null,
-          isMvp: s.base >= 80,
-          isOwn: t.isOwn,
+      model.teams.forEach((t) => {
+        t.slots.forEach((s) => {
+          entries.push({
+            id: s.playerId,
+            row: {
+              rank: 0,
+              name: s.playerName,
+              teamCode: t.shortCode,
+              logoUrl: t.logoUrl,
+              portraitUrl: s.portraitUrl,
+              score: s.net,
+              points: null,
+              isMvp: s.base >= 80,
+              isOwn: t.isOwn,
+            },
+          });
         });
-        ids.push(s.playerId);
       });
     }
-    return { rows, ids };
+    entries.sort((a, b) => (b.row.points ?? -1) - (a.row.points ?? -1) || b.row.score - a.row.score);
+    const top = entries.slice(0, 12);
+    top.forEach((e, i) => {
+      e.row.rank = i + 1;
+    });
+    return { rows: top.map((e) => e.row), ids: top.map((e) => e.id) };
   }, [useEngine, engineDiscipline, model, teamMetaById, portraitById, ownTeamId]);
 
   const ownShortCode = useMemo(() => {
@@ -343,12 +352,14 @@ export default function DisciplineStageArena({
           logoUrl: t.logoUrl,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           players: t.players.map((p) => ({
+            playerId: p.playerId,
             val: p.val,
             name: p.name,
             portraitUrl: p.portraitUrl,
             traits: [] as string[],
             mods: p.mods,
             traitMods: [] as { k: string; sign: 1 | -1; amt: number }[],
+            pointsAwarded: p.pointsAwarded,
           })),
         }))
       : model.teams.map((t) => ({
@@ -356,6 +367,7 @@ export default function DisciplineStageArena({
           name: t.name,
           logoUrl: t.logoUrl,
           players: t.slots.map((s) => ({
+            playerId: s.playerId,
             val: s.base,
             name: s.playerName,
             portraitUrl: s.portraitUrl,
@@ -363,6 +375,7 @@ export default function DisciplineStageArena({
             mods: mode === "real" ? realMods(s) : [],
             // Trait-Mutatoren (+6 je passendem Trait) — nur im Random-Test angewandt.
             traitMods: mode === "random" ? traitMutatorMods(s.traits, mutatorTraits) : [],
+            pointsAwarded: null as number | null,
           })),
         }));
     return {
@@ -568,25 +581,26 @@ export default function DisciplineStageArena({
       </div>
 
       {showNative ? (
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
-            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} />
-          </div>
-          <div style={{ flex: "1 1 640px", minWidth: 0 }}>
-            <DisciplineStageNativeArena
-              key={`${disciplineId}-${mode}-${seed}`}
-              slots={payload.slots}
-              teams={payload.teams.map((t) => ({
-                code: t.code,
-                name: t.name,
-                logoUrl: t.logoUrl,
-                isOwn: t.code === payload.mineCode,
-                players: t.players.map((p) => ({ val: p.val, name: p.name, portraitUrl: p.portraitUrl, mods: p.mods })),
-              }))}
-              onOpenPlayer={onOpenPlayer}
-            />
-          </div>
-        </div>
+        <DisciplineStageNativeArena
+          key={`${disciplineId}-${mode}-${seed}`}
+          slots={payload.slots}
+          teams={payload.teams.map((t) => ({
+            code: t.code,
+            name: t.name,
+            logoUrl: t.logoUrl,
+            isOwn: t.code === payload.mineCode,
+            players: t.players.map((p) => ({
+              playerId: p.playerId,
+              val: p.val,
+              name: p.name,
+              portraitUrl: p.portraitUrl,
+              mods: p.mods,
+              pointsAwarded: p.pointsAwarded,
+            })),
+          }))}
+          onOpenPlayer={onOpenPlayer}
+          topPlayers={topPlayers}
+        />
       ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: "0 0 340px", minWidth: 280, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>

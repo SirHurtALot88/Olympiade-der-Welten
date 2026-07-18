@@ -11,6 +11,7 @@ import type { DisciplineResolvePreview } from "@/lib/resolve/legacy-matchday-res
 export type StagePreviewMod = { k: string; sign: 1 | -1; amt: number };
 
 export type StagePreviewPlayer = {
+  playerId: string | null;
   val: number;
   name: string;
   portraitUrl: string | null;
@@ -74,6 +75,7 @@ export function buildDisciplineStageTeamsFromPreview(
       }
 
       return {
+        playerId: entry.playerId ?? null,
         val: base,
         name: entry.playerName,
         portraitUrl: portraitById.get(entry.playerId) ?? null,
