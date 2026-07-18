@@ -9,7 +9,7 @@ import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-
 import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/training/class-progression-config";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
-import { shouldRestForFatigue } from "@/lib/fatigue/fatigue-rest-propensity";
+import { resolveFatigueRestFloor, shouldRestForFatigue } from "@/lib/fatigue/fatigue-rest-propensity";
 
 export type AiTeamTrainingIntensity = "light" | "normal" | "hard";
 
@@ -203,6 +203,11 @@ function resolveModeForPlayer(input: {
   restGmCaution?: number;
   /** Rotation-depth lean in [0, 0.4]: extra willingness to rest when the squad has cover. */
   restDepthLean?: number;
+  /**
+   * Kadergroessen-abhaengiger Fatigue-Boden (siehe resolveFatigueRestFloor). Duenne Kader
+   * bekommen einen niedrigeren Boden und werden daher frueher auf "leicht" geschont.
+   */
+  restFloor?: number;
   /** Deterministic seed per (player, matchday) for the stable rest roll. */
   restSeed?: string;
 }): Pick<AiPlayerTrainingLoadPlan, "selectedMode" | "projectedInjuryRiskPercent" | "needsLineupRest" | "reasons"> {
@@ -233,6 +238,7 @@ function resolveModeForPlayer(input: {
       valueLean: input.restValueLean,
       caution: input.restGmCaution,
       depthLean: input.restDepthLean,
+      floor: input.restFloor,
       seed: input.restSeed,
     });
     if (restDecision.rest) {
@@ -456,6 +462,9 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
     0,
     Math.min(0.4, (rosterEntries.length - rosterOptTarget) / Math.max(1, rosterOptTarget * 2)),
   );
+  // Kadergroessen-abhaengiger Fatigue-Boden: duenne Kader (wenig Ersatz ueber den Startplaetzen)
+  // schonen frueher auf "leicht", damit nicht der ganze Kader gleichzeitig in Fatigue laeuft.
+  const restFloor = resolveFatigueRestFloor({ rosterSize: rosterEntries.length });
   const restMatchdayId = input.gameState.matchdayState.matchdayId;
   const currentSchedule =
     input.gameState.seasonState.disciplineSchedule?.find(
@@ -493,6 +502,7 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
         restValueLean: computeFatigueRestValueLean(player, rosterRank),
         restGmCaution,
         restDepthLean,
+        restFloor,
         restSeed: `${player.id}:${restMatchdayId}:fatigue-rest`,
       });
       const fatigue = player.fatigue ?? 0;

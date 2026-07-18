@@ -15,6 +15,7 @@ import { isEmergencyRosterRepairEnabled } from "@/lib/ai/emergency-repair-policy
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
 import { applySeasonEndRosterStressLedger } from "@/lib/ai/season-roster-stress-service";
@@ -2138,6 +2139,17 @@ async function runSeasonMatchdays(saveId: string, delegatePersistence: Persisten
       }
     }
     const matchdayStartedAt = Date.now();
+    // Per-Spieltag: AI-Trainingsmodi anhand der AKTUELLEN Fatigue neu bewerten (Fatigue-Schoner),
+    // BEVOR die AI-Aufstellung gebaut wird. Die frischen Modi speisen sowohl die
+    // Fatigue-Akkumulation (matchday-training-accumulator liest player.trainingMode beim
+    // Result-Apply) als auch die Aufstellungs-/Schonen-Entscheidung dieses Spieltags. Nur
+    // AI-Teams; menschlich gesteuerte Teams bleiben unangetastet.
+    const trainingReeval = reevaluateAiTrainingModesForMatchday({ saveId, persistence });
+    if (trainingReeval.teamsUpdated > 0) {
+      console.error(
+        `[long-run] training-reeval ${seasonId} ${matchdayId}: teams=${trainingReeval.teamsUpdated} players=${trainingReeval.playersReassigned}`,
+      );
+    }
     let startedAt = Date.now();
     const lineupReuse = LONG_RUN_SKIP_LINEUP_REAPPLY
       ? canReuseAutoprepLineupsForMatchday({

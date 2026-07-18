@@ -16,16 +16,62 @@
  * high-value player is worth the small effort/score sacrifice.
  */
 
-/** Below this fatigue the countermeasure never fires (fresh players train/play normally). */
+/**
+ * Basis-Schwelle (tiefer Kader): unter dieser Fatigue feuert die Gegenmassnahme nie
+ * (frische Spieler trainieren/spielen normal). Ein tiefer Kader mit viel Rotation haelt
+ * diesen hoeheren Boden — er kann tirede Stammspieler einfach auf die Bank rotieren.
+ */
 export const FATIGUE_REST_FLOOR = 45;
+/**
+ * Schwelle fuer einen SEHR duennen Kader (an/nahe dem Kader-Minimum). Owner-Intent:
+ * "schonen sollte ggf. eher aktiviert werden vor allem bei kleinen Kadern, damit nicht der
+ * ganze Kader so schnell in Fatigue rennt." Ein duenner Kader kann nicht rotieren (keine
+ * Ersatzbank), deshalb wird frueher auf LEICHT-Training umgestellt: leichtes Training senkt
+ * die Trainings-Fatigue-Akkumulation und hilft der Erholung, damit nicht der ganze Kader
+ * gleichzeitig in die Fatigue laeuft. */
+export const FATIGUE_REST_FLOOR_THIN = 32;
 /** At/above this fatigue the ramp reaches its configured ceiling. */
 export const FATIGUE_REST_CEILING = 88;
+/**
+ * Referenz-Anzahl Startplaetze pro Matchday. Kader-Tiefe = Kadergroesse ueber diesen
+ * Startplaetzen (verfuegbare Wechsel/Rotation).
+ */
+export const FATIGUE_REST_DEFAULT_STARTING_SLOTS = 7;
+/**
+ * Ab so vielen Ersatzspielern (Kadergroesse - Startplaetze) gilt der volle Basis-Boden
+ * (FATIGUE_REST_FLOOR). Darunter wird linear zum duennen Boden (FATIGUE_REST_FLOOR_THIN)
+ * interpoliert.
+ */
+export const FATIGUE_REST_FULL_DEPTH_SUBS = 5;
 /** Convex exponent: keeps probability low just above the floor, rising steeply late. */
 const FATIGUE_REST_RAMP_GAMMA = 1.7;
 
 function clamp01(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * Kadergroessen-abhaengiger Fatigue-Boden fuer die Schoner-/Leicht-Schwelle.
+ *
+ * Monoton & beschraenkt: ein Kader an/nahe dem Minimum (wenig Ersatz ueber den Startplaetzen)
+ * bekommt einen niedrigeren Boden (~FATIGUE_REST_FLOOR_THIN), sodass seine Spieler FRUEHER auf
+ * "leicht" geschont werden; ein tiefer Kader mit >= FATIGUE_REST_FULL_DEPTH_SUBS Ersatzspielern
+ * behaelt den vollen Basis-Boden (FATIGUE_REST_FLOOR). Linear interpoliert dazwischen.
+ * Deterministisch (nur von Kadergroesse & Startplaetzen abhaengig).
+ */
+export function resolveFatigueRestFloor(input: {
+  rosterSize: number;
+  startingSlots?: number;
+}): number {
+  const startingSlots =
+    input.startingSlots != null && input.startingSlots > 0
+      ? input.startingSlots
+      : FATIGUE_REST_DEFAULT_STARTING_SLOTS;
+  const rosterSize = Number.isFinite(input.rosterSize) ? input.rosterSize : 0;
+  const subs = Math.max(0, rosterSize - startingSlots);
+  const t = clamp01(subs / FATIGUE_REST_FULL_DEPTH_SUBS);
+  return FATIGUE_REST_FLOOR_THIN + (FATIGUE_REST_FLOOR - FATIGUE_REST_FLOOR_THIN) * t;
 }
 
 /**
@@ -61,6 +107,11 @@ export type FatigueRestProbabilityInput = {
   depthLean?: number;
   /** Ceiling probability at full fatigue before leans/caution. Defaults to 0.85. */
   ceiling?: number;
+  /**
+   * Effektiver Fatigue-Boden fuer diesen Spieler. Standard = FATIGUE_REST_FLOOR (tiefer Kader).
+   * Fuer duenne Kader via resolveFatigueRestFloor abgesenkt, damit frueher geschont wird.
+   */
+  floor?: number;
 };
 
 /**
@@ -69,11 +120,17 @@ export type FatigueRestProbabilityInput = {
  */
 export function fatigueRestProbability(input: FatigueRestProbabilityInput): number {
   const fatigue = Number.isFinite(input.fatigue) ? input.fatigue : 0;
-  if (fatigue <= FATIGUE_REST_FLOOR) {
+  // Effektiver Boden: kaderabhaengig absenkbar (duenne Kader schonen frueher), aber immer
+  // strikt unter der Decke, damit die Rampe eine positive Spanne behaelt.
+  const floor =
+    input.floor != null && Number.isFinite(input.floor)
+      ? Math.max(0, Math.min(FATIGUE_REST_CEILING - 1, input.floor))
+      : FATIGUE_REST_FLOOR;
+  if (fatigue <= floor) {
     return 0;
   }
-  const span = FATIGUE_REST_CEILING - FATIGUE_REST_FLOOR;
-  const t = clamp01((fatigue - FATIGUE_REST_FLOOR) / span);
+  const span = FATIGUE_REST_CEILING - floor;
+  const t = clamp01((fatigue - floor) / span);
   const ramp = Math.pow(t, FATIGUE_REST_RAMP_GAMMA);
   const ceiling = clamp01(input.ceiling ?? 0.85);
 

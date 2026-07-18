@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   FATIGUE_REST_FLOOR,
+  FATIGUE_REST_FLOOR_THIN,
   fatigueRestProbability,
+  resolveFatigueRestFloor,
   shouldRestForFatigue,
   stableRestRoll,
 } from "@/lib/fatigue/fatigue-rest-propensity";
@@ -47,6 +49,36 @@ describe("fatigueRestProbability", () => {
     const deep = fatigueRestProbability({ fatigue: 65, depthLean: 0.4 });
     const thin = fatigueRestProbability({ fatigue: 65, depthLean: 0 });
     expect(deep).toBeGreaterThan(thin);
+  });
+
+  it("gives a thinner roster a lower fatigue floor than a deep roster (crosses leicht earlier)", () => {
+    const thin = resolveFatigueRestFloor({ rosterSize: 8 }); // an/nahe Kader-Minimum, ~1 Ersatz
+    const deep = resolveFatigueRestFloor({ rosterSize: 14 }); // viel Rotation
+
+    // Monoton & beschraenkt: duenner Kader ~30-35, tiefer Kader = voller Basis-Boden.
+    expect(thin).toBeGreaterThanOrEqual(FATIGUE_REST_FLOOR_THIN);
+    expect(thin).toBeLessThan(35);
+    expect(deep).toBe(FATIGUE_REST_FLOOR);
+    expect(thin).toBeLessThan(deep);
+
+    // Monotonie ueber die Kadergroesse.
+    expect(resolveFatigueRestFloor({ rosterSize: 8 })).toBeLessThanOrEqual(
+      resolveFatigueRestFloor({ rosterSize: 10 }),
+    );
+    expect(resolveFatigueRestFloor({ rosterSize: 10 })).toBeLessThanOrEqual(
+      resolveFatigueRestFloor({ rosterSize: 12 }),
+    );
+  });
+
+  it("at a fatigue between the two floors the thin roster schont, the deep roster does not", () => {
+    const thin = resolveFatigueRestFloor({ rosterSize: 8 });
+    const deep = resolveFatigueRestFloor({ rosterSize: 14 });
+    const fatigue = 44; // liegt ueber dem duennen, aber unter dem tiefen Boden (45)
+
+    expect(fatigue).toBeGreaterThan(thin);
+    expect(fatigue).toBeLessThan(deep);
+    expect(fatigueRestProbability({ fatigue, floor: thin })).toBeGreaterThan(0);
+    expect(fatigueRestProbability({ fatigue, floor: deep })).toBe(0);
   });
 
   it("produces deterministic rolls in [0, 1)", () => {

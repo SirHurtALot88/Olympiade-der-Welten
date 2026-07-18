@@ -1,5 +1,6 @@
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { type GameState, type LineupDraftModifiers, type TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
@@ -664,6 +665,14 @@ export async function runLocalMatchdayAutoRun(
     result.ok = result.blockingReasons.length === 0;
     result.status = result.ok ? "applied" : "blocked";
     return result;
+  }
+
+  // Per-Spieltag: AI-Trainingsmodi anhand der AKTUELLEN Fatigue neu bewerten (Fatigue-Schoner),
+  // BEVOR die AI-Aufstellung gebaut wird — so self-managen AI-Teams ihre Fatigue auch im echten
+  // Spiel. Nur beim echten Ausfuehren (execute); ein Dry-Run-Preview veraendert den Spielstand nicht.
+  // Nur AI-Teams; menschlich gesteuerte Teams bleiben unangetastet.
+  if (!dryRun) {
+    reevaluateAiTrainingModesForMatchday({ saveId: scope.saveId, persistence });
   }
 
   const aiBatchResult = applyAiLegacyLineupBatchLocally({
