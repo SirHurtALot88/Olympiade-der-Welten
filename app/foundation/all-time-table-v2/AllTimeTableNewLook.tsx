@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import {
   NlCard,
@@ -188,20 +188,6 @@ function getTeamValueNow(row: AllTimeTableRow): number | null {
   return (row.mwNow ?? 0) + (row.cashNow ?? 0);
 }
 
-const LIVE_ONLY_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
-  { key: "allTimeRank", label: "#", align: "right", width: "40px" },
-  { key: "teamName", label: "Team" },
-  { key: "liveRank", label: "Rang", align: "right" },
-  { key: "cumulativePoints", label: "Punkte", align: "right" },
-  { key: "mwNow", label: "MW", align: "right" },
-  {
-    key: "cashNow",
-    label: "Cash (Saison-Stand)",
-    align: "right",
-    tooltip: "Cash-Stand aus der Saison-Tabelle — kann vom Live-Kontostand in Finanzen/Kredite abweichen.",
-  },
-];
-
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
@@ -265,6 +251,62 @@ function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] 
   return raw.filter(isFiniteNumber);
 }
 
+/** Zell-Renderer der Ewigen Tabelle — identisch für die Live- und die
+ * Archiv-Sicht (beide nutzen dieselben Fokus-Spalten). */
+function renderAllTimeCell(row: AllTimeTableRow, column: NlTableColumn<AllTimeTableRow>): ReactNode {
+  switch (column.key) {
+    case "allTimeRank":
+      return row.allTimeRank;
+    case "teamName":
+      return (
+        <span className="nl-alltime-team-cell">
+          <strong>{row.teamName}</strong>
+          <small>{row.teamCode}</small>
+        </span>
+      );
+    case "seasonsPlayed":
+      return formatNlNumber(row.seasons.length, 0);
+    case "cumulativePoints":
+      return formatNlNumber(row.cumulativePoints, 1);
+    case "avgPoints": {
+      const avg = getAvgPoints(row);
+      return avg != null ? formatNlNumber(avg, 1) : "—";
+    }
+    case "avgRank":
+      return row.avgRank != null ? `#${formatNlNumber(row.avgRank, 1)}` : "—";
+    case "bestRank":
+      return row.bestRank != null ? `#${formatNlNumber(row.bestRank, 0)}` : "—";
+    case "gold":
+      return row.medals.gold > 0 ? formatNlNumber(row.medals.gold, 0) : "—";
+    case "silver":
+      return row.medals.silver > 0 ? formatNlNumber(row.medals.silver, 0) : "—";
+    case "bronze":
+      return row.medals.bronze > 0 ? formatNlNumber(row.medals.bronze, 0) : "—";
+    case "top5":
+      return row.medals.top5 > 0 ? formatNlNumber(row.medals.top5, 0) : "—";
+    case "top10":
+      return row.medals.top10 > 0 ? formatNlNumber(row.medals.top10, 0) : "—";
+    case "mwNow":
+      return formatNlMoney(row.mwNow);
+    case "mwPeak":
+      return formatNlMoney(row.mwPeak);
+    case "mwGrowthAbs":
+      return row.mwGrowthAbs != null ? `${row.mwGrowthAbs >= 0 ? "+" : ""}${formatNlMoney(row.mwGrowthAbs)}` : "—";
+    case "mwGrowthPct":
+      return row.mwGrowthPct != null ? `${row.mwGrowthPct >= 0 ? "+" : ""}${formatNlNumber(row.mwGrowthPct, 0)} %` : "—";
+    case "cashNow":
+      return formatNlMoney(row.cashNow);
+    case "cashPeak":
+      return formatNlMoney(row.cashPeak);
+    case "teamValueNow": {
+      const teamValue = getTeamValueNow(row);
+      return teamValue != null ? formatNlMoney(teamValue) : "—";
+    }
+    default:
+      return null;
+  }
+}
+
 export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel, onOpenTeam }: AllTimeTableClientProps) {
   const [openKpi, setOpenKpi] = useState<AllTimeKpiKey | null>(null);
   const [focus, setFocus] = useState<TableFocus>("points");
@@ -317,6 +359,45 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
     });
   }
 
+  // Fokus-Tabelle (Punkte & Ränge · Medaillen · Marktwert · Cash & Teamwert) —
+  // identisch für Live- und Archiv-Sicht, damit die Aufteilung ab der ersten
+  // Saison sichtbar ist (Medaillen/Ø-Werte sind bis zum ersten Saison-Abschluss
+  // ehrlich 0/—).
+  function renderFocusTableCard() {
+    if (!model || model.rows.length === 0) {
+      return null;
+    }
+    return (
+      <NlCard
+        className="nl-alltime-table-card"
+        title="Alle Teams"
+        eyebrow={`${formatNlNumber(model.rows.length, 0)} Teams`}
+        actions={
+          <NlSubTabs
+            items={TABLE_FOCUS_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+            activeId={focus}
+            onSelect={(id) => handleFocusSelect(id as TableFocus)}
+            aria-label="Auswertung wählen"
+            className="nl-alltime-focus-subtabs"
+          />
+        }
+      >
+        <NlTable
+          columns={FOCUS_COLUMNS[focus]}
+          rows={sortedRows}
+          rowKey={(row) => row.teamId}
+          rowClassName={(row) => (selectedTeamId != null && row.teamId === selectedTeamId ? "is-own-team" : undefined)}
+          sortState={{ key: sort.key, direction: sort.direction }}
+          onSort={handleSort}
+          onRowClick={(row) => onOpenTeam(row.teamId)}
+          data-testid="nl-alltime-table"
+          aria-label="Ewige Tabelle"
+          renderCell={renderAllTimeCell}
+        />
+      </NlCard>
+    );
+  }
+
   if (!model || !model.hasArchive) {
     return (
       <section className="nl-alltime" id="all-time-table" data-testid="foundation-all-time-table" data-new-look="true" aria-label="Ewige Tabelle">
@@ -340,34 +421,10 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         </NlCard>
         <NlEmptyState
           title="Noch keine abgeschlossene Saison archiviert"
-          message="Sobald die erste Saison archiviert ist, erscheinen hier Punkte-, Marktwert- und Cash-Entwicklung über alle Saisons sowie der ewige Leader."
+          message="Die Aufteilung unten zeigt bereits die laufende Saison. Medaillen (🥇/🥈/🥉), Top-5/Top-10, Ø-Punkte und Ø-Rang füllen sich, sobald die erste Saison abgeschlossen ist; Verläufe & ewiger Leader ab der zweiten Saison."
           data-testid="nl-alltime-empty"
         />
-        {model.rows.length > 0 ? (
-          <NlCard className="nl-alltime-live-card" title="Laufende Saison" eyebrow={seasonLabel}>
-            <NlTable
-              columns={LIVE_ONLY_COLUMNS}
-              rows={model.rows}
-              rowKey={(row) => row.teamId}
-              rowClassName={(row) => (selectedTeamId != null && row.teamId === selectedTeamId ? "is-own-team" : undefined)}
-              onRowClick={(row) => onOpenTeam(row.teamId)}
-              data-testid="nl-alltime-live-table"
-              aria-label="Laufende Saison"
-              renderCell={(row, column) => {
-                if (column.key === "allTimeRank") return row.allTimeRank;
-                if (column.key === "teamName") return `${row.teamName} · ${row.teamCode}`;
-                if (column.key === "liveRank") {
-                  const rank = row.seasons[row.seasons.length - 1]?.rank ?? null;
-                  return rank != null ? `#${formatNlNumber(rank, 0)}` : "—";
-                }
-                if (column.key === "cumulativePoints") return formatNlNumber(row.cumulativePoints, 1);
-                if (column.key === "mwNow") return formatNlMoney(row.mwNow);
-                if (column.key === "cashNow") return formatNlMoney(row.cashNow);
-                return null;
-              }}
-            />
-          </NlCard>
-        ) : null}
+        {renderFocusTableCard()}
       </section>
     );
   }
@@ -435,85 +492,7 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         })}
       </div>
 
-      <NlCard
-        className="nl-alltime-table-card"
-        title="Alle Teams"
-        eyebrow={`${formatNlNumber(model.rows.length, 0)} Teams`}
-        actions={
-          <NlSubTabs
-            items={TABLE_FOCUS_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
-            activeId={focus}
-            onSelect={(id) => handleFocusSelect(id as TableFocus)}
-            aria-label="Auswertung wählen"
-            className="nl-alltime-focus-subtabs"
-          />
-        }
-      >
-        <NlTable
-          columns={FOCUS_COLUMNS[focus]}
-          rows={sortedRows}
-          rowKey={(row) => row.teamId}
-          rowClassName={(row) => (selectedTeamId != null && row.teamId === selectedTeamId ? "is-own-team" : undefined)}
-          sortState={{ key: sort.key, direction: sort.direction }}
-          onSort={handleSort}
-          onRowClick={(row) => onOpenTeam(row.teamId)}
-          data-testid="nl-alltime-table"
-          aria-label="Ewige Tabelle"
-          renderCell={(row, column) => {
-            switch (column.key) {
-              case "allTimeRank":
-                return row.allTimeRank;
-              case "teamName":
-                return (
-                  <span className="nl-alltime-team-cell">
-                    <strong>{row.teamName}</strong>
-                    <small>{row.teamCode}</small>
-                  </span>
-                );
-              case "seasonsPlayed":
-                return formatNlNumber(row.seasons.length, 0);
-              case "cumulativePoints":
-                return formatNlNumber(row.cumulativePoints, 1);
-              case "avgPoints": {
-                const avg = getAvgPoints(row);
-                return avg != null ? formatNlNumber(avg, 1) : "—";
-              }
-              case "avgRank":
-                return row.avgRank != null ? `#${formatNlNumber(row.avgRank, 1)}` : "—";
-              case "bestRank":
-                return row.bestRank != null ? `#${formatNlNumber(row.bestRank, 0)}` : "—";
-              case "gold":
-                return row.medals.gold > 0 ? formatNlNumber(row.medals.gold, 0) : "—";
-              case "silver":
-                return row.medals.silver > 0 ? formatNlNumber(row.medals.silver, 0) : "—";
-              case "bronze":
-                return row.medals.bronze > 0 ? formatNlNumber(row.medals.bronze, 0) : "—";
-              case "top5":
-                return row.medals.top5 > 0 ? formatNlNumber(row.medals.top5, 0) : "—";
-              case "top10":
-                return row.medals.top10 > 0 ? formatNlNumber(row.medals.top10, 0) : "—";
-              case "mwNow":
-                return formatNlMoney(row.mwNow);
-              case "mwPeak":
-                return formatNlMoney(row.mwPeak);
-              case "mwGrowthAbs":
-                return row.mwGrowthAbs != null ? `${row.mwGrowthAbs >= 0 ? "+" : ""}${formatNlMoney(row.mwGrowthAbs)}` : "—";
-              case "mwGrowthPct":
-                return row.mwGrowthPct != null ? `${row.mwGrowthPct >= 0 ? "+" : ""}${formatNlNumber(row.mwGrowthPct, 0)} %` : "—";
-              case "cashNow":
-                return formatNlMoney(row.cashNow);
-              case "cashPeak":
-                return formatNlMoney(row.cashPeak);
-              case "teamValueNow": {
-                const teamValue = getTeamValueNow(row);
-                return teamValue != null ? formatNlMoney(teamValue) : "—";
-              }
-              default:
-                return null;
-            }
-          }}
-        />
-      </NlCard>
+      {renderFocusTableCard()}
 
       <NlCard
         className="nl-alltime-charts-card"
