@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useFoundationGameState, useFoundationState } from "@/lib/foundation/foundation-state-context";
 import {
@@ -17,7 +17,59 @@ function hueFor(code: string): number {
   return h;
 }
 
+// Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,
+// statt dass die generische Shell-Karte den eigentlichen Fehler verschluckt.
+class DisciplineStageErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      const err = this.state.error;
+      return (
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, color: "inherit" }}>
+          <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Disziplin-Bühne — Fehler (Diagnose)</div>
+          <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 10 }}>
+            Bitte diese Meldung abfotografieren/kopieren — damit lässt sich die Ursache genau beheben.
+          </div>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              fontSize: 12,
+              lineHeight: 1.5,
+              background: "rgba(220,60,50,0.12)",
+              border: "1px solid rgba(220,60,50,0.45)",
+              borderRadius: 8,
+              padding: 12,
+              maxHeight: 420,
+              overflow: "auto",
+            }}
+          >
+            {String(err?.message ?? err)}
+            {"\n\n"}
+            {err?.stack ?? ""}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function FoundationDisciplineStageHost() {
+  return (
+    <DisciplineStageErrorBoundary>
+      <DisciplineStageInner />
+    </DisciplineStageErrorBoundary>
+  );
+}
+
+function DisciplineStageInner() {
   const gameState = useFoundationGameState();
   const { selectedTeamId, activeManagerTeamId } = useFoundationState();
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
