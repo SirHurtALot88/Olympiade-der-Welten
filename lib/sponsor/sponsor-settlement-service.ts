@@ -8,6 +8,7 @@ import {
   getRankMilestoneBonus,
   getSponsorPayoutForFinalRankAndTier,
   getUnlockedMilestones,
+  readLockedRankPayout,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { getSponsorProfileComponentFactors } from "@/lib/sponsor/sponsor-negotiation";
@@ -109,34 +110,51 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
       const starTier = contract.starTier ?? 2;
       const baseComponent = contract.components.find((entry) => entry.kind === "base");
       const baseTotal = baseComponent?.rewardCash ?? 0;
-      const targetTotal = getSponsorPayoutForFinalRankAndTier(
-        currentRank,
-        salaryFactor,
-        starTier,
-        baseAnchorSalary,
-        contract.archetype,
-        contract.teamQualityRankAtSign,
-        // Feed 2: expectedRank = Vorsaison-Stärkerang beim Vertragsabschluss (teamQualityRankAtSign). Für den
-        // performance-Archetyp belohnt getSponsorPayoutForFinalRankAndTier so das Übertreffen der Erwartung
-        // als KONKAVEN Bonus (absolute Rang-Leiter + Anteil der gewonnenen Meilenstein-SCHWIERIGKEIT) — ein
-        // schwaches Team, das über seine Erwartung klettert, schlägt damit security, monoton im Endrang.
-        contract.teamQualityRankAtSign,
-        // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
-        contract.isGolden ?? false,
-      );
-      // F4 — Verhandlungsprofil zahlt jetzt auch am Rang-Upside (vorher zahlte das Settlement die
-      // Kurve MINUS negotiated-Base, wodurch die Summe unabhängig vom Profil immer = Kurve war: "Ambitioniert"
-      // bekam bei gutem Endrang KEIN Plus, nur bei schlechtem Endrang WENIGER Base + doppelte Strafe → reine
-      // Falle). Fix: das Rang-Residual gegen die BALANCED-Base messen (negotiated Base / baseMult rekonstruiert
-      // die balanced Base) und mit upsideMult skalieren. Für balanced (baseMult=1, upsideMult=1) exakt das
-      // alte max(0, targetTotal - baseTotal) — kein Verhalten geändert. Ambitioniert (0.88/1.25) zahlt bei
-      // hohem Endrang echt mehr, safe (1.05/0.85) weniger Upside gegen höheren garantierten Sockel.
+      // GELOCKTE LEITER (Kern-Fix): existiert `lockedRankPayoutLadder`, wird der Payout aus der bei der
+      // Unterschrift eingefrorenen Leiter am ERREICHTEN Endrang gelesen — NICHT aus den (über die Saison
+      // gedrifteten) Season-End-Ankern neu abgeleitet. Das Rang-Residual = gelockter Gesamt-Payout am Endrang
+      // MINUS gelocktem Sockel (Rang 32 = 0 Meilensteine) = reine, monotone Meilenstein-Upside für diesen
+      // Rang; für Teams ohne freigeschalteten Meilenstein exakt 0 (keine Selbst-Widersprüche mehr). Fehlt die
+      // Leiter (Altsaves), fällt der Pfad auf die alte Season-End-Ableitung zurück (Back-Compat).
+      const lockedLadder = contract.lockedRankPayoutLadder;
+      const ladderSalaryFactor =
+        typeof contract.salaryFactorAtSign === "number" && contract.salaryFactorAtSign > 0
+          ? contract.salaryFactorAtSign
+          : salaryFactor;
       const negotiationFactors = getSponsorProfileComponentFactors(contract.negotiationProfile ?? "balanced");
-      const neutralBaseTotal = negotiationFactors.baseMult !== 0 ? baseTotal / negotiationFactors.baseMult : baseTotal;
-      const rankResidual = Math.max(0, targetTotal - neutralBaseTotal);
+      let rankResidual: number;
+      if (lockedLadder && lockedLadder.length > 0) {
+        const targetTotalLocked = readLockedRankPayout(lockedLadder, currentRank);
+        const baseFloorLocked = readLockedRankPayout(lockedLadder, 32);
+        rankResidual = Math.max(0, targetTotalLocked - baseFloorLocked);
+      } else {
+        const targetTotal = getSponsorPayoutForFinalRankAndTier(
+          currentRank,
+          salaryFactor,
+          starTier,
+          baseAnchorSalary,
+          contract.archetype,
+          contract.teamQualityRankAtSign,
+          // Feed 2: expectedRank = Vorsaison-Stärkerang beim Vertragsabschluss (teamQualityRankAtSign). Für den
+          // performance-Archetyp belohnt getSponsorPayoutForFinalRankAndTier so das Übertreffen der Erwartung
+          // als KONKAVEN Bonus (absolute Rang-Leiter + Anteil der gewonnenen Meilenstein-SCHWIERIGKEIT) — ein
+          // schwaches Team, das über seine Erwartung klettert, schlägt damit security, monoton im Endrang.
+          contract.teamQualityRankAtSign,
+          // Golden: der gedeckelte Rang-Boost muss im Settlement dasselbe zahlen wie in der Angebots-Anzeige.
+          contract.isGolden ?? false,
+        );
+        // Back-Compat (Altsaves ohne gelockte Leiter): das Rang-Residual gegen die BALANCED-Base messen
+        // (negotiated Base / baseMult rekonstruiert die balanced Base). Für balanced (baseMult=1) exakt das
+        // alte max(0, targetTotal - baseTotal).
+        const neutralBaseTotal =
+          negotiationFactors.baseMult !== 0 ? baseTotal / negotiationFactors.baseMult : baseTotal;
+        rankResidual = Math.max(0, targetTotal - neutralBaseTotal);
+      }
+      // Verhandlungsprofil zahlt am Rang-Upside: das (gelockte) Residual mit upsideMult skalieren. Für balanced
+      // (upsideMult=1) unverändert; ambitious (1.25) zahlt bei hohem Endrang echt mehr, safe (0.85) weniger.
       const payout = roundCash(rankResidual * negotiationFactors.upsideMult);
       const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);
-      const unlockedBonus = getRankMilestoneBonus(currentRank, salaryFactor);
+      const unlockedBonus = getRankMilestoneBonus(currentRank, ladderSalaryFactor);
       const completed = payout > 0;
       const noMilestones = unlockedBonus <= 0;
       rows.push({

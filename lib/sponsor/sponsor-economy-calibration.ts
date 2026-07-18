@@ -402,6 +402,54 @@ export function getSponsorPayoutForFinalRankAndTier(
   return round1(base + milestoneBonus + goldenBonus);
 }
 
+/**
+ * LOCKED-AT-SIGNING Rang-Payout-Leiter. Für JEDEN erreichbaren Endrang (1..32) wird die volle
+ * getSponsorPayoutForFinalRankAndTier-Summe mit dem Anker + salaryFactor ZUM ZEITPUNKT DER UNTERSCHRIFT
+ * berechnet und im Vertrag persistiert. Das Settlement liest die Leiter am erreichten Endrang ab, statt die
+ * Kurve aus den (über die Saison gedrifteten) Season-End-Ankern neu abzuleiten — dadurch kann eine
+ * Anker-/salaryFactor-Drift die Auszahlung eines bereits unterschriebenen Vertrags NIE mehr ändern.
+ * Rückgabe: `ladder[finalRank - 1]` = Gesamt-Payout bei diesem Endrang. Monoton (besserer Rang ≥ Payout),
+ * `ladder[31]` (Rang 32) = reiner Sockel (0 freigeschaltete Meilensteine).
+ */
+export function buildLockedRankPayoutLadder(input: {
+  salaryFactor: number;
+  starTier: SponsorStarTier;
+  leagueMinSalary: number;
+  archetype: SponsorArchetype;
+  teamQualityRank?: number | null;
+  expectedRank?: number | null;
+  isGolden?: boolean;
+}): number[] {
+  const ladder: number[] = [];
+  for (let finalRank = 1; finalRank <= 32; finalRank += 1) {
+    ladder.push(
+      getSponsorPayoutForFinalRankAndTier(
+        finalRank,
+        input.salaryFactor,
+        input.starTier,
+        input.leagueMinSalary,
+        input.archetype,
+        input.teamQualityRank,
+        input.expectedRank,
+        input.isGolden ?? false,
+      ),
+    );
+  }
+  return ladder;
+}
+
+/** Liest die gelockte Leiter am erreichten Endrang (geklammert 1..32); `null`/ungültig ⇒ Rang 32 (Sockel). */
+export function readLockedRankPayout(ladder: number[], finalRank: number | null | undefined): number {
+  if (ladder.length === 0) {
+    return 0;
+  }
+  if (finalRank == null || !Number.isFinite(finalRank)) {
+    return ladder[ladder.length - 1] ?? 0;
+  }
+  const boundedRank = Math.min(32, Math.max(1, Math.round(finalRank)));
+  return ladder[boundedRank - 1] ?? ladder[ladder.length - 1] ?? 0;
+}
+
 export function buildOfferCashAmounts(input: {
   archetype: SponsorArchetype;
   salaryFactor: number;

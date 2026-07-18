@@ -29,6 +29,7 @@ import {
   defaultAiSponsorNegotiation,
 } from "@/lib/sponsor/sponsor-negotiation";
 import {
+  buildLockedRankPayoutLadder,
   buildMilestoneRankLabel,
   buildOfferCashAmounts,
   estimateExpectedPayout,
@@ -537,6 +538,23 @@ export function chooseSponsorOffer(input: {
 
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
+  // Payouts werden bei der UNTERSCHRIFT eingefroren: die volle Rang-Payout-Leiter (pro Endrang) mit dem
+  // Anker + salaryFactor zum Sign-Zeitpunkt berechnen und im Vertrag speichern. Das Settlement zahlt am Ende
+  // aus dieser gelockten Leiter — keine Neuableitung aus gedrifteten Season-End-Ankern mehr. Identische
+  // Parameter wie der Angebots-/Settlement-Pfad (buildOfferCashAmounts / getSponsorPayoutForFinalRankAndTier),
+  // damit Anzeige == gelockte Leiter == Settlement.
+  const salaryFactorAtSign = getCurrentSalaryFactor(input.gameState);
+  const baseAnchorSalaryAtSign = getSponsorRank32BaseAnchorSalary(input.gameState);
+  const lockedRankPayoutLadder = buildLockedRankPayoutLadder({
+    salaryFactor: salaryFactorAtSign,
+    starTier: offer.starTier ?? 2,
+    leagueMinSalary: baseAnchorSalaryAtSign,
+    archetype: offer.archetype,
+    teamQualityRank: offer.teamQualityRank,
+    // Settlement füttert expectedRank = teamQualityRankAtSign (Feed 2, performance-Überperformance).
+    expectedRank: offer.teamQualityRank,
+    isGolden: offer.isGolden,
+  });
   let contract: TeamSponsorContract = {
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
@@ -558,6 +576,8 @@ export function chooseSponsorOffer(input: {
     demandProfile: offer.demandProfile,
     teamQualityRankAtSign: offer.teamQualityRank,
     isGolden: offer.isGolden,
+    lockedRankPayoutLadder,
+    salaryFactorAtSign,
   };
   contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 

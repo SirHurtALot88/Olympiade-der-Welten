@@ -24,7 +24,7 @@ import {
   SPONSOR_BASE_SALARY_BUFFER_C,
   SPONSOR_BUILDING_COST_OFFSET_C,
 } from "@/lib/sponsor/sponsor-economy-calibration";
-import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { applySponsorNegotiationToComponents } from "@/lib/sponsor/sponsor-negotiation";
 import type { SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
@@ -575,6 +575,160 @@ describe("sponsor economy balance", () => {
       }
     }
   });
+
+  // ── Payouts FIXED AT SIGNING: gelockte Rang-Leiter (Sponsor-Settlement-Korrektheit) ────────────
+  //
+  // Owner-Vorgabe: die Auszahlungen werden BEIM ABSCHLUSS eingefroren und am Saisonende sauber ausgezahlt —
+  // sie dürfen sich über die Saison nicht mehr ändern. Vorher leitete das Settlement die Kurve aus den
+  // (gedrifteten) Season-End-Ankern + salaryFactor neu ab, wodurch Anker-/Faktor-Drift die Auszahlung eines
+  // bereits unterschriebenen Vertrags still veränderte (Rang 29-32 ohne Meilenstein zahlten trotzdem Cash,
+  // realisierte Auszahlungen waren nicht-monoton). Jetzt: gelockte Leiter im Vertrag, Settlement liest ab.
+
+  function signSecurityContract(signFactor: number, teamId: string): GameState {
+    const gs = buildLeagueGameState(signFactor);
+    const offers = buildSponsorOffersForTeam({ gameState: gs, teamId });
+    const securityOffer = offers.find((offer) => offer.archetype === "security") ?? offers[0]!;
+    return chooseSponsorOffer({
+      gameState: {
+        ...gs,
+        seasonState: { ...gs.seasonState, sponsorOffersByTeamId: { [teamId]: offers } },
+      },
+      teamId,
+      offerId: securityOffer.offerId,
+      negotiationProfile: "balanced",
+    }).gameState;
+  }
+
+  function rankRowAt(signedGs: GameState, teamId: string, finalRank: number, settlementFactor: number) {
+    const gs: GameState = {
+      ...signedGs,
+      seasonState: {
+        ...signedGs.seasonState,
+        standings: {
+          ...signedGs.seasonState.standings,
+          [teamId]: { points: 50, rank: finalRank, startplatz: 16 },
+        },
+        seasonEconomyFactors: [
+          {
+            seasonId: signedGs.season.id,
+            seasonLabel: "Aktuell",
+            horizonIndex: 0,
+            factor: settlementFactor,
+            source: "sheet_seed",
+          },
+        ],
+      },
+    };
+    const preview = previewSponsorSettlement(gs, "season_end");
+    return preview.rows.find((row) => row.teamId === teamId && row.kind === "rank") ?? null;
+  }
+
+  it("stores a locked rank-payout ladder at signing", () => {
+    const teamId = "T-05";
+    const signed = signSecurityContract(1.0, teamId);
+    const contract = getTeamSponsorContract(signed, teamId)!;
+    expect(contract.lockedRankPayoutLadder).toBeDefined();
+    expect(contract.lockedRankPayoutLadder).toHaveLength(32);
+    expect(contract.salaryFactorAtSign).toBe(1.0);
+    // Monoton: besserer Endrang ⇒ nie weniger Gesamt-Payout. Rang 32 (Index 31) = reiner Sockel.
+    const ladder = contract.lockedRankPayoutLadder!;
+    for (let i = 1; i < ladder.length; i += 1) {
+      expect(ladder[i - 1]).toBeGreaterThanOrEqual(ladder[i]!);
+    }
+    expect(ladder[0]).toBeGreaterThan(ladder[31]!); // Rang 1 > Rang 32
+  }, 15000);
+
+  it("pays the LOCKED schedule even when the settlement-time salary factor drifts", () => {
+    const teamId = "T-05";
+    const signed = signSecurityContract(1.0, teamId);
+
+    // Gleicher Endrang, aber der Settlement-Faktor driftet von 1.0 (Sign) auf 1.3 hoch.
+    for (const finalRank of [4, 8, 16, 24]) {
+      const atSignFactor = rankRowAt(signed, teamId, finalRank, 1.0);
+      const atDriftedUp = rankRowAt(signed, teamId, finalRank, 1.3);
+      const atDriftedDown = rankRowAt(signed, teamId, finalRank, 0.8);
+      // Der gelockte Payout ist unabhängig vom Season-End-Faktor: byte-identisch.
+      expect(atDriftedUp?.cashDelta).toBe(atSignFactor?.cashDelta);
+      expect(atDriftedDown?.cashDelta).toBe(atSignFactor?.cashDelta);
+    }
+
+    // Und er entspricht exakt der gespeicherten Leiter: Payout(Rang) = ladder[rank] − ladder[32-Sockel].
+    const ladder = getTeamSponsorContract(signed, teamId)!.lockedRankPayoutLadder!;
+    for (const finalRank of [4, 8, 16, 24]) {
+      const expected = Number(Math.max(0, ladder[finalRank - 1]! - ladder[31]!).toFixed(1));
+      expect(rankRowAt(signed, teamId, finalRank, 1.0)?.cashDelta).toBe(expected);
+    }
+  }, 20000);
+
+  it("keeps rank payouts monotone and pays exactly 0 when no milestone is unlocked", () => {
+    const teamId = "T-05";
+    const signed = signSecurityContract(1.0, teamId);
+
+    const ranks = [1, 4, 8, 12, 16, 20, 24, 28, 29, 30, 31, 32];
+    const payouts = ranks.map((rank) => rankRowAt(signed, teamId, rank, 1.0)?.cashDelta ?? 0);
+
+    // Monoton: ein besserer Endrang zahlt nie weniger als ein schlechterer.
+    for (let i = 1; i < payouts.length; i += 1) {
+      expect(payouts[i - 1]!).toBeGreaterThanOrEqual(payouts[i]!);
+    }
+
+    // Rang 29-32 schalten keine Gewinnstufe frei (Leiter beginnt bei Top 28) ⇒ 0 Cash, kein Selbstwiderspruch.
+    for (const finalRank of [29, 30, 31, 32]) {
+      const row = rankRowAt(signed, teamId, finalRank, 1.0);
+      expect(row?.cashDelta).toBe(0);
+      expect(row?.status).not.toBe("paid");
+      expect(row?.reason).not.toMatch(/\+[1-9]/); // kein "(+N C Stufen)" bei 0 freigeschalteten Stufen
+    }
+    // Rang 28 (erste freigeschaltete Stufe) zahlt bereits > 0.
+    expect(rankRowAt(signed, teamId, 28, 1.0)?.cashDelta).toBeGreaterThan(0);
+  }, 20000);
+
+  it("pays from the STORED ladder, so later curve-constant changes never touch a signed contract", () => {
+    const teamId = "T-05";
+    const signed = signSecurityContract(1.0, teamId);
+    const contract = getTeamSponsorContract(signed, teamId)!;
+
+    // Simuliert eine SPÄTERE Kurven-Konstanten-Änderung (z. B. LADDER_SCALE-Kompression), indem die im
+    // Vertrag GESPEICHERTE Leiter durch kontrollierte Sentinel-Werte ersetzt wird. Zahlt das Settlement
+    // daraus (statt aus einer Neuableitung), ist der Vertrag gegen Kurvenänderungen immun.
+    const sentinelLadder = Array.from({ length: 32 }, (_, index) => 40 + (32 - (index + 1))); // Rang 1 = 71 … Rang 32 = 40
+    const withSentinel: GameState = {
+      ...signed,
+      seasonState: {
+        ...signed.seasonState,
+        sponsorContractsByTeamId: {
+          ...signed.seasonState.sponsorContractsByTeamId,
+          [teamId]: { ...contract, lockedRankPayoutLadder: sentinelLadder },
+        },
+      },
+    };
+
+    // ladder[rank] − ladder[32-Sockel=40]: Rang 8 → (40 + 24) − 40 = 24.
+    expect(rankRowAt(withSentinel, teamId, 8, 1.0)?.cashDelta).toBe(24);
+    expect(rankRowAt(withSentinel, teamId, 1, 1.0)?.cashDelta).toBe(31);
+    expect(rankRowAt(withSentinel, teamId, 32, 1.0)?.cashDelta).toBe(0);
+  }, 15000);
+
+  it("falls back to the season-end derivation for legacy contracts without a locked ladder (back-compat)", () => {
+    const teamId = "T-05";
+    const signed = signSecurityContract(1.0, teamId);
+    const contract = getTeamSponsorContract(signed, teamId)!;
+    // Altsave-Simulation: Vertrag ohne gelockte Leiter.
+    const { lockedRankPayoutLadder: _dropped, salaryFactorAtSign: _dropped2, ...legacyContract } = contract;
+    const legacy: GameState = {
+      ...signed,
+      seasonState: {
+        ...signed.seasonState,
+        sponsorContractsByTeamId: {
+          ...signed.seasonState.sponsorContractsByTeamId,
+          [teamId]: legacyContract,
+        },
+      },
+    };
+    // Kein Throw, Payout bleibt plausibel (positive Upside bei gutem Endrang, 0 ohne Meilenstein).
+    expect(rankRowAt(legacy, teamId, 8, 1.0)?.cashDelta).toBeGreaterThan(0);
+    expect(rankRowAt(legacy, teamId, 32, 1.0)?.cashDelta).toBe(0);
+  }, 15000);
 
   it("gives ambitious a real downside: base shrinks, upside grows vs safe/balanced", () => {
     const components: SponsorOfferComponent[] = [
