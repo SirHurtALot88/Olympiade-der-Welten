@@ -122,6 +122,11 @@ type GameMetadata = {
   playerPotential?: GameState["playerPotential"];
   playerMoraleState?: GameState["playerMoraleState"];
   playerRelationshipEvents?: GameState["playerRelationshipEvents"];
+  // #1: Der zugewiesene Saison-Kapitän (manuell/AI) muss dauerhaft überleben, sonst geht er
+  // beim Kaltladen aus der DB verloren (bisher nur im flüchtigen Session-Cache gehalten).
+  teamCaptains?: GameState["teamCaptains"];
+  // #8: Nutzer-Entscheidungen (erledigt/verworfen) auf Inbox-Items müssen den Reload überleben.
+  gameInboxItems?: GameState["gameInboxItems"];
 };
 
 type PlayerSavePayload =
@@ -1061,6 +1066,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.playerRelationshipEvents
       ? { playerRelationshipEvents: gameMetadata.playerRelationshipEvents }
       : {}),
+    // #1: Zugewiesenen Saison-Kapitän aus dem Kalt-Load wiederherstellen (Back-Compat:
+    // fehlt das Feld in älteren Saves, bleibt das bisherige Auto-Select-Verhalten).
+    ...(gameMetadata?.teamCaptains ? { teamCaptains: gameMetadata.teamCaptains } : {}),
+    // #8: Persistierte Inbox-Status-Overrides (erledigt/verworfen) wiederherstellen.
+    ...(gameMetadata?.gameInboxItems ? { gameInboxItems: gameMetadata.gameInboxItems } : {}),
     season,
     seasonState,
     matchdayState,
@@ -1344,6 +1354,10 @@ function createPersistedSaveRecord(input: {
       playerPotential: guardedGameState.playerPotential,
       playerMoraleState: guardedGameState.playerMoraleState,
       playerRelationshipEvents: guardedGameState.playerRelationshipEvents,
+      // #1: Zugewiesenen Saison-Kapitän dauerhaft schreiben (nicht nur im Session-Cache).
+      teamCaptains: guardedGameState.teamCaptains,
+      // #8: Inbox-Status-Overrides (erledigt/verworfen) dauerhaft schreiben.
+      gameInboxItems: guardedGameState.gameInboxItems,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
     replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);
