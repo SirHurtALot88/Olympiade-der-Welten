@@ -227,12 +227,20 @@ export function startSeasonTransition(
     };
   }
   const transition = buildTransitionState(save, { status: "preview", currentStep: "season_review" });
-  // Apply season-end potential updates for all players (headroom-based, no age dependency)
-  const updatedPlayerPotential = applySeasonEndPotentialUpdates({
-    saveId: save.saveId,
-    seasonId: save.gameState.season.id,
-    gameState: save.gameState,
-  });
+  // Idempotenz-Guard (mirror von season-completion-service): die Season-End-Potenzial-Updates driften die
+  // hiddenPotentialScore deterministisch um einen seed-basierten Delta. `isSeasonComplete` bleibt nach dem
+  // ersten Übergang WEITERHIN true (gamePhase = "season_review"), sodass ein erneuter Aufruf (Doppelklick,
+  // Reload, zweiter Tab, API-Retry, oder das Nebeneinander von „Saison abschließen" und „Abschluss-Run")
+  // die Drift SONST ligaweit ein zweites Mal anwenden würde. Ist der Übergang bereits gelaufen
+  // (gamePhase === "season_review"), das Potenzial NICHT erneut driften — der bestehende Wert bleibt stehen.
+  const alreadyTransitioned = save.gameState.gamePhase === "season_review";
+  const updatedPlayerPotential = alreadyTransitioned
+    ? save.gameState.playerPotential
+    : applySeasonEndPotentialUpdates({
+        saveId: save.saveId,
+        seasonId: save.gameState.season.id,
+        gameState: save.gameState,
+      });
   const nextGameState: GameState = {
     ...save.gameState,
     gamePhase: "season_review",
