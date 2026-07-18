@@ -395,7 +395,13 @@
   function genPlayers(t){
     const base = t.mine ? [80,72,66,60,54] : null;
     const arr=[];
-    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(42,90);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
     return arr;
   }
   function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
