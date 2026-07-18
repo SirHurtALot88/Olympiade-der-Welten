@@ -79,6 +79,11 @@ function getCaptainRankLeverage(rank: number | null, totalTeams: number): number
   if (rank == null) {
     return CAPTAIN_LEVERAGE_UNKNOWN_RANK;
   }
+  // Absoluter Rang-Check: Der Disziplin-LEADER (Rang 1) hat immer wenig Platzierungshebel,
+  // unabhängig von der Ligagröße. Der reine Bruchteil (frac <= 0.06) trifft Rang 1 nur ab
+  // >=17 Teams; in kleineren Ligen/Tests bekäme der Leader sonst fälschlich den HÖCHSTEN
+  // Hebel (1.15). In der 32-Team-Produktion ist das Verhalten identisch (Rang 1 -> frac 0.031).
+  if (rank <= 1) return 0.55; // Disziplin-Leader – wenig Platzierungshebel
   const frac = rank / Math.max(1, totalTeams);
   if (frac <= 0.06) return 0.55; // schon (fast) Rang 1 – wenig Platzierungshebel
   if (frac <= 0.45) return 1.15; // umkämpftes oberes Mittelfeld – höchster Hebel

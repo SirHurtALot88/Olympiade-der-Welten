@@ -289,12 +289,26 @@ async function resolveSellContext(
     activePlayer?.purchasePrice,
     activePlayer?.player?.attributes?.displayMarketValue ?? activePlayer?.player?.attributes?.marketValue ?? null,
   );
+  // WARNUNG – Buyout-Näherung (nur dieser Prisma-DB-Pfad, aktuell NICHT route-verdrahtet):
+  // Das Prisma-`ActivePlayer`-Modell persistiert weder `yearlySalarySchedule` noch
+  // `contractShape` (siehe prisma/schema.prisma model ActivePlayer). Daher lässt sich hier –
+  // anders als im LIVE-Local-Pfad (`resolveTransfermarktSellProceeds` mit dem echten
+  // rosterEntry) – der reale Restplan NICHT durchreichen. Der Buyout wird stattdessen aus
+  // `salary × contractLength` mit angenommener "balanced"-Form REKONSTRUIERT und ist damit
+  // für front-/back-loaded oder teilweise abgelaufene Verträge nur eine Näherung
+  // (mispricing der Net-Proceeds). Bevor dieser Pfad wieder verdrahtet wird, MUSS die DB die
+  // echte yearlySalarySchedule/contractShape speichern und hier durchgereicht werden.
+  // Guard: Approximation wird als Warnung sichtbar gemacht, damit eine Reaktivierung auffällt.
+  if (activePlayer && salePrice != null) {
+    warnings.push("prisma_sell_buyout_schedule_approximated");
+  }
   const sellProceeds =
     activePlayer && salePrice != null
       ? resolveTransfermarktSellProceeds({
           rosterEntry: {
             contractLength: activePlayer.contractLength,
             salary: activePlayer.salary,
+            // yearlySalarySchedule/contractShape sind in Prisma nicht persistiert – siehe Kommentar oben.
             contractShape: "balanced",
           },
           grossSalePrice: salePrice,
