@@ -73,20 +73,39 @@ export function buildDisciplineStageTeamsFromPreview(
       };
     });
 
-    // Team-Level-Delta (Form/Intensität/Team-Power/Team-PPs + Rundung) so
-    // verteilen, dass Σ(Netto) exakt == teamResult.score. Der letzte Slot nimmt
-    // den Rundungsrest auf, damit keine Drift bleibt.
-    const playerNetSum = players.reduce((sum, p) => sum + p.val + modSum(p.mods), 0);
-    let teamDelta = round1(teamResult.score - playerNetSum);
-    if (Math.abs(teamDelta) >= 0.05 && players.length > 0) {
-      const perSlot = round1(teamDelta / players.length);
-      players.forEach((player, index) => {
-        const amount = index === players.length - 1 ? round1(teamDelta) : perSlot;
-        teamDelta = round1(teamDelta - amount);
-        if (Math.abs(amount) >= 0.05) {
-          player.mods.push({ k: "Team", sign: amount < 0 ? -1 : 1, amt: Math.abs(amount) });
+    // Team-Level-Effekte (Form-Card / Intensität / Team-Power / Team-PPs) sind
+    // nicht pro Spieler in den Entries, sondern auf Team-Ebene. Für den additiven
+    // Slot-Reveal verteilen wir sie GLEICHMÄSSIG auf die Slots — aber BESCHRIFTET,
+    // damit im Hover/Reveal transparent bleibt, woher die Punkte kommen.
+    if (players.length > 0) {
+      const teamLevelMods: { k: string; value: number }[] = [
+        { k: "Form", value: teamResult.formModifier ?? 0 },
+        { k: "Intensität", value: teamResult.intensityModifier ?? 0 },
+        { k: "Team-Power", value: teamResult.teamPowerModifier ?? 0 },
+        { k: "Team-PPs", value: teamResult.teamPpsModifier ?? 0 },
+      ];
+      for (const teamMod of teamLevelMods) {
+        if (Math.abs(teamMod.value) < 0.05) {
+          continue;
         }
-      });
+        let remaining = round1(teamMod.value);
+        players.forEach((player, index) => {
+          const amount = index === players.length - 1 ? round1(remaining) : round1(teamMod.value / players.length);
+          remaining = round1(remaining - amount);
+          if (Math.abs(amount) >= 0.05) {
+            player.mods.push({ k: teamMod.k, sign: amount < 0 ? -1 : 1, amt: Math.abs(amount) });
+          }
+        });
+      }
+    }
+
+    // Rest-Reconcile: verbleibende Differenz (Rundung / nicht separat gelistete
+    // Effekte) auf den letzten Slot, damit Σ(Netto) exakt == teamResult.score.
+    const playerNetSum = players.reduce((sum, p) => sum + p.val + modSum(p.mods), 0);
+    const residual = round1(teamResult.score - playerNetSum);
+    if (Math.abs(residual) >= 0.05 && players.length > 0) {
+      const last = players[players.length - 1]!;
+      last.mods.push({ k: "Team", sign: residual < 0 ? -1 : 1, amt: Math.abs(residual) });
     }
 
     return {

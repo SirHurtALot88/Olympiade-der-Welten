@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "scenes:inject-bridge": "node scripts/inject-discipline-stage-bridge.mjs",
     "next:clean": "tsx scripts/clean-next-runtime.ts",
     "build:clean": "npm run next:clean && npm run build",
     "dev": "tsx server.ts",

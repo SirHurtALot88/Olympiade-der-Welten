@@ -893,6 +893,19 @@
           // wäre KEIN Team "mine" und reset() (teams.find(t=>t.mine)) würfe.
           if (d.mineCode && typeof teams !== "undefined" && teams.some(function(t){ return t.code === d.mineCode; })) {
             teams.forEach(function(t){ t.mine = (t.code === d.mineCode); });
+            // Team-Farben neu setzen: das ECHTE eigene Team bekommt die Mine-Optik
+            // (orange), Ex-Mine (M-M) fällt auf seine reguläre Hue-Farbe zurück.
+            teams.forEach(function(t){
+              if (t.mine) {
+                t.color = "#e07a2b";
+                t.accent = "#3a2415";
+              } else {
+                var h = (typeof hueFor === "function") ? hueFor(t.i) : ((t.i * 360 / 32) % 360);
+                t.color = "hsl(" + h + " 58% 52%)";
+                t.accent = "hsl(" + ((h + 150) % 360) + " 62% 78%)";
+              }
+              t.crest = null; // erzwingt Neuzeichnung mit der aktualisierten Farbe/Logo
+            });
           }
         } catch (e) {}
         // Echte Team-Logos: auf Team legen (Ladder-<img>) + fürs Canvas vorladen.
