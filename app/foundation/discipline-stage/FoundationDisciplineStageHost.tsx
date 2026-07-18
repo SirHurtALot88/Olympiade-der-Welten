@@ -17,6 +17,8 @@ export type FoundationDisciplineStageHostProps = {
   saveId?: string | null;
   seasonId?: string | null;
   matchdayId?: string | null;
+  // Kanonische „Weiter"-Aktion (identisch zur Arena) — wertet den Spieltag aus.
+  onAdvanceMatchday?: (() => void | Promise<void>) | null;
 };
 
 // Diagnose-Fehlergrenze: zeigt die ECHTE Fehlermeldung + Stack direkt im Tab an,

@@ -23,6 +23,7 @@ export type DisciplineStageArenaProps = {
   saveId?: string | null;
   seasonId?: string | null;
   matchdayId?: string | null;
+  onAdvanceMatchday?: (() => void | Promise<void>) | null;
 };
 
 // Disziplin-ID → fertige Arena-Szene unter /public/discipline-scenes.
@@ -150,6 +151,7 @@ export default function DisciplineStageArena({
   saveId,
   seasonId,
   matchdayId,
+  onAdvanceMatchday,
 }: DisciplineStageArenaProps) {
   const ownTeamId = activeManagerTeamId ?? selectedTeamId ?? null;
 
@@ -562,6 +564,29 @@ export default function DisciplineStageArena({
           />
           {briefingItems.length > 0 ? (
             <DisciplineStageStandingsDelta items={briefingItems} teamMetaById={teamMetaById} ownTeamId={ownTeamId} />
+          ) : null}
+          {onAdvanceMatchday ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: "var(--nl-mut)" }}>
+                Auswertung identisch zur Arena — schließt den Spieltag ab und schaltet weiter.
+              </span>
+              <button
+                type="button"
+                onClick={() => void onAdvanceMatchday()}
+                style={{
+                  padding: "11px 22px",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  border: 0,
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  color: "var(--nl-ink)",
+                  background: "var(--nl-accent)",
+                }}
+              >
+                Spieltag auswerten &amp; weiter →
+              </button>
+            </div>
           ) : null}
         </div>
       ) : null}

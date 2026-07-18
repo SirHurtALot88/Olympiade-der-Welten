@@ -2926,6 +2926,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               saveId={activeSaveId}
               seasonId={gameState.season.id}
               matchdayId={gameState.matchdayState.matchdayId}
+              onAdvanceMatchday={triggerGlobalNext}
             />
           ) : null}
 
