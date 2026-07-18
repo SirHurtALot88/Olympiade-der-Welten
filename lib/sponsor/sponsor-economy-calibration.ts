@@ -1,5 +1,6 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
-import type { GameState, SponsorArchetype, SponsorOffer, SponsorOfferComponent, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import { getSponsorCurveShapeRankMultiplier, getSponsorRarityEtatFactor } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
@@ -403,36 +404,77 @@ export function getSponsorPayoutForFinalRankAndTier(
 }
 
 /**
- * LOCKED-AT-SIGNING Rang-Payout-Leiter. Für JEDEN erreichbaren Endrang (1..32) wird die volle
- * getSponsorPayoutForFinalRankAndTier-Summe mit dem Anker + salaryFactor ZUM ZEITPUNKT DER UNTERSCHRIFT
- * berechnet und im Vertrag persistiert. Das Settlement liest die Leiter am erreichten Endrang ab, statt die
- * Kurve aus den (über die Saison gedrifteten) Season-End-Ankern neu abzuleiten — dadurch kann eine
- * Anker-/salaryFactor-Drift die Auszahlung eines bereits unterschriebenen Vertrags NIE mehr ändern.
- * Rückgabe: `ladder[finalRank - 1]` = Gesamt-Payout bei diesem Endrang. Monoton (besserer Rang ≥ Payout),
- * `ladder[31]` (Rang 32) = reiner Sockel (0 freigeschaltete Meilensteine).
+ * NEW curve-shape + rarity payout. `payout(rank) = effectiveBaseFloor(salary-anchored) × rarityEtatFactor ×
+ * shapeRankMultiplier × qualityRebalance`. The salary anchor stays the dominant driver (the whole curve scales
+ * with it); rarity is a bounded 0.90..1.15 Etat dial; the shape only redistributes WHERE the Etat sits. Golden
+ * lifts only the above-floor (rank) portion, capped — the guaranteed floor is untouched. At salaryFactor 1.0 /
+ * leagueMin 32 / magisch / no quality rebalance this returns exactly the calibrated reference arrays.
+ */
+export function getSponsorCurveShapePayout(
+  finalRank: number | null | undefined,
+  salaryFactor: number,
+  rarity: SponsorRarity,
+  curveShape: SponsorCurveShape,
+  leagueMinSalary = SPONSOR_BASE_FLOOR_C,
+  teamQualityRank?: number | null,
+  isGolden = false,
+): number {
+  const { effectiveBaseFloor } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
+  const rarityFactor = getSponsorRarityEtatFactor(rarity);
+  const rebalance = getQualityRebalanceProfile(teamQualityRank);
+  // Shapes already encode floor-vs-upside, so the weak-team rebalance is applied as a single blended scale
+  // (mean of the old base/milestone scales) instead of splitting base vs milestone.
+  const rebalanceScale = (rebalance.baseScale + rebalance.milestoneScale) / 2;
+  const anchor = effectiveBaseFloor * rarityFactor * rebalanceScale;
+  const rankPayout = round1(anchor * getSponsorCurveShapeRankMultiplier(curveShape, finalRank ?? 32));
+  const floorPayout = round1(anchor * getSponsorCurveShapeRankMultiplier(curveShape, 32));
+  const goldenBonus = isGolden ? getGoldenMilestoneBonus(Math.max(0, rankPayout - floorPayout), salaryFactor) : 0;
+  return round1(rankPayout + goldenBonus);
+}
+
+/**
+ * LOCKED-AT-SIGNING Rang-Payout-Leiter. Für JEDEN erreichbaren Endrang (1..32) wird die volle Payout-Summe mit
+ * dem Anker + salaryFactor ZUM ZEITPUNKT DER UNTERSCHRIFT berechnet und im Vertrag persistiert. Das Settlement
+ * liest die Leiter am erreichten Endrang ab, statt die Kurve aus den (über die Saison gedrifteten) Season-End-
+ * Ankern neu abzuleiten — dadurch kann eine Anker-/salaryFactor-Drift die Auszahlung eines bereits
+ * unterschriebenen Vertrags NIE mehr ändern. Wenn `rarity` + `curveShape` gesetzt sind, wird die Leiter aus dem
+ * neuen Kurven-Payout gebaut; sonst (Altverträge) über den Legacy-Stern-/Archetyp-Pfad.
  */
 export function buildLockedRankPayoutLadder(input: {
   salaryFactor: number;
-  starTier: SponsorStarTier;
   leagueMinSalary: number;
-  archetype: SponsorArchetype;
+  starTier?: SponsorStarTier;
+  archetype?: SponsorArchetype;
+  rarity?: SponsorRarity;
+  curveShape?: SponsorCurveShape;
   teamQualityRank?: number | null;
   expectedRank?: number | null;
   isGolden?: boolean;
 }): number[] {
   const ladder: number[] = [];
+  const useShape = input.rarity != null && input.curveShape != null;
   for (let finalRank = 1; finalRank <= 32; finalRank += 1) {
     ladder.push(
-      getSponsorPayoutForFinalRankAndTier(
-        finalRank,
-        input.salaryFactor,
-        input.starTier,
-        input.leagueMinSalary,
-        input.archetype,
-        input.teamQualityRank,
-        input.expectedRank,
-        input.isGolden ?? false,
-      ),
+      useShape
+        ? getSponsorCurveShapePayout(
+            finalRank,
+            input.salaryFactor,
+            input.rarity!,
+            input.curveShape!,
+            input.leagueMinSalary,
+            input.teamQualityRank,
+            input.isGolden ?? false,
+          )
+        : getSponsorPayoutForFinalRankAndTier(
+            finalRank,
+            input.salaryFactor,
+            input.starTier ?? 2,
+            input.leagueMinSalary,
+            input.archetype ?? "identity",
+            input.teamQualityRank,
+            input.expectedRank,
+            input.isGolden ?? false,
+          ),
     );
   }
   return ladder;

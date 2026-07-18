@@ -1159,7 +1159,37 @@ export type TeamSeasonObjectiveCategory =
   | "player"
   | "sponsor";
 
+/** @deprecated Legacy star-tier archetype. Superseded by SponsorCurveShape + SponsorRarity. Kept only for
+ * back-compat reading of old saves during migration; the active model no longer assigns it. */
 export type SponsorArchetype = "security" | "performance" | "identity";
+
+/**
+ * Rarity replaces the old 1..5 star tier as the Etat (total-payout) dial. Bounded spread (see
+ * SPONSOR_RARITIES in lib/sponsor/sponsor-curve-shapes.ts): gewöhnlich (lowest) → legendär (highest),
+ * factors 0.90 / 1.00 / 1.07 / 1.15 — salary-anchored, so it never dwarfs a team's wage bill.
+ */
+export type SponsorRarity = "gewöhnlich" | "magisch" | "selten" | "legendär";
+
+/** Thematic family of a curve shape — governs the offer-slate draw ("max 2 per family"). */
+export type SponsorCurveFamily = "titel" | "europa" | "stetig" | "aufstieg" | "sicherheit";
+
+/**
+ * A sponsor's curve shape = WHERE across the final table (Platz 1..32) its fixed Etat sits. Replaces the
+ * old 3 archetypes. 11 shapes in 5 families; each has a unique win-band and a matching weak-band (no shape
+ * is dominated). Data + payout profiles live in lib/sponsor/sponsor-curve-shapes.ts.
+ */
+export type SponsorCurveShape =
+  | "titeljaeger"
+  | "meisterschale"
+  | "koenigsklasse"
+  | "europapokal"
+  | "conference"
+  | "stetig"
+  | "mittelfeld"
+  | "aufsteiger"
+  | "konsolidierung"
+  | "sicherheit"
+  | "klassenerhalt";
 
 export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
 
@@ -1199,6 +1229,7 @@ export type SponsorOfferComponent = {
 
 export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
 
+/** @deprecated Replaced by SponsorRarity. Retained only so old-save blobs still type-check during migration. */
 export type SponsorStarTier = 1 | 2 | 3 | 4 | 5;
 
 export type SponsorTermSeasons = 1 | 2 | 3;
@@ -1226,6 +1257,10 @@ export type SponsorOffer = {
   seasonId: string;
   teamId: string;
   archetype: SponsorArchetype;
+  /** Curve shape = where the Etat sits across the table (transitional-optional; required after cutover). */
+  curveShape?: SponsorCurveShape;
+  /** Rarity = the Etat dial replacing starTier (transitional-optional; required after cutover). */
+  rarity?: SponsorRarity;
   name: string;
   flavor: string;
   components: SponsorOfferComponent[];
@@ -1281,6 +1316,10 @@ export type TeamSponsorContract = {
   teamId: string;
   offerId: string;
   archetype: SponsorArchetype;
+  /** Curve shape (transitional-optional; required after cutover). */
+  curveShape?: SponsorCurveShape;
+  /** Rarity — the Etat dial replacing starTier (transitional-optional; required after cutover). */
+  rarity?: SponsorRarity;
   name: string;
   chosenAt: string;
   startRank: number | null;
