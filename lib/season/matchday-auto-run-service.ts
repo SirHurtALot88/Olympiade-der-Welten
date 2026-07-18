@@ -3,6 +3,7 @@ import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupModifiers } from "@
 import { type GameState, type LineupDraftModifiers, type TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
+import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { createLineupDraftId } from "@/lib/lineups/lineup-discipline-contract";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -158,6 +159,26 @@ function getStatusFromBooleans(input: {
   if (input.warnings.length > 0) return "warning";
   if ((input.plannedWrites ?? 0) > 0) return "planned";
   return "ready";
+}
+
+// Same-day injury multipliers must be baked into the auto-run resolve preview.
+// The result-apply path uses this preview as `preloadedPreview`, so if injuries
+// are not attached before the preview is built an injured-this-matchday player
+// would be persisted at 1.0x through auto-run while scoring 0.75x through the
+// manual/sim path. Attaching here mirrors prepareLegacyMatchdayResultApply, which
+// attaches the same roll map to the contexts before it scores.
+function attachAutoRunInjuriesToContexts(
+  contexts: LegacyLineupLoadedContext[],
+  gameState: GameState,
+  scope: { saveId: string; seasonId: string; matchdayId: string },
+): void {
+  const injuryRollMap = buildMatchdayInjuryRollMap({
+    gameState,
+    saveId: scope.saveId,
+    seasonId: scope.seasonId,
+    matchdayId: scope.matchdayId,
+  });
+  attachMatchdayInjuryPerformanceToContexts(contexts, injuryRollMap);
 }
 
 function buildResolvePreviewEnvelopeFromContexts(contexts: LegacyLineupLoadedContext[]): ResolvePreviewEnvelope {
@@ -698,6 +719,7 @@ export async function runLocalMatchdayAutoRun(
     }
     return contextResult.context;
   });
+  attachAutoRunInjuriesToContexts(currentContexts, postAiSave.gameState, scope);
   const currentResolve = buildResolvePreviewEnvelopeFromContexts(currentContexts);
   let activeResolve = currentResolve;
   let lineupSummary = buildDryRunLineupSummary({
@@ -720,6 +742,7 @@ export async function runLocalMatchdayAutoRun(
       }
       return contextResult.context;
     });
+    attachAutoRunInjuriesToContexts(hypotheticalContexts, hypotheticalState.gameState, scope);
     const hypotheticalResolve = buildResolvePreviewEnvelopeFromContexts(hypotheticalContexts);
     activeResolve = hypotheticalResolve;
     lineupSummary = buildDryRunLineupSummary({

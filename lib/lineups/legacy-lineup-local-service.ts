@@ -568,6 +568,12 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
+      // Attach the (normalized) game state so the resolve engine can compute the
+      // player-morale multiplier and captain team-power modifier. Without this the
+      // resolve path silently skips both (buildPlayerMoralePerformanceMap and
+      // selectTeamCaptain are gated on context.gameState), diverging from the
+      // preview path which receives the game state via gameStateOverride.
+      gameState: normalizedGameState,
       lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(
