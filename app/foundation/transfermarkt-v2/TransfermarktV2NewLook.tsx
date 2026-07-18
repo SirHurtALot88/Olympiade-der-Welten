@@ -650,15 +650,17 @@ export function NlMarketBeforeAfterRow({
   const delta = before != null && after != null ? after - before : null;
   return (
     <div className="nl-market-deal-row" title={estimateNote}>
-      <span className="nl-market-deal-row-label">{label}</span>
+      <div className="nl-market-deal-row-head">
+        <span className="nl-market-deal-row-label">{label}</span>
+        {delta != null && delta !== 0 ? (
+          <NlDeltaChip value={delta} invert={invert} format={(n) => `${n > 0 ? "+" : ""}${format(n)}`} />
+        ) : (
+          <span className="nl-market-deal-flat nl-tnum">±0</span>
+        )}
+      </div>
       <span className="nl-market-deal-row-values nl-tnum">
         {format(before)} <span className="nl-market-deal-arrow" aria-hidden="true">→</span> {format(after)}
       </span>
-      {delta != null && delta !== 0 ? (
-        <NlDeltaChip value={delta} invert={invert} format={(n) => `${n > 0 ? "+" : ""}${format(n)}`} />
-      ) : (
-        <span className="nl-market-deal-flat nl-tnum">±0</span>
-      )}
     </div>
   );
 }

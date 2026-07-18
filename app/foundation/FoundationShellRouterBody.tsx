@@ -2839,12 +2839,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                         if (column.id === "team") {
                           return (
                             <td key={column.id} className="ranks-sticky-team">
-                              <span className="ranks-team-link">
-                                <span className="ranks-team-link-name">{row.team.name}</span>
-                                <span className="ranks-team-link-cue" aria-hidden="true">
-                                  Profil ›
-                                </span>
-                              </span>
+                              {row.team.name}
                             </td>
                           );
                         }

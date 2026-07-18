@@ -11178,39 +11178,12 @@ a {
   outline-offset: -2px;
 }
 
-/* Team-Zelle als klar erkennbarer Profil-Link: Name + dezenter „Profil ›"-Cue,
-   der bei Hover in Akzentfarbe aufleuchtet. */
-.ranks-team-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.ranks-team-link-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 750;
-  color: #f4f7ff;
-}
-
-.ranks-team-link-cue {
-  flex: 0 0 auto;
-  font-size: 0.66rem;
-  font-weight: 850;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--nl-accent, #7fb0ff) 62%, rgba(242, 237, 226, 0.55));
-  opacity: 0.62;
-  transition: opacity 0.14s ease, color 0.14s ease;
-}
-
-.ranks-table tbody tr.ranks-row-clickable:hover .ranks-team-link-cue {
-  opacity: 1;
+/* Klickbarkeit wird — wie auf den anderen Seiten — allein über Hover kenntlich
+   gemacht (cursor:pointer, Akzent-Rand + aufgehellte Team-Spalte oben), kein
+   dauerhaftes „Profil"-Label. Der Team-Name bekommt bei Hover Akzentfarbe. */
+.ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
   color: var(--nl-accent, #7fb0ff);
+  font-weight: 700;
 }
 
 .discipline-config-table {
@@ -47103,9 +47076,18 @@ button.foundation-team-portrait-card {
 /* Hauptraster */
 .is-new-look .nl-market-main-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(340px, 1.25fr) minmax(280px, 0.9fr);
+  /* Deal-Spalte (rechts) schlanker: nimmt weniger Breite, mehr Raum fürs
+     Scouting-Profil in der Mitte. */
+  grid-template-columns: minmax(280px, 0.92fr) minmax(340px, 1.4fr) minmax(250px, 0.78fr);
   gap: var(--nl-s4);
   align-items: start;
+}
+
+/* Deal-/Impact-Karten dichter stapeln, damit der rechte Block weniger
+   Vertikalraum frisst. */
+.is-new-look .nl-market-deal-card .nl-card-body,
+.is-new-look .nl-market-impact-card .nl-card-body {
+  gap: var(--nl-s2);
 }
 
 .is-new-look .nl-market-focus-column {
@@ -47583,29 +47565,48 @@ button.foundation-team-portrait-card {
 
 /* Deal-Desk */
 .is-new-look .nl-market-deal-topline {
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 
 .is-new-look .nl-market-deal-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--nl-s2);
+  gap: 6px;
 }
 
+/* Kompakte Deal-Zeile: Label + Delta oben, Vorher→Nachher einzeilig darunter
+   über die volle Breite. Vorher hatte die 3-Spalten-Grid-Variante die Werte in
+   der schmalen rechten Spalte auf bis zu 4 Zeilen umgebrochen
+   ("175,0 / Mio → / 163,7 / Mio"); jetzt zwei saubere Zeilen ohne Umbruch. */
 .is-new-look .nl-market-deal-row {
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  align-items: center;
-  gap: var(--nl-s2);
-  padding: var(--nl-s2) var(--nl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 5px 9px;
   border-radius: var(--nl-r-sm);
   border: 1px solid var(--nl-line);
   background: var(--nl-panel-2);
-  font-size: 13px;
+}
+
+.is-new-look .nl-market-deal-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.is-new-look .nl-market-deal-row-values {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--nl-ink);
 }
 
 .is-new-look .nl-market-deal-row-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -47614,7 +47615,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-market-deal-arrow {
   color: var(--nl-mut-2);
-  margin: 0 4px;
+  margin: 0 3px;
 }
 
 .is-new-look .nl-market-deal-flat {
@@ -47704,13 +47705,25 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 
-/* Phase-2 F2 — Gehalts-What-if-Slider im Deal-Desk (nur Abstand; der Regler selbst
-   nutzt die token-gestylte .nl-credits-slider-Optik aus NlWhatIfSlider). */
+/* Phase-2 F2 — Gehalts-What-if-Slider im Deal-Desk (Abstand über den Card-Body-Gap;
+   der Regler selbst nutzt die token-gestylte .nl-credits-slider-Optik aus
+   NlWhatIfSlider). Eigene Ränder entfernt, damit kein doppelter Leerraum
+   (Flex-Gap + Margin) entsteht. */
 .is-new-look .nl-market-salary-whatif {
-  margin: var(--nl-s3) 0;
+  margin: 0;
+  gap: 6px;
+}
+
+/* Bugfix: .nl-credits-slider trägt `flex: 1 1 220px` — im Kredite-View sitzt der
+   Regler in einem ROW-Flex (Basis = Breite, korrekt). NlWhatIfSlider stapelt ihn
+   aber in einem COLUMN-Flex, wo die 220px-Basis + flex-grow zur HÖHE werden und
+   ein ~220px hoher, fast leerer Regler entsteht. Hier auf natürliche Höhe zwingen. */
+.is-new-look .nl-whatif-slider input.nl-credits-slider {
+  flex: 0 0 auto;
+  height: 6px;
 }
 
 /* Phase-2 F3 — Mehrsaison-Budget-Leiste (Gehaltslast je Saison + Buyout-Fußnote). */
@@ -47718,7 +47731,7 @@ button.foundation-team-portrait-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: var(--nl-s3) 0;
+  margin: 0;
 }
 .is-new-look .nl-market-deal-budget .nl-market-budget-barchart {
   width: 100%;
