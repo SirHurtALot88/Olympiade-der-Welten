@@ -278,6 +278,7 @@
         <button class="cta" id="advance">▶ Feld läuft (Start Runner)</button>
         <div class="prog"><i id="progfill"></i></div>
         <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <button class="cta small" id="persp" title="Perspektive: Übersicht ⟷ Zoom auf dein Team">🔍 1 Team-Zoom</button>
         <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
         <button class="cta small" id="replay">↻ Neu</button>
       </div>
@@ -398,9 +399,13 @@
     for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
     return arr;
   }
+  function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
   function initData(){
     _s=0x51ed270b;
-    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; });
+    // Startaufstellung nach SAISONRANG statt alphabetisch: Nachbarn sind echte Positionsrivalen,
+    // und man sieht sofort die Tabellenlage. (stabile Pseudo-Reihenfolge über Team-Hash)
+    teams.slice().sort((a,b)=> fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
+    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; });
   }
   // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
   function ampelColor(rank){
@@ -414,7 +419,7 @@
     return Math.round(t.score) + (gain>0 ? ` (+${gain})` : '');
   }
   function recomputeRanksLive(){
-    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank);
     order.forEach((t,idx)=> t.rank=idx+1);
   }
 
@@ -636,7 +641,32 @@
     return {px,py,R};
   }
 
+  // ---- adaptive Kamera: Übersicht (alle 32) ⟷ Zoom auf 1 gesteuertes Team + Umgebung ----
+  let camZoom=1;               // 1 = Übersicht, >1 = Zoom
+  const CAM_ZOOM=1.8;
+  function focusWorldPos(){
+    const t=teams.find(x=>x.mine)||teams[0];
+    let s;
+    if(runner && runner.team===t && runT<1){ s=runner.sFrom+(runner.sTo-runner.sFrom)*runT; }
+    else { s=t.score*SCALE; }
+    return trackPoint(s, TW/2+laneVarFor(t.i));
+  }
+  function applyCamera(){
+    if(camZoom===1) return;
+    const f=focusWorldPos();
+    ctx.translate(W/2, H/2); ctx.scale(camZoom, camZoom); ctx.translate(-f.x, -f.y);
+  }
+  // Canvas-Screen-Koordinate → Welt-Koordinate (für Hover unter Zoom)
+  function screenToWorld(mx,my){
+    if(camZoom===1) return {x:mx,y:my};
+    const f=focusWorldPos();
+    return { x:(mx-W/2)/camZoom + f.x, y:(my-H/2)/camZoom + f.y };
+  }
+
   function drawScene(){
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.save();
+    applyCamera();
     drawTrackBase();
     hitboxes=[];
     const nonMine = teams.filter(x=>!x.mine).sort((a,b)=> b.rank-a.rank);
@@ -677,6 +707,7 @@
       ctx.fillStyle='rgba(255,255,255,.55)'; ctx.textAlign='center'; ctx.font='italic 600 20px Georgia,serif';
       ctx.fillText('Aufstellung bereit — Klick zum Start', CX, CY-OUTR-72);
     }
+    ctx.restore();
   }
 
   let raf=null;
@@ -821,7 +852,8 @@
   cv.addEventListener('mousemove', function(e){
     const rect=cv.getBoundingClientRect();
     const scaleX=cv.width/rect.width, scaleY=cv.height/rect.height;
-    const mx=(e.clientX-rect.left)*scaleX, my=(e.clientY-rect.top)*scaleY;
+    const sx=(e.clientX-rect.left)*scaleX, sy=(e.clientY-rect.top)*scaleY;
+    const w=screenToWorld(sx,sy); const mx=w.x, my=w.y;
     let hit=null;
     for(let i=hitboxes.length-1;i>=0;i--){
       const hb=hitboxes[i], dx=mx-hb.x, dy=my-hb.y;
@@ -881,7 +913,7 @@
       let s=0; for(let k=0;k<=round;k++){ const p=t.players[k]; s+=Math.max(0, p.val+modSum(p)); }
       return { t, after:s };
     });
-    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.i-b.t.i).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
+    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
     teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; });
   }
 
@@ -946,7 +978,7 @@
   }
   // Podest am Ende der Disziplin: Top 3, Säulen steigen nacheinander auf
   function showPodium(){
-    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i).slice(0,3);
+    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank).slice(0,3);
     const visual=[top3[1],top3[0],top3[2]]; const cls=['p2','p1','p3']; const place=[2,1,3];
     const row=document.getElementById('podRow'); row.innerHTML='';
     visual.forEach((t,idx)=>{ if(!t) return;
@@ -1105,6 +1137,11 @@
 
   document.getElementById('advance').addEventListener('click',advance);
   document.getElementById('replay').addEventListener('click',reset);
+  document.getElementById('persp').addEventListener('click',function(){
+    if(camZoom===1){ camZoom=CAM_ZOOM; this.textContent='⊡ Übersicht'; }
+    else { camZoom=1; this.textContent='🔍 1 Team-Zoom'; }
+    drawScene();
+  });
   document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) crowdSwell(0.3,0.4); });
   const mq=window.matchMedia('(prefers-color-scheme: dark)');
   if(mq.addEventListener) mq.addEventListener('change',drawScene);
