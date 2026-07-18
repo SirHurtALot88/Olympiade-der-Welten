@@ -1,12 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributes, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import {
   buildOrganicSeasonProgression,
   ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
   resolveOrganicRegressionCombinedTotal,
 } from "@/lib/training/organic-season-progression";
+import { applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
+
+function trainingCenterFacilities(level: number): TeamFacilityCollection {
+  return {
+    facilities: { training_center: { level, enabled: level > 0, conditionPct: 100 } },
+  } as unknown as TeamFacilityCollection;
+}
+
+function academyFacilities(level: number): TeamFacilityCollection {
+  return {
+    facilities: { academy: { level, enabled: level > 0, conditionPct: 100 } },
+  } as unknown as TeamFacilityCollection;
+}
 
 const attrs: PlayerGeneratorAttributes = {
   power: 70,
@@ -592,5 +605,74 @@ describe("resolveOrganicRegressionCombinedTotal", () => {
         marketValuePressureTotal,
       }),
     ).toBe(expected);
+  });
+
+  it("Fix B: training_center display (applyTrainingXpFacilityModifiers) matches the organic-applied modifier per level (no divergence), L5 = +70%", () => {
+    const expectedByLevel = [0, 14, 28, 42, 56, 70];
+    const sourcePlayer = player();
+    const baseline = buildOrganicSeasonProgression({
+      gameState: gameState(sourcePlayer),
+      player: sourcePlayer,
+      facilities: trainingCenterFacilities(0),
+    });
+
+    for (let level = 1; level <= 5; level += 1) {
+      const facilities = trainingCenterFacilities(level);
+      // Display path (training panel / forecasts / facility cards) at 100% condition.
+      const displayPct = applyTrainingXpFacilityModifiers(100, facilities).modifierPct;
+      expect(displayPct).toBe(expectedByLevel[level]);
+
+      // Organic-applied path: facilityModifierPct minus the (level-independent) team development bonus
+      // isolates the training-center modifier the progression actually applies — must equal the display.
+      const applied = buildOrganicSeasonProgression({
+        gameState: gameState(sourcePlayer),
+        player: sourcePlayer,
+        facilities,
+      });
+      const organicModifierPct = applied.facilityModifierPct - baseline.facilityModifierPct;
+      expect(organicModifierPct).toBeCloseTo(displayPct, 5);
+    }
+
+    // L5 truly advertises +70% (the real applied value).
+    expect(applyTrainingXpFacilityModifiers(100, trainingCenterFacilities(5)).modifierPct).toBe(70);
+  });
+
+  it("Fix C: an academy develops an eligible low-tier (F/E/D) player faster than academy level 0", () => {
+    // Rating 30 → tier D (F/E/D eligible for the academy youth-development boost).
+    const lowTier = player({ id: "low-tier", rating: 30 });
+
+    const withoutAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(lowTier),
+      player: lowTier,
+      facilities: academyFacilities(0),
+    });
+    const withAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(lowTier),
+      player: lowTier,
+      facilities: academyFacilities(5),
+    });
+
+    expect(withAcademy.trainingSetpoints).toBeGreaterThan(withoutAcademy.trainingSetpoints);
+    expect(withAcademy.appliedTrainingSetpoints).toBeGreaterThan(withoutAcademy.appliedTrainingSetpoints);
+    // L5 academy at 100% efficiency = +30% training budget (rounding to 2 decimals → tolerance 1 digit).
+    expect(withAcademy.trainingSetpoints).toBeCloseTo(withoutAcademy.trainingSetpoints * 1.3, 1);
+  });
+
+  it("Fix C: the academy boost does NOT apply to non-low-tier (C+) players", () => {
+    // Rating 70 → tier A (not F/E/D) — no academy youth-development boost.
+    const midTier = player({ id: "mid-tier", rating: 70 });
+
+    const withoutAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(midTier),
+      player: midTier,
+      facilities: academyFacilities(0),
+    });
+    const withAcademy = buildOrganicSeasonProgression({
+      gameState: gameState(midTier),
+      player: midTier,
+      facilities: academyFacilities(5),
+    });
+
+    expect(withAcademy.trainingSetpoints).toBe(withoutAcademy.trainingSetpoints);
   });
 });

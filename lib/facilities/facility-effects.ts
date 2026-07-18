@@ -167,6 +167,26 @@ function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, faciliti
   return roundValue(((getFacilityLevelDefinition("academy", level)?.discountPct ?? 0) * efficiencyPct) / 100);
 }
 
+/**
+ * Academy-Effekt (repurposed): realer organischer Entwicklungs-Boost für junge/Low-Tier-Spieler
+ * (F/E/D). Ersetzt den toten Upgrade-Kosten-Rabatt (XP-Kostensystem abgeschafft). Gibt den
+ * Prozent-Boost auf das organische Trainingsbudget berechtigter Spieler zurück, skaliert mit
+ * Academy-Level (`modifierPct` aus dem Katalog) × Facility-Effizienz. Für nicht-berechtigte Tiers
+ * (C und besser) 0. Analog zu `getRecoveryTrainingFatigueReductionPct` gehalten — Katalog ist die
+ * einzige Zahlenquelle.
+ */
+export function getAcademyDevelopmentBoostPct(
+  ratingTier: PlayerProgressionRatingTier,
+  facilities: TeamFacilityCollection | null | undefined,
+) {
+  if (ratingTier !== "F" && ratingTier !== "E" && ratingTier !== "D") {
+    return 0;
+  }
+  const level = getFacilityLevel(facilities, "academy");
+  const efficiencyPct = getFacilityEfficiency(facilities, "academy").efficiencyPct;
+  return roundValue(((getFacilityLevelDefinition("academy", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
+}
+
 function normalizeSpecialistVariant(value: string | null | undefined): SpecialistWingVariant {
   return value && Object.prototype.hasOwnProperty.call(SPECIALIST_WING_VARIANTS, value)
     ? (value as SpecialistWingVariant)

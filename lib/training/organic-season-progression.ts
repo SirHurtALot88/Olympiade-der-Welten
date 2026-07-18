@@ -7,7 +7,13 @@ import type {
   PlayerPotentialRecord,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
-import { getFacilityEfficiency, getFacilityLevel, getRecoveryTrainingFatigueReductionPct } from "@/lib/facilities/facility-effects";
+import {
+  getAcademyDevelopmentBoostPct,
+  getFacilityEfficiency,
+  getFacilityLevel,
+  getRecoveryTrainingFatigueReductionPct,
+} from "@/lib/facilities/facility-effects";
+import { getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
   deriveAttributeAffinityProfile,
   getAttributeAffinityKind,
@@ -39,7 +45,7 @@ import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scou
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
-import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { PlayerProgressionRatingTier, PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
 import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
 import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
@@ -128,7 +134,6 @@ export type OrganicRegressionBreakdown = {
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
 export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.28;
-const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0102;
 /**
@@ -248,9 +253,27 @@ function getFacilityTrainingModifierPct(
 ) {
   const level = getFacilityLevel(facilities, "training_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "training_center").efficiencyPct;
-  const levelModifier = TRAINING_CENTER_LEVEL_MODIFIER_PCT[level] ?? TRAINING_CENTER_LEVEL_MODIFIER_PCT.at(-1)!;
+  // Single Source of Truth: der real angewandte Level-Modifier stammt AUSSCHLIESSLICH aus dem
+  // Facility-Katalog (getFacilityLevelDefinition) — kein hartkodiertes Zweit-Array mehr, damit
+  // Anzeige (applyTrainingXpFacilityModifiers/Forecasts/UI) und hier angewandter Wert nie divergieren.
+  // Level 0 (nicht gebaut/kaputt) → 0 %; Katalog-Level 1..5 = [14,28,42,56,70] %.
+  const levelModifier = level <= 0 ? 0 : getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0;
   const developmentBonus = roundValue(developmentTendencyScore * 15, 2);
   return roundValue((levelModifier * efficiencyPct) / 100 + developmentBonus, 2);
+}
+
+/**
+ * F/E/D = Low-Tier-Einstufung eines Spielers (Rating < 45; C beginnt bei 45, siehe
+ * getProgressionRatingTier in season-end-progression-preview.ts). Bewusst inline gehalten, um keinen
+ * Laufzeit-Import auf das schwere season-end-progression-preview-Modul (potenzieller Zyklus) zu ziehen
+ * — nur die stabile Grade-Grenze wird gespiegelt. Grundlage für den Academy-Youth-Dev-Boost (Fix C).
+ */
+function resolveLowTierGrade(rating: number): PlayerProgressionRatingTier {
+  if (!isFiniteNumber(rating)) return "F";
+  if (rating < 15) return "F";
+  if (rating < 30) return "E";
+  if (rating < 45) return "D";
+  return "C";
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -696,6 +719,14 @@ export function buildOrganicSeasonProgression(input: {
     ? getTeamDevelopmentTendency({ team: playerTeam, identity: playerIdentity, profile: playerProfile, gmArchetype: playerGmArchetype })
     : null;
   const facilityModifierPct = getFacilityTrainingModifierPct(input.facilities, developmentTendency?.score ?? 0);
+  // Fix C: Academy beschleunigt die organische Entwicklung junger/Low-Tier-Spieler (F/E/D). Bewusst als
+  // separater, gebundener Trainingsbudget-Multiplikator (analog zum training_center-facilityModifierPct),
+  // NUR für berechtigte Spieler > 0. Für C+ oder ohne Academy = 0 (kein Effekt). Bleibt organisch/moderat
+  // (Wachstumsrate, kein Flat-Cap): L1..L5 = [6,12,18,24,30] % × Effizienz (Katalog = einzige Zahlenquelle).
+  const academyDevelopmentBoostPct = getAcademyDevelopmentBoostPct(
+    resolveLowTierGrade(input.player.rating),
+    input.facilities,
+  );
   const primaryTrainingClass =
     normalizeProgressionClassName(input.player.trainingClass) ??
     normalizeProgressionClassName(input.player.className) ??
@@ -743,7 +774,12 @@ export function buildOrganicSeasonProgression(input: {
     resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
   );
   const trainingSetpoints = roundValue(
-    baseTrainingBudget * traitSignal.trainingTraitMultiplier * potentialTrainingMultiplier * routeBonusMultiplier * (1 + facilityModifierPct / 100),
+    baseTrainingBudget *
+      traitSignal.trainingTraitMultiplier *
+      potentialTrainingMultiplier *
+      routeBonusMultiplier *
+      (1 + facilityModifierPct / 100) *
+      (1 + academyDevelopmentBoostPct / 100),
     2,
   );
   const primaryShare = secondaryTrainingClass ? 0.7 : 1;

@@ -1,6 +1,7 @@
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
+import { getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 /**
  * Per-matchday training accumulation (anti-cheese Teil B, B.4).
@@ -12,7 +13,11 @@ import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation"
  *
  * For every rostered player (used, benched OR injured — training happens regardless of playing time,
  * "Äquivalenz"), the active `trainingMode` for this matchday is recorded and the accumulated training
- * fatigue is advanced by `FATIGUE_LOAD_BY_MODE[mode] / totalMatchdays`.
+ * fatigue is advanced by `FATIGUE_LOAD_BY_MODE[mode] / totalMatchdays`, MINUS the REHA/recovery-center
+ * training-fatigue reduction of the player's team (`getRecoveryTrainingFatigueReductionPct`). So a built
+ * recovery_center now actually lowers the player's applied per-matchday training fatigue (Fix A) — the
+ * reduction was previously only reflected in the forecast/AI-planning and discarded at season-end apply.
+ * The same reduction factor is applied to the rollback term on a forced re-apply so it stays consistent.
  *
  * Idempotency / forceReplace (keyed on `matchdayId`):
  *  - Same matchday + same mode already recorded → the accumulator is returned untouched, but the
@@ -59,6 +64,23 @@ export function accumulateMatchdayTrainingProgress(input: {
   const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
   const now = new Date().toISOString();
 
+  // Fix A: pro Spieler das Team (Roster) auflösen und den REHA/recovery-center-Trainingsfatigue-Rabatt
+  // des Teams anwenden. Reduktions-Faktor pro Team memoisiert (ein getTeamFacilityState-Aufruf je Team),
+  // Faktor = 1 - reductionPct/100 (auf [0,1] geklemmt). Ohne Team/Recovery-Center = 1.0 (kein Rabatt).
+  const teamIdByPlayerId = new Map<string, string>();
+  for (const entry of gameState.rosters) teamIdByPlayerId.set(entry.playerId, entry.teamId);
+  const reductionFactorByTeamId = new Map<string, number>();
+  const resolveTrainingFatigueFactor = (playerId: string): number => {
+    const teamId = teamIdByPlayerId.get(playerId);
+    if (!teamId || !gameState.seasonState) return 1;
+    const cached = reductionFactorByTeamId.get(teamId);
+    if (cached != null) return cached;
+    const reductionPct = getRecoveryTrainingFatigueReductionPct(getTeamFacilityState(gameState, teamId));
+    const factor = Math.max(0, Math.min(1, 1 - reductionPct / 100));
+    reductionFactorByTeamId.set(teamId, factor);
+    return factor;
+  };
+
   let mutated = false;
   const nextPlayers = gameState.players.map((player) => {
     if (!rosteredPlayerIds.has(player.id)) return player;
@@ -86,14 +108,18 @@ export function accumulateMatchdayTrainingProgress(input: {
     const modeByMatchday = { ...(previousAccumulator?.modeByMatchday ?? {}) };
     let matchdaysCounted = previousAccumulator?.matchdaysCounted ?? 0;
     let accumulatedTrainingFatigue = previousAccumulator?.accumulatedTrainingFatigue ?? 0;
-    const fatigueShare = FATIGUE_LOAD_BY_MODE[mode] / totalMatchdays;
+    // Fix A: der REHA/recovery-center-Rabatt des Teams senkt die REAL angewandte Trainingsfatigue.
+    const trainingFatigueFactor = resolveTrainingFatigueFactor(player.id);
+    const fatigueShare = (FATIGUE_LOAD_BY_MODE[mode] / totalMatchdays) * trainingFatigueFactor;
 
     if (priorMode == null) {
       matchdaysCounted += 1;
       accumulatedTrainingFatigue += fatigueShare;
     } else {
-      // forceReplace of a previously-counted matchday: roll back the stored mode's contribution.
-      accumulatedTrainingFatigue += fatigueShare - FATIGUE_LOAD_BY_MODE[priorMode] / totalMatchdays;
+      // forceReplace of a previously-counted matchday: roll back the stored mode's contribution
+      // (same reduction factor so add and rollback stay consistent).
+      accumulatedTrainingFatigue +=
+        fatigueShare - (FATIGUE_LOAD_BY_MODE[priorMode] / totalMatchdays) * trainingFatigueFactor;
     }
     modeByMatchday[matchdayId] = mode;
     accumulatedTrainingFatigue = Math.max(0, roundValue(accumulatedTrainingFatigue));

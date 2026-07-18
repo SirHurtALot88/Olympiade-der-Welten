@@ -94,17 +94,20 @@ describe("facility effects", () => {
     const base = applyTrainingXpFacilityModifiers(100, teamFacilities);
     const performanceXp = 50;
 
-    expect(base.modifierPct).toBe(9);
-    expect(base.after).toBe(109);
-    expect(base.after + performanceXp).toBe(159);
+    // Fix B: training_center-Modifier gespiegelt auf die REAL angewandten Werte [14,28,42,56,70] %.
+    // L2 = +28 % (vorher fälschlich als +9 % angezeigt, obwohl organisch +28 % angewandt wurde).
+    expect(base.modifierPct).toBe(28);
+    expect(base.after).toBe(128);
+    expect(base.after + performanceXp).toBe(178);
   });
 
   it("scales facility effects by condition below 70 percent and reaches zero when broken", () => {
     const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 35 } });
     const brokenFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 0 } });
 
-    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(4.5);
-    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(105);
+    // L2 = 28 % Basis × 50 % Effizienz (Condition 35 %) = 14 % → after 114.
+    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(14);
+    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(114);
     expect(applyTrainingXpFacilityModifiers(100, brokenFacilities).after).toBe(100);
   });
 

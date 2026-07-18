@@ -218,10 +218,12 @@ describe("season-end progression preview", () => {
   it("applies training center only to base training XP", () => {
     const row = previewFor(createPlayer(), createForecast({ baseTrainingXP: 100, performanceXP: 50, seasonProjectedXP: 150 }), "power", { trainingCenterLevel: 2 });
 
+    // Fix B: training_center L2 now displays the REAL applied +28% (catalog = single source of truth),
+    // so 100 base training XP → 128 (delta 28). Netto-Entwicklungs-XP 150 + 28 = 178.
     expect(row.facilityEffects.xpBeforeFacility).toBe(100);
-    expect(row.facilityEffects.xpAfterFacility).toBe(106);
-    expect(row.availableXP).toBe(156);
-    expect(row.legacyAvailableXP).toBe(156);
+    expect(row.facilityEffects.xpAfterFacility).toBe(128);
+    expect(row.availableXP).toBe(178);
+    expect(row.legacyAvailableXP).toBe(178);
   });
 
   it("includes organic setpoint fields alongside legacy XP preview", () => {

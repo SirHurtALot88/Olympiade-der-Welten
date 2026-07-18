@@ -24,6 +24,24 @@ function makeState(player: Player): GameState {
   } as unknown as GameState;
 }
 
+function makeStateWithRecoveryLevel(player: Player, recoveryLevel: number): GameState {
+  return {
+    season: { id: SEASON_ID, totalMatchdays: TOTAL_MATCHDAYS },
+    seasonState: {
+      seasonId: SEASON_ID,
+      teamFacilities: {
+        "team-1": {
+          facilities: {
+            recovery_center: { level: recoveryLevel, enabled: recoveryLevel > 0, conditionPct: 100 },
+          },
+        },
+      },
+    },
+    players: [player],
+    rosters: [{ playerId: player.id, teamId: "team-1" }],
+  } as unknown as GameState;
+}
+
 function run(state: GameState, matchdayId: string): GameState {
   return accumulateMatchdayTrainingProgress({ gameState: state, seasonId: SEASON_ID, matchdayId });
 }
@@ -94,5 +112,24 @@ describe("accumulateMatchdayTrainingProgress", () => {
     expect(player.seasonTrainingAccumulator?.accumulatedTrainingFatigue).toBeCloseTo(share("hart"), 5);
     expect(player.seasonTrainingAccumulator?.matchdaysCounted).toBe(1);
     expect(player.fatigue).toBeCloseTo(30 + share("hart"), 5);
+  });
+
+  it("Fix A: a built recovery_center lowers the applied per-matchday training fatigue vs level 0", () => {
+    // Level 0 (no recovery center): raw share, no reduction.
+    let stateL0 = makeStateWithRecoveryLevel(makePlayer({ fatigue: 30, trainingMode: "hart" }), 0);
+    stateL0 = run(stateL0, "md-1");
+    const accL0 = stateL0.players[0].seasonTrainingAccumulator?.accumulatedTrainingFatigue ?? 0;
+    expect(accL0).toBeCloseTo(share("hart"), 5);
+
+    // Level 5 recovery center → 65% training-fatigue reduction (factor 0.35), so the applied share drops.
+    let stateL5 = makeStateWithRecoveryLevel(makePlayer({ fatigue: 30, trainingMode: "hart" }), 5);
+    stateL5 = run(stateL5, "md-1");
+    const accL5 = stateL5.players[0].seasonTrainingAccumulator?.accumulatedTrainingFatigue ?? 0;
+
+    expect(accL5).toBeLessThan(accL0);
+    // getRecoveryTrainingFatigueReductionPct(recovery L5) = 65 → factor 0.35.
+    expect(accL5).toBeCloseTo(share("hart") * 0.35, 5);
+    // The fatigue actually written to the player is lower with the recovery center.
+    expect(stateL5.players[0].fatigue).toBeLessThan(stateL0.players[0].fatigue);
   });
 });
