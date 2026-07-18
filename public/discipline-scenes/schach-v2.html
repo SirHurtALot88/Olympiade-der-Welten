@@ -149,7 +149,71 @@
   .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--mut); }
   .legend span{ display:inline-flex; align-items:center; gap:6px; }
   .legend .sw{ width:12px; height:12px; border-radius:3px; }
-  @media (prefers-reduced-motion: reduce){ *{ animation:none!important; } .lrow{ transition:none; } }
+
+  /* ---- impact layer (Impact-v2, geteilte Funktionsweise, Optik pro Diszi angepasst) ---- */
+  @keyframes arenashake{ 0%,100%{transform:translate(0,0);} 15%{transform:translate(-5px,3px);} 30%{transform:translate(4px,-4px);}
+                         45%{transform:translate(-4px,-2px);} 60%{transform:translate(3px,3px);} 75%{transform:translate(-2px,2px);} }
+  .arena.shake{ animation:arenashake .42s ease; }
+  .arena.shake-soft{ animation:arenashake .3s ease; }
+  .flashfx{ position:absolute; inset:0; z-index:5; pointer-events:none; opacity:0; }
+  .flashfx.gold{ background:radial-gradient(circle at 50% 42%, rgba(255,214,110,.55), transparent 60%); }
+  .flashfx.red{ background:radial-gradient(circle at 50% 50%, rgba(217,80,63,.5), transparent 62%); }
+  .flashfx.violet{ background:radial-gradient(circle at 50% 46%, rgba(160,110,232,.5), transparent 62%); }
+  .flashfx.cyan{ background:radial-gradient(circle at 50% 46%, rgba(80,200,210,.45), transparent 62%); }
+  .flashfx.fire{ animation:flashpop .5s ease; }
+  @keyframes flashpop{ 0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;} }
+
+  .spotlight{ position:absolute; left:50%; top:46%; transform:translate(-50%,-50%) scale(.8); z-index:6;
+              display:flex; align-items:center; gap:16px; padding:16px 22px 16px 16px; border-radius:18px;
+              background:rgba(16,10,6,.82); border:1.5px solid rgba(217,179,84,.7); backdrop-filter:blur(8px);
+              box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 40px -8px rgba(217,179,84,.5);
+              color:#f6ecdd; opacity:0; pointer-events:none; min-width:min(78%,420px); }
+  .spotlight.mine{ border-color:rgba(168,50,50,.85); box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 46px -6px rgba(168,50,50,.6); }
+  .spotlight.show{ animation:spotpop 2.7s cubic-bezier(.2,1.05,.3,1) forwards; }
+  @keyframes spotpop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.72);} 9%{opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+                      16%{transform:translate(-50%,-50%) scale(1);} 88%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+                      100%{opacity:0; transform:translate(-50%,-52%) scale(.98);} }
+  .spotlight .sp-crest{ width:64px; height:64px; border-radius:50%; flex:none; box-shadow:0 0 0 3px rgba(217,179,84,.6); }
+  .spotlight .sp-body{ flex:1; min-width:0; }
+  .spotlight .sp-kick{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:#f0c866; }
+  .spotlight.mine .sp-kick{ color:#e8a08a; }
+  .spotlight .sp-name{ font-family:Georgia,serif; font-weight:700; font-size:22px; line-height:1.05; margin-top:1px; }
+  .spotlight .sp-sub{ font-size:12px; color:#d8c3a6; margin-top:2px; }
+  .spotlight .sp-net{ font-family:Georgia,serif; font-weight:800; font-size:40px; color:#e8c04a; flex:none; text-shadow:0 3px 14px rgba(0,0,0,.6); }
+  .spotlight .sp-chip{ display:none; margin-top:7px; font-size:11px; font-weight:800; letter-spacing:.03em; padding:2px 10px; border-radius:99px; }
+  .impact-badge{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .impact-badge.standout{ background:color-mix(in srgb,var(--gold) 24%, transparent); color:#8a6a1f; }
+  .impact-badge.star{ background:linear-gradient(90deg,#f4d876,#d9b354); color:#3a2600; box-shadow:0 0 8px -1px rgba(217,179,84,.7); }
+  .impact-badge.push{ background:color-mix(in srgb,var(--up) 20%, transparent); color:#1f8a54; }
+  .impact-badge.injury{ background:color-mix(in srgb,var(--down) 20%, transparent); color:#c23c2c; }
+  /* Podest — Top 3 am Ende */
+  .podium{ position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+           padding:0 20px 46px; gap:14px; background:linear-gradient(180deg, rgba(16,10,6,.15), rgba(16,10,6,.72));
+           opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  .podium.show{ opacity:1; }
+  .podium .pod-kick{ position:absolute; top:26px; left:0; right:0; text-align:center; color:#f0c866; font-weight:800;
+                     font-size:12px; letter-spacing:.18em; text-transform:uppercase; }
+  .podium .pod-title{ position:absolute; top:44px; left:0; right:0; text-align:center; color:#f6ecdd;
+                      font-family:Georgia,serif; font-style:italic; font-size:26px; }
+  .podium .pod-row{ display:flex; align-items:flex-end; gap:12px; }
+  .pod-col{ display:flex; flex-direction:column; align-items:center; gap:8px; opacity:0; transform:translateY(24px); }
+  .pod-col.in{ animation:podrise .6s cubic-bezier(.2,1.1,.3,1) forwards; }
+  @keyframes podrise{ to{ opacity:1; transform:translateY(0); } }
+  .pod-col .pc-crest{ width:60px; height:60px; border-radius:50%; box-shadow:0 6px 18px -6px rgba(0,0,0,.7); }
+  .pod-col .pc-name{ color:#f6ecdd; font-weight:800; font-size:13px; text-align:center; max-width:120px; line-height:1.15; }
+  .pod-col .pc-pts{ color:#d8c3a6; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .pod-col .pc-base{ width:104px; border-radius:10px 10px 0 0; display:grid; place-items:start center; padding-top:8px;
+                     font-family:Georgia,serif; font-weight:800; font-size:28px; color:#231a10; }
+  .pod-col.p1 .pc-base{ height:132px; background:linear-gradient(180deg,#f4d876,#d9b354); }
+  .pod-col.p2 .pc-base{ height:100px; background:linear-gradient(180deg,#e2e5ea,#c8ccd4); }
+  .pod-col.p3 .pc-base{ height:76px;  background:linear-gradient(180deg,#e0a765,#cd7f32); }
+  .pod-col.mine .pc-name{ color:#e8a08a; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none!important; } .lrow{ transition:none; }
+    .arena.shake,.arena.shake-soft{ animation:none; } .spotlight.show{ animation:none; opacity:1; }
+    .flashfx.fire{ animation:none; } .pod-col.in{ animation:none; opacity:1; transform:none; }
+  }
 </style>
 </head>
 <body>
@@ -160,7 +224,7 @@
     <div>
       <p class="eyebrow">Disziplin · 32 Teams · Simultan-Wertung</p>
       <h1>Speed-Schach</h1>
-      <div class="sub">Kein Baum, kein Rennen — <b>ein</b> riesiges Brett, 32 Spuren. Jedes Team ist ein Bauer in seiner eigenen Datei, der Feld für Feld Richtung Umwandlungsreihe marschiert — <b>die Position auf der Spur ist der Punktestand</b>. Jeder Klick lässt an einer Station den Zug fallen (<b>Opening Prep, Pattern Read, Clock Pressure, Calculation Core, Endgame Anchor</b>): <b>Schach-Wert</b> − Mali + Boni = <b>Netto</b>, der Bauer rückt entsprechend vor — nie zurück. Die Reveal-Welle läuft als Lichtsaum über das Brett, von der schwächsten Spur zur stärksten — dein Bauer zieht zuletzt.</div>
+      <div class="sub">Kein Baum, kein Rennen — <b>ein</b> riesiges Brett, 32 Spuren. Jedes Team ist ein Bauer in seiner eigenen Datei, der Feld für Feld Richtung Umwandlungsreihe marschiert — <b>die Position auf der Spur ist der Punktestand</b>. Jeder Klick lässt an einer Station den Zug fallen (<b>Opening Prep, Pattern Read, Clock Pressure, Calculation Core, Endgame Anchor</b>): <b>Schach-Wert</b> − Mali + Boni = <b>Netto</b>, der Bauer rückt entsprechend vor — nie zurück. Die Reveal-Welle läuft als Lichtsaum über das Brett, von der schwächsten Spur zur stärksten — dein Bauer zieht an seiner natürlichen Position mit und wird im Rampenlicht hervorgehoben.</div>
     </div>
     <div class="headmeta">Station <b id="slotlbl">Opening Prep</b><br>Runde <b id="round">1</b> / 5<br>Rang → Punkte</div>
   </div>
@@ -176,13 +240,32 @@
         </div>
         <div class="scorepop" id="pop">+0</div>
         <div class="liveflag"><span class="pip"></span> <span id="status">Aufstellung</span></div>
+        <div class="flashfx gold" id="flashGold"></div>
+        <div class="flashfx red" id="flashRed"></div>
+        <div class="flashfx violet" id="flashViolet"></div>
+        <div class="flashfx cyan" id="flashCyan"></div>
+        <div class="spotlight" id="spotlight">
+          <img class="sp-crest" id="spCrest" alt="">
+          <div class="sp-body">
+            <div class="sp-kick" id="spKick">Moment der Runde</div>
+            <div class="sp-name" id="spName"></div>
+            <div class="sp-sub" id="spSub"></div>
+            <div class="sp-chip" id="spChip"></div>
+          </div>
+          <div class="sp-net" id="spNet"></div>
+        </div>
+        <div class="podium" id="podium">
+          <div class="pod-kick">Speed-Schach entschieden</div>
+          <div class="pod-title">Das Podest</div>
+          <div class="pod-row" id="podRow"></div>
+        </div>
         <div class="hovercard" id="hovercard"></div>
       </div>
 
       <div class="clickbar">
         <button class="cta" id="advance">▶ Feld zieht (Station: Opening Prep)</button>
         <div class="prog"><i id="progfill"></i></div>
-        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <div class="step">Runde <b id="stepnum">0</b> / 5</div>
         <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
         <button class="cta small" id="replay">↻ Neu</button>
       </div>
@@ -209,7 +292,7 @@
   </div>
 
   <div class="foot">
-    <b>Was hier echt ist:</b> 32 Teams, 5 Stationen (Opening Prep, Pattern Read, Clock Pressure, Calculation Core, Endgame Anchor), pro Spieler ein direkter Schach-Wert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen den Zug schwerer oder besser, aber Punkte werden nur <b>addiert</b>, nie abgezogen; Mali verkleinern nur den Vorrück des Bauern, nie rückwärts. Rang → Punkte am Ende. Das große Brett, die Bauern und Wappen hier sind stellvertretende Tokens.
+    <b>Was hier echt ist:</b> 32 Teams, 5 Stationen (Opening Prep, Pattern Read, Clock Pressure, Calculation Core, Endgame Anchor), pro Spieler ein direkter Schach-Wert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen den Zug schwerer oder besser, aber Punkte werden nur <b>addiert</b>, nie abgezogen; Mali verkleinern nur den Vorrück des Bauern, nie rückwärts. Standout-Momente (⭐ Star, neue Spitze, Top-3-Sprung, Verletzung) bekommen Spotlight, Screen-FX und Ton — dosiert pro Runde, damit es besonders bleibt. Rang → Punkte am Ende. Das große Brett, die Bauern und Wappen hier sind stellvertretende Tokens.
   </div>
 </div>
 
@@ -223,8 +306,9 @@
 
   const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
                  "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
-  const TEAM_NAMES = {"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const MINE = "M-M";
+  const STAR_MIN = 80; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
+  const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
                  "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
                  "Halla","Juno","Ryk","Senn","Uma","Brox","Cael","Doran","Efa","Gale","Hexe","Iven"];
@@ -237,11 +321,11 @@
       color: mine ? "#a83232" : `hsl(${h} 58% 52%)`,
       accent: mine ? "#f2e6cf" : `hsl(${(h+150)%360} 62% 78%)`,
       motif: i%4,
-      score:0, prevScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
-      thrownSlot:-1, crest:null };
+      score:0, prevScore:0, roundStartScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
+      thrownSlot:-1, crest:null, crestImg:null };
   });
 
-  // ---- procedural team crest (stands in for a real logo) ----
+  // ---- procedural team crest (stands in for a real logo) — 1:1 aus dem Oval-Kit ----
   function paintCrest(c2, cx, cy, r, t, withLetter){
     c2.save();
     c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2); c2.closePath(); c2.clip();
@@ -258,10 +342,11 @@
     c2.lineWidth = t.mine ? Math.max(2,r*0.16) : Math.max(1.5,r*0.11);
     c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
     if(withLetter){
+      const label = t.code.replace('-','');
       c2.fillStyle="#fff"; c2.textAlign="center"; c2.textBaseline="middle";
-      c2.font=`800 ${Math.round(r*0.9)}px system-ui`;
+      c2.font=`800 ${Math.round(r*(label.length>1?0.62:0.9))}px system-ui`;
       c2.shadowColor="rgba(0,0,0,.5)"; c2.shadowBlur=2;
-      c2.fillText(t.code.split('-')[0], cx, cy+0.5);
+      c2.fillText(label, cx, cy+0.5);
       c2.shadowBlur=0; c2.textBaseline="alphabetic";
     }
   }
@@ -286,6 +371,7 @@
     for(const m of MODS){ if((r-=m.w)<0){ if(!m.k)return null; return {k:m.k,sign:m.sign,amt:ri(m.min,m.max),injury:!!m.injury}; } }
     return null;
   }
+  // 0–2 stacked modifiers per player (the real additive stack: Fatigue + Captain + …)
   function rollMods(){
     const out=[]; const n = rnd()<0.34?0 : rnd()<0.78?1 : 2;
     const seen=new Set();
@@ -295,20 +381,41 @@
   function genPlayers(t){
     const base = t.mine ? [80,72,66,60,54] : null;
     const arr=[];
-    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(42,90);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
     return arr;
   }
+  function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
   function initData(){
     _s=0x51ed270b;
-    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundStartScore=0;
-      t.flashT=0; t.roundGlowUntil=0; t.animStart=null; t.animFrom=0; t.animTo=0; t.animDur=420; t.promoFlashUntil=0; t.bx=0; t.by=0; });
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst).
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
+    teams.forEach(t=>{
+      t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1;
+      t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0;
+      t.flashT=0; t.animStart=null; t.animFrom=0; t.animTo=0; t.animDur=420; t.promoFlashUntil=0;
+    });
+  }
+  // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
+  function ampelColor(rank){
+    if(rank<=3) return '#2fa564';
+    if(rank<=6) return '#d9a441';
+    if(rank<=10) return '#d9503f';
+    return '';
   }
   function recomputeRanksLive(){
-    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank);
     order.forEach((t,idx)=> t.rank=idx+1);
   }
 
-  // ---------- the board (Der Bauernmarsch) ----------
+  // ---------- the board (Der Bauernmarsch) — Optik der Halle-Referenz ----------
   const cv=document.getElementById('hall'), ctx=cv.getContext('2d');
   const W=cv.width,H=cv.height;
   const topY=104, bottomY=752;                 // promotion row .. start row
@@ -348,7 +455,9 @@
     }
   }
 
-  // ---- WebAudio: spatial ticks + chess-clock clack (no external files) ----
+  function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
+
+  // ---- WebAudio: chess-clock clack + spatial ticks (schach-eigen) + Impact-Sounds (aus dem Oval-Kit) ----
   let actx=null, muted=false;
   function audio(){ if(muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(actx.state==='suspended') actx.resume(); return actx; }
   function panFor(t){ return Math.max(-1,Math.min(1,(t.bx-W/2)/(W/2))); }
@@ -373,14 +482,82 @@
     };
     mk(0,(vol||0.4),2600);
     mk(0.045,(vol||0.4)*0.7,2000);
-    // wooden body resonance — gives the two bandpass clacks a "hölzern" (wooden) thud underneath
+    // wooden body resonance — gibt den beiden bandpass-Clacks einen "hölzernen" Thud
     const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(260,t0); o.frequency.exponentialRampToValueAtTime(170,t0+0.06);
     const wf=a.createBiquadFilter(); wf.type='lowpass'; wf.Q.value=1.4; wf.frequency.setValueAtTime(520,t0);
     const wg=a.createGain(); wg.gain.setValueAtTime((vol||0.4)*0.55,t0); wg.gain.exponentialRampToValueAtTime(0.001,t0+0.08);
     o.connect(wf); wf.connect(wg); wg.connect(a.destination); o.start(t0); o.stop(t0+0.09);
   }
-
-  function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
+  function stumbleThud(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(180,t0); o.frequency.exponentialRampToValueAtTime(70,t0+0.1);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.4),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.13);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.14);
+  }
+  // signature „Wumms" — der Auftritt des besten Zugs: Sub-Bass-Punch + Click + Sparkle-Triade
+  function wummsSound(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime; vol=(vol||1);
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,t0); o.frequency.exponentialRampToValueAtTime(44,t0+0.32);
+    const og=a.createGain(); og.gain.setValueAtTime(0.0001,t0); og.gain.exponentialRampToValueAtTime(0.9*vol,t0+0.02); og.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
+    o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0+0.52);
+    const len=0.05, buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+    const src=a.createBufferSource(); src.buffer=buf; const ng=a.createGain();
+    ng.gain.setValueAtTime(0.5*vol,t0); ng.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(ng); ng.connect(a.destination); src.start(t0); src.stop(t0+len);
+    [880,1320,1760].forEach((f,i)=>{ const s=a.createOscillator(); s.type='sine'; s.frequency.value=f;
+      const sg=a.createGain(); const st=t0+0.04+i*0.02; sg.gain.setValueAtTime(0.0001,st);
+      sg.gain.exponentialRampToValueAtTime(0.14*vol,st+0.02); sg.gain.exponentialRampToValueAtTime(0.001,st+0.34);
+      s.connect(sg); sg.connect(a.destination); s.start(st); s.stop(st+0.36); });
+  }
+  // heller Shimmer-Arpeggio für den ⭐ Star-Moment (Elite-Spieler kommt rein)
+  function starSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    [1046,1318,1568,2093].forEach((f,i)=>{ const o=a.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=a.createGain(); const st=t0+i*0.06;
+      g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.15,st+0.02); g.gain.exponentialRampToValueAtTime(0.001,st+0.4);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st+0.42); });
+  }
+  // leiser, mit dem Wert steigender Ping, wenn ein Feld-Zug eine neue Rundenbestleistung setzt
+  function risingPing(net){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(380+Math.min(520,net*3.2),t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.11,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.15);
+  }
+  // dosierte Screen-FX. Farbe = Ursache (gold Bestwert/Spitze · cyan Push · violett Rangsprung · rot Verletzung)
+  const CAUSE_COLOR={ gold:'#e8c04a', cyan:'#4fd0da', violet:'#a06ee8', red:'#ff7a6a' };
+  function fireFlash(kind){
+    const id = kind==='red'?'flashRed':kind==='violet'?'flashViolet':kind==='cyan'?'flashCyan':'flashGold';
+    const el=document.getElementById(id); if(!el) return;
+    el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire');
+  }
+  function shakeArena(soft){ const el=document.querySelector('.arena'); if(!el) return;
+    el.classList.remove('shake','shake-soft'); void el.offsetWidth; el.classList.add(soft?'shake-soft':'shake');
+    setTimeout(()=>el.classList.remove('shake','shake-soft'), soft?320:440); }
+  // kurzer „Achtung, gleich"-Riser vor dem Wumms
+  function riser(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(200,t0); o.frequency.exponentialRampToValueAtTime(760,t0+0.26);
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1700;
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.12,t0+0.2); g.gain.exponentialRampToValueAtTime(0.001,t0+0.3);
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.32);
+  }
+  function showSpotlight(o){
+    const sp=document.getElementById('spotlight');
+    document.getElementById('spCrest').src = o.team.crest || crestURL(o.team,64);
+    document.getElementById('spKick').textContent = o.kick || 'Moment der Runde';
+    document.getElementById('spName').textContent = (o.team.mine?'★ ':'')+o.player.name;
+    document.getElementById('spSub').textContent = `${o.team.code} · ${TEAM_NAMES[o.team.code]||''}${o.leg?' · '+o.leg:''}`;
+    document.getElementById('spNet').textContent = '+'+o.net;
+    const chip=document.getElementById('spChip');
+    if(o.chip && o.chip.text){ chip.style.display='inline-block'; chip.textContent=o.chip.text;
+      const c=CAUSE_COLOR[o.chip.color]||'#e8c04a'; chip.style.background=c; chip.style.color='#1a1206'; }
+    else chip.style.display='none';
+    sp.classList.toggle('mine', !!o.team.mine);
+    sp.classList.remove('show'); void sp.offsetWidth; sp.classList.add('show');
+    setTimeout(()=>sp.classList.remove('show'), 1500);
+  }
 
   // ---- static board bitmap: hall backdrop + the 32-lane checkerboard in perspective ----
   const boardC=document.createElement('canvas'); boardC.width=W; boardC.height=H;
@@ -392,7 +569,6 @@
     bctx.fillStyle=g; bctx.fillRect(0,0,W,H);
     bctx.strokeStyle='rgba(0,0,0,.18)'; bctx.lineWidth=2;
     for(let x=30;x<W;x+=100){ bctx.beginPath(); bctx.moveTo(x,0); bctx.lineTo(x,topY-38); bctx.stroke(); }
-    // the 32-lane board, drawn rank by rank in perspective (narrower toward the promotion row)
     const ranks=10;
     for(let r=0;r<ranks;r++){
       const y0=topY+(r/ranks)*(bottomY-topY), y1=topY+((r+1)/ranks)*(bottomY-topY);
@@ -407,7 +583,6 @@
     bctx.strokeStyle='rgba(0,0,0,.55)'; bctx.lineWidth=2;
     bctx.beginPath(); bctx.moveTo(boardXAt(0,topY),topY); bctx.lineTo(boardXAt(1,topY),topY);
     bctx.lineTo(boardXAt(1,bottomY),bottomY); bctx.lineTo(boardXAt(0,bottomY),bottomY); bctx.closePath(); bctx.stroke();
-    // promotion row ribbon
     const ry=topY;
     const rg=bctx.createLinearGradient(0,ry-18,0,ry+10);
     rg.addColorStop(0,'rgba(217,179,84,0)'); rg.addColorStop(.6,'rgba(217,179,84,.55)'); rg.addColorStop(1,'rgba(217,179,84,.15)');
@@ -420,7 +595,6 @@
     opts=opts||{};
     const now=Date.now();
     const r=15*scale;
-    // shadow — longer for teams further along (leading)
     const lead=Math.max(0,Math.min(1,(opts.score!=null?opts.score:t.score)/MAXSCORE));
     const shLen=(9+lead*44)*scale;
     ctx.save(); ctx.globalAlpha=.26; ctx.fillStyle='#000';
@@ -434,6 +608,12 @@
       const remain=(t.roundGlowUntil-now)/1500, pulse=0.55+0.35*Math.sin(now/110);
       ctx.save(); ctx.beginPath(); ctx.arc(x,y,r+14,0,Math.PI*2);
       ctx.strokeStyle=`rgba(232,192,74,${Math.max(0,Math.min(1,remain))*pulse})`; ctx.lineWidth=4; ctx.stroke(); ctx.restore();
+    }
+    // Gold/Silber/Bronze-Ring = Top 3 der aktuellen Runde (Rundensieger-Medaillen)
+    const medal = t.roundMedal===1?'#e8c04a' : t.roundMedal===2?'#cfd3da' : t.roundMedal===3?'#cd7f32' : null;
+    if(medal){
+      ctx.save(); ctx.beginPath(); ctx.arc(x,y,r+6.5,0,Math.PI*2);
+      ctx.strokeStyle=medal; ctx.lineWidth=(t.mine?4.5:3.5); ctx.shadowColor=medal; ctx.shadowBlur=8; ctx.stroke(); ctx.restore();
     }
     if(t.promoFlashUntil && now<t.promoFlashUntil){
       const remain=(t.promoFlashUntil-now)/2200;
@@ -475,7 +655,8 @@
       ctx.fillText(pname, x, y-r-16);
     }
     ctx.font=`700 ${Math.max(8,Math.round(10*scale))}px system-ui`; ctx.fillStyle='#f2e6cf'; ctx.textAlign='center';
-    ctx.fillText((t.mine?'★ ':'')+t.code, x, y+r+14);
+    const star = (t.players && t.players[Math.max(0,Math.min(4,t.thrownSlot<0?0:t.thrownSlot))] && t.players[Math.max(0,Math.min(4,t.thrownSlot<0?0:t.thrownSlot))].val>=STAR_MIN) ? '⭐ ' : '';
+    ctx.fillText((t.mine?'★ ':'')+star+t.code, x, y+r+14);
     ctx.font='700 9px system-ui'; ctx.fillStyle='rgba(242,230,207,.75)';
     ctx.fillText(Math.round(opts.score!=null?opts.score:t.score), x, y+r+25);
   }
@@ -548,8 +729,8 @@
   let raf=null;
   function animMine(cb){
     pieceT=0; pieceGlow=0; fragments=[]; dockFx=[]; jitter=0;
-    const p0=mover.player, raw=mover.raw;
-    runVal=raw;
+    const p0=mover.player;
+    runVal=mover.raw;
     const malis=p0.mods.filter(m=>m.sign<0), bonis=p0.mods.filter(m=>m.sign>0);
     modTriggers.length=0;
     malis.forEach((m,i)=> modTriggers.push({p:0.28+i*0.14, mod:m, done:false}));
@@ -558,7 +739,7 @@
     const quality=(malSum>bonSum || malis.some(m=>m.injury)) ? 'messy' : 'clean';
     mover.quality=quality;
     const dur=(mover.slowmo?1900:1000);
-    let start=null, snd=false, toppled=false;
+    let start=null, toppled=false;
     function frame(ts){
       if(start==null) start=ts;
       const e=Math.min(1,(ts-start)/dur);
@@ -570,7 +751,7 @@
         } else { runVal+=tr.mod.amt; const lp=piecePos(1); dockFx.push({x:lp.x,y:lp.y-24,life:1,text:`+${tr.mod.amt} ${tr.mod.k}`}); }
       }});
       jitter = (e>0.82 && quality==='messy') ? Math.sin((e-0.82)*90)*4*(1-(e-0.82)/0.18) : 0;
-      if(!snd && e>=0.88){ snd=true; clackSound(quality==='messy'?0.45:0.55); tickSound(panFor(mover.team),0.3); }
+      // Sounds NUR bei Impact — animMine bleibt hier stumm, der Ton kommt zentral über applyImpactFx.
       fragments.forEach(f=>{ f.x+=f.vx; f.y+=f.vy; f.vy+=0.18; f.life-=0.035; });
       dockFx.forEach(f=>{ f.y-=0.35; f.life-=0.03; });
       if(e>=1){ runVal=mover.net; pieceGlow=1; mover.team.flashT=1; drawHall(); fadeMineGlow(cb); return; }
@@ -608,6 +789,11 @@
     });
     positionLadder(true);
   }
+  function ptsLabel(t){
+    const total=Math.round(t.score);
+    const gain=Math.round(t.score-(t.roundStartScore||0));
+    return gain>0 ? `${total} <span class="gain">(+${gain})</span>` : `${total}`;
+  }
   function positionLadder(instant){
     teams.forEach(t=>{
       const row=rowEls[t.code];
@@ -624,6 +810,11 @@
       if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
       else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
       else { dd.className='dd'; dd.textContent=''; }
+      // Gold/Silber/Bronze = Rundensieger (Top 3 der aktuellen Runde)
+      row.classList.remove('rk-gold','rk-silver','rk-bronze');
+      if(t.roundMedal===1) row.classList.add('rk-gold');
+      else if(t.roundMedal===2) row.classList.add('rk-silver');
+      else if(t.roundMedal===3) row.classList.add('rk-bronze');
     });
   }
   function hotRow(code){
@@ -631,162 +822,7 @@
     r.classList.add('hot'); setTimeout(()=>r.classList.remove('hot'),600);
   }
 
-  // ---------- reveal flow ----------
-  const SLOTS=["Opening Prep","Pattern Read","Clock Pressure","Calculation Core","Endgame Anchor"];
-  let queue=[], stepIdx=0, busy=false, curSlot=-1;
-  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
-
-  function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
-  function slotRank(si, team){
-    const my=Math.max(0, team.players[si].val+modSum(team.players[si]));
-    let better=0;
-    teams.forEach(o=>{ const n=Math.max(0,o.players[si].val+modSum(o.players[si])); if(n>my) better++; });
-    return better+1;
-  }
-  function srClass(rank){ return rank<=3?'sr-1':rank<=6?'sr-2':rank<=10?'sr-3':'sr-4'; }
-  function srBadge(rank){ return `<b class="${srClass(rank)}">#${rank}</b>`; }
-  function ptsLabel(t){
-    const total=Math.round(t.score);
-    const gain=Math.round(t.score-(t.roundStartScore||0));
-    return gain>0 ? `${total} <span class="gain">(+${gain})</span>` : `${total}`;
-  }
-  let glowRaf=null;
-  function startGlowLoop(list){
-    const until=Date.now()+1500;
-    list.forEach(t=> t.roundGlowUntil=until);
-    if(glowRaf) cancelAnimationFrame(glowRaf);
-    function tick(){
-      drawHall();
-      if(Date.now()<until){ glowRaf=requestAnimationFrame(tick); } else { glowRaf=null; }
-    }
-    glowRaf=requestAnimationFrame(tick);
-  }
-  function applyReveal(t,slot){
-    const p=t.players[slot];
-    const net=Math.max(0, p.val+modSum(p));
-    t.prevScore=t.score; t.score+=net; t.thrownSlot=slot;
-    teams.forEach(x=>x.prevRank=x.rank);
-    recomputeRanksLive();
-    teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
-    return {player:p,net};
-  }
-  function logRow(t,slot,res){
-    const p=res.player,net=res.net;
-    const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
-    let calc=`<span class="base">${p.val}</span>`;
-    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
-    calc+=` = <span class="net">+${net}</span>`;
-    const dl=delta>0?`<span class="dl up">Rang ${t.rank} (▲${delta})</span>`:delta<0?`<span class="dl down">Rang ${t.rank} (▼${-delta})</span>`:`<span class="dl same">Rang ${t.rank}</span>`;
-    const row=document.createElement('div'); row.className='row';
-    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
-      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> · ${srBadge(slotRank(slot,t))}</div>
-      <div class="calc">${calc}</div></div>${dl}`;
-    const tk=document.getElementById('ticker');
-    if(tk.querySelector('.empty')) tk.innerHTML='';
-    tk.insertBefore(row,tk.firstChild);
-    while(tk.children.length>7) tk.removeChild(tk.lastChild);
-  }
-  function roundSummary(round){
-    const jumps = teams.slice().sort((a,b)=> ((b.roundStartRank-b.rank)-(a.roundStartRank-a.rank))).slice(0,3);
-    const jumpsTxt = jumps.map(t=>{ const d=Math.max(0,t.roundStartRank-t.rank); const p=t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${t.code} ▲${d} · ${p.name} ${net}`; }).join(' · ');
-    const el=document.createElement('div'); el.className='round-summary';
-    el.innerHTML = `Runde ${round+1} — Größte Sprünge: ${jumpsTxt}`;
-    const tk=document.getElementById('ticker');
-    if(tk.querySelector('.empty')) tk.innerHTML='';
-    tk.insertBefore(el, tk.firstChild);
-    Object.values(rowEls).forEach(r=> r.classList.remove('rk-gold','rk-silver','rk-bronze'));
-    const rankClasses=['rk-gold','rk-silver','rk-bronze'];
-    jumps.forEach((t,idx)=>{ hotRow(t.code); const r=rowEls[t.code]; if(r) r.classList.add(rankClasses[idx]); });
-    startGlowLoop(jumps);
-  }
-  function updateMyTracker(){
-    const me=teams.find(t=>t.mine);
-    document.getElementById('myrank').textContent=me.rank;
-    const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
-    const d = from - me.rank;
-    const mv=document.getElementById('mymove');
-    if(curSlot<=0){ mv.className='mv same'; mv.textContent=`Runde 1 läuft …`; }
-    else if(d>0){ mv.className='mv up'; mv.textContent=`▲ ${d} ${d===1?'Platz':'Plätze'} seit Vorrunde (${from} → ${me.rank})`; }
-    else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
-    else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
-  }
-
-  function advance(){
-    if(busy) return;
-    if(stepIdx>=queue.length) return;
-    busy=true; started=true;
-    const q=queue[stepIdx];
-    curSlot=q.round;
-    clockPressureActive=(curSlot===2);
-    if(q.stage==='field'){ teams.forEach(t=>{ t.roundStartRank=t.rank; t.roundStartScore=t.score; }); }
-    if(q.stage==='field'){
-      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
-      let i=0;
-      const doOne=()=>{
-        if(i>=field.length){ waveFrac=null; endStage(q); return; }
-        const t=field[i]; waveFrac=i/Math.max(1,field.length-1); i++;
-        const res=applyReveal(t,q.round);
-        startTween(t,380);
-        checkPromotion(t);
-        spawnTopple(boardXAt(laneFrac(t.i),yForScore(t.score))+10,yForScore(t.score)-10);
-        t.flashT=1; tickSound(panFor(t),0.26); drawHall();
-        setTimeout(()=>{
-          clackSound(0.3);
-          scorePop(t,res.net);
-          logRow(t,q.round,res);
-          t.flashT=0;
-          positionLadder(false); hotRow(t.code); updateMyTracker();
-          drawHall();
-          setTimeout(doOne, 55);
-        }, 80);
-      };
-      doOne();
-    } else {
-      const t=teams.find(x=>x.mine);
-      const res=applyReveal(t,q.round);
-      checkPromotion(t);
-      const clutch = (q.round===4 && t.lastDelta!==0);
-      mover={team:t,player:res.player,net:res.net,raw:res.player.val,slowmo:clutch};
-      document.getElementById('status').textContent= clutch?'★ ENDSPIEL — Zeitlupe':'Zug läuft …';
-      animMine(()=>{
-        scorePop(t,res.net);
-        logRow(t,q.round,res);
-        positionLadder(false); hotRow(t.code); updateMyTracker();
-        mover=null; drawHall();
-        endStage(q);
-      });
-    }
-  }
-  function endStage(q){ if(q.stage==='mine'){ roundSummary(q.round); } stepIdx++; updateControls(); setTimeout(()=>busy=false, 200); }
-
-  function updateControls(){
-    const btn=document.getElementById('advance');
-    document.getElementById('stepnum').textContent=stepIdx;
-    document.getElementById('progfill').style.width=(stepIdx/queue.length*100)+'%';
-    if(stepIdx>=queue.length){ btn.disabled=true; btn.textContent='✔ Disziplin gewertet'; document.getElementById('status').textContent='Endstand'; return; }
-    const q=queue[stepIdx], round=q.round+1;
-    document.getElementById('round').textContent=round;
-    document.getElementById('slotlbl').textContent=SLOTS[q.round];
-    if(q.stage==='field'){ btn.textContent=`▶ Feld zieht (Station: ${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Feld`; }
-    else { btn.textContent=`★ Dein Spieler zieht (${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Zug`; }
-  }
-
-  function reset(){
-    if(raf) cancelAnimationFrame(raf);
-    initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; started=false;
-    mover=null; pieceT=1; pieceGlow=0; waveFrac=null; clockPressureActive=false; fragments=[]; dockFx=[]; toppleFx=[];
-    firstPromotionAnnounced=false;
-    teams.forEach(t=>{ t.by=bottomY; t.bx=boardXAt(laneFrac(t.i),bottomY); });
-    buildBoardBitmap();
-    buildLadder(); positionLadder(true);
-    document.getElementById('ticker').innerHTML='<div class="empty">Noch nichts gezogen. Klick auf „Feld zieht".</div>';
-    document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
-    document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
-    document.getElementById('mylbl').textContent=`Dein Team · ${MINE} · ${TEAM_NAMES[MINE]}`;
-    updateControls(); drawHall();
-  }
-
-  // ---------- hover card ----------
+  // ---------- hover card (inkrementelles Hover-Delta) ----------
   const hc=document.getElementById('hovercard'), arenaEl=document.querySelector('.arena');
   function hoverCardHTML(t){
     if(!t.crest) t.crest=crestURL(t,32);
@@ -800,11 +836,19 @@
         let calc=`<span class="base">${p.val}</span>`;
         p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt}</span>` : ` <span class="bon">+ ${m.amt}</span>`; });
         calc+=` = <span class="net">${net}</span>`;
-        rows.push(`<div class="hc-slot"><span class="hc-sn">${SLOTS[s]}</span> · <span class="hc-pn">${p.name}</span><div class="hc-calc">${calc}</div></div>`);
+        const sh = t.slotHist ? t.slotHist[s] : null;
+        let srtxt='';
+        if(sh){
+          const c=ampelColor(sh.slotRank)||'var(--mut)', d=sh.delta;
+          const dtxt = d>0?` <span style="color:var(--up);font-weight:800">(▲${d})</span>` : d<0?` <span style="color:var(--down);font-weight:800">(▼${-d})</span>` : ` <span style="color:var(--mut);font-weight:700">(±0)</span>`;
+          srtxt = ` · <span style="color:${c};font-weight:800">#${sh.slotRank}</span>${dtxt}`;
+        }
+        rows.push(`<div class="hc-slot"><span class="hc-sn">${p.val>=STAR_MIN?'⭐ ':''}${SLOTS[s]}</span> · <span class="hc-pn">${p.name}</span>${srtxt}<div class="hc-calc">${calc}</div></div>`);
       }
       slotsHtml=rows.join('');
     }
-    return `<div class="hc-head"><img src="${t.crest}" alt=""><div><div class="hc-name">${TEAM_NAMES[t.code]||t.code}</div><div class="hc-code">${t.code}</div></div><div class="hc-rank">Rang<b>${t.rank}</b>${Math.round(t.score)} Pkt</div></div><div class="hc-slots">${slotsHtml}</div>`;
+    const rc=ampelColor(t.rank);
+    return `<div class="hc-head"><img src="${t.crest}" alt=""><div><div class="hc-name">${TEAM_NAMES[t.code]||t.code}</div><div class="hc-code">${t.code}</div></div><div class="hc-rank">Rang<b${rc?` style="color:${rc}"`:''}>${t.rank}</b>${Math.round(t.score)} Pkt</div></div><div class="hc-slots">${slotsHtml}</div>`;
   }
   function showHoverCard(code, clientX, clientY){
     const t=teams.find(x=>x.code===code); if(!t) return;
@@ -836,9 +880,295 @@
     if(!ev.relatedTarget || !ev.relatedTarget.closest('.lrow')) hideHoverCard();
   });
 
+  // ---------- reveal flow — gemergte Reihenfolge (ein Durchlauf/Runde über alle 32) ----------
+  const SLOTS=["Opening Prep","Pattern Read","Clock Pressure","Calculation Core","Endgame Anchor"];
+  let queue=[], stepIdx=0, busy=false, curSlot=-1;
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r}); } }
+
+  function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
+  function slotRank(si, team){
+    const my=Math.max(0, team.players[si].val+modSum(team.players[si]));
+    let better=0;
+    teams.forEach(o=>{ const n=Math.max(0,o.players[si].val+modSum(o.players[si])); if(n>my) better++; });
+    return better+1;
+  }
+  let glowRaf=null;
+  function startGlowLoop(list){
+    const until=Date.now()+1500;
+    list.forEach(t=> t.roundGlowUntil=until);
+    if(glowRaf) cancelAnimationFrame(glowRaf);
+    function tick(){
+      drawHall();
+      if(Date.now()<until){ glowRaf=requestAnimationFrame(tick); } else { glowRaf=null; }
+    }
+    glowRaf=requestAnimationFrame(tick);
+  }
+  function applyReveal(t,slot){
+    const p=t.players[slot];
+    const net=Math.max(0, p.val+modSum(p));
+    t.prevScore=t.score; t.score+=net; t.thrownSlot=slot;
+    teams.forEach(x=>x.prevRank=x.rank);
+    recomputeRanksLive();
+    teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    // Slot-Rang des Spielers + INKREMENTELLE Team-Platzveränderung dieses Slots (relativ zum
+    // Stand nach dem vorherigen Slot, nicht zum Startplatz) — via settled Rang-Historie
+    const prevR = slot>0 ? (t.rankHist[slot-1] ?? t.seasonRank) : t.seasonRank;
+    const nowR = t.rankHist[slot] ?? t.rank;
+    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: prevR - nowR };
+    updateRoundMedals(slot);
+    return {player:p,net};
+  }
+
+  // --- Impact-Klassifikation v2 (geteilte Logik) ---
+  let roundBest=null;     // bester Netto-Wert der laufenden Runde (teamübergreifend, inkl. AI)
+  let dayBest=null;       // bester Netto-Wert des ganzen Spieltags
+  let tier2Budget=2, tier1Budget=4;
+  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; teams.forEach(t=>t.roundMedal=0); }
+  // Gold/Silber/Bronze = Top 3 der AKTUELLEN Runde (nach Runden-Netto, live pro Reveal aktualisiert)
+  function updateRoundMedals(round){
+    const withNet = teams.filter(t=> t.thrownSlot===round)
+      .map(t=>({t, net: Math.max(0, t.players[round].val+modSum(t.players[round]))}))
+      .sort((a,b)=> b.net-a.net || a.t.seasonRank-b.t.seasonRank);
+    teams.forEach(t=> t.roundMedal=0);
+    withNet.slice(0,3).forEach((o,idx)=> o.t.roundMedal=idx+1);
+  }
+  // Echtes Gesamtranking der Runde: Stand NACHDEM alle Teams ihren Zug dieser Runde addiert
+  // haben (deterministisch vorab berechenbar). Rang-Ereignisse triggern gegen diese Endabrechnung.
+  function computeRoundStandings(round){
+    const withAfter = teams.map(t=>{
+      let s=0; for(let k=0;k<=round;k++){ const p=t.players[k]; s+=Math.max(0, p.val+modSum(p)); }
+      return { t, after:s };
+    });
+    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
+    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; t.rankHist[round]=t.roundRankAfter; });
+  }
+  // Impact-Klassifikation → Tier + Ursache (Rang-Ereignis schlägt Einzelwert).
+  // Tier 2 = Spotlight+Wumms · Tier 1 = Ping+Glow+Chip · Tier 0 = still.
+  function noteReveal(t,slot,res,isMine){
+    const net=res.net, p=res.player;
+    const bonSum=p.mods.filter(m=>m.sign>0).reduce((s,m)=>s+m.amt,0);
+    const malSum=p.mods.filter(m=>m.sign<0).reduce((s,m)=>s+m.amt,0);
+    const injury=p.mods.some(m=>m.injury);
+    const delta=t.roundDelta;
+    const prevBest = roundBest? roundBest.net : -1;
+    const newBest = net>prevBest;
+    if(newBest) roundBest={team:t,player:p,net,leg:SLOTS[slot]};
+    if(!dayBest || net>dayBest.net) dayBest={team:t,player:p,net,leg:SLOTS[slot]};
+    const leaderBefore=teams.find(x=>x.roundRankBefore===1);
+    const leaderChange = t.roundRankAfter===1 && leaderBefore && leaderBefore.code!==t.code;
+    const top3jump = (t.roundRankBefore>=6 && t.roundRankAfter<=3);
+
+    let cause='tick', tier=0, color='gold', text='';
+    if(injury){ cause='injury'; tier=2; color='red'; text=`−${malSum} Verletzung`; }
+    else if(p.val>=STAR_MIN){ cause='star'; tier=2; color='gold'; text=`⭐ Star · Wert ${p.val}`; }
+    else if(leaderChange){ cause='leader'; tier=2; color='gold'; text='neue Spitze · #1'; }
+    else if(top3jump){ cause='top3'; tier=2; color='violet'; text=`P${t.roundRankBefore} → P${t.roundRankAfter}`; }
+    else if(newBest){ cause='best'; tier=2; color='gold'; text=`#1 der Station · ${net}`; }
+    else if(bonSum>=13 && net>p.val){ cause='push'; tier=1; color='cyan'; text=`+${bonSum} Push`; }
+    else if(delta>=3){ cause='climb'; tier=1; color='violet'; text=`▲${delta} Plätze`; }
+    else if(prevBest>0 && net>=prevBest*0.9){ cause='strong'; tier=1; color='gold'; text=`stark · ${net}`; }
+
+    // Budget nur für AI und nur für Nicht-Verletzungen (Verletzungen nie verschlucken)
+    if(!isMine && cause!=='injury'){
+      if(tier===2){ if(tier2Budget>0) tier2Budget--; else tier=1; }
+      if(tier===1){ if(tier1Budget>0) tier1Budget--; else tier=0; }
+    }
+    return { tier, cause, color, text, kind:cause, newBest, delta };
+  }
+  function causeKick(cause, mine){
+    const own = mine?'DEIN ZUG · ':'';
+    switch(cause){
+      case 'leader': return own+'Neue Spitze';
+      case 'top3':   return own+'Sprung in die Top 3';
+      case 'best':   return own+'Bestwert der Station';
+      case 'injury': return own+'Verletzung';
+      case 'star':   return (mine?'DEIN STAR · ':'⭐ ')+'Star-Moment';
+      default:       return own+'Standout';
+    }
+  }
+  // Tier-2-Moment: Spotlight + Chip + farbiger Flash + Riser→Wumms (bzw. Thud bei Verletzung) — Guard curSlot>=0
+  function fireLiveStandout(t,res,slot,impact){
+    if(curSlot<0) return;
+    const mine=t.mine;
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot],
+                    kick:causeKick(impact.cause,mine), chip:{text:impact.text,color:impact.color} });
+    fireFlash(impact.color); shakeArena(impact.cause==='injury' ? true : !mine);
+    if(impact.cause==='injury'){ stumbleThud(mine?0.5:0.4); clackSound(0.4); }
+    else if(impact.cause==='star'){ starSound(); setTimeout(()=>wummsSound(mine?1.25:1.1), 300); }
+    else { riser(); setTimeout(()=>{ wummsSound(mine?1.1:0.92); clackSound(mine?0.5:0.35); }, 260); }
+    startGlowLoop([t]); hotRow(t.code);
+  }
+  // wendet das entschiedene Tier an — Guard curSlot>=0
+  function applyImpactFx(t,res,slot,impact){
+    if(curSlot<0) return;
+    if(impact.tier===2){ fireLiveStandout(t,res,slot,impact); }
+    else if(impact.tier===1){ risingPing(res.net); tickSound(panFor(t),0.2); startGlowLoop([t]); hotRow(t.code); }
+    // Tier 0: nur der stille Vorstoß des Bauern
+  }
+  // Podest am Ende der Disziplin: Top 3, Säulen steigen nacheinander auf
+  function showPodium(){
+    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank).slice(0,3);
+    const visual=[top3[1],top3[0],top3[2]]; const cls=['p2','p1','p3']; const place=[2,1,3];
+    const row=document.getElementById('podRow'); row.innerHTML='';
+    visual.forEach((t,idx)=>{ if(!t) return;
+      const col=document.createElement('div');
+      col.className='pod-col '+cls[idx]+(t.mine?' mine':'');
+      col.innerHTML=`<img class="pc-crest" src="${t.crest||crestURL(t,64)}" alt="">
+        <div class="pc-name">${(t.mine?'★ ':'')+(TEAM_NAMES[t.code]||t.code)}</div>
+        <div class="pc-pts">${Math.round(t.score)} Punkte</div>
+        <div class="pc-base">${place[idx]}</div>`;
+      row.appendChild(col);
+    });
+    document.getElementById('podium').classList.add('show');
+    fireFlash('gold');
+    const cols=[...row.children];
+    [2,0,1].forEach((ci,k)=> setTimeout(()=>{ if(cols[ci]) cols[ci].classList.add('in'); wummsSound(k===2?1.15:0.7); if(k===2) shakeArena(false); }, 300+k*440));
+  }
+  function logRow(t,slot,res,impact){
+    const p=res.player,net=res.net;
+    let badge='';
+    if(impact){
+      const map={ star:['star','⭐ Star'], injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
+                  best:['standout','Rundenbestwert'], push:['push','Hart gepusht'], climb:['push','Aufholjagd'], strong:['standout','Stark'] };
+      const m=map[impact.cause];
+      if(m) badge=` <span class="impact-badge ${m[0]}">${m[1]}</span>`;
+    }
+    const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
+    let calc=`<span class="base">${p.val}</span>`;
+    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+    calc+=` = <span class="net">+${net}</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const sr = slotRank(slot,t);
+    const src = ampelColor(sr);
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span style="color:var(--mut);font-weight:600">· Slot-Rang <b${src?` style="color:${src}"`:''}>#${sr}</b></span>${badge}</div>
+      <div class="calc">${calc}</div></div>${dl}`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+  }
+  function clearMedals(){
+    teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
+  }
+  function roundSummary(round){
+    const jumps = teams.map(t=>({t, d:(t.roundStartRank-t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
+    const parts = jumps.map(({t,d})=>{ const p=t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${t.code} ▲${d} · ${p.name} ${net}`; });
+    const el=document.createElement('div'); el.className='round-summary';
+    el.innerHTML = jumps.length ? `Runde ${round+1} — Größte Sprünge: ${parts.join(' · ')}` : `Runde ${round+1} — keine Rangsprünge`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(el, tk.firstChild);
+    jumps.forEach(({t})=> hotRow(t.code));
+    startGlowLoop(jumps.map(j=>j.t));
+  }
+  function updateMyTracker(){
+    const me=teams.find(t=>t.mine);
+    document.getElementById('myrank').textContent=me.rank;
+    const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
+    const d = from - me.rank;
+    const mv=document.getElementById('mymove');
+    if(curSlot<=0){ mv.className='mv same'; mv.textContent=`Runde 1 läuft …`; }
+    else if(d>0){ mv.className='mv up'; mv.textContent=`▲ ${d} ${d===1?'Platz':'Plätze'} seit Vorrunde (${from} → ${me.rank})`; }
+    else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
+    else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
+  }
+  // kurzer Hervorhebungs-Moment für das eigene Team, auch ohne Tier-2 (Rahmen hat es eh)
+  function liteMineSpotlight(t,res,slot){
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot], kick:'DEIN ZUG', chip:{text:`+${res.net}`, color:'gold'} });
+  }
+
+  function advance(){
+    if(busy) return;
+    if(stepIdx>=queue.length) return;
+    busy=true; started=true;
+    const q=queue[stepIdx];
+    curSlot=q.round;
+    clockPressureActive=(curSlot===2);
+    teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; });
+    clearMedals(); resetRoundBest(); computeRoundStandings(q.round);
+    // EIN Durchlauf über ALLE Teams (schlechtestes zuerst) — eigenes Team an natürlicher Position,
+    // nicht ans Ende geschoben. Das beste Team kommt automatisch zuletzt (Höhepunkt).
+    const order=teams.slice().sort((a,b)=> b.rank-a.rank);
+    let i=0;
+    const doOne=()=>{
+      if(i>=order.length){ waveFrac=null; endStage(q); return; }
+      const t=order[i]; waveFrac=i/Math.max(1,order.length-1); i++;
+      const isMine=t.mine;
+      const res=applyReveal(t,q.round);
+      const impact=noteReveal(t,q.round,res,isMine);
+      checkPromotion(t);
+      const finish=()=>{
+        if(isMine){ mover=null; drawHall(); } // Spotlight-Dimmung der Feld-Bauern beenden
+        scorePop(t,res.net);
+        logRow(t,q.round,res,impact);
+        positionLadder(false); hotRow(t.code); updateMyTracker();
+        applyImpactFx(t,res,q.round,impact);
+        if(isMine && impact.tier<2){ liteMineSpotlight(t,res,q.round); }
+        const delay = impact.tier===2 ? 1550 : (isMine ? 500 : (impact.tier===1 ? 240 : 90));
+        setTimeout(doOne, delay);
+      };
+      if(isMine){
+        mover={team:t,player:res.player,net:res.net,raw:res.player.val,slowmo:impact.tier===2};
+        document.getElementById('status').textContent= impact.tier===2 ? '★ DEIN ZUG — Highlight' : 'Dein Zug läuft …';
+        animMine(finish);
+      } else {
+        startTween(t,380);
+        spawnTopple(boardXAt(laneFrac(t.i),yForScore(t.score))+10,yForScore(t.score)-10);
+        t.flashT=1; drawHall();
+        setTimeout(()=>{ t.flashT=0; finish(); }, 380);
+      }
+    };
+    doOne();
+  }
+  function endStage(q){
+    clockPressureActive=false;
+    roundSummary(q.round);
+    stepIdx++; updateControls();
+    if(stepIdx>=queue.length){ setTimeout(showPodium, 700); }
+    setTimeout(()=>busy=false, 200);
+  }
+
+  function updateControls(){
+    const btn=document.getElementById('advance');
+    document.getElementById('stepnum').textContent=stepIdx;
+    document.getElementById('progfill').style.width=(stepIdx/queue.length*100)+'%';
+    if(stepIdx>=queue.length){ btn.disabled=true; btn.textContent='✔ Disziplin gewertet'; document.getElementById('status').textContent='Endstand'; return; }
+    const q=queue[stepIdx], round=q.round+1;
+    document.getElementById('round').textContent=round;
+    document.getElementById('slotlbl').textContent=SLOTS[q.round];
+    btn.textContent=`▶ Feld zieht (Station: ${SLOTS[q.round]})`;
+    document.getElementById('status').textContent=`Runde ${round}`;
+  }
+
+  function reset(){
+    if(raf) cancelAnimationFrame(raf);
+    initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; started=false;
+    mover=null; pieceT=1; pieceGlow=0; waveFrac=null; clockPressureActive=false; fragments=[]; dockFx=[]; toppleFx=[];
+    firstPromotionAnnounced=false;
+    roundBest=null; dayBest=null; tier2Budget=2; tier1Budget=4;
+    teams.forEach(t=>{ t.by=bottomY; t.bx=boardXAt(laneFrac(t.i),bottomY); });
+    buildBoardBitmap();
+    buildLadder(); positionLadder(true);
+    document.getElementById('ticker').innerHTML='<div class="empty">Noch nichts gezogen. Klick auf „Feld zieht".</div>';
+    document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
+    document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
+    document.getElementById('mylbl').textContent=`Dein Team · ${MINE} · ${TEAM_NAMES[MINE]}`;
+    document.getElementById('spotlight').classList.remove('show','mine');
+    document.getElementById('podium').classList.remove('show');
+    document.getElementById('podRow').innerHTML='';
+    updateControls(); drawHall();
+  }
+
   document.getElementById('advance').addEventListener('click',advance);
   document.getElementById('replay').addEventListener('click',reset);
-  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) tickSound(0,0.3); });
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted && curSlot>=0) tickSound(0,0.3); });
   const mq=window.matchMedia('(prefers-color-scheme: dark)');
   function onThemeChange(){ buildBoardBitmap(); drawHall(); }
   if(mq.addEventListener) mq.addEventListener('change',onThemeChange);

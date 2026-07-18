@@ -194,6 +194,7 @@
   .spotlight .sp-chip{ display:none; margin-top:7px; font-size:11px; font-weight:800; letter-spacing:.03em; padding:2px 10px; border-radius:99px; }
   .impact-badge{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
   .impact-badge.standout{ background:color-mix(in srgb,var(--gold-1) 24%, transparent); color:#8a6a1e; }
+  .impact-badge.star{ background:linear-gradient(90deg,#f4d876,#e8c04a); color:#3a2600; box-shadow:0 0 8px -1px rgba(232,192,74,.7); }
   .impact-badge.push{ background:color-mix(in srgb,var(--up) 20%, transparent); color:#1f8a54; }
   .impact-badge.injury{ background:color-mix(in srgb,var(--down) 20%, transparent); color:#c23c2c; }
   .impact-badge.lift{ background:color-mix(in srgb,var(--accent) 22%, transparent); color:var(--accent); }
@@ -331,6 +332,7 @@
   const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
                  "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
   const MINE = "M-M";
+  const STAR_MIN = 80; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
   const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
                  "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
@@ -404,10 +406,17 @@
   function genPlayers(t){
     const base = t.mine ? [80,72,66,60,54] : null;
     const arr=[];
-    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(42,90);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
     return arr;
   }
   function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
   function bandOf(rank){ return Math.min(3, Math.floor((rank-1)/8)); }
   function colOf(rank){ return (rank-1)%8; }
   const BAND_NAMES=['Elite / Gold','Silber','Bronze','Eisen'];
@@ -416,10 +425,12 @@
 
   function initData(){
     _s=0x51ed270b;
-    // Startaufstellung nach SAISONRANG statt alphabetisch: Nachbarn sind echte Positionsrivalen.
-    teams.slice().sort((a,b)=> fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst).
+    // Vor dem ersten Spieltag gibt es keinen Punktestand — der Vorsaison-Abschluss ordnet das Feld.
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
     teams.forEach(t=>{
-      t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0;
+      t.score=0; t.prevScore=0; t.roundStartScore=0;
       t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank;
       t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0;
       t.curBand=bandOf(t.rank); t.curCol=colOf(t.rank); t.visBand=t.curBand; t.visCol=t.curCol;
@@ -487,6 +498,14 @@
       const sg=a.createGain(); const st=t0+0.04+i*0.02; sg.gain.setValueAtTime(0.0001,st);
       sg.gain.exponentialRampToValueAtTime(0.14*vol,st+0.02); sg.gain.exponentialRampToValueAtTime(0.001,st+0.34);
       s.connect(sg); sg.connect(a.destination); s.start(st); s.stop(st+0.36); });
+  }
+  // heller Shimmer-Arpeggio für den ⭐ Star-Moment (Elite-Spieler kommt rein)
+  function starSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    [1046,1318,1568,2093].forEach((f,i)=>{ const o=a.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=a.createGain(); const st=t0+i*0.06;
+      g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.15,st+0.02); g.gain.exponentialRampToValueAtTime(0.001,st+0.4);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st+0.42); });
   }
   function risingPing(net){
     const a=audio(); if(!a) return; const t0=a.currentTime;
@@ -729,7 +748,7 @@
         srtxt = ` · <span style="color:${c};font-weight:800">#${sh.slotRank}</span>${dtxt}`;
       }
       html+=`<div class="row"><div class="av" style="background:${t.color}">${t.code.replace('-','')}</div>
-        <div class="body"><div class="nm">${p.name} <span style="color:#c7d0e6;font-weight:600">· ${SLOTS[s]}</span>${srtxt}</div>
+        <div class="body"><div class="nm">${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:#c7d0e6;font-weight:600">· ${SLOTS[s]}</span>${srtxt}</div>
         <div class="calc">${calc}</div></div></div>`;
     }
     host.innerHTML=html;
@@ -830,6 +849,7 @@
 
     let cause='tick', tier=0, color='gold', text='';
     if(injury){ cause='injury'; tier=2; color='red'; text=`−${malSum} Verletzung`; }
+    else if(p.val>=STAR_MIN){ cause='star'; tier=2; color='gold'; text=`⭐ Star · Wert ${p.val}`; }
     else if(leaderChange){ cause='leader'; tier=2; color='gold'; text='neue Spitze · #1'; }
     else if(top3jump){ cause='top3'; tier=2; color='violet'; text=`P${t.roundRankBefore} → P${t.roundRankAfter}`; }
     else if(newBest){ cause='best'; tier=2; color='gold'; text=`#1 der Runde · ${net}`; }
@@ -850,6 +870,7 @@
       case 'top3':   return own+'Sprung in die Top 3';
       case 'best':   return own+'Bestwert der Runde';
       case 'injury': return own+'Verletzung';
+      case 'star':   return (mine?'DEIN STAR · ':'⭐ ')+'Star-Moment';
       default:       return own+'Standout';
     }
   }
@@ -859,6 +880,7 @@
                     kick:causeKick(impact.cause,mine), chip:{text:impact.text,color:impact.color} });
     fireFlash(impact.color); shakeArena(impact.cause==='injury' ? true : !mine);
     if(impact.cause==='injury'){ stumbleThud(mine?0.5:0.4); }
+    else if(impact.cause==='star'){ starSound(); setTimeout(()=>wummsSound(mine?1.25:1.1), 300); }
     else { riser(); setTimeout(()=>wummsSound(mine?1.1:0.92), 260); }
     startGlowLoop([t]); hotRow(t.code);
   }
@@ -923,7 +945,7 @@
     const p=res.player,net=res.net;
     let badge='';
     if(impact){
-      const map={ injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
+      const map={ star:['star','⭐ Star'], injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
                   best:['standout','Rundenbestwert'], push:['push','Hart gepusht'], climb:['push','Aufholjagd'], strong:['standout','Stark'] };
       const m=map[impact.cause];
       if(m) badge=` <span class="impact-badge ${m[0]}">${m[1]}</span>`;
@@ -942,7 +964,7 @@
     const src = ampelColor(sr);
     const row=document.createElement('div'); row.className='row';
     row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
-      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span style="color:var(--mut);font-weight:600">· Slot-Rang <b${src?` style="color:${src}"`:''}>#${sr}</b></span>${badge}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span style="color:var(--mut);font-weight:600">· Slot-Rang <b${src?` style="color:${src}"`:''}>#${sr}</b></span>${badge}</div>
       <div class="calc">${calc}</div></div>${dl}`;
     const tk=document.getElementById('ticker');
     if(tk.querySelector('.empty')) tk.innerHTML='';

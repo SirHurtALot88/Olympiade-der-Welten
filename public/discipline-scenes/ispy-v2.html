@@ -103,6 +103,7 @@
 
   .round-summary{ margin:0 0 10px; padding:9px 12px; border-radius:10px; font-size:12px; font-weight:700; line-height:1.45;
                    background:color-mix(in srgb,var(--gold) 20%, var(--panel)); border:1.5px solid var(--gold); color:var(--ink); }
+  .round-summary b{ color:var(--accent); }
 
   .side{ margin-top:14px; display:flex; flex-direction:column; gap:14px; }
   .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 17px; box-shadow:var(--shadow); }
@@ -158,6 +159,67 @@
   .hc-slots .body .calc{ font-size:10.5px; }
   .hc-slots .body .calc .base{ color:#f6ecdd; }
   .hc-empty{ font-size:11.5px; font-style:italic; color:#b3a0c9; padding:2px 0; }
+
+  /* ---- impact layer (geteilte Funktionsweise; Optik bleibt pro Diszi) ---- */
+  @keyframes arenashake{ 0%,100%{transform:translate(0,0);} 15%{transform:translate(-5px,3px);} 30%{transform:translate(4px,-4px);}
+                         45%{transform:translate(-4px,-2px);} 60%{transform:translate(3px,3px);} 75%{transform:translate(-2px,2px);} }
+  .arena.shake{ animation:arenashake .42s ease; }
+  .arena.shake-soft{ animation:arenashake .3s ease; }
+  .flashfx{ position:absolute; inset:0; z-index:5; pointer-events:none; opacity:0; }
+  .flashfx.gold{ background:radial-gradient(circle at 50% 42%, rgba(212,175,106,.5), transparent 60%); }
+  .flashfx.red{ background:radial-gradient(circle at 50% 50%, rgba(224,86,122,.48), transparent 62%); }
+  .flashfx.violet{ background:radial-gradient(circle at 50% 46%, rgba(155,79,224,.5), transparent 62%); }
+  .flashfx.cyan{ background:radial-gradient(circle at 50% 46%, rgba(79,209,138,.4), transparent 62%); }
+  .flashfx.fire{ animation:flashpop .5s ease; }
+  @keyframes flashpop{ 0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;} }
+
+  .spotlight{ position:absolute; left:50%; top:46%; transform:translate(-50%,-50%) scale(.8); z-index:6;
+              display:flex; align-items:center; gap:16px; padding:16px 22px 16px 16px; border-radius:18px;
+              background:rgba(18,8,28,.86); border:1.5px solid rgba(212,175,106,.7); backdrop-filter:blur(8px);
+              box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 40px -8px rgba(212,175,106,.5);
+              color:#f6ecdd; opacity:0; pointer-events:none; min-width:min(78%,420px); }
+  .spotlight.mine{ border-color:rgba(155,79,224,.85); box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 46px -6px rgba(155,79,224,.6); }
+  .spotlight.show{ animation:spotpop 2.7s cubic-bezier(.2,1.05,.3,1) forwards; }
+  @keyframes spotpop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.72);} 9%{opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+                      16%{transform:translate(-50%,-50%) scale(1);} 88%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+                      100%{opacity:0; transform:translate(-50%,-52%) scale(.98);} }
+  .spotlight .sp-crest{ width:64px; height:64px; border-radius:50%; flex:none; box-shadow:0 0 0 3px rgba(212,175,106,.6); }
+  .spotlight .sp-body{ flex:1; min-width:0; }
+  .spotlight .sp-kick{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:#e8cd8e; }
+  .spotlight.mine .sp-kick{ color:#c9a2f0; }
+  .spotlight .sp-name{ font-family:Georgia,serif; font-weight:700; font-size:22px; line-height:1.05; margin-top:1px; }
+  .spotlight .sp-sub{ font-size:12px; color:#c7b3dd; margin-top:2px; }
+  .spotlight .sp-net{ font-family:Georgia,serif; font-weight:800; font-size:40px; color:#d4af6a; flex:none; text-shadow:0 3px 14px rgba(0,0,0,.6); }
+  .spotlight .sp-chip{ display:none; margin-top:7px; font-size:11px; font-weight:800; letter-spacing:.03em; padding:2px 10px; border-radius:99px; }
+  .impact-badge{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .impact-badge.standout{ background:color-mix(in srgb,var(--gold) 24%, transparent); color:#c9a24a; }
+  .impact-badge.star{ background:linear-gradient(90deg,#e8cd8e,#d4af6a); color:#2c1e00; box-shadow:0 0 8px -1px rgba(212,175,106,.7); }
+  .impact-badge.push{ background:color-mix(in srgb,var(--up) 20%, transparent); color:#2fae76; }
+  .impact-badge.injury{ background:color-mix(in srgb,var(--down) 20%, transparent); color:#c23a5e; }
+  /* Podest — Top 3 am Ende */
+  .podium{ position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+           padding:0 20px 46px; gap:14px; background:linear-gradient(180deg, rgba(18,8,28,.15), rgba(18,8,28,.76));
+           opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  .podium.show{ opacity:1; }
+  .podium .pod-kick{ position:absolute; top:26px; left:0; right:0; text-align:center; color:#e8cd8e; font-weight:800;
+                     font-size:12px; letter-spacing:.18em; text-transform:uppercase; }
+  .podium .pod-title{ position:absolute; top:44px; left:0; right:0; text-align:center; color:#f6ecdd;
+                      font-family:Georgia,serif; font-style:italic; font-size:26px; }
+  .podium .pod-row{ display:flex; align-items:flex-end; gap:12px; }
+  .pod-col{ display:flex; flex-direction:column; align-items:center; gap:8px; opacity:0; transform:translateY(24px); }
+  .pod-col.in{ animation:podrise .6s cubic-bezier(.2,1.1,.3,1) forwards; }
+  @keyframes podrise{ to{ opacity:1; transform:translateY(0); } }
+  .pod-col .pc-crest{ width:60px; height:60px; border-radius:50%; box-shadow:0 6px 18px -6px rgba(0,0,0,.7); }
+  .pod-col .pc-name{ color:#f6ecdd; font-weight:800; font-size:13px; text-align:center; max-width:120px; line-height:1.15; }
+  .pod-col .pc-pts{ color:#c7b3dd; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .pod-col .pc-base{ width:104px; border-radius:10px 10px 0 0; display:grid; place-items:start center; padding-top:8px;
+                     font-family:Georgia,serif; font-weight:800; font-size:28px; color:#20141c; }
+  .pod-col.p1 .pc-base{ height:132px; background:linear-gradient(180deg,#e8cd8e,#d4af6a); }
+  .pod-col.p2 .pc-base{ height:100px; background:linear-gradient(180deg,#e2e5ea,#c8ccd4); }
+  .pod-col.p3 .pc-base{ height:76px;  background:linear-gradient(180deg,#e0a765,#cd7f32); }
+  .pod-col.mine .pc-name{ color:#c9a2f0; }
+  @media (prefers-reduced-motion: reduce){ .arena.shake,.arena.shake-soft{ animation:none; } .spotlight.show{ animation:none; opacity:1; }
+    .flashfx.fire{ animation:none; } .pod-col.in{ animation:none; opacity:1; transform:none; } }
 </style>
 </head>
 <body>
@@ -183,7 +245,7 @@
     <div>
       <p class="eyebrow">Disziplin · 32 Agenten · Enttarnungs-Wertung</p>
       <h1>I-Spy — Die Enttarnung</h1>
-      <div class="sub">Kein Duell — EIN <b>Dossierraum</b>, 32 Undercover-Agenten rücken gleichzeitig von der Legende zur Enttarnung vor. Jeder Klick löst einen stillen Zug aus: der aufgestellte Slot (<b>Observer, Pattern Lock, Social Read, Quiet Move, Reveal</b>) trägt seinen <b>Gespür-Wert</b> − Mali + Boni = <b>Netto-Fortschritt</b>. Jede Maske rutscht weiter Richtung Enttarnung — nie zurück; die gezackte Dossier-Linie zeigt den Rang auf einen Blick. Dein Agent zieht zuletzt.</div>
+      <div class="sub">Kein Duell — EIN <b>Dossierraum</b>, alle 32 Undercover-Agenten sind jederzeit ehrlich sichtbar und rücken gemeinsam von der Legende zur Enttarnung vor. Jeder Klick löst eine ganze Runde aus: pro Agent trägt der aktive Slot (<b>Observer, Pattern Lock, Social Read, Quiet Move, Reveal</b>) seinen <b>Gespür-Wert</b> − Mali + Boni = <b>Netto-Fortschritt</b>. Jede Maske rutscht weiter Richtung Enttarnung — nie zurück; <b>Position auf der Bahn = kumulierte Punkte</b>. Dein Agent zieht innerhalb jeder Runde zuletzt.</div>
     </div>
     <div class="headmeta">Runde <b id="round">1</b> / 5<br>Dossier → Punkte</div>
   </div>
@@ -204,12 +266,31 @@
         </div>
         <div class="scorepop" id="pop">+0</div>
         <div class="liveflag"><span class="pip"></span> <span id="status">Legende steht</span></div>
+        <div class="flashfx gold" id="flashGold"></div>
+        <div class="flashfx red" id="flashRed"></div>
+        <div class="flashfx violet" id="flashViolet"></div>
+        <div class="flashfx cyan" id="flashCyan"></div>
+        <div class="spotlight" id="spotlight">
+          <img class="sp-crest" id="spCrest" alt="">
+          <div class="sp-body">
+            <div class="sp-kick" id="spKick">Moment der Runde</div>
+            <div class="sp-name" id="spName"></div>
+            <div class="sp-sub" id="spSub"></div>
+            <div class="sp-chip" id="spChip"></div>
+          </div>
+          <div class="sp-net" id="spNet"></div>
+        </div>
+        <div class="podium" id="podium">
+          <div class="pod-kick">Disziplin gewertet</div>
+          <div class="pod-title">Das Podest</div>
+          <div class="pod-row" id="podRow"></div>
+        </div>
       </div>
 
       <div class="clickbar">
         <button class="cta" id="advance">🕵 Feld ermittelt (Observer)</button>
         <div class="prog"><i id="progfill"></i></div>
-        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <div class="step">Runde <b id="stepnum">0</b> / 5</div>
         <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
         <button class="cta small" id="replay">↻ Neu</button>
       </div>
@@ -244,7 +325,7 @@
   </div>
 
   <div class="foot">
-    <b>Was hier echt ist:</b> 32 Agenten, 5 Rollen-Slots (Observer, Pattern Lock, Social Read, Quiet Move, Reveal), pro Rolle ein direkter Gespür-Wert. Modifikatoren (Tarnungsmüdigkeit, Enttarnungsrisiko, Führungsoffizier, Netzwerk, Zwischenfall, Adrenalin) sind bestehende Mechaniken — sie erschweren oder verbessern die Ermittlung, aber Einfluss wird nur <b>addiert</b>, nie abgezogen. Rang → Punkte am Ende. Masken hier als farbige Dossier-Tokens stellvertretend.
+    <b>Was hier echt ist:</b> 32 Agenten, 5 Rollen-Slots (Observer, Pattern Lock, Social Read, Quiet Move, Reveal), pro Rolle ein direkter Gespür-Wert. Modifikatoren (Fatigue, Captain, Mutator, Push, Team-Bonus, Verletzung) sind bestehende Mechaniken — sie erschweren oder verbessern die Ermittlung, aber Einfluss wird nur <b>addiert</b>, nie abgezogen; die Dossier-Position bewegt sich deshalb <b>nur vorwärts</b>. Rang → Punkte am Ende. Masken hier als farbige Dossier-Tokens stellvertretend.
   </div>
 </div>
 
@@ -259,6 +340,7 @@
   const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
                  "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
   const MINE = "M-M";
+  const STAR_MIN = 80; // Elite-Grundwert: ab hier ist ein Agent ein „Star" (Ausnahmekönner)
   const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
                  "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
@@ -309,12 +391,12 @@
 
   const MODS = [
     {k:null,         w:40},
-    {k:"Tarnungsmüdigkeit", w:15, sign:-1, min:6,  max:20},
-    {k:"Führungsoffizier",  w:9,  sign:+1, min:4,  max:11},
-    {k:"Zwischenfall",      w:11, sign:+1, min:5,  max:14},
-    {k:"Adrenalin",         w:11, sign:+1, min:5,  max:16},
-    {k:"Netzwerk",          w:10, sign:+1, min:3,  max:9},
-    {k:"Enttarnungsrisiko", w:4,  sign:-1, min:12, max:26, injury:true},
+    {k:"Fatigue",    w:15, sign:-1, min:6,  max:20},
+    {k:"Captain",    w:9,  sign:+1, min:4,  max:11},
+    {k:"Mutator",    w:11, sign:+1, min:5,  max:14},
+    {k:"Push",       w:11, sign:+1, min:5,  max:16},
+    {k:"Team-Bonus", w:10, sign:+1, min:3,  max:9},
+    {k:"Verletzung", w:4,  sign:-1, min:12, max:26, injury:true},
   ];
   const MODW = MODS.reduce((s,m)=>s+m.w,0);
   function rollMod(){
@@ -331,19 +413,28 @@
   function genPlayers(t){
     const base = t.mine ? [80,72,66,60,54] : null;
     const arr=[];
-    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(42,90);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
     return arr;
   }
+  function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
   function initData(){
     _s=0x51ed270b;
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst).
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
     teams.forEach(t=>{
-      t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundHot=false;
+      t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0;
+      t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0; t.roundHot=false;
       t.restX=t.homeX; t.restY=t.homeY; t.dispX=t.homeX; t.dispY=t.homeY; t.anim=null; t.wobble=null; t.wobOffX=0; t.wobOffY=0;
     });
   }
-  // slotRank: current standing of a team (kept as a named accessor so the round-summary /
-  // tracker code reads intent rather than poking t.rank directly everywhere).
-  function slotRank(t){ return t.rank; }
   // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
   function ampelColor(rank){
     if(rank<=3) return '#2fa564';
@@ -356,7 +447,7 @@
     return Math.round(t.score) + (gain>0 ? ` (+${gain})` : '');
   }
   function recomputeRanksLive(){
-    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank);
     order.forEach((t,idx)=> t.rank=idx+1);
   }
 
@@ -384,48 +475,88 @@
   function progressX(score){ return trenchX + (fortX - trenchX - 24) * (1 - 1/(1 + Math.max(0,score)/SCORE_K)); }
   teams.forEach(t=>{ t.homeY = laneY(t.i); t.homeX = trenchX; });
 
-  // ---- WebAudio: reveal stinger + whisper hiss + feed blips (no external files) ----
+  // ---- WebAudio: Impact-gated stingers only (no per-move sound) ----
   let actx=null, muted=false;
   function audio(){ if(muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(actx.state==='suspended') actx.resume(); return actx; }
-  // revealStinger: short, sharp two-note sting for the player's own unmasking moment
-  function revealStinger(vol){
-    const a=audio(); if(!a) return; const t0=a.currentTime;
-    const o=a.createOscillator(); o.type='triangle';
-    o.frequency.setValueAtTime(220,t0); o.frequency.exponentialRampToValueAtTime(660,t0+0.09); o.frequency.exponentialRampToValueAtTime(494,t0+0.22);
-    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; lp.Q.value=0.7;
-    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.45),t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.5);
-    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.52);
-    const o2=a.createOscillator(); o2.type='sine';
-    o2.frequency.setValueAtTime(880,t0+0.02); o2.frequency.exponentialRampToValueAtTime(1320,t0+0.16);
-    const g2=a.createGain(); g2.gain.setValueAtTime(0.0001,t0+0.02); g2.gain.exponentialRampToValueAtTime((vol||0.45)*0.35,t0+0.05); g2.gain.exponentialRampToValueAtTime(0.0001,t0+0.4);
-    o2.connect(g2); g2.connect(a.destination); o2.start(t0+0.02); o2.stop(t0+0.42);
-  }
-  // whisperNoise: soft breathy hiss for every reveal in the field — a mask sliding off, unheard
-  function whisperNoise(vol){
-    const a=audio(); if(!a) return; const t0=a.currentTime;
-    const len=0.22, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
-    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.1); }
+  function crowdSwell(vol,dur){
+    const a=audio(); if(!a) return; const t0=a.currentTime; dur=Math.max(0.3,dur||0.6);
+    const buf=a.createBuffer(1, Math.max(1,Math.floor(a.sampleRate*dur)), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1); }
     const src=a.createBufferSource(); src.buffer=buf;
     const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.6;
-    bp.frequency.setValueAtTime(4200+Math.random()*1800,t0);
-    const g=a.createGain(); g.gain.setValueAtTime((vol||0.18),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
-    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+    bp.frequency.setValueAtTime(500,t0); bp.frequency.linearRampToValueAtTime(2400,t0+dur*0.7);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.3),t0+dur*0.55); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+dur);
   }
-  // unmaskThud: a quiet, close, low settle — the moment a dossier locks in
-  function unmaskThud(vol){
+  function stumbleThud(vol){
     const a=audio(); if(!a) return; const t0=a.currentTime;
-    const o=a.createOscillator(); o.type='sine';
-    o.frequency.setValueAtTime(196,t0); o.frequency.exponentialRampToValueAtTime(72,t0+0.22);
-    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=340; lp.Q.value=0.7;
-    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.3),t0+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.3);
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(180,t0); o.frequency.exponentialRampToValueAtTime(70,t0+0.1);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.4),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.13);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.14);
+  }
+  // signature „Wumms" — der Auftritt des besten Agenten: Sub-Bass-Punch + Click + Sparkle-Triade
+  function wummsSound(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime; vol=(vol||1);
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,t0); o.frequency.exponentialRampToValueAtTime(44,t0+0.32);
+    const og=a.createGain(); og.gain.setValueAtTime(0.0001,t0); og.gain.exponentialRampToValueAtTime(0.9*vol,t0+0.02); og.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
+    o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0+0.52);
+    const len=0.05, buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+    const src=a.createBufferSource(); src.buffer=buf; const ng=a.createGain();
+    ng.gain.setValueAtTime(0.5*vol,t0); ng.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(ng); ng.connect(a.destination); src.start(t0); src.stop(t0+len);
+    [880,1320,1760].forEach((f,i)=>{ const s=a.createOscillator(); s.type='sine'; s.frequency.value=f;
+      const sg=a.createGain(); const st=t0+0.04+i*0.02; sg.gain.setValueAtTime(0.0001,st);
+      sg.gain.exponentialRampToValueAtTime(0.14*vol,st+0.02); sg.gain.exponentialRampToValueAtTime(0.001,st+0.34);
+      s.connect(sg); sg.connect(a.destination); s.start(st); s.stop(st+0.36); });
+  }
+  // heller Shimmer-Arpeggio für den ⭐ Star-Moment (Elite-Agent kommt rein)
+  function starSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    [1046,1318,1568,2093].forEach((f,i)=>{ const o=a.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=a.createGain(); const st=t0+i*0.06;
+      g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.15,st+0.02); g.gain.exponentialRampToValueAtTime(0.001,st+0.4);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st+0.42); });
+  }
+  // leiser, mit dem Wert steigender Ping, wenn ein Feld-Agent eine neue Rundenbestleistung setzt
+  function risingPing(net){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(380+Math.min(520,net*3.2),t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.11,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.15);
+  }
+  // dosierte Screen-FX. Farbe = Ursache (gold Bestwert/Spitze · cyan Push · violett Rangsprung · rot Verletzung)
+  const CAUSE_COLOR={ gold:'#d4af6a', cyan:'#4fd18a', violet:'#9b4fe0', red:'#e0567a' };
+  function fireFlash(kind){
+    const id = kind==='red'?'flashRed':kind==='violet'?'flashViolet':kind==='cyan'?'flashCyan':'flashGold';
+    const el=document.getElementById(id); if(!el) return;
+    el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire');
+  }
+  function shakeArena(soft){ const el=document.querySelector('.arena'); if(!el) return;
+    el.classList.remove('shake','shake-soft'); void el.offsetWidth; el.classList.add(soft?'shake-soft':'shake');
+    setTimeout(()=>el.classList.remove('shake','shake-soft'), soft?320:440); }
+  // kurzer „Achtung, gleich"-Riser vor dem Wumms
+  function riser(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(200,t0); o.frequency.exponentialRampToValueAtTime(760,t0+0.26);
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1700;
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.12,t0+0.2); g.gain.exponentialRampToValueAtTime(0.001,t0+0.3);
     o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.32);
   }
-  function feedBlip(vol,good){
-    const a=audio(); if(!a) return; const t0=a.currentTime;
-    const o=a.createOscillator(); o.type=good?'triangle':'square';
-    o.frequency.setValueAtTime(good?880:340,t0); o.frequency.exponentialRampToValueAtTime(good?600:250,t0+0.06);
-    const g=a.createGain(); g.gain.setValueAtTime((vol||0.25),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.08);
-    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.09);
+  function showSpotlight(o){
+    const sp=document.getElementById('spotlight');
+    document.getElementById('spCrest').src = o.team.crest || crestURL(o.team,64);
+    document.getElementById('spKick').textContent = o.kick || 'Moment der Runde';
+    document.getElementById('spName').textContent = (o.team.mine?'★ ':'')+o.player.name;
+    document.getElementById('spSub').textContent = `${o.team.code} · ${TEAM_NAMES[o.team.code]||''}${o.leg?' · '+o.leg:''}`;
+    document.getElementById('spNet').textContent = '+'+o.net;
+    const chip=document.getElementById('spChip');
+    if(o.chip && o.chip.text){ chip.style.display='inline-block'; chip.textContent=o.chip.text;
+      const c=CAUSE_COLOR[o.chip.color]||'#d4af6a'; chip.style.background=c; chip.style.color='#1a1206'; }
+    else chip.style.display='none';
+    sp.classList.toggle('mine', !!o.team.mine);
+    sp.classList.remove('show'); void sp.offsetWidth; sp.classList.add('show');
+    setTimeout(()=>sp.classList.remove('show'), 1500);
   }
 
   function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
@@ -472,7 +603,6 @@
       trail: []
     };
     t.restX = newRestX;
-    // neighboring lanes flinch as the breach's shockwave passes through the line
     [t.i-2,t.i-1,t.i+1,t.i+2].forEach(ni=>{
       if(ni<0||ni>=teams.length) return;
       const o=teams[ni];
@@ -592,9 +722,17 @@
       hitboxes.push({code:t.code, x:px, y:py, r:rad+4});
       ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=t.mine?2.4:1.6;
       ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,py+laneH*0.34); ctx.stroke();
-      if(t.roundHot){
-        ctx.beginPath(); ctx.arc(px,py,rad+5,0,Math.PI*2);
-        ctx.strokeStyle=cssv('--gold','#c99a2e'); ctx.lineWidth=2.6; ctx.globalAlpha=.9; ctx.stroke(); ctx.globalAlpha=1;
+      // Gold/Silber/Bronze-Ring = Top 3 der aktuellen Runde (nach Runden-Netto, nicht Total)
+      const medal = t.roundMedal===1?'#e8c04a' : t.roundMedal===2?'#cfd3da' : t.roundMedal===3?'#cd7f32' : null;
+      if(medal){
+        ctx.beginPath(); ctx.arc(px,py,rad+4,0,Math.PI*2);
+        ctx.strokeStyle=medal; ctx.lineWidth=t.mine?3.6:2.8; ctx.shadowColor=medal; ctx.shadowBlur=7; ctx.stroke(); ctx.shadowBlur=0;
+      }
+      if(t.roundGlowUntil && Date.now()<t.roundGlowUntil){
+        const remain=(t.roundGlowUntil-Date.now())/1500;
+        const pulse=0.55+0.35*Math.sin(Date.now()/110);
+        ctx.beginPath(); ctx.arc(px,py,rad+8,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(212,175,106,${Math.max(0,Math.min(1,remain))*pulse})`; ctx.lineWidth=3.2; ctx.stroke();
       }
       if(justFought){
         ctx.beginPath(); ctx.arc(px,py,rad+3.5,0,Math.PI*2);
@@ -602,6 +740,7 @@
       }
       paintCrest(ctx, px, py, rad, t, true);
       if(t.mine){
+        // Guard: curSlot kann -1 sein (vor dem ersten Zug) — nie negativ indizieren
         const slotP = (curSlot>=0 && curSlot<5) ? t.players[curSlot] : null;
         const label = slotP ? slotP.name : t.code;
         ctx.font='700 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
@@ -669,13 +808,13 @@
   // score pop
   function scorePop(net,mine){
     const pop=document.getElementById('pop');
-    pop.textContent='+'+net; pop.style.color=mine?'#e6c15a':'var(--gold)';
+    pop.textContent='+'+net; pop.style.color=mine?'#c9a2f0':'var(--gold)';
     pop.style.left='calc(50% - 20px)'; pop.style.top='42%';
     pop.style.transition='none'; pop.style.opacity='1'; pop.style.transform='translateY(0) scale(1)';
     requestAnimationFrame(()=>{ pop.style.transition='opacity .9s, transform .9s'; pop.style.opacity='0'; pop.style.transform='translateY(-40px) scale(1.25)'; });
   }
 
-  // ---------- standings ladder (pulse bar) ----------
+  // ---------- standings ladder ----------
   const ROWH=21;
   const rowEls={};
   function buildLadder(){
@@ -684,7 +823,7 @@
       if(!t.crest) t.crest=crestURL(t,32);
       const row=document.createElement('div');
       row.className='lrow'+(t.mine?' mine':'');
-      row.innerHTML=`<span class="pos">${t.rank}</span><img class="crest" src="${t.crest}" alt=""><span class="cd">${t.code}</span><span class="thr" title="in dieser Welle gekämpft">○</span><span class="pts">0</span><span class="dd"></span>`;
+      row.innerHTML=`<span class="pos">${t.rank}</span><img class="crest" src="${t.crest}" alt=""><span class="cd">${t.code}</span><span class="thr" title="in dieser Runde enttarnt">○</span><span class="pts">0</span><span class="dd"></span>`;
       row.addEventListener('mousemove',(e)=> showHoverCard(t,e.clientX,e.clientY));
       row.addEventListener('mouseleave', hideHoverCard);
       host.appendChild(row); rowEls[t.code]=row;
@@ -695,9 +834,9 @@
     teams.forEach(t=>{
       const row=rowEls[t.code];
       if(instant) row.style.transition='none';
-      row.style.transform=`translateY(${(slotRank(t)-1)*ROWH}px)`;
+      row.style.transform=`translateY(${(t.rank-1)*ROWH}px)`;
       if(instant) requestAnimationFrame(()=>{ row.style.transition=''; });
-      row.querySelector('.pos').textContent=slotRank(t);
+      row.querySelector('.pos').textContent=t.rank;
       row.querySelector('.pts').textContent=fmtScore(t);
       const thr=row.querySelector('.thr');
       const done = t.thrownSlot===curSlot;
@@ -707,6 +846,11 @@
       if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
       else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
       else { dd.className='dd'; dd.textContent=''; }
+      // Gold/Silber/Bronze = Rundensieger (Top 3 der aktuellen Runde)
+      row.classList.remove('rk-gold','rk-silver','rk-bronze');
+      if(t.roundMedal===1) row.classList.add('rk-gold');
+      else if(t.roundMedal===2) row.classList.add('rk-silver');
+      else if(t.roundMedal===3) row.classList.add('rk-bronze');
     });
   }
   function hotRow(code){
@@ -733,8 +877,15 @@
       let calc=`<span class="base">${p.val}</span>`;
       p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
       calc+=` = <span class="net">+${net}</span>`;
+      const sh = t.slotHist ? t.slotHist[s] : null;
+      let srtxt='';
+      if(sh){
+        const c=ampelColor(sh.slotRank)||'#e6d9c4', d=sh.delta;
+        const dtxt = d>0?` <span style="color:#66e29b;font-weight:800">(▲${d})</span>` : d<0?` <span style="color:#ff8a7a;font-weight:800">(▼${-d})</span>` : ` <span style="color:#c9b89f;font-weight:700">(±0)</span>`;
+        srtxt = ` · <span style="color:${c};font-weight:800">#${sh.slotRank}</span>${dtxt}`;
+      }
       html+=`<div class="row"><div class="av" style="background:${t.color}">${t.code.replace('-','')}</div>
-        <div class="body"><div class="nm">${p.name} <span style="color:#b3a0c9;font-weight:600">· ${ROLES[s]}</span></div>
+        <div class="body"><div class="nm">${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:#b3a0c9;font-weight:600">· ${ROLES[s]}</span>${srtxt}</div>
         <div class="calc">${calc}</div></div></div>`;
     }
     host.innerHTML=html;
@@ -764,11 +915,17 @@
   });
   cv.addEventListener('mouseleave', hideHoverCard);
 
-  // ---------- reveal flow ----------
+  // ---------- reveal flow (EIN gemergter Durchlauf/Runde über alle 32) ----------
   let queue=[], stepIdx=0, busy=false;
-  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r}); } }
 
   function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
+  function slotRank(si, team){
+    const my=Math.max(0, team.players[si].val+modSum(team.players[si]));
+    let better=0;
+    teams.forEach(o=>{ const n=Math.max(0,o.players[si].val+modSum(o.players[si])); if(n>my) better++; });
+    return better+1;
+  }
   function applyReveal(t,slot){
     const p=t.players[slot];
     const net=Math.max(0, p.val+modSum(p));
@@ -776,31 +933,125 @@
     teams.forEach(x=>x.prevRank=x.rank);
     recomputeRanksLive();
     teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    // Slot-Rang des Agenten + INKREMENTELLE Team-Platzveränderung dieses Slots (relativ zum
+    // Stand nach dem vorherigen Slot, nicht zum Startplatz) — via settled Rang-Historie
+    const prevR = slot>0 ? (t.rankHist[slot-1] ?? t.seasonRank) : t.seasonRank;
+    const nowR = t.rankHist[slot] ?? t.rank;
+    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: prevR - nowR };
+    updateRoundMedals(slot);
     return {player:p,net};
   }
-  function logRow(t,slot,res){
-    const p=res.player,net=res.net;
-    const delta=t.lastDelta;
-    let calc=`<span class="base">${p.val}</span>`;
-    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
-    calc+=` = <span class="net">+${net}</span>`;
-    const showDelta = delta!==0 && curSlot>0;
-    const rc = ampelColor(t.rank);
-    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
-    const dl = showDelta
-      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
-      : `<span class="dl same">${rankSpan}</span>`;
-    const row=document.createElement('div'); row.className='row';
-    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
-      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${ROLES[slot]}</span></div>
-      <div class="calc">${calc}</div></div>${dl}`;
-    const tk=document.getElementById('ticker');
-    if(tk.querySelector('.empty')) tk.innerHTML='';
-    tk.insertBefore(row,tk.firstChild);
-    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+  // --- Impact-Klassifikation (geteilte Logik, jede Diszi rendert das Tier anders) ---
+  let roundBest=null;     // bester Netto-Wert der laufenden Runde (teamübergreifend, inkl. KI)
+  let dayBest=null;       // bester Netto-Wert des ganzen Spieltags
+  // Tier-Budget pro Runde: „dosiert" wird zur Regel statt zum Gefühl
+  let tier2Budget=2, tier1Budget=4;
+  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; teams.forEach(t=>t.roundMedal=0); }
+  // Gold/Silber/Bronze = Top 3 der AKTUELLEN Runde (nach Runden-Netto, live pro Reveal aktualisiert)
+  function updateRoundMedals(round){
+    const withNet = teams.filter(t=> t.thrownSlot===round)
+      .map(t=>({t, net: Math.max(0, t.players[round].val+modSum(t.players[round]))}))
+      .sort((a,b)=> b.net-a.net || a.t.seasonRank-b.t.seasonRank);
+    teams.forEach(t=> t.roundMedal=0);
+    withNet.slice(0,3).forEach((o,idx)=> o.t.roundMedal=idx+1);
   }
-  // Flavor lines are role-specific (the role itself is shown once in the banner above the
-  // scene, so these deliberately avoid repeating the role name 32x — just varied verbs/imagery).
+  // Echtes Gesamtranking der Runde: Stand NACHDEM alle Teams ihren Slot dieser Runde addiert
+  // haben (deterministisch vorab berechenbar). Rang-Ereignisse triggern gegen die
+  // Endabrechnung der Runde, nicht gegen den flackernden Live-Rang im Cascade.
+  function computeRoundStandings(round){
+    const withAfter = teams.map(t=>{
+      let s=0; for(let k=0;k<=round;k++){ const p=t.players[k]; s+=Math.max(0, p.val+modSum(p)); }
+      return { t, after:s };
+    });
+    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
+    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; t.rankHist[round]=t.roundRankAfter; });
+  }
+  // Impact-Klassifikation → Tier + Ursache (Rang-Ereignis schlägt Einzelwert).
+  // Tier 2 = Spotlight+Wumms · Tier 1 = Ping+Glow+Chip · Tier 0 = still.
+  function noteReveal(t,slot,res,isMine){
+    const net=res.net, p=res.player;
+    const bonSum=p.mods.filter(m=>m.sign>0).reduce((s,m)=>s+m.amt,0);
+    const malSum=p.mods.filter(m=>m.sign<0).reduce((s,m)=>s+m.amt,0);
+    const injury=p.mods.some(m=>m.injury);
+    const delta=t.roundDelta;                      // Rangveränderung über die GANZE Runde (echtes Gesamtranking)
+    const prevBest = roundBest? roundBest.net : -1;
+    const newBest = net>prevBest;
+    if(newBest) roundBest={team:t,player:p,net,leg:ROLES[slot]};
+    if(!dayBest || net>dayBest.net) dayBest={team:t,player:p,net,leg:ROLES[slot]};
+    const leaderBefore=teams.find(x=>x.roundRankBefore===1);
+    const leaderChange = t.roundRankAfter===1 && leaderBefore && leaderBefore.code!==t.code;
+    const top3jump = (t.roundRankBefore>=6 && t.roundRankAfter<=3);
+
+    let cause='tick', tier=0, color='gold', text='';
+    if(injury){ cause='injury'; tier=2; color='red'; text=`−${malSum} Verletzung`; }
+    else if(p.val>=STAR_MIN){ cause='star'; tier=2; color='gold'; text=`⭐ Star · Wert ${p.val}`; }
+    else if(leaderChange){ cause='leader'; tier=2; color='gold'; text='neue Spitze · #1'; }
+    else if(top3jump){ cause='top3'; tier=2; color='violet'; text=`P${t.roundRankBefore} → P${t.roundRankAfter}`; }
+    else if(newBest){ cause='best'; tier=2; color='gold'; text=`#1 der Runde · ${net}`; }
+    else if(bonSum>=13 && net>p.val){ cause='push'; tier=1; color='cyan'; text=`+${bonSum} Push`; }
+    else if(delta>=3){ cause='climb'; tier=1; color='violet'; text=`▲${delta} Plätze`; }
+    else if(prevBest>0 && net>=prevBest*0.9){ cause='strong'; tier=1; color='gold'; text=`stark · ${net}`; }
+
+    // Budget nur für KI und nur für Nicht-Verletzungen (Verletzungen nie verschlucken)
+    if(!isMine && cause!=='injury'){
+      if(tier===2){ if(tier2Budget>0) tier2Budget--; else tier=1; }
+      if(tier===1){ if(tier1Budget>0) tier1Budget--; else tier=0; }
+    }
+    return { tier, cause, color, text, kind:cause, newBest, delta };
+  }
+  function causeKick(cause, mine){
+    const own = mine?'DEIN AGENT · ':'';
+    switch(cause){
+      case 'leader': return own+'Neue Spitze';
+      case 'top3':   return own+'Sprung in die Top 3';
+      case 'best':   return own+'Bestwert der Runde';
+      case 'injury': return own+'Verletzung';
+      case 'star':   return (mine?'DEIN STAR · ':'⭐ ')+'Star-Moment';
+      default:       return own+'Standout';
+    }
+  }
+  // Tier-2-Moment: Spotlight + Chip + farbiger Flash + Riser→Wumms (bzw. Thud bei Verletzung)
+  function fireLiveStandout(t,res,slot,impact){
+    const mine=t.mine;
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:ROLES[slot],
+                    kick:causeKick(impact.cause,mine), chip:{text:impact.text,color:impact.color} });
+    fireFlash(impact.color); shakeArena(impact.cause==='injury' ? true : !mine);
+    if(impact.cause==='injury'){ stumbleThud(mine?0.5:0.4); }
+    else if(impact.cause==='star'){ starSound(); crowdSwell(mine?0.4:0.28,0.5); setTimeout(()=>wummsSound(mine?1.25:1.1), 300); }
+    else { riser(); setTimeout(()=>wummsSound(mine?1.1:0.92), 260); }
+    startGlowLoop([t]); hotRow(t.code);
+  }
+  // wendet das entschiedene Tier an — Sounds NUR hier, nie beim stillen Tier-0-Vorstoß
+  function applyImpactFx(t,res,slot,impact){
+    if(impact.tier===2){ fireLiveStandout(t,res,slot,impact); }
+    else if(impact.tier===1){ risingPing(res.net); startGlowLoop([t]); hotRow(t.code); }
+    // Tier 0: nur der stille Vorstoß des Tokens, keine Sounds
+  }
+  function startGlowLoop(list){
+    const until=Date.now()+1500;
+    list.forEach(t=> t.roundGlowUntil=until);
+  }
+  // Podest am Ende der Disziplin: Top 3, Säulen steigen nacheinander auf
+  function showPodium(){
+    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank).slice(0,3);
+    const visual=[top3[1],top3[0],top3[2]]; const cls=['p2','p1','p3']; const place=[2,1,3];
+    const row=document.getElementById('podRow'); row.innerHTML='';
+    visual.forEach((t,idx)=>{ if(!t) return;
+      const col=document.createElement('div');
+      col.className='pod-col '+cls[idx]+(t.mine?' mine':'');
+      col.innerHTML=`<img class="pc-crest" src="${t.crest||crestURL(t,64)}" alt="">
+        <div class="pc-name">${(t.mine?'★ ':'')+(TEAM_NAMES[t.code]||t.code)}</div>
+        <div class="pc-pts">${Math.round(t.score)} Punkte</div>
+        <div class="pc-base">${place[idx]}</div>`;
+      row.appendChild(col);
+    });
+    document.getElementById('podium').classList.add('show');
+    fireFlash('gold');
+    const cols=[...row.children];
+    [2,0,1].forEach((ci,k)=> setTimeout(()=>{ if(cols[ci]) cols[ci].classList.add('in'); wummsSound(k===2?1.15:0.7); if(k===2) shakeArena(false); }, 300+k*440));
+  }
+
+  // Flavor lines are role-specific (cosmetic feed text only — no sound is tied to these)
   const FLAVOR={
     "Observer":{
       good:["{c} liest den Raum richtig","{c} merkt sich das Zittern der Hände","{c} entdeckt die Blickkontakte",
@@ -855,9 +1106,42 @@
     host.insertBefore(row,host.firstChild);
     while(host.children.length>8) host.removeChild(host.lastChild);
   }
+  function logRow(t,slot,res,impact){
+    const p=res.player,net=res.net;
+    let badge='';
+    if(impact){
+      const map={ star:['star','⭐ Star'], injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
+                  best:['standout','Rundenbestwert'], push:['push','Hart gepusht'], climb:['push','Aufholjagd'], strong:['standout','Stark'] };
+      const m=map[impact.cause];
+      if(m) badge=` <span class="impact-badge ${m[0]}">${m[1]}</span>`;
+    }
+    const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
+    let calc=`<span class="base">${p.val}</span>`;
+    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+    calc+=` = <span class="net">+${net}</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const sr = slotRank(slot,t);
+    const src = ampelColor(sr);
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${ROLES[slot]}</span> <span style="color:var(--mut);font-weight:600">· Slot-Rang <b${src?` style="color:${src}"`:''}>#${sr}</b></span>${badge}</div>
+      <div class="calc">${calc}</div></div>${dl}`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+  }
+  function clearMedals(){
+    teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
+  }
   function updateMyTracker(){
     const me=teams.find(t=>t.mine);
-    document.getElementById('myrank').textContent=slotRank(me);
+    document.getElementById('myrank').textContent=me.rank;
     const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
     const d = from - me.rank;
     const mv=document.getElementById('mymove');
@@ -866,49 +1150,37 @@
     else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
     else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
   }
+  // kurzer Hervorhebungs-Moment für den eigenen Agenten, auch ohne Tier-2 (Rahmen hat es eh)
+  function liteMineSpotlight(t,res,slot){
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:ROLES[slot], kick:'DEIN AGENT', chip:{text:`+${res.net}`, color:'gold'} });
+  }
+  function roundSummary(round){
+    const jumps = teams.map(t=>({t, d:(t.roundStartRank-t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
+    jumps.forEach(({t})=>{ t.roundHot=true; setTimeout(()=>{ t.roundHot=false; }, 1400); });
+    const panel=document.getElementById('roundsumPanel');
+    const line=document.getElementById('roundsumline');
+    if(!jumps.length){ panel.style.display='none'; return; }
+    const parts = jumps.map(({t,d})=> `${t.code} ▲${d} · ${t.players[round].name} ${Math.round(t.lastNet||0)}`);
+    line.textContent = `Runde ${round+1} — Größte Sprünge: ${parts.join(' · ')}`;
+    panel.style.display='';
+    jumps.forEach(({t})=> hotRow(t.code));
+    startGlowLoop(jumps.map(j=>j.t));
+  }
 
-  function triggerClash(t,slot,res,isMine){
+  function triggerClash(t,slot,res,isMine,impact){
     const feed=killFeedLine(t,slot,res);
     const {contactX,contactY}=startLunge(t,res.net,isMine);
-    // spark burst fires once the sigil actually reaches the contact point (mid-lunge)
     setTimeout(()=>{
       spawnSparks(contactX,contactY,feed.good);
       feedPops.push({x:contactX,y:contactY-12,life:1,text:feed.text,color:feed.good?'#8fe3a8':'#ff8a5c'});
-      whisperNoise(isMine?0.32:0.18);
-      unmaskThud(isMine?0.32:0.2);
     }, isMine?280:180);
     pushFeedPanel(feed.text,feed.good);
-    logRow(t,slot,res);
-    feedBlip(isMine?0.3:0.2, feed.good);
-    if(isMine){ revealStinger(0.42); diveCamera(t); }
+    logRow(t,slot,res,impact);
     positionLadder(false); hotRow(t.code); updateMyTracker();
     scorePop(res.net,isMine);
-  }
-
-  // Round-summary: once a full round (field cascade + own team) has revealed, flag the
-  // top-3 rank-jumpers of that round so their lane/banner flashes gold briefly.
-  function clearMedals(){
-    teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
-  }
-  const MEDAL_CLASSES=['rk-gold','rk-silver','rk-bronze'];
-  function roundSummary(){
-    const jumped = teams
-      .map(t=>({ t, d: t.roundStartRank - t.rank }))
-      .filter(x=>x.d>0)
-      .sort((a,b)=> b.d-a.d)
-      .slice(0,3);
-    jumped.forEach(({t},idx)=>{
-      t.roundHot=true; hotRow(t.code);
-      setTimeout(()=>{ t.roundHot=false; }, 1400);
-      const row=rowEls[t.code]; if(row) row.classList.add(MEDAL_CLASSES[idx]);
-    });
-    const panel=document.getElementById('roundsumPanel');
-    const line=document.getElementById('roundsumline');
-    if(!jumped.length){ panel.style.display='none'; return; }
-    const round=curSlot+1;
-    const parts = jumped.map(({t,d})=> `${t.code} ▲${d} · ${t.players[curSlot].name} ${Math.round(t.lastNet||0)}`);
-    line.textContent = `Runde ${round} — Größte Sprünge: ${parts.join(' · ')}`;
-    panel.style.display='';
+    if(isMine || impact.tier===2) diveCamera(t);
+    applyImpactFx(t,res,slot,impact);
+    if(isMine && impact.tier<2){ liteMineSpotlight(t,res,slot); }
   }
 
   function advance(){
@@ -917,27 +1189,30 @@
     busy=true; started=true;
     const q=queue[stepIdx];
     curSlot=q.round;
-    if(q.stage==='field'){ teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); }
-    if(q.stage==='field'){
-      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
-      let i=0;
-      const doOne=()=>{
-        if(i>=field.length){ endStage(); return; }
-        const t=field[i++];
-        const res=applyReveal(t,q.round);
-        triggerClash(t,q.round,res,false);
-        setTimeout(doOne, 65);
-      };
-      doOne();
-    } else {
-      const t=teams.find(x=>x.mine);
+    teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); resetRoundBest(); computeRoundStandings(q.round);
+    // EIN Durchlauf über ALLE 32 Agenten (schlechtestes zuerst) — eigener Agent an natürlicher
+    // Position, nicht separat ans Ende geschoben. Der beste Agent kommt automatisch zuletzt.
+    const order=teams.slice().sort((a,b)=> b.rank-a.rank);
+    let i=0;
+    const doOne=()=>{
+      if(i>=order.length){ endStage(q); return; }
+      const t=order[i++];
+      const isMine=t.mine;
       const res=applyReveal(t,q.round);
-      document.getElementById('status').textContent='★ Dein Agent enttarnt — Stinger';
-      triggerClash(t,q.round,res,true);
-      setTimeout(()=>{ roundSummary(); endStage(); }, 900);
-    }
+      const impact=noteReveal(t,q.round,res,isMine);
+      if(isMine) document.getElementById('status').textContent='★ Dein Agent enttarnt';
+      triggerClash(t,q.round,res,isMine,impact);
+      const delay = impact.tier===2 ? 1550 : isMine ? 750 : impact.tier===1 ? 260 : 90;
+      setTimeout(doOne, delay);
+    };
+    doOne();
   }
-  function endStage(){ stepIdx++; updateControls(); setTimeout(()=>busy=false, 160); }
+  function endStage(q){
+    roundSummary(q.round);
+    stepIdx++; updateControls();
+    if(stepIdx>=queue.length){ setTimeout(showPodium, 700); }
+    setTimeout(()=>busy=false, 200);
+  }
 
   function updateControls(){
     const btn=document.getElementById('advance');
@@ -948,26 +1223,32 @@
     document.getElementById('round').textContent=round;
     document.getElementById('slotbig').textContent=ROLES[q.round];
     document.getElementById('slotdesc').textContent=ROLE_DESC[ROLES[q.round]];
-    if(q.stage==='field'){ btn.textContent=`🕵 Feld ermittelt (${ROLES[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Ermittlung`; }
-    else { btn.textContent=`★ Dein Agent ermittelt (${ROLES[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Agent`; }
+    btn.textContent=`🕵 Feld ermittelt (${ROLES[q.round]})`;
+    document.getElementById('status').textContent=`Runde ${round}`;
   }
 
   function reset(){
     document.querySelector('.mytrack .lbl').textContent = 'Dein Agent · '+MINE+' · '+(TEAM_NAMES[MINE]||MINE);
     initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; started=false;
+    roundBest=null; dayBest=null; tier2Budget=2; tier1Budget=4;
     particles=[]; feedPops=[]; camera.zoom=1; camera.fx=W/2; camera.fy=H/2; camera.tzoom=1; camera.tfx=W/2; camera.tfy=H/2;
+    document.getElementById('spotlight').classList.remove('show','mine');
+    document.getElementById('podium').classList.remove('show');
+    document.getElementById('podRow').innerHTML='';
     buildLadder(); positionLadder(true);
     document.getElementById('ticker').innerHTML='<div class="empty">Noch nichts geschehen.</div>';
     document.getElementById('feedlist').innerHTML='<div class="empty">Noch kein Hinweis. Klick auf „Feld ermittelt".</div>';
     document.getElementById('roundsumPanel').style.display='none';
     document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
     document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
-    updateControls();
+    updateControls(); drawScene();
   }
 
   document.getElementById('advance').addEventListener('click',advance);
   document.getElementById('replay').addEventListener('click',reset);
-  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) feedBlip(0.3,true); });
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) risingPing(60); });
+  const mq=window.matchMedia('(prefers-color-scheme: dark)');
+  if(mq.addEventListener) mq.addEventListener('change',drawScene);
 
   reset();
   if(!raf) loop();

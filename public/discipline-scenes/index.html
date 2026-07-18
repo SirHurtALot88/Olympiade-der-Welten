@@ -1,8 +1,5 @@
 <!doctype html>
-<html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Disziplin-Szenen — Prototypen · Olympiade der Welten</title>
 <style>
   :root{ --bg:#12100c; --panel:#1c1812; --ink:#f3ebdf; --mut:#a1917c; --line:#2e2618; --accent:#e07a2b; }
@@ -14,55 +11,48 @@
   .sub{ color:var(--mut); font-size:14px; max-width:66ch; margin:0 0 8px; }
   h2{ font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); margin:26px 0 10px; }
   .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
-  .card{ display:flex; flex-direction:column; gap:8px; padding:16px; border-radius:14px; text-decoration:none;
-         background:var(--panel); border:1px solid var(--line); color:var(--ink); transition:border-color .15s, transform .06s; }
+  .card{ display:flex; flex-direction:column; gap:8px; padding:16px; border-radius:14px; text-decoration:none; background:var(--panel); border:1px solid var(--line); color:var(--ink); transition:border-color .15s, transform .06s; }
   .card:hover{ border-color:var(--accent); transform:translateY(-2px); }
-  .card .t{ font-weight:800; font-size:15px; }
-  .card .go{ font-size:12px; color:var(--accent); font-weight:700; }
-</style>
-</head>
-<body>
+  .card .t{ font-weight:800; font-size:15px; } .card .go{ font-size:12px; color:var(--accent); font-weight:700; }
+</style></head><body>
 <div class="wrap">
-  <p class="eyebrow">Prototypen · Reveal-Szenen</p>
+  <p class="eyebrow">Prototypen · Reveal-Szenen · alle 20</p>
   <h1>Disziplin-Szenen</h1>
-  <p class="sub">Interaktive Mockups für die Matchday-Darstellung jeder Disziplin. Grammatik überall gleich (Position = Punkte, 32 Teams), Optik pro Disziplin eigen. Klick dich durch und spiel jede Szene an.</p>
-  <p class="sub"><b>Staffel</b> trägt bereits den vollen Highlight-v2-Layer (Ursachen-Chips, Rang-Trigger, Wumms, Podest); die anderen zeigen ihre jeweilige Optik.</p>
+  <p class="sub">Alle 20 Disziplinen auf einheitlichem Kit-Stand: Position = Punkte, alle 32 Teams sichtbar, ehrliche Geometrien (Bahn / Türme / Feld …), Impact-v2 mit ⭐ Star-Tier, Rundensieger-Medaillen, Verletzung = 50 %, Startreihenfolge nach Vorsaison-Stärke. Optik pro Disziplin eigen.</p>
   <h2>Rennen / Strecke</h2>
 <div class="grid">
   <a class="card" href="./staffel-oval.html"><span class="t">Staffel — 400m-Oval</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./spurt-meute.html"><span class="t">Spurt — Meuten-Strecke</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./timetrial.html"><span class="t">Time Trial — Zeitfahren</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./spurt-v2.html"><span class="t">Spurt — Meuten-Strecke</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./timetrial-v2.html"><span class="t">Time Trial — Zeitfahren</span><span class="go">öffnen →</span></a>
 </div>
 <h2>Kraft / Körper</h2>
 <div class="grid">
-  <a class="card" href="./staffel-track.html"><span class="t">Gewichtheben — Hantelbahn</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./wettessen.html"><span class="t">Wettessen — Gelage</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./minidm.html"><span class="t">Mini-DM — Grube</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./gewichtheben-v2.html"><span class="t">Gewichtheben — Türme</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./wettessen-tafel.html"><span class="t">Wettessen — Die Lange Tafel</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./minidm-v2.html"><span class="t">Mini-DM — Die Grube</span><span class="go">öffnen →</span></a>
 </div>
 <h2>Ballsport</h2>
 <div class="grid">
-  <a class="card" href="./basketball-skyline-v2.html"><span class="t">Basketball — Skyline (Türme)</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./football.html"><span class="t">Football — Drives</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./hockey.html"><span class="t">Hockey — Eis</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./tennis.html"><span class="t">Tennis — Match</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./basketball-skyline-v2.html"><span class="t">Basketball — Skyline</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./football-v2.html"><span class="t">Football — Das Feld</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./hockey-v2.html"><span class="t">Hockey — Das Eis</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./tennis-v2.html"><span class="t">Tennis — Match</span><span class="go">öffnen →</span></a>
 </div>
 <h2>Kampf / Taktik</h2>
 <div class="grid">
-  <a class="card" href="./tdm-etagen.html"><span class="t">TDM — Etagen</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./battlefield.html"><span class="t">Battlefield — Schlacht</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./fechten-focus.html"><span class="t">Fechten — Planche-Duell (Focus+Context)</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./schach-halle.html"><span class="t">Speed-Schach — Bauernmarsch</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./breakingpoint.html"><span class="t">Breaking Point — Kessel</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./tdm-etagen-v2.html"><span class="t">TDM — Etagen</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./battlefield-v2.html"><span class="t">Battlefield — Schlacht</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./fechten-v2.html"><span class="t">Fechten — Pisten</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./schach-v2.html"><span class="t">Speed-Schach — Bauernmarsch</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./breakingpoint-v2.html"><span class="t">Breaking Point — Kessel</span><span class="go">öffnen →</span></a>
 </div>
 <h2>Geschick / Show</h2>
 <div class="grid">
-  <a class="card" href="./climbing.html"><span class="t">Climbing — Wand</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./eiskunstlauf.html"><span class="t">Eiskunstlauf — Kür</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./showcase-buehne.html"><span class="t">Showcase — Ruhmtreppe</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./takeshi-elim.html"><span class="t">Takeshi — Elimination</span><span class="go">öffnen →</span></a>
-  <a class="card" href="./ispy.html"><span class="t">I-Spy — Enttarnung</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./climbing-v2.html"><span class="t">Climbing — Die Wand</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./eiskunstlauf-v2.html"><span class="t">Eiskunstlauf — Kür</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./showcase-v2.html"><span class="t">Showcase — Ruhmtreppe</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./takeshi-v2.html"><span class="t">Takeshi — Parcours</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./ispy-v2.html"><span class="t">I-Spy — Enttarnung</span><span class="go">öffnen →</span></a>
 </div>
 
-</div>
-</body>
-</html>
+</div></body></html>

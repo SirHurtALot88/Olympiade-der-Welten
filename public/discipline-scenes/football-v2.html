@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Football — Die Drives · Olympiade der Welten</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#eef1ee; --panel:#fffdfb; --ink:#161c18; --mut:#6b756d; --line:#dde4de;
+    --track-0:#0e3d1e; --track-1:#155229; --track-2:#1c6b35; --lane-line:#f3ece0; --leather:#8c5a2c;
+    --accent:#1c6b35; --accent-soft:#2f9350; --gold:#e8c04a;
+    --up:#2fa564; --down:#d9503f; --ghost:#9fb3a4;
+    --shadow:0 20px 54px -26px rgba(20,28,24,.5); color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0b0f0c; --panel:#141a15; --ink:#eaf1eb; --mut:#8c988e; --line:#26302a;
+           --track-0:#06210f; --track-1:#0c3319; --track-2:#134523; --lane-line:#d6cbb8; --leather:#c9915a;
+           --shadow:0 24px 64px -30px rgba(0,0,0,.8); color-scheme:dark; }
+  }
+  :root[data-theme="light"]{ --bg:#eef1ee; --panel:#fffdfb; --ink:#161c18; --mut:#6b756d; --line:#dde4de;
+    --track-0:#0e3d1e; --track-1:#155229; --track-2:#1c6b35; --lane-line:#f3ece0; --leather:#8c5a2c; --shadow:0 20px 54px -26px rgba(20,28,24,.5); color-scheme:light; }
+  :root[data-theme="dark"]{ --bg:#0b0f0c; --panel:#141a15; --ink:#eaf1eb; --mut:#8c988e; --line:#26302a;
+    --track-0:#06210f; --track-1:#0c3319; --track-2:#134523; --lane-line:#d6cbb8; --leather:#c9915a; --shadow:0 24px 64px -30px rgba(0,0,0,.8); color-scheme:dark; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1240px; margin:0 auto; padding:clamp(16px,3vw,34px); }
+  .cardhead{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .eyebrow{ font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:800; margin:0 0 6px; }
+  h1{ font-family:Georgia,"Times New Roman",serif; font-style:italic; font-weight:700; font-size:clamp(26px,4.6vw,44px); line-height:.98; margin:0; letter-spacing:-.01em; }
+  .sub{ font-size:13px; color:var(--mut); margin-top:7px; max-width:76ch; } .sub b{ color:var(--ink); }
+  .headmeta{ text-align:right; font-size:12.5px; color:var(--mut); } .headmeta b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .arena{ position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--track-0); box-shadow:var(--shadow); }
+  .arena canvas{ display:block; width:100%; height:auto; cursor:crosshair; }
+  .mytrack{ position:absolute; top:12px; left:14px; z-index:3; background:rgba(9,15,10,.66); border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:9px 13px; backdrop-filter:blur(6px); color:#eef5ee; max-width:250px; }
+  .mytrack .lbl{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#bfe0c4; font-weight:800; }
+  .mytrack .rk{ display:flex; align-items:baseline; gap:8px; margin-top:1px; }
+  .mytrack .rk .now{ font-family:Georgia,serif; font-weight:700; font-size:34px; line-height:.9; font-variant-numeric:tabular-nums; }
+  .mytrack .rk .of{ font-size:12px; color:#c3d6c6; }
+  .mytrack .mv{ font-size:11.5px; font-weight:800; margin-top:1px; font-variant-numeric:tabular-nums; min-height:14px; }
+  .mytrack .mv.up{ color:#66e29b; } .mytrack .mv.down{ color:#ff8a7a; } .mytrack .mv.same{ color:#c9d6cb; }
+  .mytrack .pts{ font-size:12px; font-weight:800; color:#eef5ee; font-variant-numeric:tabular-nums; margin-top:1px; }
+  .mytrack .pts .plus{ color:#66e29b; }
+  .mytrack .now-split{ font-size:10.5px; color:#cbb08a; margin-top:3px; }
+  .scorepop{ position:absolute; z-index:4; font-family:Georgia,serif; font-weight:800; font-size:26px; color:var(--gold); text-shadow:0 3px 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; left:50%; top:50%; }
+  .liveflag{ position:absolute; top:12px; right:13px; z-index:3; display:flex; align-items:center; gap:7px; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#eef5ee; background:rgba(9,15,10,.6); border:1px solid rgba(255,255,255,.14); padding:6px 11px; border-radius:99px; }
+  .liveflag .pip{ width:8px; height:8px; border-radius:50%; background:#ff6a4a; box-shadow:0 0 9px #ff6a4a; animation:pulse 1.1s infinite; }
+  @keyframes pulse{ 50%{ opacity:.35; } }
+
+  .hovercard{ position:fixed; left:0; top:0; z-index:9999; pointer-events:none; width:270px; max-width:80vw;
+              background:rgba(9,15,10,.94); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:11px 13px;
+              color:#eef5ee; box-shadow:0 14px 34px -12px rgba(0,0,0,.65); opacity:0;
+              transform:translate(-9999px,-9999px); transition:opacity .12s ease; }
+  .hovercard.show{ opacity:1; }
+  .hc-head{ display:flex; align-items:center; gap:9px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.14); }
+  .hc-crest{ width:32px; height:32px; border-radius:50%; flex:none; display:block; }
+  .hc-id{ flex:1; min-width:0; }
+  .hc-code{ font-weight:800; font-size:13px; }
+  .hc-name{ font-size:11.5px; color:#c3d6c6; }
+  .hc-stats{ text-align:right; flex:none; }
+  .hc-rank{ font-family:Georgia,serif; font-weight:700; font-size:18px; line-height:1; }
+  .hc-rank .of{ font-size:10px; color:#adc4b5; font-weight:600; margin-left:2px; font-family:system-ui; }
+  .hc-pts{ font-size:11px; color:#c3d6c6; margin-top:2px; }
+  .hc-slots{ max-height:230px; overflow-y:auto; }
+  .hc-slots .row{ padding:6px 0; border-bottom:1px solid rgba(255,255,255,.10); }
+  .hc-slots .row:last-child{ border-bottom:0; }
+  .hc-slots .av{ width:22px; height:22px; font-size:9px; }
+  .hc-slots .body .nm{ font-size:11.5px; color:#eef5ee; }
+  .hc-slots .body .calc{ font-size:10.5px; }
+  .hc-slots .body .calc .base{ color:#eef5ee; }
+  .hc-empty{ font-size:11.5px; font-style:italic; color:#adc4b5; padding:2px 0; }
+
+  .clickbar{ margin-top:12px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:12px 16px; box-shadow:var(--shadow); }
+  .clickbar .step{ font-size:12.5px; color:var(--mut); } .clickbar .step b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .cta{ font:inherit; font-weight:800; font-size:14.5px; cursor:pointer; border:0; color:#fff; background:linear-gradient(180deg,var(--accent-soft),var(--accent)); padding:11px 22px; border-radius:11px; box-shadow:0 8px 20px -8px rgba(28,107,53,.7); transition:transform .06s, filter .15s; }
+  .cta:hover{ filter:brightness(1.06); } .cta:active{ transform:translateY(1px); }
+  .cta:disabled{ background:var(--line); color:var(--mut); box-shadow:none; cursor:default; }
+  .cta.small{ background:transparent; color:var(--ink); border:1px solid var(--line); box-shadow:none; font-size:13px; padding:9px 15px; }
+  .cta.small:hover{ border-color:var(--accent); color:var(--accent); }
+  .prog{ flex:1; min-width:110px; height:8px; border-radius:99px; background:var(--line); overflow:hidden; }
+  .prog i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent-soft),var(--accent)); transition:width .3s; }
+
+  .side{ margin-top:14px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 17px; box-shadow:var(--shadow); }
+  .panel h2{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); font-weight:800; margin:0 0 11px; }
+  .math{ font-variant-numeric:tabular-nums; }
+  .math .row{ display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px solid var(--line); } .math .row:last-child{ border-bottom:0; }
+  .math .av{ width:30px; height:30px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff; }
+  .math .body{ flex:1; min-width:0; } .math .body .nm{ font-weight:700; font-size:13px; }
+  .math .body .calc{ font-size:12px; color:var(--mut); }
+  .math .body .calc .base{ color:var(--ink); font-weight:700; } .math .body .calc .mal{ color:var(--down); font-weight:700; } .math .body .calc .bon{ color:var(--up); font-weight:700; } .math .body .calc .net{ color:var(--accent); font-weight:800; }
+  .math .dl{ font-weight:800; font-size:13px; flex:none; } .math .dl.up{ color:var(--up); } .math .dl.down{ color:var(--down); } .math .dl.same{ color:var(--mut); }
+  .empty{ color:var(--mut); font-size:12.5px; font-style:italic; }
+  .round-summary{ margin:0 0 10px; padding:9px 12px; border-radius:10px; font-size:12px; font-weight:700; line-height:1.45;
+                   background:color-mix(in srgb,var(--gold) 18%, var(--panel)); border:1.5px solid var(--gold); color:var(--ink); }
+  .round-summary b{ color:var(--accent); }
+  .slotrank{ color:var(--mut); font-weight:600; }
+  .slotrank b{ color:var(--accent); }
+  .foot{ margin-top:16px; font-size:12px; color:var(--mut); max-width:86ch; } .foot b{ color:var(--ink); }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--mut); } .legend span{ display:inline-flex; align-items:center; gap:6px; } .legend .sw{ width:12px; height:12px; border-radius:3px; }
+  .impact-badge{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .impact-badge.standout{ background:color-mix(in srgb,var(--gold) 24%, transparent); color:#8a6415; }
+  .impact-badge.star{ background:linear-gradient(90deg,#f4d876,#e8c04a); color:#3a2600; box-shadow:0 0 8px -1px rgba(232,192,74,.7); }
+  .impact-badge.push{ background:color-mix(in srgb,var(--up) 20%, transparent); color:#1f8a54; }
+  .impact-badge.injury{ background:color-mix(in srgb,var(--down) 20%, transparent); color:#c23c2c; }
+
+  @keyframes arenashake{ 0%,100%{transform:translate(0,0);} 15%{transform:translate(-5px,3px);} 30%{transform:translate(4px,-4px);}
+                         45%{transform:translate(-4px,-2px);} 60%{transform:translate(3px,3px);} 75%{transform:translate(-2px,2px);} }
+  .arena.shake{ animation:arenashake .42s ease; }
+  .arena.shake-soft{ animation:arenashake .3s ease; }
+  .flashfx{ position:absolute; inset:0; z-index:5; pointer-events:none; opacity:0; }
+  .flashfx.gold{ background:radial-gradient(circle at 50% 42%, rgba(232,192,74,.5), transparent 60%); }
+  .flashfx.red{ background:radial-gradient(circle at 50% 50%, rgba(217,80,63,.48), transparent 62%); }
+  .flashfx.violet{ background:radial-gradient(circle at 50% 46%, rgba(160,110,232,.48), transparent 62%); }
+  .flashfx.cyan{ background:radial-gradient(circle at 50% 46%, rgba(80,200,210,.44), transparent 62%); }
+  .flashfx.fire{ animation:flashpop .5s ease; }
+  @keyframes flashpop{ 0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;} }
+
+  .spotlight{ position:absolute; left:50%; top:46%; transform:translate(-50%,-50%) scale(.8); z-index:6;
+              display:flex; align-items:center; gap:16px; padding:16px 22px 16px 16px; border-radius:18px;
+              background:rgba(9,15,10,.85); border:1.5px solid rgba(232,192,74,.7); backdrop-filter:blur(8px);
+              box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 40px -8px rgba(232,192,74,.5);
+              color:#eef5ee; opacity:0; pointer-events:none; min-width:min(78%,420px); }
+  .spotlight.mine{ border-color:rgba(217,72,47,.9); box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 46px -6px rgba(217,72,47,.6); }
+  .spotlight.show{ animation:spotpop 2.7s cubic-bezier(.2,1.05,.3,1) forwards; }
+  @keyframes spotpop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.72);} 9%{opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+                      16%{transform:translate(-50%,-50%) scale(1);} 88%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+                      100%{opacity:0; transform:translate(-50%,-52%) scale(.98);} }
+  .spotlight .sp-crest{ width:64px; height:64px; border-radius:50%; flex:none; box-shadow:0 0 0 3px rgba(232,192,74,.6); }
+  .spotlight .sp-body{ flex:1; min-width:0; }
+  .spotlight .sp-kick{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:#f0c866; }
+  .spotlight.mine .sp-kick{ color:#f19a72; }
+  .spotlight .sp-name{ font-family:Georgia,serif; font-weight:700; font-size:22px; line-height:1.05; margin-top:1px; }
+  .spotlight .sp-sub{ font-size:12px; color:#c3d6c6; margin-top:2px; }
+  .spotlight .sp-net{ font-family:Georgia,serif; font-weight:800; font-size:40px; color:#e8c04a; flex:none; text-shadow:0 3px 14px rgba(0,0,0,.6); }
+  .spotlight .sp-chip{ display:none; margin-top:7px; font-size:11px; font-weight:800; letter-spacing:.03em; padding:2px 10px; border-radius:99px; }
+
+  .podium{ position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+           padding:0 20px 46px; gap:14px; background:linear-gradient(180deg, rgba(9,15,10,.12), rgba(9,15,10,.76));
+           opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  .podium.show{ opacity:1; }
+  .podium .pod-kick{ position:absolute; top:26px; left:0; right:0; text-align:center; color:#f0c866; font-weight:800;
+                     font-size:12px; letter-spacing:.18em; text-transform:uppercase; }
+  .podium .pod-title{ position:absolute; top:44px; left:0; right:0; text-align:center; color:#eef5ee;
+                      font-family:Georgia,serif; font-style:italic; font-size:26px; }
+  .podium .pod-row{ display:flex; align-items:flex-end; gap:12px; }
+  .pod-col{ display:flex; flex-direction:column; align-items:center; gap:8px; opacity:0; transform:translateY(24px); }
+  .pod-col.in{ animation:podrise .6s cubic-bezier(.2,1.1,.3,1) forwards; }
+  @keyframes podrise{ to{ opacity:1; transform:translateY(0); } }
+  .pod-col .pc-crest{ width:60px; height:60px; border-radius:50%; box-shadow:0 6px 18px -6px rgba(0,0,0,.7); }
+  .pod-col .pc-name{ color:#eef5ee; font-weight:800; font-size:13px; text-align:center; max-width:120px; line-height:1.15; }
+  .pod-col .pc-pts{ color:#c3d6c6; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .pod-col .pc-base{ width:104px; border-radius:10px 10px 0 0; display:grid; place-items:start center; padding-top:8px;
+                     font-family:Georgia,serif; font-weight:800; font-size:28px; color:#161c18; }
+  .pod-col.p1 .pc-base{ height:132px; background:linear-gradient(180deg,#f4d876,#e8c04a); }
+  .pod-col.p2 .pc-base{ height:100px; background:linear-gradient(180deg,#e2e5ea,#c8ccd4); }
+  .pod-col.p3 .pc-base{ height:76px;  background:linear-gradient(180deg,#e0a765,#cd7f32); }
+  .pod-col.mine .pc-name{ color:#f19a72; }
+
+  @media (prefers-reduced-motion: reduce){ *{ animation:none!important; } .arena.shake,.arena.shake-soft{ animation:none; }
+    .spotlight.show{ animation:none; opacity:1; } .flashfx.fire{ animation:none; } .pod-col.in{ animation:none; opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <div class="cardhead">
+    <div>
+      <p class="eyebrow">Disziplin · 32 Teams · Yard-Feld</p>
+      <h1>Football</h1>
+      <div class="sub">32 Teams treiben gemeinsam auf <b>demselben überlangen Feld</b> — <b>alle 32 bleiben durchgehend sichtbar</b>, keine Auswahl, kein Ausscheiden. Das Feld hat <b>5 Downs</b> (Line Power, Route Burst, Field Read, Red Zone, Locker Leader). Pro Runde spielt das <b>ganze Feld</b> gemeinsam einen Down — der Ball rückt vor: Spielwert − Mali + Boni = <b>Netto-Yards</b>, der Drive wächst. <b>Yard-Position auf dem Feld = kumulierte Punkte</b> — wer am weitesten treibt, führt. Die Skala wächst dynamisch mit dem Spitzenreiter mit.</div>
+    </div>
+    <div class="headmeta">Down <b id="slotlbl">1</b> · <b id="slotcode">Line Power</b><br>von 5<br>Rang → Yards</div>
+  </div>
+
+  <div class="arena">
+    <canvas id="track" width="1200" height="772"></canvas>
+    <div class="mytrack">
+      <div class="lbl">Dein Team · <span id="mytrackname">Mayhem Mavericks (M-M)</span></div>
+      <div class="rk"><span class="now" id="myrank">–</span><span class="of">/ 32</span></div>
+      <div class="pts" id="mypts">0 yds</div>
+      <div class="mv same" id="mymove">bereit</div>
+      <div class="now-split" id="mysplit"></div>
+    </div>
+    <div class="scorepop" id="pop">+0</div>
+    <div class="liveflag"><span class="pip"></span> <span id="status">Aufstellung</span></div>
+    <div class="flashfx gold" id="flashGold"></div>
+    <div class="flashfx red" id="flashRed"></div>
+    <div class="flashfx violet" id="flashViolet"></div>
+    <div class="flashfx cyan" id="flashCyan"></div>
+    <div class="spotlight" id="spotlight">
+      <img class="sp-crest" id="spCrest" alt="">
+      <div class="sp-body">
+        <div class="sp-kick" id="spKick">Moment der Runde</div>
+        <div class="sp-name" id="spName"></div>
+        <div class="sp-sub" id="spSub"></div>
+        <div class="sp-chip" id="spChip"></div>
+      </div>
+      <div class="sp-net" id="spNet"></div>
+    </div>
+    <div class="podium" id="podium">
+      <div class="pod-kick">Disziplin gewertet</div>
+      <div class="pod-title">Das Podest</div>
+      <div class="pod-row" id="podRow"></div>
+    </div>
+  </div>
+  <div class="hovercard" id="hovercard">
+    <div class="hc-head">
+      <img class="hc-crest" id="hcCrest" alt="">
+      <div class="hc-id">
+        <div class="hc-code" id="hcCode"></div>
+        <div class="hc-name" id="hcName"></div>
+      </div>
+      <div class="hc-stats">
+        <div class="hc-rank"><span id="hcRank"></span></div>
+        <div class="hc-pts" id="hcPts"></div>
+      </div>
+    </div>
+    <div class="hc-slots math" id="hcSlots"></div>
+  </div>
+
+  <div class="clickbar">
+    <button class="cta" id="advance">▶ Feld spielt Down 1 (Line Power)</button>
+    <div class="prog"><i id="progfill"></i></div>
+    <div class="step">Schritt <b id="stepnum">0</b> / 5</div>
+    <button class="cta small" id="replay">↻ Neu</button>
+    <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--accent)"></span> dein Drive (M-M)</span>
+    <span><span class="sw" style="background:var(--gold)"></span> gerade gespielt / Impact</span>
+    <span><span class="sw" style="background:var(--leather);border-radius:2px"></span> Marker = Stand nach jedem Down (rot = Mali-Play)</span>
+    <span><span class="sw" style="background:#e8c04a;border-radius:50%"></span> Gold = Down-Sieger</span>
+    <span><span class="sw" style="background:#c8ccd4;border-radius:50%"></span> Silber = 2. Platz</span>
+    <span><span class="sw" style="background:#cd7f32;border-radius:50%"></span> Bronze = 3. Platz</span>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>Drive-Log — warum die Yards wachsen</h2>
+      <div class="math" id="ticker"><div class="empty">Noch kein Snap gespielt. Klick auf „Feld spielt".</div></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>Was hier echt ist:</b> 32 Teams, 5 Down-Slots (Line Power … Locker Leader), pro Down ein direkter Spielwert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen einen Down stärker/schwächer, aber der Drive wird nur <b>länger</b>, nie kürzer (kein Raumverlust). Verletzungen kosten die Hälfte des Grundwerts. Startreihenfolge vor Down 1 ist die <b>Vorsaison-Kaderstärke</b>. Jede Spur zeigt links den Live-Rang; die Hovercard zeigt je Down den Slot-Rang mit ▲/▼-Delta zur Vorrunde. Gold/Silber/Bronze-Ringe = die drei größten Down-Netto-Werte der laufenden Runde. Die letzten Yards vor der Endzone glühen als <b>Red Zone</b>. Wappen als Helm-Logo stellvertretend. Fahr mit der Maus über einen Drive für Details.
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---------- RNG (Kit 1:1) ----------
+  let _s=0x9e3779b9;
+  function rnd(){ _s^=_s<<13; _s^=_s>>>17; _s^=_s<<5; _s>>>=0; return _s/4294967296; }
+  function ri(a,b){ return a+Math.floor(rnd()*(b-a+1)); }
+  function pick(a){ return a[Math.floor(rnd()*a.length)]; }
+
+  const CODES=["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
+               "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
+  const MINE="M-M";
+  const STAR_MIN=80; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
+  const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
+  const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
+                 "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
+                 "Halla","Juno","Ryk","Senn","Uma","Brox","Cael","Doran","Efa","Gale","Hexe","Iven"];
+
+  function hueFor(i){ return Math.round((i*360/32 + (i%3)*11)) % 360; }
+  const teams = CODES.map((code,i)=>{
+    const mine = code===MINE;
+    const h = hueFor(i);
+    return { code, i, mine,
+      color: mine ? "#d9482f" : `hsl(${h} 55% 50%)`,
+      accent: mine ? "#eaf1eb" : `hsl(${(h+150)%360} 60% 78%)`,
+      motif: i%4,
+      score:0, prevScore:0, roundStartScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
+      thrownSlot:-1, crest:null, legHistory:[], reveals:[], roundMedal:0 };
+  });
+
+  // ---- procedural team crest (Kit 1:1) ----
+  function paintCrest(c2, cx, cy, r, t, withLetter){
+    c2.save();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2); c2.closePath(); c2.clip();
+    c2.fillStyle=t.color; c2.fillRect(cx-r,cy-r,r*2,r*2);
+    c2.fillStyle=t.accent; c2.globalAlpha=.9;
+    if(t.motif===0){ c2.fillRect(cx-r,cy-r*0.28,r*2,r*0.56); }
+    else if(t.motif===1){ c2.beginPath(); c2.moveTo(cx-r,cy-r); c2.lineTo(cx+r,cy-r); c2.lineTo(cx-r,cy+r); c2.closePath(); c2.fill(); }
+    else if(t.motif===2){ c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx+r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill();
+                          c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx-r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill(); }
+    else { c2.beginPath(); c2.arc(cx,cy,r*0.58,0,Math.PI*2); c2.fill(); }
+    c2.globalAlpha=1;
+    c2.restore();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2);
+    c2.lineWidth = t.mine ? Math.max(2,r*0.16) : Math.max(1.5,r*0.11);
+    c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
+    if(withLetter){
+      const label = t.code.replace('-','');
+      c2.fillStyle="#fff"; c2.textAlign="center"; c2.textBaseline="middle";
+      c2.font=`800 ${Math.round(r*(label.length>1?0.62:0.9))}px system-ui`;
+      c2.shadowColor="rgba(0,0,0,.5)"; c2.shadowBlur=2;
+      c2.fillText(label, cx, cy+0.5);
+      c2.shadowBlur=0; c2.textBaseline="alphabetic";
+    }
+  }
+  function crestURL(t,size){
+    const oc=document.createElement('canvas'); oc.width=oc.height=size;
+    const o=oc.getContext('2d'); paintCrest(o,size/2,size/2,size/2-1,t,true);
+    return oc.toDataURL();
+  }
+
+  // ---- modifiers (Kit 1:1) ----
+  const MODS = [
+    {k:null,         w:40},
+    {k:"Fatigue",    w:15, sign:-1, min:6,  max:20},
+    {k:"Captain",    w:9,  sign:+1, min:4,  max:11},
+    {k:"Mutator",    w:11, sign:+1, min:5,  max:14},
+    {k:"Push",       w:11, sign:+1, min:5,  max:16},
+    {k:"Team-Bonus", w:10, sign:+1, min:3,  max:9},
+    {k:"Verletzung", w:4,  sign:-1, min:12, max:26, injury:true},
+  ];
+  const MODW = MODS.reduce((s,m)=>s+m.w,0);
+  function rollMod(){
+    let r=rnd()*MODW;
+    for(const m of MODS){ if((r-=m.w)<0){ if(!m.k)return null; return {k:m.k,sign:m.sign,amt:ri(m.min,m.max),injury:!!m.injury}; } }
+    return null;
+  }
+  // 0–2 stacked modifiers per player
+  function rollMods(){
+    const out=[]; const n = rnd()<0.34?0 : rnd()<0.78?1 : 2;
+    const seen=new Set();
+    for(let j=0;j<n;j++){ const m=rollMod(); if(m && !seen.has(m.k)){ seen.add(m.k); out.push(m); } }
+    return out;
+  }
+  function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
+  function genPlayers(t){
+    const base = t.mine ? [76,70,64,60,55] : null;
+    const arr=[];
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(46,92);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
+    return arr;
+  }
+  function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
+  function initData(){
+    _s=0x51ed270b;
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst).
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
+    teams.forEach(t=>{ t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1;
+      t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0; t.legHistory=[]; t.reveals=[]; });
+  }
+  // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral
+  function ampelColor(rank){
+    if(rank<=3) return '#2fa564';
+    if(rank<=6) return '#d9a441';
+    if(rank<=10) return '#d9503f';
+    return '';
+  }
+  function recomputeRanksLive(){
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank);
+    order.forEach((t,idx)=> t.rank=idx+1);
+  }
+
+  // ---------- Yard-Feld (überlange Football-Bahn, alle 32 Spuren, Optik-Referenz) ----------
+  const cv=document.getElementById('track'), ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const TOP=104,BOT=16,PAD_L=138,PAD_R=58;
+  const trackTop=TOP, trackH=H-TOP-BOT, laneH=trackH/32;
+  const trackLeft=PAD_L, trackRight=W-PAD_R, trackW=trackRight-trackLeft;
+  const PERLEG=96;
+  const REDZONE_FRAC=0.8; // letzte 20 % der aktuellen Skala = Red Zone
+  function axisMax(){ const lead=teams.reduce((m,t)=>Math.max(m,t.score),0); return Math.max(PERLEG*0.6, lead/0.9); }
+  function scoreX(s){ return trackLeft + (s/axisMax())*trackW; }
+  function laneY(l){ return trackTop + laneH*l + laneH/2; }
+  const rs={}; teams.forEach(t=> rs[t.code]={ax:trackLeft, glow:0, stumble:0, hi:0});
+  const hitboxes={};
+
+  function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
+  function hatch(x0,w){
+    ctx.save(); ctx.beginPath(); ctx.rect(x0,trackTop,w,trackH); ctx.clip();
+    ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=2;
+    for(let x=x0-trackH;x<x0+w;x+=8){ ctx.beginPath(); ctx.moveTo(x,trackTop); ctx.lineTo(x+trackH,trackTop+trackH); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawTrack(){
+    ctx.clearRect(0,0,W,H);
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,cssv('--track-2','#1c6b35')); g.addColorStop(1,cssv('--track-0','#0e3d1e')); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(0,0,0,.18)'; ctx.fillRect(0,trackTop,PAD_L-6,trackH);
+    // Rasen-Mähstreifen (Optik-Ref)
+    ctx.save(); ctx.beginPath(); ctx.rect(trackLeft,trackTop,trackW,trackH); ctx.clip();
+    ctx.fillStyle='rgba(0,0,0,.05)';
+    for(let x=trackLeft-((trackLeft)%46); x<trackRight; x+=46){ ctx.fillRect(x,trackTop,23,trackH); }
+    ctx.restore();
+    teams.forEach((t,l)=>{ const y0=trackTop+laneH*l;
+      if(t.mine){ ctx.fillStyle='rgba(47,147,80,.22)'; ctx.fillRect(0,y0,W,laneH); }
+      else if(l%2===0){ ctx.fillStyle='rgba(255,255,255,.03)'; ctx.fillRect(trackLeft,y0,trackW,laneH); }
+      ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(trackLeft,y0+laneH); ctx.lineTo(trackRight+PAD_R*0.5,y0+laneH); ctx.stroke();
+    });
+    // Red Zone Glow — letztes Stück der dynamischen Skala
+    const axMax=axisMax();
+    const rzX=scoreX(axMax*REDZONE_FRAC);
+    const rz=ctx.createLinearGradient(rzX,0,trackRight,0); rz.addColorStop(0,'rgba(217,72,47,0)'); rz.addColorStop(1,'rgba(217,72,47,.22)');
+    ctx.fillStyle=rz; ctx.fillRect(rzX,trackTop,trackRight-rzX,trackH);
+    ctx.fillStyle='rgba(255,138,122,.6)'; ctx.font='800 10px system-ui'; ctx.textAlign='center'; ctx.fillText('RED ZONE', (rzX+trackRight)/2, trackTop+14);
+    // Yard-Linien alle 10, fett alle 20 (Kreide-Optik)
+    const ll=cssv('--lane-line','#f3ece0');
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.font='700 9px system-ui'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.35)';
+    for(let yd=10; yd<axMax; yd+=10){ const x=scoreX(yd); const bold=(yd%20===0);
+      ctx.lineWidth=bold?1.6:1; ctx.globalAlpha=bold?.5:.25;
+      ctx.beginPath(); ctx.moveTo(x,trackTop); ctx.lineTo(x,trackTop+trackH); ctx.stroke();
+      if(bold){ ctx.globalAlpha=.55; ctx.fillText(String(yd), x, trackTop-6); }
+    }
+    ctx.globalAlpha=1; ctx.restore();
+    // First-Down-Ketten an den Down-Grenzen (Leder-Akzent)
+    for(let k=1;k<5;k++){ const x=scoreX(PERLEG*k); hatch(x-5,10);
+      ctx.fillStyle=cssv('--leather','#8c5a2c'); ctx.font='700 10px system-ui'; ctx.textAlign='center'; ctx.fillText('1st Down '+k, x, trackTop-20); }
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='800 10px system-ui'; ctx.textAlign='center';
+    for(let k=0;k<5;k++){ const xc=scoreX(PERLEG*(k+0.5)); ctx.fillText('DOWN '+(k+1), xc, trackTop-34); }
+    // eigene Torlinie (Start)
+    ctx.strokeStyle=ll; ctx.globalAlpha=.6; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(trackLeft,trackTop); ctx.lineTo(trackLeft,trackTop+trackH); ctx.stroke(); ctx.globalAlpha=1;
+
+    teams.forEach((t,l)=>{
+      const y=laneY(l);
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.font=t.mine?'800 13px system-ui':'700 12px system-ui'; ctx.fillStyle=t.mine?'#fff':'rgba(255,255,255,.9)';
+      ctx.fillText('#'+t.rank, 8, y);
+      const d=(curSlot>0)?(t.roundStartRank-t.rank):0;
+      if(d!==0){ ctx.font='800 10px system-ui'; ctx.fillStyle=d>0?'#66e29b':'#ff8a7a'; ctx.fillText((d>0?'▲':'▼')+Math.abs(d), 40, y); }
+      ctx.font=t.mine?'800 12px system-ui':'600 11px system-ui'; ctx.fillStyle=t.mine?'#fff':'rgba(255,255,255,.75)'; ctx.fillText(t.code, 66, y);
+      ctx.textBaseline='alphabetic';
+
+      // vergangene Down-Marker entlang des Drives
+      t.reveals.forEach(rv=>{ const mx=scoreX(rv.score); const h=rv.malus?6:9;
+        ctx.fillStyle= rv.malus?'rgba(255,138,122,.6)':'rgba(230,225,215,.55)'; ctx.fillRect(mx-1.5, y-h/2, 3, h); });
+
+      // First-Down-Pylon je Spur am aktuellen Down-Ziel
+      if(curSlot>=0){ const fdX=scoreX(PERLEG*(curSlot+1)); const reached=t.score>=PERLEG*(curSlot+1);
+        ctx.save(); ctx.fillStyle= reached?'rgba(102,226,155,.85)':'rgba(255,255,255,.5)';
+        ctx.beginPath(); ctx.moveTo(fdX,y-laneH/2+2); ctx.lineTo(fdX-3.5,y-laneH/2+8); ctx.lineTo(fdX+3.5,y-laneH/2+8); ctx.closePath(); ctx.fill(); ctx.restore(); }
+
+      const R=t.mine?Math.min(12,laneH/2):Math.min(8.5,laneH/2-1);
+      let x=rs[t.code].ax; let yy=y; let shakeX=0;
+      if(rs[t.code].stumble>0.02){ shakeX = Math.sin(rs[t.code].stumble*30)*2*rs[t.code].stumble; }
+      // Drive-Linie (Yard-Fortschritt)
+      ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(trackLeft, yy); ctx.lineTo(x+shakeX, yy); ctx.stroke();
+      // Line of Scrimmage am Start
+      ctx.fillStyle='rgba(255,255,255,.4)'; ctx.fillRect(trackLeft-2, yy-4, 4, 8);
+      if(rs[t.code].glow>0.03){ ctx.beginPath(); ctx.arc(x+shakeX,yy,R+6*rs[t.code].glow,0,Math.PI*2); ctx.fillStyle=`rgba(232,192,74,${.35*rs[t.code].glow})`; ctx.fill(); }
+      // gestapelte Down-Plättchen am Ballspot (Leder-Ton für Feld, Team-Farbe für dich)
+      const plateN=Math.min(4,1+t.thrownSlot);
+      for(let pI=0;pI<plateN;pI++){ const pr=R*(0.55+0.15*pI);
+        ctx.fillStyle=t.mine?'rgba(217,72,47,.9)':'rgba(140,90,44,.6)'; ctx.fillRect(x+shakeX-3-pI*2, yy-pr, 3, pr*2); }
+      paintCrest(ctx,x+shakeX,yy,R,t,R>=8);
+      const medal = t.roundMedal===1?'#e8c04a' : t.roundMedal===2?'#c8ccd4' : t.roundMedal===3?'#cd7f32' : null;
+      if(medal){ ctx.beginPath(); ctx.arc(x+shakeX,yy,R+6,0,Math.PI*2); ctx.strokeStyle=medal; ctx.lineWidth=3; ctx.shadowColor=medal; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0; }
+      if(rs[t.code].hi>0.02){ ctx.beginPath(); ctx.arc(x+shakeX,yy,R+11,0,Math.PI*2); ctx.strokeStyle=`rgba(232,192,74,${Math.min(1,rs[t.code].hi)})`; ctx.lineWidth=2; ctx.stroke(); }
+      hitboxes[t.code]={code:t.code, x:x+shakeX, y:yy, r:R+10};
+    });
+
+    if(stepIdx===0 && curSlot<0){
+      ctx.fillStyle='rgba(255,255,255,.5)'; ctx.textAlign='center'; ctx.font='italic 600 16px Georgia,serif';
+      ctx.fillText('Aufstellung bereit — Klick zum Start', (trackLeft+trackRight)/2, trackTop-52);
+      ctx.textAlign='left';
+    }
+  }
+
+  let raf=null, animating=false;
+  function loop(){ let moving=false;
+    teams.forEach(t=>{ const r=rs[t.code]; const tx=scoreX(t.score); r.ax+=(tx-r.ax)*0.13; if(Math.abs(tx-r.ax)>0.4)moving=true;
+      r.glow+=(0-r.glow)*0.05; r.stumble+=(0-r.stumble)*0.04; if(r.glow>0.03||r.stumble>0.03)moving=true;
+      if(r.hi>0){ r.hi-=0.011; if(r.hi<0)r.hi=0; moving=true; } });
+    drawTrack(); if(moving){ raf=requestAnimationFrame(loop); animating=true; } else animating=false; }
+  function kick(){ if(!animating){ animating=true; raf=requestAnimationFrame(loop); } }
+  function scorePopAt(net,mine,team){
+    const pop=document.getElementById('pop');
+    pop.textContent='+'+net+' yds'; pop.style.color=mine?'#2f9350':'#e8c04a';
+    const x=scoreX(team.score), y=laneY(team.i);
+    pop.style.left=(x/W*100)+'%'; pop.style.top=(y/H*100)+'%';
+    pop.style.transition='none'; pop.style.opacity='1'; pop.style.transform='translate(-50%,-50%) scale(1)';
+    requestAnimationFrame(()=>{ pop.style.transition='opacity .9s, transform .9s'; pop.style.opacity='0'; pop.style.transform='translate(-50%,-160%) scale(1.25)'; });
+  }
+
+  // ---------- WebAudio: nur bei Impact (kein Hintergrundrauschen pro Reveal) ----------
+  let actx=null, muted=false;
+  function audio(){ if(muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(actx.state==='suspended') actx.resume(); return actx; }
+  function whistleSnap(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle';
+    o.frequency.setValueAtTime(2600,t0); o.frequency.linearRampToValueAtTime(3100,t0+0.05); o.frequency.linearRampToValueAtTime(2500,t0+0.14);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.4),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.17);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.18);
+    const len=0.16, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.6); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp2=a.createBiquadFilter(); bp2.type='bandpass'; bp2.Q.value=0.9; bp2.frequency.setValueAtTime(900,t0);
+    const g2=a.createGain(); g2.gain.setValueAtTime((vol||0.4)*0.55,t0); g2.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(bp2); bp2.connect(g2); g2.connect(a.destination); src.start(t0); src.stop(t0+len);
+  }
+  function crowdSwell(vol,dur){
+    const a=audio(); if(!a) return; const t0=a.currentTime; dur=Math.max(0.3,dur||0.6);
+    const buf=a.createBuffer(1, Math.max(1,Math.floor(a.sampleRate*dur)), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.6;
+    bp.frequency.setValueAtTime(500,t0); bp.frequency.linearRampToValueAtTime(2400,t0+dur*0.7);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.3),t0+dur*0.55); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+dur);
+  }
+  function tackleThud(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime+0.1; const v=vol||0.3;
+    const o=a.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(110,t0); o.frequency.exponentialRampToValueAtTime(42,t0+0.14);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.linearRampToValueAtTime(v,t0+0.015); g.gain.exponentialRampToValueAtTime(0.001,t0+0.22);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.24);
+    const len=0.09, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.5); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.8; lp.frequency.setValueAtTime(700,t0);
+    const g2=a.createGain(); g2.gain.setValueAtTime(v*0.6,t0); g2.gain.exponentialRampToValueAtTime(0.001,len+t0);
+    src.connect(lp); lp.connect(g2); g2.connect(a.destination); src.start(t0); src.stop(t0+len);
+  }
+  function wummsSound(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime; vol=(vol||1);
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,t0); o.frequency.exponentialRampToValueAtTime(44,t0+0.32);
+    const og=a.createGain(); og.gain.setValueAtTime(0.0001,t0); og.gain.exponentialRampToValueAtTime(0.9*vol,t0+0.02); og.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
+    o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0+0.52);
+    const len=0.05, buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+    const src=a.createBufferSource(); src.buffer=buf; const ng=a.createGain();
+    ng.gain.setValueAtTime(0.5*vol,t0); ng.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(ng); ng.connect(a.destination); src.start(t0); src.stop(t0+len);
+    [880,1320,1760].forEach((f,i)=>{ const s=a.createOscillator(); s.type='sine'; s.frequency.value=f;
+      const sg=a.createGain(); const st=t0+0.04+i*0.02; sg.gain.setValueAtTime(0.0001,st);
+      sg.gain.exponentialRampToValueAtTime(0.14*vol,st+0.02); sg.gain.exponentialRampToValueAtTime(0.001,st+0.34);
+      s.connect(sg); sg.connect(a.destination); s.start(st); s.stop(st+0.36); });
+  }
+  // heller Shimmer-Arpeggio für den ⭐ Star-Moment (Elite-Spieler kommt rein)
+  function starSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    [1046,1318,1568,2093].forEach((f,i)=>{ const o=a.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=a.createGain(); const st=t0+i*0.06;
+      g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.15,st+0.02); g.gain.exponentialRampToValueAtTime(0.001,st+0.4);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st+0.42); });
+  }
+  function risingPing(net){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(380+Math.min(520,net*3.2),t0);
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.2; bp.frequency.setValueAtTime(600,t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.11,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
+    o.connect(bp); bp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.15);
+  }
+  function riser(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(200,t0); o.frequency.exponentialRampToValueAtTime(760,t0+0.26);
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1700; lp.Q.value=1;
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.12,t0+0.2); g.gain.exponentialRampToValueAtTime(0.001,t0+0.3);
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.32);
+  }
+  const CAUSE_COLOR={ gold:'#e8c04a', cyan:'#4fd0da', violet:'#a06ee8', red:'#ff7a6a' };
+  function fireFlash(kind){
+    const id = kind==='red'?'flashRed':kind==='violet'?'flashViolet':kind==='cyan'?'flashCyan':'flashGold';
+    const el=document.getElementById(id); if(!el) return;
+    el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire');
+  }
+  function shakeArena(soft){ const el=document.querySelector('.arena'); if(!el) return;
+    el.classList.remove('shake','shake-soft'); void el.offsetWidth; el.classList.add(soft?'shake-soft':'shake');
+    setTimeout(()=>el.classList.remove('shake','shake-soft'), soft?320:440); }
+  function showSpotlight(o){
+    const sp=document.getElementById('spotlight');
+    document.getElementById('spCrest').src = o.team.crest || crestURL(o.team,64);
+    document.getElementById('spKick').textContent = o.kick || 'Moment der Runde';
+    document.getElementById('spName').textContent = (o.team.mine?'★ ':'')+o.player.name;
+    document.getElementById('spSub').textContent = `${o.team.code} · ${TEAM_NAMES[o.team.code]||''}${o.leg?' · '+o.leg:''}`;
+    document.getElementById('spNet').textContent = '+'+o.net+' yds';
+    const chip=document.getElementById('spChip');
+    if(o.chip && o.chip.text){ chip.style.display='inline-block'; chip.textContent=o.chip.text;
+      const c=CAUSE_COLOR[o.chip.color]||'#e8c04a'; chip.style.background=c; chip.style.color='#1a1206'; }
+    else chip.style.display='none';
+    sp.classList.toggle('mine', !!o.team.mine);
+    sp.classList.remove('show'); void sp.offsetWidth; sp.classList.add('show');
+    setTimeout(()=>sp.classList.remove('show'), 1500);
+  }
+
+  // ---------- reveal ----------
+  const SLOTS=["Line Power","Route Burst","Field Read","Red Zone","Locker Leader"];
+  let queue=[],stepIdx=0,busy=false,curSlot=-1;
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r}); } }
+  function slotRank(si, team){
+    const my=Math.max(0, team.players[si].val+modSum(team.players[si]));
+    let better=0;
+    teams.forEach(o=>{ const n=Math.max(0,o.players[si].val+modSum(o.players[si])); if(n>my) better++; });
+    return better+1;
+  }
+  function slotRankColor(rank){ return rank<=3?'#2fa564':rank<=6?'#d9a441':rank<=10?'#d9503f':'var(--mut)'; }
+  function slotRankBadge(rank){ return `<b style="color:${slotRankColor(rank)}">#${rank}</b>`; }
+
+  function applyReveal(t,slot){
+    const p=t.players[slot];
+    const net=Math.max(0, p.val+modSum(p));
+    t.prevScore=t.score; t.score+=net; t.thrownSlot=slot;
+    t.legHistory.push(t.score);
+    t.reveals.push({slot,score:t.score,player:p,net,malus: !!(p.mods.some(m=>m.sign<0))});
+    teams.forEach(x=>x.prevRank=x.rank);
+    recomputeRanksLive();
+    teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    // Slot-Rang + INKREMENTELLE Team-Platzveränderung dieses Slots (relativ zum Stand nach dem
+    // vorherigen Slot, nicht zum Startplatz) — via settled Rang-Historie
+    const prevR = slot>0 ? (t.rankHist[slot-1] ?? t.seasonRank) : t.seasonRank;
+    const nowR = t.rankHist[slot] ?? t.rank;
+    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: prevR - nowR };
+    updateRoundMedals(slot);
+    return {player:p,net};
+  }
+
+  // --- Impact-Klassifikation v2 (geteilte Logik, Optik pro Diszi eigen) ---
+  let roundBest=null, dayBest=null;
+  let tier2Budget=2, tier1Budget=4;
+  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; teams.forEach(t=>t.roundMedal=0); }
+  // Gold/Silber/Bronze = Top 3 der AKTUELLEN Runde (nach Runden-Netto, live pro Reveal aktualisiert)
+  function updateRoundMedals(round){
+    const withNet = teams.filter(t=> t.thrownSlot===round)
+      .map(t=>({t, net: Math.max(0, t.players[round].val+modSum(t.players[round]))}))
+      .sort((a,b)=> b.net-a.net || a.t.seasonRank-b.t.seasonRank);
+    teams.forEach(t=> t.roundMedal=0);
+    withNet.slice(0,3).forEach((o,idx)=> o.t.roundMedal=idx+1);
+  }
+  // Echtes Gesamtranking der Runde: Stand NACHDEM alle Teams ihren Down addiert haben
+  // (deterministisch vorab berechenbar) — Rang-Ereignisse triggern gegen die Endabrechnung.
+  function computeRoundStandings(round){
+    const withAfter = teams.map(t=>{
+      let s=0; for(let k=0;k<=round;k++){ const p=t.players[k]; s+=Math.max(0, p.val+modSum(p)); }
+      return { t, after:s };
+    });
+    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
+    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; t.rankHist[round]=t.roundRankAfter; });
+  }
+  function noteReveal(t,slot,res,isMine){
+    const net=res.net, p=res.player;
+    const bonSum=p.mods.filter(m=>m.sign>0).reduce((s,m)=>s+m.amt,0);
+    const injury=p.mods.some(m=>m.injury);
+    const malSum=p.mods.filter(m=>m.sign<0).reduce((s,m)=>s+m.amt,0);
+    const delta=t.roundDelta;
+    const prevBest = roundBest? roundBest.net : -1;
+    const newBest = net>prevBest;
+    if(newBest) roundBest={team:t,player:p,net,leg:SLOTS[slot]};
+    if(!dayBest || net>dayBest.net) dayBest={team:t,player:p,net,leg:SLOTS[slot]};
+    const leaderBefore=teams.find(x=>x.roundRankBefore===1);
+    const leaderChange = t.roundRankAfter===1 && leaderBefore && leaderBefore.code!==t.code;
+    const top3jump = (t.roundRankBefore>=6 && t.roundRankAfter<=3);
+
+    let cause='tick', tier=0, color='gold', text='';
+    if(injury){ cause='injury'; tier=2; color='red'; text=`−${malSum} Verletzung`; }
+    else if(p.val>=STAR_MIN){ cause='star'; tier=2; color='gold'; text=`⭐ Star · Wert ${p.val}`; }
+    else if(leaderChange){ cause='leader'; tier=2; color='gold'; text='neue Spitze · #1'; }
+    else if(top3jump){ cause='top3'; tier=2; color='violet'; text=`P${t.roundRankBefore} → P${t.roundRankAfter}`; }
+    else if(newBest){ cause='best'; tier=2; color='gold'; text=`#1 des Downs · ${net}`; }
+    else if(bonSum>=13 && net>p.val){ cause='push'; tier=1; color='cyan'; text=`+${bonSum} Push`; }
+    else if(delta>=3){ cause='climb'; tier=1; color='violet'; text=`▲${delta} Plätze`; }
+    else if(prevBest>0 && net>=prevBest*0.9){ cause='strong'; tier=1; color='gold'; text=`stark · ${net}`; }
+
+    if(!isMine && cause!=='injury'){
+      if(tier===2){ if(tier2Budget>0) tier2Budget--; else tier=1; }
+      if(tier===1){ if(tier1Budget>0) tier1Budget--; else tier=0; }
+    }
+    return { tier, cause, color, text, kind:cause, newBest, delta };
+  }
+  function causeKick(cause, mine){
+    const own = mine?'DEIN TEAM · ':'';
+    switch(cause){
+      case 'leader': return own+'Neue Spitze';
+      case 'top3':   return own+'Sprung in die Top 3';
+      case 'best':   return own+'Bestwert des Downs';
+      case 'injury': return own+'Verletzung';
+      case 'star':   return (mine?'DEIN STAR · ':'⭐ ')+'Star-Moment';
+      default:       return own+'Standout';
+    }
+  }
+  // Tier-2-Moment: Spotlight + Chip + farbiger Flash + Riser→Wumms (bzw. Thud bei Verletzung)
+  function fireLiveStandout(t,res,slot,impact){
+    const mine=t.mine;
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot],
+                    kick:causeKick(impact.cause,mine), chip:{text:impact.text,color:impact.color} });
+    fireFlash(impact.color); shakeArena(impact.cause==='injury' ? true : !mine);
+    if(impact.cause==='injury'){ tackleThud(mine?0.5:0.4); }
+    else if(impact.cause==='star'){ starSound(); setTimeout(()=>wummsSound(mine?1.25:1.1), 300); }
+    else { riser(); setTimeout(()=>wummsSound(mine?1.1:0.92), 260); }
+    rs[t.code].hi=1; kick();
+  }
+  // wendet das entschiedene Tier an — Sounds nur hier (Tier 0 bleibt stumm)
+  function applyImpactFx(t,res,slot,impact){
+    if(impact.tier===2){ fireLiveStandout(t,res,slot,impact); }
+    else if(impact.tier===1){ risingPing(res.net); rs[t.code].hi=1; kick(); }
+    // Tier 0: nur der stille Vorstoß des Ball-Markers
+  }
+  function liteMineSpotlight(t,res,slot){
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot], kick:'DEIN TEAM', chip:{text:`+${res.net} yds`, color:'gold'} });
+  }
+  // Podest am Ende der Disziplin: Top 3, Säulen steigen nacheinander auf
+  function showPodium(){
+    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank).slice(0,3);
+    const visual=[top3[1],top3[0],top3[2]]; const cls=['p2','p1','p3']; const place=[2,1,3];
+    const row=document.getElementById('podRow'); row.innerHTML='';
+    visual.forEach((t,idx)=>{ if(!t) return;
+      const col=document.createElement('div');
+      col.className='pod-col '+cls[idx]+(t.mine?' mine':'');
+      col.innerHTML=`<img class="pc-crest" src="${t.crest||crestURL(t,64)}" alt="">
+        <div class="pc-name">${(t.mine?'★ ':'')+(TEAM_NAMES[t.code]||t.code)}</div>
+        <div class="pc-pts">${Math.round(t.score)} yds</div>
+        <div class="pc-base">${place[idx]}</div>`;
+      row.appendChild(col);
+    });
+    document.getElementById('podium').classList.add('show');
+    fireFlash('gold');
+    const cols=[...row.children];
+    [2,0,1].forEach((ci,k)=> setTimeout(()=>{ if(cols[ci]) cols[ci].classList.add('in'); wummsSound(k===2?1.15:0.7); if(k===2) shakeArena(false); }, 300+k*440));
+  }
+
+  function logRow(t,slot,res,impact){
+    const p=res.player,net=res.net;
+    let badge='';
+    if(impact){
+      const map={ star:['star','⭐ Star'], injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
+                  best:['standout','Downbestwert'], push:['push','Hart gepusht'], climb:['push','Aufholjagd'], strong:['standout','Stark'] };
+      const m=map[impact.cause];
+      if(m) badge=` <span class="impact-badge ${m[0]}">${m[1]}</span>`;
+    }
+    const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
+    let calc=`<span class="base">${p.val}</span>`;
+    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+    calc+=` = <span class="net">+${net} yds</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const sr = slotRank(slot,t);
+    const src = ampelColor(sr);
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span class="slotrank">· Slot-Rang ${slotRankBadge(sr)}</span>${badge}</div>
+      <div class="calc">${calc}</div></div>${dl}`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+  }
+  function roundSummary(round){
+    const winners = teams.filter(t=>t.roundMedal>0).sort((a,b)=>a.roundMedal-b.roundMedal);
+    const parts = winners.map(t=>{ const p=t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${['🥇','🥈','🥉'][t.roundMedal-1]} ${t.code} · ${p.name} +${net}`; });
+    const el=document.createElement('div'); el.className='round-summary';
+    el.innerHTML = parts.length ? `Down ${round+1} — Sieger: ${parts.join(' · ')}` : `Down ${round+1} — kein Ergebnis`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(el, tk.firstChild);
+  }
+  function updateMyTracker(){
+    const me=teams.find(t=>t.mine);
+    document.getElementById('myrank').textContent=me.rank;
+    const plus=me.score-me.roundStartScore;
+    document.getElementById('mypts').innerHTML=`${me.score} yds`+(plus>0?` <span class="plus">(+${plus})</span>`:'');
+    const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
+    const d = from - me.rank;
+    const mv=document.getElementById('mymove');
+    if(curSlot<=0){ mv.className='mv same'; mv.textContent='Down 1 läuft …'; }
+    else if(d>0){ mv.className='mv up'; mv.textContent=`▲ ${d} ${d===1?'Platz':'Plätze'} seit Vorrunde (${from} → ${me.rank})`; }
+    else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
+    else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
+    // Guard: curSlot startet bei -1, erst ab curSlot>=0 gibt es einen aktuellen Down-Namen
+    document.getElementById('mysplit').textContent = curSlot>=0 ? `aktueller Down: ${SLOTS[Math.max(0,curSlot)]}` : '';
+  }
+
+  function advance(){
+    if(busy) return;
+    if(stepIdx>=queue.length) return;
+    busy=true;
+    const q=queue[stepIdx];
+    curSlot=q.round;
+    if(stepIdx===0){ whistleSnap(0.55); }
+    teams.forEach(t=>{ t.roundStartRank=t.rank; t.roundStartScore=t.score; });
+    resetRoundBest(); computeRoundStandings(q.round);
+    // EIN Durchlauf über ALLE 32 Teams (schlechtestes zuerst) — eigenes Team an natürlicher
+    // Position, nicht separat ans Ende geschoben. Kein Ausscheiden, alle bleiben sichtbar.
+    const order=teams.slice().sort((a,b)=> b.rank-a.rank);
+    let i=0;
+    const doOne=()=>{
+      if(i>=order.length){ endStage(q); return; }
+      const t=order[i++];
+      const isMine=t.mine;
+      const res=applyReveal(t,q.round);
+      const impact=noteReveal(t,q.round,res,isMine);
+      rs[t.code].glow = isMine?1.5:1;
+      if(res.player.mods.some(m=>m.injury)) rs[t.code].stumble=1;
+      kick();
+      const after=()=>{
+        scorePopAt(res.net,isMine,t);
+        logRow(t,q.round,res,impact);
+        updateMyTracker();
+        applyImpactFx(t,res,q.round,impact);
+        if(isMine && impact.tier<2){ liteMineSpotlight(t,res,q.round); }
+        const delay = impact.tier===2 ? 1550 : isMine ? 750 : impact.tier===1 ? 240 : 90;
+        setTimeout(doOne, delay);
+      };
+      if(isMine){ document.getElementById('status').textContent='★ Dein Team'; setTimeout(after, 480); }
+      else { setTimeout(after, 90); }
+    };
+    doOne();
+  }
+  function endStage(q){
+    roundSummary(q.round);
+    stepIdx++; updateControls();
+    if(stepIdx>=queue.length){ setTimeout(showPodium, 700); }
+    setTimeout(()=>busy=false, 200);
+  }
+  function updateControls(){
+    const btn=document.getElementById('advance');
+    document.getElementById('stepnum').textContent=stepIdx;
+    document.getElementById('progfill').style.width=(stepIdx/queue.length*100)+'%';
+    if(stepIdx>=queue.length){ btn.disabled=true; btn.textContent='✔ Wertung abgeschlossen'; document.getElementById('status').textContent='Wertung'; return; }
+    const q=queue[stepIdx], round=q.round+1;
+    document.getElementById('slotlbl').textContent=round; document.getElementById('slotcode').textContent=SLOTS[q.round];
+    btn.textContent=`▶ Feld spielt Down ${round} (${SLOTS[q.round]})`;
+    document.getElementById('status').textContent=`Down ${round} · Feld`;
+  }
+
+  // ---------- hover card (inkrementelles Delta über slotHist) ----------
+  const hc=document.getElementById('hovercard');
+  function fillHoverCard(t){
+    document.getElementById('hcCrest').src = t.crest || crestURL(t,64);
+    document.getElementById('hcCode').textContent = t.code;
+    document.getElementById('hcName').textContent = TEAM_NAMES[t.code] || t.code;
+    const hcRankEl=document.getElementById('hcRank');
+    hcRankEl.textContent = '#'+t.rank;
+    hcRankEl.style.color = ampelColor(t.rank) || '';
+    const plus=t.score-t.roundStartScore;
+    document.getElementById('hcPts').textContent = t.score+' yds'+(plus>0?` (+${plus})`:'');
+    const host=document.getElementById('hcSlots');
+    if(t.thrownSlot<0){ host.innerHTML='<div class="hc-empty">noch nicht angetreten</div>'; return; }
+    let html='';
+    for(let s=0;s<=t.thrownSlot;s++){
+      const p=t.players[s];
+      const net=Math.max(0, p.val+modSum(p));
+      let calc=`<span class="base">${p.val}</span>`;
+      p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+      calc+=` = <span class="net">+${net} yds</span>`;
+      const sh = t.slotHist ? t.slotHist[s] : null;
+      let srtxt='';
+      if(sh){
+        const c=ampelColor(sh.slotRank)||'#c3d6c6', d=sh.delta;
+        const dtxt = d>0?` <span style="color:#66e29b;font-weight:800">(▲${d})</span>` : d<0?` <span style="color:#ff8a7a;font-weight:800">(▼${-d})</span>` : ` <span style="color:#adc4b5;font-weight:700">(±0)</span>`;
+        srtxt = ` · <span style="color:${c};font-weight:800">#${sh.slotRank}</span>${dtxt}`;
+      }
+      html+=`<div class="row"><div class="av" style="background:${t.color}">${t.code.replace('-','')}</div>
+        <div class="body"><div class="nm">${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:#adc4b5;font-weight:600">· ${SLOTS[s]}</span>${srtxt}</div>
+        <div class="calc">${calc}</div></div></div>`;
+    }
+    host.innerHTML=html;
+  }
+  function showHoverCard(t, clientX, clientY){
+    fillHoverCard(t);
+    hc.classList.add('show');
+    const pad=16;
+    let x=clientX+pad, y=clientY+pad;
+    const w=hc.offsetWidth||270, h=hc.offsetHeight||160;
+    if(x+w > window.innerWidth-8) x = clientX-w-pad;
+    if(y+h > window.innerHeight-8) y = clientY-h-pad;
+    hc.style.transform = `translate(${Math.max(4,x)}px,${Math.max(4,y)}px)`;
+  }
+  function hideHoverCard(){ hc.classList.remove('show'); }
+  cv.addEventListener('mousemove', function(e){
+    const rect=cv.getBoundingClientRect();
+    const scaleX=cv.width/rect.width, scaleY=cv.height/rect.height;
+    const cx=(e.clientX-rect.left)*scaleX, cy=(e.clientY-rect.top)*scaleY;
+    let hit=null;
+    for(const code in hitboxes){ const h=hitboxes[code]; const dx=cx-h.x, dy=cy-h.y; if(dx*dx+dy*dy<=h.r*h.r){ hit=h; break; } }
+    if(hit){ const t=teams.find(x=>x.code===hit.code); if(t) showHoverCard(t,e.clientX,e.clientY); else hideHoverCard(); }
+    else hideHoverCard();
+  });
+  cv.addEventListener('mouseleave', hideHoverCard);
+
+  function reset(){
+    if(raf) cancelAnimationFrame(raf);
+    initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1;
+    roundBest=null; dayBest=null; tier2Budget=2; tier1Budget=4;
+    teams.forEach(t=>{ if(!t.crest) t.crest=crestURL(t,32); });
+    teams.forEach(t=>{ rs[t.code].ax=trackLeft; rs[t.code].glow=0; rs[t.code].stumble=0; rs[t.code].hi=0; });
+    document.getElementById('spotlight').classList.remove('show','mine');
+    document.getElementById('podium').classList.remove('show');
+    document.getElementById('podRow').innerHTML='';
+    document.getElementById('ticker').innerHTML='<div class="empty">Noch kein Snap gespielt. Klick auf „Feld spielt".</div>';
+    document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
+    document.getElementById('mysplit').textContent='';
+    document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
+    document.getElementById('mypts').textContent='0 yds';
+    document.getElementById('mytrackname').textContent=`${TEAM_NAMES[MINE]} (${MINE})`;
+    hc.classList.remove('show');
+    updateControls(); drawTrack();
+  }
+
+  document.getElementById('advance').addEventListener('click',advance);
+  document.getElementById('replay').addEventListener('click',reset);
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) risingPing(20); });
+  const mq=window.matchMedia('(prefers-color-scheme: dark)'); if(mq.addEventListener) mq.addEventListener('change',drawTrack);
+  reset();
+})();
+</script>
+
+</body>
+</html>

@@ -36,7 +36,7 @@
   .headmeta{ text-align:right; font-size:12.5px; color:var(--mut); }
   .headmeta b{ color:var(--ink); font-variant-numeric:tabular-nums; }
 
-  /* layout: court | standings ladder */
+  /* layout: wall | standings ladder */
   .stage{ display:grid; grid-template-columns:1fr 288px; gap:14px; align-items:start; }
   @media (max-width:900px){ .stage{ grid-template-columns:1fr; } }
 
@@ -118,6 +118,11 @@
   .round-summary b{ color:var(--ink); }
   .slotrank{ color:var(--mut); font-weight:600; }
   .slotrank b{ color:var(--accent); }
+  .impact-badge{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .impact-badge.standout{ background:color-mix(in srgb,var(--gold) 24%, transparent); color:#b8901f; }
+  .impact-badge.star{ background:linear-gradient(90deg,#f4d876,#e8c04a); color:#3a2600; box-shadow:0 0 8px -1px rgba(232,192,74,.7); }
+  .impact-badge.push{ background:color-mix(in srgb,var(--up) 20%, transparent); color:#1f8a54; }
+  .impact-badge.injury{ background:color-mix(in srgb,var(--down) 20%, transparent); color:#c23c2c; }
 
   .hovercard{ position:absolute; z-index:20; pointer-events:none; min-width:220px; max-width:290px;
               background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow);
@@ -147,6 +152,63 @@
   .legend span{ display:inline-flex; align-items:center; gap:6px; }
   .legend .sw{ width:12px; height:12px; border-radius:3px; }
   @media (prefers-reduced-motion: reduce){ *{ animation:none!important; } .lrow{ transition:none; } }
+
+  /* ---- impact layer (geteilte Funktionsweise; Optik der Wand bleibt) ---- */
+  @keyframes arenashake{ 0%,100%{transform:translate(0,0);} 15%{transform:translate(-5px,3px);} 30%{transform:translate(4px,-4px);}
+                         45%{transform:translate(-4px,-2px);} 60%{transform:translate(3px,3px);} 75%{transform:translate(-2px,2px);} }
+  .arena.shake{ animation:arenashake .42s ease; }
+  .arena.shake-soft{ animation:arenashake .3s ease; }
+  .flashfx{ position:absolute; inset:0; z-index:5; pointer-events:none; opacity:0; }
+  .flashfx.gold{ background:radial-gradient(circle at 50% 42%, rgba(255,214,110,.55), transparent 60%); }
+  .flashfx.red{ background:radial-gradient(circle at 50% 50%, rgba(217,80,63,.5), transparent 62%); }
+  .flashfx.violet{ background:radial-gradient(circle at 50% 46%, rgba(160,110,232,.5), transparent 62%); }
+  .flashfx.cyan{ background:radial-gradient(circle at 50% 46%, rgba(80,200,210,.45), transparent 62%); }
+  .flashfx.fire{ animation:flashpop .5s ease; }
+  @keyframes flashpop{ 0%{opacity:0;} 18%{opacity:1;} 100%{opacity:0;} }
+
+  .spotlight{ position:absolute; left:50%; top:40%; transform:translate(-50%,-50%) scale(.8); z-index:6;
+              display:flex; align-items:center; gap:16px; padding:16px 22px 16px 16px; border-radius:18px;
+              background:rgba(8,12,12,.82); border:1.5px solid rgba(232,192,74,.7); backdrop-filter:blur(8px);
+              box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 40px -8px rgba(232,192,74,.5);
+              color:#eaf3f2; opacity:0; pointer-events:none; min-width:min(78%,420px); }
+  .spotlight.mine{ border-color:rgba(47,143,174,.85); box-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 0 46px -6px rgba(47,143,174,.6); }
+  .spotlight.show{ animation:spotpop 2.7s cubic-bezier(.2,1.05,.3,1) forwards; }
+  @keyframes spotpop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.72);} 9%{opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+                      16%{transform:translate(-50%,-50%) scale(1);} 88%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+                      100%{opacity:0; transform:translate(-50%,-52%) scale(.98);} }
+  .spotlight .sp-crest{ width:64px; height:64px; border-radius:50%; flex:none; box-shadow:0 0 0 3px rgba(232,192,74,.6); }
+  .spotlight .sp-body{ flex:1; min-width:0; }
+  .spotlight .sp-kick{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:#f0c866; }
+  .spotlight.mine .sp-kick{ color:#7fd3ea; }
+  .spotlight .sp-name{ font-family:Georgia,serif; font-weight:700; font-size:22px; line-height:1.05; margin-top:1px; }
+  .spotlight .sp-sub{ font-size:12px; color:#bcd6d9; margin-top:2px; }
+  .spotlight .sp-net{ font-family:Georgia,serif; font-weight:800; font-size:40px; color:#e8c04a; flex:none; text-shadow:0 3px 14px rgba(0,0,0,.6); }
+  .spotlight .sp-chip{ display:none; margin-top:7px; font-size:11px; font-weight:800; letter-spacing:.03em; padding:2px 10px; border-radius:99px; }
+
+  /* Podest — Top 3 am Ende */
+  .podium{ position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+           padding:0 20px 46px; gap:14px; background:linear-gradient(180deg, rgba(8,12,12,.15), rgba(8,12,12,.72));
+           opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  .podium.show{ opacity:1; }
+  .podium .pod-kick{ position:absolute; top:26px; left:0; right:0; text-align:center; color:#f0c866; font-weight:800;
+                     font-size:12px; letter-spacing:.18em; text-transform:uppercase; }
+  .podium .pod-title{ position:absolute; top:44px; left:0; right:0; text-align:center; color:#eaf3f2;
+                      font-family:Georgia,serif; font-style:italic; font-size:26px; }
+  .podium .pod-row{ display:flex; align-items:flex-end; gap:12px; }
+  .pod-col{ display:flex; flex-direction:column; align-items:center; gap:8px; opacity:0; transform:translateY(24px); }
+  .pod-col.in{ animation:podrise .6s cubic-bezier(.2,1.1,.3,1) forwards; }
+  @keyframes podrise{ to{ opacity:1; transform:translateY(0); } }
+  .pod-col .pc-crest{ width:60px; height:60px; border-radius:50%; box-shadow:0 6px 18px -6px rgba(0,0,0,.7); }
+  .pod-col .pc-name{ color:#eaf3f2; font-weight:800; font-size:13px; text-align:center; max-width:120px; line-height:1.15; }
+  .pod-col .pc-pts{ color:#bcd6d9; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .pod-col .pc-base{ width:104px; border-radius:10px 10px 0 0; display:grid; place-items:start center; padding-top:8px;
+                     font-family:Georgia,serif; font-weight:800; font-size:28px; color:#20180f; }
+  .pod-col.p1 .pc-base{ height:132px; background:linear-gradient(180deg,#f4d876,#e8c04a); }
+  .pod-col.p2 .pc-base{ height:100px; background:linear-gradient(180deg,#e2e5ea,#c8ccd4); }
+  .pod-col.p3 .pc-base{ height:76px;  background:linear-gradient(180deg,#e0a765,#cd7f32); }
+  .pod-col.mine .pc-name{ color:#7fd3ea; }
+  @media (prefers-reduced-motion: reduce){ .arena.shake,.arena.shake-soft{ animation:none; } .spotlight.show{ animation:none; opacity:1; }
+    .flashfx.fire{ animation:none; } .pod-col.in{ animation:none; opacity:1; transform:none; } }
 </style>
 </head>
 <body>
@@ -157,7 +219,7 @@
     <div>
       <p class="eyebrow">Disziplin · 32 Teams · Wand-Wertung</p>
       <h1>Climbing</h1>
-      <div class="sub"><b>Die Wand</b> — 32 Kletterer hangeln sich an derselben Felswand nebeneinander nach oben. Jeder Klick schickt einen aufgestellten Kletterer (Slots <b>Route Reader … Summit Push</b>) an den nächsten Griff: sein <b>Kletter-Wert</b> − Mali + Boni = <b>Netto-Punkte</b>, um die er nach dem Griff höher steigt. Höhe = Punkte — wer am höchsten klettert, führt. Die Skala wächst dynamisch mit dem Spitzenreiter mit. Rechts klettert die <b>Rangliste</b> synchron mit. Dein Team klettert zuletzt.</div>
+      <div class="sub"><b>Die Wand</b> — 32 Kletterer hangeln sich an derselben vertikalen Felswand nebeneinander nach oben, alle 32 immer sichtbar. Jeder Klick schickt einen aufgestellten Kletterer (Slots <b>Route Reader … Summit Push</b>) an den nächsten Griff: sein <b>Kletter-Wert</b> − Mali + Boni = <b>Netto-Punkte</b>, um die er nach dem Griff höher steigt. Höhe = kumulierte Punkte, Griffe/Sims markieren die Meilensteine — wer am höchsten klettert, führt. Die Skala wächst dynamisch mit dem Spitzenreiter mit. Rechts klettert die <b>Rangliste</b> synchron mit. Dein Team klettert zuletzt.</div>
     </div>
     <div class="headmeta">Slot <b id="slotlbl">Route Reader</b><br>Runde <b id="round">1</b> / 5<br>Rang → Punkte</div>
   </div>
@@ -173,13 +235,32 @@
         </div>
         <div class="scorepop" id="pop">+0</div>
         <div class="liveflag"><span class="pip"></span> <span id="status">Einseilen</span></div>
+        <div class="flashfx gold" id="flashGold"></div>
+        <div class="flashfx red" id="flashRed"></div>
+        <div class="flashfx violet" id="flashViolet"></div>
+        <div class="flashfx cyan" id="flashCyan"></div>
+        <div class="spotlight" id="spotlight">
+          <img class="sp-crest" id="spCrest" alt="">
+          <div class="sp-body">
+            <div class="sp-kick" id="spKick">Moment der Runde</div>
+            <div class="sp-name" id="spName"></div>
+            <div class="sp-sub" id="spSub"></div>
+            <div class="sp-chip" id="spChip"></div>
+          </div>
+          <div class="sp-net" id="spNet"></div>
+        </div>
+        <div class="podium" id="podium">
+          <div class="pod-kick">Disziplin gewertet</div>
+          <div class="pod-title">Das Podest</div>
+          <div class="pod-row" id="podRow"></div>
+        </div>
         <div class="hovercard" id="hovercard"></div>
       </div>
 
       <div class="clickbar">
         <button class="cta" id="advance">▶ Feld klettert (Slot Route Reader)</button>
         <div class="prog"><i id="progfill"></i></div>
-        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <div class="step">Runde <b id="stepnum">0</b> / 5</div>
         <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
         <button class="cta small" id="replay">↻ Neu</button>
       </div>
@@ -206,7 +287,7 @@
   </div>
 
   <div class="foot">
-    <b>Was hier echt ist:</b> 32 Teams, 5 Kletter-Slots (Route Reader, Grip Specialist, Pace Climber, Endurance Wall, Summit Push), pro Kletterer ein direkter Kletter-Wert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen den Griff schwerer oder besser, aber Punkte werden nur <b>addiert</b>, nie abgezogen. Rang → Punkte am Ende. Portraits hier als farbige Tokens stellvertretend.
+    <b>Was hier echt ist:</b> 32 Teams, 5 Kletter-Slots (Route Reader, Grip Specialist, Pace Climber, Endurance Wall, Summit Push), pro Kletterer ein direkter Kletter-Wert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen den Griff schwerer oder besser, aber Punkte werden nur <b>addiert</b>, nie abgezogen; die Wandposition bewegt sich deshalb <b>nur aufwärts</b>. Rang → Punkte am Ende. Keine Elimination — alle 32 klettern bis zum Gipfel. Portraits hier als Wappen-Tokens stellvertretend.
   </div>
 </div>
 
@@ -220,8 +301,9 @@
 
   const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
                  "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
-  const TEAM_NAMES = {"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const MINE = "M-M";
+  const STAR_MIN = 80; // Elite-Grundwert: ab hier ist ein Spieler ein „Star" (Ausnahmekönner)
+  const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
   const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
                  "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
                  "Halla","Juno","Ryk","Senn","Uma","Brox","Cael","Doran","Efa","Gale","Hexe","Iven"];
@@ -234,7 +316,7 @@
       color: mine ? "#2f8fae" : `hsl(${h} 58% 52%)`,
       accent: mine ? "#3a2415" : `hsl(${(h+150)%360} 62% 78%)`,
       motif: i%4,
-      score:0, prevScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
+      score:0, prevScore:0, roundStartScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
       thrownSlot:-1, crest:null };
   });
 
@@ -258,10 +340,11 @@
     c2.lineWidth = t.mine ? Math.max(2,r*0.16) : Math.max(1.5,r*0.11);
     c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
     if(withLetter){
+      const label = t.code.replace('-','');
       c2.fillStyle="#fff"; c2.textAlign="center"; c2.textBaseline="middle";
-      c2.font=`800 ${Math.round(r*0.9)}px system-ui`;
+      c2.font=`800 ${Math.round(r*(label.length>1?0.62:0.9))}px system-ui`;
       c2.shadowColor="rgba(0,0,0,.5)"; c2.shadowBlur=2;
-      c2.fillText(t.code.split('-')[0], cx, cy+0.5);
+      c2.fillText(label, cx, cy+0.5);
       c2.shadowBlur=0; c2.textBaseline="alphabetic";
     }
   }
@@ -306,23 +389,41 @@
   function genPlayers(t){
     const base = t.mine ? [80,72,66,60,54] : null;
     const arr=[];
-    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    for(let k=0;k<5;k++){
+      const val = base?base[k]:ri(42,90);
+      const mods = rollMods();
+      // Verletzung = 50 % Abschlag vom Grundwert (nicht flacher Malus)
+      mods.forEach(m=>{ if(m.injury) m.amt = Math.max(1, Math.round(val*0.5)); });
+      arr.push({ val, name:pick(NAMES), mods });
+    }
     return arr;
   }
+  function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
   function initData(){
     _s=0x51ed270b;
-    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundStartScore=0;
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst).
+    // Vor dem ersten Spieltag gibt es keinen Punktestand — der Vorsaison-Abschluss ordnet das Feld.
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=> t.seasonRank=idx+1);
+    teams.forEach(t=>{ t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0;
       t.dispScore=0; t.growFrom=0; t.growTo=0; t.glowUntil=0; });
   }
+  // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
+  function ampelColor(rank){
+    if(rank<=3) return '#2fa564';
+    if(rank<=6) return '#d9a441';
+    if(rank<=10) return '#d9503f';
+    return '';
+  }
   function recomputeRanksLive(){
-    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank);
     order.forEach((t,idx)=> t.rank=idx+1);
   }
 
-  // ---------- skyline canvas ----------
+  // ---------- vertical wall canvas: 32 columns side by side, one per team, fixed x-order by team index ----------
   const cv=document.getElementById('court'), ctx=cv.getContext('2d');
   const W=cv.width,H=cv.height;
-  // 32 hoop-towers side by side, one per team, fixed x-order by team index.
   const MARGIN=22, BASE_Y=H-72, TOP_Y=92, PLOT_H=BASE_Y-TOP_Y;
   const COLW=(W-MARGIN*2)/32, TOWERW=COLW*0.58;
   function heightPxFor(score,scaleRef){ return Math.min(PLOT_H, Math.max(0,(score/scaleRef)*PLOT_H)); }
@@ -343,6 +444,7 @@
   let slipX=0;         // horizontal jitter near rim for bad shots
   const modTriggers=[];  // {p, mod} progress points where each mod fires
   let phaseLabel='Einseilen — bereit';
+  let hitboxes=[];
 
   // ---- WebAudio: synthesized wind whistle + carabiner click (no external files) ----
   let actx=null, muted=false;
@@ -363,11 +465,80 @@
     const g=a.createGain(); g.gain.setValueAtTime((vol||0.4),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.08);
     o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.09);
   }
+  function stumbleThud(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(180,t0); o.frequency.exponentialRampToValueAtTime(70,t0+0.1);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.4),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.13);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.14);
+  }
+  // signature „Wumms" — der Auftritt des besten Spielers: Sub-Bass-Punch + Click + Sparkle-Triade
+  function wummsSound(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime; vol=(vol||1);
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,t0); o.frequency.exponentialRampToValueAtTime(44,t0+0.32);
+    const og=a.createGain(); og.gain.setValueAtTime(0.0001,t0); og.gain.exponentialRampToValueAtTime(0.9*vol,t0+0.02); og.gain.exponentialRampToValueAtTime(0.001,t0+0.5);
+    o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0+0.52);
+    const len=0.05, buf=a.createBuffer(1, Math.floor(a.sampleRate*len), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+    const src=a.createBufferSource(); src.buffer=buf; const ng=a.createGain();
+    ng.gain.setValueAtTime(0.5*vol,t0); ng.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(ng); ng.connect(a.destination); src.start(t0); src.stop(t0+len);
+    [880,1320,1760].forEach((f,i)=>{ const s=a.createOscillator(); s.type='sine'; s.frequency.value=f;
+      const sg=a.createGain(); const st=t0+0.04+i*0.02; sg.gain.setValueAtTime(0.0001,st);
+      sg.gain.exponentialRampToValueAtTime(0.14*vol,st+0.02); sg.gain.exponentialRampToValueAtTime(0.001,st+0.34);
+      s.connect(sg); sg.connect(a.destination); s.start(st); s.stop(st+0.36); });
+  }
+  // heller Shimmer-Arpeggio für den ⭐ Star-Moment (Elite-Spieler kommt rein)
+  function starSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    [1046,1318,1568,2093].forEach((f,i)=>{ const o=a.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=a.createGain(); const st=t0+i*0.06;
+      g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.15,st+0.02); g.gain.exponentialRampToValueAtTime(0.001,st+0.4);
+      o.connect(g); g.connect(a.destination); o.start(st); o.stop(st+0.42); });
+  }
+  // leiser, mit dem Wert steigender Ping, wenn ein Feld-Kletterer eine neue Rundenbestleistung setzt
+  function risingPing(net){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(380+Math.min(520,net*3.2),t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.11,t0+0.02); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.15);
+  }
+  // kurzer „Achtung, gleich"-Riser vor dem Wumms — gibt dem Auge Zeit zum Banner zu springen
+  function riser(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sawtooth'; o.frequency.setValueAtTime(200,t0); o.frequency.exponentialRampToValueAtTime(760,t0+0.26);
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1700;
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.12,t0+0.2); g.gain.exponentialRampToValueAtTime(0.001,t0+0.3);
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.32);
+  }
+  // dosierte Screen-FX. Farbe = Ursache (gold Bestwert/Spitze · cyan Push · violett Rangsprung · rot Verletzung)
+  const CAUSE_COLOR={ gold:'#e8c04a', cyan:'#4fd0da', violet:'#a06ee8', red:'#ff7a6a' };
+  function fireFlash(kind){
+    const id = kind==='red'?'flashRed':kind==='violet'?'flashViolet':kind==='cyan'?'flashCyan':'flashGold';
+    const el=document.getElementById(id); if(!el) return;
+    el.classList.remove('fire'); void el.offsetWidth; el.classList.add('fire');
+  }
+  function shakeArena(soft){ const el=document.querySelector('.arena'); if(!el) return;
+    el.classList.remove('shake','shake-soft'); void el.offsetWidth; el.classList.add(soft?'shake-soft':'shake');
+    setTimeout(()=>el.classList.remove('shake','shake-soft'), soft?320:440); }
+  function showSpotlight(o){
+    const sp=document.getElementById('spotlight');
+    document.getElementById('spCrest').src = o.team.crest || crestURL(o.team,64);
+    document.getElementById('spKick').textContent = o.kick || 'Moment der Runde';
+    document.getElementById('spName').textContent = (o.team.mine?'★ ':'')+o.player.name;
+    document.getElementById('spSub').textContent = `${o.team.code} · ${TEAM_NAMES[o.team.code]||''}${o.leg?' · '+o.leg:''}`;
+    document.getElementById('spNet').textContent = '+'+o.net;
+    const chip=document.getElementById('spChip');
+    if(o.chip && o.chip.text){ chip.style.display='inline-block'; chip.textContent=o.chip.text;
+      const c=CAUSE_COLOR[o.chip.color]||'#e8c04a'; chip.style.background=c; chip.style.color='#1a1206'; }
+    else chip.style.display='none';
+    sp.classList.toggle('mine', !!o.team.mine);
+    sp.classList.remove('show'); void sp.offsetWidth; sp.classList.add('show');
+    setTimeout(()=>sp.classList.remove('show'), 1500);
+  }
 
   function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
   function easeOutBack(x){ const c1=1.22,c3=c1+1; return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2); }
 
-  let hitboxes=[];
   function drawCourt(){
     ctx.clearRect(0,0,W,H);
     hitboxes=[];
@@ -401,7 +572,7 @@
         ctx.fillRect(cx-TOWERW/2-5, topY-8, TOWERW+10, hpx+16);
         ctx.restore();
       }
-      // stacked climbing-hold column (the route climbed so far)
+      // stacked climbing-hold column (the route climbed so far — holds/Sims = Meilensteine)
       const step=R*1.42;
       for(let by=BASE_Y-R; by>topY-R; by-=step){
         ctx.beginPath(); ctx.arc(cx,by,R,0,Math.PI*2);
@@ -424,6 +595,15 @@
       const crestY = hoopY-R*1.7-crestR;
       if(t.mine){ ctx.beginPath(); ctx.arc(cx,crestY,crestR+3,0,Math.PI*2); ctx.fillStyle='rgba(47,143,174,.5)'; ctx.fill(); }
       drawCrestFast(cx, crestY, crestR, t, t.mine);
+      // Gold/Silber/Bronze-Ring = Top 3 der aktuellen Runde (nach Runden-Netto), nicht Total
+      const medal = t.roundMedal===1?'#e8c04a' : t.roundMedal===2?'#cfd3da' : t.roundMedal===3?'#cd7f32' : null;
+      if(medal){
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx,crestY,crestR+3.5,0,Math.PI*2);
+        ctx.strokeStyle=medal; ctx.lineWidth=t.mine?4.5:3.5;
+        ctx.shadowColor=medal; ctx.shadowBlur=8; ctx.stroke();
+        ctx.restore();
+      }
       // code label at the foot
       ctx.textAlign='center'; ctx.font=(t.mine?'800 11px':'600 8.5px')+' system-ui';
       ctx.fillStyle= t.mine ? cssv('--accent-soft','#63bcd6') : 'rgba(255,255,255,.55)';
@@ -476,7 +656,7 @@
   }
 
   let raf=null;
-  // local (per-tower) ball flight: shooter stands at the foot, arcs up to the hoop that
+  // local (per-tower) ball flight: shooter stands at the foot, arcs up to the anchor that
   // sits on top of the tower's height *before* this throw — the tower only grows after the swish.
   function ballPos(t,p){
     const cx=towerX(t), R=ballR(), scaleRef=currentScaleRef();
@@ -563,7 +743,6 @@
   function scorePop(net,mine){
     const pop=document.getElementById('pop');
     pop.textContent='+'+net; pop.style.color=mine?'#63bcd6':'var(--gold)';
-    pop.style.left=(W/2/W*100)+'%'; // percentage relative to arena
     pop.style.left='calc(50% - 20px)'; pop.style.top='42%';
     pop.style.transition='none'; pop.style.opacity='1'; pop.style.transform='translateY(0) scale(1)';
     requestAnimationFrame(()=>{ pop.style.transition='opacity .9s, transform .9s'; pop.style.opacity='0'; pop.style.transform='translateY(-40px) scale(1.25)'; });
@@ -579,6 +758,8 @@
       const row=document.createElement('div');
       row.className='lrow'+(t.mine?' mine':'');
       row.innerHTML=`<span class="pos">${t.rank}</span><img class="crest" src="${t.crest}" alt=""><span class="cd">${t.code}</span><span class="thr" title="in diesem Slot geklettert">○</span><span class="pts">0</span><span class="dd"></span>`;
+      row.addEventListener('mousemove',(e)=> showHoverCard(t,e.clientX,e.clientY));
+      row.addEventListener('mouseleave', hideHoverCard);
       host.appendChild(row); rowEls[t.code]=row;
     });
     positionLadder(true);
@@ -596,26 +777,31 @@
       const thr=row.querySelector('.thr');
       const done = t.thrownSlot===curSlot;
       thr.className='thr'+(done?' done':''); thr.textContent=done?'●':'○';
-      // delta = net movement since the current click began (Stand davor)
+      // delta = net movement since the current round began (Stand davor)
       const d = (t.roundStartRank!=null && curSlot>0) ? (t.roundStartRank - t.rank) : 0;
       const dd=row.querySelector('.dd');
       if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
       else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
       else { dd.className='dd'; dd.textContent=''; }
+      // Gold/Silber/Bronze = Rundensieger (Top 3 der aktuellen Runde)
+      row.classList.remove('rk-gold','rk-silver','rk-bronze');
+      if(t.roundMedal===1) row.classList.add('rk-gold');
+      else if(t.roundMedal===2) row.classList.add('rk-silver');
+      else if(t.roundMedal===3) row.classList.add('rk-bronze');
     });
   }
   function hotRow(code){
     const r=rowEls[code]; if(!r) return;
     r.classList.add('hot'); setTimeout(()=>r.classList.remove('hot'),600);
   }
-  function clearRankMarks(){
+  function clearMedals(){
     teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
   }
 
   // ---------- reveal flow ----------
   const SLOTS=["Route Reader","Grip Specialist","Pace Climber","Endurance Wall","Summit Push"];
   let queue=[], stepIdx=0, busy=false, curSlot=-1;
-  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r}); } }
 
   function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
   function slotRank(si, team){
@@ -634,41 +820,165 @@
     teams.forEach(x=>x.prevRank=x.rank);
     recomputeRanksLive();
     teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    // Slot-Rang des Spielers + INKREMENTELLE Team-Platzveränderung dieses Slots (relativ zum
+    // Stand nach dem vorherigen Slot, nicht zum Startplatz) — via settled Rang-Historie
+    const prevR = slot>0 ? (t.rankHist[slot-1] ?? t.seasonRank) : t.seasonRank;
+    const nowR = t.rankHist[slot] ?? t.rank;
+    t.slotHist[slot] = { slotRank: slotRank(slot,t), delta: prevR - nowR };
+    updateRoundMedals(slot);
     return {player:p,net};
   }
-  function logRow(t,slot,res){
+  // --- Impact-Klassifikation (geteilte Logik, jede Diszi rendert das Tier anders) ---
+  let roundBest=null;     // bester Netto-Wert der laufenden Runde (teamübergreifend, inkl. AI)
+  let dayBest=null;       // bester Netto-Wert des ganzen Spieltags
+  // Tier-Budget pro Runde: „dosiert" wird zur Regel statt zum Gefühl
+  let tier2Budget=2, tier1Budget=4;
+  function resetRoundBest(){ roundBest=null; tier2Budget=2; tier1Budget=4; teams.forEach(t=>t.roundMedal=0); }
+  // Gold/Silber/Bronze = Top 3 der AKTUELLEN Runde (nach Runden-Netto, live pro Reveal aktualisiert)
+  function updateRoundMedals(round){
+    const withNet = teams.filter(t=> t.thrownSlot===round)
+      .map(t=>({t, net: Math.max(0, t.players[round].val+modSum(t.players[round]))}))
+      .sort((a,b)=> b.net-a.net || a.t.seasonRank-b.t.seasonRank);
+    teams.forEach(t=> t.roundMedal=0);
+    withNet.slice(0,3).forEach((o,idx)=> o.t.roundMedal=idx+1);
+  }
+
+  // Echtes Gesamtranking der Runde: Stand NACHDEM alle Teams ihren Slot dieser Runde addiert
+  // haben (deterministisch vorab berechenbar). Damit triggern Rang-Ereignisse gegen die
+  // Endabrechnung der Runde, nicht gegen den flackernden Live-Rang im Cascade.
+  function computeRoundStandings(round){
+    const withAfter = teams.map(t=>{
+      let s=0; for(let k=0;k<=round;k++){ const p=t.players[k]; s+=Math.max(0, p.val+modSum(p)); }
+      return { t, after:s };
+    });
+    withAfter.slice().sort((a,b)=> b.after-a.after || a.t.seasonRank-b.t.seasonRank).forEach((o,idx)=> o.t.roundRankAfter=idx+1);
+    teams.forEach(t=>{ t.roundRankBefore=t.roundStartRank; t.roundDelta=t.roundStartRank - t.roundRankAfter; t.rankHist[round]=t.roundRankAfter; });
+  }
+
+  // Impact-Klassifikation → Tier + Ursache (Rang-Ereignis schlägt Einzelwert).
+  // Tier 2 = Spotlight+Wumms · Tier 1 = Ping+Glow+Chip · Tier 0 = still.
+  function noteReveal(t,slot,res,isMine){
+    const net=res.net, p=res.player;
+    const bonSum=p.mods.filter(m=>m.sign>0).reduce((s,m)=>s+m.amt,0);
+    const malSum=p.mods.filter(m=>m.sign<0).reduce((s,m)=>s+m.amt,0);
+    const injury=p.mods.some(m=>m.injury);
+    const delta=t.roundDelta;                      // Rangveränderung über die GANZE Runde (echtes Gesamtranking)
+    const prevBest = roundBest? roundBest.net : -1;
+    const newBest = net>prevBest;
+    if(newBest) roundBest={team:t,player:p,net,leg:SLOTS[slot]};
+    if(!dayBest || net>dayBest.net) dayBest={team:t,player:p,net,leg:SLOTS[slot]};
+    // Rang-Ereignisse gegen die Runden-Endabrechnung (roundRankBefore/After), nicht den Live-Rang
+    const leaderBefore=teams.find(x=>x.roundRankBefore===1);
+    const leaderChange = t.roundRankAfter===1 && leaderBefore && leaderBefore.code!==t.code;
+    const top3jump = (t.roundRankBefore>=6 && t.roundRankAfter<=3);
+
+    let cause='tick', tier=0, color='gold', text='';
+    if(injury){ cause='injury'; tier=2; color='red'; text=`−${malSum} Verletzung`; }
+    else if(p.val>=STAR_MIN){ cause='star'; tier=2; color='gold'; text=`⭐ Star · Wert ${p.val}`; }
+    else if(leaderChange){ cause='leader'; tier=2; color='gold'; text='neue Spitze · #1'; }
+    else if(top3jump){ cause='top3'; tier=2; color='violet'; text=`P${t.roundRankBefore} → P${t.roundRankAfter}`; }
+    else if(newBest){ cause='best'; tier=2; color='gold'; text=`#1 der Etappe · ${net}`; }
+    else if(bonSum>=13 && net>p.val){ cause='push'; tier=1; color='cyan'; text=`+${bonSum} Push`; }
+    else if(delta>=3){ cause='climb'; tier=1; color='violet'; text=`▲${delta} Plätze`; }
+    else if(prevBest>0 && net>=prevBest*0.9){ cause='strong'; tier=1; color='gold'; text=`stark · ${net}`; }
+
+    // Budget nur für AI und nur für Nicht-Verletzungen (Verletzungen nie verschlucken)
+    if(!isMine && cause!=='injury'){
+      if(tier===2){ if(tier2Budget>0) tier2Budget--; else tier=1; }
+      if(tier===1){ if(tier1Budget>0) tier1Budget--; else tier=0; }
+    }
+    return { tier, cause, color, text, kind:cause, newBest, delta };
+  }
+  function causeKick(cause, mine){
+    const own = mine?'DEIN KLETTERER · ':'';
+    switch(cause){
+      case 'leader': return own+'Neue Spitze';
+      case 'top3':   return own+'Sprung in die Top 3';
+      case 'best':   return own+'Bestwert der Etappe';
+      case 'injury': return own+'Verletzung';
+      case 'star':   return (mine?'DEIN STAR · ':'⭐ ')+'Star-Moment';
+      default:       return own+'Standout';
+    }
+  }
+  // Tier-2-Moment: Spotlight + Chip + farbiger Flash + Riser→Wumms (bzw. Thud bei Verletzung)
+  function fireLiveStandout(t,res,slot,impact){
+    const mine=t.mine;
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot],
+                    kick:causeKick(impact.cause,mine), chip:{text:impact.text,color:impact.color} });
+    fireFlash(impact.color); shakeArena(impact.cause==='injury' ? true : !mine);
+    if(impact.cause==='injury'){ stumbleThud(mine?0.5:0.4); }
+    else if(impact.cause==='star'){ starSound(); setTimeout(()=>wummsSound(mine?1.25:1.1), 300); }
+    else { riser(); setTimeout(()=>wummsSound(mine?1.1:0.92), 260); }
+    t.glowUntil=performance.now()+1500; pulseGlow(1500); hotRow(t.code);
+  }
+  // wendet das entschiedene Tier an
+  function applyImpactFx(t,res,slot,impact){
+    if(impact.tier===2){ fireLiveStandout(t,res,slot,impact); }
+    else if(impact.tier===1){ risingPing(res.net); t.glowUntil=performance.now()+900; pulseGlow(900); hotRow(t.code); }
+    // Tier 0: nur der stille Vorstoß des Griffs
+  }
+  // kurzer Hervorhebungs-Moment für das eigene Team, auch ohne Tier-2 (Rahmen hat es eh)
+  function liteMineSpotlight(t,res,slot){
+    showSpotlight({ team:t, player:res.player, net:res.net, leg:SLOTS[slot], kick:'DEIN KLETTERER', chip:{text:`+${res.net}`, color:'cyan'} });
+  }
+  // Podest am Ende der Disziplin: Top 3, Säulen steigen nacheinander auf
+  function showPodium(){
+    const top3=teams.slice().sort((a,b)=> b.score-a.score || a.seasonRank-b.seasonRank).slice(0,3);
+    const visual=[top3[1],top3[0],top3[2]]; const cls=['p2','p1','p3']; const place=[2,1,3];
+    const row=document.getElementById('podRow'); row.innerHTML='';
+    visual.forEach((t,idx)=>{ if(!t) return;
+      const col=document.createElement('div');
+      col.className='pod-col '+cls[idx]+(t.mine?' mine':'');
+      col.innerHTML=`<img class="pc-crest" src="${t.crest||crestURL(t,64)}" alt="">
+        <div class="pc-name">${(t.mine?'★ ':'')+(TEAM_NAMES[t.code]||t.code)}</div>
+        <div class="pc-pts">${Math.round(t.score)} Punkte</div>
+        <div class="pc-base">${place[idx]}</div>`;
+      row.appendChild(col);
+    });
+    document.getElementById('podium').classList.add('show');
+    fireFlash('gold');
+    const cols=[...row.children];
+    [2,0,1].forEach((ci,k)=> setTimeout(()=>{ if(cols[ci]) cols[ci].classList.add('in'); wummsSound(k===2?1.15:0.7); if(k===2) shakeArena(false); }, 300+k*440));
+  }
+  function logRow(t,slot,res,impact){
     const p=res.player,net=res.net;
+    let badge='';
+    if(impact){
+      const map={ star:['star','⭐ Star'], injury:['injury','Verletzung'], leader:['standout','Neue Spitze'], top3:['standout','Sprung Top 3'],
+                  best:['standout','Rundenbestwert'], push:['push','Hart gepusht'], climb:['push','Aufholjagd'], strong:['standout','Stark'] };
+      const m=map[impact.cause];
+      if(m) badge=` <span class="impact-badge ${m[0]}">${m[1]}</span>`;
+    }
     const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
     let calc=`<span class="base">${p.val}</span>`;
     p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
     calc+=` = <span class="net">+${net}</span>`;
-    const dl = delta===0 ? `<span class="dl same">Rang ${t.rank}</span>` : delta>0 ? `<span class="dl up">Rang ${t.rank} (▲${delta})</span>` : `<span class="dl down">Rang ${t.rank} (▼${-delta})</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const sr = slotRank(slot,t);
     const row=document.createElement('div'); row.className='row';
     row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
-      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span class="slotrank">· Slot-Rang ${slotRankBadge(slotRank(slot,t))}</span></div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.val>=STAR_MIN?'⭐ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span class="slotrank">· Slot-Rang ${slotRankBadge(sr)}</span>${badge}</div>
       <div class="calc">${calc}</div></div>${dl}`;
     const tk=document.getElementById('ticker');
     if(tk.querySelector('.empty')) tk.innerHTML='';
     tk.insertBefore(row,tk.firstChild);
-    while(tk.children.length>8) tk.removeChild(tk.lastChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
   }
   function roundSummary(round){
-    const jumps = teams.map(t=>({t, d:(t.roundStartRank - t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
-    const jumpTxt = jumps.map(j=>{
-      const p=j.t.players[round]; const net=Math.max(0,p.val+modSum(p));
-      return `${j.t.code} ▲${j.d} · ${p.name} ${net}`;
-    }).join(' · ') || '–';
-    const row=document.createElement('div'); row.className='row round-summary';
-    row.innerHTML=`<div class="body"><b>Runde ${round+1}</b> — Größte Sprünge: ${jumpTxt}</div>`;
+    const jumps = teams.map(t=>({t, d:(t.roundStartRank-t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
+    const parts = jumps.map(({t,d})=>{ const p=t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${t.code} ▲${d} · ${p.name} ${net}`; });
+    const el=document.createElement('div'); el.className='round-summary';
+    el.innerHTML = jumps.length ? `<b>Runde ${round+1}</b> — Größte Sprünge: ${parts.join(' · ')}` : `<b>Runde ${round+1}</b> — keine Rangsprünge`;
     const tk=document.getElementById('ticker');
     if(tk.querySelector('.empty')) tk.innerHTML='';
-    tk.insertBefore(row,tk.firstChild);
-    while(tk.children.length>8) tk.removeChild(tk.lastChild);
-    jumps.forEach((j,idx)=>{
-      hotRow(j.t.code); j.t.glowUntil=performance.now()+950;
-      const r=rowEls[j.t.code]; if(r) r.classList.add(idx===0?'rk-gold':idx===1?'rk-silver':'rk-bronze');
-    });
-    if(jumps.length) pulseGlow(1000);
+    tk.insertBefore(el, tk.firstChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+    jumps.forEach(({t})=> hotRow(t.code));
   }
   function updateMyTracker(){
     const me=teams.find(t=>t.mine);
@@ -688,44 +998,38 @@
     busy=true;
     const q=queue[stepIdx];
     curSlot=q.round;
-    // Reference = standings at the START of this ROUND (previous round's end).
-    // Snapshot only when the round begins (field stage) and keep it through the own-throw,
-    // so the shown delta is round-over-round: rank now vs rank after the previous round.
-    if(q.stage==='field'){ teams.forEach(t=>{ t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearRankMarks(); }
-    if(q.stage==='field'){
-      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
-      let i=0;
-      const doOne=()=>{
-        if(i>=field.length){ endStage(q); return; }
-        const t=field[i++];
-        const res=applyReveal(t,q.round);
-        shooter={team:t,player:res.player,net:res.net,raw:res.player.val};
-        quickShot(()=>{
-          scorePop(res.net,false);
-          logRow(t,q.round,res);
-          positionLadder(false); hotRow(t.code); updateMyTracker();
-          setTimeout(doOne, 60);
-        });
-      };
-      doOne();
-    } else {
-      const t=teams.find(x=>x.mine);
+    teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); resetRoundBest(); computeRoundStandings(q.round);
+    // EIN Durchlauf über ALLE 32 Teams (schlechtestes zuerst) — eigenes Team an natürlicher Position,
+    // nicht separat ans Ende geschoben. Das beste Team kommt automatisch zuletzt (Höhepunkt).
+    const order=teams.slice().sort((a,b)=> b.rank-a.rank);
+    let i=0;
+    const doOne=()=>{
+      if(i>=order.length){ endStage(q); return; }
+      const t=order[i++];
+      const isMine=t.mine;
       const res=applyReveal(t,q.round);
-      // clutch slow-mo: only the 5th slot, only if this throw changed our rank
-      const clutch = (q.round===4 && t.lastDelta!==0);
-      shooter={team:t,player:res.player,net:res.net,raw:res.player.val,slowmo:clutch};
-      document.getElementById('status').textContent= clutch?'★ GIPFELSTURM — Zeitlupe':'Aufstieg …';
-      phaseLabel = clutch ? `Runde ${q.round+1} · ★ GIPFELSTURM — Zeitlupe` : `Runde ${q.round+1} · ★ dein Aufstieg — ${SLOTS[q.round]}`;
-      animShot(()=>{
-        scorePop(res.net,true);
-        logRow(t,q.round,res);
+      const impact=noteReveal(t,q.round,res,isMine);
+      shooter={team:t,player:res.player,net:res.net,raw:res.player.val,slowmo:isMine&&impact.tier===2};
+      const after=()=>{
+        scorePop(res.net,isMine);
+        logRow(t,q.round,res,impact);
         positionLadder(false); hotRow(t.code); updateMyTracker();
-        roundSummary(q.round);
-        endStage(q);
-      });
-    }
+        applyImpactFx(t,res,q.round,impact);
+        if(isMine && impact.tier<2){ liteMineSpotlight(t,res,q.round); }
+        const delay = impact.tier===2 ? 1550 : isMine ? 750 : impact.tier===1 ? 240 : 90;
+        setTimeout(doOne, delay);
+      };
+      if(isMine){ document.getElementById('status').textContent='★ Dein Aufstieg'; phaseLabel = impact.tier===2 ? `Runde ${q.round+1} · ★ GIPFELSTURM — Zeitlupe` : `Runde ${q.round+1} · ★ dein Aufstieg — ${SLOTS[q.round]}`; animShot(after); }
+      else { phaseLabel=`Runde ${q.round+1} · Feld klettert — ${SLOTS[q.round]}`; quickShot(after); }
+    };
+    doOne();
   }
-  function endStage(q){ stepIdx++; updateControls(); setTimeout(()=>busy=false, 200); }
+  function endStage(q){
+    roundSummary(q.round);
+    stepIdx++; updateControls();
+    if(stepIdx>=queue.length){ setTimeout(showPodium, 700); }
+    setTimeout(()=>busy=false, 200);
+  }
 
   function updateControls(){
     const btn=document.getElementById('advance');
@@ -735,19 +1039,24 @@
     const q=queue[stepIdx], round=q.round+1;
     document.getElementById('round').textContent=round;
     document.getElementById('slotlbl').textContent=SLOTS[q.round];
-    if(q.stage==='field'){ btn.textContent=`▶ Feld klettert (Slot ${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Feld klettert`; phaseLabel=`Runde ${round} · Feld klettert — ${SLOTS[q.round]}`; }
-    else { btn.textContent=`★ Dein Kletterer steigt (${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Aufstieg`; phaseLabel=`Runde ${round} · ★ dein Aufstieg — ${SLOTS[q.round]}`; }
+    btn.textContent=`▶ Feld klettert (Slot ${SLOTS[q.round]})`;
+    document.getElementById('status').textContent=`Runde ${round} · Feld klettert`;
+    phaseLabel=`Runde ${round} · Feld klettert — ${SLOTS[q.round]}`;
     drawCourt();
   }
 
   function reset(){
+    document.getElementById('mylbl').textContent=`Dein Team · ${MINE} · ${TEAM_NAMES[MINE]||MINE}`;
     if(raf) cancelAnimationFrame(raf);
     initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; shooter=null; ballT=1; ballGlow=0; phaseLabel='Einseilen — bereit';
+    roundBest=null; dayBest=null; tier2Budget=2; tier1Budget=4;
+    document.getElementById('spotlight').classList.remove('show','mine');
+    document.getElementById('podium').classList.remove('show');
+    document.getElementById('podRow').innerHTML='';
     buildLadder(); positionLadder(true);
     document.getElementById('ticker').innerHTML='<div class="empty">Noch niemand geklettert. Klick auf „Feld klettert".</div>';
     document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
     document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
-    document.getElementById('mylbl').textContent=`Dein Team · ${MINE} · ${TEAM_NAMES[MINE]}`;
     updateControls(); drawCourt();
   }
 
@@ -765,23 +1074,30 @@
         let calc=`<span class="base">${p.val}</span>`;
         p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt}</span>` : ` <span class="bon">+ ${m.amt}</span>`; });
         calc+=` = <span class="net">${net}</span>`;
-        rows.push(`<div class="hc-slot"><span class="hc-sn">${SLOTS[s]}</span> · <span class="hc-pn">${p.name}</span> <span class="slotrank">· Slot-Rang ${slotRankBadge(slotRank(s,t))}</span><div class="hc-calc">${calc}</div></div>`);
+        const sh = t.slotHist ? t.slotHist[s] : null;
+        let srtxt='';
+        if(sh){
+          const c=ampelColor(sh.slotRank)||'var(--mut)', d=sh.delta;
+          const dtxt = d>0?` <span style="color:var(--up);font-weight:800">(▲${d})</span>` : d<0?` <span style="color:var(--down);font-weight:800">(▼${-d})</span>` : ` <span style="color:var(--mut);font-weight:700">(±0)</span>`;
+          srtxt = ` · <span style="color:${c};font-weight:800">#${sh.slotRank}</span>${dtxt}`;
+        }
+        rows.push(`<div class="hc-slot"><span class="hc-sn">${p.val>=STAR_MIN?'⭐ ':''}${SLOTS[s]}</span> · <span class="hc-pn">${p.name}</span>${srtxt}<div class="hc-calc">${calc}</div></div>`);
       }
       slotsHtml=rows.join('');
     }
     const plus=t.score-(t.roundStartScore||0);
-    const ptsTxt=Math.round(t.score)+(plus>0?` (+${Math.round(plus)})`:'')+' Pkt';
-    return `<div class="hc-head"><img src="${t.crest}" alt=""><div><div class="hc-name">${TEAM_NAMES[t.code]||t.code}</div><div class="hc-code">${t.code}</div></div><div class="hc-rank">Rang<b>${t.rank}</b>${ptsTxt}</div></div><div class="hc-slots">${slotsHtml}</div>`;
+    const ptsTxt=Math.round(t.score)+(plus>0?` (+${Math.round(plus)})`:'');
+    const rc=ampelColor(t.rank);
+    return `<div class="hc-head"><img src="${t.crest}" alt=""><div><div class="hc-name">${TEAM_NAMES[t.code]||t.code}</div><div class="hc-code">${t.code}</div></div><div class="hc-rank">Rang<b${rc?` style="color:${rc}"`:''}>#${t.rank}</b>${ptsTxt} Pkt</div></div><div class="hc-slots">${slotsHtml}</div>`;
   }
-  function showHoverCard(code, clientX, clientY){
-    const t=teams.find(x=>x.code===code); if(!t) return;
+  function showHoverCard(t, clientX, clientY){
     hc.innerHTML=hoverCardHTML(t);
+    hc.classList.add('show');
     const box=arenaEl.getBoundingClientRect();
     let left=clientX-box.left+16, top=clientY-box.top+16;
     if(left+300>box.width) left=clientX-box.left-300-16;
     if(top+260>box.height) top=Math.max(6, box.height-266);
     hc.style.left=left+'px'; hc.style.top=top+'px';
-    hc.classList.add('show');
   }
   function hideHoverCard(){ hc.classList.remove('show'); }
   cv.addEventListener('mousemove', function(ev){
@@ -790,22 +1106,14 @@
     const mx=(ev.clientX-rect.left)*sx, my=(ev.clientY-rect.top)*sy;
     let found=null;
     for(const hb of hitboxes){ const dx=mx-hb.x, dy=my-hb.y; if(dx*dx+dy*dy<=hb.r*hb.r){ found=hb; break; } }
-    if(found) showHoverCard(found.code, ev.clientX, ev.clientY); else hideHoverCard();
+    if(found){ const t=teams.find(x=>x.code===found.code); if(t) showHoverCard(t, ev.clientX, ev.clientY); else hideHoverCard(); }
+    else hideHoverCard();
   });
   cv.addEventListener('mouseleave', hideHoverCard);
-  document.getElementById('lrows').addEventListener('mouseover', function(ev){
-    const row=ev.target.closest('.lrow'); if(!row) return;
-    const code=row.querySelector('.cd').textContent;
-    const r=row.getBoundingClientRect();
-    showHoverCard(code, r.left+r.width/2, r.top);
-  });
-  document.getElementById('lrows').addEventListener('mouseout', function(ev){
-    if(!ev.relatedTarget || !ev.relatedTarget.closest('.lrow')) hideHoverCard();
-  });
 
   document.getElementById('advance').addEventListener('click',advance);
   document.getElementById('replay').addEventListener('click',reset);
-  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) windSound(0.4); });
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted && curSlot>=0) windSound(0.4); });
   const mq=window.matchMedia('(prefers-color-scheme: dark)');
   if(mq.addEventListener) mq.addEventListener('change',drawCourt);
   reset();
