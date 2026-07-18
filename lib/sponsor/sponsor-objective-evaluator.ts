@@ -3,6 +3,7 @@ import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/l
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   FAN_INFRASTRUCTURE_LEVEL_CAP,
@@ -322,7 +323,11 @@ export function computeObjectiveProgressMetric(
       return computeTransferWindowNet(gameState, teamId, gameState.season.id);
     case "sustainability_architect": {
       const facilities = getTeamFacilityState(gameState, teamId);
-      const income = calculateFacilityIncome(facilities);
+      // Wie beim echten Saison-End-Credit (facility-season-end-service): die Arena-Einnahme skaliert
+      // mit dem persistierten Beliebtheitsfaktor des Teams. Ohne diesen Faktor überschätzt das Ziel
+      // die tatsächlich gutgeschriebene Einnahme. Alle anderen Gebäude bleiben flach (Faktor 1).
+      const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
+      const income = calculateFacilityIncome(facilities, { arenaPopularityFactor });
       const upkeep = calculateFacilityUpkeep(facilities);
       return income - upkeep;
     }
@@ -330,9 +335,25 @@ export function computeObjectiveProgressMetric(
       const rosterIds = rosterPlayerIdsForTeam(gameState, teamId);
       if (rosterIds.size === 0) return 0;
       const cap = SPONSOR_OBJ_FATIGUE_CAP;
-      const fresh = gameState.players.filter(
-        (player) => rosterIds.has(player.id) && (typeof player.fatigue === "number" ? player.fatigue : 0) <= cap,
-      ).length;
+      // Die Mechanik (Verletzungs-Rolls, Match-Scoring) misst gegen die REINE Match-Fatigue aus
+      // playerAvailabilityState (via getPlayerCurrentFatigue), NICHT gegen player.fatigue — letztere
+      // trägt zusätzlich die aufsummierte Trainings-Fatigue-Schicht. Das Ziel spiegelt deshalb genau
+      // dieselbe Availability-Fatigue wie die Mechanik: availability?.fatigue ?? player.fatigue ?? 0.
+      const availabilityFatigueByPlayerId = new Map<string, number>();
+      for (const entry of gameState.seasonState.playerAvailabilityState ?? []) {
+        if (entry.teamId === teamId) availabilityFatigueByPlayerId.set(entry.playerId, entry.fatigue);
+      }
+      const fresh = gameState.players.filter((player) => {
+        if (!rosterIds.has(player.id)) return false;
+        const availabilityFatigue = availabilityFatigueByPlayerId.get(player.id);
+        const matchFatigue =
+          typeof availabilityFatigue === "number"
+            ? availabilityFatigue
+            : typeof player.fatigue === "number"
+              ? player.fatigue
+              : 0;
+        return matchFatigue <= cap;
+      }).length;
       return (100 * fresh) / rosterIds.size;
     }
     case "form_color_cover": {

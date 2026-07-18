@@ -26,10 +26,17 @@ import {
 } from "@/lib/economy/team-beliebtheit";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import {
+  computeObjectiveProgressMetric,
   evaluateSpecialComponentForObjective,
   evaluateSpecialComponentStage,
 } from "@/lib/sponsor/sponsor-objective-evaluator";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  calculateFacilityIncome,
+  calculateFacilityUpkeep,
+  getTeamFacilityState,
+} from "@/lib/facilities/facility-effects";
+import { SPONSOR_OBJ_FATIGUE_CAP } from "@/lib/sponsor/sponsor-special-objectives";
+import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 
 describe("sponsor special objectives", () => {
   it("never asks weak teams for unrealistic axis top-10 targets", () => {
@@ -182,6 +189,90 @@ describe("sponsor bonus objectives (Teil B)", () => {
       expect(getAvailableBonusObjectiveKeys(archetype, "season-4")).not.toContain(pick as never);
     }
   });
+
+  it("measures fatigue_management against pure availability fatigue, not the training layer", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+    const rosterPlayerIds = gs.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
+    expect(rosterPlayerIds.length).toBeGreaterThan(1);
+
+    const comp: SponsorOfferComponent = {
+      componentId: "special-fatigue",
+      kind: "special",
+      label: "Fatigue-Management",
+      targetValue: SPONSOR_OBJ_FATIGUE_CAP,
+      rewardCash: 5,
+      specialKey: "fatigue_management",
+    };
+
+    // Fall 1: EIN Spieler trägt eine hohe Trainings-Fatigue-Schicht (player.fatigue weit über Cap),
+    // aber seine reine Match-Fatigue (availability) liegt unter dem Cap. Er MUSS als frisch zählen.
+    const highTrainingId = rosterPlayerIds[0]!;
+    gs.seasonState.playerAvailabilityState = rosterPlayerIds.map((playerId) => ({
+      playerId,
+      teamId,
+      fatigue: 5,
+      injuryStatus: "healthy" as const,
+    }));
+    gs.players = gs.players.map((player) =>
+      player.id === highTrainingId ? { ...player, fatigue: SPONSOR_OBJ_FATIGUE_CAP + 50 } : player,
+    );
+    const metricFresh = computeObjectiveProgressMetric(gs, teamId, comp);
+    expect(metricFresh).toBe(100); // reine Match-Fatigue → gesamter Kader frisch
+
+    // Fall 2: Umgekehrt — reine Match-Fatigue über Cap zählt NICHT als frisch, auch wenn
+    // player.fatigue (Trainingsschicht) niedrig ist.
+    gs.seasonState.playerAvailabilityState = rosterPlayerIds.map((playerId) => ({
+      playerId,
+      teamId,
+      fatigue: playerId === highTrainingId ? SPONSOR_OBJ_FATIGUE_CAP + 10 : 5,
+      injuryStatus: "healthy" as const,
+    }));
+    gs.players = gs.players.map((player) => (player.id === highTrainingId ? { ...player, fatigue: 0 } : player));
+    const metricTired = computeObjectiveProgressMetric(gs, teamId, comp);
+    expect(metricTired).toBeCloseTo((100 * (rosterPlayerIds.length - 1)) / rosterPlayerIds.length, 5);
+  }, 60000);
+
+  it("measures sustainability_architect income with the arena popularity factor", () => {
+    const gs = structuredClone(createSingleplayerGameState());
+    const teamId = gs.teams[0]!.teamId;
+
+    // Arena gebaut (Beliebtheit skaliert nur die Arena-Einnahme); Beliebtheit = 1.5 (Max).
+    gs.seasonState.teamFacilities = {
+      ...(gs.seasonState.teamFacilities ?? {}),
+      [teamId]: {
+        facilities: {
+          arena_upgrade: { level: 5, enabled: true, conditionPct: 100 },
+        },
+      },
+    } as never;
+    gs.seasonState.beliebtheitByTeamId = {
+      ...(gs.seasonState.beliebtheitByTeamId ?? {}),
+      [teamId]: { value: 1.5 } as never,
+    };
+
+    const comp: SponsorOfferComponent = {
+      componentId: "special-sustainability",
+      kind: "special",
+      label: "Sustainability Architect",
+      targetValue: 5,
+      rewardCash: 5,
+      specialKey: "sustainability_architect",
+    };
+
+    const facilities = getTeamFacilityState(gs, teamId);
+    const upkeep = calculateFacilityUpkeep(facilities);
+    const incomeWithPopularity = calculateFacilityIncome(facilities, { arenaPopularityFactor: 1.5 });
+    const incomeNaive = calculateFacilityIncome(facilities); // ohne Beliebtheitsfaktor (der alte Bug)
+
+    const metric = computeObjectiveProgressMetric(gs, teamId, comp);
+
+    // Ziel spiegelt exakt die tatsächlich gutgeschriebene, beliebtheits-skalierte Einnahme.
+    expect(metric).toBeCloseTo(incomeWithPopularity - upkeep, 5);
+    // Der Faktor wirkt wirklich: die Arena ist gebaut und 1.5 > 1.0 hebt die Einnahme über den naiven Wert.
+    expect(incomeWithPopularity).toBeGreaterThan(incomeNaive);
+    expect(metric).not.toBeCloseTo(incomeNaive - upkeep, 5);
+  }, 60000);
 
   it("gates golden title-shock to weak teams only", () => {
     const gs = structuredClone(createSingleplayerGameState());
