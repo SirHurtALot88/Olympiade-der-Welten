@@ -405,12 +405,14 @@
     return arr;
   }
   function fnvHash(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function teamStrength(t){ return t.players.reduce((s,p)=>s+p.val,0); }
   function initData(){
     _s=0x51ed270b;
-    // Startaufstellung nach SAISONRANG statt alphabetisch — das ist zugleich die FESTE
-    // x-Position jedes Turms in der Skyline (xSlot). Nur die Höhe bewegt sich später.
-    teams.slice().sort((a,b)=> fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=>{ t.seasonRank=idx+1; t.xSlot=idx; });
-    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0; });
+    teams.forEach(t=>{ t.players=genPlayers(t); });
+    // Startreihenfolge = Vorsaison-Abschlusstabelle (Proxy: Kaderstärke, stärkstes Team zuerst) —
+    // das ist zugleich die FESTE x-Position jedes Turms (xSlot). Nur die Höhe bewegt sich später.
+    teams.slice().sort((a,b)=> teamStrength(b)-teamStrength(a) || fnvHash(a.code)-fnvHash(b.code)).forEach((t,idx)=>{ t.seasonRank=idx+1; t.xSlot=idx; });
+    teams.forEach(t=>{ t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.seasonRank; t.prevRank=t.seasonRank; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundGlowUntil=0; t.slotHist={}; t.rankHist={}; t.roundMedal=0; });
   }
   function ampelColor(rank){
     if(rank<=3) return '#2fa564';
