@@ -49,6 +49,7 @@ import {
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import {
   applySellPricingPolicyToBreakdown,
   isBigHaircut,
@@ -122,12 +123,21 @@ function normId(value: number | null | undefined): number {
  * Build the utility player view from a domain Player (quality from stats; marketValue = price only).
  * `purchasePrice` (the roster entry's cost basis) is threaded only for SELL views — it feeds the
  * profit-flip term in sellUtility. Buy/draft views omit it (undefined ⇒ no profit signal).
+ * `openBuyoutCost` (the remaining open buyout/release clause the club owes on a sale) is likewise SELL-only:
+ * it converts marketValue into the NET proceeds the club actually banks (netSaleProceeds = marketValue −
+ * openBuyoutCost), the same net figure resolveTransfermarktSellProceeds credits to cash at execution time.
+ * Omitted / ≤ 0 ⇒ no clause ⇒ netSaleProceeds stays undefined (net == marketValue), so buy/draft views and
+ * clause-free players are bit-identical to before.
  */
 export function toOrganicPlayerView(
   player: Player,
   themeFit?: number,
   purchasePrice?: number | null,
+  openBuyoutCost?: number | null,
 ): OrganicPlayerView {
+  const marketValue = Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0);
+  const buyoutCost =
+    typeof openBuyoutCost === "number" && Number.isFinite(openBuyoutCost) ? Math.max(0, openBuyoutCost) : 0;
   return {
     playerId: player.id,
     pow: player.coreStats?.pow ?? 0,
@@ -135,10 +145,14 @@ export function toOrganicPlayerView(
     men: player.coreStats?.men ?? 0,
     soc: player.coreStats?.soc ?? 0,
     disciplineRatings: player.disciplineRatings ?? {},
-    marketValue: Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0),
+    marketValue,
     salary: Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0),
     purchasePrice:
       typeof purchasePrice === "number" && Number.isFinite(purchasePrice) ? Math.max(0, purchasePrice) : undefined,
+    // Only a real clause (> 0) sets netSaleProceeds — otherwise leave it undefined so sellUtility keeps
+    // using marketValue unchanged (net == marketValue when nothing is owed). Net may be negative when the
+    // clause exceeds the price; sellUtility clamps that to 0.
+    netSaleProceeds: buyoutCost > 0 ? marketValue - buyoutCost : undefined,
     potential: player.potential ?? null,
     themeFit,
   };
@@ -703,9 +717,26 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     identity: input.identity,
     draftSeed: input.draftSeed ?? null,
   });
-  const held = input.roster.map((player) =>
-    toOrganicPlayerView(player, undefined, input.purchasePriceByPlayerId?.[player.id]),
+  const rosterEntryByPlayerId = new Map(
+    (input.gameState.rosters ?? [])
+      .filter((entry) => entry.teamId === input.team.teamId)
+      .map((entry) => [entry.playerId, entry] as const),
   );
+  // SELL views carry NET-including-buyout proceeds: for each held player resolve the open buyout/release
+  // clause from its live roster entry (same resolveOpenBuyoutCostForRoster the real sale uses; no
+  // seasonsElapsed, mirroring transfermarkt-sell-service) so sellUtility scores what the club actually banks.
+  const held = input.roster.map((player) => {
+    const rosterEntry = rosterEntryByPlayerId.get(player.id) ?? null;
+    const openBuyoutCost = rosterEntry
+      ? resolveOpenBuyoutCostForRoster({ rosterEntry, gameState: input.gameState })
+      : 0;
+    return toOrganicPlayerView(
+      player,
+      undefined,
+      input.purchasePriceByPlayerId?.[player.id],
+      openBuyoutCost,
+    );
+  });
   // Season-end may empty the roster (rebuild in preseason); in-season keeps a fieldable floor.
   const rosterMin = input.allowBelowMin ? 0 : ROSTER_MIN;
 
@@ -719,11 +750,6 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   // parked here and excluded from further selection this run (they are kept, not sold).
   const teamDistressed = isSellerDistressed(input.gameState, input.team.teamId);
   const playerById = new Map(input.roster.map((player) => [player.id, player]));
-  const rosterEntryByPlayerId = new Map(
-    (input.gameState.rosters ?? [])
-      .filter((entry) => entry.teamId === input.team.teamId)
-      .map((entry) => [entry.playerId, entry] as const),
-  );
   const blockedFloorPlayerIds = new Set<string>();
 
   const buildState = (): OrganicTeamState => {

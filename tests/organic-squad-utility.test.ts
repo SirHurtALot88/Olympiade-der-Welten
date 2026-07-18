@@ -115,6 +115,66 @@ describe("sellUtility — cheap to sell from a covered discipline", () => {
   });
 });
 
+describe("sellUtility — scores NET-including-buyout proceeds, not raw marketValue", () => {
+  it("a player WITH a buyout clause is scored on net proceeds (below its marketValue)", () => {
+    const noClause = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 40,
+      purchasePrice: 20,
+    });
+    const withClause = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 40,
+      purchasePrice: 20,
+      // Clause of 15 owed on the sale ⇒ the club only nets 25, not the 40 marketValue.
+      netSaleProceeds: 25,
+    });
+    const state = makeState({ disciplineNeeds: NEEDS_SATURATED });
+    expect(sellUtility(withClause, state)).toBeLessThan(sellUtility(noClause, state));
+  });
+
+  it("net proceeds — not marketValue — is the only sale figure the sell utility reads", () => {
+    // marketValue 40 with a 15 clause (net 25) must score EXACTLY like a clause-free MW-25 player: proves the
+    // utility banks netSaleProceeds and never the raw marketValue.
+    const netFromClause = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 40,
+      purchasePrice: 20,
+      netSaleProceeds: 25,
+    });
+    const clauseFreeAtNet = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 25,
+      purchasePrice: 20,
+    });
+    const state = makeState({ disciplineNeeds: NEEDS_SATURATED });
+    expect(sellUtility(netFromClause, state)).toBeCloseTo(sellUtility(clauseFreeAtNet, state), 10);
+  });
+
+  it("a clause-free player (no netSaleProceeds) is unchanged — still scored on marketValue", () => {
+    const clauseFree = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 40,
+      purchasePrice: 20,
+    });
+    // Explicitly setting net == marketValue must be identical to leaving it undefined (no-clause case).
+    const explicitNetEqualsMw = makePlayer({
+      pow: 84,
+      disciplineRatings: { tdm: 82 },
+      marketValue: 40,
+      purchasePrice: 20,
+      netSaleProceeds: 40,
+    });
+    const state = makeState({ disciplineNeeds: NEEDS_SATURATED });
+    expect(sellUtility(explicitNetEqualsMw, state)).toBeCloseTo(sellUtility(clauseFree, state), 10);
+  });
+});
+
 describe("stopUtility — organic saving + soft OPT brake", () => {
   it("saving is more attractive when cash is scarce", () => {
     expect(stopUtility(makeState({ cash: 15 }))).toBeGreaterThan(stopUtility(makeState({ cash: 300 })));
