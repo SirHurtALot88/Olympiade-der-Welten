@@ -789,7 +789,7 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       // (bereits auf 28 gesenkten) Bauschwelle, weshalb heiß gelaufene Teams trotz Druck NICHT bauten. Jetzt
       // skaliert das Signal mit der tatsächlichen Vorsaison-Belastung, sodass heiße Teams die Schwelle
       // zuverlässig knacken, kühl gelaufene aber weiter nichts bauen.
-      score += Math.max(0, context.prevSeasonAvgMatchdayFatigue - 30) * 1.2; // Fatigue 55→+30, 66→+43
+      score += Math.max(0, context.prevSeasonAvgMatchdayFatigue - 30) * 1.5; // Fatigue 55→+37, 66→+54
       score += Math.max(0, context.prevSeasonInjuryCount - 4) * 3; // 8 Verletzungen→+12, 12→+24
       if (context.fatigueAvg >= 60) score += 12;
       if (context.chronicInjuryPlayerCount >= 2) score += 10;
@@ -797,6 +797,15 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       // Hebel für Teams, die (bewusst) nahe am Minimum laufen, statt sie in die Fatigue-Spirale zu schicken.
       if (context.rosterCount <= context.identity.playerOpt) score += 8;
       if (context.rosterCount >= context.identity.playerOpt + 2) score -= 6;
+      // Ladder-Climb: Teams bauten Recovery bislang nur auf Level 1 und blieben dort (der L1-Effekt +2 ist zu
+      // schwach für die Fatigue-Last). Ein noch immer heiß laufendes Team mit vorhandenem Recovery Center soll
+      // es aktiv HOCHZIEHEN (L1→L2→L3: +4/+6/+9 statt +2). Das Signal hält den Score klar über der
+      // Downgrade-/Low-Value-Linie (42), damit die Stufe unter Cash-Druck nicht wieder abgebaut wird — aber nur
+      // solange die Vorsaison-Belastung real hoch war (kühl gelaufene Teams stagnieren korrekt bei ihrem Level).
+      if (currentLevel >= 1 && (context.prevSeasonAvgMatchdayFatigue >= 50 || context.fatigueAvg >= 55)) {
+        score += 16;
+        positive.push("Recovery Center weiter ausbauen (Fatigue-Last bleibt hoch)");
+      }
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
     } else if (facility.facilityId === "scouting_office" || facility.facilityId === "analytics_room") {
