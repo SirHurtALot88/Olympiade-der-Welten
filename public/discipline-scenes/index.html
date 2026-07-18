@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disziplin-Szenen — Prototypen · Olympiade der Welten</title>
+<style>
+  :root{ --bg:#12100c; --panel:#1c1812; --ink:#f3ebdf; --mut:#a1917c; --line:#2e2618; --accent:#e07a2b; }
+  @media (prefers-color-scheme: light){ :root{ --bg:#f2efe9; --panel:#fffdf9; --ink:#20180f; --mut:#7c7161; --line:#e6ded0; } }
+  *{ box-sizing:border-box; } body{ margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap{ max-width:1040px; margin:0 auto; padding:clamp(18px,4vw,44px); }
+  .eyebrow{ font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:800; margin:0 0 6px; }
+  h1{ font-family:Georgia,serif; font-style:italic; font-size:clamp(26px,5vw,42px); margin:0 0 6px; }
+  .sub{ color:var(--mut); font-size:14px; max-width:66ch; margin:0 0 8px; }
+  h2{ font-size:12px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); margin:26px 0 10px; }
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+  .card{ display:flex; flex-direction:column; gap:8px; padding:16px; border-radius:14px; text-decoration:none;
+         background:var(--panel); border:1px solid var(--line); color:var(--ink); transition:border-color .15s, transform .06s; }
+  .card:hover{ border-color:var(--accent); transform:translateY(-2px); }
+  .card .t{ font-weight:800; font-size:15px; }
+  .card .go{ font-size:12px; color:var(--accent); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Prototypen · Reveal-Szenen</p>
+  <h1>Disziplin-Szenen</h1>
+  <p class="sub">Interaktive Mockups für die Matchday-Darstellung jeder Disziplin. Grammatik überall gleich (Position = Punkte, 32 Teams), Optik pro Disziplin eigen. Klick dich durch und spiel jede Szene an.</p>
+  <p class="sub"><b>Staffel</b> trägt bereits den vollen Highlight-v2-Layer (Ursachen-Chips, Rang-Trigger, Wumms, Podest); die anderen zeigen ihre jeweilige Optik.</p>
+  <h2>Rennen / Strecke</h2>
+<div class="grid">
+  <a class="card" href="./staffel-oval.html"><span class="t">Staffel — 400m-Oval</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./spurt-meute.html"><span class="t">Spurt — Meuten-Strecke</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./timetrial.html"><span class="t">Time Trial — Zeitfahren</span><span class="go">öffnen →</span></a>
+</div>
+<h2>Kraft / Körper</h2>
+<div class="grid">
+  <a class="card" href="./staffel-track.html"><span class="t">Gewichtheben — Hantelbahn</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./wettessen.html"><span class="t">Wettessen — Gelage</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./minidm.html"><span class="t">Mini-DM — Grube</span><span class="go">öffnen →</span></a>
+</div>
+<h2>Ballsport</h2>
+<div class="grid">
+  <a class="card" href="./basketball-court.html"><span class="t">Basketball — Skyline</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./football.html"><span class="t">Football — Drives</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./hockey.html"><span class="t">Hockey — Eis</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./tennis.html"><span class="t">Tennis — Match</span><span class="go">öffnen →</span></a>
+</div>
+<h2>Kampf / Taktik</h2>
+<div class="grid">
+  <a class="card" href="./tdm-schlachtfeld.html"><span class="t">TDM — Vormarsch</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./battlefield.html"><span class="t">Battlefield — Schlacht</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./fechten.html"><span class="t">Fechten — Pisten</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./schach-halle.html"><span class="t">Speed-Schach — Bauernmarsch</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./breakingpoint.html"><span class="t">Breaking Point — Kessel</span><span class="go">öffnen →</span></a>
+</div>
+<h2>Geschick / Show</h2>
+<div class="grid">
+  <a class="card" href="./climbing.html"><span class="t">Climbing — Wand</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./eiskunstlauf.html"><span class="t">Eiskunstlauf — Kür</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./showcase-buehne.html"><span class="t">Showcase — Ruhmtreppe</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./takeshi.html"><span class="t">Takeshi's Castle — Parcours</span><span class="go">öffnen →</span></a>
+  <a class="card" href="./ispy.html"><span class="t">I-Spy — Enttarnung</span><span class="go">öffnen →</span></a>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Spurt — 100m Meuten-Strecke · Olympiade der Welten</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#f0ede7; --panel:#fffdf9; --ink:#20180f; --mut:#7c7161; --line:#e6ded0;
+    --track-0:#3a1310; --track-1:#7a2620; --track-2:#a5382a; --lane:#f4e6cf; --lane-dim:#e8c9a5;
+    --accent:#d1432b; --accent-soft:#ef7a52; --gold:#e8c04a;
+    --up:#2fa564; --down:#d9503f; --ghost:#b9ab97;
+    --shadow:0 20px 54px -26px rgba(40,24,10,.5); color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f0b08; --panel:#1b140d; --ink:#f3ebdf; --mut:#a1917c; --line:#2e2317;
+           --track-0:#170908; --track-1:#3a1512; --track-2:#57201a; --lane:#e8dcc4; --lane-dim:#c9ac86;
+           --shadow:0 24px 64px -30px rgba(0,0,0,.8); color-scheme:dark; }
+  }
+  :root[data-theme="light"]{ --bg:#f0ede7; --panel:#fffdf9; --ink:#20180f; --mut:#7c7161; --line:#e6ded0;
+    --track-0:#3a1310; --track-1:#7a2620; --track-2:#a5382a; --lane:#f4e6cf; --lane-dim:#e8c9a5; --shadow:0 20px 54px -26px rgba(40,24,10,.5); color-scheme:light; }
+  :root[data-theme="dark"]{ --bg:#0f0b08; --panel:#1b140d; --ink:#f3ebdf; --mut:#a1917c; --line:#2e2317;
+    --track-0:#170908; --track-1:#3a1512; --track-2:#57201a; --lane:#e8dcc4; --lane-dim:#c9ac86; --shadow:0 24px 64px -30px rgba(0,0,0,.8); color-scheme:dark; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1280px; margin:0 auto; padding:clamp(16px,3vw,34px); }
+
+  .cardhead{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .eyebrow{ font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:800; margin:0 0 6px; }
+  h1{ font-family:Georgia,"Times New Roman",serif; font-style:italic; font-weight:700;
+      font-size:clamp(26px,4.6vw,44px); line-height:.98; margin:0; letter-spacing:-.01em; }
+  .sub{ font-size:13px; color:var(--mut); margin-top:7px; max-width:72ch; }
+  .sub b{ color:var(--ink); }
+  .headmeta{ text-align:right; font-size:12.5px; color:var(--mut); }
+  .headmeta b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .stage{ display:grid; grid-template-columns:1fr 288px; gap:14px; align-items:start; }
+  @media (max-width:900px){ .stage{ grid-template-columns:1fr; } }
+
+  .arena{ position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--track-0); box-shadow:var(--shadow); }
+  .arena canvas{ display:block; width:100%; height:auto; }
+
+  .mytrack{ position:absolute; top:12px; left:14px; z-index:3; background:rgba(16,10,6,.62);
+            border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:10px 14px; backdrop-filter:blur(6px); color:#f6ecdd; }
+  .mytrack .lbl{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#e8c9a5; font-weight:800; }
+  .mytrack .rk{ display:flex; align-items:baseline; gap:8px; margin-top:2px; }
+  .mytrack .rk .now{ font-family:Georgia,serif; font-weight:700; font-size:40px; line-height:.9; font-variant-numeric:tabular-nums; }
+  .mytrack .rk .of{ font-size:13px; color:#d8c3a6; }
+  .mytrack .mv{ font-size:12px; font-weight:800; margin-top:2px; font-variant-numeric:tabular-nums; min-height:15px; }
+  .mytrack .mv.up{ color:#66e29b; } .mytrack .mv.down{ color:#ff8a7a; } .mytrack .mv.same{ color:#c9b89f; }
+
+  .scorepop{ position:absolute; z-index:4; font-family:Georgia,serif; font-weight:800; font-size:30px; color:var(--gold);
+             text-shadow:0 3px 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; }
+
+  .liveflag{ position:absolute; top:12px; right:13px; z-index:3; display:flex; align-items:center; gap:7px;
+             font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#f0e6d7;
+             background:rgba(16,10,6,.6); border:1px solid rgba(255,255,255,.14); padding:6px 11px; border-radius:99px; }
+  .liveflag .pip{ width:8px; height:8px; border-radius:50%; background:#ff6a4a; box-shadow:0 0 9px #ff6a4a; animation:pulse 1.1s infinite; }
+  @keyframes pulse{ 50%{ opacity:.35; } }
+
+  .flash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:5; }
+
+  .clickbar{ margin-top:12px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+             background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:12px 16px; box-shadow:var(--shadow); }
+  .clickbar .step{ font-size:12.5px; color:var(--mut); }
+  .clickbar .step b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .cta{ font:inherit; font-weight:800; font-size:14.5px; cursor:pointer; border:0; color:#fff;
+        background:linear-gradient(180deg,var(--accent-soft),var(--accent)); padding:11px 22px; border-radius:11px;
+        box-shadow:0 8px 20px -8px rgba(209,67,43,.7); transition:transform .06s, filter .15s; }
+  .cta:hover{ filter:brightness(1.06); } .cta:active{ transform:translateY(1px); }
+  .cta:disabled{ background:var(--line); color:var(--mut); box-shadow:none; cursor:default; }
+  .cta.small{ background:transparent; color:var(--ink); border:1px solid var(--line); box-shadow:none; font-size:13px; padding:9px 15px; }
+  .cta.small:hover{ border-color:var(--accent); color:var(--accent); }
+  .prog{ flex:1; min-width:110px; height:8px; border-radius:99px; background:var(--line); overflow:hidden; }
+  .prog i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent-soft),var(--accent)); transition:width .3s; }
+
+  .ladder{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 10px; box-shadow:var(--shadow); }
+  .ladder h2{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); font-weight:800; margin:2px 4px 10px; }
+  .lwrap{ position:relative; }
+  .lrows{ position:relative; height:calc(32 * 21px); }
+  .lrow{ position:absolute; left:0; right:0; height:20px; display:flex; align-items:center; gap:7px; padding:0 6px; border-radius:6px;
+         font-size:12px; font-variant-numeric:tabular-nums; transition:transform .55s cubic-bezier(.34,1.2,.4,1), background .5s; will-change:transform; }
+  .lrow .pos{ width:19px; text-align:right; color:var(--mut); font-weight:700; }
+  .lrow .crest{ width:16px; height:16px; border-radius:50%; flex:none; display:block; }
+  .lrow .cd{ font-weight:700; }
+  .lrow .thr{ width:13px; text-align:center; font-size:11px; line-height:1; color:var(--line); flex:none; }
+  .lrow .thr.done{ color:var(--accent); }
+  .lrow .pts{ margin-left:auto; color:var(--mut); font-size:11px; }
+  .lrow .dd{ font-size:10px; font-weight:800; width:24px; text-align:right; }
+  .lrow .dd.up{ color:var(--up); } .lrow .dd.down{ color:var(--down); }
+  .lrow.mine{ background:color-mix(in srgb,var(--accent) 18%, transparent); }
+  .lrow.mine .cd{ color:var(--accent); } .lrow.mine .pos{ color:var(--accent); }
+  .lrow.hot{ background:color-mix(in srgb,var(--gold) 34%, transparent); }
+  .lrow.rk-gold{ box-shadow:inset 0 0 0 2px #e8c04a; }
+  .lrow.rk-silver{ box-shadow:inset 0 0 0 2px #c8ccd4; }
+  .lrow.rk-bronze{ box-shadow:inset 0 0 0 2px #cd7f32; }
+
+  .side{ margin-top:14px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 17px; box-shadow:var(--shadow); }
+  .panel h2{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); font-weight:800; margin:0 0 11px; }
+  .math{ font-variant-numeric:tabular-nums; }
+  .math .row{ display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .math .row:last-child{ border-bottom:0; }
+  .math .av{ width:30px; height:30px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff; }
+  .math .body{ flex:1; min-width:0; } .math .body .nm{ font-weight:700; font-size:13px; }
+  .math .body .calc{ font-size:12px; color:var(--mut); }
+  .math .body .calc .base{ color:var(--ink); font-weight:700; }
+  .math .body .calc .mal{ color:var(--down); font-weight:700; }
+  .math .body .calc .bon{ color:var(--up); font-weight:700; }
+  .math .body .calc .net{ color:var(--accent); font-weight:800; }
+  .math .dl{ font-weight:800; font-size:13px; flex:none; }
+  .math .dl.up{ color:var(--up); } .math .dl.down{ color:var(--down); } .math .dl.same{ color:var(--mut); }
+  .empty{ color:var(--mut); font-size:12.5px; font-style:italic; }
+  .round-summary{ border:1px solid var(--gold); background:color-mix(in srgb,var(--gold) 16%, transparent); border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12.5px; }
+  .round-summary b{ color:var(--ink); }
+  .slotrank{ color:var(--mut); font-weight:600; }
+  .slotrank b{ color:var(--accent); }
+
+  .foot{ margin-top:18px; font-size:12px; color:var(--mut); max-width:82ch; }
+  .foot b{ color:var(--ink); }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--mut); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw{ width:12px; height:12px; border-radius:3px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none!important; } .lrow{ transition:none; } }
+
+  .hovercard{ position:fixed; left:0; top:0; z-index:9999; pointer-events:none; width:270px; max-width:80vw;
+              background:rgba(16,10,6,.94); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:11px 13px;
+              color:#f6ecdd; box-shadow:0 14px 34px -12px rgba(0,0,0,.65); opacity:0;
+              transform:translate(-9999px,-9999px); transition:opacity .12s ease; }
+  .hovercard.show{ opacity:1; }
+  .hc-head{ display:flex; align-items:center; gap:9px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.14); }
+  .hc-crest{ width:32px; height:32px; border-radius:50%; flex:none; display:block; }
+  .hc-id{ flex:1; min-width:0; }
+  .hc-code{ font-weight:800; font-size:13px; }
+  .hc-name{ font-size:11.5px; color:#d8c3a6; }
+  .hc-stats{ text-align:right; flex:none; }
+  .hc-rank{ font-family:Georgia,serif; font-weight:700; font-size:18px; line-height:1; }
+  .hc-rank .of{ font-size:10px; color:#c9b89f; font-weight:600; margin-left:2px; font-family:system-ui; }
+  .hc-pts{ font-size:11px; color:#d8c3a6; margin-top:2px; }
+  .hc-slots{ max-height:230px; overflow-y:auto; }
+  .hc-slots .row{ padding:6px 0; border-bottom:1px solid rgba(255,255,255,.10); }
+  .hc-slots .row:last-child{ border-bottom:0; }
+  .hc-slots .av{ width:22px; height:22px; font-size:9px; }
+  .hc-slots .body .nm{ font-size:11.5px; color:#f6ecdd; }
+  .hc-slots .body .calc{ font-size:10.5px; }
+  .hc-slots .body .calc .base{ color:#f6ecdd; }
+  .hc-empty{ font-size:11.5px; font-style:italic; color:#c9b89f; padding:2px 0; }
+</style>
+</head>
+<body>
+
+
+<div class="hovercard" id="hovercard">
+  <div class="hc-head">
+    <img class="hc-crest" id="hcCrest" alt="">
+    <div class="hc-id">
+      <div class="hc-code" id="hcCode"></div>
+      <div class="hc-name" id="hcName"></div>
+    </div>
+    <div class="hc-stats">
+      <div class="hc-rank"><span id="hcRank"></span></div>
+      <div class="hc-pts" id="hcPts"></div>
+    </div>
+  </div>
+  <div class="hc-slots math" id="hcSlots"></div>
+</div>
+
+<div class="wrap">
+  <div class="cardhead">
+    <div>
+      <p class="eyebrow">Disziplin · 32 Teams · Meuten-Strecke</p>
+      <h1>Spurt</h1>
+      <div class="sub">Kein Bahnrennen mit Einzelspuren — <b>eine</b> gemeinsame 100-m-Gerade. Alle 32 Läufer starten als dichter Pulk. Jeder Klick schickt eine <b>Phase</b> (<b>Block Start … Photo Finish</b>) durchs Feld: <b>Sprint-Wert</b> − Mali + Boni = <b>Netto</b>, der Läufer prescht entsprechend nach vorn — nie zurück. Dein Läufer läuft zuletzt.</div>
+    </div>
+    <div class="headmeta">Phase <b id="slotlbl">Block Start</b><br>Runde <b id="round">1</b> / 5<br>Rang → Punkte</div>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="arena">
+        <canvas id="track" width="1180" height="460"></canvas>
+        <div class="mytrack">
+          <div class="lbl">Dein Team · M-M</div>
+          <div class="rk"><span class="now" id="myrank">–</span><span class="of">/ 32</span></div>
+          <div class="mv same" id="mymove">bereit</div>
+        </div>
+        <div class="scorepop" id="pop">+0</div>
+        <div class="liveflag"><span class="pip"></span> <span id="status">Aufstellung</span></div>
+        <div class="flash" id="flash"></div>
+      </div>
+
+      <div class="clickbar">
+        <button class="cta" id="advance">▶ Feld läuft (Phase Block Start)</button>
+        <div class="prog"><i id="progfill"></i></div>
+        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
+        <button class="cta small" id="replay">↻ Neu</button>
+      </div>
+
+      <div class="legend">
+        <span><span class="sw" style="background:var(--accent)"></span> dein Team (M-M)</span>
+        <span><span class="sw" style="background:var(--gold)"></span> gerade gelaufen</span>
+        <span><span class="sw" style="background:var(--up)"></span> Plätze gut</span>
+        <span><span class="sw" style="background:var(--down)"></span> Plätze verloren</span>
+      </div>
+
+      <div class="side">
+        <div class="panel">
+          <h2>Lauf-Log — warum sich die Positionen verschieben</h2>
+          <div class="math" id="ticker"><div class="empty">Noch niemand gelaufen. Klick auf „Feld läuft".</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ladder">
+      <h2>Rangliste — live</h2>
+      <div class="lwrap"><div class="lrows" id="lrows"></div></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>Was hier echt ist:</b> 32 Teams, 5 Aufstellungs-Slots als Rennphasen (Block Start, Acceleration, Top Speed, Drive Phase, Photo Finish), pro Läufer ein direkter Sprint-Wert. Modifikatoren (Fatigue, Verletzung, Captain, Team-Bonus, Mutator, Push) sind bestehende Mechaniken — sie machen den Antritt schwerer oder besser, aber der Läufer bewegt sich nur <b>nach vorn</b>, nie zurück. Fatigue verkürzt den Schritt, Verletzung sorgt für einen kurzen Stolperer — beides bremst nur die Wucht, nie die Richtung. Die X-Position ist die kumulierte Punktzahl, die Skala der Geraden passt sich dem Spitzenfeld an. Rang → Punkte am Ende. Portraits hier als farbige Wappen-Tokens stellvertretend.
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  let _s = 0x9e3779b9;
+  function rnd(){ _s ^= _s<<13; _s^=_s>>>17; _s^=_s<<5; _s>>>=0; return _s/4294967296; }
+  function ri(a,b){ return a + Math.floor(rnd()*(b-a+1)); }
+  function pick(arr){ return arr[Math.floor(rnd()*arr.length)]; }
+
+  const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
+                 "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
+  const MINE = "M-M";
+  const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
+  const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
+                 "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
+                 "Halla","Juno","Ryk","Senn","Uma","Brox","Cael","Doran","Efa","Gale","Hexe","Iven"];
+
+  function hueFor(i){ return Math.round((i*360/32 + (i%3)*11)) % 360; }
+  const teams = CODES.map((code,i)=>{
+    const mine = code===MINE;
+    const h = hueFor(i);
+    return { code, i, mine,
+      color: mine ? "#e07a2b" : `hsl(${h} 58% 52%)`,
+      accent: mine ? "#3a2415" : `hsl(${(h+150)%360} 62% 78%)`,
+      motif: i%4,
+      score:0, prevScore:0, roundStartScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
+      thrownSlot:-1, crest:null };
+  });
+
+  // ---- procedural team crest (stands in for a real logo) ----
+  function paintCrest(c2, cx, cy, r, t, withLetter){
+    c2.save();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2); c2.closePath(); c2.clip();
+    c2.fillStyle=t.color; c2.fillRect(cx-r,cy-r,r*2,r*2);
+    c2.fillStyle=t.accent; c2.globalAlpha=.9;
+    if(t.motif===0){ c2.fillRect(cx-r,cy-r*0.28,r*2,r*0.56); }
+    else if(t.motif===1){ c2.beginPath(); c2.moveTo(cx-r,cy-r); c2.lineTo(cx+r,cy-r); c2.lineTo(cx-r,cy+r); c2.closePath(); c2.fill(); }
+    else if(t.motif===2){ c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx+r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill();
+                          c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx-r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill(); }
+    else { c2.beginPath(); c2.arc(cx,cy,r*0.58,0,Math.PI*2); c2.fill(); }
+    c2.globalAlpha=1;
+    c2.restore();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2);
+    c2.lineWidth = t.mine ? Math.max(2,r*0.16) : Math.max(1.5,r*0.11);
+    c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
+    if(withLetter){
+      const label = t.code.replace('-','');
+      c2.fillStyle="#fff"; c2.textAlign="center"; c2.textBaseline="middle";
+      c2.font=`800 ${Math.round(r*(label.length>1?0.62:0.9))}px system-ui`;
+      c2.shadowColor="rgba(0,0,0,.5)"; c2.shadowBlur=2;
+      c2.fillText(label, cx, cy+0.5);
+      c2.shadowBlur=0; c2.textBaseline="alphabetic";
+    }
+  }
+  function crestURL(t,size){
+    const oc=document.createElement('canvas'); oc.width=oc.height=size;
+    const o=oc.getContext('2d'); paintCrest(o,size/2,size/2,size/2-1,t,true);
+    return oc.toDataURL();
+  }
+
+  const MODS = [
+    {k:null,         w:40},
+    {k:"Fatigue",    w:15, sign:-1, min:6,  max:20},
+    {k:"Captain",    w:9,  sign:+1, min:4,  max:11},
+    {k:"Mutator",    w:11, sign:+1, min:5,  max:14},
+    {k:"Push",       w:11, sign:+1, min:5,  max:16},
+    {k:"Team-Bonus", w:10, sign:+1, min:3,  max:9},
+    {k:"Verletzung", w:4,  sign:-1, min:12, max:26, injury:true},
+  ];
+  const MODW = MODS.reduce((s,m)=>s+m.w,0);
+  function rollMod(){
+    let r=rnd()*MODW;
+    for(const m of MODS){ if((r-=m.w)<0){ if(!m.k)return null; return {k:m.k,sign:m.sign,amt:ri(m.min,m.max),injury:!!m.injury}; } }
+    return null;
+  }
+  function rollMods(){
+    const out=[]; const n = rnd()<0.34?0 : rnd()<0.78?1 : 2;
+    const seen=new Set();
+    for(let j=0;j<n;j++){ const m=rollMod(); if(m && !seen.has(m.k)){ seen.add(m.k); out.push(m); } }
+    return out;
+  }
+  function genPlayers(t){
+    const base = t.mine ? [80,72,66,60,54] : null;
+    const arr=[];
+    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    return arr;
+  }
+  function initData(){
+    _s=0x51ed270b;
+    teams.forEach(t=>{ t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.animScore=0; });
+  }
+  // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
+  function ampelColor(rank){
+    if(rank<=3) return '#2fa564';
+    if(rank<=6) return '#d9a441';
+    if(rank<=10) return '#d9503f';
+    return '';
+  }
+  function fmtScore(t){
+    const gain = Math.round(t.score - (t.roundStartScore||0));
+    return Math.round(t.score) + (gain>0 ? ` (+${gain})` : '');
+  }
+  function recomputeRanksLive(){
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    order.forEach((t,idx)=> t.rank=idx+1);
+  }
+
+  // ---------- track canvas ----------
+  const cv=document.getElementById('track'), ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const X0=100, X1=W-70, TLEN=X1-X0;
+  const YTOP=88, YBOT=H-64, YCEN=(YTOP+YBOT)/2;
+
+  let scale = 80;          // display scale (denominator for x-mapping), monotonically grows
+  let scaleAnimFrom = 80, scaleAnimTo = 80, scaleAnimT = 1, scaleAnimDur = 1;
+  let active=null;         // {team, net, raw, mods, quality, slowmo}
+  let animT=1, animFrom=0, animTo=0, animDur=1, animStart=null;
+  let stumbleWobble=0;
+  let fragments=[], dockFx=[], trail=[];
+  const modTriggers=[];
+  let photoMode=false, photoAlpha=0;
+  let hitboxes=[];    // per-token hit areas in CANVAS coordinates, rebuilt every drawTrack() {code,x,y,r}
+
+  function xForScore(sc,scl){ return X0 + TLEN*Math.min(1, sc/Math.max(1,scl)); }
+  function curScale(){ return scaleAnimT>=1 ? scaleAnimTo : scaleAnimFrom+(scaleAnimTo-scaleAnimFrom)*scaleAnimT; }
+
+  function beeswarm(points){
+    points.sort((a,b)=>a.x-b.x);
+    const placed=[];
+    points.forEach(p=>{
+      let y=YCEN;
+      const collides=(yy)=> placed.some(q=> Math.abs(q.x-p.x) < (q.r+p.r)*1.35 && Math.abs(q.y-yy) < (q.r+p.r)*1.15);
+      if(collides(y)){
+        let dir=1, step=1, found=false;
+        for(let tries=0; tries<60; tries++){
+          const tryY = YCEN + dir*step*(p.r*1.9);
+          if(tryY>=YTOP+p.r && tryY<=YBOT-p.r && !collides(tryY)){ y=tryY; found=true; break; }
+          if(dir===1) dir=-1; else { dir=1; step++; }
+        }
+        if(!found) y=YCEN;
+      }
+      p.y=y; placed.push(p);
+    });
+    return placed;
+  }
+
+  // ---- WebAudio: synthesized starter shot / footstep whoosh / stumble thud / camera click ----
+  let actx=null, muted=false;
+  function audio(){ if(muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(actx.state==='suspended') actx.resume(); return actx; }
+  function gongSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const len=0.18, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const hp=a.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7; hp.frequency.setValueAtTime(1800,t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.9,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(hp); hp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+    const o=a.createOscillator(); o.type='square'; o.frequency.setValueAtTime(180,t0); o.frequency.exponentialRampToValueAtTime(60,t0+0.1);
+    const og=a.createGain(); og.gain.setValueAtTime(0.5,t0); og.gain.exponentialRampToValueAtTime(0.001,t0+0.12);
+    o.connect(og); og.connect(a.destination); o.start(t0); o.stop(t0+0.13);
+  }
+  function whooshSound(vol,pitch){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const len=0.16, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.8); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.8;
+    bp.frequency.setValueAtTime((pitch||3200),t0); bp.frequency.exponentialRampToValueAtTime((pitch||3200)*0.4,t0+len);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.35),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+  }
+  function crescendoSound(dur,peak){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const len=Math.max(0.2,dur/1000), buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1); }
+    const src=a.createBufferSource(); src.buffer=buf; src.loop=false;
+    const bp=a.createBiquadFilter(); bp.type='lowpass'; bp.Q.value=0.5; bp.frequency.setValueAtTime(2600,t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.001,t0); g.gain.linearRampToValueAtTime((peak||0.22),t0+len*0.85); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+  }
+  function stumbleSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(160,t0); o.frequency.exponentialRampToValueAtTime(70,t0+0.14);
+    const g=a.createGain(); g.gain.setValueAtTime(0.5,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.16);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.17);
+  }
+  function boniSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(760,t0); o.frequency.exponentialRampToValueAtTime(1180,t0+0.09);
+    const g=a.createGain(); g.gain.setValueAtTime(0.28,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.12);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.13);
+  }
+  function crowdRoar(vol,dur){
+    const a=audio(); if(!a) return; const t0=a.currentTime; dur=Math.max(0.25,dur||0.45);
+    const buf=a.createBuffer(1, Math.max(1,Math.floor(a.sampleRate*dur)), a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.55;
+    bp.frequency.setValueAtTime(700,t0); bp.frequency.linearRampToValueAtTime(1900,t0+dur*0.4); bp.frequency.linearRampToValueAtTime(1200,t0+dur);
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.32),t0+dur*0.22); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+dur);
+  }
+  function cameraClickSound(){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const len=0.05, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,0.6); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const hp=a.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7; hp.frequency.setValueAtTime(3000,t0);
+    const g=a.createGain(); g.gain.setValueAtTime(0.7,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(hp); hp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+    setTimeout(()=>{ const t1=a.currentTime;
+      const o=a.createOscillator(); o.type='square'; o.frequency.setValueAtTime(900,t1);
+      const g2=a.createGain(); g2.gain.setValueAtTime(0.25,t1); g2.gain.exponentialRampToValueAtTime(0.001,t1+0.05);
+      o.connect(g2); g2.connect(a.destination); o.start(t1); o.stop(t1+0.06);
+    },70);
+  }
+
+  function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  function drawTrack(){
+    ctx.clearRect(0,0,W,H);
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,cssv('--track-2','#a5382a')); g.addColorStop(.55,cssv('--track-1','#7a2620')); g.addColorStop(1,cssv('--track-0','#3a1310'));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    // tartan texture stripes
+    ctx.strokeStyle='rgba(0,0,0,.10)'; ctx.lineWidth=1;
+    for(let y=YTOP-18; y<YBOT+18; y+=14){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    // shared running band
+    ctx.fillStyle='rgba(0,0,0,.12)'; ctx.fillRect(0,YTOP-18,W,(YBOT+18)-(YTOP-18));
+    const lane=cssv('--lane','#f4e6cf'), laneDim=cssv('--lane-dim','#e8c9a5');
+    // distance markers
+    ctx.strokeStyle=laneDim; ctx.fillStyle=laneDim; ctx.font='600 11px system-ui'; ctx.textAlign='center';
+    for(let m=0;m<=100;m+=20){
+      const x=X0+TLEN*(m/100);
+      ctx.globalAlpha=.55; ctx.beginPath(); ctx.moveTo(x,YBOT+6); ctx.lineTo(x,YBOT+14); ctx.stroke(); ctx.globalAlpha=1;
+      ctx.fillText(m+'m', x, YBOT+28);
+    }
+    // start line
+    ctx.strokeStyle=lane; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(X0,YTOP-18); ctx.lineTo(X0,YBOT+18); ctx.stroke();
+    ctx.save(); ctx.translate(X0-16,(YTOP+YBOT)/2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle=lane; ctx.font='800 12px system-ui'; ctx.textAlign='center'; ctx.fillText('START', 0,0); ctx.restore();
+    // finish line — checkered
+    const fw=14, fh=8;
+    for(let y=YTOP-18, ri2=0; y<YBOT+18; y+=fh, ri2++){
+      for(let c=0;c<2;c++){ ctx.fillStyle=((ri2+c)%2===0)? '#fff':'#161616'; ctx.fillRect(X1-fw/2+c*(fw/2), y, fw/2, fh); }
+    }
+    ctx.save(); ctx.translate(X1+18,(YTOP+YBOT)/2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle=lane; ctx.font='800 12px system-ui'; ctx.textAlign='center'; ctx.fillText('ZIEL', 0,0); ctx.restore();
+
+    // trail (motion smear) behind active runner
+    trail.forEach(p=>{ if(p.life<=0) return; ctx.globalAlpha=Math.max(0,p.life)*0.35;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*0.8,0,Math.PI*2); ctx.fillStyle=p.color; ctx.fill(); ctx.globalAlpha=1; });
+
+    // build points for all teams (beeswarm)
+    const scl=curScale();
+    const pts=teams.map(t=>{
+      const sc = (active && active.team===t) ? t.animScore : t.score;
+      const r = t.mine?16:12;
+      return {t, r, x:xForScore(sc,scl)};
+    });
+    const placed=beeswarm(pts);
+
+    hitboxes=[];
+    placed.forEach(p=>{
+      const t=p.t; let yy=p.y;
+      if(active && active.team===t && stumbleWobble!==0){ yy += stumbleWobble; }
+      ctx.save();
+      if(active && active.team===t){
+        ctx.beginPath(); ctx.arc(p.x,yy,p.r+6,0,Math.PI*2);
+        ctx.fillStyle= t.mine? 'rgba(224,122,43,.4)':'rgba(232,192,74,.35)'; ctx.fill();
+      }
+      paintCrest(ctx, p.x, yy, p.r, t, true);
+      if(jumpGlow[t.code]>0){
+        ctx.beginPath(); ctx.arc(p.x,yy,p.r+9,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(232,192,74,${Math.min(1,jumpGlow[t.code])})`; ctx.lineWidth=3; ctx.stroke();
+      }
+      hitboxes.push({code:t.code, x:p.x, y:yy, r:p.r+4});
+      ctx.restore();
+    });
+
+    // name plate for active runner
+    if(active){
+      const p=placed.find(pp=>pp.t===active.team);
+      if(p){
+        let yy=p.y + (stumbleWobble||0);
+        const label=(active.team.mine?'★ ':'')+active.team.code+' · '+active.player.name;
+        ctx.font='700 12px system-ui'; const tw=ctx.measureText(label).width+18;
+        ctx.fillStyle='rgba(0,0,0,.5)'; roundRect(p.x-tw/2, yy-p.r-30, tw, 22, 7); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(label, p.x, yy-p.r-15);
+        // running net value sticker
+        ctx.fillStyle=cssv('--gold','#e8c04a'); ctx.font='800 13px system-ui';
+        ctx.fillText(String(Math.round(runValFor())), p.x, yy - p.r - 34 < YTOP ? yy+p.r+38 : yy-p.r-34);
+      }
+    }
+
+    // mali fragments / boni sparkles
+    fragments.forEach(f=>{ if(f.life<=0) return; ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle='#ff6a52'; ctx.beginPath(); ctx.arc(f.x,f.y,3.2,0,Math.PI*2); ctx.fill();
+      if(f.text){ ctx.font='800 11px system-ui'; ctx.fillStyle='#ff6a52'; ctx.textAlign='center'; ctx.fillText(f.text,f.x,f.y-8); }
+      ctx.globalAlpha=1; });
+    dockFx.forEach(f=>{ if(f.life<=0) return; ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle='#5fe3a0'; ctx.font='800 12px system-ui'; ctx.textAlign='center'; ctx.fillText(f.text,f.x,f.y); ctx.globalAlpha=1; });
+
+    if(!active && !photoMode){
+      ctx.fillStyle='rgba(255,255,255,.4)'; ctx.textAlign='center'; ctx.font='italic 600 19px Georgia,serif';
+      ctx.fillText('Startaufstellung bereit — Klick zum Antritt', W/2, YTOP-30<40?60:YTOP-30);
+    }
+
+    if(photoMode){ drawPhotoOverlay(placed); }
+  }
+
+  function drawPhotoOverlay(placed){
+    ctx.save();
+    ctx.fillStyle=`rgba(6,4,2,${0.55*photoAlpha})`; ctx.fillRect(0,0,W,H);
+    // vertical rank lines near finish for top runners
+    const top = teams.slice().sort((a,b)=>a.rank-b.rank).slice(0,6);
+    ctx.globalAlpha=photoAlpha;
+    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
+    top.forEach((t,idx)=>{
+      const p=placed.find(pp=>pp.t===t); if(!p) return;
+      ctx.beginPath(); ctx.moveTo(p.x,YTOP-24); ctx.lineTo(p.x,YBOT+24); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.fillStyle='#fff'; ctx.font='800 13px system-ui'; ctx.textAlign='left';
+    top.forEach((t,idx)=>{
+      const p=placed.find(pp=>pp.t===t); if(!p) return;
+      ctx.fillText('#'+t.rank+' '+t.code, Math.min(p.x+6,W-90), YTOP-6+ (idx%3)*14);
+    });
+    ctx.fillStyle=cssv('--gold','#e8c04a'); ctx.font='italic 800 22px Georgia,serif'; ctx.textAlign='center';
+    ctx.fillText('ZIELFOTO', W/2, YTOP-36<26?26:YTOP-36);
+    ctx.restore();
+    ctx.globalAlpha=1;
+  }
+
+  function runValFor(){
+    if(!active) return 0;
+    const p=active.player;
+    return active._runVal!=null? active._runVal : p.val;
+  }
+
+  // ---------- score pop ----------
+  function scorePop(net,mine,xpx,ypx){
+    const pop=document.getElementById('pop');
+    pop.textContent='+'+net; pop.style.color=mine?'#f0a35a':'var(--gold)';
+    const leftPct=Math.max(4,Math.min(92,(xpx/W*100)));
+    const topPct=Math.max(4,Math.min(85,(ypx/H*100)));
+    pop.style.left='calc('+leftPct+'% - 16px)'; pop.style.top=topPct+'%';
+    pop.style.transition='none'; pop.style.opacity='1'; pop.style.transform='translateY(0) scale(1)';
+    requestAnimationFrame(()=>{ pop.style.transition='opacity .9s, transform .9s'; pop.style.opacity='0'; pop.style.transform='translateY(-40px) scale(1.25)'; });
+  }
+
+  // ---------- animation core ----------
+  let raf=null;
+  function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
+
+  function animateRunner(team, res, opts, cb){
+    const {net, slowmo, fast, finalField} = opts;
+    active = {team, player:res.player, net, quality:'run', slowmo, _runVal:res.player.val};
+    animFrom = team.prevScore; animTo = team.score;
+    scaleAnimFrom = curScale();
+    scaleAnimTo = Math.max(scaleAnimFrom, team.score*1.15, 80);
+    animStart=null;
+    fragments=[]; dockFx=[]; stumbleWobble=0;
+    const p=res.player;
+    const malis=p.mods.filter(m=>m.sign<0), bonis=p.mods.filter(m=>m.sign>0);
+    modTriggers.length=0;
+    malis.forEach((m,i)=> modTriggers.push({p:0.22+i*0.16, mod:m, done:false}));
+    bonis.forEach((m,i)=> modTriggers.push({p:0.60+i*0.14, mod:m, done:false}));
+    const dur = slowmo ? 2200 : (finalField ? 320 : (fast ? 150 : 320));
+    animDur=dur;
+    function frame(ts){
+      if(animStart==null) animStart=ts;
+      const e=Math.min(1,(ts-animStart)/dur);
+      animT=e;
+      const ee=easeOutCubic(e);
+      team.animScore = animFrom + (animTo-animFrom)*ee;
+      scaleAnimT = e;
+      modTriggers.forEach(tr=>{
+        if(!tr.done && e>=tr.p){ tr.done=true;
+          const scl=curScale(); const tx=xForScore(team.animScore,scl);
+          if(tr.mod.sign<0){
+            active._runVal=Math.max(0,active._runVal-tr.mod.amt);
+            for(let j=0;j<3;j++) fragments.push({x:tx,y:YCEN,vx:(Math.random()*2-1)*2.4,vy:-(Math.random()*1.6+0.6),life:1,text:j===0?`−${tr.mod.amt} ${tr.mod.k}`:''});
+            if(tr.mod.injury){ stumbleWobble = 7; stumbleSound(); setTimeout(()=>{ stumbleWobble=0; },220); }
+            else { whooshSound(0.18,900); }
+          } else {
+            active._runVal += tr.mod.amt;
+            dockFx.push({x:tx,y:YCEN-30,life:1,text:`+${tr.mod.amt} ${tr.mod.k}`});
+            boniSound();
+          }
+        }
+      });
+      fragments.forEach(f=>{ f.x+=f.vx; f.y+=f.vy; f.vy+=0.2; f.life-=0.035; });
+      dockFx.forEach(f=>{ f.y-=0.35; f.life-=0.03; });
+      if(e<0.97){
+        const scl=curScale();
+        trail.push({x:xForScore(team.animScore,scl), y:YCEN, r: team.mine?16:12, life:0.6, color:team.color});
+      }
+      trail.forEach(t=>t.life-=0.05); trail = trail.filter(t=>t.life>0);
+      if(e>=1){
+        team.animScore=animTo; scaleAnimT=1;
+        active._runVal=net;
+        drawTrack();
+        setTimeout(()=>{ fragments=[]; dockFx=[]; trail=[]; cb&&cb(); }, 90);
+        return;
+      }
+      drawTrack();
+      raf=requestAnimationFrame(frame);
+    }
+    raf=requestAnimationFrame(frame);
+  }
+
+  // ---------- standings ladder ----------
+  const ROWH=21;
+  const rowEls={};
+  function buildLadder(){
+    const host=document.getElementById('lrows'); host.innerHTML='';
+    teams.forEach(t=>{
+      if(!t.crest) t.crest=crestURL(t,32);
+      const row=document.createElement('div');
+      row.className='lrow'+(t.mine?' mine':'');
+      row.innerHTML=`<span class="pos">${t.rank}</span><img class="crest" src="${t.crest}" alt=""><span class="cd">${t.code}</span><span class="thr" title="in dieser Phase gelaufen">○</span><span class="pts">0</span><span class="dd"></span>`;
+      row.addEventListener('mousemove',(e)=> showHoverCard(t,e.clientX,e.clientY));
+      row.addEventListener('mouseleave', hideHoverCard);
+      host.appendChild(row); rowEls[t.code]=row;
+    });
+    positionLadder(true);
+  }
+  function positionLadder(instant){
+    teams.forEach(t=>{
+      const row=rowEls[t.code];
+      if(instant) row.style.transition='none';
+      row.style.transform=`translateY(${(t.rank-1)*ROWH}px)`;
+      if(instant) requestAnimationFrame(()=>{ row.style.transition=''; });
+      row.querySelector('.pos').textContent=t.rank;
+      row.querySelector('.pts').textContent=fmtScore(t);
+      const thr=row.querySelector('.thr');
+      const done = t.thrownSlot===curSlot;
+      thr.className='thr'+(done?' done':''); thr.textContent=done?'●':'○';
+      const d = (t.roundStartRank!=null && curSlot>0) ? (t.roundStartRank - t.rank) : 0;
+      const dd=row.querySelector('.dd');
+      if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
+      else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
+      else { dd.className='dd'; dd.textContent=''; }
+    });
+  }
+  function hotRow(code){
+    const r=rowEls[code]; if(!r) return;
+    r.classList.add('hot'); setTimeout(()=>r.classList.remove('hot'),600);
+  }
+
+  // ---------- hover card ----------
+  const hc=document.getElementById('hovercard');
+  function fillHoverCard(t){
+    document.getElementById('hcCrest').src = t.crest || crestURL(t,64);
+    document.getElementById('hcCode').textContent = t.code;
+    document.getElementById('hcName').textContent = TEAM_NAMES[t.code] || t.code;
+    const hcRankEl=document.getElementById('hcRank');
+    hcRankEl.textContent = '#'+t.rank;
+    hcRankEl.style.color = ampelColor(t.rank) || '';
+    document.getElementById('hcPts').textContent = Math.round(t.score)+' Punkte';
+    const host=document.getElementById('hcSlots');
+    if(t.thrownSlot<0){ host.innerHTML='<div class="hc-empty">noch nicht angetreten</div>'; return; }
+    let html='';
+    for(let s=0;s<=t.thrownSlot;s++){
+      const p=t.players[s];
+      const net=Math.max(0, p.val+modSum(p));
+      let calc=`<span class="base">${p.val}</span>`;
+      p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+      calc+=` = <span class="net">+${net}</span>`;
+      html+=`<div class="row"><div class="av" style="background:${t.color}">${t.code.replace('-','')}</div>
+        <div class="body"><div class="nm">${p.name} <span style="color:#c9b89f;font-weight:600">· ${SLOTS[s]}</span></div>
+        <div class="calc">${calc}</div></div></div>`;
+    }
+    host.innerHTML=html;
+  }
+  function showHoverCard(t, clientX, clientY){
+    fillHoverCard(t);
+    hc.classList.add('show');
+    const pad=16;
+    let x=clientX+pad, y=clientY+pad;
+    const w=hc.offsetWidth||270, h=hc.offsetHeight||160;
+    if(x+w > window.innerWidth-8) x = clientX-w-pad;
+    if(y+h > window.innerHeight-8) y = clientY-h-pad;
+    hc.style.transform = `translate(${Math.max(4,x)}px,${Math.max(4,y)}px)`;
+  }
+  function hideHoverCard(){ hc.classList.remove('show'); }
+  cv.addEventListener('mousemove', function(e){
+    const rect=cv.getBoundingClientRect();
+    const scaleX=cv.width/rect.width, scaleY=cv.height/rect.height;
+    const mx=(e.clientX-rect.left)*scaleX, my=(e.clientY-rect.top)*scaleY;
+    let hit=null;
+    for(let i=hitboxes.length-1;i>=0;i--){
+      const hb=hitboxes[i], dx=mx-hb.x, dy=my-hb.y;
+      if(dx*dx+dy*dy<=hb.r*hb.r){ hit=hb; break; }
+    }
+    if(hit){ const t=teams.find(x=>x.code===hit.code); if(t) showHoverCard(t,e.clientX,e.clientY); else hideHoverCard(); }
+    else hideHoverCard();
+  });
+  cv.addEventListener('mouseleave', hideHoverCard);
+
+  // ---------- reveal flow ----------
+  const SLOTS=["Block Start","Acceleration","Top Speed","Drive Phase","Photo Finish"];
+  let queue=[], stepIdx=0, busy=false, curSlot=-1;
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
+
+  function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
+  function slotRank(si, team){
+    const my=Math.max(0, team.players[si].val+modSum(team.players[si]));
+    let better=0;
+    teams.forEach(o=>{ const n=Math.max(0,o.players[si].val+modSum(o.players[si])); if(n>my) better++; });
+    return better+1;
+  }
+  function applyReveal(t,slot){
+    const p=t.players[slot];
+    const net=Math.max(0, p.val+modSum(p));
+    t.prevScore=t.score; t.score+=net; t.thrownSlot=slot;
+    teams.forEach(x=>x.prevRank=x.rank);
+    recomputeRanksLive();
+    teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    return {player:p,net};
+  }
+  function logRow(t,slot,res){
+    const p=res.player,net=res.net;
+    const delta = curSlot>0 ? (t.roundStartRank - t.rank) : 0;
+    let calc=`<span class="base">${p.val}</span>`;
+    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+    calc+=` = <span class="net">+${net}</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const sr = slotRank(slot,t);
+    const src = ampelColor(sr);
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${SLOTS[slot]}</span> <span class="slotrank">· Slot-Rang <b${src?` style="color:${src}"`:''}>#${sr}</b></span></div>
+      <div class="calc">${calc}</div></div>${dl}`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>8) tk.removeChild(tk.lastChild);
+  }
+  const jumpGlow={}; let glowRafRunning=false;
+  function pulseJumpGlow(){
+    let any=false;
+    Object.keys(jumpGlow).forEach(code=>{ jumpGlow[code]-=0.012; if(jumpGlow[code]<=0){ delete jumpGlow[code]; } else any=true; });
+    drawTrack();
+    if(any){ requestAnimationFrame(pulseJumpGlow); } else { glowRafRunning=false; }
+  }
+  function clearMedals(){
+    teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
+  }
+  const MEDAL_CLASSES=['rk-gold','rk-silver','rk-bronze'];
+  function roundSummary(round){
+    const jumps = teams.map(t=>({t, d:(t.roundStartRank - t.rank)})).filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,3);
+    jumps.forEach((j,idx)=>{ const row=rowEls[j.t.code]; if(row) row.classList.add(MEDAL_CLASSES[idx]); });
+    const parts = jumps.map(j=>{ const p=j.t.players[round]; const net=Math.max(0,p.val+modSum(p)); return `${j.t.code} ▲${j.d} · ${p.name} ${net}`; });
+    const row=document.createElement('div'); row.className='row round-summary';
+    row.innerHTML = `<div class="body">${jumps.length ? `Runde ${round+1} — Größte Sprünge: ${parts.join(' · ')}` : `Runde ${round+1} — keine Rangsprünge`}</div>`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>8) tk.removeChild(tk.lastChild);
+    jumps.forEach(j=>{ hotRow(j.t.code); jumpGlow[j.t.code]=1; });
+    if(!glowRafRunning && jumps.length){ glowRafRunning=true; requestAnimationFrame(pulseJumpGlow); }
+  }
+  function updateMyTracker(){
+    const me=teams.find(t=>t.mine);
+    document.getElementById('myrank').textContent=me.rank;
+    const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
+    const d = from - me.rank;
+    const mv=document.getElementById('mymove');
+    if(curSlot<=0){ mv.className='mv same'; mv.textContent=`Runde 1 läuft …`; }
+    else if(d>0){ mv.className='mv up'; mv.textContent=`▲ ${d} ${d===1?'Platz':'Plätze'} seit Vorrunde (${from} → ${me.rank})`; }
+    else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
+    else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
+  }
+
+  function photoFinishSequence(cb){
+    photoMode=true; photoAlpha=0;
+    const flash=document.getElementById('flash');
+    flash.style.transition='none'; flash.style.opacity='0.9';
+    requestAnimationFrame(()=>{ flash.style.transition='opacity .5s'; flash.style.opacity='0'; });
+    cameraClickSound();
+    let t0=null;
+    function f(ts){ if(t0==null) t0=ts; const e=Math.min(1,(ts-t0)/280); photoAlpha=e; drawTrack();
+      if(e<1){ raf=requestAnimationFrame(f); } else { holdPhoto(); } }
+    raf=requestAnimationFrame(f);
+    function holdPhoto(){
+      setTimeout(()=>{
+        let t1=null;
+        function fo(ts){ if(t1==null) t1=ts; const e=Math.min(1,(ts-t1)/450); photoAlpha=1-e; drawTrack();
+          if(e<1){ raf=requestAnimationFrame(fo); } else { photoMode=false; photoAlpha=0; active=null; drawTrack(); cb&&cb(); } }
+        raf=requestAnimationFrame(fo);
+      }, 1300);
+    }
+  }
+
+  function advance(){
+    if(busy) return;
+    if(stepIdx>=queue.length) return;
+    busy=true;
+    const q=queue[stepIdx];
+    curSlot=q.round;
+    const finalRound = q.round===4;
+    if(q.stage==='field'){ teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); }
+    if(stepIdx===0){ gongSound(); }
+    if(q.stage==='field'){
+      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
+      crescendoSound(finalRound? field.length*380 : field.length*130, finalRound?0.30:0.20);
+      let i=0;
+      const doOne=()=>{
+        if(i>=field.length){ endStage(q); return; }
+        const t=field[i++];
+        const res=applyReveal(t,q.round);
+        animateRunner(t,res,{net:res.net, finalField:finalRound, fast:!finalRound},()=>{
+          const scl=curScale(); const px=xForScore(t.score,scl);
+          scorePop(res.net,false,px,YCEN);
+          logRow(t,q.round,res);
+          positionLadder(false); hotRow(t.code); updateMyTracker();
+          setTimeout(doOne, finalRound?60:20);
+        });
+      };
+      doOne();
+    } else {
+      const t=teams.find(x=>x.mine);
+      const res=applyReveal(t,q.round);
+      const clutch = finalRound;
+      document.getElementById('status').textContent= clutch?'★ PHOTO FINISH — Zeitlupe':'Läuft …';
+      crowdRoar(clutch?0.42:0.28, clutch?0.7:0.4);
+      animateRunner(t,res,{net:res.net, slowmo:clutch, fast:false},()=>{
+        const scl=curScale(); const px=xForScore(t.score,scl);
+        scorePop(res.net,true,px,YCEN);
+        logRow(t,q.round,res);
+        positionLadder(false); hotRow(t.code); updateMyTracker();
+        roundSummary(q.round);
+        if(finalRound){
+          photoFinishSequence(()=> endStage(q));
+        } else {
+          endStage(q);
+        }
+      });
+    }
+  }
+  function endStage(q){ stepIdx++; updateControls(); setTimeout(()=>busy=false, 200); }
+
+  function updateControls(){
+    const btn=document.getElementById('advance');
+    document.getElementById('stepnum').textContent=stepIdx;
+    document.getElementById('progfill').style.width=(stepIdx/queue.length*100)+'%';
+    if(stepIdx>=queue.length){ btn.disabled=true; btn.textContent='✔ Disziplin gewertet'; document.getElementById('status').textContent='Endstand'; return; }
+    const q=queue[stepIdx], round=q.round+1;
+    document.getElementById('round').textContent=round;
+    document.getElementById('slotlbl').textContent=SLOTS[q.round];
+    if(q.stage==='field'){ btn.textContent=`▶ Feld läuft (Phase ${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Feld`; }
+    else { btn.textContent=`★ Dein Läufer läuft (${SLOTS[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Lauf`; }
+  }
+
+  function reset(){
+    document.querySelector('.mytrack .lbl').textContent = 'Dein Team · '+MINE+' · '+(TEAM_NAMES[MINE]||MINE);
+    if(raf) cancelAnimationFrame(raf);
+    initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; active=null;
+    scale=80; scaleAnimFrom=80; scaleAnimTo=80; scaleAnimT=1; fragments=[]; dockFx=[]; trail=[]; photoMode=false; photoAlpha=0;
+    buildLadder(); positionLadder(true);
+    document.getElementById('ticker').innerHTML='<div class="empty">Noch niemand gelaufen. Klick auf „Feld läuft".</div>';
+    document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
+    document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
+    document.getElementById('status').textContent='Aufstellung';
+    updateControls(); drawTrack();
+  }
+
+  document.getElementById('advance').addEventListener('click',advance);
+  document.getElementById('replay').addEventListener('click',reset);
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) whooshSound(0.3,2600); });
+  const mq=window.matchMedia('(prefers-color-scheme: dark)');
+  if(mq.addEventListener) mq.addEventListener('change',drawTrack);
+  reset();
+})();
+</script>
+
+</body>
+</html>

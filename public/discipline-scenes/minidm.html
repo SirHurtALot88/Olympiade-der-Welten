@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Mini-DM — Die Grube · Olympiade der Welten</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#171310; --panel:#241d18; --ink:#f1e3cd; --mut:#a4907a; --line:#3c3126;
+    --field-0:#0a0908; --field-1:#211a13; --field-2:#3a2c1b; --zone:#5c0f14; --zone-line:#e0b25a;
+    --accent:#c9432c; --accent-soft:#e2694a; --gold:#d9a441;
+    --up:#3fae72; --down:#d1503f; --ghost:#8b7a63;
+    --shadow:0 20px 54px -26px rgba(0,0,0,.75); color-scheme:dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0a0807; --panel:#171310; --ink:#eee0c9; --mut:#93816c; --line:#2a231b;
+           --field-0:#060504; --field-1:#161109; --field-2:#251c10; --zone:#440a0e; --zone-line:#c99a4c;
+           --shadow:0 24px 64px -30px rgba(0,0,0,.9); color-scheme:dark; }
+  }
+  :root[data-theme="light"]{ --bg:#221c17; --panel:#2e2620; --ink:#f3e7d4; --mut:#ad9a83; --line:#453729;
+    --field-0:#0d0b09; --field-1:#261d13; --field-2:#40301c; --zone:#661016; --zone-line:#e6bb66; --shadow:0 20px 54px -26px rgba(0,0,0,.7); color-scheme:dark; }
+  :root[data-theme="dark"]{ --bg:#0a0807; --panel:#171310; --ink:#eee0c9; --mut:#93816c; --line:#2a231b;
+    --field-0:#060504; --field-1:#161109; --field-2:#251c10; --zone:#440a0e; --zone-line:#c99a4c; --shadow:0 24px 64px -30px rgba(0,0,0,.9); color-scheme:dark; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1280px; margin:0 auto; padding:clamp(16px,3vw,34px); }
+
+  .cardhead{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .eyebrow{ font-size:11.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:800; margin:0 0 6px; }
+  h1{ font-family:Georgia,"Times New Roman",serif; font-style:italic; font-weight:700;
+      font-size:clamp(26px,4.6vw,44px); line-height:.98; margin:0; letter-spacing:-.01em; }
+  .sub{ font-size:13px; color:var(--mut); margin-top:7px; max-width:74ch; }
+  .sub b{ color:var(--ink); }
+  .headmeta{ text-align:right; font-size:12.5px; color:var(--mut); }
+  .headmeta b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  .stage{ display:grid; grid-template-columns:1fr 288px; gap:14px; align-items:start; }
+  @media (max-width:900px){ .stage{ grid-template-columns:1fr; } }
+
+  .slotbanner{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 80%, var(--accent) 8%));
+               border:1px solid var(--line); border-radius:13px; padding:10px 16px; box-shadow:var(--shadow); margin-bottom:10px; }
+  .slotbanner .tag{ font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--mut); font-weight:800; }
+  .slotbanner .big{ font-family:Georgia,serif; font-style:italic; font-weight:700; font-size:clamp(19px,2.6vw,26px); color:var(--accent); }
+  .slotbanner .desc{ font-size:12.5px; color:var(--mut); }
+
+  .arena{ position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--field-0); box-shadow:var(--shadow); }
+  .arena canvas{ display:block; width:100%; height:auto; }
+
+  .mytrack{ position:absolute; top:12px; left:14px; z-index:3; background:rgba(10,8,6,.62);
+            border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:10px 14px; backdrop-filter:blur(6px); color:#f6ecdd; }
+  .mytrack .lbl{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#e8c9a5; font-weight:800; }
+  .mytrack .rk{ display:flex; align-items:baseline; gap:8px; margin-top:2px; }
+  .mytrack .rk .now{ font-family:Georgia,serif; font-weight:700; font-size:40px; line-height:.9; font-variant-numeric:tabular-nums; }
+  .mytrack .rk .of{ font-size:13px; color:#d8c3a6; }
+  .mytrack .mv{ font-size:12px; font-weight:800; margin-top:2px; font-variant-numeric:tabular-nums; min-height:15px; }
+  .mytrack .mv.up{ color:#66e29b; } .mytrack .mv.down{ color:#ff8a7a; } .mytrack .mv.same{ color:#c9b89f; }
+
+  .scorepop{ position:absolute; z-index:4; font-family:Georgia,serif; font-weight:800; font-size:34px; color:var(--gold);
+             text-shadow:0 3px 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; }
+
+  .liveflag{ position:absolute; top:12px; right:13px; z-index:3; display:flex; align-items:center; gap:7px;
+             font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#f0e6d7;
+             background:rgba(10,8,6,.6); border:1px solid rgba(255,255,255,.14); padding:6px 11px; border-radius:99px; }
+  .liveflag .pip{ width:8px; height:8px; border-radius:50%; background:#e04a3a; box-shadow:0 0 9px #e04a3a; animation:pulse 1.1s infinite; }
+  @keyframes pulse{ 50%{ opacity:.35; } }
+
+  .clickbar{ margin-top:12px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+             background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:12px 16px; box-shadow:var(--shadow); }
+  .clickbar .step{ font-size:12.5px; color:var(--mut); }
+  .clickbar .step b{ color:var(--ink); font-variant-numeric:tabular-nums; }
+  .cta{ font:inherit; font-weight:800; font-size:14.5px; cursor:pointer; border:0; color:#fff;
+        background:linear-gradient(180deg,var(--accent-soft),var(--accent)); padding:11px 22px; border-radius:11px;
+        box-shadow:0 8px 20px -8px rgba(179,38,30,.7); transition:transform .06s, filter .15s; }
+  .cta:hover{ filter:brightness(1.06); } .cta:active{ transform:translateY(1px); }
+  .cta:disabled{ background:var(--line); color:var(--mut); box-shadow:none; cursor:default; }
+  .cta.small{ background:transparent; color:var(--ink); border:1px solid var(--line); box-shadow:none; font-size:13px; padding:9px 15px; }
+  .cta.small:hover{ border-color:var(--accent); color:var(--accent); }
+  .prog{ flex:1; min-width:110px; height:8px; border-radius:99px; background:var(--line); overflow:hidden; }
+  .prog i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--accent-soft),var(--accent)); transition:width .3s; }
+
+  .ladder{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 10px; box-shadow:var(--shadow); }
+  .ladder h2{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); font-weight:800; margin:2px 4px 10px; }
+  .lwrap{ position:relative; }
+  .lrows{ position:relative; height:calc(32 * 21px); }
+  .lrow{ position:absolute; left:0; right:0; height:20px; display:flex; align-items:center; gap:7px; padding:0 6px; border-radius:6px;
+         font-size:12px; font-variant-numeric:tabular-nums; transition:transform .55s cubic-bezier(.34,1.2,.4,1), background .5s; will-change:transform; }
+  .lrow .pos{ width:19px; text-align:right; color:var(--mut); font-weight:700; }
+  .lrow .crest{ width:16px; height:16px; border-radius:50%; flex:none; display:block; }
+  .lrow .cd{ font-weight:700; }
+  .lrow .thr{ width:13px; text-align:center; font-size:11px; line-height:1; color:var(--line); flex:none; }
+  .lrow .thr.done{ color:var(--accent); }
+  .lrow .pts{ margin-left:auto; color:var(--mut); font-size:11px; }
+  .lrow .dd{ font-size:10px; font-weight:800; width:24px; text-align:right; }
+  .lrow .dd.up{ color:var(--up); } .lrow .dd.down{ color:var(--down); }
+  .lrow.mine{ background:color-mix(in srgb,var(--accent) 18%, transparent); }
+  .lrow.mine .cd{ color:var(--accent); } .lrow.mine .pos{ color:var(--accent); }
+  .lrow.hot{ background:color-mix(in srgb,var(--gold) 34%, transparent); }
+  .lrow.rk-gold{ box-shadow:inset 0 0 0 2px #e8c04a; }
+  .lrow.rk-silver{ box-shadow:inset 0 0 0 2px #c8ccd4; }
+  .lrow.rk-bronze{ box-shadow:inset 0 0 0 2px #cd7f32; }
+
+  .round-summary{ margin:0 0 10px; padding:9px 12px; border-radius:10px; font-size:12px; font-weight:700; line-height:1.45;
+                   background:color-mix(in srgb,var(--gold) 20%, var(--panel)); border:1.5px solid var(--gold); color:var(--ink); }
+
+  .side{ margin-top:14px; display:flex; flex-direction:column; gap:14px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 17px; box-shadow:var(--shadow); }
+  .panel h2{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--mut); font-weight:800; margin:0 0 11px; }
+
+  .feed{ display:flex; flex-direction:column; gap:6px; }
+  .feed .frow{ font-size:12.5px; padding:6px 9px; border-radius:8px; background:color-mix(in srgb, var(--line) 45%, transparent);
+               display:flex; align-items:center; gap:8px; animation:feedin .3s ease; }
+  .feed .frow .dot{ width:7px; height:7px; border-radius:50%; flex:none; }
+  .feed .frow.good .dot{ background:var(--up); } .feed .frow.bad .dot{ background:var(--down); }
+  @keyframes feedin{ from{ opacity:0; transform:translateX(-6px); } to{ opacity:1; transform:none; } }
+
+  .math{ font-variant-numeric:tabular-nums; }
+  .math .row{ display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .math .row:last-child{ border-bottom:0; }
+  .math .av{ width:30px; height:30px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:10px; font-weight:800; color:#fff; text-align:center; }
+  .math .body{ flex:1; min-width:0; } .math .body .nm{ font-weight:700; font-size:13px; }
+  .math .body .calc{ font-size:12px; color:var(--mut); }
+  .math .body .calc .base{ color:var(--ink); font-weight:700; }
+  .math .body .calc .mal{ color:var(--down); font-weight:700; }
+  .math .body .calc .bon{ color:var(--up); font-weight:700; }
+  .math .body .calc .net{ color:var(--accent); font-weight:800; }
+  .math .dl{ font-weight:800; font-size:13px; flex:none; }
+  .math .dl.up{ color:var(--up); } .math .dl.down{ color:var(--down); } .math .dl.same{ color:var(--mut); }
+  .empty{ color:var(--mut); font-size:12.5px; font-style:italic; }
+
+  .foot{ margin-top:18px; font-size:12px; color:var(--mut); max-width:82ch; }
+  .foot b{ color:var(--ink); }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--mut); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw{ width:12px; height:12px; border-radius:3px; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none!important; } .lrow{ transition:none; } }
+
+  .hovercard{ position:fixed; left:0; top:0; z-index:9999; pointer-events:none; width:270px; max-width:80vw;
+              background:rgba(10,8,6,.94); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:11px 13px;
+              color:#f6ecdd; box-shadow:0 14px 34px -12px rgba(0,0,0,.65); opacity:0;
+              transform:translate(-9999px,-9999px); transition:opacity .12s ease; }
+  .hovercard.show{ opacity:1; }
+  .hc-head{ display:flex; align-items:center; gap:9px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.14); }
+  .hc-crest{ width:32px; height:32px; border-radius:50%; flex:none; display:block; }
+  .hc-id{ flex:1; min-width:0; }
+  .hc-code{ font-weight:800; font-size:13px; }
+  .hc-name{ font-size:11.5px; color:#d8c3a6; }
+  .hc-stats{ text-align:right; flex:none; }
+  .hc-rank{ font-family:Georgia,serif; font-weight:700; font-size:18px; line-height:1; }
+  .hc-rank .of{ font-size:10px; color:#c9b89f; font-weight:600; margin-left:2px; font-family:system-ui; }
+  .hc-pts{ font-size:11px; color:#d8c3a6; margin-top:2px; }
+  .hc-slots{ max-height:230px; overflow-y:auto; }
+  .hc-slots .row{ padding:6px 0; border-bottom:1px solid rgba(255,255,255,.10); }
+  .hc-slots .row:last-child{ border-bottom:0; }
+  .hc-slots .av{ width:22px; height:22px; font-size:9px; }
+  .hc-slots .body .nm{ font-size:11.5px; color:#f6ecdd; }
+  .hc-slots .body .calc{ font-size:10.5px; }
+  .hc-slots .body .calc .base{ color:#f6ecdd; }
+  .hc-empty{ font-size:11.5px; font-style:italic; color:#c9b89f; padding:2px 0; }
+</style>
+</head>
+<body>
+
+
+<div class="hovercard" id="hovercard">
+  <div class="hc-head">
+    <img class="hc-crest" id="hcCrest" alt="">
+    <div class="hc-id">
+      <div class="hc-code" id="hcCode"></div>
+      <div class="hc-name" id="hcName"></div>
+    </div>
+    <div class="hc-stats">
+      <div class="hc-rank"><span id="hcRank"></span></div>
+      <div class="hc-pts" id="hcPts"></div>
+    </div>
+  </div>
+  <div class="hc-slots math" id="hcSlots"></div>
+</div>
+
+<div class="wrap">
+  <div class="cardhead">
+    <div>
+      <p class="eyebrow">Disziplin · 32 Kämpfer · Frag-Wertung</p>
+      <h1>Mini-DM — Die Grube</h1>
+      <div class="sub">Kein Duell, kein Team — EINE enge, dunkle <b>Grube</b>, 32 Einzelkämpfer drängen gleichzeitig von ihrer Startspur Richtung Zentrum. Jeder Klick schickt eine Frag-Welle: der aufgestellte Slot (<b>Frontliner, Finisher, Trick Fighter, Chaos Driver, Last Hit</b>) trägt seinen <b>Kampfwert</b> − Mali + Boni = <b>Netto-Frags</b>. Jeder Kämpfer rammt sich weiter Richtung Zentrum — nie zurück; die gezackte Frontlinie zeigt den Rang auf einen Blick. Dein Kämpfer greift zuletzt.</div>
+    </div>
+    <div class="headmeta">Runde <b id="round">1</b> / 5<br>Rang → Punkte</div>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="slotbanner">
+        <span class="tag">Aktiver Slot</span>
+        <span class="big" id="slotbig">Frontliner</span>
+        <span class="desc" id="slotdesc">Öffnet die Grube — sucht den ersten Kontakt</span>
+      </div>
+      <div class="arena">
+        <canvas id="court" width="1180" height="820"></canvas>
+        <div class="mytrack">
+          <div class="lbl">Dein Kämpfer · M-M</div>
+          <div class="rk"><span class="now" id="myrank">–</span><span class="of">/ 32</span></div>
+          <div class="mv same" id="mymove">bereit</div>
+        </div>
+        <div class="scorepop" id="pop">+0</div>
+        <div class="liveflag"><span class="pip"></span> <span id="status">Einlass</span></div>
+      </div>
+
+      <div class="clickbar">
+        <button class="cta" id="advance">🗡 Grube tobt (Frontliner)</button>
+        <div class="prog"><i id="progfill"></i></div>
+        <div class="step">Schritt <b id="stepnum">0</b> / 10</div>
+        <button class="cta small" id="mute" title="Sound an/aus">🔊 Sound</button>
+        <button class="cta small" id="replay">↻ Neu</button>
+      </div>
+
+      <div class="legend">
+        <span><span class="sw" style="background:var(--accent)"></span> dein Kämpfer (M-M)</span>
+        <span><span class="sw" style="background:var(--gold)"></span> gerade im Gefecht</span>
+        <span><span class="sw" style="background:var(--up)"></span> Plätze gut</span>
+        <span><span class="sw" style="background:var(--down)"></span> Plätze verloren</span>
+      </div>
+
+      <div class="side">
+        <div class="panel" id="roundsumPanel" style="display:none">
+          <h2>Runden-Zusammenfassung</h2>
+          <div class="round-summary" id="roundsumline"></div>
+        </div>
+        <div class="panel">
+          <h2>Kill-Feed</h2>
+          <div class="feed" id="feedlist"><div class="empty">Noch kein Kontakt. Klick auf „Grube tobt".</div></div>
+        </div>
+        <div class="panel">
+          <h2>Frag-Log — Schadensrechnung</h2>
+          <div class="math" id="ticker"><div class="empty">Noch nichts geschehen.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ladder">
+      <h2>Kill-Leiste — Rangverlauf</h2>
+      <div class="lwrap"><div class="lrows" id="lrows"></div></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>Was hier echt ist:</b> 32 Kämpfer, 5 Rollen-Slots (Frontliner, Finisher, Trick Fighter, Chaos Driver, Last Hit), pro Rolle ein direkter Kampfwert. Modifikatoren (Fatigue, Verletzung, Adrenalin, Publikumsgunst, Mutator, Push) sind bestehende Mechaniken — sie erschweren oder verbessern den Kampf, aber Einfluss wird nur <b>addiert</b>, nie abgezogen. Rang → Punkte am Ende. Sigille hier als farbige Wappen-Tokens stellvertretend.
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  let _s = 0x9e3779b9;
+  function rnd(){ _s ^= _s<<13; _s^=_s>>>17; _s^=_s<<5; _s>>>=0; return _s/4294967296; }
+  function ri(a,b){ return a + Math.floor(rnd()*(b-a+1)); }
+  function pick(arr){ return arr[Math.floor(rnd()*arr.length)]; }
+
+  const CODES = ["A-A","B-B","B-P","C-S","C-C","D-L","D-P","G-G","H-R","L-K","L-R","M-M","M-S","N-N","N-W","P-C",
+                 "P-S","R-C","R-L","R-R","S-C","S-S","T-C","T-G","T-T","U-A","V-D","V-V","V-W","W-L","W-W","Z-H"];
+  const MINE = "M-M";
+  const TEAM_NAMES={"A-A":"Armageddon Aftermath","B-B":"Blazing Beasts","B-P":"Black Panthers","C-S":"Cold Steel","C-C":"Cash Creators","D-L":"Dire Legion","D-P":"Death Peaches","G-G":"Golden Gladiators","H-R":"Hell Raisers","L-K":"Lost Kingdom","L-R":"Last Ride","M-M":"Mayhem Mavericks","M-S":"Mortal Sin","N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","P-C":"Pirate Crew","P-S":"Project Suicide","R-C":"Royal Court","R-L":"Raging Lunatics","R-R":"Riptide Rivers","S-C":"Stronghold Crusaders","S-S":"Silver Soldiers","T-C":"The Chantry","T-G":"The Giants","T-T":"Terrible Teachers","U-A":"Undercover Agents","V-D":"Vicious & Delicious","V-V":"Vigorous Vikings","V-W":"Vigilante Wranglers","W-L":"Wrecking Legionnaires","W-W":"Wicked Wizards","Z-H":"Zero Heroes"};
+  const NAMES = ["Grimnak","Lyra","Vex","Orla","Pike","Sable","Thane","Wren","Bhodi","Kessa",
+                 "Runa","Dax","Mira","Volk","Nyx","Esk","Torin","Yara","Corvo","Fenn",
+                 "Halla","Juno","Ryk","Senn","Uma","Brox","Cael","Doran","Efa","Gale","Hexe","Iven"];
+
+  function hueFor(i){ return Math.round((i*360/32 + (i%3)*11)) % 360; }
+  const teams = CODES.map((code,i)=>{
+    const mine = code===MINE;
+    const h = hueFor(i);
+    return { code, i, mine,
+      color: mine ? "#b3261e" : `hsl(${h} 58% 52%)`,
+      accent: mine ? "#f0d9b5" : `hsl(${(h+150)%360} 62% 78%)`,
+      motif: i%4,
+      score:0, prevScore:0, roundStartScore:0, rank:i+1, prevRank:i+1, players:null, lastDelta:0,
+      thrownSlot:-1, crest:null };
+  });
+
+  // ---- procedural team crest (stands in for a real logo) ----
+  function paintCrest(c2, cx, cy, r, t, withLetter){
+    c2.save();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2); c2.closePath(); c2.clip();
+    c2.fillStyle=t.color; c2.fillRect(cx-r,cy-r,r*2,r*2);
+    c2.fillStyle=t.accent; c2.globalAlpha=.9;
+    if(t.motif===0){ c2.fillRect(cx-r,cy-r*0.28,r*2,r*0.56); }
+    else if(t.motif===1){ c2.beginPath(); c2.moveTo(cx-r,cy-r); c2.lineTo(cx+r,cy-r); c2.lineTo(cx-r,cy+r); c2.closePath(); c2.fill(); }
+    else if(t.motif===2){ c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx+r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill();
+                          c2.beginPath(); c2.moveTo(cx,cy-r); c2.lineTo(cx-r,cy); c2.lineTo(cx,cy+r); c2.lineTo(cx,cy); c2.closePath(); c2.fill(); }
+    else { c2.beginPath(); c2.arc(cx,cy,r*0.58,0,Math.PI*2); c2.fill(); }
+    c2.globalAlpha=1;
+    c2.restore();
+    c2.beginPath(); c2.arc(cx,cy,r,0,Math.PI*2);
+    c2.lineWidth = t.mine ? Math.max(2,r*0.16) : Math.max(1.5,r*0.11);
+    c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
+    if(withLetter){
+      const label = t.code.replace('-','');
+      c2.fillStyle="#fff"; c2.textAlign="center"; c2.textBaseline="middle";
+      c2.font=`800 ${Math.round(r*(label.length>1?0.62:0.9))}px system-ui`;
+      c2.shadowColor="rgba(0,0,0,.5)"; c2.shadowBlur=2;
+      c2.fillText(label, cx, cy+0.5);
+      c2.shadowBlur=0; c2.textBaseline="alphabetic";
+    }
+  }
+  function crestURL(t,size){
+    const oc=document.createElement('canvas'); oc.width=oc.height=size;
+    const o=oc.getContext('2d'); paintCrest(o,size/2,size/2,size/2-1,t,true);
+    return oc.toDataURL();
+  }
+
+  const MODS = [
+    {k:null,             w:40},
+    {k:"Fatigue",        w:15, sign:-1, min:6,  max:20},
+    {k:"Adrenalin",      w:9,  sign:+1, min:4,  max:11},
+    {k:"Mutator",        w:11, sign:+1, min:5,  max:14},
+    {k:"Push",           w:11, sign:+1, min:5,  max:16},
+    {k:"Publikumsgunst", w:10, sign:+1, min:3,  max:9},
+    {k:"Verletzung",     w:4,  sign:-1, min:12, max:26, injury:true},
+  ];
+  const MODW = MODS.reduce((s,m)=>s+m.w,0);
+  function rollMod(){
+    let r=rnd()*MODW;
+    for(const m of MODS){ if((r-=m.w)<0){ if(!m.k)return null; return {k:m.k,sign:m.sign,amt:ri(m.min,m.max),injury:!!m.injury}; } }
+    return null;
+  }
+  function rollMods(){
+    const out=[]; const n = rnd()<0.34?0 : rnd()<0.78?1 : 2;
+    const seen=new Set();
+    for(let j=0;j<n;j++){ const m=rollMod(); if(m && !seen.has(m.k)){ seen.add(m.k); out.push(m); } }
+    return out;
+  }
+  function genPlayers(t){
+    const base = t.mine ? [80,72,66,60,54] : null;
+    const arr=[];
+    for(let k=0;k<5;k++){ arr.push({ val: base?base[k]:ri(42,90), name:pick(NAMES), mods:rollMods() }); }
+    return arr;
+  }
+  function initData(){
+    _s=0x51ed270b;
+    teams.forEach(t=>{
+      t.players=genPlayers(t); t.score=0; t.prevScore=0; t.roundStartScore=0; t.rank=t.i+1; t.prevRank=t.i+1; t.lastDelta=0; t.thrownSlot=-1; t.roundStartRank=t.rank; t.roundHot=false;
+      t.restX=t.homeX; t.restY=t.homeY; t.dispX=t.homeX; t.dispY=t.homeY; t.anim=null; t.wobble=null; t.wobOffX=0; t.wobOffY=0;
+    });
+  }
+  // slotRank: current standing of a team (kept as a named accessor so the round-summary /
+  // tracker code reads intent rather than poking t.rank directly everywhere).
+  function slotRank(t){ return t.rank; }
+  // Ampel: #1-3 grün, #4-6 gelb, #7-10 rot, ab #11 neutral (kein Akzent)
+  function ampelColor(rank){
+    if(rank<=3) return '#2fa564';
+    if(rank<=6) return '#d9a441';
+    if(rank<=10) return '#d9503f';
+    return '';
+  }
+  function fmtScore(t){
+    const gain = Math.round(t.score - (t.roundStartScore||0));
+    return Math.round(t.score) + (gain>0 ? ` (+${gain})` : '');
+  }
+  function recomputeRanksLive(){
+    const order=teams.slice().sort((a,b)=> b.score-a.score || a.i-b.i);
+    order.forEach((t,idx)=> t.rank=idx+1);
+  }
+
+  // ---------- pit layout ----------
+  const ROLES=["Frontliner","Finisher","Trick Fighter","Chaos Driver","Last Hit"];
+  const ROLE_DESC={
+    "Frontliner":"Öffnet die Grube — sucht den ersten Kontakt",
+    "Finisher":"Setzt den Gnadenstoß",
+    "Trick Fighter":"Fintet und punktet aus der Bewegung",
+    "Chaos Driver":"Reißt die Grube durcheinander",
+    "Last Hit":"Sichert den letzten Treffer",
+  };
+  const cv=document.getElementById('court'), ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+
+  // ---------- pit layout: 32 stacked lanes, rim (left) → killzone (right) ----------
+  // Position along a lane IS the cumulative score (axis-principle): forward-only, never resets.
+  const MARGIN_T=30, MARGIN_B=30, LABEL_W=118, FORT_W=150;
+  const trenchX = LABEL_W + 26;
+  const fortX = W - FORT_W;
+  const LANES = teams.length;
+  const laneH = (H - MARGIN_T - MARGIN_B) / LANES;
+  const SCORE_K = 210; // asymptotic — approaches but never reaches the fortress wall
+  function laneY(i){ return MARGIN_T + i*laneH + laneH/2; }
+  function progressX(score){ return trenchX + (fortX - trenchX - 24) * (1 - 1/(1 + Math.max(0,score)/SCORE_K)); }
+  teams.forEach(t=>{ t.homeY = laneY(t.i); t.homeX = trenchX; });
+
+  // ---- WebAudio: blade clash + grunt + feed blips (no external files) ----
+  let actx=null, muted=false;
+  function audio(){ if(muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(actx.state==='suspended') actx.resume(); return actx; }
+  // short blade-on-blade clash — bright bandpassed noise burst
+  function clashNoise(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const len=0.14, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.3); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=2.2;
+    bp.frequency.setValueAtTime(3200+Math.random()*1800,t0);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.35),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0+len);
+    // a second, brighter ring for the "clang"
+    const o=a.createOscillator(); o.type='triangle';
+    o.frequency.setValueAtTime(1800+Math.random()*900,t0);
+    const g2=a.createGain(); g2.gain.setValueAtTime((vol||0.35)*0.5,t0); g2.gain.exponentialRampToValueAtTime(0.001,t0+0.1);
+    o.connect(g2); g2.connect(a.destination); o.start(t0); o.stop(t0+0.11);
+  }
+  // short human grunt — quick pitch-drop vocal-ish burst with a noisy breath
+  function grunt(vol){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(150+Math.random()*40,t0); o.frequency.exponentialRampToValueAtTime(78,t0+0.14);
+    const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=900; lp.Q.value=0.6;
+    const g=a.createGain(); g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((vol||0.4),t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.22);
+    o.connect(lp); lp.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.24);
+    const len=0.09, buf=a.createBuffer(1, a.sampleRate*len, a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.8); }
+    const src=a.createBufferSource(); src.buffer=buf;
+    const bp=a.createBiquadFilter(); bp.type='lowpass'; bp.Q.value=0.7; bp.frequency.value=420;
+    const g2=a.createGain(); g2.gain.setValueAtTime((vol||0.4)*0.6,t0); g2.gain.exponentialRampToValueAtTime(0.001,t0+len);
+    src.connect(bp); bp.connect(g2); g2.connect(a.destination); src.start(t0); src.stop(t0+len);
+  }
+  function feedBlip(vol,good){
+    const a=audio(); if(!a) return; const t0=a.currentTime;
+    const o=a.createOscillator(); o.type=good?'triangle':'square';
+    o.frequency.setValueAtTime(good?880:340,t0); o.frequency.exponentialRampToValueAtTime(good?600:250,t0+0.06);
+    const g=a.createGain(); g.gain.setValueAtTime((vol||0.25),t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.08);
+    o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+0.09);
+  }
+
+  function cssv(n,f){ const v=getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return v||f; }
+
+  // ---------- animation state ----------
+  let particles=[];   // clash sparks {x,y,vx,vy,life,color}
+  let feedPops=[];    // floating combat text {x,y,life,text,color}
+  let hitboxes=[];    // per-token hit areas in CANVAS coordinates, rebuilt every drawScene() {code,x,y,r}
+  const camera={zoom:1,fx:W/2,fy:H/2,tzoom:1,tfx:W/2,tfy:H/2};
+  let started=false;
+  let curSlot=-1;
+
+  function spawnSparks(x,y,good){
+    for(let k=0;k<8;k++){
+      particles.push({x,y,vx:(rnd()-.5)*4.4,vy:(rnd()-.5)*4.4-0.6,life:1,
+        color: good ? (Math.random()<0.5?'#e6c15a':'#8fe3a8') : '#ff8a5c'});
+    }
+  }
+  function diveCamera(t){
+    const cx = t.anim ? t.anim.contactX : t.dispX, cy = t.anim ? t.anim.contactY : t.dispY;
+    camera.tzoom=1.32; camera.tfx=cx; camera.tfy=cy;
+    setTimeout(()=>{ camera.tzoom=1; camera.tfx=W/2; camera.tfy=H/2; }, 720);
+  }
+
+  function easeOutBack(x){ const c1=1.7, c3=c1+1; return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2); }
+  function easeInQuad(x){ return x*x; }
+
+  // Starts one reveal-wave lunge: the banner surges forward, "clashes" a bit past its new
+  // resting spot, then bounces back to rest exactly at progressX(score) — the position that
+  // *is* the team's cumulative score along its lane. Forward-only, because score never drops.
+  function startLunge(t, net, isMine){
+    const now = performance.now();
+    const newRestX = Math.max(t.restX, progressX(t.score));
+    const overshoot = Math.min(38, 10 + net*0.45);
+    const contactX = Math.min(fortX-6, newRestX + overshoot);
+    const contactY = t.homeY;
+    t.anim = {
+      t0: now,
+      lungeDur: isMine?380:240,
+      recoverDur: isMine?420:300,
+      fromX: t.dispX, fromY: t.dispY,
+      contactX, contactY,
+      toX: newRestX, toY: t.homeY,
+      trail: []
+    };
+    t.restX = newRestX;
+    // neighboring lanes flinch as the breach's shockwave passes through the line
+    [t.i-2,t.i-1,t.i+1,t.i+2].forEach(ni=>{
+      if(ni<0||ni>=teams.length) return;
+      const o=teams[ni];
+      if(rnd()<0.5){ o.wobble = { t0: now, dur: 200+ri(0,110), dx:0, dy:(rnd()-.5)*7 }; }
+    });
+    return {contactX,contactY};
+  }
+  function stepAnimations(now){
+    teams.forEach(t=>{
+      if(t.anim){
+        const a=t.anim, el=now-a.t0;
+        if(el<a.lungeDur){
+          const p=easeInQuad(Math.min(1,el/a.lungeDur));
+          t.dispX = a.fromX + (a.contactX-a.fromX)*p;
+          t.dispY = a.fromY + (a.contactY-a.fromY)*p;
+          if(el>10) a.trail.push({x:t.dispX,y:t.dispY});
+          if(a.trail.length>10) a.trail.shift();
+        } else if(el < a.lungeDur+a.recoverDur){
+          const p=Math.min(1,(el-a.lungeDur)/a.recoverDur);
+          const e=easeOutBack(p);
+          t.dispX = a.contactX + (a.toX-a.contactX)*e;
+          t.dispY = a.contactY + (a.toY-a.contactY)*e;
+          a.trail.push({x:t.dispX,y:t.dispY}); if(a.trail.length>10) a.trail.shift();
+        } else {
+          t.dispX=a.toX; t.dispY=a.toY; t.anim=null;
+        }
+      } else {
+        t.dispX += (t.restX - t.dispX)*0.18;
+        t.dispY += (t.restY - t.dispY)*0.18;
+      }
+      if(t.wobble){
+        const w=t.wobble, el=now-w.t0;
+        if(el<w.dur){
+          const p=el/w.dur, damp=Math.sin(p*Math.PI);
+          t.wobOffX = w.dx*damp; t.wobOffY = w.dy*damp;
+        } else { t.wobble=null; t.wobOffX=0; t.wobOffY=0; }
+      } else { t.wobOffX=0; t.wobOffY=0; }
+    });
+  }
+
+  function drawScene(){
+    // sky strip + battlefield ground
+    const sky=ctx.createLinearGradient(0,0,0,MARGIN_T+laneH*3);
+    sky.addColorStop(0,cssv('--field-2','#546e34')); sky.addColorStop(1,cssv('--field-1','#3a4d26'));
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,MARGIN_T+laneH*3);
+    ctx.fillStyle=cssv('--field-0','#1f2a17'); ctx.fillRect(0,MARGIN_T+laneH*3,W,H-(MARGIN_T+laneH*3));
+    ctx.strokeStyle='rgba(0,0,0,.07)'; ctx.lineWidth=1;
+    for(let x=-H;x<W;x+=30){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke(); }
+
+    ctx.save();
+    ctx.translate(camera.fx,camera.fy); ctx.scale(camera.zoom,camera.zoom); ctx.translate(-camera.fx,-camera.fy);
+
+    // lane separators
+    ctx.strokeStyle='rgba(240,217,181,.10)'; ctx.lineWidth=1;
+    for(let i=0;i<=LANES;i++){
+      const y=MARGIN_T+i*laneH;
+      ctx.beginPath(); ctx.moveTo(trenchX-14,y); ctx.lineTo(fortX+10,y); ctx.stroke();
+    }
+
+    // conquered terrain — persistent, per-lane, never shrinks (position = points, made visible as ground)
+    teams.forEach(t=>{
+      const y0=t.homeY-laneH*0.36, hgt=laneH*0.72;
+      ctx.fillStyle=t.color; ctx.globalAlpha= t.mine?0.30:0.16;
+      ctx.fillRect(trenchX, y0, Math.max(0,t.restX-trenchX), hgt);
+      ctx.globalAlpha=1;
+    });
+
+    // trench (start line)
+    ctx.strokeStyle='rgba(240,217,181,.5)'; ctx.lineWidth=2.5; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(trenchX,MARGIN_T-8); ctx.lineTo(trenchX,MARGIN_T+LANES*laneH+8); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // feindfestung (goal, dark silhouette with crenellations)
+    ctx.fillStyle=cssv('--zone','#8a2f28'); ctx.globalAlpha=.92;
+    ctx.fillRect(fortX, MARGIN_T-10, FORT_W, LANES*laneH+20);
+    ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    for(let k=0;k<6;k++){
+      const segH=(LANES*laneH+20)/6, ty=MARGIN_T-10+k*segH;
+      ctx.fillRect(fortX+8, ty+6, 26, segH-12);
+    }
+    ctx.strokeStyle=cssv('--zone-line','#f0d9b5'); ctx.lineWidth=2;
+    ctx.strokeRect(fortX, MARGIN_T-10, FORT_W, LANES*laneH+20);
+    ctx.fillStyle=cssv('--zone-line','#f0d9b5'); ctx.globalAlpha=.85;
+    for(let x=fortX;x<fortX+FORT_W;x+=18){ ctx.fillRect(x,MARGIN_T-10,9,7); }
+    ctx.globalAlpha=1;
+    ctx.save();
+    ctx.translate(fortX+FORT_W/2, MARGIN_T+LANES*laneH/2); ctx.rotate(-Math.PI/2);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='700 15px Georgia,serif'; ctx.textAlign='center';
+    ctx.fillText('KILLZONE', 0, -FORT_W/2+18);
+    ctx.restore();
+
+    // gezackte Frontlinie — connects every lane's current position; jaggedness = rank at a glance
+    ctx.beginPath();
+    teams.forEach((t,idx)=>{ if(idx===0) ctx.moveTo(t.dispX,t.homeY); else ctx.lineTo(t.dispX,t.homeY); });
+    ctx.strokeStyle=cssv('--gold','#c99a2e'); ctx.lineWidth=1.6; ctx.globalAlpha=.55; ctx.stroke(); ctx.globalAlpha=1;
+
+    // motion trail while lunging
+    teams.forEach(t=>{
+      if(t.anim && t.anim.trail && t.anim.trail.length>1){
+        for(let k=0;k<t.anim.trail.length-1;k++){
+          const pt=t.anim.trail[k];
+          const a=(k/t.anim.trail.length)*0.5;
+          ctx.beginPath(); ctx.arc(pt.x,pt.y,(t.mine?7:5)*(0.4+a),0,Math.PI*2);
+          ctx.fillStyle=t.color; ctx.globalAlpha=a*0.5; ctx.fill(); ctx.globalAlpha=1;
+        }
+      }
+    });
+
+    // troop banners (rammed into the ground at their advanced position)
+    hitboxes=[];
+    teams.forEach(t=>{
+      const px=t.dispX, py=t.dispY+(t.wobOffY||0);
+      const justFought = t.thrownSlot===curSlot;
+      const lunging = !!t.anim;
+      const rad = (t.mine?15:11) * (lunging ? (t.mine?1.22:1.1) : 1);
+      hitboxes.push({code:t.code, x:px, y:py, r:rad+4});
+      ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=t.mine?2.4:1.6;
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,py+laneH*0.34); ctx.stroke();
+      if(t.roundHot){
+        ctx.beginPath(); ctx.arc(px,py,rad+5,0,Math.PI*2);
+        ctx.strokeStyle=cssv('--gold','#c99a2e'); ctx.lineWidth=2.6; ctx.globalAlpha=.9; ctx.stroke(); ctx.globalAlpha=1;
+      }
+      if(justFought){
+        ctx.beginPath(); ctx.arc(px,py,rad+3.5,0,Math.PI*2);
+        ctx.strokeStyle=cssv('--gold','#c99a2e'); ctx.lineWidth=2.2; ctx.globalAlpha=.8; ctx.stroke(); ctx.globalAlpha=1;
+      }
+      paintCrest(ctx, px, py, rad, t, true);
+      if(t.mine){
+        const slotP = (curSlot>=0 && curSlot<5) ? t.players[curSlot] : null;
+        const label = slotP ? slotP.name : t.code;
+        ctx.font='700 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+        ctx.fillStyle='rgba(255,255,255,.92)'; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=3;
+        ctx.fillText(label, px+rad+7, py);
+        ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+      }
+    });
+
+    // camera-dive highlight on own banner
+    if(camera.zoom>1.03){
+      const me=teams.find(x=>x.mine);
+      const pulse=0.5+0.5*Math.sin(performance.now()/90);
+      ctx.beginPath(); ctx.arc(me.dispX,me.dispY,26+5*pulse,0,Math.PI*2);
+      ctx.strokeStyle=cssv('--gold','#c99a2e'); ctx.lineWidth=2.4; ctx.globalAlpha=.75; ctx.stroke(); ctx.globalAlpha=1;
+    }
+
+    // particles (clash sparks)
+    particles.forEach(p=>{
+      if(p.life<=0) return;
+      ctx.globalAlpha=Math.max(0,p.life);
+      ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,2.4,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    });
+    // feed pops (floating combat text)
+    feedPops.forEach(f=>{
+      if(f.life<=0) return;
+      ctx.globalAlpha=Math.max(0,f.life);
+      ctx.fillStyle=f.color; ctx.font='800 11px system-ui'; ctx.textAlign='center';
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.globalAlpha=1;
+    });
+
+    // team-code labels along the trench
+    ctx.font='600 9px system-ui'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    teams.forEach(t=>{
+      ctx.fillStyle = t.mine ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.4)';
+      ctx.fillText(t.code, trenchX-20, t.homeY);
+    });
+    ctx.textBaseline='alphabetic';
+
+    ctx.restore();
+
+    if(!started){
+      ctx.fillStyle='rgba(255,255,255,.45)'; ctx.textAlign='center'; ctx.font='italic 600 20px Georgia,serif';
+      ctx.fillText('Grube bereit — Klick zum Start', W/2, H/2);
+    }
+  }
+
+  let raf=null;
+  function loop(){
+    const now=performance.now();
+    camera.zoom += (camera.tzoom-camera.zoom)*0.12;
+    camera.fx += (camera.tfx-camera.fx)*0.12;
+    camera.fy += (camera.tfy-camera.fy)*0.12;
+    stepAnimations(now);
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.life-=0.035; });
+    particles=particles.filter(p=>p.life>0.02);
+    feedPops.forEach(f=>{ f.y-=0.35; f.life-=0.018; });
+    feedPops=feedPops.filter(f=>f.life>0.02);
+    drawScene();
+    raf=requestAnimationFrame(loop);
+  }
+
+  // score pop
+  function scorePop(net,mine){
+    const pop=document.getElementById('pop');
+    pop.textContent='+'+net; pop.style.color=mine?'#e6c15a':'var(--gold)';
+    pop.style.left='calc(50% - 20px)'; pop.style.top='42%';
+    pop.style.transition='none'; pop.style.opacity='1'; pop.style.transform='translateY(0) scale(1)';
+    requestAnimationFrame(()=>{ pop.style.transition='opacity .9s, transform .9s'; pop.style.opacity='0'; pop.style.transform='translateY(-40px) scale(1.25)'; });
+  }
+
+  // ---------- standings ladder (pulse bar) ----------
+  const ROWH=21;
+  const rowEls={};
+  function buildLadder(){
+    const host=document.getElementById('lrows'); host.innerHTML='';
+    teams.forEach(t=>{
+      if(!t.crest) t.crest=crestURL(t,32);
+      const row=document.createElement('div');
+      row.className='lrow'+(t.mine?' mine':'');
+      row.innerHTML=`<span class="pos">${t.rank}</span><img class="crest" src="${t.crest}" alt=""><span class="cd">${t.code}</span><span class="thr" title="in dieser Welle gekämpft">○</span><span class="pts">0</span><span class="dd"></span>`;
+      row.addEventListener('mousemove',(e)=> showHoverCard(t,e.clientX,e.clientY));
+      row.addEventListener('mouseleave', hideHoverCard);
+      host.appendChild(row); rowEls[t.code]=row;
+    });
+    positionLadder(true);
+  }
+  function positionLadder(instant){
+    teams.forEach(t=>{
+      const row=rowEls[t.code];
+      if(instant) row.style.transition='none';
+      row.style.transform=`translateY(${(slotRank(t)-1)*ROWH}px)`;
+      if(instant) requestAnimationFrame(()=>{ row.style.transition=''; });
+      row.querySelector('.pos').textContent=slotRank(t);
+      row.querySelector('.pts').textContent=fmtScore(t);
+      const thr=row.querySelector('.thr');
+      const done = t.thrownSlot===curSlot;
+      thr.className='thr'+(done?' done':''); thr.textContent=done?'●':'○';
+      const d = (t.roundStartRank!=null && curSlot>0) ? (t.roundStartRank - t.rank) : 0;
+      const dd=row.querySelector('.dd');
+      if(d>0){ dd.className='dd up'; dd.textContent='▲'+d; }
+      else if(d<0){ dd.className='dd down'; dd.textContent='▼'+(-d); }
+      else { dd.className='dd'; dd.textContent=''; }
+    });
+  }
+  function hotRow(code){
+    const r=rowEls[code]; if(!r) return;
+    r.classList.add('hot'); setTimeout(()=>r.classList.remove('hot'),600);
+  }
+
+  // ---------- hover card ----------
+  const hc=document.getElementById('hovercard');
+  function fillHoverCard(t){
+    document.getElementById('hcCrest').src = t.crest || crestURL(t,64);
+    document.getElementById('hcCode').textContent = t.code;
+    document.getElementById('hcName').textContent = TEAM_NAMES[t.code] || t.code;
+    const hcRankEl=document.getElementById('hcRank');
+    hcRankEl.textContent = '#'+t.rank;
+    hcRankEl.style.color = ampelColor(t.rank) || '';
+    document.getElementById('hcPts').textContent = Math.round(t.score)+' Punkte';
+    const host=document.getElementById('hcSlots');
+    if(t.thrownSlot<0){ host.innerHTML='<div class="hc-empty">noch nicht angetreten</div>'; return; }
+    let html='';
+    for(let s=0;s<=t.thrownSlot;s++){
+      const p=t.players[s];
+      const net=Math.max(0, p.val+modSum(p));
+      let calc=`<span class="base">${p.val}</span>`;
+      p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+      calc+=` = <span class="net">+${net}</span>`;
+      html+=`<div class="row"><div class="av" style="background:${t.color}">${t.code.replace('-','')}</div>
+        <div class="body"><div class="nm">${p.name} <span style="color:#c9b89f;font-weight:600">· ${ROLES[s]}</span></div>
+        <div class="calc">${calc}</div></div></div>`;
+    }
+    host.innerHTML=html;
+  }
+  function showHoverCard(t, clientX, clientY){
+    fillHoverCard(t);
+    hc.classList.add('show');
+    const pad=16;
+    let x=clientX+pad, y=clientY+pad;
+    const w=hc.offsetWidth||270, h=hc.offsetHeight||160;
+    if(x+w > window.innerWidth-8) x = clientX-w-pad;
+    if(y+h > window.innerHeight-8) y = clientY-h-pad;
+    hc.style.transform = `translate(${Math.max(4,x)}px,${Math.max(4,y)}px)`;
+  }
+  function hideHoverCard(){ hc.classList.remove('show'); }
+  cv.addEventListener('mousemove', function(e){
+    const rect=cv.getBoundingClientRect();
+    const scaleX=cv.width/rect.width, scaleY=cv.height/rect.height;
+    const mx=(e.clientX-rect.left)*scaleX, my=(e.clientY-rect.top)*scaleY;
+    let hit=null;
+    for(let i=hitboxes.length-1;i>=0;i--){
+      const hb=hitboxes[i], dx=mx-hb.x, dy=my-hb.y;
+      if(dx*dx+dy*dy<=hb.r*hb.r){ hit=hb; break; }
+    }
+    if(hit){ const t=teams.find(x=>x.code===hit.code); if(t) showHoverCard(t,e.clientX,e.clientY); else hideHoverCard(); }
+    else hideHoverCard();
+  });
+  cv.addEventListener('mouseleave', hideHoverCard);
+
+  // ---------- reveal flow ----------
+  let queue=[], stepIdx=0, busy=false;
+  function buildQueue(){ queue=[]; for(let r=0;r<5;r++){ queue.push({round:r,stage:'field'}); queue.push({round:r,stage:'mine'}); } }
+
+  function modSum(p){ return p.mods.reduce((s,m)=>s+m.sign*m.amt,0); }
+  function applyReveal(t,slot){
+    const p=t.players[slot];
+    const net=Math.max(0, p.val+modSum(p));
+    t.prevScore=t.score; t.score+=net; t.thrownSlot=slot; t.lastNet=net;
+    teams.forEach(x=>x.prevRank=x.rank);
+    recomputeRanksLive();
+    teams.forEach(x=>x.lastDelta=x.prevRank-x.rank);
+    return {player:p,net};
+  }
+  function logRow(t,slot,res){
+    const p=res.player,net=res.net;
+    const delta=t.lastDelta;
+    let calc=`<span class="base">${p.val}</span>`;
+    p.mods.forEach(m=>{ calc += m.sign<0 ? ` <span class="mal">− ${m.amt} ${m.k}</span>` : ` <span class="bon">+ ${m.amt} ${m.k}</span>`; });
+    calc+=` = <span class="net">+${net}</span>`;
+    const showDelta = delta!==0 && curSlot>0;
+    const rc = ampelColor(t.rank);
+    const rankSpan = `<span${rc?` style="color:${rc}"`:''}>#${t.rank}</span>`;
+    const dl = showDelta
+      ? `<span class="dl ${delta>0?'up':'down'}">${rankSpan} (${delta>0?'▲':'▼'}${Math.abs(delta)})</span>`
+      : `<span class="dl same">${rankSpan}</span>`;
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="av" style="background:${t.color}">${t.code.split('-')[0]}</div>
+      <div class="body"><div class="nm">${t.mine?'★ ':''}${p.name} <span style="color:var(--mut);font-weight:600">· ${t.code} · ${ROLES[slot]}</span></div>
+      <div class="calc">${calc}</div></div>${dl}`;
+    const tk=document.getElementById('ticker');
+    if(tk.querySelector('.empty')) tk.innerHTML='';
+    tk.insertBefore(row,tk.firstChild);
+    while(tk.children.length>7) tk.removeChild(tk.lastChild);
+  }
+  // Flavor lines are role-specific (the role itself is shown once in the banner above the
+  // scene, so these deliberately avoid repeating the role name 32x — just varied verbs/imagery).
+  const FLAVOR={
+    "Frontliner":{
+      good:["{c} eröffnet die Grube mit einem Treffer","{c} rennt in den ersten Clash","{c} setzt den ersten Cut",
+            "{c} drängt sofort ins Gewühl","{c} findet als Erster Kontakt","{c} reißt die Startlücke auf",
+            "{c} setzt den Ton der Runde"],
+      bad:["{c} verliert den ersten Schlagabtausch","{c} wird direkt umgestoßen","{c} rutscht auf dem Grubenboden aus",
+           "{c} läuft ins offene Messer","{c} verliert früh Boden","{c} wird sofort zurückgedrängt",
+           "{c} kassiert den ersten Treffer"] },
+    "Finisher":{
+      good:["{c} setzt den Gnadenstoß","{c} beendet den Kampf brutal","{c} landet den entscheidenden Hieb",
+            "{c} macht kurzen Prozess","{c} schließt den Frag sauber ab","{c} trifft die offene Flanke tödlich",
+            "{c} vollendet den Angriff"],
+      bad:["{c} verpasst den finalen Treffer","{c} zögert im entscheidenden Moment","{c} lässt den Gegner entkommen",
+           "{c} schlägt daneben","{c} verliert die Distanz","{c} wird im letzten Moment geblockt",
+           "{c} bricht den Finish ab"] },
+    "Trick Fighter":{
+      good:["{c} täuscht und trifft aus der Drehung","{c} nutzt einen Trickstoß","{c} überrascht mit einer Finte",
+            "{c} punktet aus der Bewegung heraus","{c} landet einen Backstab-Trick","{c} verwirrt mit Tempowechsel",
+            "{c} zeigt einen sauberen Konter"],
+      bad:["{c} verkalkuliert die Finte","{c} stolpert über den eigenen Trick","{c} verliert das Gleichgewicht",
+           "{c} wird beim Trick erwischt","{c} setzt den Move zu früh","{c} landet den Konter nicht",
+           "{c} wird durchschaut"] },
+    "Chaos Driver":{
+      good:["{c} reißt die ganze Grube durcheinander","{c} provoziert ein Massenscharmützel","{c} zieht drei Gegner in den Nahkampf",
+            "{c} sorgt für pures Chaos","{c} nutzt das Gewühl gnadenlos","{c} trifft mitten im Getümmel",
+            "{c} lässt niemanden zur Ruhe kommen"],
+      bad:["{c} verliert im eigenen Chaos die Übersicht","{c} gerät zwischen die Fronten","{c} wird vom Gewühl verschluckt",
+           "{c} trifft die falsche Seite","{c} verheddert sich im Getümmel","{c} wird von allen Seiten bedrängt",
+           "{c} verliert die Kontrolle"] },
+    "Last Hit":{
+      good:["{c} sichert den letzten Treffer","{c} schnappt sich den Restfrag","{c} beendet die Runde mit Stil",
+            "{c} nutzt die letzte offene Sekunde","{c} setzt den Schlusspunkt","{c} räumt die Nachzügler ab",
+            "{c} holt den späten Frag"],
+      bad:["{c} kommt zu spät zum letzten Treffer","{c} verpasst den Schlusspunkt","{c} wird knapp abgefangen",
+           "{c} findet kein letztes Ziel","{c} verliert den Restfrag","{c} bleibt ohne Abschluss",
+           "{c} wird im letzten Moment gestoppt"] },
+  };
+  function killFeedLine(t,slot,res){
+    const role=ROLES[slot], code=t.code;
+    const malSum = res.player.mods.filter(m=>m.sign<0).reduce((s,m)=>s+m.amt,0);
+    const bonSum = res.player.mods.filter(m=>m.sign>0).reduce((s,m)=>s+m.amt,0);
+    const good = bonSum>=malSum;
+    const pool = FLAVOR[role][good?'good':'bad'];
+    const text = pick(pool).replace('{c}', code);
+    return {text, good};
+  }
+  function pushFeedPanel(text,good){
+    const host=document.getElementById('feedlist');
+    if(host.querySelector('.empty')) host.innerHTML='';
+    const row=document.createElement('div'); row.className='frow '+(good?'good':'bad');
+    row.innerHTML=`<span class="dot"></span><span>${text}</span>`;
+    host.insertBefore(row,host.firstChild);
+    while(host.children.length>8) host.removeChild(host.lastChild);
+  }
+  function updateMyTracker(){
+    const me=teams.find(t=>t.mine);
+    document.getElementById('myrank').textContent=slotRank(me);
+    const from = (me.roundStartRank!=null)? me.roundStartRank : me.rank;
+    const d = from - me.rank;
+    const mv=document.getElementById('mymove');
+    if(curSlot<=0){ mv.className='mv same'; mv.textContent=`Runde 1 läuft …`; }
+    else if(d>0){ mv.className='mv up'; mv.textContent=`▲ ${d} ${d===1?'Platz':'Plätze'} seit Vorrunde (${from} → ${me.rank})`; }
+    else if(d<0){ mv.className='mv down'; mv.textContent=`▼ ${-d} seit Vorrunde (${from} → ${me.rank})`; }
+    else { mv.className='mv same'; mv.textContent=`Platz ${me.rank} gehalten`; }
+  }
+
+  function triggerClash(t,slot,res,isMine){
+    const feed=killFeedLine(t,slot,res);
+    const {contactX,contactY}=startLunge(t,res.net,isMine);
+    // spark burst fires once the sigil actually reaches the contact point (mid-lunge)
+    setTimeout(()=>{
+      spawnSparks(contactX,contactY,feed.good);
+      feedPops.push({x:contactX,y:contactY-12,life:1,text:feed.text,color:feed.good?'#8fe3a8':'#ff8a5c'});
+      clashNoise(isMine?0.55:0.32);
+      grunt(isMine?0.48:0.3);
+    }, isMine?280:180);
+    pushFeedPanel(feed.text,feed.good);
+    logRow(t,slot,res);
+    feedBlip(isMine?0.3:0.2, feed.good);
+    if(isMine){ diveCamera(t); }
+    positionLadder(false); hotRow(t.code); updateMyTracker();
+    scorePop(res.net,isMine);
+  }
+
+  // Round-summary: once a full round (field cascade + own team) has revealed, flag the
+  // top-3 rank-jumpers of that round so their lane/banner flashes gold briefly.
+  function clearMedals(){
+    teams.forEach(t=>{ const r=rowEls[t.code]; if(r) r.classList.remove('rk-gold','rk-silver','rk-bronze'); });
+  }
+  const MEDAL_CLASSES=['rk-gold','rk-silver','rk-bronze'];
+  function roundSummary(){
+    const jumped = teams
+      .map(t=>({ t, d: t.roundStartRank - t.rank }))
+      .filter(x=>x.d>0)
+      .sort((a,b)=> b.d-a.d)
+      .slice(0,3);
+    jumped.forEach(({t},idx)=>{
+      t.roundHot=true; hotRow(t.code);
+      setTimeout(()=>{ t.roundHot=false; }, 1400);
+      const row=rowEls[t.code]; if(row) row.classList.add(MEDAL_CLASSES[idx]);
+    });
+    const panel=document.getElementById('roundsumPanel');
+    const line=document.getElementById('roundsumline');
+    if(!jumped.length){ panel.style.display='none'; return; }
+    const round=curSlot+1;
+    const parts = jumped.map(({t,d})=> `${t.code} ▲${d} · ${t.players[curSlot].name} ${Math.round(t.lastNet||0)}`);
+    line.textContent = `Runde ${round} — Größte Sprünge: ${parts.join(' · ')}`;
+    panel.style.display='';
+  }
+
+  function advance(){
+    if(busy) return;
+    if(stepIdx>=queue.length) return;
+    busy=true; started=true;
+    const q=queue[stepIdx];
+    curSlot=q.round;
+    if(q.stage==='field'){ teams.forEach(t=> { t.roundStartRank=t.rank; t.roundStartScore=t.score; }); clearMedals(); }
+    if(q.stage==='field'){
+      const field=teams.filter(t=>!t.mine).sort((a,b)=> b.rank-a.rank); // worst first
+      let i=0;
+      const doOne=()=>{
+        if(i>=field.length){ endStage(); return; }
+        const t=field[i++];
+        const res=applyReveal(t,q.round);
+        triggerClash(t,q.round,res,false);
+        setTimeout(doOne, 65);
+      };
+      doOne();
+    } else {
+      const t=teams.find(x=>x.mine);
+      const res=applyReveal(t,q.round);
+      document.getElementById('status').textContent='★ Du greifst an — Klingen-Clash';
+      triggerClash(t,q.round,res,true);
+      setTimeout(()=>{ roundSummary(); endStage(); }, 900);
+    }
+  }
+  function endStage(){ stepIdx++; updateControls(); setTimeout(()=>busy=false, 160); }
+
+  function updateControls(){
+    const btn=document.getElementById('advance');
+    document.getElementById('stepnum').textContent=stepIdx;
+    document.getElementById('progfill').style.width=(stepIdx/queue.length*100)+'%';
+    if(stepIdx>=queue.length){ btn.disabled=true; btn.textContent='✔ Disziplin gewertet'; document.getElementById('status').textContent='Endstand'; return; }
+    const q=queue[stepIdx], round=q.round+1;
+    document.getElementById('round').textContent=round;
+    document.getElementById('slotbig').textContent=ROLES[q.round];
+    document.getElementById('slotdesc').textContent=ROLE_DESC[ROLES[q.round]];
+    if(q.stage==='field'){ btn.textContent=`🗡 Grube tobt (${ROLES[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · Gefecht`; }
+    else { btn.textContent=`★ Du greifst an (${ROLES[q.round]})`; document.getElementById('status').textContent=`Runde ${round} · dein Kämpfer`; }
+  }
+
+  function reset(){
+    document.querySelector('.mytrack .lbl').textContent = 'Dein Kämpfer · '+MINE+' · '+(TEAM_NAMES[MINE]||MINE);
+    initData(); buildQueue(); stepIdx=0; busy=false; curSlot=-1; started=false;
+    particles=[]; feedPops=[]; camera.zoom=1; camera.fx=W/2; camera.fy=H/2; camera.tzoom=1; camera.tfx=W/2; camera.tfy=H/2;
+    buildLadder(); positionLadder(true);
+    document.getElementById('ticker').innerHTML='<div class="empty">Noch nichts geschehen.</div>';
+    document.getElementById('feedlist').innerHTML='<div class="empty">Noch kein Kontakt. Klick auf „Grube tobt".</div>';
+    document.getElementById('roundsumPanel').style.display='none';
+    document.getElementById('mymove').textContent='bereit'; document.getElementById('mymove').className='mv same';
+    document.getElementById('myrank').textContent=teams.find(t=>t.mine).rank;
+    updateControls();
+  }
+
+  document.getElementById('advance').addEventListener('click',advance);
+  document.getElementById('replay').addEventListener('click',reset);
+  document.getElementById('mute').addEventListener('click',function(){ muted=!muted; this.textContent=muted?'🔇 Stumm':'🔊 Sound'; if(!muted) feedBlip(0.3,true); });
+
+  reset();
+  if(!raf) loop();
+})();
+</script>
+
+</body>
+</html>
