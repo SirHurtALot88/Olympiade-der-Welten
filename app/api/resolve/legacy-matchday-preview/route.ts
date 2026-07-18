@@ -78,6 +78,12 @@ function resolveDefaultSqliteParams(input: { saveId: string | null; seasonId: st
   };
 }
 
+function resolveSqliteGameState(saveId: string) {
+  const persistence = createPersistenceService();
+  const save = persistence.getSaveById(saveId) ?? persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
+  return save.gameState;
+}
+
 async function loadPrismaContexts(params: LegacyLineupKeyParams[]): Promise<LegacyLineupContextLoadResult[]> {
   const loader = new LegacyLineupContextLoader(db, new LegacyLineupRepository(db));
   return Promise.all(params.map((entry) => loader.loadLegacyLineupContext(entry)));
@@ -123,6 +129,14 @@ export async function GET(request: Request) {
         ? await resolveDefaultPrismaParams(parsed)
         : resolveDefaultSqliteParams(parsed);
 
+    // Für die SQLite-Quelle den GameState einmal auflösen und weiterreichen — er
+    // liefert die Team-IDs UND (im Payload-Builder) die deterministische
+    // Same-Day-Injury-Rolle, exakt wie im Apply-Pfad.
+    let sqliteGameState: Awaited<ReturnType<typeof resolveSqliteGameState>> | null = null;
+    if (parsed.source === "sqlite") {
+      sqliteGameState = resolveSqliteGameState(params.saveId);
+    }
+
     const teamIds =
       parsed.source === "prisma"
         ? (
@@ -132,11 +146,7 @@ export async function GET(request: Request) {
               select: { teamId: true },
             })
           ).map((state) => state.teamId)
-        : (() => {
-            const persistence = createPersistenceService();
-            const save = persistence.getSaveById(params.saveId) ?? persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
-            return save.gameState.teams.map((team) => team.teamId);
-          })();
+        : sqliteGameState!.teams.map((team) => team.teamId);
 
     const teamParams = teamIds.map<LegacyLineupKeyParams>((teamId) => ({
       ...params,
@@ -163,6 +173,7 @@ export async function GET(request: Request) {
       source: parsed.source,
       params,
       contextResults,
+      gameState: sqliteGameState,
     });
 
     if (!responsePayload) {

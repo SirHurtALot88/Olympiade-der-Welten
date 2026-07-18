@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
+import { attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 
 function createContext(input: {
   teamId: string;
@@ -448,5 +450,127 @@ describe("legacy matchday resolve preview payload", () => {
     expect(payload).not.toBeNull();
     expect(payload?.warnings).toContain("context-warning");
     expect(payload?.warnings).not.toContain("team-load-failed");
+  });
+
+  it("applies the deterministic same-day injury malus (0.75x) so preview == applied result (#9)", () => {
+    // Bug #9: Die interaktive Resolve-VORSCHAU heftete die deterministische
+    // Same-Day-Verletzungs-Performance nicht an die Contexts — der Score-Engine
+    // fiel auf injuryMultiplier=1 zurück und überschätzte die Totals systematisch
+    // gegenüber dem persistierten Ergebnis (das Apply-Pfade mit 0.75x scoren).
+    // Die Verletzungs-Rolle ist deterministisch (stableHash-Seed), also am
+    // Vorschau-Zeitpunkt bekannt. `A-A-d1-3` verletzt sich bei diesem Seed
+    // (save-1/season-1/matchday-1) mit riskPercent 40 bei Fatigue 100.
+    const params = { saveId: "save-1", seasonId: "season-1", matchdayId: "matchday-1" };
+    const victimId = "A-A-d1-3";
+    // Vier d1-Spieler; nur der 4. (Index 3) ist der Verletzungskandidat und
+    // trägt den prägnanten Score 80, damit der Malus klar messbar ist.
+    const d1Scores = [10, 10, 10, 80];
+    const d2Scores = [20];
+
+    const usedPlayerIds = [
+      ...d1Scores.map((_score, index) => `A-A-d1-${index}`),
+      ...d2Scores.map((_score, index) => `A-A-d2-${index}`),
+    ];
+
+    // Minimaler GameState, dessen Aufstellung exakt die Context-Spieler nutzt.
+    // Nur der Verletzungskandidat trägt Fatigue 100 (riskPercent 40 → Rolle
+    // "injured"); alle anderen liegen bei 0 (riskPercent 0 → healthy).
+    const gameState = {
+      season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["matchday-1", "matchday-2"] },
+      seasonState: {
+        seasonId: "season-1",
+        schedule: [],
+        standings: {},
+        playerAvailabilityState: [],
+        lineupDrafts: [
+          {
+            lineupId: "lineup-A-A",
+            saveId: "save-1",
+            seasonId: "season-1",
+            matchdayId: "matchday-1",
+            teamId: "A-A",
+            status: "submitted",
+            entries: usedPlayerIds.map((playerId, index) => ({
+              disciplineId: playerId.includes("-d1-") ? "mini-dm" : "fechten",
+              disciplineSide: (playerId.includes("-d1-") ? "d1" : "d2") as "d1" | "d2",
+              slotIndex: index,
+              playerId,
+              activePlayerId: `active-${playerId}`,
+            })),
+            createdAt: "2026-06-03T00:00:00.000Z",
+            updatedAt: "2026-06-03T00:00:00.000Z",
+          },
+        ],
+      },
+      players: usedPlayerIds.map((id) => ({
+        id,
+        name: id,
+        fatigue: id === victimId ? 100 : 0,
+      })),
+      rosters: usedPlayerIds.map((playerId, index) => ({
+        id: `r-${index}`,
+        teamId: "A-A",
+        playerId,
+        contractLength: 2,
+        salary: 2,
+        upkeep: 2,
+        roleTag: "starter",
+        joinedSeasonId: "season-1",
+      })),
+      teams: [{ teamId: "A-A", shortCode: "A-A", name: "Alpha" }],
+    } as unknown as GameState;
+
+    // Kontrolle: der Roll-Map (exakt wie im Apply-Pfad gebaut) verletzt genau den Kandidaten.
+    const rollMap = buildMatchdayInjuryRollMap({ gameState, ...params });
+    expect(rollMap.get(`A-A::${victimId}`)?.result).toBe("injured");
+
+    const victimScoreFor = (payload: ReturnType<typeof buildLegacyMatchdayResolvePreviewPayload>) =>
+      payload?.preview.disciplinePreviews
+        .find((discipline) => discipline.disciplineId === "mini-dm")
+        ?.topPlayers.find((player) => player.playerId === victimId)?.finalPlayerScore ?? null;
+
+    // 1) OHNE gameState: keine Verletzung angeheftet → voller Score (der alte, überschätzende Zustand).
+    const previewNoInjury = buildLegacyMatchdayResolvePreviewPayload({
+      source: "sqlite",
+      params,
+      contextResults: [{ ok: true, context: createContext({ teamId: "A-A", teamName: "Alpha", d1Scores, d2Scores }), warnings: [] }],
+    });
+
+    // 2) MIT gameState (der Fix): der Payload-Builder heftet die Verletzung an → 0.75x-Malus.
+    const previewWithInjury = buildLegacyMatchdayResolvePreviewPayload({
+      source: "sqlite",
+      params,
+      gameState,
+      contextResults: [{ ok: true, context: createContext({ teamId: "A-A", teamName: "Alpha", d1Scores, d2Scores }), warnings: [] }],
+    });
+
+    // 3) APPLIED-Referenz: dieselbe Roll-Map an frische Contexts heften und direkt scoren
+    //    (genau wie result-apply-service / matchday-auto-run-service).
+    const appliedContexts = [createContext({ teamId: "A-A", teamName: "Alpha", d1Scores, d2Scores })];
+    attachMatchdayInjuryPerformanceToContexts(appliedContexts, rollMap);
+    const appliedPreview = buildLegacyMatchdayResolvePreview(appliedContexts);
+    const appliedVictimScore = appliedPreview.disciplinePreviews
+      .find((discipline) => discipline.disciplineId === "mini-dm")
+      ?.topPlayers.find((player) => player.playerId === victimId)?.finalPlayerScore ?? null;
+
+    const baseline = victimScoreFor(previewNoInjury);
+    const withMalus = victimScoreFor(previewWithInjury);
+
+    expect(baseline).not.toBeNull();
+    // Der Malus senkt den Score genau um den Faktor 0.75.
+    expect(withMalus).toBeCloseTo(0.75 * baseline!, 5);
+    // Und die Vorschau matcht das angewandte Ergebnis exakt (nicht divergent).
+    expect(withMalus).toBe(appliedVictimScore);
+
+    // Auch aggregiert (Summe der mini-dm-Spieler-Scores) ist die Vorschau mit
+    // Malus == angewandtes Ergebnis und niedriger als der (fälschliche)
+    // malus-freie Zustand.
+    const d1ScoreSum = (preview: typeof appliedPreview) =>
+      (preview.disciplinePreviews.find((discipline) => discipline.disciplineId === "mini-dm")?.topPlayers ?? []).reduce(
+        (sum, player) => sum + (player.finalPlayerScore ?? 0),
+        0,
+      );
+    expect(d1ScoreSum(previewWithInjury!.preview)).toBe(d1ScoreSum(appliedPreview));
+    expect(d1ScoreSum(previewWithInjury!.preview)).toBeLessThan(d1ScoreSum(previewNoInjury!.preview));
   });
 });

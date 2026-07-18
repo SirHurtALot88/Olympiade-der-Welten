@@ -15,7 +15,7 @@ import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } fr
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
-import { buildBeliebtheitLeagueContext, computeTeamBeliebtheit } from "@/lib/economy/team-beliebtheit";
+import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
@@ -477,9 +477,6 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
   const items: GameInboxItem[] = [];
   const settingsMap = buildTeamControlSettingsMap(input.gameState.teams, input.gameState.seasonState.teamControlSettings);
   const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  // Einmalig für die Liga: Beliebtheit skaliert die Arena-Einnahme in der
-  // Cash-Risiko-Vorschau (konsistent zur echten Season-End-Resolution).
-  const beliebtheitContext = buildBeliebtheitLeagueContext(input.gameState);
 
   for (const team of input.gameState.teams) {
     if (!visibleTeamIds.has(team.teamId)) continue;
@@ -808,8 +805,15 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
     const upkeep = calculateFacilityUpkeep(facilities);
+    // Beliebtheit skaliert die Arena-Einnahme in der Cash-Risiko-Vorschau. Wir
+    // nutzen bewusst computeTeamBeliebtheitFromGameState (bevorzugt den
+    // persistierten, mean-revertenden seasonState.beliebtheitByTeamId-KPI), damit
+    // die Warnung denselben arenaPopularityFactor sieht wie die echte
+    // Season-End-Gutschrift (previewFacilitySeasonEndFinance) und die
+    // Finanzansicht — sonst würde die Warnung ab Saison 2 mit einem anderen
+    // Faktor rechnen und fälschlich (nicht) auslösen.
     const income = calculateFacilityIncome(facilities, {
-      arenaPopularityFactor: computeTeamBeliebtheit(team.teamId, beliebtheitContext).value,
+      arenaPopularityFactor: computeTeamBeliebtheitFromGameState(input.gameState, team.teamId).value,
     });
     if (upkeep > 0 && team.cash + income - upkeep < 0) {
       items.push(
