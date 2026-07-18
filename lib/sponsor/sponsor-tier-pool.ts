@@ -1,5 +1,18 @@
-import type { SponsorStarTier } from "@/lib/data/olyDataTypes";
+import type {
+  SponsorArchetype,
+  SponsorCurveFamily,
+  SponsorCurveShape,
+  SponsorRarity,
+  SponsorStarTier,
+} from "@/lib/data/olyDataTypes";
 import { getStarTierMilestoneMultiplier } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  SPONSOR_CURVE_SHAPE_KEYS,
+  SPONSOR_RARITIES,
+  SPONSOR_RARITY_KEYS,
+  getSponsorCurveFamily,
+  mapStarTierToRarity,
+} from "@/lib/sponsor/sponsor-curve-shapes";
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 export type SponsorTierRollResult = {
@@ -306,4 +319,130 @@ export function getDemandProfile(starTier: SponsorStarTier): "safe" | "balanced"
   if (starTier >= 4) return "ambitious";
   if (starTier >= 2) return "balanced";
   return "safe";
+}
+
+// ── Rarity + curve-shape slate roller (new model) ────────────────────────────────────────────────────────
+
+export type SponsorSlateEntry = { curveShape: SponsorCurveShape; rarity: SponsorRarity };
+export type SponsorSlateResult = { entries: SponsorSlateEntry[]; goldenCardSlots: number[] };
+
+/** Legacy rarity → star tier (for the transition: gewöhnlich→2, magisch→3, selten→4, legendär→5). */
+export function mapRarityToStarTier(rarity: SponsorRarity): SponsorStarTier {
+  switch (rarity) {
+    case "legendär":
+      return 5;
+    case "selten":
+      return 4;
+    case "magisch":
+      return 3;
+    default:
+      return 2;
+  }
+}
+
+/** Legacy curve shape → archetype (titel→performance, sicherheit→security, else→identity). */
+export function mapCurveShapeToArchetype(curveShape: SponsorCurveShape): SponsorArchetype {
+  const family = getSponsorCurveFamily(curveShape);
+  if (family === "titel") return "performance";
+  if (family === "sicherheit") return "security";
+  return "identity";
+}
+
+/**
+ * Neuer Angebots-Slate-Wurf (ersetzt den Sterne-Wurf): pro Slot eine RARITY (gedeckelt am maxStarTier→Rarity,
+ * beliebtheits-gehoben Richtung höherer Rarity) und dazu ein SLATE aus DISTINCT Kurvenformen (höchstens 2 pro
+ * Familie). Vollständig deterministisch über getStableUnitHash (kein Math.random). Golden bleibt orthogonal
+ * und läuft über denselben Golden-Los-Pfad wie rollSponsorStarTiers.
+ */
+export function rollSponsorOfferSlate(input: {
+  seasonId: string;
+  teamId: string;
+  qualityRank: SponsorTeamQualityRank;
+  slotCount?: number;
+  beliebtheit?: number | null;
+  hadGoldenLastSeason?: boolean;
+  teamCount?: number;
+}): SponsorSlateResult {
+  const slotCount = input.slotCount ?? 5;
+  const teamCount = input.teamCount ?? 32;
+
+  // Cap: keine Rarity über dem maxStarTier→Rarity-Deckel des Teams. (targetStarTier→Rarity liegt darunter und
+  // bleibt der Normalfall dank drawWeight; der Cap begrenzt nur die Obergrenze.)
+  const maxRarity = mapStarTierToRarity(input.qualityRank.maxStarTier);
+  const maxOrder = SPONSOR_RARITIES[maxRarity].order;
+  const beliebtheitLift = beliebtheitTerm(input.beliebtheit);
+
+  // Rarity pro Slot: gewichteter Zug (drawWeight), gedeckelt (order ≤ maxOrder). Beliebtheit hebt höhere
+  // Rarities leicht an, damit populäre Teams die Spitzen-Rarities etwas häufiger sehen.
+  const rarities: SponsorRarity[] = [];
+  const candidates = SPONSOR_RARITY_KEYS.filter((r) => SPONSOR_RARITIES[r].order <= maxOrder);
+  const weights = candidates.map(
+    (r) => SPONSOR_RARITIES[r].drawWeight * (1 + beliebtheitLift * SPONSOR_RARITIES[r].order * 0.15),
+  );
+  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
+  for (let slot = 0; slot < slotCount; slot += 1) {
+    const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-rarity:${slot}`) * weightTotal;
+    let acc = 0;
+    let picked: SponsorRarity = candidates[candidates.length - 1] ?? maxRarity;
+    for (let i = 0; i < candidates.length; i += 1) {
+      acc += weights[i]!;
+      if (roll < acc) {
+        picked = candidates[i]!;
+        break;
+      }
+    }
+    rarities.push(picked);
+  }
+
+  // Kurven-Slate: distinct Formen, höchstens 2 pro Familie. Deterministische Reihenfolge (hash-sortiert),
+  // greedy einsammeln; falls das (mit ≤2/Familie) nicht reicht, auf 3/Familie lockern.
+  const orderedShapes = [...SPONSOR_CURVE_SHAPE_KEYS].sort(
+    (a, b) =>
+      getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${a}`) -
+      getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-curve:${b}`),
+  );
+  const collectShapes = (maxPerFamily: number, seed: SponsorCurveShape[]): SponsorCurveShape[] => {
+    const chosen = [...seed];
+    const familyCount = new Map<SponsorCurveFamily, number>();
+    for (const shape of chosen) {
+      const fam = getSponsorCurveFamily(shape);
+      familyCount.set(fam, (familyCount.get(fam) ?? 0) + 1);
+    }
+    for (const shape of orderedShapes) {
+      if (chosen.length >= slotCount) break;
+      if (chosen.includes(shape)) continue;
+      const fam = getSponsorCurveFamily(shape);
+      if ((familyCount.get(fam) ?? 0) >= maxPerFamily) continue;
+      chosen.push(shape);
+      familyCount.set(fam, (familyCount.get(fam) ?? 0) + 1);
+    }
+    return chosen;
+  };
+  let shapes = collectShapes(2, []);
+  if (shapes.length < slotCount) {
+    shapes = collectShapes(3, shapes);
+  }
+  shapes = shapes.slice(0, slotCount);
+
+  const entries: SponsorSlateEntry[] = shapes.map((curveShape, i) => ({
+    curveShape,
+    rarity: rarities[i] ?? maxRarity,
+  }));
+
+  // Golden bleibt orthogonal zur Rarity: derselbe Golden-Los-Pfad (Wahrscheinlichkeit + Seeds) wie
+  // rollSponsorStarTiers, höchstens EIN goldener Slot. Die Dummy-Tier-Liste liefert nur die Slot-Anzahl.
+  const golden = rollGoldenLuck(
+    Array.from({ length: slotCount }, () => 2 as SponsorStarTier),
+    [],
+    {
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      leaguePosition: input.qualityRank.leaguePosition,
+      teamCount,
+      beliebtheit: input.beliebtheit,
+      hadGoldenLastSeason: input.hadGoldenLastSeason,
+    },
+  );
+
+  return { entries, goldenCardSlots: golden.goldenCardSlots };
 }
