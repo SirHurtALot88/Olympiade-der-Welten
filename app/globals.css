@@ -6573,6 +6573,94 @@ a {
   min-width: 0;
 }
 
+/* Route-Error-Boundary (app/foundation/error.tsx) — bewusst self-contained mit
+   Fallback-Werten, damit die Karte auch dann sauber aussieht, wenn der Fehler
+   im View-CSS/Chunk selbst liegt. */
+.foundation-error-boundary {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.foundation-error-card {
+  max-width: 460px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 32px 28px;
+  border-radius: var(--nl-r-lg, 16px);
+  border: 1px solid var(--nl-line, rgba(255, 255, 255, 0.1));
+  background: var(--nl-panel, rgba(20, 26, 38, 0.96));
+  box-shadow: var(--nl-e2, 0 18px 48px rgba(0, 0, 0, 0.45));
+}
+
+.foundation-error-icon {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--nl-warn, #f0b84c);
+}
+
+.foundation-error-title {
+  margin: 0;
+  font-size: var(--nl-fs-4, 20px);
+  font-weight: 700;
+  color: var(--nl-ink, #e8eef7);
+  text-wrap: balance;
+}
+
+.foundation-error-copy {
+  margin: 0;
+  font-size: var(--nl-fs-2, 14px);
+  line-height: 1.5;
+  color: var(--nl-mut, rgba(214, 224, 240, 0.72));
+}
+
+.foundation-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.foundation-error-btn {
+  padding: 9px 18px;
+  border-radius: var(--nl-r-pill, 999px);
+  border: 1px solid var(--nl-line-2, rgba(255, 255, 255, 0.16));
+  background: transparent;
+  color: var(--nl-ink, #e8eef7);
+  font-size: var(--nl-fs-2, 14px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.foundation-error-btn:hover {
+  border-color: var(--nl-accent, #6ea8fe);
+}
+
+.foundation-error-btn.is-primary {
+  background: var(--nl-accent, #6ea8fe);
+  border-color: var(--nl-accent, #6ea8fe);
+  color: var(--nl-on-accent, #0b1220);
+}
+
+.foundation-error-btn.is-primary:hover {
+  filter: brightness(1.06);
+}
+
+.foundation-error-digest {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--nl-mut-2, rgba(160, 174, 196, 0.6));
+  font-family: var(--nl-mono, ui-monospace, monospace);
+}
+
 .foundation-encyclopedia-panel {
   display: grid;
   gap: 18px;
