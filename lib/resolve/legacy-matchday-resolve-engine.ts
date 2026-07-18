@@ -34,6 +34,24 @@ function roundScore(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+// Gleichstand-Regel: Teams mit exakt gleicher (auf Anzeige-Präzision gerundeter)
+// Punktzahl teilen sich den besseren Rang (Standard Competition Ranking: 1, 2, 2, 4).
+// Damit erhalten bei Gleichstand beide Teams die höheren Punkte statt einer
+// alphabetisch-nach-teamId aufgelösten Reihenfolge.
+function rankDescendingSharedTies<T>(items: T[], scoreAccessor: (item: T) => number) {
+  const sorted = [...items].sort((left, right) => scoreAccessor(right) - scoreAccessor(left));
+  let previousScore: number | null = null;
+  let sharedRank = 0;
+  return sorted.map((item, index) => {
+    const score = roundScore(scoreAccessor(item));
+    if (previousScore === null || score !== previousScore) {
+      sharedRank = index + 1;
+      previousScore = score;
+    }
+    return { item, rank: sharedRank };
+  });
+}
+
 function selectDebuffTargets(input: {
   source: DisciplineTeamResolvePreview;
   teamResults: DisciplineTeamResolvePreview[];
@@ -550,7 +568,7 @@ export function buildLegacyMatchdayResolvePreview(
         })),
       }));
     const teamResultsAfterPowers = applyTeamPowerDebuffs(rawTeamResults);
-    const teamResultsRanked = rankDescending(
+    const teamResultsRanked = rankDescendingSharedTies(
       teamResultsAfterPowers,
       (result) => result.score,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => ({
@@ -729,7 +747,7 @@ export function buildLegacyMatchdayResolvePreview(
     }
   }
 
-  const rankedTeams = rankDescending(
+  const rankedTeams = rankDescendingSharedTies(
     rankedTeamsBeforePowers.map((team) => {
       const scores = disciplineScoreSummaryByTeamId.get(team.teamId);
       const d1Score = scores?.d1Score ?? team.d1Score;
