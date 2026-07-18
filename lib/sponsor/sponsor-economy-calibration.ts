@@ -1,6 +1,11 @@
 import prizeMoneyNormalized from "@/references/sheets/prize-money-table.normalized.json";
 import type { GameState, SponsorArchetype, SponsorCurveShape, SponsorOffer, SponsorOfferComponent, SponsorRarity, SponsorStarTier } from "@/lib/data/olyDataTypes";
-import { getSponsorCurveShapeRankMultiplier, getSponsorRarityEtatFactor } from "@/lib/sponsor/sponsor-curve-shapes";
+import {
+  getSponsorCurveShapeRankMultiplier,
+  getSponsorRarityEtatFactor,
+  mapArchetypeToCurveShape,
+  mapStarTierToRarity,
+} from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDisplaySalaryTotal, getTeamSponsorBaseReferenceTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
@@ -590,6 +595,36 @@ export function estimateExpectedPayout(
     (offer.archetype === "security"
       ? round1(baseCash / Math.max(0.01, getStarTierBaseMultiplier(starTier) * archetypeBaseMult))
       : SPONSOR_BASE_FLOOR_C * salaryFactor);
+
+  // Neuer Kurven-Pfad: die AI bewertet das Angebot an ihrem ERWARTETEN Endrang (≈ teamQualityRank), sodass die
+  // Kurvenform-Ökonomie tatsächlich in die Wahl einfließt — sonst liefern alle Formen einer Familie denselben
+  // erwarteten Payout und die AI wählt beliebig. Ein Team, das ~3. wird, bewertet Titel-/Meisterschale-Formen am
+  // höchsten; ein Team, das ~28. wird, die Sicherheits-/Klassenerhalt-Formen. Rarity-Etat + Golden-Bonus stecken
+  // bereits in getSponsorCurveShapePayout. Fallback auf den Legacy-Stern-Pfad nur für Altangebote ohne curveShape.
+  if (offer.curveShape != null || offer.rarity != null) {
+    const expectedRank = offer.teamQualityRank ?? powerRank;
+    const rarity = offer.rarity ?? mapStarTierToRarity(offer.starTier);
+    const curveShape = offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype);
+    let expected = getSponsorCurveShapePayout(
+      expectedRank,
+      salaryFactor,
+      rarity,
+      curveShape,
+      resolvedLeagueMin,
+      offer.teamQualityRank,
+      offer.isGolden ?? false,
+    );
+    for (const component of offer.components) {
+      if (component.kind === "improvement") {
+        expected += component.rewardCash * 0.2;
+      } else if (component.kind === "special") {
+        expected += component.rewardCash * 0.12;
+      }
+    }
+    return round1(expected);
+  }
+
+  // Legacy-Fallback (Altangebote ohne curveShape/rarity): Stern-/Archetyp-Payout am powerRank.
   const targetTotal = getSponsorPayoutForFinalRankAndTier(
     powerRank,
     salaryFactor,

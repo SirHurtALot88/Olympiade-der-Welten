@@ -10,7 +10,9 @@ import {
 } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
-import { SPONSOR_RARITY_KEYS, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
+import type { SponsorCurveShape, SponsorOffer } from "@/lib/data/olyDataTypes";
+import { estimateExpectedPayout } from "@/lib/sponsor/sponsor-economy-calibration";
+import { SPONSOR_CURVE_SHAPE_KEYS, SPONSOR_RARITY_KEYS, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
 
 function createTeam(partial: Partial<Team> = {}): Team {
   return {
@@ -158,6 +160,45 @@ describe("sponsor offer service", () => {
     });
     const next = chooseSponsorOfferForAiTeams(ensureSeasonSponsorOffers(gameState));
     expect(getTeamSponsorContract(next, "A-A")).not.toBeNull();
+  });
+});
+
+describe("ai sponsor curve-shape preference", () => {
+  // Baut ein minimales Angebot mit fester Kurvenform + erwartetem Endrang (teamQualityRank). estimateExpectedPayout
+  // ist die Bewertung, die scoreOfferForAi antreibt: es muss die Form am ERWARTETEN Rang bewerten, sonst liefern
+  // alle Formen einer Familie denselben Payout und die AI wählt beliebig.
+  function offerWithShape(curveShape: SponsorCurveShape, teamQualityRank: number): SponsorOffer {
+    return {
+      offerId: `offer-${curveShape}`,
+      seasonId: "season-2",
+      teamId: "T",
+      archetype: "balanced",
+      curveShape,
+      rarity: "magisch",
+      name: curveShape,
+      flavor: "",
+      totalUpsideEstimate: 0,
+      starTier: 3,
+      teamQualityRank,
+      isGolden: false,
+      components: [{ kind: "base", label: "Basis", rewardCash: 40 }],
+    } as SponsorOffer;
+  }
+
+  function topFamilyForRank(rank: number): string {
+    const scored = SPONSOR_CURVE_SHAPE_KEYS.map((shape) => ({
+      family: getSponsorCurveFamily(shape),
+      payout: estimateExpectedPayout(offerWithShape(shape, rank), rank),
+    })).sort((left, right) => right.payout - left.payout);
+    return scored[0]!.family;
+  }
+
+  it("a title-contender team (expected ~3rd) values titel-family curves highest", () => {
+    expect(topFamilyForRank(3)).toBe("titel");
+  });
+
+  it("a relegation team (expected ~28th) values sicherheit-family curves highest", () => {
+    expect(topFamilyForRank(28)).toBe("sicherheit");
   });
 });
 

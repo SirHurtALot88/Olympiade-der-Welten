@@ -371,7 +371,12 @@ export function rollSponsorOfferSlate(input: {
   hadGoldenLastSeason?: boolean;
   teamCount?: number;
 }): SponsorSlateResult {
-  const slotCount = input.slotCount ?? 5;
+  // Guard: es gibt nur SPONSOR_CURVE_SHAPE_KEYS.length distinkte Kurvenformen. Fragt ein Aufrufer mehr Slots
+  // an, könnten wir nie so viele DISTINCT-Formen liefern und würden stillschweigend weniger Einträge zurückgeben.
+  // Deshalb den effektiven slotCount hart auf die Anzahl verfügbarer Formen deckeln. Das Spiel nutzt 5 (< 11),
+  // daher ist das rein defensiv — das slotCount=5-Verhalten bleibt unverändert.
+  const requestedSlotCount = input.slotCount ?? 5;
+  const slotCount = Math.min(requestedSlotCount, SPONSOR_CURVE_SHAPE_KEYS.length);
   const teamCount = input.teamCount ?? 32;
 
   // Cap: keine Rarity über dem maxStarTier→Rarity-Deckel des Teams. (targetStarTier→Rarity liegt darunter und
