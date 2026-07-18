@@ -10,6 +10,7 @@ import {
 } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
+import { SPONSOR_RARITY_KEYS, getSponsorCurveFamily } from "@/lib/sponsor/sponsor-curve-shapes";
 
 function createTeam(partial: Partial<Team> = {}): Team {
   return {
@@ -94,27 +95,44 @@ function createGameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("sponsor offer service", () => {
-  it("generates three distinct sponsor archetypes per team", () => {
+  it("generates a distinct-curve, max-2-per-family, rarity-capped slate per team", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     expect(offers).toHaveLength(5);
-    // 5 Angebote aus 3 Typen (2× security, 1× identity, 2× performance) → weiterhin genau 3 distinkte Archetypen.
-    expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
+
+    // Jedes Angebot trägt den neuen Rarity+Kurvenform-Layer.
+    expect(offers.every((offer) => offer.rarity != null && SPONSOR_RARITY_KEYS.includes(offer.rarity))).toBe(true);
+    expect(offers.every((offer) => offer.curveShape != null)).toBe(true);
+
+    // Distinkte Kurvenformen …
+    const curves = offers.map((offer) => offer.curveShape!);
+    expect(new Set(curves).size).toBe(curves.length);
+
+    // … höchstens 2 pro Familie.
+    const familyCounts = new Map<string, number>();
+    for (const shape of curves) {
+      const family = getSponsorCurveFamily(shape);
+      familyCounts.set(family, (familyCounts.get(family) ?? 0) + 1);
+    }
+    for (const count of familyCounts.values()) {
+      expect(count).toBeLessThanOrEqual(2);
+    }
+
+    // Legacy-Ableitungen bleiben konsistent gefüllt (Marken-/Cash-Infrastruktur läuft weiter).
     expect(offers.every((offer) => offer.starTier != null && offer.starTier >= 1 && offer.starTier <= 5)).toBe(true);
-    expect(offers.find((offer) => offer.archetype === "security")?.components.find((c) => c.kind === "base")?.rewardCash).toBeGreaterThan(
-      offers.find((offer) => offer.archetype === "performance")?.components.find((c) => c.kind === "base")?.rewardCash ?? 0,
-    );
   });
 
   it("persists sponsor choice and pays first base installment", () => {
     const gameState = ensureSeasonSponsorOffers(createGameState());
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
-    const security = offers.find((offer) => offer.archetype === "security");
-    expect(security).toBeTruthy();
-    const result = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: security!.offerId });
+    const chosen = offers[0]!;
+    const result = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: chosen.offerId });
     const contract = getTeamSponsorContract(result.gameState, "M-M");
-    expect(contract?.name).toBe(security!.name);
-    expect(contract?.archetype).toBe("security");
+    expect(contract?.name).toBe(chosen.name);
+    // Der Vertrag friert den neuen Rarity+Kurvenform-Layer ein (nicht mehr über den Archetyp gewählt).
+    expect(contract?.rarity).toBe(chosen.rarity);
+    expect(contract?.curveShape).toBe(chosen.curveShape);
+    expect(contract?.archetype).toBe(chosen.archetype);
     expect(contract?.payouts.baseFirstPaid).toBe(true);
     expect(result.gameState.teams[0]?.cash).toBeGreaterThan(50);
   });
@@ -146,7 +164,8 @@ describe("sponsor offer service", () => {
 describe("sponsor settlement service", () => {
   it("settles rank and improvement components at season end", () => {
     let gameState = ensureSeasonSponsorOffers(createGameState());
-    const offer = buildSponsorOffersForTeam({ gameState, teamId: "M-M" }).find((entry) => entry.archetype === "performance");
+    // Jedes Angebot trägt eine Rang-Komponente; das erste genügt, um Rang+Improvement zu settlen.
+    const offer = buildSponsorOffersForTeam({ gameState, teamId: "M-M" })[0];
     gameState = chooseSponsorOffer({ gameState, teamId: "M-M", offerId: offer!.offerId }).gameState;
     const preview = previewSponsorSettlement(gameState, "season_end");
     expect(preview.rows.some((row) => row.kind === "rank")).toBe(true);

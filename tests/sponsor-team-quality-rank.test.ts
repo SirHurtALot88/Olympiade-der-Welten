@@ -7,6 +7,7 @@ import {
   getMaxStarTierForQualityRank,
   getPercentileTargetStarTier,
 } from "@/lib/sponsor/sponsor-team-quality-rank";
+import { mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 
 function createRow(input: {
   teamId: string;
@@ -119,6 +120,12 @@ describe("sponsor team quality rank", () => {
 
     expect(top?.qualityRank).toBeLessThan(bottom?.qualityRank ?? 32);
     expect(top?.targetStarTier).toBeGreaterThan(bottom?.targetStarTier ?? 1);
+
+    // Neuer Rarity-Layer: maxRarity/targetRarity spiegeln exakt die (weiterhin vorhandenen) Sterngrenzen.
+    expect(top?.maxRarity).toBe(mapStarTierToRarity(top!.maxStarTier));
+    expect(top?.targetRarity).toBe(mapStarTierToRarity(top!.targetStarTier));
+    expect(bottom?.maxRarity).toBe(mapStarTierToRarity(bottom!.maxStarTier));
+    expect(bottom?.targetRarity).toBe(mapStarTierToRarity(bottom!.targetStarTier));
   });
 
   it("falls back to budget rank when market value is missing", () => {
@@ -148,5 +155,25 @@ describe("sponsor team quality rank", () => {
     expect(getMaxStarTierForQualityRank(20)).toBe(2);
     expect(getPercentileTargetStarTier(1, 32)).toBe(5);
     expect(getPercentileTargetStarTier(32, 32)).toBe(1);
+  });
+
+  it("derives maxRarity/targetRarity from the star-tier bounds for every ranked team", () => {
+    const rows = Array.from({ length: 32 }, (_, index) => {
+      const rank = index + 1;
+      return createRow({
+        teamId: `T-${String(rank).padStart(2, "0")}`,
+        teamName: `Team ${rank}`,
+        rank,
+        budget: 200 - index * 4,
+        marketValueTotal: 500 - index * 12,
+        historicalRanks: [rank, rank + 1, rank + 2],
+      });
+    });
+    const ranks = buildLeagueTeamQualityRanks(rows);
+    expect(ranks.size).toBe(32);
+    for (const entry of ranks.values()) {
+      expect(entry.maxRarity).toBe(mapStarTierToRarity(entry.maxStarTier));
+      expect(entry.targetRarity).toBe(mapStarTierToRarity(entry.targetStarTier));
+    }
   });
 });

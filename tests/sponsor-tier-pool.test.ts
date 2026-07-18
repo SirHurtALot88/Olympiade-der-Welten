@@ -1,7 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
-import { getDemandMultiplier, getRewardMultiplier, rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
+import {
+  getDemandMultiplier,
+  getRewardMultiplier,
+  rollSponsorOfferSlate,
+  rollSponsorStarTiers,
+} from "@/lib/sponsor/sponsor-tier-pool";
+import {
+  SPONSOR_RARITIES,
+  getSponsorCurveFamily,
+  mapStarTierToRarity,
+} from "@/lib/sponsor/sponsor-curve-shapes";
+import type { SponsorCurveFamily } from "@/lib/data/olyDataTypes";
 
 // Diese Suite prüft die HARTEN Cap-/Cluster-Grenzen (den Normalfall). Die Golden-Sterne-Varianz ist die
 // bewusste AUSNAHME davon (kleine Teams selten über Cap, große selten drunter) und würde die exakten
@@ -14,11 +25,15 @@ afterAll(() => {
 });
 
 function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
+  const maxStarTier = overrides.maxStarTier ?? 3;
+  const targetStarTier = overrides.targetStarTier ?? 3;
   return {
     qualityRank: 16,
     components: [],
-    maxStarTier: 3,
-    targetStarTier: 3,
+    maxStarTier,
+    targetStarTier,
+    maxRarity: mapStarTierToRarity(maxStarTier),
+    targetRarity: mapStarTierToRarity(targetStarTier),
     leaguePosition: 16,
     leaguePercentile: 50,
     ...overrides,
@@ -121,5 +136,80 @@ describe("sponsor tier pool", () => {
     expect(poolText).toContain("roll < 0.10");
     expect(poolText).toContain("roll < 0.28");
     expect(poolText).toContain("roll < 0.38");
+  });
+});
+
+describe("sponsor offer slate (rarity + curve shapes)", () => {
+  function familyCounts(shapes: SponsorCurveFamily[]) {
+    const counts = new Map<SponsorCurveFamily, number>();
+    for (const family of shapes) {
+      counts.set(family, (counts.get(family) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  it("rolls five DISTINCT curve shapes with at most two per family", () => {
+    const slate = rollSponsorOfferSlate({
+      seasonId: "season-slate",
+      teamId: "M-M",
+      qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 5, maxStarTier: 5, targetStarTier: 4 }),
+    });
+    expect(slate.entries).toHaveLength(5);
+    const curves = slate.entries.map((entry) => entry.curveShape);
+    expect(new Set(curves).size).toBe(curves.length); // distinkt
+    const counts = familyCounts(curves.map(getSponsorCurveFamily));
+    for (const count of counts.values()) {
+      expect(count).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("never lets a slate rarity exceed the team's quality-rank cap", () => {
+    // maxStarTier 3 → Rarity-Decke magisch (order 1): keine selten/legendär-Angebote.
+    const capped = rollSponsorOfferSlate({
+      seasonId: "season-cap",
+      teamId: "MID",
+      qualityRank: createQualityRank({ teamId: "MID", qualityRank: 16, maxStarTier: 3, targetStarTier: 3 }),
+    });
+    const maxOrder = SPONSOR_RARITIES[mapStarTierToRarity(3)].order;
+    for (const entry of capped.entries) {
+      expect(SPONSOR_RARITIES[entry.rarity].order).toBeLessThanOrEqual(maxOrder);
+    }
+
+    // Bottom-Team (maxStarTier 1) → Decke gewöhnlich (order 0): ausschließlich gewöhnliche Angebote.
+    const bottom = rollSponsorOfferSlate({
+      seasonId: "season-cap-bottom",
+      teamId: "R-R",
+      qualityRank: createQualityRank({ teamId: "R-R", qualityRank: 31, maxStarTier: 1, targetStarTier: 1, leaguePosition: 32 }),
+    });
+    expect(bottom.entries.every((entry) => entry.rarity === "gewöhnlich")).toBe(true);
+  });
+
+  it("is deterministic — identical input yields an identical slate", () => {
+    const input = {
+      seasonId: "season-det",
+      teamId: "M-M",
+      qualityRank: createQualityRank({ teamId: "M-M", qualityRank: 8, maxStarTier: 4, targetStarTier: 4 }),
+    };
+    const first = rollSponsorOfferSlate(input);
+    const second = rollSponsorOfferSlate(input);
+    expect(second.entries).toEqual(first.entries);
+    expect(second.goldenCardSlots).toEqual(first.goldenCardSlots);
+  });
+
+  it("keeps the golden-card luck orthogonal to the slate (at most one slot)", () => {
+    const slate = rollSponsorOfferSlate({
+      seasonId: "season-golden",
+      teamId: "R-R",
+      qualityRank: createQualityRank({ teamId: "R-R", qualityRank: 30, maxStarTier: 2, targetStarTier: 2, leaguePosition: 31 }),
+      beliebtheit: 1.5,
+    });
+    expect(Array.isArray(slate.goldenCardSlots)).toBe(true);
+    expect(slate.goldenCardSlots.length).toBeLessThanOrEqual(1);
+    // Golden verändert die Slot-Anzahl / Rarity-Decke nicht: weiterhin 5 distinkte, gedeckelte Einträge.
+    expect(slate.entries).toHaveLength(5);
+    for (const index of slate.goldenCardSlots) {
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(slate.entries.length);
+    }
   });
 });
