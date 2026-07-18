@@ -27,8 +27,14 @@ import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft
 
 export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
 export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as const;
-export const MATCHDAY_FATIGUE_LOAD = 11;
-export const BASE_MATCHDAY_RECOVERY = 24;
+// Fatigue-Kalibrierung (Balancing): Recovery/Last-Ratio bewusst eng gehalten, damit Fatigue ein
+// GLATTER, universeller Constraint ist (auch für Rotierer, nicht nur Dauerspieler) und echte
+// Kadertiefe belohnt. Ratio ~1,33 (20/15): ein Ruhetag (Recovery) löscht ~1,3 Spieltage (Last) —
+// nicht mehr 2,2 wie bei 24/11, wo ein einziger Ruhetag zwei Spieltage tilgte und Fatigue für jeden
+// Rotierer wirkungslos wurde. `BASE_MATCHDAY_RECOVERY = 20` ist zudem die Basis, für die die
+// REHA-Recovery-Leiter designt war (L5 = 20 + 12 = 32 absolut, siehe RECOVERY_FLAT_BONUS_BY_LEVEL).
+export const MATCHDAY_FATIGUE_LOAD = 15;
+export const BASE_MATCHDAY_RECOVERY = 20;
 
 /**
  * Deterministische Phasendauern der Verletzungs-Timeline (in Spieltagen), gemessen relativ zum

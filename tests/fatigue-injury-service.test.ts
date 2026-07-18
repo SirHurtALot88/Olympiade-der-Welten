@@ -426,7 +426,7 @@ describe("fatigue injury service", () => {
     const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
     const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
 
-    expect(usedPlayer?.fatigue).toBe(31);
+    expect(usedPlayer?.fatigue).toBe(35);
     expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
     expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
     expect(benchAvailability.blocker).toBeNull();
@@ -453,7 +453,7 @@ describe("fatigue injury service", () => {
       joinedSeasonId: "season-1",
     } as never);
     const recovery = calculateTeamRecovery(gameState, "A-A");
-    const load = 11;
+    const load = 15;
 
     const applyParams = {
       saveId: "save-1",
@@ -536,7 +536,7 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-1",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(31);
+    expect(getPlayerAvailabilityView(first.gameState, "used-0", "A-A", "md-1").fatigue).toBe(35);
 
     // Normales Vorrücken md-1 -> md-2 (isMatchdayReplay weggelassen -> false): akkumuliert weiter.
     const second = applyFatigueAndInjuryAfterMatchday({
@@ -547,7 +547,7 @@ describe("fatigue injury service", () => {
       matchdayResultId: "result-md-2",
       timestamp: "2026-06-13T00:00:00.000Z",
     });
-    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(42);
+    expect(getPlayerAvailabilityView(second.gameState, "used-0", "A-A", "md-2").fatigue).toBe(50);
   });
 
   it("returns a recovering player to healthy once the recovery window has elapsed within the season", () => {

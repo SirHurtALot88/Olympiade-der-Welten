@@ -127,8 +127,12 @@ export function applyTrainingXpFacilityModifiers(
   };
 }
 
-/** Cumulative flat recovery bonus by REHA level (Basis 20 → L1=22, L2=24, L3=26, L4=29, L5=32 at 100% condition). */
-export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 3, 5, 7, 10, 13] as const;
+/**
+ * REHA/recovery-center = FLACHER, absoluter Recovery-Bonus (kein %-Bonus): Basis 20 →
+ * L1=22, L2=24, L3=26, L4=29, L5=32 pro Spieltag bei 100% Zustand. Die Leiter ist exakt auf
+ * `BASE_MATCHDAY_RECOVERY = 20` abgestimmt (L5 = 20 + 12 = 32 absolut).
+ */
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 2, 4, 6, 9, 12] as const;
 
 export function getRecoveryFlatBonusAtLevel(level: number) {
   return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;
@@ -152,10 +156,14 @@ export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities:
   };
 }
 
-/** Reduces season-end training fatigue load (on top of matchday fatigue) by REHA flat bonus vs basis 20. */
+/**
+ * Trainings-Fatigue-Reduktion durch REHA (Balancing: Double-Dip entschärft). Der Divisor ist /40
+ * (vorher /20), damit dieselbe flatBonus-Leiter NICHT zweimal voll zählt — einmal als flacher
+ * Recovery-Bonus (Match-Fatigue) und einmal als Trainings-Cut. L5 = 12/40 = 30% statt 65%.
+ */
 export function getRecoveryTrainingFatigueReductionPct(facilities: TeamFacilityCollection | null | undefined) {
   const flatBonus = getRecoveryFlatBonus(facilities);
-  return roundValue((flatBonus / 20) * 100);
+  return roundValue((flatBonus / 40) * 100);
 }
 
 function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, facilities: TeamFacilityCollection | null | undefined) {

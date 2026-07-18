@@ -114,18 +114,18 @@ describe("facility effects", () => {
   it("recovery center adds flat bonus on top of base recovery", () => {
     const result = applyRecoveryFacilityModifiers(20, facilities({ recovery_center: { level: 3, enabled: true } }));
 
-    expect(result.flatBonus).toBe(7);
-    expect(result.after).toBe(27);
+    expect(result.flatBonus).toBe(6);
+    expect(result.after).toBe(26);
   });
 
   it("recovery center reduces training fatigue load proportional to flat bonus vs basis 20", () => {
-    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(65);
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(30);
     expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 0, enabled: false } }))).toBe(0);
   });
 
   it("recovery center uses tiered flat bonus by level", () => {
     const levels = [0, 1, 2, 3, 4, 5] as const;
-    const expectedTotals = [20, 23, 25, 27, 30, 33];
+    const expectedTotals = [20, 22, 24, 26, 29, 32];
 
     for (const level of levels) {
       const result = applyRecoveryFacilityModifiers(
