@@ -39,17 +39,47 @@ const SCENE_BY_DISCIPLINE: Record<string, string> = {
   breaking: "breakingpoint-v2",
 };
 
-// Mutator-Pool für den Random-Test: 2 davon werden pro Disziplin bestimmt und
-// auf ALLE Spieler additiv angewandt — so wird sichtbar, ob das Modell korrekt
-// aufsummiert (Position = Punkte).
-const MUTATOR_POOL: { k: string; sign: 1 | -1; min: number; max: number }[] = [
-  { k: "Rückenwind", sign: 1, min: 5, max: 12 },
-  { k: "Gegenwind", sign: -1, min: 5, max: 12 },
-  { k: "Heimvorteil", sign: 1, min: 3, max: 9 },
-  { k: "Nervenflattern", sign: -1, min: 4, max: 10 },
-  { k: "Flow-State", sign: 1, min: 6, max: 14 },
-  { k: "Hitzeschlacht", sign: -1, min: 3, max: 8 },
+// Mutator-Traits = echte Spielregel (lib/lineups/legacy-lineup-modifiers.ts):
+// 2 Traits werden pro Disziplin bestimmt; jeder eingesetzte Spieler mit
+// passendem Trait bekommt +6 Score pro Treffer (max +12) und +0,3 Player-Points.
+const MUTATOR_TRAIT_BONUS = 6;
+const MUTATOR_PP_BONUS = 0.3;
+const POSITIVE_MUTATOR_TRAITS = [
+  "Altruistic", "Ambitious", "Caring", "Cool", "Diligent", "Disciplined", "Eloquent", "Fair",
+  "FanFavorite", "Fearless", "FiredUp", "Flexible", "Healthy", "Loyal", "Motivated", "Relaxed",
+  "Resourceful", "Sexy",
 ];
+const NEGATIVE_MUTATOR_TRAITS = [
+  "Timid", "Cheater", "ColdBlooded", "Cruel", "Devious", "Diva", "Egomaniac", "FaintHearted",
+  "Feisty", "Gambler", "Lazy", "Manipulative", "Mercenary", "Obsessive", "Paranoid", "Renegade",
+  "Scandalous", "Vindictive",
+];
+const ALL_MUTATOR_TRAITS = [...POSITIVE_MUTATOR_TRAITS, ...NEGATIVE_MUTATOR_TRAITS];
+const POSITIVE_TRAIT_SET = new Set(POSITIVE_MUTATOR_TRAITS.map((t) => t.toLowerCase()));
+
+// 2 Traits deterministisch aus dem Pool wählen (seed = Wurf).
+function pickMutatorTraits(seed: number): string[] {
+  const rng = mulberry32(seed);
+  const pool = [...ALL_MUTATOR_TRAITS];
+  const out: string[] = [];
+  for (let i = 0; i < 2 && pool.length > 0; i += 1) {
+    const idx = Math.floor(rng() * pool.length);
+    out.push(pool.splice(idx, 1)[0]!);
+  }
+  return out;
+}
+
+// +6-Mods für die Traits, die dieser Spieler tatsächlich hat (case-insensitiv).
+function traitMutatorMods(playerTraits: string[], chosenTraits: string[]): StageMod[] {
+  const owned = new Set(playerTraits.map((t) => t.toLowerCase()));
+  const mods: StageMod[] = [];
+  for (const trait of chosenTraits) {
+    if (owned.has(trait.toLowerCase())) {
+      mods.push({ k: trait, sign: 1, amt: MUTATOR_TRAIT_BONUS });
+    }
+  }
+  return mods;
+}
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -71,18 +101,6 @@ function hashStr(s: string): number {
 }
 
 type StageMod = { k: string; sign: 1 | -1; amt: number; injury?: boolean };
-
-function pickDiscMutators(seed: number): StageMod[] {
-  const rng = mulberry32(seed);
-  const pool = [...MUTATOR_POOL];
-  const out: StageMod[] = [];
-  for (let i = 0; i < 2 && pool.length > 0; i += 1) {
-    const idx = Math.floor(rng() * pool.length);
-    const m = pool.splice(idx, 1)[0]!;
-    out.push({ k: m.k, sign: m.sign, amt: m.min + Math.floor(rng() * (m.max - m.min + 1)) });
-  }
-  return out;
-}
 
 // Echte Save-Werte als additive Mods, damit val + Σmods = net (die Modellrechnung).
 function realMods(slot: DisciplineStageSlot): StageMod[] {
@@ -150,8 +168,9 @@ export default function DisciplineStageArena({
     [gameState, disciplineId, ownTeamId],
   );
 
-  const discMutators = useMemo(
-    () => (mode === "random" ? pickDiscMutators(seed + hashStr(disciplineId)) : []),
+  // Random-Test: 2 Mutator-Traits werden für die Disziplin bestimmt.
+  const mutatorTraits = useMemo(
+    () => (mode === "random" ? pickMutatorTraits(seed + hashStr(disciplineId)) : []),
     [mode, seed, disciplineId],
   );
 
@@ -163,7 +182,7 @@ export default function DisciplineStageArena({
       seed,
       slots: Array.from({ length: model.slotCount }, (_, i) => slotLabel(disciplineId, i, model.slotCount)),
       mineCode,
-      discMutators,
+      mutatorTraits,
       teams: model.teams.map((t) => ({
         code: t.shortCode,
         name: t.name,
@@ -174,10 +193,29 @@ export default function DisciplineStageArena({
           portraitUrl: s.portraitUrl,
           traits: s.traits,
           mods: mode === "real" ? realMods(s) : [],
+          // Trait-Mutatoren (+6 je passendem Trait) — nur im Random-Test angewandt.
+          traitMods: mode === "random" ? traitMutatorMods(s.traits, mutatorTraits) : [],
         })),
       })),
     };
-  }, [model, mode, seed, disciplineId, discMutators]);
+  }, [model, mode, seed, disciplineId, mutatorTraits]);
+
+  // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
+  const mutatorImpact = useMemo(() => {
+    if (mode !== "random" || mutatorTraits.length === 0) {
+      return { affected: 0, entries: [] as { name: string; code: string; hits: number }[] };
+    }
+    const entries: { name: string; code: string; hits: number }[] = [];
+    for (const t of model.teams) {
+      for (const s of t.slots) {
+        const hits = traitMutatorMods(s.traits, mutatorTraits).length;
+        if (hits > 0) {
+          entries.push({ name: s.playerName, code: t.shortCode, hits });
+        }
+      }
+    }
+    return { affected: entries.length, entries };
+  }, [model, mode, mutatorTraits]);
 
   // Szenenwechsel → iframe lädt neu → Ready-Status zurücksetzen.
   useEffect(() => {
@@ -277,25 +315,27 @@ export default function DisciplineStageArena({
             ↻ Neu würfeln
           </button>
         ) : null}
-        {mode === "random" && discMutators.length > 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
-            <span style={{ opacity: 0.65, fontWeight: 700 }}>Disziplin-Mutatoren:</span>
-            {discMutators.map((m) => (
+        {mode === "random" && mutatorTraits.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, flexWrap: "wrap" }}>
+            <span style={{ opacity: 0.65, fontWeight: 700 }}>Mutator-Traits (+{MUTATOR_TRAIT_BONUS}):</span>
+            {mutatorTraits.map((trait) => (
               <span
-                key={m.k}
+                key={trait}
                 style={{
                   padding: "3px 9px",
                   borderRadius: 99,
                   fontWeight: 800,
                   fontSize: 12,
                   color: "var(--nl-ink)",
-                  background: m.sign > 0 ? "var(--nl-good)" : "var(--nl-risk)",
+                  background: POSITIVE_TRAIT_SET.has(trait.toLowerCase()) ? "var(--nl-good)" : "var(--nl-risk)",
                 }}
               >
-                {m.k} {m.sign > 0 ? "+" : "−"}
-                {m.amt}
+                {trait}
               </span>
             ))}
+            <span style={{ opacity: 0.7 }}>
+              · {mutatorImpact.affected} Spieler betroffen (+{fmt1(MUTATOR_PP_BONUS)} PP je)
+            </span>
           </div>
         ) : null}
         {ownRank ? (

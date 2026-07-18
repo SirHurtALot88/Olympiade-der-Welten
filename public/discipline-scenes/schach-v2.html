@@ -1273,8 +1273,9 @@
             if (d.mode === "random") {
               var mods = (typeof rollMods === "function") ? rollMods() : [];
               mods.forEach(function(m){ if (m.injury) m.amt = Math.max(1, Math.round((p.val || 0) * 0.5)); });
-              if (Array.isArray(d.discMutators)) {
-                d.discMutators.forEach(function(dm){ mods.push({ k: dm.k, sign: dm.sign, amt: dm.amt }); });
+              // Trait-Mutatoren: +6 je passendem Trait, nur für Spieler die ihn haben.
+              if (Array.isArray(p.traitMods)) {
+                p.traitMods.forEach(function(tm){ mods.push({ k: tm.k, sign: tm.sign, amt: tm.amt }); });
               }
               base.mods = mods;
             } else {
