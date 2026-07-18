@@ -1408,6 +1408,9 @@
             base.traits = Array.isArray(p.traits) ? p.traits : (base.traits || []);
             if (d.mode === "random") {
               var mods = (typeof rollMods === "function") ? rollMods() : [];
+              // Generischen szenen-eigenen "Mutator"-Mod rauswerfen — die echten
+              // Mutatoren sind die Trait-Mods (unten); sonst doppelt/verwirrend.
+              mods = mods.filter(function(m){ return m.k !== "Mutator"; });
               mods.forEach(function(m){ if (m.injury) m.amt = Math.max(1, Math.round((p.val || 0) * 0.5)); });
               // Trait-Mutatoren: +6 je passendem Trait, nur für Spieler die ihn haben.
               if (Array.isArray(p.traitMods)) {
@@ -1425,6 +1428,13 @@
         if (!window.__olyPatched) {
           window.__olyPatched = true;
           function f1(x){ var v = Math.round((x || 0) * 10) / 10; return (v % 1 === 0) ? String(v) : v.toFixed(1); }
+          // Szene den verfügbaren Platz nutzen lassen (das eingebettete iframe ist
+          // breiter als das native 1280er-Cap; die Canvas skaliert via width:100%).
+          try {
+            var wst = document.createElement("style");
+            wst.textContent = ".wrap{max-width:min(1600px,96vw)!important;}";
+            document.head.appendChild(wst);
+          } catch (e) {}
           // Canvas-Tokens: echtes Logo statt prozeduralem Wappen.
           try {
             if (typeof paintCrest !== "undefined") {
@@ -1477,6 +1487,18 @@
               };
             }
           } catch (e) {}
+          // Netto pro Reveal auf 1 Dezimale runden — bereinigt Float-Artefakte
+          // (z.B. 45.800000004) in Ticker, Spotlight und Score-Pops.
+          try {
+            if (typeof applyReveal !== "undefined") {
+              var _applyReveal = applyReveal;
+              applyReveal = function(t, slot){
+                var r = _applyReveal(t, slot);
+                try { if (r && typeof r.net === "number") r.net = Math.round(r.net * 10) / 10; } catch (e) {}
+                return r;
+              };
+            }
+          } catch (e) {}
           // Runden-Medaillen: echte Top-3 der Runde (gegen ALLE Teams), Medaille nur
           // auf bereits aufgedeckten Teams — kein Fehl-Gold auf zuerst-aufgedeckte.
           try {
@@ -1495,6 +1517,15 @@
           } catch (e) {}
         }
         if (typeof reset === "function") { reset(); }
+        // „Dein Team"-Label auf das ECHTE eigene Team setzen (Szene nutzt sonst
+        // die Konstante MINE und zeigt z.B. M-M, obwohl das Save-Team P-S ist).
+        try {
+          var meTeam = (typeof teams !== "undefined") ? teams.find(function(t){ return t.mine; }) : null;
+          if (meTeam && typeof TEAM_NAMES !== "undefined") {
+            var lbl = document.querySelector(".mytrack .lbl") || document.querySelector(".mytrackname") || document.getElementById("mytrackname");
+            if (lbl) { lbl.textContent = "Dein Team · " + meTeam.code + " · " + (TEAM_NAMES[meTeam.code] || meTeam.code); }
+          }
+        } catch (e) {}
       } catch (e) { /* Szene niemals crashen lassen */ }
     }
     try {

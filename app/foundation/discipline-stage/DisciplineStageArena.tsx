@@ -237,7 +237,8 @@ export default function DisciplineStageArena({
   // Sobald bereit (oder Payload sich ändert): echte Daten in die Szene posten.
   useEffect(() => {
     if (ready && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(payload, "*");
+      // Same-origin-Asset — Ziel-Origin explizit statt "*".
+      iframeRef.current.contentWindow.postMessage(payload, window.location.origin);
     }
   }, [ready, payload]);
 
@@ -256,25 +257,25 @@ export default function DisciplineStageArena({
   }
 
   return (
-    <div style={{ maxWidth: 1280, margin: "0 auto", padding: 20, color: "inherit" }}>
+    <div style={{ maxWidth: "min(1720px, 97vw)", margin: "0 auto", padding: "20px 24px", color: "inherit" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, fontWeight: 800 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
             Disziplin-Bühne · Test-Modus · echte Save-Werte
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 30, fontWeight: 800 }}>{model.disciplineName}</h1>
-          <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, maxWidth: 720 }}>
+          <div style={{ fontSize: 13, color: "var(--nl-mut)", marginTop: 4, maxWidth: 720 }}>
             Alle {model.teams.length} Teams mit ihren echten Top-{model.slotCount}-Spielern aus dem Save.
             Netto = Grundwert − Fatigue + Form. „🎲 Random" verteilt zusätzlich zufällig Fatigue/Pushes und
-            2 Disziplin-Mutatoren, damit sichtbar wird, ob das additive Modell korrekt rechnet (Position = Punkte).
+            die 2 Mutator-Traits, damit sichtbar wird, ob das additive Modell korrekt rechnet (Position = Punkte).
           </div>
         </div>
         <label style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ opacity: 0.7, fontWeight: 700 }}>Disziplin</span>
+          <span style={{ color: "var(--nl-mut)", fontWeight: 700 }}>Disziplin</span>
           <select
             value={disciplineId}
             onChange={(event) => setDisciplineId(event.target.value)}
-            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(0,0,0,0.2)", color: "inherit", fontSize: 14, fontWeight: 700 }}
+            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--nl-line)", background: "var(--nl-panel)", color: "inherit", fontSize: 14, fontWeight: 700 }}
           >
             {disciplines.map((discipline) => (
               <option key={discipline.id} value={discipline.id} disabled={!SCENE_BY_DISCIPLINE[discipline.id]}>
@@ -287,7 +288,7 @@ export default function DisciplineStageArena({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.18)" }}>
+        <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--nl-line)" }}>
           <button
             type="button"
             onClick={() => setMode("real")}
@@ -310,7 +311,7 @@ export default function DisciplineStageArena({
           <button
             type="button"
             onClick={() => setSeed((s) => s + 1)}
-            style={{ padding: "8px 12px", fontWeight: 700, fontSize: 13, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
+            style={{ padding: "8px 12px", fontWeight: 700, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
           >
             ↻ Neu würfeln
           </button>
@@ -318,22 +319,27 @@ export default function DisciplineStageArena({
         {mode === "random" && mutatorTraits.length > 0 ? (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, flexWrap: "wrap" }}>
             <span style={{ opacity: 0.65, fontWeight: 700 }}>Mutator-Traits (+{MUTATOR_TRAIT_BONUS}):</span>
-            {mutatorTraits.map((trait) => (
-              <span
-                key={trait}
-                style={{
-                  padding: "3px 9px",
-                  borderRadius: 99,
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: "var(--nl-ink)",
-                  background: POSITIVE_TRAIT_SET.has(trait.toLowerCase()) ? "var(--nl-good)" : "var(--nl-risk)",
-                }}
-              >
-                {trait}
-              </span>
-            ))}
-            <span style={{ opacity: 0.7 }}>
+            {mutatorTraits.map((trait) => {
+              const tone = POSITIVE_TRAIT_SET.has(trait.toLowerCase()) ? "var(--nl-good)" : "var(--nl-risk)";
+              return (
+                <span
+                  key={trait}
+                  title={`+${MUTATOR_TRAIT_BONUS} Score je Spieler mit diesem Trait`}
+                  style={{
+                    padding: "3px 9px",
+                    borderRadius: 99,
+                    fontWeight: 800,
+                    fontSize: 12,
+                    color: tone,
+                    background: `color-mix(in srgb, ${tone} 16%, transparent)`,
+                    border: `1px solid ${tone}`,
+                  }}
+                >
+                  {trait}
+                </span>
+              );
+            })}
+            <span style={{ color: "var(--nl-mut)" }}>
               · {mutatorImpact.affected} Spieler betroffen (+{fmt1(MUTATOR_PP_BONUS)} PP je)
             </span>
           </div>
@@ -346,13 +352,13 @@ export default function DisciplineStageArena({
       </div>
 
       {scene ? (
-        <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,0.12)", background: "var(--nl-bg)" }}>
+        <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
           <iframe
             ref={iframeRef}
             key={scene}
             src={`/discipline-scenes/${scene}.html`}
             title={`Arena — ${model.disciplineName}`}
-            style={{ width: "100%", height: 960, border: 0, display: "block" }}
+            style={{ width: "100%", height: "min(960px, calc(100vh - 240px))", minHeight: 560, border: 0, display: "block" }}
           />
         </div>
       ) : (
@@ -362,22 +368,34 @@ export default function DisciplineStageArena({
       )}
 
       {ownTeam ? (
-        <div style={{ marginTop: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", opacity: 0.7, fontWeight: 800, marginBottom: 8 }}>
+        <div style={{ marginTop: 14, background: "var(--nl-panel)", border: "1px solid var(--nl-line)", borderRadius: 14, padding: 14 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800, marginBottom: 8 }}>
             Modell-Check · {ownTeam.shortCode} · {ownTeam.name} — echte Save-Werte (Grundwert − Fatigue + Form = Netto)
           </div>
           {ownTeam.slots.length === 0 ? (
-            <div style={{ fontSize: 13, opacity: 0.7, fontStyle: "italic" }}>Keine aufstellbaren Spieler für diese Disziplin.</div>
+            <div style={{ fontSize: 13, color: "var(--nl-mut)", fontStyle: "italic" }}>Keine aufstellbaren Spieler für diese Disziplin.</div>
           ) : (
             <>
               {ownTeam.slots.map((slot) => (
                 <div
                   key={slot.playerId}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.08)", fontVariantNumeric: "tabular-nums", fontSize: 13 }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--nl-line)", fontVariantNumeric: "tabular-nums", fontSize: 13 }}
                 >
-                  <span style={{ width: 20, fontWeight: 800, opacity: 0.7 }}>{slot.slotIndex + 1}</span>
-                  <span style={{ fontWeight: 700, flex: "0 0 150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{slot.playerName}</span>
-                  <span style={{ opacity: 0.9 }}>
+                  <span style={{ width: 20, fontWeight: 800, color: "var(--nl-mut)" }}>{slot.slotIndex + 1}</span>
+                  {slot.portraitUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={slot.portraitUrl}
+                      alt=""
+                      width={22}
+                      height={22}
+                      style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flex: "none", border: "1px solid var(--nl-line)" }}
+                    />
+                  ) : (
+                    <span aria-hidden style={{ width: 22, height: 22, borderRadius: "50%", flex: "none", background: "var(--nl-bg)", border: "1px solid var(--nl-line)" }} />
+                  )}
+                  <span style={{ fontWeight: 700, flex: "0 0 140px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{slot.playerName}</span>
+                  <span style={{ color: "var(--nl-ink)" }}>
                     <b>{fmt1(slot.base)}</b>
                     {slot.fatiguePenalty > 0 ? <span style={{ color: "var(--nl-risk)" }}> − {fmt1(slot.fatiguePenalty)} Fatigue</span> : null}
                     {slot.formSwing !== 0 ? (
@@ -392,12 +410,12 @@ export default function DisciplineStageArena({
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8, fontWeight: 800 }}>
-                <span style={{ opacity: 0.7 }}>Team-Summe (echt):</span>
+                <span style={{ color: "var(--nl-mut)" }}>Team-Summe (echt):</span>
                 <span style={{ color: "var(--nl-accent)" }}>{fmt1(ownTeam.total)}</span>
               </div>
             </>
           )}
-          <div style={{ marginTop: 8, fontSize: 11.5, opacity: 0.6 }}>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--nl-mut)" }}>
             Im Random-Test rechnet die Arena mit denselben Grundwerten, aber gewürfelten Mods — die Netto-Werte
             dort weichen daher bewusst von dieser echten Referenz ab.
           </div>

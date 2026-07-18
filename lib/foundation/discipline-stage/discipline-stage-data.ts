@@ -50,7 +50,10 @@ function seededJitter(seed: string): number {
 }
 
 function computeSlot(player: Player, disciplineId: string, slotIndex: number): DisciplineStageSlot {
-  const base = player.disciplineRatings?.[disciplineId] ?? 0;
+  // Grundwert kann im Save bis zu 2 Nachkommastellen haben — zuerst auf 1
+  // Dezimale runden und ALLES daraus ableiten, damit die Anzeige-Identität
+  // „Grundwert − Fatigue + Form = Netto" exakt stimmt (keine 0,1-Abweichung).
+  const base = Number((player.disciplineRatings?.[disciplineId] ?? 0).toFixed(1));
   const fatigue = clamp(player.fatigue ?? 0, 0, 100);
   const form = clamp(player.form ?? 50, 0, 100);
   // Fatigue bremst nach vorne: bis zu 25 % des Werts bei voller Erschöpfung.
@@ -58,7 +61,6 @@ function computeSlot(player: Player, disciplineId: string, slotIndex: number): D
   // Form über/unter 50 gibt bis zu ±12 %, plus kleiner Tagesform-Swing.
   const formBase = Math.round(((form - 50) / 50) * base * 0.12);
   const formSwing = formBase + seededJitter(`${player.id}|${disciplineId}`);
-  // Skill-Punkte mit max. 1 Nachkommastelle (Grundwert kann im Save eine Kommazahl sein).
   const net = Number(Math.max(0, base - fatiguePenalty + formSwing).toFixed(1));
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
   const traits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map((t) => String(t).trim()).filter(Boolean);
@@ -66,7 +68,7 @@ function computeSlot(player: Player, disciplineId: string, slotIndex: number): D
     slotIndex,
     playerId: player.id,
     playerName: player.name,
-    base: Number(base.toFixed(1)),
+    base,
     fatiguePenalty,
     formSwing,
     net,

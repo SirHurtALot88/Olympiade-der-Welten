@@ -31,7 +31,7 @@ class DisciplineStageErrorBoundary extends Component<{ children: ReactNode }, { 
       return (
         <div style={{ maxWidth: 900, margin: "0 auto", padding: 20, color: "inherit" }}>
           <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Disziplin-Bühne — Fehler (Diagnose)</div>
-          <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 10 }}>
+          <div style={{ fontSize: 13, color: "var(--nl-mut)", marginBottom: 10 }}>
             Bitte diese Meldung abfotografieren/kopieren — damit lässt sich die Ursache genau beheben.
           </div>
           <pre
@@ -40,8 +40,8 @@ class DisciplineStageErrorBoundary extends Component<{ children: ReactNode }, { 
               wordBreak: "break-word",
               fontSize: 12,
               lineHeight: 1.5,
-              background: "rgba(220,60,50,0.12)",
-              border: "1px solid rgba(220,60,50,0.45)",
+              background: "color-mix(in srgb, var(--nl-risk) 12%, transparent)",
+              border: "1px solid var(--nl-risk)",
               borderRadius: 8,
               padding: 12,
               maxHeight: 420,
