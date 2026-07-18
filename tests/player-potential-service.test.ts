@@ -83,6 +83,35 @@ describe("player potential service", () => {
     expect(potential.warnings).toContain("potential_source_missing");
   });
 
+  it("generates a lower-centered, right-skewed potential-star distribution (no 5-star inflation)", () => {
+    // Regression guard for the reshaped hidden-PO generator. The old generator
+    // was ~uniform (35 + seed*64), producing mean ~67, a ~4.3-star median and
+    // ~40% of players pinned at 5.0 stars — a third of the league was
+    // indistinguishable at max potential. The quantile-anchored generator tracks
+    // the star curve's real-catalog percentile calibration (p50~47 -> 2.5 stars)
+    // so elites are rare and earned. Sampled across many save-seed hashes.
+    const N = 6000;
+    const stars: number[] = [];
+    for (let i = 0; i < N; i += 1) {
+      const player = makePlayer({ id: `dist-${i}`, traitsPositive: [], traitsNegative: [] });
+      const record = buildPlayerPotentialRecord({ saveId: "dist-check", player });
+      stars.push(potentialScoreToStars(record.hiddenPotentialScore!));
+    }
+    stars.sort((a, b) => a - b);
+    const median = stars[Math.floor(0.5 * (N - 1))]!;
+    const shareAtLeast = (threshold: number) => stars.filter((s) => s >= threshold).length / N;
+    const pinnedAtFive = stars.filter((s) => s >= 4.99).length / N;
+
+    // Lower-centered: median sits in the 2.5-3.0 star band, not up at ~4.3.
+    expect(median).toBeGreaterThanOrEqual(2.4);
+    expect(median).toBeLessThanOrEqual(3.1);
+    // Elites are rare: only a single-digit share reaches 5.0 stars (was ~40%).
+    expect(pinnedAtFive).toBeLessThan(0.1);
+    expect(shareAtLeast(4.5)).toBeLessThan(0.12);
+    // ...but the spread stays believable — some genuine high-ceiling talent exists.
+    expect(shareAtLeast(4.0)).toBeGreaterThan(0.02);
+  });
+
   it("generates stable save-specific hidden potential records", () => {
     const player = makePlayer();
     const first = buildPlayerPotentialRecord({ saveId: "save-a", player });

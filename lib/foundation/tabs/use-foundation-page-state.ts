@@ -372,22 +372,39 @@ export function useFoundationPageState({
     generatedAt: initialPersistenceState?._meta?.generatedAt ?? new Date().toISOString(),
     saveMode: initialPersistenceState?._meta?.saveMode,
   });
-  // Active team resolution order: explicit route/prop → the club picked at new-game start
-  // (newGameFlow.selectedTeamId) → the human-controlled team → first team as a last resort.
-  // Previously this fell straight through to teams[0] (alphabetically A-A), so starting a season
-  // with e.g. P-S still opened on A-A. teams[0] is only a fallback when no team is owned.
+  // Active team resolution order: explicit route/prop (only when it points at a
+  // controllable team) → the club picked at new-game start (newGameFlow.selectedTeamId)
+  // → the human-controlled team → first team as a last resort. Previously this honored
+  // the route/prop team unconditionally, so a stale/AI `team=` URL param (e.g. team=R-C
+  // carried over from a previous save while Chris owns a different club) opened the save
+  // on an AI team the player cannot manage. A route team is now only honored when it is
+  // itself owned; otherwise the owned team wins. teams[0] is only a fallback when the
+  // save has no owned team at all (AI-only dev/admin states).
+  const initialTeamSettingsMap = buildTeamControlSettingsMap(
+    initialClientGameState.teams,
+    initialClientGameState.seasonState.teamControlSettings,
+  );
+  const initialHasOwnedTeam = initialClientGameState.teams.some(
+    (team) => initialTeamSettingsMap[team.teamId]?.controlMode === "manual",
+  );
   const initialRouteTeamId = resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId);
+  const initialRouteTeamIsOwned =
+    initialRouteTeamId != null && initialTeamSettingsMap[initialRouteTeamId]?.controlMode === "manual";
   const initialOwnedTeamId =
     resolveFoundationTeamId(
       initialClientGameState.teams,
       initialClientGameState.seasonState.newGameFlow?.selectedTeamId,
-    ) ?? initialClientGameState.teams.find((team) => team.humanControlled)?.teamId ?? null;
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(
-    () => initialRouteTeamId ?? initialOwnedTeamId ?? initialClientGameState.teams[0]?.teamId ?? "",
-  );
+    ) ?? resolveDefaultManagerTeamId(initialClientGameState.teams, initialTeamSettingsMap) ?? null;
+  const initialResolvedTeamId =
+    (initialRouteTeamIsOwned ? initialRouteTeamId : null) ??
+    (initialHasOwnedTeam ? initialOwnedTeamId : initialRouteTeamId) ??
+    initialOwnedTeamId ??
+    initialClientGameState.teams[0]?.teamId ??
+    "";
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(() => initialResolvedTeamId);
   const [managerTeamPreferenceHydrated, setManagerTeamPreferenceHydrated] = useState(false);
   const [activeManagerTeamSource, setActiveManagerTeamSource] = useState<ActiveManagerTeamSource>(() =>
-    initialRouteTeamId ? "route" : "default_human_team",
+    initialResolvedTeamId && initialResolvedTeamId === initialRouteTeamId ? "route" : "default_human_team",
   );
   const [activeOwnerId, setActiveOwnerId] = useState<string>(
     // Wenn Phase-1-Login aktiv ist und eine Session vorliegt, gewinnt die echte

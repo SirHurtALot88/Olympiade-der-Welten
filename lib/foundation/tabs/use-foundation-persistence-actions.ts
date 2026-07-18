@@ -422,17 +422,27 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
         if (payload._meta) {
           setReadMeta(payload._meta);
         }
+        const saveTeamSettingsMap = buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings);
         const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
-        const nextTeamContext = saveSelectedTeamId
-          ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
-          : resolvePreferredFoundationTeamContext(nextGameState.teams, {
-              currentTeamId: selectedTeamId,
-              currentSource: activeManagerTeamSource,
-              initialTeamId: initialSelectedTeamId,
-              savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
-              activeSaveId: payload.save.saveId,
-              settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
-            });
+        const saveHasOwnedTeam = nextGameState.teams.some((team) => saveTeamSettingsMap[team.teamId]?.controlMode === "manual");
+        const saveSelectionIsOwned =
+          saveSelectedTeamId != null && saveTeamSettingsMap[saveSelectedTeamId]?.controlMode === "manual";
+        // Honor the save's own picked team directly only when it is actually a
+        // human-controlled team (or the save has no owned team at all). Otherwise a
+        // stale/AI newGameFlow.selectedTeamId would bypass the owned-team guard in
+        // resolvePreferredFoundationTeamContext and reopen the save on a club the
+        // player cannot manage.
+        const nextTeamContext =
+          saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
+            ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+            : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+                currentTeamId: selectedTeamId,
+                currentSource: activeManagerTeamSource,
+                initialTeamId: initialSelectedTeamId,
+                savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+                activeSaveId: payload.save.saveId,
+                settingsMap: saveTeamSettingsMap,
+              });
         setSelectedTeamId(nextTeamContext.teamId);
         setActiveManagerTeamSource(nextTeamContext.source);
         setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
@@ -687,17 +697,27 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
       if (payload._meta) {
         setReadMeta(payload._meta);
       }
+      const saveTeamSettingsMap = buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings);
       const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
-      const nextTeamContext = saveSelectedTeamId
-        ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
-        : resolvePreferredFoundationTeamContext(nextGameState.teams, {
-            currentTeamId: selectedTeamId,
-            currentSource: activeManagerTeamSource,
-            initialTeamId: initialSelectedTeamId,
-            savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
-            activeSaveId: payload.save.saveId,
-            settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
-          });
+      const saveHasOwnedTeam = nextGameState.teams.some((team) => saveTeamSettingsMap[team.teamId]?.controlMode === "manual");
+      const saveSelectionIsOwned =
+        saveSelectedTeamId != null && saveTeamSettingsMap[saveSelectedTeamId]?.controlMode === "manual";
+      // Honor the save's own picked team directly only when it is actually a
+      // human-controlled team (or the save has no owned team at all). Otherwise a
+      // stale/AI newGameFlow.selectedTeamId would bypass the owned-team guard in
+      // resolvePreferredFoundationTeamContext and reopen the save on a club the
+      // player cannot manage.
+      const nextTeamContext =
+        saveSelectedTeamId && (saveSelectionIsOwned || !saveHasOwnedTeam)
+          ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+          : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+              currentTeamId: selectedTeamId,
+              currentSource: activeManagerTeamSource,
+              initialTeamId: initialSelectedTeamId,
+              savedTeamId: nextGameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+              activeSaveId: payload.save.saveId,
+              settingsMap: saveTeamSettingsMap,
+            });
       setSelectedTeamId(nextTeamContext.teamId);
       setActiveManagerTeamSource(nextTeamContext.source);
       setActiveManagerTeamWarning(nextTeamContext.warning ?? null);

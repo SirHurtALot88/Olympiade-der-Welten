@@ -311,9 +311,60 @@ function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" |
   return clamp(modifier, -8, 10);
 }
 
+/**
+ * Inverse-CDF (quantile) anchors for the hidden PO generator, expressed as
+ * [cumulativeProbability, potentialScore]. This reshapes the seed — a ~uniform
+ * value in [0,1] — into a realistic, lower-centered, RIGHT-SKEWED league where
+ * elite ceilings are rare, instead of the old uniform 35..99+trait roll (mean
+ * ~67, which pinned ~40% of players at 5.0★ and made a third of the league
+ * indistinguishable at max potential).
+ *
+ * The anchors deliberately track the MEASURED real-catalog CA/PO percentile
+ * shape the star curve above was calibrated against
+ *   (p5≈29 p25≈39 p50≈46 p75≈54 p90≈62 p95≈68 p99≈78),
+ * sitting a hair above it since PO is an upside ceiling (>= current ability).
+ * Feeding these through `potentialScoreToStars` yields, across many seeds:
+ *   median ~2.5★ · ~5% ≥4.5★ · only ~3% pinned at 5.0★ · a long thin elite tail.
+ * A talent-trait modifier is layered on top so gifted/prodigy players earn their
+ * higher ceilings organically — the elites that DO exist are the ones with a
+ * natural-gift trait, not a flat lucky roll. Monotonic, piecewise-linear,
+ * seed-deterministic (no Math.random). The [35,99] clamp is unchanged.
+ */
+const PO_QUANTILE_ANCHORS: ReadonlyArray<readonly [cumulativeP: number, score: number]> = [
+  [0.0, 35],
+  [0.05, 37],
+  [0.2, 41],
+  [0.4, 45],
+  [0.55, 48],
+  [0.7, 52],
+  [0.82, 57],
+  [0.9, 62],
+  [0.95, 68],
+  [0.98, 74],
+  [0.995, 82],
+  [1.0, 95],
+];
+
+/** Map a uniform seed in [0,1] to a PO score via the right-skewed quantile curve. */
+function seedToPotentialScore(seed: number): number {
+  const first = PO_QUANTILE_ANCHORS[0]!;
+  const last = PO_QUANTILE_ANCHORS[PO_QUANTILE_ANCHORS.length - 1]!;
+  if (seed <= first[0]) return first[1];
+  if (seed >= last[0]) return last[1];
+  for (let index = 1; index < PO_QUANTILE_ANCHORS.length; index += 1) {
+    const [hiP, hiScore] = PO_QUANTILE_ANCHORS[index]!;
+    if (seed <= hiP) {
+      const [loP, loScore] = PO_QUANTILE_ANCHORS[index - 1]!;
+      const t = (seed - loP) / (hiP - loP);
+      return loScore + t * (hiScore - loScore);
+    }
+  }
+  return last[1];
+}
+
 function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
-  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v3`);
-  const rawRoll = roundValue(35 + seed * 64, 0);
+  const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v4`);
+  const rawRoll = roundValue(seedToPotentialScore(seed), 0);
   const traitBonus = getTalentTraitPotentialModifier(input.player);
   return clamp(rawRoll + traitBonus, 35, 99);
 }
