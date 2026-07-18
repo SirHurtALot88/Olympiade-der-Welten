@@ -839,6 +839,12 @@ export function calculateMatchdayProjectedPreview(input: {
 
 export const SLOT_ROLE_RESOLVE_SCORING_ENABLED = true;
 
+// "Ruhepol"-Kanal im echten Resolve-Score: Rivalitaetsdruck (nach Captain-Reduktion) zieht den
+// Seiten-Score unter Push leicht runter. Bounded pro Rivalitaets-Einheit (rivalryPressure ∈ [0,2]),
+// konsistent mit rivalryLoad/rivalryPressureModifier (beide push-only). Ein starker Captain reduziert
+// rivalryPressure upstream (applyCaptainRivalryPressureReduction) und damit real diesen Abzug.
+const RIVALRY_RESOLVE_SCORE_DRAG_PER_UNIT = 1;
+
 export function calculateSideSlotRoleModifierTotal(input: {
   disciplineId: string;
   disciplineSide: "d1" | "d2";
@@ -848,6 +854,7 @@ export function calculateSideSlotRoleModifierTotal(input: {
   intensity?: MatchdayIntensityStage;
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
   requiredPlayers?: number | null;
+  rivalryPressure?: number | null;
 }): number {
   if (!SLOT_ROLE_RESOLVE_SCORING_ENABLED || input.entries.length === 0) {
     return 0;
@@ -862,22 +869,26 @@ export function calculateSideSlotRoleModifierTotal(input: {
   const rosterById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
   const intensity = input.intensity ?? "normal";
 
-  return Number(
-    input.entries
-      .reduce((sum, entry) => {
-        const role = roles[entry.slotIndex] ?? null;
-        const rosterPlayer = rosterById.get(entry.playerId) ?? null;
-        const baseScore = scoreByPlayer.get(`${entry.playerId}::${input.disciplineId}`) ?? null;
-        const preview = calculateMatchdayProjectedPreview({
-          baseScore,
-          role,
-          attributeStats: rosterPlayer?.attributeStats ?? null,
-          currentFatigueCount: input.fatigueByPlayerId?.[entry.playerId]?.count ?? 0,
-          requiredPlayers: input.requiredPlayers ?? input.entries.length,
-          intensity,
-        });
-        return sum + preview.roleModifier;
-      }, 0)
-      .toFixed(1),
-  );
+  const roleModifierTotal = input.entries.reduce((sum, entry) => {
+    const role = roles[entry.slotIndex] ?? null;
+    const rosterPlayer = rosterById.get(entry.playerId) ?? null;
+    const baseScore = scoreByPlayer.get(`${entry.playerId}::${input.disciplineId}`) ?? null;
+    const preview = calculateMatchdayProjectedPreview({
+      baseScore,
+      role,
+      attributeStats: rosterPlayer?.attributeStats ?? null,
+      currentFatigueCount: input.fatigueByPlayerId?.[entry.playerId]?.count ?? 0,
+      requiredPlayers: input.requiredPlayers ?? input.entries.length,
+      intensity,
+      rivalryPressure: input.rivalryPressure ?? 0,
+    });
+    return sum + preview.roleModifier;
+  }, 0);
+
+  // Rivalitaetsdruck wirkt jetzt auch auf den echten Score (nicht nur auf die Lab-Streuung):
+  // einmaliger, gedeckelter Seiten-Abzug unter Push. Default 0 → keine Verhaltensaenderung ohne Rivalen.
+  const rivalryPressure = Math.max(0, Math.min(2, input.rivalryPressure ?? 0));
+  const rivalryScoreDrag = intensity === "push" ? rivalryPressure * RIVALRY_RESOLVE_SCORE_DRAG_PER_UNIT : 0;
+
+  return Number((roleModifierTotal - rivalryScoreDrag).toFixed(1));
 }

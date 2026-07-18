@@ -30,7 +30,7 @@ import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
 import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
-import { resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
+import { applyGmPressureDemandConcession, resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 
 export type AiSellPreviewSource = "sqlite" | "prisma";
@@ -645,10 +645,29 @@ function buildCandidate(
   if (premiumQualityGm && isFloorPlayer && !starProtection && !coversNeedAxis) {
     pushSell("roster_quality_floor", "unteres Kader-Drittel — GM will Qualitaet upgraden");
   }
+  // Graduierter GM-Concession-Kanal unter Druck: der Hot-Seat-/Archetyp-Multiplikator
+  // (concedeDemandsMultiplier) moduliert jetzt WIE STARK der GM auf offene Forderungen eingeht —
+  // nicht mehr nur ein An/Aus-Flag. 0 wenn nicht unter Druck (acceptPlayerDemandsUnderPressure=false).
+  let demandConcessionKeepBoost = 0;
   if (openDemands.length > 0) {
     const demandLabels = openDemands.slice(0, 2).map((demand) => demand.label).join(", ");
     const highPriorityDemand = openDemands.some((demand) => demand.priority === "high");
-    if (gmPressure.acceptPlayerDemandsUnderPressure && highPriorityDemand) {
+    const topDemandPriority: "high" | "medium" | "low" = highPriorityDemand
+      ? "high"
+      : openDemands.some((demand) => demand.priority === "medium")
+        ? "medium"
+        : "low";
+    // Basis-Keep-Neigung aus den offenen Forderungen (0..1, gedeckelt); die Concession hebt sie an.
+    const demandConcessionBase = Math.min(1, demandKeepScore + demandPressureScore * 0.5);
+    const demandConcessionScore = applyGmPressureDemandConcession({
+      baseScore: demandConcessionBase,
+      pressure: gmPressure,
+      demandPriority: topDemandPriority,
+    });
+    demandConcessionKeepBoost = Math.max(0, demandConcessionScore - demandConcessionBase);
+    const gmConcedesToDemands =
+      gmPressure.acceptPlayerDemandsUnderPressure && (highPriorityDemand || demandConcessionKeepBoost >= 0.02);
+    if (gmConcedesToDemands) {
       pushKeep(
         "player_demand_keep",
         `GM unter Druck geht eher auf Forderungen ein: ${demandLabels}`,
@@ -757,6 +776,7 @@ function buildCandidate(
     strategy.preferredHits * 5 -
     (coversNeedAxis ? 12 : 0) -
     demandKeepScore * 14 -
+    demandConcessionKeepBoost * 60 -
     (starProtection && !negativeCashPressure && !lowCashReservePressure && boardPressure < 0.65 ? 14 : 0) -
     loyaltyBias * (roster.contractLength >= 3 ? 8 : 2) -
     ((identity?.boardConfidence ?? 0) >= 7 ? Math.round(((identity?.boardConfidence ?? 7) - 6) * 4) : 0);

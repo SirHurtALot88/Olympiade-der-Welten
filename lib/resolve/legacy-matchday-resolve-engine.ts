@@ -1,5 +1,5 @@
 import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
-import { calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
+import { applyCaptainRivalryPressureReduction, calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import {
@@ -272,10 +272,21 @@ export function buildLegacyMatchdayResolvePreview(
         context.gameState?.rosters.filter((entry) => entry.teamId === context.teamId && resolvePlayerIds.has(entry.playerId)) ??
         null,
     });
+    // Captain einmal pro Team ermitteln (Team-Level-Effekt, kein Per-Side-Recompute).
+    const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
 
     for (const meta of getDisciplineSideMeta(context)) {
       const sideEntries = (draft?.entries ?? []).filter(
         (entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide,
+      );
+      // "Ruhepol"-Captain-Effekt jetzt auch im echten Resolve (vorher nur Lab-UI): Rivalitaetsdruck aus
+      // Top-Rivalen der Diszi wird wie im Lab berechnet und durch rivalryPressureReductionPct gedaempft.
+      const disciplineTop8Rivals = context.teamPowerWindows?.[meta.disciplineId]?.top8Rivals ?? [];
+      const rivalryTopRank = Math.min(...disciplineTop8Rivals.map((rival) => rival.rank));
+      const rawRivalryPressure = Number.isFinite(rivalryTopRank) ? (rivalryTopRank <= 3 ? 1.5 : 1) : 0;
+      const rivalryPressure = applyCaptainRivalryPressureReduction(
+        rawRivalryPressure,
+        teamCaptain?.effects.rivalryPressureReductionPct ?? null,
       );
       const slotRoleModifier = calculateSideSlotRoleModifierTotal({
         disciplineId: meta.disciplineId,
@@ -289,6 +300,7 @@ export function buildLegacyMatchdayResolvePreview(
           context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
           context.disciplinePlayerCounts[meta.disciplineId] ??
           null,
+        rivalryPressure,
       });
       const score = scoreLegacyLineupDisciplineSide({
         disciplineId: meta.disciplineId,
@@ -348,7 +360,6 @@ export function buildLegacyMatchdayResolvePreview(
             (context.teamPowerWindows?.[meta.disciplineId]?.top8Rivals.length ?? 0) > 0
               ? selectedTeamPower.conditionalBonusPct
               : 0;
-          const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
           const teamPowerResult = calculateTeamPowerModifierForSide({
             modifiers: draft?.modifiers,
             disciplineSide: meta.disciplineSide,

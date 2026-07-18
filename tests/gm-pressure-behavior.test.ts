@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
-import { resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
+import {
+  applyGmPressureDemandConcession,
+  resolveGmPressureBehavior,
+  type GmPressureBehavior,
+} from "@/lib/foundation/gm-pressure-behavior";
 import { applyTransferBalanceRiskToReplacementProbability } from "@/lib/foundation/team-general-managers";
+
+function createPressure(partial?: Partial<GmPressureBehavior>): GmPressureBehavior {
+  return {
+    pressureLevel: partial?.pressureLevel ?? "hot",
+    isHotSeat: partial?.isHotSeat ?? true,
+    concedeDemandsMultiplier: partial?.concedeDemandsMultiplier ?? 1.4,
+    chaseBoardObjectivesMultiplier: partial?.chaseBoardObjectivesMultiplier ?? 1.4,
+    sellCoreUnderPressure: partial?.sellCoreUnderPressure ?? false,
+    acceptPlayerDemandsUnderPressure: partial?.acceptPlayerDemandsUnderPressure ?? true,
+    warning: partial?.warning ?? null,
+    softBlockStarSell: partial?.softBlockStarSell ?? false,
+    detail: partial?.detail ?? "",
+  };
+}
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -57,6 +75,43 @@ describe("gm-pressure-behavior", () => {
     expect(behavior.pressureLevel).not.toBe("stable");
     expect(behavior.concedeDemandsMultiplier).toBeGreaterThan(1);
     expect(behavior.chaseBoardObjectivesMultiplier).toBeGreaterThan(1);
+  });
+});
+
+describe("applyGmPressureDemandConcession", () => {
+  it("concedes more with a higher concedeDemandsMultiplier (graduated, not on/off)", () => {
+    const base = 0.4;
+    const lowMultiplier = applyGmPressureDemandConcession({
+      baseScore: base,
+      pressure: createPressure({ concedeDemandsMultiplier: 1.1 }),
+      demandPriority: "high",
+    });
+    const highMultiplier = applyGmPressureDemandConcession({
+      baseScore: base,
+      pressure: createPressure({ concedeDemandsMultiplier: 1.7 }),
+      demandPriority: "high",
+    });
+
+    expect(lowMultiplier).toBeGreaterThan(base);
+    expect(highMultiplier).toBeGreaterThan(lowMultiplier);
+  });
+
+  it("scales concession by demand priority", () => {
+    const pressure = createPressure({ concedeDemandsMultiplier: 1.6 });
+    const low = applyGmPressureDemandConcession({ baseScore: 0.3, pressure, demandPriority: "low" });
+    const high = applyGmPressureDemandConcession({ baseScore: 0.3, pressure, demandPriority: "high" });
+
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it("is a no-op when the GM is not conceding under pressure", () => {
+    const result = applyGmPressureDemandConcession({
+      baseScore: 0.55,
+      pressure: createPressure({ acceptPlayerDemandsUnderPressure: false, concedeDemandsMultiplier: 1.7 }),
+      demandPriority: "high",
+    });
+
+    expect(result).toBe(0.55);
   });
 });
 
