@@ -91,11 +91,12 @@ const KPI_METRICS: AllTimeKpiMetric[] = [
   },
 ];
 
-type ChartMetricKey = "mw" | "cash" | "points" | "rank";
+type ChartMetricKey = "mw" | "cash" | "teamValue" | "points" | "rank";
 
 const CHART_METRICS: Array<{ id: ChartMetricKey; label: string; tone: NlTone }> = [
   { id: "mw", label: "MW", tone: "accent" },
   { id: "cash", label: "Cash", tone: "good" },
+  { id: "teamValue", label: "Teamwert", tone: "men" },
   { id: "points", label: "Punkte", tone: "spe" },
   { id: "rank", label: "Rang", tone: "warn" },
 ];
@@ -103,27 +104,89 @@ const CHART_METRICS: Array<{ id: ChartMetricKey; label: string; tone: NlTone }> 
 type TableSortKey =
   | "seasonsPlayed"
   | "cumulativePoints"
+  | "avgPoints"
   | "avgRank"
   | "bestRank"
   | "titles"
+  | "gold"
+  | "silver"
+  | "bronze"
+  | "top5"
+  | "top10"
   | "mwNow"
   | "mwPeak"
   | "mwGrowthAbs"
-  | "cashPeak";
+  | "mwGrowthPct"
+  | "cashNow"
+  | "cashPeak"
+  | "teamValueNow";
 
-const TABLE_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
+// „Aufteilung" der Ewigen Tabelle in fokussierte Sichten (Reiter über der
+// Tabelle): Punkte & Ränge · Medaillen · Marktwert · Cash & Teamwert. Alle
+// Werte stammen aus dem bereits berechneten Modell — hier nur Spaltenauswahl.
+type TableFocus = "points" | "medals" | "marketValue" | "cash";
+
+const TABLE_FOCUS_TABS: Array<{ id: TableFocus; label: string }> = [
+  { id: "points", label: "Punkte & Ränge" },
+  { id: "medals", label: "Medaillen" },
+  { id: "marketValue", label: "Marktwert" },
+  { id: "cash", label: "Cash & Teamwert" },
+];
+
+const BASE_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
   { key: "allTimeRank", label: "#", align: "right", width: "40px" },
   { key: "teamName", label: "Team" },
   { key: "seasonsPlayed", label: "Saisons", align: "right", sortable: true, tooltip: "Anzahl gespielter Saisons (inkl. laufender Saison)" },
-  { key: "cumulativePoints", label: "Punkte", align: "right", sortable: true, tooltip: "Kumulierte Liga-Punkte über alle Saisons inkl. laufender Saison" },
-  { key: "avgRank", label: "Ø Rang", align: "right", sortable: true, tooltip: "Ø Rang über archivierte Saisons" },
-  { key: "bestRank", label: "Best", align: "right", sortable: true, tooltip: "Bester Rang über archivierte Saisons" },
-  { key: "titles", label: "Titel", align: "right", sortable: true, tooltip: "#1-Finishes über archivierte Saisons" },
-  { key: "mwNow", label: "MW jetzt", align: "right", sortable: true, tooltip: "Aktuellster bekannter Marktwert" },
-  { key: "mwPeak", label: "MW Peak", align: "right", sortable: true, tooltip: "Höchster je erreichter Marktwert" },
-  { key: "mwGrowthAbs", label: "MW +/-", align: "right", sortable: true, tooltip: "Marktwert-Wachstum seit der ersten bekannten Saison" },
-  { key: "cashPeak", label: "Cash Peak", align: "right", sortable: true, tooltip: "Höchster je erreichter Cash-Stand" },
 ];
+
+const FOCUS_COLUMNS: Record<TableFocus, Array<NlTableColumn<AllTimeTableRow>>> = {
+  points: [
+    ...BASE_COLUMNS,
+    { key: "cumulativePoints", label: "Punkte", align: "right", sortable: true, tooltip: "Kumulierte Liga-Punkte über alle Saisons inkl. laufender Saison" },
+    { key: "avgPoints", label: "Ø Punkte", align: "right", sortable: true, tooltip: "Ø Liga-Punkte je gespielter Saison" },
+    { key: "avgRank", label: "Ø Rang", align: "right", sortable: true, tooltip: "Ø Abschluss-Rang über alle Saisons (kleiner = besser)" },
+    { key: "bestRank", label: "Best", align: "right", sortable: true, tooltip: "Bester je erreichter Abschluss-Rang" },
+  ],
+  medals: [
+    ...BASE_COLUMNS,
+    { key: "gold", label: "🥇", align: "right", sortable: true, tooltip: "Gold — Anzahl 1. Plätze (Meistertitel)" },
+    { key: "silver", label: "🥈", align: "right", sortable: true, tooltip: "Silber — Anzahl 2. Plätze" },
+    { key: "bronze", label: "🥉", align: "right", sortable: true, tooltip: "Bronze — Anzahl 3. Plätze" },
+    { key: "top5", label: "Top 5", align: "right", sortable: true, tooltip: "Wie oft das Team eine Saison in den Top 5 abgeschlossen hat" },
+    { key: "top10", label: "Top 10", align: "right", sortable: true, tooltip: "Wie oft das Team eine Saison in den Top 10 abgeschlossen hat" },
+  ],
+  marketValue: [
+    ...BASE_COLUMNS,
+    { key: "mwNow", label: "MW jetzt", align: "right", sortable: true, tooltip: "Aktuellster bekannter Marktwert" },
+    { key: "mwPeak", label: "MW Peak", align: "right", sortable: true, tooltip: "Höchster je erreichter Marktwert" },
+    { key: "mwGrowthAbs", label: "MW +/-", align: "right", sortable: true, tooltip: "Marktwert-Wachstum seit der ersten bekannten Saison" },
+    { key: "mwGrowthPct", label: "MW %", align: "right", sortable: true, tooltip: "Prozentuales Marktwert-Wachstum seit der ersten bekannten Saison" },
+  ],
+  cash: [
+    ...BASE_COLUMNS,
+    { key: "cashNow", label: "Cash jetzt", align: "right", sortable: true, tooltip: "Aktuellster bekannter Cash-Stand" },
+    { key: "cashPeak", label: "Cash Peak", align: "right", sortable: true, tooltip: "Höchster je erreichter Cash-Stand" },
+    { key: "teamValueNow", label: "Teamwert", align: "right", sortable: true, tooltip: "Teamwert = Marktwert + Cash (aktuellster bekannter Stand)" },
+  ],
+};
+
+const FOCUS_DEFAULT_SORT: Record<TableFocus, TableSortKey> = {
+  points: "cumulativePoints",
+  medals: "gold",
+  marketValue: "mwNow",
+  cash: "teamValueNow",
+};
+
+function getAvgPoints(row: AllTimeTableRow): number | null {
+  return row.seasons.length > 0 ? row.cumulativePoints / row.seasons.length : null;
+}
+
+function getTeamValueNow(row: AllTimeTableRow): number | null {
+  if (row.mwNow == null && row.cashNow == null) {
+    return null;
+  }
+  return (row.mwNow ?? 0) + (row.cashNow ?? 0);
+}
 
 const LIVE_ONLY_COLUMNS: Array<NlTableColumn<AllTimeTableRow>> = [
   { key: "allTimeRank", label: "#", align: "right", width: "40px" },
@@ -149,20 +212,38 @@ function getSortValue(row: AllTimeTableRow, key: TableSortKey): number {
       return row.seasons.length;
     case "cumulativePoints":
       return row.cumulativePoints;
+    case "avgPoints":
+      return getAvgPoints(row) ?? Number.NEGATIVE_INFINITY;
     case "avgRank":
       return row.avgRank ?? Number.POSITIVE_INFINITY;
     case "bestRank":
       return row.bestRank ?? Number.POSITIVE_INFINITY;
     case "titles":
       return row.titles;
+    case "gold":
+      return row.medals.gold;
+    case "silver":
+      return row.medals.silver;
+    case "bronze":
+      return row.medals.bronze;
+    case "top5":
+      return row.medals.top5;
+    case "top10":
+      return row.medals.top10;
     case "mwNow":
       return row.mwNow ?? Number.NEGATIVE_INFINITY;
     case "mwPeak":
       return row.mwPeak ?? Number.NEGATIVE_INFINITY;
     case "mwGrowthAbs":
       return row.mwGrowthAbs ?? Number.NEGATIVE_INFINITY;
+    case "mwGrowthPct":
+      return row.mwGrowthPct ?? Number.NEGATIVE_INFINITY;
+    case "cashNow":
+      return row.cashNow ?? Number.NEGATIVE_INFINITY;
     case "cashPeak":
       return row.cashPeak ?? Number.NEGATIVE_INFINITY;
+    case "teamValueNow":
+      return getTeamValueNow(row) ?? Number.NEGATIVE_INFINITY;
     default:
       return 0;
   }
@@ -173,6 +254,9 @@ function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] 
   const raw = seasons.map((season) => {
     if (metric === "mw") return season.marketValue;
     if (metric === "cash") return season.cash;
+    if (metric === "teamValue") {
+      return season.marketValue != null || season.cash != null ? (season.marketValue ?? 0) + (season.cash ?? 0) : null;
+    }
     if (metric === "points") return season.points;
     // Rang invertiert (kleinere Zahl = besser) → -rang, damit "hoch" in der
     // Sparkline immer "besser" bedeutet, wie bei MW/Cash/Punkte.
@@ -183,10 +267,18 @@ function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] 
 
 export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel, onOpenTeam }: AllTimeTableClientProps) {
   const [openKpi, setOpenKpi] = useState<AllTimeKpiKey | null>(null);
+  const [focus, setFocus] = useState<TableFocus>("points");
   const [sort, setSort] = useState<{ key: TableSortKey; direction: NlTableSortDirection }>({
     key: "cumulativePoints",
     direction: "desc",
   });
+
+  // Fokus-Wechsel setzt die Tabelle auf eine sinnvolle Standard-Sortierung der
+  // gewählten Sicht (z. B. Medaillen → Gold, Marktwert → MW jetzt).
+  function handleFocusSelect(nextFocus: TableFocus) {
+    setFocus(nextFocus);
+    setSort({ key: FOCUS_DEFAULT_SORT[nextFocus], direction: "desc" });
+  }
   const [chartMetric, setChartMetric] = useState<ChartMetricKey>("mw");
   const [showAllCharts, setShowAllCharts] = useState(false);
 
@@ -343,9 +435,22 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
         })}
       </div>
 
-      <NlCard className="nl-alltime-table-card" title="Alle Teams" eyebrow={`${formatNlNumber(model.rows.length, 0)} Teams`}>
+      <NlCard
+        className="nl-alltime-table-card"
+        title="Alle Teams"
+        eyebrow={`${formatNlNumber(model.rows.length, 0)} Teams`}
+        actions={
+          <NlSubTabs
+            items={TABLE_FOCUS_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+            activeId={focus}
+            onSelect={(id) => handleFocusSelect(id as TableFocus)}
+            aria-label="Auswertung wählen"
+            className="nl-alltime-focus-subtabs"
+          />
+        }
+      >
         <NlTable
-          columns={TABLE_COLUMNS}
+          columns={FOCUS_COLUMNS[focus]}
           rows={sortedRows}
           rowKey={(row) => row.teamId}
           rowClassName={(row) => (selectedTeamId != null && row.teamId === selectedTeamId ? "is-own-team" : undefined)}
@@ -369,20 +474,40 @@ export default function AllTimeTableNewLook({ model, selectedTeamId, seasonLabel
                 return formatNlNumber(row.seasons.length, 0);
               case "cumulativePoints":
                 return formatNlNumber(row.cumulativePoints, 1);
+              case "avgPoints": {
+                const avg = getAvgPoints(row);
+                return avg != null ? formatNlNumber(avg, 1) : "—";
+              }
               case "avgRank":
                 return row.avgRank != null ? `#${formatNlNumber(row.avgRank, 1)}` : "—";
               case "bestRank":
                 return row.bestRank != null ? `#${formatNlNumber(row.bestRank, 0)}` : "—";
-              case "titles":
-                return row.titles > 0 ? formatNlNumber(row.titles, 0) : "—";
+              case "gold":
+                return row.medals.gold > 0 ? formatNlNumber(row.medals.gold, 0) : "—";
+              case "silver":
+                return row.medals.silver > 0 ? formatNlNumber(row.medals.silver, 0) : "—";
+              case "bronze":
+                return row.medals.bronze > 0 ? formatNlNumber(row.medals.bronze, 0) : "—";
+              case "top5":
+                return row.medals.top5 > 0 ? formatNlNumber(row.medals.top5, 0) : "—";
+              case "top10":
+                return row.medals.top10 > 0 ? formatNlNumber(row.medals.top10, 0) : "—";
               case "mwNow":
                 return formatNlMoney(row.mwNow);
               case "mwPeak":
                 return formatNlMoney(row.mwPeak);
               case "mwGrowthAbs":
                 return row.mwGrowthAbs != null ? `${row.mwGrowthAbs >= 0 ? "+" : ""}${formatNlMoney(row.mwGrowthAbs)}` : "—";
+              case "mwGrowthPct":
+                return row.mwGrowthPct != null ? `${row.mwGrowthPct >= 0 ? "+" : ""}${formatNlNumber(row.mwGrowthPct, 0)} %` : "—";
+              case "cashNow":
+                return formatNlMoney(row.cashNow);
               case "cashPeak":
                 return formatNlMoney(row.cashPeak);
+              case "teamValueNow": {
+                const teamValue = getTeamValueNow(row);
+                return teamValue != null ? formatNlMoney(teamValue) : "—";
+              }
               default:
                 return null;
             }
