@@ -844,17 +844,56 @@ function maskEconomyForVisibility(
   };
 }
 
-// T-024 (Fog-of-War-Leak): player.potential ist der exakte, interne Hidden-Score. Bei
-// visibility !== "exact" wird er durch die vorhandene scoutingLevel-Bandbreite
-// (buildPlayerScoutPotential) ersetzt statt roh durchgereicht zu werden.
+// Progressive-Reveal-Schwelle für den EXAKTEN Potential-Score (PO) eigener
+// Spieler: Erst ab scouting_office-Level 5 wird der exakte, interne
+// Hidden-PO-Score freigegeben; darunter greift eine gestufte Bandbreite.
+const OWNED_EXACT_POTENTIAL_SCOUTING_LEVEL = 5;
+
+// Normalisiert ein (Facility-)Scouting-Level auf den gültigen 0..5-Bereich.
+function normalizeScoutingLevelValue(level: number | null | undefined) {
+  if (typeof level !== "number" || !Number.isFinite(level)) return 0;
+  return Math.max(0, Math.min(5, Math.round(level)));
+}
+
+// Entscheidet, ob der exakte Hidden-PO eines EIGENEN Spielers angezeigt werden
+// darf. Bewusst am reinen scouting_office-FACILITY-Level festgemacht (NICHT am
+// effectiveScoutingLevel): getEffectiveScoutingLevel() addiert für Kaderspieler
+// pauschal +4 (Roster-Certainty 100 → floor(100/25) = 4), wodurch PO sonst schon
+// ab Facility-Level 1 exakt wäre. Der Progressive-Reveal soll aber allein durch
+// den Scouting-Office-Ausbau verdient werden (User: "nicht jeder hat potential 99
+// und das weiss man auch schon ohne lvl 5 scouting"): L0 = grobes Band … L5 = exakt.
+function ownedPotentialRevealsExact(facilityScoutingLevel: number | null | undefined) {
+  if (DEBUG_FORCE_PLAYER_VISIBILITY) return true;
+  return normalizeScoutingLevelValue(facilityScoutingLevel) >= OWNED_EXACT_POTENTIAL_SCOUTING_LEVEL;
+}
+
+// T-024 (Fog-of-War-Leak) + Progressive-PO-Reveal: player.potential ist der exakte,
+// interne Hidden-Score.
+//  - Fremdspieler (visibility "scouted") bekommen ihn NIE roh, sondern über die
+//    effectiveScoutingLevel-Bandbreite (buildPlayerScoutPotential) — unverändertes
+//    Bestandsverhalten.
+//  - EIGENE Spieler ("exact") bekommen den exakten Score erst ab scouting_office L5;
+//    darunter greift DIESELBE getScoutingUncertainty()-Bandbreite (reuse), nur aus
+//    dem reinen Facility-Level abgeleitet (L0 ±16 grob, L1 ±10, L2 ±8, L3 ±6, L4 ±4).
+//    Das Band verengt sich damit monoton mit dem Scouting-Ausbau.
 function maskPotentialForVisibility(
   player: Pick<Player, "potential">,
   visibility: AttributeVisibility,
   scoutingLevel: number | null | undefined,
   scoutPotential: PlayerScoutPotential | null,
+  ownedFacilityScoutingLevel?: number | null,
 ): { potential: number | null; scoutPotential: PlayerScoutPotential | null } {
   if (visibility === "exact") {
-    return { potential: player.potential ?? null, scoutPotential };
+    if (ownedPotentialRevealsExact(ownedFacilityScoutingLevel)) {
+      return { potential: player.potential ?? null, scoutPotential };
+    }
+    return {
+      potential: null,
+      scoutPotential: buildPlayerScoutPotential({
+        player,
+        scoutingLevel: normalizeScoutingLevelValue(ownedFacilityScoutingLevel),
+      }),
+    };
   }
   return {
     potential: null,
@@ -2433,7 +2472,18 @@ export function buildPlayerDrawerDataFromGameState(input: {
     attributeVisibility,
     scoutingLevel,
     progressionForecast.scoutPotential,
+    facilityScoutingLevel,
   );
+  // Progressive-PO-Reveal auch für die "eigenen" Potential-Anzeigen (Achsen-PO-
+  // Sterne, Achsen-Decke, Attribut-Ceilings, PO-Sterne im Header): Diese Felder
+  // zeigen den exakten Hidden-PO als Sterne und werden – wie der exakte PO-Score –
+  // erst ab scouting_office L5 freigegeben. Darunter bleibt nur das gebänderte
+  // data.scoutPotential sichtbar. Für Fremdspieler ("scouted") greift die bestehende
+  // Scouting-Reveal-Logik unverändert (potentialDisplay ist dort ohnehin null, die
+  // PO-Sterne stammen aus dem scoutingLevel-gebänderten starSnapshot). CURRENT-Werte
+  // (OVR, aktuelle Sterne, Attribute) bleiben in JEDEM Fall unberührt.
+  const revealExactOwnedPotential =
+    attributeVisibility === "exact" ? ownedPotentialRevealsExact(facilityScoutingLevel) : true;
   const seasonOrganicForecast =
     team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
       ? buildOrganicSeasonProgression({
@@ -2550,10 +2600,12 @@ export function buildPlayerDrawerDataFromGameState(input: {
     scoutingLevel,
     effectiveScoutingLevel,
     axisStarsDisplay: starSnapshot?.revealedCurrentStars.displayLabel ?? null,
-    potentialStarsDisplay: starSnapshot?.revealedPotentialStars.displayLabel ?? null,
-    potentialGapStars: starSnapshot?.potentialGap ?? null,
+    potentialStarsDisplay: revealExactOwnedPotential
+      ? starSnapshot?.revealedPotentialStars.displayLabel ?? null
+      : null,
+    potentialGapStars: revealExactOwnedPotential ? starSnapshot?.potentialGap ?? null : null,
     potentialOverallStars:
-      potentialDisplay?.potentialOverallStars != null
+      revealExactOwnedPotential && potentialDisplay?.potentialOverallStars != null
         ? clampPotentialOverallToCurrent(
             currentAxisStars.overall,
             potentialDisplay.potentialOverallStars,
@@ -2561,11 +2613,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
         : null,
     currentOverallStars:
       starSnapshot?.revealedCurrentStars.overall ?? currentAxisStars.overall ?? null,
-    potentialOverallDelta: potentialDisplay?.potentialOverallDelta ?? null,
-    potentialOverallDeltaSourceLabel: potentialDisplay?.potentialOverallDeltaSourceLabel ?? null,
-    potentialAxisStatus: potentialDisplay?.potentialAxisStatus ?? [],
-    attributeCeilingPreview: potentialDisplay?.attributeCeilingPreview ?? [],
-    trainingRouteImpact: potentialDisplay?.trainingRouteImpact ?? null,
+    potentialOverallDelta: revealExactOwnedPotential ? potentialDisplay?.potentialOverallDelta ?? null : null,
+    potentialOverallDeltaSourceLabel: revealExactOwnedPotential
+      ? potentialDisplay?.potentialOverallDeltaSourceLabel ?? null
+      : null,
+    potentialAxisStatus: revealExactOwnedPotential ? potentialDisplay?.potentialAxisStatus ?? [] : [],
+    attributeCeilingPreview: revealExactOwnedPotential ? potentialDisplay?.attributeCeilingPreview ?? [] : [],
+    trainingRouteImpact: revealExactOwnedPotential ? potentialDisplay?.trainingRouteImpact ?? null : null,
     scoutingDisclosure: traitView.disclosure,
     hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
     hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
