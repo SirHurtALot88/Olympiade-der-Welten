@@ -14,11 +14,13 @@ import type {
   SeasonState,
   SeasonTransitionState,
   ScenarioMeta,
+  SponsorOffer,
   Team,
   TeamIdentity,
   TransferHistoryEntry,
   TransferListing,
 } from "@/lib/data/olyDataTypes";
+import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -212,6 +214,53 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     ...gameState,
     ...(teamsChanged ? { teams } : {}),
     ...(identitiesChanged ? { teamIdentities } : {}),
+  };
+}
+
+/**
+ * Back-compat: old saves carry sponsor offers/contracts with `starTier`/`archetype` but no `rarity`/
+ * `curveShape`. Backfill the new fields deterministically (star→rarity, archetype→curve shape) on load so
+ * every consumer sees them. Signed contracts keep their frozen `lockedRankPayoutLadder`, so payouts are
+ * unaffected; this only labels them for the new UI/roller. Idempotent (skips already-migrated entries).
+ */
+function normalizeLegacySponsors(gameState: GameState): GameState {
+  const seasonState = gameState.seasonState;
+  if (!seasonState) return gameState;
+  let changed = false;
+  const migrateOffer = (offer: SponsorOffer): SponsorOffer => {
+    if (offer.rarity != null && offer.curveShape != null) return offer;
+    changed = true;
+    return {
+      ...offer,
+      rarity: offer.rarity ?? mapStarTierToRarity(offer.starTier),
+      curveShape: offer.curveShape ?? mapArchetypeToCurveShape(offer.archetype),
+    };
+  };
+  const nextOffers = seasonState.sponsorOffersByTeamId
+    ? Object.fromEntries(
+        Object.entries(seasonState.sponsorOffersByTeamId).map(([teamId, list]) => [teamId, list.map(migrateOffer)]),
+      )
+    : seasonState.sponsorOffersByTeamId;
+  const nextContracts = seasonState.sponsorContractsByTeamId
+    ? Object.fromEntries(
+        Object.entries(seasonState.sponsorContractsByTeamId).map(([teamId, contract]) => {
+          if (contract.rarity != null && contract.curveShape != null) return [teamId, contract];
+          changed = true;
+          return [
+            teamId,
+            {
+              ...contract,
+              rarity: contract.rarity ?? mapStarTierToRarity(contract.starTier),
+              curveShape: contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype),
+            },
+          ];
+        }),
+      )
+    : seasonState.sponsorContractsByTeamId;
+  if (!changed) return gameState;
+  return {
+    ...gameState,
+    seasonState: { ...seasonState, sponsorOffersByTeamId: nextOffers, sponsorContractsByTeamId: nextContracts },
   };
 }
 
@@ -1087,12 +1136,14 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   });
   mark("hydrateGameStateMedia done");
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
+    normalizeLegacySponsors(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
         withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated)), {
           saveId,
         }),
       ),
+    ),
     ),
   );
   mark("legacy normalization done");
