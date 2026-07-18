@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
 import { makePlayer, makeRosterEntry, makeTeam, makeTeamIdentity } from "./_fixtures/game-entity-fixtures";
 
@@ -173,6 +173,49 @@ describe("finances view-model — cash reconciliation (T-108)", () => {
     // The reconciliation identity the tab renders: start-cash + guv + other movements == cash.
     expect(team.cashSeasonStart).toBe(150);
     expect(round1((team.cashSeasonStart ?? 0) + team.guv + (team.otherCashMovements ?? 0))).toBe(round1(team.cash));
+  });
+
+  it("(e) loan expense in the GuV is the INTEREST portion only, not the full installment", () => {
+    // Accounting model: only interest is a P&L expense; the principal repayment is a balance movement
+    // (mirror of loan proceeds NOT being income). Loan: outstanding 100 @ 10% -> interest 10 per season,
+    // while the full installment is 30. The GuV loan expense must be 10, not 30.
+    const base = buildGameState({ teamCash: 200, salary: 20 });
+    const loan: LoanRecord = {
+      loanId: "loan-1",
+      borrowerTeamId: "team-1",
+      lenderType: "bank",
+      principalOriginal: 120,
+      principalOutstanding: 100,
+      interestRatePerSeason: 0.1,
+      termSeasons: 5,
+      seasonsRemaining: 4,
+      installmentPerSeason: 30,
+      originatedSeasonId: "season-1",
+      status: "active",
+      missedPayments: 0,
+    };
+    const gameState = { ...base, seasonState: { ...base.seasonState, loans: [loan] } } as GameState;
+
+    const model = buildFinancesViewModel(gameState, "team-1");
+    if (model.status !== "ready") throw new Error("expected ready");
+    const { team } = model;
+
+    // Loan expense line = interest (10), NOT the full installment (30).
+    expect(team.expenses.loanInstallments.total).toBe(10);
+    expect(team.expenses.loanInstallments.total).not.toBe(30);
+    // Per-loan row carries the interest too (display/total stay consistent -> no share/flow-chart drift).
+    expect(team.expenses.loanInstallments.loans).toHaveLength(1);
+    expect(team.expenses.loanInstallments.loans[0].installment).toBe(10);
+    expect(team.expenses.loanInstallments.loans[0].outstanding).toBe(100);
+    // The interest flows into totalExpenses; the principal repayment does not.
+    const expenseSum = round1(
+      team.expenses.salaries.total +
+        team.expenses.facilityUpkeep.total +
+        team.expenses.loanInstallments.total +
+        (team.expenses.transferDeficit ?? 0) +
+        (team.expenses.objectivePenalty ?? 0),
+    );
+    expect(team.totalExpenses).toBe(expenseSum);
   });
 
   it("(d) archived history uses REAL cashEnd (not phantom cashTotal) and suppresses stale guv", () => {

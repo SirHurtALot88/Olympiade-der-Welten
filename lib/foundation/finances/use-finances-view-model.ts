@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import type { GameState, SponsorOfferComponentKind } from "@/lib/data/olyDataTypes";
-import { estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
+import { estimateTeamAnnualRevenue, getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorComponentKindLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
@@ -225,7 +225,14 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
   const facilityRows = facilityCash.paidUpkeep.facilities;
   const facilityUpkeepTotal = facilityCash.paidUpkeep.total;
 
-  // --- Kreditraten ----------------------------------------------------------
+  // --- Kreditzinsen (GuV-Ausgabe) ------------------------------------------
+  // Buchhaltungsmodell (siehe unten bei totalExpenses): NUR der Zinsanteil einer Kreditrate ist eine
+  // GuV-Ausgabe. Der Tilgungsanteil (principal) ist eine reine Bilanzbewegung (Cash runter, Restschuld
+  // runter, Eigenkapital unverändert) und darf NICHT als Ausgabe zählen — genau symmetrisch dazu, dass
+  // die Kreditauszahlung KEINE Einnahme ist (beide laufen über `otherCashMovements`, nicht die GuV).
+  // Deshalb trägt die Kredit-Ausgabenzeile den pro-Kredit-ZINS (principalOutstanding * Zinssatz), nicht
+  // die volle Rate. Pro-Kredit-Rundung = Zinsanteil im Season-End-Settlement, damit Summe (unten,
+  // `getTeamAnnualLoanInterest`) und Zeilen bit-genau übereinstimmen (keine Anteil-/Flow-Chart-Diskrepanz).
   const activeLoans = (gameState.seasonState.loans ?? []).filter(
     (loan) => loan.borrowerTeamId === teamId && loan.status === "active",
   );
@@ -235,11 +242,11 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
         loan.lenderType === "team"
           ? (gameState.teams.find((candidate) => candidate.teamId === loan.lenderTeamId)?.name ?? "Team")
           : "Bank",
-      installment: round1(loan.installmentPerSeason),
+      installment: round1(loan.principalOutstanding * loan.interestRatePerSeason),
       outstanding: round1(loan.principalOutstanding),
     }))
     .sort((left, right) => right.installment - left.installment);
-  const loanInstallmentTotal = getTeamAnnualLoanInstallment(gameState, teamId);
+  const loanInterestTotal = getTeamAnnualLoanInterest(gameState, teamId);
 
   // --- Board-Objective-cashDelta (T-108 c) --------------------------------
   // Netto-cashDelta, den die Engine über `buildTeamSeasonObjectiveSettlement` tatsächlich verbucht
@@ -254,11 +261,19 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
 
   // Preisgeld ist NIE cash-wirksam (Benchmark) → NICHT in totalIncome. Facility-Income und
   // Objective-Prämie sind es → dazu. Symmetrisch: bezahlter Upkeep + Objective-Strafe als Ausgabe.
+  //
+  // Buchhaltungsmodell (Kredite): Die GuV ist intern konsistent, indem WEDER die Kreditauszahlung als
+  // Einnahme NOCH die Tilgung als Ausgabe zählt — beide sind Bilanzbewegungen und landen in
+  // `otherCashMovements`. Als Kredit-Ausgabe geht deshalb NUR der Zinsanteil (`loanInterestTotal`) ein,
+  // nicht die volle Rate. (Vorher: volle Rate als Ausgabe, Auszahlung ausgeschlossen → inkonsistent, die
+  // Tilgung wurde doppelt bestraft.) Die Cash-Reconciliation `cashSeasonStart + guv + otherCashMovements
+  // == cash` bleibt gültig: `otherCashMovements` ist eine reine Differenz und absorbiert den nun nicht
+  // mehr in der GuV enthaltenen Tilgungs-Cashabfluss.
   const totalIncome = round1(
     (sponsor?.total ?? 0) + (facilityIncome?.total ?? 0) + (transferSurplus ?? 0) + (objectiveReward ?? 0),
   );
   const totalExpenses = round1(
-    salaryTotal + facilityUpkeepTotal + loanInstallmentTotal + (transferDeficit ?? 0) + (objectivePenalty ?? 0),
+    salaryTotal + facilityUpkeepTotal + loanInterestTotal + (transferDeficit ?? 0) + (objectivePenalty ?? 0),
   );
   const guv = round1(totalIncome - totalExpenses);
 
@@ -307,7 +322,9 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     expenses: {
       salaries: { total: salaryTotal, players: salaryRows },
       facilityUpkeep: { total: facilityUpkeepTotal, facilities: facilityRows },
-      loanInstallments: { total: loanInstallmentTotal, loans: loanRows },
+      // `total`/Zeilen = Kredit-ZINS der Saison (GuV-Ausgabe), NICHT die volle Rate — der Tilgungsanteil
+      // ist eine Bilanzbewegung, keine Ausgabe (siehe Kommentar bei totalExpenses).
+      loanInstallments: { total: loanInterestTotal, loans: loanRows },
       transferDeficit,
       objectivePenalty,
     },

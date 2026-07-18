@@ -7,6 +7,7 @@ import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolveTeamLiquidityBufferTarget } from "@/lib/ai/planner-cash-buffer-policy";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 
 /** Bank-Kredit-Kern (Phase 1), KI-Anbindung (Phase 2) und Team-zu-Team-Kredite (Phase 3), siehe
  * docs/design/kredit-system.md. */
@@ -22,6 +23,8 @@ const DEFAULT_PENALTY_RATE = 0.05;
 /** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
 const PREPAYMENT_FEE_RATE = 0.2;
 export const SEASON_ONE_NO_LOANS_REASON = "season_one_no_loans";
+/** Distress-Gate-Reason: Team schleppt einen geplatzten (defaulted) Kredit → keine Neuaufnahme (siehe `isDefaultedDebtBorrowBlocked`). */
+export const DISTRESS_DEFAULTED_DEBT_REASON = "distress_defaulted_debt";
 const DEFAULT_MISSED_PAYMENTS_THRESHOLD = 2;
 const MIN_TERM_SEASONS = 1;
 const MAX_TERM_SEASONS = 10;
@@ -114,6 +117,48 @@ export function getTeamOutstandingDebt(gameState: GameState, teamId: string): nu
 }
 
 /**
+ * Restschuld-Summe für die KAPAZITÄTS-Berechnung: aktive UND geplatzte (defaulted) Kredite. Ein
+ * geplatzter Kredit ist keine getilgte Schuld — die Restschuld bleibt bestehen (und wächst über den
+ * kapitalisierten Strafzins), also muss sie die Kreditkapazität mindern. Sonst liest sich ein chronisch
+ * überschuldetes Team (nur defaulted, 0 aktive) als schuldenfrei und hebelt munter weiter auf. Bewusst
+ * getrennt von `getTeamOutstandingDebt` (nur AKTIV — das ist die UI-Restschuld-Anzeige auf den Finanz-
+ * Flächen), damit die Anzeige unverändert nur laufende Kredite zeigt. Spiegelt `sumOwedOutstanding` aus
+ * dem KI-Kreditentscheid (ai-loan-decision-service.ts), damit KI- und Kapazitätslogik dieselbe
+ * Schuldenlast sehen.
+ */
+export function getTeamOwedOutstandingDebt(gameState: GameState, teamId: string): number {
+  const loans = gameState.seasonState.loans ?? [];
+  return roundCash(
+    loans
+      .filter((loan) => loan.borrowerTeamId === teamId && (loan.status === "active" || loan.status === "defaulted"))
+      .reduce((sum, loan) => sum + loan.principalOutstanding, 0),
+  );
+}
+
+/**
+ * Ob eine NEUE Kreditaufnahme durch das Distress-Gate blockiert ist: ein Team, das bereits einen Kredit
+ * hat platzen lassen (status "defaulted"), bekommt keinen neuen Kredit oben drauf — es muss sich erst
+ * stabilisieren (Verkäufe/Tilgung) statt weiter in die Schuldenspirale zu leihen. AUSNAHME
+ * (Überlebenskredit): ein Team UNTER dem harten Roster-Minimum (rosterCount < playerMin) darf trotzdem
+ * leihen, sonst hält der Saison-Preflight "teams_under_7" den ganzen Lauf an. Identisch zur KI-Regel in
+ * `resolveAiLoanDecision` (distress_defaulted_debt), damit menschliche UND KI-Kreditnehmer denselben
+ * Restriktionen unterliegen — vorher war das Gate KI-only. Siehe docs/design/kredit-system.md.
+ */
+export function isDefaultedDebtBorrowBlocked(gameState: GameState, teamId: string): boolean {
+  const loans = gameState.seasonState.loans ?? [];
+  const hasDefaultedLoan = loans.some(
+    (loan) => loan.borrowerTeamId === teamId && loan.status === "defaulted",
+  );
+  if (!hasDefaultedLoan) return false;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+  const { playerMin } = deriveRosterTargets(team, identity);
+  const belowHardMin = rosterCount < playerMin;
+  return !belowHardMin;
+}
+
+/**
  * Summe der jährlichen Kreditraten (`installmentPerSeason`) über alle aktiven Kredite eines
  * Teams — die Cash-Belastung, die `applyLoanSettlement` am Saisonende abbucht. Für UI-Zwecke
  * gedacht (Kreditrate neben Gehälter/Gebäudekosten als Ausgabenzeile), nicht Teil der
@@ -125,6 +170,25 @@ export function getTeamAnnualLoanInstallment(gameState: GameState, teamId: strin
     loans
       .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
       .reduce((sum, loan) => sum + loan.installmentPerSeason, 0),
+  );
+}
+
+/**
+ * Summe des jährlichen ZINSANTEILS (`principalOutstanding * interestRatePerSeason`) über alle aktiven
+ * Kredite eines Teams — der Teil der Kreditrate, der eine echte GuV-Ausgabe ist. Der Tilgungsanteil
+ * (principal) ist dagegen eine reine Bilanzbewegung (Cash runter, Restschuld runter, Eigenkapital
+ * unverändert), KEINE Ausgabe — genau wie die Kreditauszahlung keine Einnahme ist. Deshalb geht in die
+ * GuV nur der Zins ein, nicht die volle Rate (siehe use-finances-view-model.ts). Pro Kredit gerundet wie
+ * der Zinsanteil im Season-End-Settlement (`buildSettlementRows`: `interestPortion =
+ * roundCash(principalOutstanding * rate)`), damit die angezeigte Zinsausgabe und die GuV bit-genau
+ * zusammenpassen.
+ */
+export function getTeamAnnualLoanInterest(gameState: GameState, teamId: string): number {
+  const loans = gameState.seasonState.loans ?? [];
+  return roundCash(
+    loans
+      .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
+      .reduce((sum, loan) => sum + roundCash(loan.principalOutstanding * loan.interestRatePerSeason), 0),
   );
 }
 
@@ -258,11 +322,18 @@ export function buildLoanOffers(
   if (!borrower) return [];
   if (!Number.isFinite(principal) || principal <= 0) return [];
 
+  // Distress-Gate (jetzt für Mensch UND KI, vorher KI-only): geplatzte Schuld → keine Neuaufnahme,
+  // also gar keine Angebote (der Marktplatz zeigt dann konsistent „kein Kreditrahmen"). Below-min bleibt
+  // als Überlebenskredit ausgenommen. Siehe `isDefaultedDebtBorrowBlocked`.
+  if (isDefaultedDebtBorrowBlocked(gameState, borrowerTeamId)) return [];
+
   const borrowerIdentity = gameState.teamIdentities.find((entry) => entry.teamId === borrowerTeamId) ?? null;
   const borrowerFinances = borrowerIdentity?.finances ?? 5;
   const marketValueTotal = getTeamMarketValueTotal(gameState, borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, borrowerTeamId);
-  const currentOutstandingDebt = getTeamOutstandingDebt(gameState, borrowerTeamId);
+  // Kapazität berücksichtigt AKTIVE + GEPLATZTE Restschuld (reale offene Verpflichtungen), siehe
+  // `getTeamOwedOutstandingDebt`.
+  const currentOutstandingDebt = getTeamOwedOutstandingDebt(gameState, borrowerTeamId);
   const capacity = computeBorrowingCapacity({
     cash: borrower.cash,
     marketValueTotal,
@@ -390,13 +461,22 @@ export function originateLoan(
   const finances = identity?.finances ?? 5;
   const marketValueTotal = getTeamMarketValueTotal(gameState, input.borrowerTeamId);
   const annualRevenue = estimateTeamAnnualRevenue(gameState, input.borrowerTeamId);
-  const currentOutstandingDebt = getTeamOutstandingDebt(gameState, input.borrowerTeamId);
+  // Kapazität berücksichtigt AKTIVE + GEPLATZTE Restschuld (reale offene Verpflichtungen), siehe
+  // `getTeamOwedOutstandingDebt`.
+  const currentOutstandingDebt = getTeamOwedOutstandingDebt(gameState, input.borrowerTeamId);
   const capacity = computeBorrowingCapacity({
     cash: borrower.cash,
     marketValueTotal,
     annualRevenue,
     currentOutstandingDebt,
   });
+
+  // Distress-Gate (jetzt für Mensch UND KI, vorher KI-only): geplatzte Schuld → keine Neuaufnahme, es sei
+  // denn das Team steht unter dem harten Roster-Minimum (Überlebenskredit). Kapazität wird trotzdem
+  // zurückgegeben, damit der Aufrufer den Rahmen weiterhin anzeigen kann. Siehe `isDefaultedDebtBorrowBlocked`.
+  if (isDefaultedDebtBorrowBlocked(gameState, input.borrowerTeamId)) {
+    return { ok: false, loan: null, reason: DISTRESS_DEFAULTED_DEBT_REASON, capacity, terms: null, gameState };
+  }
 
   if (input.principal > capacity) {
     return { ok: false, loan: null, reason: "over_capacity", capacity, terms: null, gameState };
