@@ -3167,7 +3167,7 @@ export default function PlayerDetailDrawer({
           ) : null}
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-training-progress">
-            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} /> : null}
+            {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} /> : null}
           </section>
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-market">
@@ -3215,7 +3215,7 @@ export default function PlayerDetailDrawer({
             {variant === "page" && data.historyRows.length >= 2 ? (
               <div className="player-drawer-stats-chart">
                 <h3>Stat-Entwicklung über Seasons</h3>
-                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} progressionEvents={data.progressionEvents} />
+                <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} classHistory={data.classHistory} />
               </div>
             ) : null}
             {data.injurySummary.totalInjuries > 0 ? (

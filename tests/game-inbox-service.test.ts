@@ -300,7 +300,7 @@ describe("game inbox service", () => {
     });
 
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
-    expect(items.some((item) => item.title === "Story Card: XP zeigt Wirkung")).toBe(true);
+    expect(items.some((item) => item.title === "Story Card: Entwicklung zeigt Wirkung")).toBe(true);
   });
 
   it("keeps dismissed stored status for deterministic generated items", () => {
@@ -553,33 +553,13 @@ describe("game inbox service", () => {
     expect(isGameInboxChronicleItem(chronicle.find((item) => item.source === "transfer_history")!)).toBe(true);
   });
 
-  it("keeps progression and facility news out of decisions and groups them for display", () => {
+  it("keeps facility news out of decisions and groups it for display", () => {
+    // XP-Ökonomie abgeschafft: Die frühere „XP-Upgrade durchgeführt"-Inbox-Karte
+    // (Quelle `player_progression_events`) wurde entfernt, da sie strukturell
+    // immer „0 XP ausgegeben" zeigte. Progressions-Ereignisse erscheinen nur
+    // noch als organische Story-Karten (siehe eigener Test). Dieser Test deckt
+    // weiterhin die Facility-Gruppierung ab.
     const gameState = makeGameState({
-      playerProgressionEvents: [
-        {
-          eventId: "prog-1",
-          teamId: "M-M",
-          playerId: "p-1",
-          seasonId: "season-3",
-          upgrades: [{ playerId: "p-1", attribute: "power", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" }],
-          xpSpent: 0,
-          timestamp: "2026-06-25T00:00:00.000Z",
-          source: "manual_season_end_xp_spend" as const,
-        },
-        {
-          eventId: "prog-2",
-          teamId: "M-M",
-          playerId: "p-2",
-          seasonId: "season-3",
-          upgrades: [
-            { playerId: "p-2", attribute: "speed", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
-            { playerId: "p-2", attribute: "intelligence", fromValue: 40, toValue: 41, cost: 1, source: "manual_xp_spend_preview" },
-          ],
-          xpSpent: 0,
-          timestamp: "2026-06-25T01:00:00.000Z",
-          source: "manual_season_end_xp_spend" as const,
-        },
-      ],
       seasonState: {
         ...(makeGameState().seasonState ?? {}),
         facilityEvents: [
@@ -614,11 +594,9 @@ describe("game inbox service", () => {
 
     expect(decisions.some((item) => item.source === "player_progression_events")).toBe(false);
     expect(decisions.some((item) => item.source === "facility_events")).toBe(false);
-    expect(chronicle.some((item) => item.source === "player_progression_events")).toBe(true);
+    expect(items.some((item) => item.source === "player_progression_events")).toBe(false);
 
     const grouped = groupInboxItemsForDisplay(chronicle);
-    expect(grouped.some((item) => item.itemId.startsWith("grouped:player_progression_events:"))).toBe(true);
-    expect(grouped.some((item) => item.title === "2 XP-Upgrades durchgeführt")).toBe(true);
     expect(grouped.some((item) => item.title === "2 Facility-Events")).toBe(true);
   });
 

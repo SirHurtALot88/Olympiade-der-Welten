@@ -364,7 +364,6 @@ export type PlayerDetailDrawerData = {
   progressionEvents: Array<{
     eventId: string;
     seasonId: string;
-    xpSpent: number;
     timestamp: string;
     source: "manual_season_end_xp_spend" | "organic_season_progression";
     upgrades: Array<{
@@ -2469,7 +2468,6 @@ export function buildPlayerDrawerDataFromGameState(input: {
     .map((event) => ({
       eventId: event.eventId,
       seasonId: event.seasonId,
-      xpSpent: event.xpSpent,
       timestamp: event.timestamp,
       source: event.source,
       upgrades: event.upgrades.map((upgrade) => ({
