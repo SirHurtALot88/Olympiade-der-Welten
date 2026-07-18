@@ -1763,6 +1763,12 @@ export function calculateBoardConfidence(input: {
   previousSeasonBoard?: TeamBoardConfidenceRecord | null;
   gmChangedThisSeason?: boolean;
   neutralPreseasonBoard?: boolean;
+  /**
+   * Season 1 (no prior board record): every team starts at the neutral DEFAULT_BOARD_RATING (5/10)
+   * instead of its identity.boardConfidence. Board trust is then earned through performance via the
+   * objective deltas below. Only applies when there is no carried previous-season board value.
+   */
+  initialSeason?: boolean;
   /** Slice 4 (F2): team captain's leadership score; dampens perceivedPressure under V2. */
   captainLeadershipScore?: number | null;
 }): TeamBoardConfidenceRecord {
@@ -1779,7 +1785,11 @@ export function calculateBoardConfidence(input: {
   const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
   const prev = input.previousSeasonBoard?.value ?? null;
   let base: number;
-  if (prev != null && !input.gmChangedThisSeason) {
+  if (input.initialSeason && prev == null) {
+    // S1-for-all: uniform neutral start (5/10) regardless of identity.boardConfidence. The objective
+    // deltas below still move it within the season, so the opening rating is neutral but not frozen.
+    base = DEFAULT_BOARD_RATING;
+  } else if (prev != null && !input.gmChangedThisSeason) {
     // Same GM: carry over last season's final confidence, blended slightly toward the
     // identity seed to prevent permanent drift away from the team's natural level.
     base = roundValue(prev * 0.8 + identitySeed * 0.2, 1);
@@ -1927,6 +1937,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   const warnings: string[] = [];
   const neutralPreseasonBoard = isSeasonOnePreseasonNeutralBoard(gameState);
+  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
 
   for (const team of gameState.teams) {
     const row = rowsByTeamId.get(team.teamId);
@@ -1957,6 +1968,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       previousSeasonBoard,
       gmChangedThisSeason,
       neutralPreseasonBoard,
+      initialSeason,
       captainLeadershipScore,
     });
     boardConfidence[team.teamId] = board;
@@ -2209,12 +2221,13 @@ function buildStoredObjectiveAiBiasByTeamId(gameState: GameState) {
     objectivesByTeamId.set(objective.teamId, objectives);
   }
 
+  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   for (const team of gameState.teams) {
     const objectives = objectivesByTeamId.get(team.teamId) ?? [];
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const storedBoard = storedBoardConfidence[team.teamId] ?? null;
-    const board = storedBoard ?? calculateBoardConfidence({ teamId: team.teamId, identity, objectives, storedBoard: null });
+    const board = storedBoard ?? calculateBoardConfidence({ teamId: team.teamId, identity, objectives, storedBoard: null, initialSeason });
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives, board });
   }
 
