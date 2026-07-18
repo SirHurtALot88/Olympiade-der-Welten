@@ -36,7 +36,7 @@ export const SPONSOR_BASE_SALARY_BUFFER_C = Number(process.env.OLY_SPONSOR_BASE_
  * Meilensteine stapelt) zahlt nicht mehr komplett über: sie kappt den Top-Bonus, ohne den Sockel (der die
  * Kleinen absichert) anzutasten. So sinkt die Rang-Spreizung Richtung der funktionierenden Preisgeld-Kurve.
  */
-export const SPONSOR_MILESTONE_LADDER_SCALE = Number(process.env.OLY_SPONSOR_MILESTONE_LADDER ?? 0.92) || 0.92;
+export const SPONSOR_MILESTONE_LADDER_SCALE = Number(process.env.OLY_SPONSOR_MILESTONE_LADDER ?? 0.82) || 0.82;
 
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
