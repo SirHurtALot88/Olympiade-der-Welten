@@ -27,6 +27,10 @@ describe("foundation page surfaces contract", () => {
       `${root}/app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx`,
       "utf8",
     );
+    const sellHostText = await fs.readFile(
+      `${root}/app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx`,
+      "utf8",
+    );
     const orchestratorText = await readFoundationOrchestratorSource(root);
     const foundationText = await readFoundationSurfaceSource(root);
     const facilityText = await fs.readFile(`${root}/app/foundation/facilities-v2/facility-ui-shared.tsx`, "utf8");
@@ -34,7 +38,11 @@ describe("foundation page surfaces contract", () => {
     expect(buyHostText).toContain("foundation-drilldown-page");
     expect(buyHostText).toContain('data-testid="transfer-offer-page"');
     expect(transferText).not.toContain("foundation-modal-backdrop");
-    expect(foundationText).toContain('data-testid="transfer-sell-page"');
+    // Verkaufs-Drilldown lebt im dedizierten Shell-Host, der Body rendert ihn
+    // über FoundationShellRouterMarketSell (Strangler Phase 5.3 abgeschlossen).
+    expect(sellHostText).toContain("foundation-drilldown-page");
+    expect(sellHostText).toContain('data-testid="transfer-sell-page"');
+    expect(foundationText).toContain("FoundationShellRouterMarketSell");
     expect(foundationText).toContain('data-testid="season-briefing-page"');
     expect(orchestratorText).not.toContain("season-briefing-modal");
     expect(orchestratorText).not.toContain("foundation-modal-backdrop");

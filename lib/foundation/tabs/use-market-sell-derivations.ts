@@ -71,7 +71,7 @@ function roundViewNumber(value: number, digits = 4) {
 }
 
 function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
-  if (type === "contract_exit") return "Contract Exit";
+  if (type === "contract_exit") return "Vertragsende";
   return type === "buy" ? "Kauf" : "Verkauf";
 }
 

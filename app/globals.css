@@ -70058,3 +70058,62 @@ button.nl-players-axis:focus-visible {
   font-size: 11px;
   color: var(--nl-risk);
 }
+
+/* --- Verkaufsfenster (transfer-sell-page): verschlankte Struktur "Neuer Look" ---
+   Entscheidungs-Zone oben (Hero-KPIs, Team-Auswirkung, Board/GM), Detail-Sektionen
+   als kompakte <details>-Disclosures. Nur Tokens, Scope .is-new-look. */
+
+.is-new-look .transfer-sell-page .transfer-buy-modal-body {
+  gap: var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-page .transfer-modal-section {
+  gap: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-disclosure {
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel);
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+.is-new-look .transfer-sell-disclosure > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nl-ink);
+  list-style-position: inside;
+}
+
+.is-new-look .transfer-sell-disclosure > summary:hover {
+  color: var(--nl-accent);
+}
+
+.is-new-look .transfer-sell-disclosure > summary .muted {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nl-mut);
+  text-align: right;
+}
+
+.is-new-look .transfer-sell-disclosure-body {
+  display: grid;
+  gap: var(--nl-s2);
+  margin-top: var(--nl-s2);
+}
+
+.is-new-look .transfer-sell-page .transfer-sell-metric-grid .metric-card {
+  min-height: 0;
+  padding: var(--nl-s2) var(--nl-s3);
+}
+
+@media (min-width: 1180px) {
+  .is-new-look .transfer-sell-page .transfer-sell-kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
