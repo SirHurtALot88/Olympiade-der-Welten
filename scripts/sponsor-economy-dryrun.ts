@@ -41,7 +41,14 @@ import { getPrizeMoneyReference } from "@/lib/sponsor/sponsor-economy-calibratio
 const INCOME_MODE = (process.env.OLY_DRYRUN_INCOME ?? "sponsor").toLowerCase() === "prize" ? "prize" : "sponsor";
 import { buildLeagueTeamQualityRanks } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  SPONSOR_CURVE_SHAPES,
+  SPONSOR_RARITIES,
+  SPONSOR_RARITY_KEYS,
+  mapArchetypeToCurveShape,
+  mapStarTierToRarity,
+} from "@/lib/sponsor/sponsor-curve-shapes";
+import type { GameState, SponsorCurveShape, SponsorRarity } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 
@@ -194,12 +201,20 @@ type TeamSeasonLedger = {
   net: number;
   cashAfter: number;
   finalRank: number;
-  starTier: number | null;
+  rarity: SponsorRarity | null;
+  curveShape: SponsorCurveShape | null;
 };
 
-function starTierOf(gameState: GameState, teamId: string): number | null {
+/** Rarität + Kurvenform des Team-Vertrags auflösen (mit Back-Compat auf Altverträge). */
+function sponsorMetaOf(
+  gameState: GameState,
+  teamId: string,
+): { rarity: SponsorRarity | null; curveShape: SponsorCurveShape | null } {
   const contract = getTeamSponsorContract(gameState, teamId);
-  return contract?.starTier ?? null;
+  if (contract == null) return { rarity: null, curveShape: null };
+  const rarity = contract.rarity ?? mapStarTierToRarity(contract.starTier);
+  const curveShape = contract.curveShape ?? mapArchetypeToCurveShape(contract.archetype);
+  return { rarity, curveShape };
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +233,7 @@ type SeasonSummary = {
   teamsMinus: number;
   avgCoverRatio: number;
   bankrupt: number;
-  starDist: Record<number, number>;
+  rarityDist: Record<string, number>;
   totalSponsor: number;
   totalCost: number;
 };
@@ -232,16 +247,17 @@ function padEnd(value: string | number, width: number): string {
 
 function printSeasonTable(seasonId: string, ledgers: TeamSeasonLedger[], summary: SeasonSummary) {
   console.log("");
-  console.log("=".repeat(96));
+  console.log("=".repeat(120));
   console.log(`SAISON ${seasonId}`);
-  console.log("=".repeat(96));
+  console.log("=".repeat(120));
 
   const sorted = [...ledgers].sort((a, b) => a.finalRank - b.finalRank);
   console.log(
     [
       padEnd("Rk", 3),
       padEnd("Team", 8),
-      padEnd("★", 2),
+      padEnd("Rarität", 11),
+      padEnd("Kurve", 16),
       pad("Sponsor", 9),
       pad("Gehalt", 8),
       pad("Facility", 9),
@@ -252,14 +268,17 @@ function printSeasonTable(seasonId: string, ledgers: TeamSeasonLedger[], summary
       pad("Deckung", 8),
     ].join(" "),
   );
-  console.log("-".repeat(96));
+  console.log("-".repeat(120));
   for (const l of sorted) {
     const cover = l.totalCost > 0 ? l.sponsorIncome / l.totalCost : Infinity;
+    const rarityLabel = l.rarity ? SPONSOR_RARITIES[l.rarity].labelDe : "-";
+    const curveLabel = l.curveShape ? SPONSOR_CURVE_SHAPES[l.curveShape].labelDe : "-";
     console.log(
       [
         padEnd(l.finalRank, 3),
         padEnd(l.shortCode, 8),
-        padEnd(l.starTier ?? "-", 2),
+        padEnd(rarityLabel, 11),
+        padEnd(curveLabel, 16),
         pad(round(l.sponsorIncome), 9),
         pad(round(l.salary), 8),
         pad(round(l.facilityUpkeep), 9),
@@ -271,7 +290,7 @@ function printSeasonTable(seasonId: string, ledgers: TeamSeasonLedger[], summary
       ].join(" "),
     );
   }
-  console.log("-".repeat(96));
+  console.log("-".repeat(120));
   console.log(
     `Liga-Cash: ${round(summary.leagueCash)} | Liga-Marktwert: ${round(summary.leagueMarketValue)} | ` +
       `Sponsor-Summe: ${round(summary.totalSponsor)} | Kosten-Summe: ${round(summary.totalCost)}`,
@@ -286,8 +305,10 @@ function printSeasonTable(seasonId: string, ledgers: TeamSeasonLedger[], summary
     `Sponsor deckt Kosten: ${summary.teamsPlus}/32 Plus, ${summary.teamsMinus}/32 Minus | ` +
       `ØDeckung ${summary.avgCoverRatio.toFixed(2)}x | Pleiten (cash<0): ${summary.bankrupt}`,
   );
-  const starParts = [1, 2, 3, 4, 5].map((s) => `★${s}:${summary.starDist[s] ?? 0}`);
-  console.log(`Stern-Verteilung: ${starParts.join("  ")}`);
+  const rarityParts = SPONSOR_RARITY_KEYS.map(
+    (r) => `${SPONSOR_RARITIES[r].labelDe}:${summary.rarityDist[r] ?? 0}`,
+  );
+  console.log(`Raritäts-Verteilung: ${rarityParts.join("  ")}`);
 }
 
 function buildSeasonSummary(seasonId: string, gameState: GameState, ledgers: TeamSeasonLedger[]): SeasonSummary {
@@ -311,10 +332,10 @@ function buildSeasonSummary(seasonId: string, gameState: GameState, ledgers: Tea
       coverCount += 1;
     }
   }
-  const starDist: Record<number, number> = {};
+  const rarityDist: Record<string, number> = {};
   for (const team of gameState.teams) {
-    const tier = starTierOf(gameState, team.teamId);
-    if (tier != null) starDist[tier] = (starDist[tier] ?? 0) + 1;
+    const { rarity } = sponsorMetaOf(gameState, team.teamId);
+    if (rarity != null) rarityDist[rarity] = (rarityDist[rarity] ?? 0) + 1;
   }
 
   return {
@@ -330,7 +351,7 @@ function buildSeasonSummary(seasonId: string, gameState: GameState, ledgers: Tea
     teamsMinus,
     avgCoverRatio: coverCount > 0 ? coverSum / coverCount : 0,
     bankrupt: gameState.teams.filter((t) => t.cash < 0).length,
-    starDist,
+    rarityDist,
     totalSponsor: ledgers.reduce((s, l) => s + l.sponsorIncome, 0),
     totalCost: ledgers.reduce((s, l) => s + l.totalCost, 0),
   };
@@ -362,7 +383,9 @@ function printSanityCheck(ledgers: TeamSeasonLedger[]) {
   console.log("SANITY-CHECK (nach Saison 1)");
   console.log("-".repeat(96));
   const line = (l: TeamSeasonLedger, tag: string) =>
-    `${padEnd(tag, 9)} ${padEnd(l.shortCode, 8)} Rk${padEnd(l.finalRank, 3)} ★${l.starTier ?? "-"} | ` +
+    `${padEnd(tag, 9)} ${padEnd(l.shortCode, 8)} Rk${padEnd(l.finalRank, 3)} ` +
+    `${padEnd(l.rarity ? SPONSOR_RARITIES[l.rarity].labelDe : "-", 11)} ` +
+    `${padEnd(l.curveShape ? SPONSOR_CURVE_SHAPES[l.curveShape].labelDe : "-", 16)} | ` +
     `sponsor ${pad(round(l.sponsorIncome), 8)} - gehalt ${pad(round(l.salary), 7)} - facility ${pad(round(l.facilityUpkeep), 7)} - ` +
     `kredit ${pad(round(l.loan), 5)} = netto ${pad(round(l.net), 8)} -> cash ${pad(round(l.cashAfter), 8)}`;
   for (const l of richest) console.log(line(l, "REICH"));
@@ -466,7 +489,7 @@ function main() {
         net: round(sponsorIncome - totalCost, 2),
         cashAfter,
         finalRank: (gameState.seasonState.standings?.[team.teamId] as { rank?: number })?.rank ?? 0,
-        starTier: starTierOf(gameState, team.teamId),
+        ...sponsorMetaOf(gameState, team.teamId),
       });
       return { ...team, cash: cashAfter };
     });
@@ -549,8 +572,8 @@ function main() {
   );
   console.log(`Pleiten gesamt (Team-Saisons mit cash<0): ${totalBankrupt}`);
   console.log(`Sponsor deckt Kosten (S5): ${lastCover}/32 Teams im Plus, ØDeckung ${last.avgCoverRatio.toFixed(2)}x`);
-  const s5stars = [1, 2, 3, 4, 5].map((s) => `★${s}:${last.starDist[s] ?? 0}`).join("  ");
-  console.log(`Stern-Verteilung (S5): ${s5stars}`);
+  const s5rarities = SPONSOR_RARITY_KEYS.map((r) => `${SPONSOR_RARITIES[r].labelDe}:${last.rarityDist[r] ?? 0}`).join("  ");
+  console.log(`Raritäts-Verteilung (S5): ${s5rarities}`);
   void season1Ledgers;
 }
 
