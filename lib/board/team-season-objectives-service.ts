@@ -466,11 +466,22 @@ export function getExpectationRankObjective(input: {
   profile: TeamStrategyProfile | null;
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  // V2: stärke-kalibrierter Zielrang (getSportTargetV2 mit BOARD_V2_CALIBRATION + Dispositions-
+  // Ambition). Überschreibt NUR den Zielrang der gewerteten Slot-1-Sportvorgabe — Belohnung/Strafe
+  // und der Confidence-Swing bleiben (rankDelta-basiert) unverändert. Ohne Override (V1, Flag aus)
+  // greift weiter das statische identity.ambition-Ziel.
+  targetRankOverride?: number | null;
 }): ObjectiveDraft {
   const expectation = computeTeamExpectation({ row: input.row, rowsByTeamId: input.rowsByTeamId, identity: input.identity });
   const ambition = input.identity?.ambition ?? 5;
   const overachieveGap = Math.max(1, Math.round(1 + ambition / 3));
-  const targetRank = clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
+  const targetRank =
+    input.targetRankOverride != null
+      ? clamp(Math.round(input.targetRankOverride), 1, expectation.teamCount)
+      : clamp(expectation.expectedRank - overachieveGap, 1, expectation.teamCount);
+  // Für den Detail-Text: der tatsächlich geforderte Vorsprung. Ohne Override identisch zu
+  // overachieveGap (V1 unverändert), mit Override das echte Delta zum kalibrierten V2-Ziel.
+  const detailGap = input.targetRankOverride != null ? Math.max(0, expectation.expectedRank - targetRank) : overachieveGap;
   const currentRank = input.row.rank ?? null;
   const status = statusForRank(currentRank, targetRank);
 
@@ -485,7 +496,7 @@ export function getExpectationRankObjective(input: {
     objectiveId: "expectation-rank",
     category: "sport",
     label: `Übertreffe die Erwartung (Top ${targetRank})`,
-    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${overachieveGap} Plätze besser abschneiden.`,
+    detail: `Kaderstärke erwartet Rang #${expectation.expectedRank}/${expectation.teamCount}. Ziel: mindestens ${detailGap} Plätze besser abschneiden.`,
     actionHint: "Transfers und Aufstellung so priorisieren, dass die Erwartung der Kaderstärke übertroffen wird.",
     targetValue: `Top ${targetRank}`,
     currentValue: currentRank ?? "offen",
@@ -1643,7 +1654,18 @@ function buildTeamObjectives(input: {
       getAxisRankObjective({ team, identity, profile, rowsByTeamId }),
       getAllRoundAxisObjective({ team, identity, profile, rowsByTeamId }),
       // From origin/main: richer board objective slate.
-      getExpectationRankObjective({ team, identity, profile, row, rowsByTeamId }),
+      // V2: die tatsächlich gewertete Slot-1-Sportvorgabe (expectation-rank) trägt jetzt den stärke-
+      // kalibrierten V2-Zielrang (getSportTargetV2 mit BOARD_V2_CALIBRATION + Dispositions-Ambition)
+      // statt des statischen identity.ambition-Ziels. Bisher wurde sportTarget nur in den stets
+      // verworfenen sport-rank-* Draft eingebettet — die V2-Kalibrierung erreichte das gewertete Ziel nie.
+      getExpectationRankObjective({
+        team,
+        identity,
+        profile,
+        row,
+        rowsByTeamId,
+        targetRankOverride: boardV2 ? sportTarget.rank : null,
+      }),
       getUpsetAvoidanceObjective({ team, identity, profile, row, rowsByTeamId, gameState }),
       getTransferSpendCeilingObjective({ team, identity, profile, row }),
       getSignatureAxisWinObjective({ team, identity, profile, gameState }),
