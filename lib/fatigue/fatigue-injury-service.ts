@@ -6,6 +6,7 @@ import type {
   PlayerAvailabilityStateRecord,
   PlayerInjuryHistoryRecord,
   PlayerInjuryRiskRollRecord,
+  PlayerInjuryStatus,
 } from "@/lib/data/olyDataTypes";
 import { applyRecoveryFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
@@ -28,6 +29,23 @@ export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
 export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as const;
 export const MATCHDAY_FATIGUE_LOAD = 11;
 export const BASE_MATCHDAY_RECOVERY = 24;
+
+/**
+ * Deterministische Phasendauern der Verletzungs-Timeline (in Spieltagen), gemessen relativ zum
+ * Spieltag, an dem sich der Spieler verletzt hat (`injuredAtMatchdayId`).
+ *
+ * - INJURY_UNAVAILABLE_MATCHDAYS: Ausfallzeit — Spieltage nach der Verletzung, an denen der
+ *   Spieler gesperrt ist (`injured` + unavailable). Deckungsgleich mit `unavailableForMatchdays`.
+ * - INJURY_RECOVERING_MATCHDAYS: anschließendes Erholungsfenster — der Spieler ist wieder
+ *   einsatzfähig, aber noch als `recovering` markiert, bevor er auf `healthy` zurückfällt.
+ *
+ * Der Status wird ausschließlich aus diesen Spieltags-Fenstern abgeleitet und hängt NICHT davon
+ * ab, dass ein späterer Spieltag-Apply eine Status-Transition anstößt. Dadurch (a) friert eine
+ * Verletzung am letzten Spieltag der Saison nicht dauerhaft als `injured` ein und (b) kehrt
+ * `recovering` nach Ablauf des Fensters innerhalb der Saison zu `healthy` zurück.
+ */
+export const INJURY_UNAVAILABLE_MATCHDAYS = 1;
+export const INJURY_RECOVERING_MATCHDAYS = 1;
 
 export { getInjuryRiskBand, getInjuryRiskPercent, injuryRiskBands, type InjuryRiskBand };
 export const FATIGUE_INJURY_RISK_CURVE = FATIGUE_INJURY_RISK_ANCHORS;
@@ -224,25 +242,57 @@ export function getPlayerAvailabilityView(
   );
   const currentIndex = getMatchdayIndex(gameState, matchdayId);
   const injuredAtIndex = stored?.injuredAtMatchdayId ? getMatchdayIndex(gameState, stored.injuredAtMatchdayId) : -1;
-  const untilIndex = stored?.injuryUntilMatchday ? getMatchdayIndex(gameState, stored.injuryUntilMatchday) : -1;
+  const explicitUntilIndex = stored?.injuryUntilMatchday ? getMatchdayIndex(gameState, stored.injuryUntilMatchday) : -1;
+  // Effektives Ende der Ausfallzeit (letzter Spieltag, an dem der Spieler gesperrt ist):
+  // bevorzugt der persistierte `injuryUntilMatchday`; fehlt dieser (Verletzung am LETZTEN
+  // Spieltag der Saison -> kein Folge-Spieltag, `injuryUntilMatchday` ist unbestimmt), wird die
+  // Ausfalldauer deterministisch aus dem Verletzungs-Spieltag + INJURY_UNAVAILABLE_MATCHDAYS
+  // abgeleitet. So folgt der Status der Timeline, statt als "injured" einzufrieren.
+  const unavailableUntilIndex =
+    explicitUntilIndex >= 0
+      ? explicitUntilIndex
+      : injuredAtIndex >= 0
+        ? injuredAtIndex + INJURY_UNAVAILABLE_MATCHDAYS
+        : -1;
+  // Ende des Erholungsfensters: nach der Ausfallzeit ist der Spieler wieder einsatzfähig, bleibt
+  // aber INJURY_RECOVERING_MATCHDAYS Spieltage lang "recovering", danach "healthy".
+  const recoveryUntilIndex = unavailableUntilIndex >= 0 ? unavailableUntilIndex + INJURY_RECOVERING_MATCHDAYS : -1;
+  const hasActiveInjury = stored?.injuryStatus === "injured" || stored?.injuryStatus === "recovering";
+
+  // Gesperrt: ab dem Spieltag NACH der Verletzung bis einschließlich Ende der Ausfallzeit.
   const isUnavailable =
     stored?.injuryStatus === "injured" &&
     currentIndex >= 0 &&
     injuredAtIndex >= 0 &&
-    untilIndex >= 0 &&
+    unavailableUntilIndex >= 0 &&
     currentIndex > injuredAtIndex &&
-    currentIndex <= untilIndex;
-  const recovered =
-    stored?.injuryStatus === "injured" &&
+    currentIndex <= unavailableUntilIndex;
+  // Ausfallzeit vorbei, aber Erholungsfenster noch offen -> "recovering" (einsatzfähig).
+  const inRecoveryWindow =
+    hasActiveInjury &&
     currentIndex >= 0 &&
-    untilIndex >= 0 &&
-    currentIndex > untilIndex;
+    unavailableUntilIndex >= 0 &&
+    currentIndex > unavailableUntilIndex &&
+    currentIndex <= recoveryUntilIndex;
+  // Erholungsfenster abgelaufen -> Rückkehr zu "healthy" INNERHALB der Saison, statt in
+  // "recovering" zu verharren.
+  const recovered =
+    hasActiveInjury &&
+    currentIndex >= 0 &&
+    recoveryUntilIndex >= 0 &&
+    currentIndex > recoveryUntilIndex;
+
+  const resolvedInjuryStatus: PlayerInjuryStatus = recovered
+    ? "healthy"
+    : inRecoveryWindow
+      ? "recovering"
+      : stored?.injuryStatus ?? "healthy";
 
   return {
     playerId,
     teamId,
     fatigue: clampFatigue(stored?.fatigue ?? player?.fatigue ?? 0),
-    injuryStatus: recovered ? "recovering" : stored?.injuryStatus ?? "healthy",
+    injuryStatus: resolvedInjuryStatus,
     injuryUntilMatchday: stored?.injuryUntilMatchday,
     injuredAtSeasonId: stored?.injuredAtSeasonId,
     injuredAtMatchdayId: stored?.injuredAtMatchdayId,
@@ -260,6 +310,38 @@ export function buildPlayerAvailabilityMap(gameState: GameState, seasonId: strin
       getPlayerAvailabilityView(gameState, roster.playerId, roster.teamId, matchdayId),
     ] as const),
   );
+}
+
+/**
+ * Normalisiert Verletzungs-Zustände beim Saisonwechsel: jede offene Verletzung (`injured` oder
+ * `recovering`) wird auf `healthy` zurückgesetzt und die zugehörigen Verletzungs-Metadaten
+ * (Ausfallfenster, Ursache, Herkunft) werden entfernt. Fatigue/Ausdauer bleibt unangetastet.
+ *
+ * Hintergrund: Die maximale Verletzungsdauer (Ausfall + Erholung =
+ * INJURY_UNAVAILABLE_MATCHDAYS + INJURY_RECOVERING_MATCHDAYS Spieltage) ist deutlich kürzer als
+ * die Pause zwischen zwei Saisons. Eine am LETZTEN Spieltag zugezogene Verletzung hat innerhalb
+ * der Saison keinen Folge-Spieltag mehr, an dem sie weiterlaufen könnte; zu Saisonbeginn ist sie
+ * jedoch längst ausgeheilt. Diese Funktion stellt sicher, dass ein solcher Spieler nicht mit
+ * eingefrorenem `injured`/`recovering`-Status in die neue Saison übernommen wird.
+ *
+ * Rein funktional und deterministisch (kein Zufall). Vorgesehener Aufrufer: der Saison-Setup-Pfad,
+ * der `seasonState.playerAvailabilityState` für die neue Saison aufbaut
+ * (siehe lib/season/preseason-workflow-service.ts).
+ */
+export function normalizeAvailabilityForNewSeason(
+  entries: PlayerAvailabilityStateRecord[] | undefined | null,
+): PlayerAvailabilityStateRecord[] {
+  return (entries ?? []).map((entry) => {
+    if (entry.injuryStatus !== "injured" && entry.injuryStatus !== "recovering") {
+      return entry;
+    }
+    return {
+      playerId: entry.playerId,
+      teamId: entry.teamId,
+      fatigue: entry.fatigue,
+      injuryStatus: "healthy",
+    };
+  });
 }
 
 function collectMatchdayUses(gameState: GameState, seasonId: string, matchdayId: string): MatchdayUse[] {
