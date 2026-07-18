@@ -1123,6 +1123,217 @@ function FoundationTeamsDetailPanel({
                         <span>{selectedTeamRosterActionHint}</span>
                       </div>
                     ) : null}
+                    {selectedTeam
+                      ? (() => {
+                          /* Vertrags-Auslauf-Center: fokussiertes „verlängern-oder-verkaufen"-
+                             Cockpit für alle Verträge mit LZ ≤ 1 (letzte Saison, endet nach
+                             MD10). Bewusst KEINE zweite Volltabelle — kompakte Entscheidungs-
+                             karten mit Performance (PPs/OVR) + Vertragsdaten nebeneinander,
+                             damit die Keep-/Sell-Entscheidung fundiert in einem Klick fällt. */
+                          const auslaufRows = (visibleSelectedTeamContractRows ?? []).filter(
+                            (row) => row.status === "active" && row.contractLength <= 1,
+                          );
+                          if (auslaufRows.length === 0) {
+                            return null;
+                          }
+                          const auslaufPlayersById = new Map(
+                            (gameState?.players ?? []).map((player) => [player.id, player]),
+                          );
+                          const auslaufDecorated = auslaufRows.map((row) => {
+                            const ratings = playerRatingsById.get(row.playerId);
+                            const staircase = buildContractSalarySteps(row, selectedTeamContractTable?.seasonLabels);
+                            return {
+                              row,
+                              ratings,
+                              currentSalary: staircase.lastActiveSalary,
+                              ppsSeason: ratings?.ppsSeason ?? null,
+                            };
+                          });
+                          const auslaufSorted = [...auslaufDecorated].sort((left, right) => {
+                            const leftPps = left.ppsSeason != null && Number.isFinite(left.ppsSeason) ? left.ppsSeason : Number.NEGATIVE_INFINITY;
+                            const rightPps = right.ppsSeason != null && Number.isFinite(right.ppsSeason) ? right.ppsSeason : Number.NEGATIVE_INFINITY;
+                            if (rightPps !== leftPps) {
+                              return rightPps - leftPps;
+                            }
+                            return String(left.row.playerName).localeCompare(String(right.row.playerName), "de-DE");
+                          });
+                          const auslaufSalaryFreed = auslaufDecorated.reduce(
+                            (sum, item) => sum + (Number.isFinite(item.currentSalary) ? item.currentSalary : 0),
+                            0,
+                          );
+                          const auslaufPpsValues = auslaufDecorated
+                            .map((item) => item.ppsSeason)
+                            .filter((value) => value != null && Number.isFinite(value));
+                          const auslaufAvgPps =
+                            auslaufPpsValues.length > 0
+                              ? auslaufPpsValues.reduce((sum, value) => sum + value, 0) / auslaufPpsValues.length
+                              : null;
+                          return (
+                            <NlCard
+                              className="team-auslauf-center"
+                              eyebrow="Kaderplanung"
+                              title="Vertrags-Auslauf-Center"
+                              data-testid="team-auslauf-center"
+                            >
+                              <p className="team-auslauf-explainer">
+                                Diese Verträge enden nach MD10 dieser Saison. Verlängere jetzt — sonst wird der Spieler
+                                beim Verkauf auf den Transfermarkt gestellt.
+                              </p>
+                              <StatChipRow aria-label="Auslauf-Kennzahlen">
+                                <StatChip
+                                  label="Auslaufend"
+                                  value={formatWholeNumber(auslaufDecorated.length)}
+                                  tone="warn"
+                                  sub="LZ läuft aus"
+                                />
+                                <StatChip
+                                  label="Gehalt frei"
+                                  value={formatNlMoney(auslaufSalaryFreed)}
+                                  sub="bei Verkauf aller"
+                                />
+                                <StatChip
+                                  label="Ø PPs"
+                                  value={auslaufAvgPps != null ? formatLocalePoints(auslaufAvgPps, 1) : "—"}
+                                  sub="Saison-Schnitt"
+                                />
+                              </StatChipRow>
+                              <div className="team-auslauf-grid" role="list">
+                                {auslaufSorted.map(({ row, ratings, currentSalary, ppsSeason }) => {
+                                  const auslaufPlayer = auslaufPlayersById.get(row.playerId);
+                                  const auslaufPortrait = auslaufPlayer ? getPlayerPortraitModel(auslaufPlayer) : null;
+                                  const auslaufShapeClass = (row.contractShape ?? "balanced").replace("_", "-");
+                                  return (
+                                    <article className="team-auslauf-card" role="listitem" key={row.rowId ?? row.playerId}>
+                                      <header className="team-auslauf-card-head">
+                                        <PlayerPortrait
+                                          className="team-auslauf-portrait"
+                                          src={auslaufPortrait?.thumbSrc ?? auslaufPortrait?.src ?? null}
+                                          initials={auslaufPortrait?.initials ?? String(row.playerName ?? "?").slice(0, 2)}
+                                          alt={row.playerName}
+                                        />
+                                        <div className="team-auslauf-card-ident">
+                                          <button
+                                            type="button"
+                                            className="nl-teams-playerlink"
+                                            onClick={() => void openPlayerDrawerById(row.playerId)}
+                                          >
+                                            <span className="nl-teams-playername">{row.playerName}</span>
+                                            <span className="nl-teams-playermeta">
+                                              {(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}
+                                            </span>
+                                          </button>
+                                          <span
+                                            className="team-contract-lz-chip is-expiring heat-band-1 team-auslauf-lz"
+                                            title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
+                                          >
+                                            läuft aus
+                                          </span>
+                                        </div>
+                                      </header>
+                                      <div className="team-auslauf-perf" aria-label="Performance">
+                                        <span className="team-auslauf-stat">
+                                          <small>PPs Saison</small>
+                                          <strong>
+                                            {ppsSeason != null ? formatLocalePoints(ppsSeason, 1) : "—"}
+                                            {ratings?.ppsSeasonRank != null ? ` · #${formatWholeNumber(ratings.ppsSeasonRank)}` : ""}
+                                          </strong>
+                                        </span>
+                                        <span className="team-auslauf-stat">
+                                          <small>OVR</small>
+                                          <strong>{ratings?.ovrNormalized != null ? formatWholeNumber(ratings.ovrNormalized) : "—"}</strong>
+                                        </span>
+                                      </div>
+                                      <dl className="team-auslauf-facts">
+                                        <div>
+                                          <dt>Gehalt</dt>
+                                          <dd>{currentSalary != null ? formatNlMoney(currentSalary) : "—"}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Buyout</dt>
+                                          <dd>{row.buyoutCost != null ? formatNlMoney(row.buyoutCost) : "—"}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>VK/Ablöse</dt>
+                                          <dd>{row.exitValue != null ? formatNlMoney(row.exitValue) : "—"}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Form</dt>
+                                          <dd>
+                                            <span className={`team-contract-shape is-${auslaufShapeClass}`}>
+                                              {formatContractShapeLabel(row.contractShape)}
+                                            </span>
+                                          </dd>
+                                        </div>
+                                      </dl>
+                                      <div className="team-auslauf-moral">
+                                        {row.moraleContractIntent ? (
+                                          <span
+                                            className={`team-contract-intent-chip ${getContractIntentToneClass(row.moraleContractIntent)}`}
+                                          >
+                                            {formatMoraleContractIntentLabel(row.moraleContractIntent)}
+                                          </span>
+                                        ) : null}
+                                        {row.morale != null ? (
+                                          <span className="team-auslauf-morale-val" title={row.moraleMood ?? "Moral"}>
+                                            {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
+                                          </span>
+                                        ) : null}
+                                        {row.moraleRenewalRisk != null ? (
+                                          <span className="team-auslauf-risk">
+                                            Risiko {formatWholeNumber(row.moraleRenewalRisk)}%
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      {selectedTeamRosterActionsAvailable ? (
+                                        <div className="team-auslauf-actions" onClick={(event) => event.stopPropagation()}>
+                                          <button
+                                            className="nl-teams-action"
+                                            type="button"
+                                            disabled={contractRenewalBusy != null}
+                                            onClick={() =>
+                                              void openContractRenewalNegotiation({
+                                                teamId: selectedTeam.teamId,
+                                                playerId: row.playerId,
+                                                playerName: row.playerName,
+                                                contractLength: 2,
+                                              })
+                                            }
+                                          >
+                                            Verlängern
+                                          </button>
+                                          <span className="nl-teams-action-danger-group">
+                                            <button
+                                              className="nl-teams-action nl-teams-action-danger"
+                                              type="button"
+                                              disabled={marketSellBusy}
+                                              title="Verkaufen — öffnet die Verkaufs-Vorschau"
+                                              onClick={() =>
+                                                void openMarketSellModal(
+                                                  {
+                                                    activePlayerId: row.rowId,
+                                                    playerId: row.playerId,
+                                                    playerName: row.playerName,
+                                                    className: auslaufPlayer?.className ?? "—",
+                                                    race: auslaufPlayer?.race ?? "—",
+                                                    portraitUrl: auslaufPortrait?.previewSrc ?? auslaufPortrait?.src ?? null,
+                                                  },
+                                                  selectedTeam.teamId,
+                                                )
+                                              }
+                                            >
+                                              Verkaufen
+                                            </button>
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                    </article>
+                                  );
+                                })}
+                              </div>
+                            </NlCard>
+                          );
+                        })()
+                      : null}
                     {selectedTeamContractTable ? (
                       <div className="team-contracts-forecast-row contract-forecast-panel">
                         <div className="team-contracts-section-head">
@@ -1405,7 +1616,14 @@ function FoundationTeamsDetailPanel({
                                 </span>
                               );
                             case "lz":
-                              return (
+                              return row.contractLength <= 1 ? (
+                                <span
+                                  className={`team-contract-lz-chip is-expiring ${getContractLengthHeatBandClass(row.contractLength)}`}
+                                  title="Letzte Vertragssaison — endet nach MD10. Verlängern, sonst wandert der Spieler beim Verkauf auf den Transfermarkt."
+                                >
+                                  läuft aus
+                                </span>
+                              ) : (
                                 <span className={`team-contract-lz-chip ${getContractLengthHeatBandClass(row.contractLength)}`}>
                                   {formatWholeNumber(row.contractLength)}
                                 </span>

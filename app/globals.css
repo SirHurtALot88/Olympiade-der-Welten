@@ -26069,6 +26069,15 @@ a {
   font-size: 0.78rem;
 }
 
+/* LZ = 1 → letzte Vertragssaison: als „läuft aus" statt bare „1" anzeigen
+   (endet nach MD10, danach Verkauf → Transfermarkt). */
+.team-contract-lz-chip.is-expiring {
+  white-space: nowrap;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 /* --- Verträge-Tabelle: Card-Look, Status-/Intent-Chips, Gehaltsverlauf-
    Treppe & Fußzeilen-Streifen. Übernimmt die Amber/Blau/Slate-Palette der
    Gehaltsforecast-/Vertragsmix-Panels darüber, damit Chart, Panels und
@@ -46362,6 +46371,167 @@ button.foundation-team-portrait-card {
   color: var(--nl-risk);
   border-color: var(--nl-risk);
   background: color-mix(in srgb, var(--nl-risk) 14%, var(--nl-panel-2));
+}
+
+/* --- Vertrags-Auslauf-Center (Verträge-Tab) --------------------------
+   Fokussiertes „verlängern-oder-verkaufen"-Cockpit über der Verträge-
+   Tabelle: kompakte Entscheidungskarten je auslaufendem Vertrag (LZ ≤ 1),
+   Performance + Vertragsdaten nebeneinander. Bewusst dicht & scrollbar,
+   damit auch der S1·MD1-Fall (ganzer Kader läuft aus) kompakt bleibt. */
+.is-new-look .team-auslauf-center {
+  border-color: color-mix(in srgb, var(--nl-warn) 32%, var(--nl-line));
+}
+
+.is-new-look .team-auslauf-explainer {
+  margin: 0 0 var(--nl-s3);
+  font-size: var(--nl-fs-md);
+  line-height: 1.45;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--nl-s3);
+  margin-top: var(--nl-s3);
+  max-height: 460px;
+  overflow-y: auto;
+  padding-right: var(--nl-s1);
+}
+
+.is-new-look .team-auslauf-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  padding: var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .team-auslauf-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-portrait {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: var(--nl-r-sm);
+  object-fit: cover;
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look span.team-auslauf-portrait {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--nl-fs-sm);
+  font-weight: 700;
+  color: var(--nl-mut);
+  background: var(--nl-panel);
+}
+
+.is-new-look .team-auslauf-card-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-lz {
+  align-self: flex-start;
+  font-size: var(--nl-fs-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.is-new-look .team-auslauf-perf {
+  display: flex;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  padding: var(--nl-s1) var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .team-auslauf-stat small {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-stat strong {
+  font-size: var(--nl-fs-lg);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink);
+}
+
+.is-new-look .team-auslauf-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px var(--nl-s3);
+  margin: 0;
+}
+
+.is-new-look .team-auslauf-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+  min-width: 0;
+}
+
+.is-new-look .team-auslauf-facts dt {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-facts dd {
+  margin: 0;
+  font-size: var(--nl-fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-ink);
+  text-align: right;
+}
+
+.is-new-look .team-auslauf-moral {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .team-auslauf-morale-val {
+  font-size: var(--nl-fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-mut);
+}
+
+.is-new-look .team-auslauf-risk {
+  font-size: var(--nl-fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--nl-warn);
+}
+
+.is-new-look .team-auslauf-actions {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  padding-top: var(--nl-s1);
+}
+
+.is-new-look .team-auslauf-actions .nl-teams-action {
+  flex: 1;
+  text-align: center;
 }
 
 /* --- Liga-Board (Teamtabelle als Board-Zeilen) ----------------------- */
