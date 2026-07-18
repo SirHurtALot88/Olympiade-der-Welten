@@ -193,8 +193,8 @@ function DisciplineStageInner() {
             border: 0,
             borderRadius: 10,
             padding: "10px 20px",
-            color: "#fff",
-            background: done ? "rgba(255,255,255,0.15)" : "linear-gradient(180deg,#f0a35a,#e07a2b)",
+            color: "var(--nl-ink)",
+            background: done ? "rgba(255,255,255,0.15)" : "linear-gradient(180deg,var(--nl-accent),var(--nl-accent))",
           }}
         >
           {done ? "✔ Disziplin gewertet" : `▶ Slot ${revealedSlots + 1} aufdecken`}
@@ -211,7 +211,7 @@ function DisciplineStageInner() {
         </div>
         {ownRowIndex >= 0 ? (
           <div style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800 }}>
-            Dein Team: <span style={{ color: "#f0a35a" }}>Rang {ownRowIndex + 1}</span> / {rows.length}
+            Dein Team: <span style={{ color: "var(--nl-accent)" }}>Rang {ownRowIndex + 1}</span> / {rows.length}
           </div>
         ) : null}
       </div>
@@ -225,25 +225,25 @@ function DisciplineStageInner() {
             marginBottom: 14,
             padding: "10px 14px",
             borderRadius: 12,
-            border: "1.5px solid #e8c04a",
+            border: "1.5px solid var(--nl-warn)",
             background: "linear-gradient(90deg, rgba(232,192,74,0.18), rgba(232,192,74,0.04))",
           }}
         >
           {spotlight.portraitUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={spotlight.portraitUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid #e8c04a" }} />
+            <img src={spotlight.portraitUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--nl-warn)" }} />
           ) : (
             <span aria-hidden style={{ fontSize: 22 }}>🌟</span>
           )}
           <div style={{ fontSize: 13.5 }}>
-            <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "#e8c04a" }}>
+            <span style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-warn)" }}>
               Spotlight · Slot {revealedSlots}
             </span>
             <div style={{ fontWeight: 800 }}>
               {spotlight.playerName}{" "}
               <span style={{ opacity: 0.8, fontWeight: 600 }}>· {spotlight.shortCode}</span>{" "}
-              <span style={{ color: "#f0a35a" }}>+{spotlight.net}</span>
-              {spotlight.isOwn ? <span style={{ color: "#e8c04a" }}> · dein Team!</span> : null}
+              <span style={{ color: "var(--nl-accent)" }}>+{spotlight.net}</span>
+              {spotlight.isOwn ? <span style={{ color: "var(--nl-warn)" }}> · dein Team!</span> : null}
             </div>
           </div>
         </div>
@@ -274,15 +274,15 @@ function DisciplineStageInner() {
                   alt=""
                   width={18}
                   height={18}
-                  style={{ width: 18, height: 18, borderRadius: 4, flex: "none", objectFit: "cover", border: row.team.isOwn ? "2px solid #fff" : "none" }}
+                  style={{ width: 18, height: 18, borderRadius: 4, flex: "none", objectFit: "cover", border: row.team.isOwn ? "2px solid var(--nl-ink)" : "none" }}
                 />
               ) : (
                 <span
                   aria-hidden
-                  style={{ width: 14, height: 14, borderRadius: "50%", flex: "none", background: `hsl(${hue} 60% 55%)`, border: row.team.isOwn ? "2px solid #fff" : "none" }}
+                  style={{ width: 14, height: 14, borderRadius: "50%", flex: "none", background: `hsl(${hue} 60% 55%)`, border: row.team.isOwn ? "2px solid var(--nl-ink)" : "none" }}
                 />
               )}
-              <span style={{ width: 44, fontWeight: 800, color: row.team.isOwn ? "#f0a35a" : "inherit" }}>{row.team.shortCode}</span>
+              <span style={{ width: 44, fontWeight: 800, color: row.team.isOwn ? "var(--nl-accent)" : "inherit" }}>{row.team.shortCode}</span>
               <span style={{ flex: "0 0 180px", fontSize: 12.5, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.team.name}</span>
               <div style={{ flex: 1, height: 12, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${width}%`, background: `hsl(${hue} 60% 52%)`, borderRadius: 99, transition: "width .45s cubic-bezier(.34,1.2,.4,1)" }} />
@@ -319,15 +319,15 @@ function DisciplineStageInner() {
                   {revealed ? (
                     <span style={{ fontSize: 12.5, opacity: 0.9 }}>
                       <b>{slot.base}</b>
-                      {slot.fatiguePenalty > 0 ? <span style={{ color: "#e2564a" }}> − {slot.fatiguePenalty} Fatigue</span> : null}
+                      {slot.fatiguePenalty > 0 ? <span style={{ color: "var(--nl-risk)" }}> − {slot.fatiguePenalty} Fatigue</span> : null}
                       {slot.formSwing !== 0 ? (
-                        <span style={{ color: slot.formSwing > 0 ? "#3fbf6f" : "#e2564a" }}>
+                        <span style={{ color: slot.formSwing > 0 ? "var(--nl-good)" : "var(--nl-risk)" }}>
                           {" "}
                           {slot.formSwing > 0 ? "+" : "−"} {Math.abs(slot.formSwing)} Form
                         </span>
                       ) : null}
                       {" = "}
-                      <b style={{ color: "#f0a35a" }}>+{slot.net}</b>
+                      <b style={{ color: "var(--nl-accent)" }}>+{slot.net}</b>
                     </span>
                   ) : (
                     <span style={{ fontSize: 12.5, opacity: 0.6, fontStyle: "italic" }}>noch nicht aufgedeckt</span>
