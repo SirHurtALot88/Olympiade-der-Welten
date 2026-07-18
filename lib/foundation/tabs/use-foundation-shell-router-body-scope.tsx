@@ -4750,6 +4750,44 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  /**
+   * Dry-run-Preview für die Gehaltsverhandlung (Verlängern-Fenster). Reine
+   * Lese-Operation gegen /api/contracts/renewal — liefert die vollständige
+   * `negotiationPreview` (Forderung, Accept/Counter/Reject, Gehaltstreppe,
+   * Moral) für die aktuell eingestellten Konditionen. Kein State-Write.
+   */
+  async function requestContractRenewalPreview(input: {
+    teamId: string;
+    playerId: string;
+    contractLength: number;
+    offeredSalary: number | null;
+    contractShape?: ContractShape;
+  }): Promise<ContractRenewalApiResponse | null> {
+    if (readMeta.source === "prisma") {
+      return null;
+    }
+    try {
+      const response = await fetch("/api/contracts/renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: input.teamId,
+          playerId: input.playerId,
+          action: "renew",
+          contractLength: input.contractLength,
+          offeredSalary: input.offeredSalary,
+          contractShape: input.contractShape ?? "balanced",
+          dryRun: true,
+          source: readMeta.source,
+        })),
+      });
+      return (await response.json()) as ContractRenewalApiResponse;
+    } catch {
+      return null;
+    }
+  }
+
   async function openContractRenewalNegotiation(input: {
     teamId: string;
     playerId: string;
@@ -4766,6 +4804,10 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
+    const rosterEntry = gameState.rosters.find(
+      (entry) => entry.teamId === input.teamId && entry.playerId === input.playerId,
+    ) ?? null;
+    const startLength = input.contractLength ?? 2;
     setContractRenewalBusy(`preview:${input.teamId}:${input.playerId}`);
     setContractRenewalError(null);
     try {
@@ -4777,7 +4819,8 @@ export function useFoundationShellRouterBodyScope({
           teamId: input.teamId,
           playerId: input.playerId,
           action: "renew",
-          contractLength: input.contractLength ?? 2,
+          contractLength: startLength,
+          contractShape: "balanced",
           dryRun: true,
           source: readMeta.source,
         })),
@@ -4791,15 +4834,24 @@ export function useFoundationShellRouterBodyScope({
         );
         return;
       }
+      // Start-Angebot: moral-adjustierte Erwartung (falls vorhanden), sonst
+      // die rohe Forderung — derselbe Default, den auch der Season-End-Tick
+      // beim Auto-Renewal ansetzt.
       const expectedSalary = previewPayload.summary.negotiationPreview?.expectedSalary ?? null;
+      const startOffer = previewPayload.summary.moraleAdjustedExpectedSalary ?? expectedSalary;
       setContractRenewalNegotiation({
         teamId: input.teamId,
         playerId: input.playerId,
         playerName: input.playerName,
-        contractLength: input.contractLength ?? 2,
-        offeredSalary: expectedSalary,
+        contractLength: startLength,
+        offeredSalary: startOffer,
         expectedSalary,
         confirmToken: previewPayload.summary.confirmToken,
+        contractShape: "balanced",
+        currentSalary: rosterEntry?.salary ?? null,
+        currentLength: rosterEntry?.contractLength ?? null,
+        currentShape: rosterEntry?.contractShape ?? null,
+        initialPreview: previewPayload.summary,
       });
     } catch {
       setContractRenewalError(`${input.playerName}: Verhandlungsvorschau konnte nicht geladen werden.`);
@@ -4808,19 +4860,36 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  async function confirmContractRenewalNegotiation() {
+  /**
+   * Bestätigt die Gehaltsverhandlung. `draft` trägt die im Fenster zuletzt
+   * eingestellten Konditionen (Gehalt/Laufzeit/Form); ohne draft gelten die
+   * beim Öffnen gespeicherten Werte. Der Apply-Pfad holt sich server-seitig
+   * einen frischen confirmToken (Preview + Apply in `runContractRenewalAction`),
+   * daher ist der Token aus dem Öffnen-Preview hier nicht stale-gefährdet.
+   */
+  async function confirmContractRenewalNegotiation(draft?: {
+    contractLength?: number;
+    offeredSalary?: number | null;
+    contractShape?: ContractShape;
+  }) {
     if (!contractRenewalNegotiation) {
       return;
     }
-    await runContractRenewalAction({
+    const applied = await runContractRenewalAction({
       teamId: contractRenewalNegotiation.teamId,
       playerId: contractRenewalNegotiation.playerId,
       playerName: contractRenewalNegotiation.playerName,
       action: "renew",
-      contractLength: contractRenewalNegotiation.contractLength,
-      offeredSalary: contractRenewalNegotiation.offeredSalary,
+      contractLength: draft?.contractLength ?? contractRenewalNegotiation.contractLength,
+      offeredSalary:
+        draft && "offeredSalary" in draft ? draft.offeredSalary ?? null : contractRenewalNegotiation.offeredSalary,
+      contractShape: draft?.contractShape ?? contractRenewalNegotiation.contractShape ?? "balanced",
     });
-    setContractRenewalNegotiation(null);
+    // Fenster bleibt bei Fehlschlag offen, damit der Gate-Grund (z. B.
+    // Phase-Sperre bis Season-End) direkt im Verhandlungsfenster sichtbar ist.
+    if (applied) {
+      setContractRenewalNegotiation(null);
+    }
   }
 
   async function chooseTeamSponsor(offerId: string) {
@@ -4962,15 +5031,16 @@ export function useFoundationShellRouterBodyScope({
     action: "renew" | "release";
     contractLength?: number | null;
     offeredSalary?: number | null;
-  }) {
+    contractShape?: ContractShape;
+  }): Promise<boolean> {
     if (readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
-      return;
+      return false;
     }
     if (!canManageTeamId(input.teamId)) {
       setContractRenewalError(`${getTeamLockedName(input.teamId)} gehört nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
-      return;
+      return false;
     }
 
     const busyKey = `${input.action}:${input.teamId}:${input.playerId}`;
@@ -4989,6 +5059,7 @@ export function useFoundationShellRouterBodyScope({
           action: input.action,
           contractLength: input.contractLength,
           offeredSalary: input.offeredSalary,
+          contractShape: input.contractShape,
           dryRun: true,
           source: readMeta.source,
         })),
@@ -5000,7 +5071,7 @@ export function useFoundationShellRouterBodyScope({
             previewPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsvorschau blockiert.`,
         );
-        return;
+        return false;
       }
 
       const applyResponse = await fetch("/api/contracts/renewal", {
@@ -5013,6 +5084,7 @@ export function useFoundationShellRouterBodyScope({
           action: input.action,
           contractLength: input.contractLength,
           offeredSalary: input.offeredSalary ?? previewPayload.summary.negotiationPreview?.expectedSalary ?? null,
+          contractShape: input.contractShape,
           dryRun: false,
           confirmToken: previewPayload.summary.confirmToken,
           source: readMeta.source,
@@ -5025,7 +5097,7 @@ export function useFoundationShellRouterBodyScope({
             applyPayload.summary?.blockingReasons?.[0] ??
             `${input.playerName}: Vertragsaktion blockiert.`,
         );
-        return;
+        return false;
       }
 
       setContractRenewalMessage(
@@ -5048,8 +5120,10 @@ export function useFoundationShellRouterBodyScope({
         reloadSeasonManagementOverview(),
       ]);
       setMarketReloadToken((current) => current + 1);
+      return true;
     } catch {
       setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgeführt werden.`);
+      return false;
     } finally {
       setContractRenewalBusy(null);
     }
@@ -10705,6 +10779,7 @@ export function useFoundationShellRouterBodyScope({
     newGameSaveName,
     newGameSuccess,
     openContractRenewalNegotiation,
+    requestContractRenewalPreview,
     openFacilityPanel,
     openFoundationViewCommand,
     openMarketOfferPanel,

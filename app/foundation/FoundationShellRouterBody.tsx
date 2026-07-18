@@ -7,6 +7,7 @@ import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMoun
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import ContractRenewalNegotiationModal from "@/app/foundation/teams-v2/ContractRenewalNegotiationModal";
 import { formatNlMoney } from "@/components/foundation/new-look/nl-format";
 import { NlCard, StatChip, NlCountUpValue, nlToneClass, formatNlNumber, type NlTone } from "@/components/foundation/new-look";
 import type { CSSProperties } from "react";
@@ -548,6 +549,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   reloadSeasonStandingsOverview,
   reloadStandingsPreviewFeed,
   removeTransferWishlistEntry,
+  requestContractRenewalPreview,
   resetTableColumnWidth,
   resetTableLayout,
   resolvePreviewFeed,
@@ -1975,6 +1977,23 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             selectedTeam={selectedTeam}
             hostProps={foundationTeamsViewHostProps}
           />
+
+          {/* Gehaltsverhandlung („Verlängern") — Overlay-Modal, bewusst auf
+              Body-Ebene gemountet, damit es sowohl aus dem Kader-Tab
+              (FoundationTeamsNewLook) als auch aus dem Verträge-Tab
+              (FoundationTeamsDetailPanel, inkl. Auslauf-Center) funktioniert.
+              Alle Zahlen kommen aus der Server-Preview (dryRun), Bestätigen
+              läuft über den bestehenden Renewal-Apply-Pfad. */}
+          {contractRenewalNegotiation ? (
+            <ContractRenewalNegotiationModal
+              subject={contractRenewalNegotiation}
+              busy={contractRenewalBusy != null && !String(contractRenewalBusy).startsWith("preview:")}
+              error={contractRenewalError}
+              requestPreview={requestContractRenewalPreview}
+              onConfirm={(draft) => void confirmContractRenewalNegotiation(draft)}
+              onClose={() => setContractRenewalNegotiation(null)}
+            />
+          ) : null}
 
           <FoundationShellRouterTraining
             active={activeView === "trainingCompact"}

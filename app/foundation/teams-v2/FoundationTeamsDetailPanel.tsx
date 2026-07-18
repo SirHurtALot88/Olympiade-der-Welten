@@ -31,6 +31,13 @@ const TEAM_ROSTER_PORTRAIT_LOADING = {
   fetchPriority: "auto",
 } as const;
 
+// TEMP TEST: forces roster actions clickable so the sell/renew windows can be
+// previewed mid-season. Remove when done. Der Server phase-gated produktive
+// Writes weiterhin (Preview-sicher) — dieser Schalter macht NUR die Buttons
+// klickbar, damit Verkaufs-/Verhandlungsfenster vor dem Season-End begutachtet
+// werden können.
+const TEMP_FORCE_ROSTER_ACTIONS = true;
+
 /** League-table logos beyond the selected row load after shell paint (+200 ms idle). */
 const TEAMS_INITIAL_VISIBLE_LOGO_ROWS = 10;
 const TEAMS_DEFERRED_LOGO_IDLE_MS = 200;
@@ -572,6 +579,20 @@ function FoundationTeamsDetailPanel({
       rowIndex < TEAMS_INITIAL_VISIBLE_LOGO_ROWS ||
       teamId === selectedTeam?.teamId);
   const contractExpiringCount = selectedRoster.filter((entry) => entry.contractLength <= 1).length;
+  // Verkaufen/Verlängern sind IMMER sichtbar (Discoverability); außerhalb des
+  // Season-End-Fensters nur ausgegraut + Tooltip statt versteckt. Der TEMP-
+  // Schalter oben macht sie zum Testen sofort klickbar (Server gated Writes).
+  const rosterActionsEnabled = Boolean(selectedTeamRosterActionsAvailable) || TEMP_FORCE_ROSTER_ACTIONS;
+  const sellActionTitle = selectedTeamRosterActionsAvailable
+    ? "Verkaufen — öffnet die Verkaufs-Vorschau"
+    : TEMP_FORCE_ROSTER_ACTIONS
+      ? "Test-Modus: Aktion freigeschaltet. Verkauf öffnet regulär am Season-End (nach MD10)."
+      : "Verkauf öffnet am Season-End (nach MD10).";
+  const renewActionTitle = selectedTeamRosterActionsAvailable
+    ? "Verlängern — öffnet die Gehaltsverhandlung"
+    : TEMP_FORCE_ROSTER_ACTIONS
+      ? "Test-Modus: Aktion freigeschaltet. Gehaltsverhandlung öffnet regulär am Season-End (nach MD10)."
+      : "Gehaltsverhandlung öffnet am Season-End (nach MD10).";
 
   return (
     <div className="foundation-teams-view-panel" data-testid="foundation-teams-view" data-team-tab={selectedTeamDetailTab}>
@@ -771,50 +792,48 @@ function FoundationTeamsDetailPanel({
                                             {player.name}
                                           </button>
                                           <small className="muted table-player-identity">{formatPlayerIdentitySubMeta(player)}</small>
-                                          {selectedTeamRosterActionsAvailable ? (
-                                            <div className="transfermarkt-inline-actions teams-v2-row-icon-actions">
+                                          <div className="transfermarkt-inline-actions teams-v2-row-icon-actions">
+                                            <button
+                                              className="table-icon-button"
+                                              type="button"
+                                              title={sellActionTitle}
+                                              aria-label={`${player.name} verkaufen`}
+                                              disabled={!rosterActionsEnabled || marketSellBusy}
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                void openMarketSellModal({
+                                                  activePlayerId: entry.id,
+                                                  playerId: player.id,
+                                                  playerName: player.name,
+                                                  className: player.className,
+                                                  race: player.race,
+                                                  portraitUrl: getPlayerPortraitModel(player).previewSrc ?? getPlayerPortraitModel(player).src,
+                                                }, selectedTeam?.teamId);
+                                              }}
+                                            >
+                                              ⇄
+                                            </button>
+                                            {selectedTeam ? (
                                               <button
                                                 className="table-icon-button"
                                                 type="button"
-                                                title="Verkaufen"
-                                                aria-label={`${player.name} verkaufen`}
-                                                disabled={marketSellBusy}
+                                                title={renewActionTitle}
+                                                aria-label={`${player.name} verlängern`}
+                                                disabled={!rosterActionsEnabled || contractRenewalBusy != null}
                                                 onClick={(event) => {
                                                   event.stopPropagation();
-                                                  void openMarketSellModal({
-                                                    activePlayerId: entry.id,
+                                                  void openContractRenewalNegotiation({
+                                                    teamId: selectedTeam.teamId,
                                                     playerId: player.id,
                                                     playerName: player.name,
-                                                    className: player.className,
-                                                    race: player.race,
-                                                    portraitUrl: getPlayerPortraitModel(player).previewSrc ?? getPlayerPortraitModel(player).src,
-                                                  }, selectedTeam?.teamId);
+                                                    contractLength: 2,
+                                                  });
                                                 }}
                                               >
-                                                ⇄
+                                                ↻
                                               </button>
-                                              {isContractExpiring && selectedTeam ? (
-                                                <button
-                                                  className="table-icon-button"
-                                                  type="button"
-                                                  title="Verlängern"
-                                                  aria-label={`${player.name} verlängern`}
-                                                  disabled={contractRenewalBusy != null}
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    void openContractRenewalNegotiation({
-                                                      teamId: selectedTeam.teamId,
-                                                      playerId: player.id,
-                                                      playerName: player.name,
-                                                      contractLength: 2,
-                                                    });
-                                                  }}
-                                                >
-                                                  ↻
-                                                </button>
-                                              ) : null}
-                                            </div>
-                                          ) : null}
+                                            ) : null}
+                                          </div>
                                         </div>
                                       </td>
                                     );
@@ -1087,39 +1106,10 @@ function FoundationTeamsDetailPanel({
                     {contractRenewalError ? (
                       <div className="status-banner is-warning">{contractRenewalError}</div>
                     ) : null}
-                    {contractRenewalNegotiation ? (
-                      <div className="status-banner is-info">
-                        <strong>Verhandlung: {contractRenewalNegotiation.playerName}</strong>
-                        <p className="muted">
-                          Erwartung {contractRenewalNegotiation.expectedSalary != null ? formatTransfermarktCurrency(contractRenewalNegotiation.expectedSalary) : "—"}
-                        </p>
-                        <label className="stack gap-xs">
-                          <span>Angebot p.a.</span>
-                          <input
-                            type="number"
-                            value={contractRenewalNegotiation.offeredSalary ?? ""}
-                            onChange={(event) =>
-                              setContractRenewalNegotiation((current) =>
-                                current
-                                  ? {
-                                      ...current,
-                                      offeredSalary: event.target.value === "" ? null : Number(event.target.value),
-                                    }
-                                  : current,
-                              )
-                            }
-                          />
-                        </label>
-                        <div className="transfermarkt-inline-actions">
-                          <button type="button" className="primary-button inline-button" onClick={() => void confirmContractRenewalNegotiation()}>
-                            Vertrag bestätigen
-                          </button>
-                          <button type="button" className="secondary-button inline-button" onClick={() => setContractRenewalNegotiation(null)}>
-                            Abbrechen
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
+                    {/* Die Gehaltsverhandlung („Verlängern") öffnet als eigenes
+                        Overlay-Fenster (ContractRenewalNegotiationModal, gemountet
+                        in FoundationShellRouterBody) — der frühere Inline-Banner
+                        mit nacktem Zahlenfeld ist dadurch ersetzt. */}
                     {selectedTeamRosterActionHint ? (
                       <div className={`team-roster-action-status${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
                         <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
@@ -1357,48 +1347,49 @@ function FoundationTeamsDetailPanel({
                                           </span>
                                         ) : null}
                                       </div>
-                                      {selectedTeamRosterActionsAvailable ? (
-                                        <div className="team-auslauf-actions" onClick={(event) => event.stopPropagation()}>
+                                      {/* Immer sichtbar: außerhalb des Season-End-Fensters
+                                          ausgegraut + Tooltip statt versteckt (Discoverability). */}
+                                      <div className="team-auslauf-actions" onClick={(event) => event.stopPropagation()}>
+                                        <button
+                                          className="nl-teams-action"
+                                          type="button"
+                                          disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                                          title={renewActionTitle}
+                                          onClick={() =>
+                                            void openContractRenewalNegotiation({
+                                              teamId: selectedTeam.teamId,
+                                              playerId: row.playerId,
+                                              playerName: row.playerName,
+                                              contractLength: 2,
+                                            })
+                                          }
+                                        >
+                                          Verlängern
+                                        </button>
+                                        <span className="nl-teams-action-danger-group">
                                           <button
-                                            className="nl-teams-action"
+                                            className="nl-teams-action nl-teams-action-danger"
                                             type="button"
-                                            disabled={contractRenewalBusy != null}
+                                            disabled={!rosterActionsEnabled || marketSellBusy}
+                                            title={sellActionTitle}
                                             onClick={() =>
-                                              void openContractRenewalNegotiation({
-                                                teamId: selectedTeam.teamId,
-                                                playerId: row.playerId,
-                                                playerName: row.playerName,
-                                                contractLength: 2,
-                                              })
+                                              void openMarketSellModal(
+                                                {
+                                                  activePlayerId: row.rowId,
+                                                  playerId: row.playerId,
+                                                  playerName: row.playerName,
+                                                  className: auslaufPlayer?.className ?? "—",
+                                                  race: auslaufPlayer?.race ?? "—",
+                                                  portraitUrl: auslaufPortrait?.previewSrc ?? auslaufPortrait?.src ?? null,
+                                                },
+                                                selectedTeam.teamId,
+                                              )
                                             }
                                           >
-                                            Verlängern
+                                            Verkaufen
                                           </button>
-                                          <span className="nl-teams-action-danger-group">
-                                            <button
-                                              className="nl-teams-action nl-teams-action-danger"
-                                              type="button"
-                                              disabled={marketSellBusy}
-                                              title="Verkaufen — öffnet die Verkaufs-Vorschau"
-                                              onClick={() =>
-                                                void openMarketSellModal(
-                                                  {
-                                                    activePlayerId: row.rowId,
-                                                    playerId: row.playerId,
-                                                    playerName: row.playerName,
-                                                    className: auslaufPlayer?.className ?? "—",
-                                                    race: auslaufPlayer?.race ?? "—",
-                                                    portraitUrl: auslaufPortrait?.previewSrc ?? auslaufPortrait?.src ?? null,
-                                                  },
-                                                  selectedTeam.teamId,
-                                                )
-                                              }
-                                            >
-                                              Verkaufen
-                                            </button>
-                                          </span>
-                                        </div>
-                                      ) : null}
+                                        </span>
+                                      </div>
                                     </article>
                                   );
                                 })}
@@ -1768,13 +1759,19 @@ function FoundationTeamsDetailPanel({
                                  „Verkaufen" in eigener Danger-Gruppe mit Abstand/Trennlinie
                                  und Warnstil (`nl-teams-action-danger-group` /
                                  `nl-teams-action-danger`, bereits vorhanden). */
-                              return row.status === "active" && selectedTeamRosterActionsAvailable ? (
+                              /* Immer sichtbar (statt hinter `selectedTeamRosterActionsAvailable`
+                                 versteckt): außerhalb des Season-End-Fensters ausgegraut +
+                                 Tooltip. „Verlängern" rendert jetzt für ALLE aktiven Verträge —
+                                 das Verhandlungsfenster erklärt selbst, warum LZ > 1 (noch)
+                                 blockiert ist. */
+                              return row.status === "active" ? (
                                 <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
-                                  {row.contractLength <= 1 && selectedTeam ? (
+                                  {selectedTeam ? (
                                     <button
                                       className="nl-teams-action"
                                       type="button"
-                                      disabled={contractRenewalBusy != null}
+                                      disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                                      title={renewActionTitle}
                                       onClick={() =>
                                         void openContractRenewalNegotiation({
                                           teamId: selectedTeam.teamId,
@@ -1809,8 +1806,8 @@ function FoundationTeamsDetailPanel({
                                     <button
                                       className="nl-teams-action nl-teams-action-danger"
                                       type="button"
-                                      disabled={marketSellBusy}
-                                      title="Verkaufen — öffnet die Verkaufs-Vorschau"
+                                      disabled={!rosterActionsEnabled || marketSellBusy}
+                                      title={sellActionTitle}
                                       onClick={() =>
                                         void openMarketSellModal(
                                           {

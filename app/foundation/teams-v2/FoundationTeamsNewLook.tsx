@@ -67,6 +67,12 @@ import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/se
  * Bereichs-Ränge die Hover-Karte (Mini-Radar + Saison-Sparkline).
  */
 
+// TEMP TEST: forces roster actions clickable so the sell/renew windows can be
+// previewed mid-season. Remove when done. Der Server phase-gated produktive
+// Writes weiterhin (Preview-sicher) — dieser Schalter macht NUR die Buttons
+// klickbar. (Eigene lokale Konstante, Pendant zu FoundationTeamsDetailPanel.)
+const TEMP_FORCE_ROSTER_ACTIONS = true;
+
 type NlTeamsRosterMode = "portraits" | "tabelle";
 
 export type NlTeamsRosterRow = {
@@ -1245,7 +1251,21 @@ export default function FoundationTeamsNewLook({
   }
 
   function renderRosterTable() {
-    const showActions = selectedTeamRosterActionsAvailable;
+    // Aktionen-Spalte ist IMMER sichtbar (Discoverability): außerhalb des
+    // Season-End-Fensters sind die Buttons ausgegraut + Tooltip statt
+    // versteckt. TEMP_FORCE_ROSTER_ACTIONS macht sie zum Testen klickbar.
+    const showActions = true;
+    const rosterActionsEnabled = selectedTeamRosterActionsAvailable || TEMP_FORCE_ROSTER_ACTIONS;
+    const sellActionTitle = selectedTeamRosterActionsAvailable
+      ? "Verkaufen — öffnet die Verkaufs-Vorschau"
+      : TEMP_FORCE_ROSTER_ACTIONS
+        ? "Test-Modus: Aktion freigeschaltet. Verkauf öffnet regulär am Season-End (nach MD10)."
+        : "Verkauf öffnet am Season-End (nach MD10).";
+    const renewActionTitle = selectedTeamRosterActionsAvailable
+      ? "Verlängern — öffnet die Gehaltsverhandlung"
+      : TEMP_FORCE_ROSTER_ACTIONS
+        ? "Test-Modus: Aktion freigeschaltet. Gehaltsverhandlung öffnet regulär am Season-End (nach MD10)."
+        : "Gehaltsverhandlung öffnet am Season-End (nach MD10).";
     return (
       <div className="nl-teams-table-shell" style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
         <table className="nl-teams-table nl-tnum">
@@ -1346,31 +1366,29 @@ export default function FoundationTeamsNewLook({
                           den Vorschau-/Bestätigungsschritt in `openMarketSellModal`
                           abgesichert (öffnet nur ein Preview-Panel, verkauft nicht
                           sofort). */}
-                      {isContractExpiring ? (
-                        <button
-                          type="button"
-                          className="nl-teams-action"
-                          disabled={contractRenewalBusy != null}
-                          title="Verlängern"
-                          aria-label={`${player.name} verlängern`}
-                          onClick={() =>
-                            void openContractRenewalNegotiation({
-                              teamId: selectedTeam.teamId,
-                              playerId: player.id,
-                              playerName: player.name,
-                              contractLength: 2,
-                            })
-                          }
-                        >
-                          Verlängern
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        className="nl-teams-action"
+                        disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                        title={renewActionTitle}
+                        aria-label={`${player.name} verlängern`}
+                        onClick={() =>
+                          void openContractRenewalNegotiation({
+                            teamId: selectedTeam.teamId,
+                            playerId: player.id,
+                            playerName: player.name,
+                            contractLength: 2,
+                          })
+                        }
+                      >
+                        Verlängern
+                      </button>
                       <span className="nl-teams-action-danger-group">
                         <button
                           type="button"
                           className="nl-teams-action nl-teams-action-danger"
-                          disabled={marketSellBusy}
-                          title="Verkaufen — öffnet die Verkaufs-Vorschau"
+                          disabled={!rosterActionsEnabled || marketSellBusy}
+                          title={sellActionTitle}
                           aria-label={`${player.name} verkaufen`}
                           onClick={() =>
                             void openMarketSellModal(

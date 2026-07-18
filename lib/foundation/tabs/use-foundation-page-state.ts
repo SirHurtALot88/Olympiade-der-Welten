@@ -548,6 +548,14 @@ export function useFoundationPageState({
     offeredSalary: number | null;
     expectedSalary: number | null;
     confirmToken: string;
+    /** Gewählte Vertragsform der Verhandlung (Default: balanced). */
+    contractShape?: ContractShape;
+    /** Ist-Vertrag (aus dem Roster-Entry beim Öffnen) für den Vorher/Nachher-Vergleich im Verhandlungsfenster. */
+    currentSalary?: number | null;
+    currentLength?: number | null;
+    currentShape?: ContractShape | null;
+    /** Erste Server-Preview (dryRun) beim Öffnen — das Fenster refresht danach selbst. */
+    initialPreview?: import("@/lib/foundation/tabs/foundation-page-types").ContractRenewalApiResponse["summary"] | null;
   } | null>(null);
   const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);

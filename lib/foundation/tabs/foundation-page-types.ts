@@ -314,6 +314,57 @@ export type TransfermarktBuyApiResponse = {
   scope?: Omit<TransfermarktBuyRequestContext, "view"> & { view?: FoundationView };
 };
 
+/**
+ * Voller Verhandlungs-Preview-Ausschnitt aus `previewContractRenewalAction`
+ * (lib/contracts/contract-renewal-service.ts) — dieselben Zahlen, die auch
+ * die Season-End-Auto-Verlängerung benutzt. Die Gehaltsverhandlungs-UI
+ * konsumiert sie 1:1, es gibt bewusst KEIN paralleles Client-Rechenmodell.
+ */
+export type ContractRenewalNegotiationPreviewPayload = {
+  expectedSalary: number | null;
+  baseExpectedSalary?: number | null;
+  demandMultiplier?: number | null;
+  offeredSalary?: number | null;
+  offerRatio?: number | null;
+  contractLength?: number;
+  contractShape?: ContractShape;
+  yearlySalarySchedule?: Array<{ yearIndex: number; seasonOffset: number; label: string; salary: number }>;
+  totalSalary?: number | null;
+  buyoutCost?: number | null;
+  teamFit?: number | null;
+  acceptanceScore?: number | null;
+  acceptChance?: number | null;
+  counterChance?: number | null;
+  rejectChance?: number | null;
+  contractPreference?: {
+    lengthPreference: "short" | "medium" | "long";
+    shapePreference: ContractShape;
+    preferredMinLength: number;
+    preferredMaxLength: number;
+    idealLength: number;
+    matchQuality: "preferred" | "acceptable" | "mismatch";
+    reasons: string[];
+    warnings: string[];
+  } | null;
+  reasons?: string[];
+  warnings?: string[];
+  blockingReasons?: string[];
+  status?: string;
+};
+
+export type ContractRenewalMoralePayload = {
+  morale: number;
+  visibleMood: string;
+  smiley: string;
+  contractIntent: string;
+  salaryModifier: number;
+  contractLengthLimit: number | null;
+  renewalRisk: number;
+  reasons: string[];
+  suggestedActions: string[];
+  warnings: string[];
+};
+
 export type ContractRenewalApiResponse = {
   success: boolean;
   summary: {
@@ -322,9 +373,9 @@ export type ContractRenewalApiResponse = {
     confirmToken: string;
     warnings: string[];
     blockingReasons: string[];
-    negotiationPreview?: {
-      expectedSalary: number | null;
-    } | null;
+    negotiationPreview?: ContractRenewalNegotiationPreviewPayload | null;
+    morale?: ContractRenewalMoralePayload | null;
+    moraleAdjustedExpectedSalary?: number | null;
     contractEvent?: {
       eventType: string;
       oldSalary: number | null;
