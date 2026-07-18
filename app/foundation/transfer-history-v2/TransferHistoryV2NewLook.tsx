@@ -500,62 +500,6 @@ export default function TransferHistoryV2NewLook({
         />
       </StatChipRow>
 
-      {/* #D10: Eigene kumulative Netto-Ausgaben (Sparkline) + CSV-Export der
-          sichtbaren Deal-Liste. Fog-safe: nur eigene, ohnehin sichtbare Deals. */}
-      <NlCard
-        className="nl-thist-own-card"
-        eyebrow="Eigenes Team"
-        title="Netto-Ausgaben-Verlauf"
-        actions={
-          <button
-            type="button"
-            className="nl-thist-inline-action"
-            onClick={handleExportCsv}
-            disabled={!canExportCsv}
-            title={
-              canExportCsv
-                ? "Sichtbare Deal-Liste als CSV herunterladen"
-                : "Noch keine Deals zum Exportieren"
-            }
-          >
-            CSV exportieren
-          </button>
-        }
-      >
-        {ownTeamId ? (
-          ownNetSpendSeries.length ? (
-            <div className="nl-thist-own-spend">
-              <div className="nl-thist-own-spend-head">
-                <span className="nl-thist-eyebrow">
-                  Kumulative Netto-Ausgaben{ownTeamName ? ` · ${ownTeamName}` : ""} (Käufe − Verkäufe)
-                </span>
-                <strong
-                  className={`nl-tnum${ownNetSpendFinal > 0 ? " is-negative" : ownNetSpendFinal < 0 ? " is-positive" : ""}`}
-                >
-                  {formatNlSignedMoney(ownNetSpendFinal)}
-                </strong>
-              </div>
-              <NlSparkline
-                points={ownNetSpendPoints}
-                tone={ownNetSpendFinal > 0 ? "risk" : "good"}
-                aria-label="Kumulative Netto-Ausgaben des eigenen Teams über die Saison"
-                className="nl-thist-own-sparkline"
-              />
-              <small className="nl-thist-spotlight-meta nl-tnum">
-                {ownNetSpendSeries.length} eigene Deals · Δ {formatNlSignedMoney(ownNetSpendFinal)}
-              </small>
-            </div>
-          ) : (
-            <p className="nl-thist-muted">
-              Noch keine eigenen Deals im aktuellen Scope — der Verlauf bleibt flach.
-            </p>
-          )
-        ) : (
-          <p className="nl-thist-muted">Kein eigenes Team im Kontext — Netto-Ausgaben-Verlauf nicht verfügbar.</p>
-        )}
-        {!canExportCsv ? <p className="nl-thist-muted">Noch keine Deals — CSV-Export deaktiviert.</p> : null}
-      </NlCard>
-
       {/* #2: Story-Kacheln als Portale — Klick wählt den jeweiligen Deal
           (Spotlight) bzw. öffnet das aktivste Team; nur klickbar, wenn ein
           echter Zieldatensatz existiert. */}
@@ -948,6 +892,59 @@ export default function TransferHistoryV2NewLook({
         </div>
       ) : (
         <div className="nl-thist-teams-layout">
+        {/* #D10: Eigene kumulative Netto-Ausgaben (Sparkline) + CSV-Export der
+            sichtbaren Deal-Liste. Fog-safe: nur eigene, ohnehin sichtbare Deals.
+            Im Teams-Fokus verortet — team-/finanzbezogen, hält den Spieler-Tab luftig. */}
+        <NlCard
+          className="nl-thist-own-card"
+          eyebrow="Eigenes Team"
+          title="Netto-Ausgaben-Verlauf"
+          actions={
+            <button
+              type="button"
+              className="nl-thist-inline-action"
+              onClick={handleExportCsv}
+              disabled={!canExportCsv}
+              title={
+                canExportCsv ? "Sichtbare Deal-Liste als CSV herunterladen" : "Noch keine Deals zum Exportieren"
+              }
+            >
+              CSV exportieren
+            </button>
+          }
+        >
+          {ownTeamId ? (
+            ownNetSpendSeries.length ? (
+              <div className="nl-thist-own-spend">
+                <div className="nl-thist-own-spend-head">
+                  <span className="nl-thist-eyebrow">
+                    Kumulative Netto-Ausgaben{ownTeamName ? ` · ${ownTeamName}` : ""} (Käufe − Verkäufe)
+                  </span>
+                  <strong
+                    className={`nl-tnum${ownNetSpendFinal > 0 ? " is-negative" : ownNetSpendFinal < 0 ? " is-positive" : ""}`}
+                  >
+                    {formatNlSignedMoney(ownNetSpendFinal)}
+                  </strong>
+                </div>
+                <NlSparkline
+                  points={ownNetSpendPoints}
+                  tone={ownNetSpendFinal > 0 ? "risk" : "good"}
+                  aria-label="Kumulative Netto-Ausgaben des eigenen Teams über die Saison"
+                  className="nl-thist-own-sparkline"
+                />
+                <small className="nl-thist-spotlight-meta nl-tnum">
+                  {ownNetSpendSeries.length} eigene Deals · Δ {formatNlSignedMoney(ownNetSpendFinal)}
+                </small>
+              </div>
+            ) : (
+              <p className="nl-thist-muted">Noch keine eigenen Deals im aktuellen Scope — der Verlauf bleibt flach.</p>
+            )
+          ) : (
+            <p className="nl-thist-muted">Kein eigenes Team im Kontext — Netto-Ausgaben-Verlauf nicht verfügbar.</p>
+          )}
+          {!canExportCsv ? <p className="nl-thist-muted">Noch keine Deals — CSV-Export deaktiviert.</p> : null}
+        </NlCard>
+
         <NlCard
           className="nl-thist-teams-card"
           eyebrow="Teambewegung"
