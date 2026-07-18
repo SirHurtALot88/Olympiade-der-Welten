@@ -46359,6 +46359,119 @@ button.foundation-team-portrait-card {
   gap: var(--nl-s2);
 }
 
+/* Verträge & Auslauf (unten im Teams-Reiter, ersetzt die entfernte
+   „Alle Teams"-Tabelle). Kader-Vertragsliste nach Restlaufzeit sortiert. */
+.is-new-look .nl-teams-contracts-load {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Wenige Balken (Saison-Offsets) → SVG NICHT auf volle Kartenbreite hochskalieren
+   (sonst Riesen-Labels, die sich überlappen). Feste Höhe, Breite folgt dem
+   viewBox-Seitenverhältnis. */
+.is-new-look .nl-teams-contracts-load-chart {
+  height: 132px;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Werte-Labels kleiner, damit „138,6 Mio" in den schmalen Balken-Slot passt und
+   nicht in den Nachbarbalken überläuft (nur für diesen kompakten 3-Balken-Chart). */
+.is-new-look .nl-teams-contracts-load-chart .nl-barchart-value {
+  font-size: 7.5px;
+}
+
+.is-new-look .nl-teams-contracts-load-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-contracts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.is-new-look .nl-teams-contracts-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 13px;
+}
+
+.is-new-look .nl-teams-contracts-row.is-expiring {
+  border-color: color-mix(in srgb, var(--nl-warn) 55%, var(--nl-line));
+  box-shadow: inset 3px 0 0 var(--nl-warn);
+}
+
+.is-new-look .nl-teams-contracts-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  color: var(--nl-ink);
+  cursor: pointer;
+}
+
+.is-new-look .nl-teams-contracts-name:hover {
+  color: var(--nl-accent);
+  text-decoration: underline;
+}
+
+.is-new-look .nl-teams-contracts-role {
+  font-size: 11px;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-contracts-salary {
+  min-width: 72px;
+  text-align: right;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-teams-contracts-term {
+  min-width: 84px;
+  text-align: right;
+  color: var(--nl-mut);
+  white-space: nowrap;
+}
+
+.is-new-look .nl-teams-contracts-term small {
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-teams-contracts-flag {
+  justify-self: end;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-teams-contracts-flag.is-expiring {
+  color: var(--nl-warn);
+}
+
 .is-new-look .nl-teams-boardrow {
   display: flex;
   align-items: stretch;

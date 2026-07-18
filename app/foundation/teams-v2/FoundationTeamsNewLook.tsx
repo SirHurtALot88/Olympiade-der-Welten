@@ -971,6 +971,62 @@ export default function FoundationTeamsNewLook({
     [boardRows],
   );
 
+  // „Verträge & Auslauf" — Vertragsübersicht des gewählten Kaders (unten im
+  // Teams-Reiter, ersetzt die entfernte „Alle Teams"-Tabelle). Restlaufzeit aus
+  // entry.contractLength; Gehalt fog-gated (nur eigenes Team echte Werte).
+  const contractRows = useMemo(() => {
+    return filteredSelectedRosterTableRows
+      .map((row) => {
+        const salaryRaw = getRosterEntryDisplaySalary(row.entry, row.player);
+        const length = Number.isFinite(row.entry.contractLength) ? row.entry.contractLength : 0;
+        return {
+          playerId: row.player.id,
+          entryId: row.entry.id,
+          playerName: row.player.name,
+          roleTag: row.entry.roleTag,
+          salary: heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null,
+          contractLength: length,
+          shapeShort: formatContractShapeShortLabel(row.entry.contractShape),
+          expiring: length <= 1,
+        };
+      })
+      .sort((left, right) =>
+        left.contractLength !== right.contractLength
+          ? left.contractLength - right.contractLength
+          : (right.salary ?? 0) - (left.salary ?? 0),
+      );
+  }, [filteredSelectedRosterTableRows, getRosterEntryDisplaySalary, heroIsOwnTeam]);
+
+  // KPIs: Ausläufer (Restlaufzeit ≤ 1), Ø-Restlaufzeit, Gehaltslast p.a. (eigenes Team).
+  const contractSummary = useMemo(() => {
+    const expiringCount = contractRows.filter((row) => row.expiring).length;
+    const lengths = contractRows.map((row) => row.contractLength).filter((value) => value > 0);
+    const avgLength = lengths.length > 0 ? lengths.reduce((sum, value) => sum + value, 0) / lengths.length : null;
+    const salaries = contractRows.map((row) => row.salary).filter(isFiniteNumber);
+    const salaryTotal = heroIsOwnTeam && salaries.length > 0 ? salaries.reduce((sum, value) => sum + value, 0) : null;
+    return { expiringCount, avgLength, salaryTotal, count: contractRows.length };
+  }, [contractRows, heroIsOwnTeam]);
+
+  // Gehaltslast-Projektion je kommender Saison (eigenes Team): Summe der Gehälter
+  // aller Spieler, deren Vertrag in Saison-Offset s noch läuft (contractLength > s).
+  // Zeigt, wie die Last mit auslaufenden Verträgen sinkt.
+  const contractSalaryLoad = useMemo(() => {
+    if (!heroIsOwnTeam) {
+      return [];
+    }
+    const maxLen = contractRows.reduce((max, row) => (row.contractLength > max ? row.contractLength : max), 0);
+    const horizon = Math.min(Math.max(maxLen, 1), 5);
+    const bars: Array<{ label: string; value: number; tone: NlTone }> = [];
+    for (let offset = 0; offset < horizon; offset += 1) {
+      const load = contractRows.reduce(
+        (sum, row) => (row.contractLength > offset && isFiniteNumber(row.salary) ? sum + row.salary : sum),
+        0,
+      );
+      bars.push({ label: offset === 0 ? "Aktuell" : `+${offset}`, value: load, tone: "warn" });
+    }
+    return bars;
+  }, [contractRows, heroIsOwnTeam]);
+
   const heroRadarAxes = useMemo(() => {
     if (teamCount <= 0) {
       return [];
@@ -1754,8 +1810,7 @@ export default function FoundationTeamsNewLook({
                       label="Cash"
                       value={heroRow?.cash != null ? formatNlMoney(heroRow.cash) : "—"}
                       tone={heroRow?.cash != null && heroRow.cash < 0 ? "risk" : "neutral"}
-                      title="Cash — sortiert die Teamtabelle nach Cash"
-                      onClick={() => handleHeroBoardSortSelect("cash", "desc")}
+                      title="Cash — GuV-Projektion einblenden"
                     />
                   }
                 >
@@ -1768,8 +1823,7 @@ export default function FoundationTeamsNewLook({
                     <StatChip
                       label="MW"
                       value={formatNlMoney(heroRow?.marketValueTotal)}
-                      title="Marktwert gesamt — sortiert die Teamtabelle nach Marktwert"
-                      onClick={() => handleHeroBoardSortSelect("mw", "desc")}
+                      title="Marktwert gesamt — Kader-Breakdown einblenden"
                     />
                   }
                 >
@@ -1850,14 +1904,13 @@ export default function FoundationTeamsNewLook({
             </div>
           </div>
           <div className="nl-teams-hero-axes">
-            {renderAxisRankBadges(heroRow, selectedTeam.teamId, selectedTeam.name, false, handleHeroAxisSortSelect)}
+            {renderAxisRankBadges(heroRow, selectedTeam.teamId, selectedTeam.name, false)}
             {heroRadarAxes.length > 0 ? (
               <figure className="nl-teams-hero-radar-figure">
                 <NlRadar
                   axes={heroRadarAxes}
                   max={teamCount}
                   className="nl-teams-hero-radar"
-                  onAxisClick={handleHeroAxisSortSelect}
                   aria-label={`Stärkenprofil von ${selectedTeam.name}: Bereichs-Ränge im Liga-Vergleich, außen = stärker`}
                 />
                 <figcaption className="nl-teams-hero-radar-caption">Stärkenprofil · außen = liga-stark</figcaption>
@@ -2153,59 +2206,89 @@ export default function FoundationTeamsNewLook({
       </NlCard>
       </div>
 
-      <div ref={leagueCardRef} className="nl-teams-anchor">
-      <NlCard className="nl-teams-league-card" eyebrow="Teams · Liga" title="Teamtabelle">
-        {boardRows.length > 0 ? (
+      <div className="nl-teams-anchor">
+      <NlCard
+        className="nl-teams-contracts-card"
+        eyebrow="Kaderplanung"
+        title="Verträge & Auslauf"
+      >
+        {contractRows.length > 0 ? (
           <>
-            <div className="nl-teams-sortbar" role="group" aria-label="Teamtabelle sortieren">
-              <span className="nl-teams-sortbar-label">Sortieren</span>
-              {NL_TEAMS_BOARD_SORTS.map((option) => {
-                const isActive = boardSort.key === option.key;
-                return (
+            <StatChipRow className="nl-teams-contracts-kpis" aria-label="Vertrags-Kennzahlen">
+              <StatChip
+                label="Ausläufer"
+                value={formatNlNumber(contractSummary.expiringCount, 0)}
+                sub={`von ${formatNlNumber(contractSummary.count, 0)} im Kader`}
+                tone={contractSummary.expiringCount > 0 ? "warn" : "good"}
+                title="Verträge mit Restlaufzeit ≤ 1 Saison — laufen bald aus"
+              />
+              <StatChip
+                label="Ø Restlaufzeit"
+                value={contractSummary.avgLength != null ? `${formatNlNumber(contractSummary.avgLength, 1)} Sais.` : "—"}
+                tone="accent"
+                title="Durchschnittliche verbleibende Vertragslaufzeit des Kaders"
+              />
+              {heroIsOwnTeam ? (
+                <StatChip
+                  label="Gehaltslast p.a."
+                  value={contractSummary.salaryTotal != null ? formatNlMoney(contractSummary.salaryTotal) : "—"}
+                  tone="warn"
+                  title="Summe der aktuellen Jahresgehälter des Kaders"
+                />
+              ) : null}
+            </StatChipRow>
+            {heroIsOwnTeam && contractSalaryLoad.length > 0 ? (
+              <div className="nl-teams-contracts-load" aria-label="Gehaltslast-Projektion je Saison">
+                <span className="nl-teams-contracts-load-label">
+                  Gehaltslast je Saison — sinkt mit auslaufenden Verträgen
+                </span>
+                <NlBarChart
+                  bars={contractSalaryLoad}
+                  format={(value) => formatNlMoney(value)}
+                  aria-label="Projizierte Gehaltslast der kommenden Saisons"
+                  className="nl-teams-contracts-load-chart"
+                />
+              </div>
+            ) : null}
+            <ol className="nl-teams-contracts-list" aria-label="Verträge nach Restlaufzeit">
+              {contractRows.map((row) => (
+                <li
+                  key={row.entryId}
+                  className={`nl-teams-contracts-row${row.expiring ? " is-expiring" : ""}`}
+                >
                   <button
-                    key={`nl-teams-sort-${option.key}`}
                     type="button"
-                    className={`nl-teams-sort${isActive ? " is-active" : ""}`}
-                    onClick={() => handleBoardSortToggle(option.key, option.defaultDir)}
-                    title={option.title}
-                    aria-pressed={isActive}
+                    className="nl-teams-contracts-name"
+                    onClick={() => void openPlayerDrawerById(row.playerId, row.entryId)}
+                    title={`${row.playerName} öffnen`}
                   >
-                    {option.label}
-                    {isActive ? (
-                      <span className="nl-teams-sort-dir" aria-hidden="true">
-                        {boardSort.dir === "asc" ? "▲" : "▼"}
-                      </span>
-                    ) : null}
+                    {row.playerName}
                   </button>
-                );
-              })}
-              {NL_TEAMS_AXES.map(({ key, label }) => {
-                const isActive = boardSort.key === key;
-                return (
-                  <button
-                    key={`nl-teams-sort-${key}`}
-                    type="button"
-                    className={`nl-teams-sort nl-teams-sort-axis ${nlToneClass(key)}${isActive ? " is-active" : ""}`}
-                    onClick={() => handleBoardSortToggle(key, "desc")}
-                    title={`Liga nach ${label}-Team-Stärke sortieren`}
-                    aria-pressed={isActive}
-                  >
-                    {label}
-                    {isActive ? (
-                      <span className="nl-teams-sort-dir" aria-hidden="true">
-                        {boardSort.dir === "asc" ? "▲" : "▼"}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-            <ol className="nl-teams-board" aria-label="Teamtabelle">
-              {boardRows.map((row) => renderBoardRow(row))}
+                  <span className="nl-teams-contracts-role">
+                    {row.roleTag === "starter"
+                      ? "Starter"
+                      : row.roleTag === "bench"
+                        ? "Bank"
+                        : row.roleTag === "rotation"
+                          ? "Rotation"
+                          : "Kader"}
+                  </span>
+                  <span className="nl-teams-contracts-salary nl-tnum">
+                    {row.salary != null ? formatNlMoney(row.salary) : "—"}
+                  </span>
+                  <span className="nl-teams-contracts-term nl-tnum">
+                    {row.contractLength > 0 ? `${formatNlNumber(row.contractLength, 0)} Sais.` : "—"}
+                    {row.shapeShort ? <small> · {row.shapeShort}</small> : null}
+                  </span>
+                  <span className={`nl-teams-contracts-flag${row.expiring ? " is-expiring" : ""}`}>
+                    {row.expiring ? "läuft aus" : "läuft"}
+                  </span>
+                </li>
+              ))}
             </ol>
           </>
         ) : (
-          <p className="nl-teams-empty">Noch keine Teamdaten für diese Saison.</p>
+          <p className="nl-teams-empty">Keine Kaderdaten für diese Ansicht.</p>
         )}
       </NlCard>
       </div>
