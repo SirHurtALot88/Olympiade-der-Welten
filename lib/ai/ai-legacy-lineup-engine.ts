@@ -34,6 +34,168 @@ type CaptainDecision = {
   warnings: string[];
 };
 
+// ===========================================================================================
+// Captain-Opportunismus & Pacing
+// -------------------------------------------------------------------------------------------
+// Der Captain-Boost ist knapp: SEASON_CAPTAIN_SLOTS = 3 über 10 Spieltage. Früher wurde er
+// rein gierig gesetzt (jede KI klatscht ihn an Spieltag 1 rein und verbrennt alle 3 bis
+// Spieltag 3). Stattdessen entscheidet die KI jetzt opportunistisch, ob sich EIN Slot HEUTE
+// lohnt, gemessen an:
+//   1. Ertrag/Magnitude: Der Boost bringt exakt +0.5 x finalContribution des Spielers
+//      (siehe legacy-score-engine.ts). Je stärker der geboostete Spieler, desto mehr Rohpunkte.
+//   2. Hebel/Leverage: Wie stark verbessert der Boost die Platzierung? Über den
+//      Disziplin-Rang (teamDisciplineRanks). Hoch im umkämpften oberen Mittelfeld, gering an
+//      der Tabellenspitze (schon vorne) und im aussichtslosen Keller.
+//   3. Diszi-Größe: In großen Disziplinen (viele Spieler) generiert der Boost mehr Rohpunkte
+//      ("den großen Weg für ein paar Extrapunkte gehen").
+// Pacing ("use it but not all at once"): Früh in der Saison mit allen Slots muss die Chance
+// ÜBERDURCHSCHNITTLICH sein; läuft die Saison aus (Restspieltage nähern sich Restslots), sinkt
+// die Hürde Richtung 0, damit ungenutzte Slots trotzdem vergeben werden (kein ai_captain_unused).
+// Alle Schwellen sind benannte Konstanten, damit der Owner sie später tunen kann.
+// ===========================================================================================
+
+// Maximal EIN neuer Captain pro Spieltag: verhindert das Verbrennen mehrerer knapper Slots
+// an einem einzigen Spieltag und streut sie über die Saison.
+const CAPTAIN_MAX_NEW_PER_MATCHDAY = 1;
+// Basis-Hürde für den "lohnt es sich"-Ertrag (in effektiven Boost-Punkten), früh in der Saison.
+const CAPTAIN_WORTHWHILE_BASE_THRESHOLD = 44;
+// Die Hürde sinkt mit dem Saison-Druck, aber nie unter diesen Bruchteil der Basis.
+const CAPTAIN_THRESHOLD_MIN_FRACTION = 0.15;
+// Faktor des Captain-Boosts laut Score-Engine: +0.5 x finalContribution.
+const CAPTAIN_RAW_BOOST_FACTOR = 0.5;
+// Ab dieser Spielerzahl gilt eine Diszi als "groß" -> Boost bringt spürbar mehr Rohpunkte.
+const CAPTAIN_LARGE_DISCIPLINE_PLAYER_COUNT = 5;
+const CAPTAIN_LARGE_DISCIPLINE_MULTIPLIER = 1.18;
+// Fallback-Teamzahl für die Rang-Normierung, falls allTeamIdentities fehlt.
+const CAPTAIN_DEFAULT_TOTAL_TEAMS = 32;
+// Ein bester Seiten-Score darunter gilt als "schwache Seite" (Konzession möglich).
+const CAPTAIN_WEAK_SIDE_STRONGEST_SCORE = 66;
+// Fallback-Hebel, wenn kein Rang bekannt ist: Magnitude entscheidet allein.
+const CAPTAIN_LEVERAGE_UNKNOWN_RANK = 0.85;
+
+// Hebel-Multiplikator aus dem Disziplin-Rang (rank 1 = stärkstes Team der Liga in der Diszi).
+// Deterministisch, rein aus Rangposition; dokumentiert und beschränkt (0.28..1.15).
+function getCaptainRankLeverage(rank: number | null, totalTeams: number): number {
+  if (rank == null) {
+    return CAPTAIN_LEVERAGE_UNKNOWN_RANK;
+  }
+  const frac = rank / Math.max(1, totalTeams);
+  if (frac <= 0.06) return 0.55; // schon (fast) Rang 1 – wenig Platzierungshebel
+  if (frac <= 0.45) return 1.15; // umkämpftes oberes Mittelfeld – höchster Hebel
+  if (frac <= 0.62) return 0.8;
+  if (frac <= 0.78) return 0.5;
+  return 0.28; // aussichtslos schwach – Slot lieber sparen
+}
+
+function getCaptainTotalTeams(context: LegacyLineupLoadedContext): number {
+  return context.allTeamIdentities?.length && context.allTeamIdentities.length > 0
+    ? context.allTeamIdentities.length
+    : CAPTAIN_DEFAULT_TOTAL_TEAMS;
+}
+
+function getCaptainRequiredPlayers(
+  context: LegacyLineupLoadedContext,
+  disciplineId: string,
+  disciplineSide: DisciplineSide,
+): number {
+  return (
+    context.disciplineSidePlayerCounts?.[`${disciplineId}::${disciplineSide}`] ??
+    context.disciplinePlayerCounts[disciplineId] ??
+    0
+  );
+}
+
+// Stärkster Disziplin-Score der aktuell für diese Seite geplanten Spieler.
+function getCaptainSideStrongestScore(
+  context: LegacyLineupLoadedContext,
+  entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>,
+  disciplineId: string,
+  disciplineSide: DisciplineSide,
+): number {
+  const sideEntries = entries.filter(
+    (entry) => entry.disciplineId === disciplineId && entry.disciplineSide === disciplineSide,
+  );
+  return Math.max(
+    0,
+    ...sideEntries.map(
+      (entry) =>
+        context.disciplineScores.find(
+          (score) => score.playerId === entry.playerId && score.disciplineId === disciplineId,
+        )?.score ?? 0,
+    ),
+  );
+}
+
+// Ist das Team insgesamt unterdurchschnittlich (Tabellenkeller-Kandidat)? Nur als weiches
+// Zusatzsignal für die Konzessions-Erkennung; ohne allTeamIdentities neutral (false).
+function isCaptainTeamBottomTier(context: LegacyLineupLoadedContext): boolean {
+  const others = context.allTeamIdentities ?? [];
+  if (others.length === 0) {
+    return false;
+  }
+  const teamTotal = context.teamIdentity.pow + context.teamIdentity.spe + context.teamIdentity.men + context.teamIdentity.soc;
+  const mean =
+    others.reduce((sum, entry) => sum + entry.pow + entry.spe + entry.men + entry.soc, 0) / others.length;
+  return teamTotal < mean * 0.9;
+}
+
+type CaptainOpportunity = {
+  side: DisciplineSide;
+  candidate: CaptainSuggestionCandidate;
+  opportunityScore: number;
+  rawBoost: number;
+  leverage: number;
+  rank: number | null;
+  strongestScore: number;
+  isLargeDiscipline: boolean;
+  isConceding: boolean;
+  worthwhile: boolean;
+};
+
+// Bewertet einen Captain-Kandidaten: erwarteter effektiver Ertrag = Rohboost x Hebel x Größe,
+// plus Konzessions-Erkennung (schwach + konservativ/Tabellenkeller => Slot sparen).
+function evaluateCaptainOpportunity(input: {
+  context: LegacyLineupLoadedContext;
+  entries: Array<LegacyLineupEntryInput & { isCaptain: boolean }>;
+  candidate: CaptainSuggestionCandidate;
+  effectiveThreshold: number;
+  strategyConservative: boolean;
+  bottomTier: boolean;
+  totalTeams: number;
+}): CaptainOpportunity {
+  const { context, entries, candidate, totalTeams } = input;
+  const rank = context.teamDisciplineRanks?.[candidate.disciplineId]?.rank ?? null;
+  const requiredPlayers = getCaptainRequiredPlayers(context, candidate.disciplineId, candidate.disciplineSide);
+  const strongestScore = getCaptainSideStrongestScore(context, entries, candidate.disciplineId, candidate.disciplineSide);
+  const contribution = Number.isFinite(candidate.estimatedContribution) ? candidate.estimatedContribution : 0;
+  const rawBoost = Math.max(0, contribution) * CAPTAIN_RAW_BOOST_FACTOR;
+  const leverage = getCaptainRankLeverage(rank, totalTeams);
+  const isLargeDiscipline = requiredPlayers >= CAPTAIN_LARGE_DISCIPLINE_PLAYER_COUNT;
+  const sizeMultiplier = isLargeDiscipline ? CAPTAIN_LARGE_DISCIPLINE_MULTIPLIER : 1;
+  const opportunityScore = rawBoost * leverage * sizeMultiplier;
+
+  // Konzession: schwache Seite UND (konservative Aufstellung ODER Tabellenkeller). Genau der
+  // Fall des Users: "wenn man eh schwach ist und negative Form reinschmeißt, warum Captain?"
+  const isWeakSide =
+    (rank != null && rank >= Math.ceil(totalTeams * 0.72)) || strongestScore < CAPTAIN_WEAK_SIDE_STRONGEST_SCORE;
+  const isConceding = isWeakSide && (input.strategyConservative || input.bottomTier);
+
+  const worthwhile = !isConceding && opportunityScore >= input.effectiveThreshold;
+
+  return {
+    side: candidate.disciplineSide,
+    candidate,
+    opportunityScore,
+    rawBoost,
+    leverage,
+    rank,
+    strongestScore,
+    isLargeDiscipline,
+    isConceding,
+    worthwhile,
+  };
+}
+
 function getIdentityTieBreakScore(
   context: LegacyLineupLoadedContext,
   playerId: string,
@@ -519,26 +681,95 @@ function buildCaptainDecisions(
   const captainUsage = getCaptainUsageBeforeCurrentDraft(context);
   const captainSlotsUsed = captainUsage.count;
   const seasonCaptainSlots = context.captainRule?.seasonCaptainSlots ?? 0;
-  const captainSlotsRemaining = Math.max(0, seasonCaptainSlots - captainSlotsUsed);
+  // Slots VOR diesem Spieltag (für Validierung/Idempotenz).
+  const captainSlotsRemainingBeforeDraft = Math.max(0, seasonCaptainSlots - captainSlotsUsed);
 
   const candidates = [
     suggestCaptainForSide(context, entries, input.d1DisciplineId, "d1"),
     suggestCaptainForSide(context, entries, input.d2DisciplineId, "d2"),
   ].filter((candidate): candidate is CaptainSuggestionCandidate => Boolean(candidate));
 
-  const selectedCandidateKeys = new Set<string>();
-  let newlyConsumedCaptainSlots = 0;
-  for (const candidate of [...candidates].sort((left, right) => right.estimatedContribution - left.estimatedContribution)) {
-    const sideKey = `${candidate.disciplineId}::${candidate.disciplineSide}`;
-    const alreadyConsumedThisSeason = captainUsage.hasExactSideKeys && captainUsage.sideKeys.has(sideKey);
+  // --- Pacing-Kontext: Wie viel Saison ist noch übrig pro verbleibendem Slot? ---
+  const totalSeasonSides = context.matchdayContract?.totalDisciplineSidesInSeason ?? 20;
+  const totalMatchdays = Math.max(1, Math.ceil(totalSeasonSides / 2));
+  const matchdayIndex = Math.max(
+    1,
+    context.matchdayContract?.matchdayIndex ?? context.matchday?.index ?? context.season?.currentMatchday ?? 1,
+  );
+  const matchdaysRemainingIncludingCurrent = Math.max(1, totalMatchdays - matchdayIndex + 1);
+  // "use it or lose it": sobald man ab jetzt an JEDEM Restspieltag einen Slot bräuchte, wird
+  // erzwungen (Hürde/Konzession ignoriert), damit keine Slots ungenutzt verfallen.
+  const forced =
+    captainSlotsRemainingBeforeDraft > 0 &&
+    captainSlotsRemainingBeforeDraft >= matchdaysRemainingIncludingCurrent;
+  // Druck steigt Richtung Saisonende / bei vielen Restslots -> Hürde sinkt.
+  const pressure = captainSlotsRemainingBeforeDraft / matchdaysRemainingIncludingCurrent;
+  const thresholdFraction = Math.min(1, Math.max(CAPTAIN_THRESHOLD_MIN_FRACTION, 1 - pressure));
+  const effectiveThreshold = CAPTAIN_WORTHWHILE_BASE_THRESHOLD * thresholdFraction;
 
-    if (alreadyConsumedThisSeason || newlyConsumedCaptainSlots < captainSlotsRemaining) {
-      selectedCandidateKeys.add(sideKey);
-      if (!alreadyConsumedThisSeason) {
-        newlyConsumedCaptainSlots += 1;
-      }
+  const strategyConservative = (() => {
+    const strategy = resolveLineupStrategy(context);
+    return strategy === "avoid_injury" || strategy === "rotate_depth";
+  })();
+  const bottomTier = isCaptainTeamBottomTier(context);
+  const totalTeams = getCaptainTotalTeams(context);
+
+  const opportunityBySide = new Map<DisciplineSide, CaptainOpportunity>();
+  for (const candidate of candidates) {
+    opportunityBySide.set(
+      candidate.disciplineSide,
+      evaluateCaptainOpportunity({
+        context,
+        entries,
+        candidate,
+        effectiveThreshold,
+        strategyConservative,
+        bottomTier,
+        totalTeams,
+      }),
+    );
+  }
+
+  // --- Auswahl: höchstens EIN neuer Captain pro Spieltag, an der lohnendsten Seite. ---
+  // Deterministische Reihenfolge: bester Opportunity-Score zuerst, dann stabile Schlüssel.
+  const rankedOpportunities = [...opportunityBySide.values()].sort((left, right) => {
+    if (right.opportunityScore !== left.opportunityScore) {
+      return right.opportunityScore - left.opportunityScore;
+    }
+    if (left.candidate.disciplineId !== right.candidate.disciplineId) {
+      return left.candidate.disciplineId.localeCompare(right.candidate.disciplineId);
+    }
+    if (left.side !== right.side) {
+      return left.side.localeCompare(right.side);
+    }
+    return left.candidate.playerId.localeCompare(right.candidate.playerId);
+  });
+
+  const selectedNewSides = new Set<DisciplineSide>();
+  let newlyConsumedCaptainSlots = 0;
+  const maxNewThisMatchday = Math.min(CAPTAIN_MAX_NEW_PER_MATCHDAY, captainSlotsRemainingBeforeDraft);
+  for (const opportunity of rankedOpportunities) {
+    if (newlyConsumedCaptainSlots >= maxNewThisMatchday) {
+      break;
+    }
+    const sideKey = `${opportunity.candidate.disciplineId}::${opportunity.candidate.disciplineSide}`;
+    const alreadyConsumedThisSeason = captainUsage.hasExactSideKeys && captainUsage.sideKeys.has(sideKey);
+    if (alreadyConsumedThisSeason) {
+      continue; // verbraucht keinen neuen Slot; wird unten separat als "selected" markiert
+    }
+    // Erzwungener Spend (Saisonende) nimmt die beste Seite unabhängig von Hürde/Konzession.
+    if (forced || opportunity.worthwhile) {
+      selectedNewSides.add(opportunity.side);
+      newlyConsumedCaptainSlots += 1;
     }
   }
+
+  const captainSlotsRemainingAfterDraft = Math.max(
+    0,
+    captainSlotsRemainingBeforeDraft - newlyConsumedCaptainSlots,
+  );
+
+  const formatBoost = (value: number) => (Math.round(value * 10) / 10).toFixed(1);
 
   const decisionsBySide = new Map<DisciplineSide, CaptainDecision>();
   for (const side of ["d1", "d2"] as const) {
@@ -564,17 +795,12 @@ function buildCaptainDecisions(
 
     const sideKey = `${candidate.disciplineId}::${candidate.disciplineSide}`;
     const alreadyConsumedThisSeason = captainUsage.hasExactSideKeys && captainUsage.sideKeys.has(sideKey);
+    const opportunity = opportunityBySide.get(side)!;
+    const captainLabel = candidate.captainName ?? candidate.playerId;
+    const rankLabel = opportunity.rank == null ? "n/a" : String(opportunity.rank);
 
-    if (captainSlotsRemaining <= 0 && !alreadyConsumedThisSeason) {
-      decisionsBySide.set(side, {
-        candidate,
-        status: "skipped_limit_reached",
-        warnings: ["captain_limit_reached"],
-      });
-      continue;
-    }
-
-    if (selectedCandidateKeys.has(sideKey)) {
+    // Bereits diese Saison an dieser Diszi-Seite gesetzt -> beibehalten (Idempotenz).
+    if (alreadyConsumedThisSeason) {
       decisionsBySide.set(side, {
         candidate,
         status: "selected",
@@ -583,10 +809,65 @@ function buildCaptainDecisions(
       continue;
     }
 
+    // Saisonlimit bereits ausgeschöpft (unabhängig vom Pacing).
+    if (captainSlotsRemainingBeforeDraft <= 0) {
+      decisionsBySide.set(side, {
+        candidate,
+        status: "skipped_limit_reached",
+        warnings: ["captain_limit_reached"],
+      });
+      continue;
+    }
+
+    if (selectedNewSides.has(side)) {
+      // Grund/Reasoning sichtbar machen (Audit/Preview): großer Weg vs. opportunistisch.
+      const reason =
+        opportunity.isLargeDiscipline && opportunity.rank != null && opportunity.rank <= Math.ceil(totalTeams * 0.5)
+          ? `Captain auf große Diszi absichern: ${captainLabel} (Rang ${rankLabel}, +${formatBoost(opportunity.rawBoost)} Rohpunkte, Hebel ${opportunity.leverage.toFixed(2)})`
+          : forced
+            ? `Captain gesetzt (Saisonende, Slot sonst verfallen): ${captainLabel} (+${formatBoost(opportunity.rawBoost)} Rohpunkte)`
+            : `Captain opportunistisch gesetzt: ${captainLabel} (Wert ${formatBoost(opportunity.opportunityScore)} >= Hürde ${formatBoost(effectiveThreshold)}, Rang ${rankLabel})`;
+      decisionsBySide.set(side, {
+        candidate,
+        status: "selected",
+        warnings: [reason, ...candidate.warnings],
+      });
+      continue;
+    }
+
+    // Nicht gewählt: Slot wird bewusst gespart. Grund je nach Ursache.
+    if (opportunity.isConceding) {
+      decisionsBySide.set(side, {
+        candidate,
+        status: "skipped_not_worthwhile",
+        warnings: [
+          `Captain gespart: schwache/konservative Diszi, Slot für später aufgehoben (Rang ${rankLabel}, bester Score ${formatBoost(opportunity.strongestScore)})`,
+          ...candidate.warnings,
+        ],
+      });
+      continue;
+    }
+
+    if (!opportunity.worthwhile) {
+      decisionsBySide.set(side, {
+        candidate,
+        status: "skipped_not_worthwhile",
+        warnings: [
+          `Captain gespart: Ertrag zu gering (Wert ${formatBoost(opportunity.opportunityScore)} < Hürde ${formatBoost(effectiveThreshold)}, Rang ${rankLabel})`,
+          ...candidate.warnings,
+        ],
+      });
+      continue;
+    }
+
+    // Grundsätzlich lohnend, aber wir setzen nur den besten Kandidaten pro Spieltag: gespart.
     decisionsBySide.set(side, {
       candidate,
-      status: "skipped_limit_reached",
-      warnings: ["captain_limit_reached", ...candidate.warnings],
+      status: "skipped_saving_for_later",
+      warnings: [
+        `Captain gespart: stärkere Seite/späterer Spieltag bevorzugt (Wert ${formatBoost(opportunity.opportunityScore)}, max ${CAPTAIN_MAX_NEW_PER_MATCHDAY}/Spieltag)`,
+        ...candidate.warnings,
+      ],
     });
   }
 
@@ -596,7 +877,8 @@ function buildCaptainDecisions(
   return {
     entries: nextEntries,
     captainSlotsUsed,
-    captainSlotsRemaining,
+    // Nach diesem Spieltag verbleibende Slots (spiegelt die heutige Entscheidung wider).
+    captainSlotsRemaining: captainSlotsRemainingAfterDraft,
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsage.sideKeys),
     d1: decisionsBySide.get("d1")!,
     d2: decisionsBySide.get("d2")!,
@@ -735,7 +1017,11 @@ function buildPreviewSide(
         ? [`Captain: ${captainDecision.candidate.captainName}`]
         : captainDecision.status === "skipped_limit_reached"
           ? ["Captain uebersprungen: Saisonlimit erreicht"]
-          : ["Kein Captain-Vorschlag"]),
+          : captainDecision.status === "skipped_not_worthwhile"
+            ? ["Captain gespart: Ertrag/Diszi diesen Spieltag nicht lohnend"]
+            : captainDecision.status === "skipped_saving_for_later"
+              ? ["Captain gespart: Slot fuer spaeter/staerkere Seite aufgehoben"]
+              : ["Kein Captain-Vorschlag"]),
     ],
   };
 }

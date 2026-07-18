@@ -57,6 +57,13 @@ export type AiCaptainSelectionStatus =
   | "skipped_limit_reached"
   | "skipped_reserved"
   | "skipped_not_needed"
+  // Opportunistischer Verzicht: Der Kandidat wäre grundsätzlich möglich, aber der erwartete
+  // Ertrag rechtfertigt es nicht, einen der knappen Saison-Slots JETZT zu verbrennen
+  // (schwache/konservative Diszi, geringer Hebel).
+  | "skipped_not_worthwhile"
+  // Pacing-Verzicht: Es gäbe einen lohnenden Kandidaten, aber wir sparen den Slot bewusst
+  // (max. ein neuer Captain pro Spieltag / stärkere Seite bevorzugt / noch genug Saison übrig).
+  | "skipped_saving_for_later"
   | "blocked_policy";
 
 export type AiLegacyLineupSelectedPlayer = {
