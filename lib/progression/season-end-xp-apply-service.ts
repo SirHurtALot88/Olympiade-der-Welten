@@ -389,8 +389,11 @@ function buildEconomyAudit(input: {
           players: input.gameState.players.map((entry) => (entry.id === input.baselinePlayer!.id ? input.baselinePlayer! : entry)),
         }
       : null;
+  // Freeze-Bypass: Der Progression-Audit muss die Before/After-OVR LIVE aus den getauschten
+  // Spielern rechnen. Ohne `ignoreFreeze` liefert die Map nach MD10 die eingefrorenen Rows
+  // (playerId-keyed) → beforeRating === afterRating → Development-Delta strukturell 0.
   const beforeRating = baselineGameState
-    ? buildPlayerRatingContractMap(baselineGameState).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
+    ? buildPlayerRatingContractMap(baselineGameState, undefined, { ignoreFreeze: true }).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
     : input.context.beforeRatings.get(input.player.id) ?? null;
   const rankTableMarketValueBefore = resolveRankTableMarketValueFromCompareRow(beforeRow);
   const rankTableMarketValueAfter = input.hasAttributeChanges
@@ -403,7 +406,7 @@ function buildEconomyAudit(input: {
       }
     : null;
   const afterRating = afterGameState
-    ? buildPlayerRatingContractMap(afterGameState).get(input.player.id) ?? null
+    ? buildPlayerRatingContractMap(afterGameState, undefined, { ignoreFreeze: true }).get(input.player.id) ?? null
     : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && input.player.marketValue != null
