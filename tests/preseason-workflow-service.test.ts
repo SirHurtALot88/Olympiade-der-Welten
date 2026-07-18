@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameState, Player, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { createPlayerBaselineFromPlayer } from "@/lib/players/player-baseline-service";
+import { computeSeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
 
 vi.mock("@/lib/season/prize-money-preview", () => ({
   buildPrizeMoneyPreview: vi.fn(async () => ({
@@ -217,8 +218,12 @@ function gameState(): GameState {
       { id: "showcase", name: "Showcase", category: "social", weight: 1, playerCount: 2 },
     ],
     rosters: [
-      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 1, roleTag: "bench", joinedSeasonId: "season-1" },
+      // Mehrjahresverträge (LZ 3), damit die generischen Saisonübergangs-Tests die Setup-Mechanik
+      // prüfen und nicht versehentlich am Vertragsablauf hängen. Die Season-End-Vertragsalterung
+      // dekrementiert diese im Übergang auf LZ 2 (siehe Zusatz-Assertions unten). Vertragsablauf
+      // (LZ 1 -> ausgelaufen) wird gezielt im dedizierten Aging-Test abgedeckt.
+      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, roleTag: "bench", joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],
@@ -377,10 +382,110 @@ describe("pre-season workflow service", () => {
     expect(savedState.seasonState.standings["human-1"]?.points).toBe(0);
     expect(savedState.rosters.length).toBe(2);
     expect(savedState.transferHistory.length).toBe(0);
+    // Season-End-Vertragsalterung ist im echten Übergang gelaufen: LZ 3 -> 2 (genau ein Tick), und
+    // der Übergangs-AuditLog vermerkt den angewandten Tick.
+    expect(savedState.rosters.find((entry) => entry.id === "r-human")?.contractLength).toBe(2);
+    expect(savedState.rosters.find((entry) => entry.id === "r-ai")?.contractLength).toBe(2);
+    expect(
+      savedState.seasonState.preSeasonWorkflowLogs?.[0]?.warnings.some((warning) =>
+        warning.startsWith("season_end_contract_tick_applied"),
+      ),
+    ).toBe(true);
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.status).toBe("applied");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("seasonState.disciplineSchedule");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("playerProgressionEvents");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.warnings).toContain("season_mutator_state_reset_lineup_modifiers_cleared");
+  });
+
+  it("ages contracts exactly once per interactive transition: -1 decrement + salary schedule advance + expiry, idempotent, and ticks again next season", () => {
+    const sourceSave = save();
+    // Mehrjahresvertrag (LZ 3) mit explizitem Gehaltsplan auf dem MENSCHEN-Team: muss im echten
+    // Übergang um genau 1 dekrementieren und der Gehaltsplan muss um ein Jahr vorrücken (Menschen-
+    // Teams altern ebenso). Zusätzlich ein auslaufender (LZ 1) Vertrag: muss ausgelaufen sein.
+    const multi = createPlayer({ id: "p-multi", name: "Longterm", marketValue: 30, salaryDemand: 10 });
+    const expiring = createPlayer({ id: "p-exp", name: "Expiring", marketValue: 8, salaryDemand: 3 });
+    sourceSave.gameState.players.push(multi, expiring);
+    sourceSave.gameState.playerBaselines = [
+      ...(sourceSave.gameState.playerBaselines ?? []),
+      createPlayerBaselineFromPlayer(multi, { source: "seed", createdAt: "2026-06-11T00:00:00.000Z" }),
+      createPlayerBaselineFromPlayer(expiring, { source: "seed", createdAt: "2026-06-11T00:00:00.000Z" }),
+    ];
+    sourceSave.gameState.rosters = [
+      ...sourceSave.gameState.rosters,
+      {
+        id: "r-multi",
+        teamId: "human-1",
+        playerId: "p-multi",
+        salary: 10,
+        upkeep: 10,
+        contractLength: 3,
+        contractStatus: "active",
+        roleTag: "starter",
+        joinedSeasonId: "season-1",
+        yearlySalarySchedule: [
+          { yearIndex: 0, seasonOffset: 0, label: "Season 1", salary: 10 },
+          { yearIndex: 1, seasonOffset: 1, label: "Season 2", salary: 8 },
+          { yearIndex: 2, seasonOffset: 2, label: "Season 3", salary: 6 },
+        ],
+      },
+      {
+        id: "r-exp",
+        teamId: "human-1",
+        playerId: "p-exp",
+        salary: 3,
+        upkeep: 3,
+        contractLength: 1,
+        contractStatus: "expiring",
+        roleTag: "bench",
+        joinedSeasonId: "season-1",
+      },
+    ];
+
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+    const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+    const saved = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!saved) throw new Error("Expected interactive transition to persist state.");
+
+    // Mehrjahresvertrag: genau ein Tick (LZ 3 -> 2) und Gehaltsplan vorgerückt (Jahr 1 konsumiert).
+    const multiAfter = saved.rosters.find((entry) => entry.id === "r-multi");
+    expect(multiAfter?.contractLength).toBe(2);
+    expect(multiAfter?.contractStatus).toBe("active");
+    expect(multiAfter?.yearlySalarySchedule?.length).toBe(2);
+    expect(multiAfter?.yearlySalarySchedule?.[0]?.salary).toBe(8);
+    expect(multiAfter?.salary).toBe(8);
+
+    // Auslaufender Vertrag (Menschen-Team): ausgelaufen (LZ 0) und wartet als renewal_pending auf die
+    // menschliche Entscheidung — bleibt im Kader, KI-Entscheidungen greifen hier NICHT.
+    const expAfter = saved.rosters.find((entry) => entry.id === "r-exp");
+    expect(expAfter?.contractLength).toBe(0);
+    expect(expAfter?.contractStatus).toBe("renewal_pending");
+
+    // Der Übergang hat den Idempotenz-Marker der auslaufenden Saison persistiert.
+    const season1TickMarker = saved.seasonState.preSeasonWorkflowLogs?.find(
+      (log) => log.stepId === "season_end_contract_tick" && log.fromSeasonId === "season-1",
+    );
+    expect(season1TickMarker?.status).toBe("applied");
+
+    // Idempotenz: ein erneuter Tick auf denselben (season-1-)Übergang ist ein No-Op — KEIN Doppel-Tick.
+    const firstTick = computeSeasonEndContractTick(sourceSave);
+    const doubleTick = computeSeasonEndContractTick({ ...sourceSave, gameState: firstTick.gameState });
+    expect(firstTick.applied).toBe(true);
+    expect(doubleTick.applied).toBe(false);
+    expect(doubleTick.alreadyApplied).toBe(true);
+    // Unverändert gegenüber dem ersten Tick (LZ bleibt 2, nicht 1).
+    expect(doubleTick.gameState.rosters.find((entry) => entry.id === "r-multi")?.contractLength).toBe(2);
+
+    // Zweiter Saisonübergang tickt ERNEUT (nicht steckengeblieben): der Marker ist je fromSeasonId,
+    // die neue Saison (season-2) hat noch keinen Marker. LZ 2 -> 1.
+    expect(saved.season.id).toBe("season-2");
+    const nextSeasonSave: PersistedSaveGame = { ...sourceSave, gameState: saved };
+    const secondTick = computeSeasonEndContractTick(nextSeasonSave);
+    expect(secondTick.applied).toBe(true);
+    expect(secondTick.alreadyApplied).toBe(false);
+    expect(secondTick.gameState.rosters.find((entry) => entry.id === "r-multi")?.contractLength).toBe(1);
   });
 
   it("also snapshots the completed season in the lightweight next-season setup path", () => {

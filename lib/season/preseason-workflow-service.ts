@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -507,10 +507,24 @@ function isTransferPipelineFastMode() {
 }
 
 function buildNextSeasonGameState(
-  save: PersistedSaveGame,
+  inputSave: PersistedSaveGame,
   opts?: { transferPipelineFast?: boolean },
 ): { gameState: GameState; auditLog: PreSeasonWorkflowLogRecord } {
   const transferPipelineFast = opts?.transferPipelineFast ?? isTransferPipelineFastMode();
+  // KERN DES SAISON-LOOPS: Vertragsalterung GENAU EINMAL pro echtem Saisonübergang anwenden. Der Tick
+  // schreibt contractLength/Status/Gehaltsplan fort, lässt 0-Jahres-Verträge auslaufen (Free-Agent-
+  // Exit-Cash fließt in team.cash) und fährt KI-Verlängern/-Freigeben. Menschen-Teams altern EBENSO
+  // (kein Verlust der Vertragsalterung), ihre auslaufenden Verträge bleiben aber "renewal_pending" —
+  // die KI-Entscheidung greift nur für KI-Teams. Idempotent über einen preSeasonWorkflowLogs-Marker je
+  // fromSeasonId: wurde der Tick vorher schon über den (Vorschau-)Schritt contract_renewal / den Sim-
+  // Apply angewandt und persistiert (und der Save vor dem Übergang neu geladen), ist dies ein No-Op —
+  // kein Doppel-Tick, keine doppelte Cash-Buchung. Der Tick läuft VOR der Rest-Pipeline (Baseline-Drift
+  // für frisch freigesetzte Free Agents, Sponsoren, Kader-Neuaufbau), damit diese auf dem gealterten
+  // Kader/Cash aufsetzen und nichts doppelt zählen.
+  const contractTick = computeSeasonEndContractTick(inputSave);
+  const save: PersistedSaveGame = contractTick.applied
+    ? { ...inputSave, gameState: contractTick.gameState }
+    : inputSave;
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
@@ -629,6 +643,11 @@ function buildNextSeasonGameState(
       `season_economy_factors_advanced:s_plus_4=${economyFactors.rerolledSeasonPlus4.factor}`,
       nextFormCards.length === 0 ? "season_formcards_generation_empty" : null,
       transferPipelineFast ? "transfer_pipeline_fast_skip_expensive_season_prep" : null,
+      contractTick.applied
+        ? `season_end_contract_tick_applied:renewed=${contractTick.renewedPlayers}:released=${contractTick.releasedPlayers}`
+        : contractTick.alreadyApplied
+          ? "season_end_contract_tick_already_applied"
+          : null,
       "season_mutator_state_reset_lineup_modifiers_cleared",
     ].filter((entry): entry is string => Boolean(entry)),
     affectedEntities: [
@@ -647,6 +666,7 @@ function buildNextSeasonGameState(
       "playerProgressionEvents",
       "players.season_baseline_progression",
       "rosters.currentValue",
+      "rosters.contractLength_season_end_tick",
       "arena_state_reset",
     ],
     timestamp: new Date().toISOString(),
