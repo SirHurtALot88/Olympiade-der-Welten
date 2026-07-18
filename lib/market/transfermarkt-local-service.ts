@@ -2925,6 +2925,25 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
     warnings.push(note);
   }
 
+  // Bug (deep-hunt): Roster-Mindestbestand-Warnungen wie im Referenz-Sell-Service
+  // (transfermarkt-sell-service.ts). Der lokale Pfad hat bisher nur die Readiness-
+  // Warnung emittiert, aber nicht gewarnt, wenn ein Verkauf den Kader unter das
+  // 7er-Minimum, das Pflicht-Minimum (playerMin) oder den Optimalwert (playerOpt)
+  // fallen laesst. Gleiche Warn-Codes/-Form wie die Referenz, damit die UI sie
+  // konsistent rendert. rosterAfter wird nur bei tatsaechlichem Verkauf dekrementiert.
+  if (activePlayer && teamContext) {
+    const rosterAfterForWarnings = Math.max(0, rosterBefore - 1);
+    if (rosterAfterForWarnings < 7) {
+      warnings.push("team_would_fall_under_7");
+    }
+    if (teamContext.playerMin != null && rosterAfterForWarnings < teamContext.playerMin) {
+      warnings.push("team_would_fall_under_player_min");
+    }
+    if (teamContext.playerOpt != null && rosterAfterForWarnings < teamContext.playerOpt) {
+      warnings.push("team_would_fall_under_player_opt");
+    }
+  }
+
   // Bug #11: Echte Readiness-Projektion nach dem Verkauf statt hartcodiertem "unknown".
   const readinessPreview =
     activePlayer && team && activePlayer.teamId === params.teamId

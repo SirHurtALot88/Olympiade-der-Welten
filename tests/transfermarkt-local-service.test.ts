@@ -1996,6 +1996,50 @@ describe("transfermarkt local service", () => {
     expect(preview.warnings).toContain("team_readiness_would_get_worse");
   }, 30000);
 
+  // Bug (deep-hunt): Der lokale Sell-Preview muss — wie der Referenz-Sell-Service — warnen,
+  // wenn ein Verkauf den Kader unter das Pflicht-Minimum (playerMin) fallen laesst.
+  it("surfaces the roster-minimum fall-below warnings when a local sell drops the roster below its minimum", async () => {
+    const players = Array.from({ length: 8 }, (_, index) =>
+      createPlayer(`p${index + 1}`, {
+        marketValue: 20,
+        displayMarketValue: 20,
+        salaryDemand: 5,
+        displaySalary: 5,
+      }),
+    );
+    const rosters = Array.from({ length: 8 }, (_, index) =>
+      createRosterEntry(`r${index + 1}`, `p${index + 1}`, {
+        salary: 5,
+        contractLength: 3,
+        currentValue: 20,
+        purchasePrice: 20,
+      }),
+    );
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+      players,
+      rosters,
+    });
+    // Kader (8) == playerMin (8): Nach dem Verkauf faellt er auf 7 -> unter playerMin und playerOpt,
+    // aber nicht unter das harte 7er-Minimum.
+    gameState.teamIdentities = [makeTeamIdentity({ teamId: "A-A", playerMin: 8, playerOpt: 10 })];
+    persistenceState.save = { saveId: "save-singleplayer-dev", gameState };
+
+    const { previewLocalTransfermarktSell } = await import("@/lib/market/transfermarkt-local-service");
+    const preview = previewLocalTransfermarktSell({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      activePlayerId: "r1",
+    });
+
+    // Gleiche Warn-Codes wie der Referenz-Sell-Service, damit die UI konsistent rendert.
+    expect(preview.rosterAfter).toBe(7);
+    expect(preview.warnings).toContain("team_would_fall_under_player_min");
+    expect(preview.warnings).toContain("team_would_fall_under_player_opt");
+    expect(preview.warnings).not.toContain("team_would_fall_under_7");
+  }, 30000);
+
   // Bug #12: Der AI-Liquiditaetspuffer darf nur AI-/Auto-Kaeufe begrenzen, nicht menschliche.
   it("gates human buys on raw on-hand cash but keeps the AI liquidity buffer for AI-controlled teams", async () => {
     // Distinkte saveIds, damit der inhaltsbasierte Market-Context-Cache die beiden
