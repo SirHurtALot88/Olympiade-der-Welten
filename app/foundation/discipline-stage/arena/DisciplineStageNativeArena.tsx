@@ -196,6 +196,7 @@ export default function DisciplineStageNativeArena({ teams, slots }: DisciplineS
   }, [slotCount]);
 
   const maxScore = Math.max(1, ...live.map((t) => t.score));
+  const minScore = Math.min(...live.map((t) => t.score));
 
   // Oval-Pfad: Länge messen, Tokens per getPointAtLength platzieren.
   const pathRef = useRef<SVGPathElement | null>(null);
@@ -221,7 +222,11 @@ export default function DisciplineStageNativeArena({ teams, slots }: DisciplineS
 
   function tokenPos(score: number): { x: number; y: number } {
     if (!pathRef.current || pathLen === 0) return { x: W / 2, y: 70 };
-    const frac = maxScore > 0 ? (score / maxScore) * 0.9 : 0;
+    // Feld über das Oval spreizen: Letzter am Start (~6%), Führender vorn (~92%).
+    // Sonst kleben die Tokens bei eng beieinander liegenden Summen zusammen.
+    const span = maxScore - minScore;
+    const norm = span > 0 ? (score - minScore) / span : 0;
+    const frac = 0.06 + norm * 0.86;
     const pt = pathRef.current.getPointAtLength(frac * pathLen);
     return { x: pt.x, y: pt.y };
   }
