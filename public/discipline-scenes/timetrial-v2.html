@@ -912,6 +912,24 @@
             teams.forEach(function(t){ t.mine = (t.code === d.mineCode); });
           }
         } catch (e) {}
+        // Echte Team-Logos: auf Team legen (Ladder-<img>) + fürs Canvas vorladen.
+        try {
+          if (typeof teams !== "undefined") {
+            d.teams.forEach(function(rt){
+              var t = teams.find(function(x){ return x.code === rt.code; });
+              if (!t) return;
+              t.logoUrl = rt.logoUrl || null;
+              if (rt.logoUrl) {
+                t.crest = rt.logoUrl;
+                if (!t.logoImg) {
+                  var im = new Image();
+                  im.onload = function(){ t.logoImg = im; try { if (typeof drawScene === "function") drawScene(); } catch (e) {} };
+                  im.src = rt.logoUrl;
+                }
+              }
+            });
+          }
+        } catch (e) {}
         var ORIG_GEN = genPlayers;
         genPlayers = function(t){
           var rt = byCode[t.code];
@@ -932,6 +950,8 @@
             }
             base.val = (p.val || 0);
             base.name = p.name || base.name || "\u2014";
+            base.portraitUrl = p.portraitUrl || base.portraitUrl || null;
+            base.traits = Array.isArray(p.traits) ? p.traits : (base.traits || []);
             if (d.mode === "random") {
               var mods = (typeof rollMods === "function") ? rollMods() : [];
               mods.forEach(function(m){ if (m.injury) m.amt = Math.max(1, Math.round((p.val || 0) * 0.5)); });
@@ -946,6 +966,77 @@
           }
           return out;
         };
+        // Einmalige Funktions-Patches (echte Bilder, 1-Dezimal-Punkte, Medaillen-Fix).
+        if (!window.__olyPatched) {
+          window.__olyPatched = true;
+          function f1(x){ var v = Math.round((x || 0) * 10) / 10; return (v % 1 === 0) ? String(v) : v.toFixed(1); }
+          // Canvas-Tokens: echtes Logo statt prozeduralem Wappen.
+          try {
+            if (typeof paintCrest !== "undefined") {
+              var _paint = paintCrest;
+              paintCrest = function(c2, cx, cy, r, t, withLetter){
+                if (t && t.logoImg && t.logoImg.complete && t.logoImg.naturalWidth) {
+                  try {
+                    c2.save();
+                    c2.beginPath(); c2.arc(cx, cy, r, 0, Math.PI * 2); c2.closePath(); c2.clip();
+                    c2.drawImage(t.logoImg, cx - r, cy - r, r * 2, r * 2);
+                    c2.restore();
+                    c2.beginPath(); c2.arc(cx, cy, r, 0, Math.PI * 2);
+                    c2.lineWidth = t.mine ? Math.max(2, r * 0.16) : Math.max(1.5, r * 0.11);
+                    c2.strokeStyle = t.mine ? "#fff" : "rgba(255,255,255,.55)"; c2.stroke();
+                    return;
+                  } catch (e) {}
+                }
+                return _paint(c2, cx, cy, r, t, withLetter);
+              };
+            }
+          } catch (e) {}
+          // Ladder-<img>: echte Logo-URL statt gemaltem DataURL.
+          try {
+            if (typeof crestURL !== "undefined") {
+              var _crestURL = crestURL;
+              crestURL = function(t, size){ if (t && t.logoUrl) return t.logoUrl; return _crestURL(t, size); };
+            }
+          } catch (e) {}
+          // Spotlight: echtes Spieler-Portrait des hervorgehobenen Spielers.
+          try {
+            if (typeof showSpotlight !== "undefined") {
+              var _spot = showSpotlight;
+              showSpotlight = function(o){
+                _spot(o);
+                try {
+                  if (o && o.player && o.player.portraitUrl) {
+                    var el = document.getElementById("spCrest");
+                    if (el) el.src = o.player.portraitUrl;
+                  }
+                } catch (e) {}
+              };
+            }
+          } catch (e) {}
+          // Skill-Punkte im Ladder mit max. 1 Nachkommastelle.
+          try {
+            if (typeof fmtScore !== "undefined") {
+              fmtScore = function(t){
+                var g = t.score - (t.roundStartScore || 0);
+                return f1(t.score) + (g > 0.05 ? " (+" + f1(g) + ")" : "");
+              };
+            }
+          } catch (e) {}
+          // Runden-Medaillen: echte Top-3 der Runde (gegen ALLE Teams), Medaille nur
+          // auf bereits aufgedeckten Teams — kein Fehl-Gold auf zuerst-aufgedeckte.
+          try {
+            if (typeof updateRoundMedals !== "undefined" && typeof modSum !== "undefined") {
+              updateRoundMedals = function(round){
+                var ranked = teams.map(function(t){
+                  var p = t.players[round];
+                  return { t: t, net: p ? Math.max(0, p.val + modSum(p)) : -1 };
+                }).sort(function(a, b){ return b.net - a.net || a.t.seasonRank - b.t.seasonRank; });
+                teams.forEach(function(t){ t.roundMedal = 0; });
+                ranked.slice(0, 3).forEach(function(o, idx){ if (o.t.thrownSlot === round) o.t.roundMedal = idx + 1; });
+              };
+            }
+          } catch (e) {}
+        }
         if (typeof reset === "function") { reset(); }
       } catch (e) { /* Szene niemals crashen lassen */ }
     }

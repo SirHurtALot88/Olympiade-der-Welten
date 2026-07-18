@@ -12,6 +12,7 @@ export type DisciplineStageSlot = {
   formSwing: number; // aus player.form + kleiner Tagesform-Swing
   net: number; // max(0, base - fatiguePenalty + formSwing)
   portraitUrl: string | null;
+  traits: string[]; // player.traitsPositive + traitsNegative (für Trait-Mutatoren)
 };
 
 export type DisciplineStageTeam = {
@@ -57,9 +58,21 @@ function computeSlot(player: Player, disciplineId: string, slotIndex: number): D
   // Form über/unter 50 gibt bis zu ±12 %, plus kleiner Tagesform-Swing.
   const formBase = Math.round(((form - 50) / 50) * base * 0.12);
   const formSwing = formBase + seededJitter(`${player.id}|${disciplineId}`);
-  const net = Math.max(0, base - fatiguePenalty + formSwing);
+  // Skill-Punkte mit max. 1 Nachkommastelle (Grundwert kann im Save eine Kommazahl sein).
+  const net = Number(Math.max(0, base - fatiguePenalty + formSwing).toFixed(1));
   const portraitUrl = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null);
-  return { slotIndex, playerId: player.id, playerName: player.name, base, fatiguePenalty, formSwing, net, portraitUrl };
+  const traits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map((t) => String(t).trim()).filter(Boolean);
+  return {
+    slotIndex,
+    playerId: player.id,
+    playerName: player.name,
+    base: Number(base.toFixed(1)),
+    fatiguePenalty,
+    formSwing,
+    net,
+    portraitUrl,
+    traits,
+  };
 }
 
 export function buildDisciplineStageModel(

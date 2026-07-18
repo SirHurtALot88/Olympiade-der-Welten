@@ -100,6 +100,12 @@ function realMods(slot: DisciplineStageSlot): StageMod[] {
   return mods;
 }
 
+// Skill-Punkte mit max. 1 Nachkommastelle anzeigen (nachlaufende .0 weglassen).
+function fmt1(x: number): string {
+  const v = Math.round(x * 10) / 10;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
 function slotLabel(disciplineId: string, index: number, total: number): string {
   if (disciplineId === "staffel") {
     const legs = ["Start-Läufer", "Tempo-Läufer", "Kurven-Läufer", "Schluss-Läufer", "Anker"];
@@ -161,9 +167,12 @@ export default function DisciplineStageArena({
       teams: model.teams.map((t) => ({
         code: t.shortCode,
         name: t.name,
+        logoUrl: t.logoUrl,
         players: t.slots.map((s) => ({
           val: s.base,
           name: s.playerName,
+          portraitUrl: s.portraitUrl,
+          traits: s.traits,
           mods: mode === "real" ? realMods(s) : [],
         })),
       })),
@@ -329,22 +338,22 @@ export default function DisciplineStageArena({
                   <span style={{ width: 20, fontWeight: 800, opacity: 0.7 }}>{slot.slotIndex + 1}</span>
                   <span style={{ fontWeight: 700, flex: "0 0 150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{slot.playerName}</span>
                   <span style={{ opacity: 0.9 }}>
-                    <b>{slot.base}</b>
-                    {slot.fatiguePenalty > 0 ? <span style={{ color: "var(--nl-risk)" }}> − {slot.fatiguePenalty} Fatigue</span> : null}
+                    <b>{fmt1(slot.base)}</b>
+                    {slot.fatiguePenalty > 0 ? <span style={{ color: "var(--nl-risk)" }}> − {fmt1(slot.fatiguePenalty)} Fatigue</span> : null}
                     {slot.formSwing !== 0 ? (
                       <span style={{ color: slot.formSwing > 0 ? "var(--nl-good)" : "var(--nl-risk)" }}>
                         {" "}
-                        {slot.formSwing > 0 ? "+" : "−"} {Math.abs(slot.formSwing)} Form
+                        {slot.formSwing > 0 ? "+" : "−"} {fmt1(Math.abs(slot.formSwing))} Form
                       </span>
                     ) : null}
                     {" = "}
-                    <b style={{ color: "var(--nl-accent)" }}>+{slot.net}</b>
+                    <b style={{ color: "var(--nl-accent)" }}>+{fmt1(slot.net)}</b>
                   </span>
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8, fontWeight: 800 }}>
                 <span style={{ opacity: 0.7 }}>Team-Summe (echt):</span>
-                <span style={{ color: "var(--nl-accent)" }}>{ownTeam.total}</span>
+                <span style={{ color: "var(--nl-accent)" }}>{fmt1(ownTeam.total)}</span>
               </div>
             </>
           )}
