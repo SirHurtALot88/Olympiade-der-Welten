@@ -5,10 +5,11 @@
  * layer + captain channel.
  *
  * Flag default OFF: V2 is behaviour-changing (golden-master / objective tests shift intentionally),
- * so it stays behind OLY_BOARD_OBJECTIVES_V2 until parity/balancing is green. Set "1" to enable.
+ * Flag default ON: V2 (strength-calibrated objectives + perceived-pressure + captain channel) is now
+ * the shipped default. Disable with OLY_BOARD_OBJECTIVES_V2="0" for A/B or regression comparison.
  */
 export function isBoardObjectivesV2Enabled(): boolean {
-  return process.env.OLY_BOARD_OBJECTIVES_V2 === "1";
+  return process.env.OLY_BOARD_OBJECTIVES_V2 !== "0";
 }
 
 /**
