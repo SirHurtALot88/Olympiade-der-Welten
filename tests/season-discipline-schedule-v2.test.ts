@@ -4,6 +4,7 @@ import type { Discipline, GameState } from "@/lib/data/olyDataTypes";
 import {
   buildSeasonSeededDisciplineSchedule,
   getSeasonDisciplineSchedule,
+  withNormalizedSeasonDisciplineSchedule,
 } from "@/lib/season/season-discipline-schedule";
 
 const disciplines: Discipline[] = [
@@ -196,4 +197,103 @@ it("rebuilds stored schedules that are complete but missing discipline slots", (
 
   expect(resolved).toHaveLength(4);
   expect(resolved.every((entry) => entry.discipline1?.disciplineId && entry.discipline2?.disciplineId)).toBe(true);
+});
+
+function buildGameStateNeedingSchedule(seasonId: string, matchdayIds: string[]): GameState {
+  return {
+    season: { id: seasonId, name: seasonId, year: 1, currentMatchday: 1, matchdayIds },
+    seasonState: {
+      seasonId,
+      schedule: [],
+      disciplineSchedule: [],
+      standings: {},
+    },
+    matchdayState: { matchdayId: matchdayIds[0], status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+    disciplines,
+    teams: [],
+  } as unknown as GameState;
+}
+
+function normalizedSignature(gameState: GameState) {
+  return (gameState.seasonState.disciplineSchedule ?? [])
+    .map((entry) => `${entry.discipline1?.disciplineId}:${entry.discipline1?.playerCount}|${entry.discipline2?.disciplineId}:${entry.discipline2?.playerCount}`)
+    .join("||");
+}
+
+it("withNormalizedSeasonDisciplineSchedule gives distinct saves distinct schedules for the same season (bug fix regression)", () => {
+  const matchdayIds = ["season-5-matchday-1", "season-5-matchday-2", "season-5-matchday-3", "season-5-matchday-4"];
+  const stateForSaveA = buildGameStateNeedingSchedule("season-5", matchdayIds);
+  const stateForSaveB = buildGameStateNeedingSchedule("season-5", matchdayIds);
+
+  const normalizedA = withNormalizedSeasonDisciplineSchedule(stateForSaveA, "save-unique-a");
+  const normalizedB = withNormalizedSeasonDisciplineSchedule(stateForSaveB, "save-unique-b");
+
+  // Before the fix, withNormalizedSeasonDisciplineSchedule always fell back to the constant
+  // "normalized-local-save" seed regardless of which save called it, so every save produced
+  // an identical discipline pairing/player-count schedule. Passing the real saveId must yield
+  // a different schedule per save.
+  expect(normalizedSignature(normalizedA)).not.toBe(normalizedSignature(normalizedB));
+
+  for (const entry of normalizedA.seasonState.disciplineSchedule ?? []) {
+    for (const slot of [entry.discipline1, entry.discipline2]) {
+      if (!slot) continue;
+      expect(slot.playerCount).toBeGreaterThanOrEqual(2);
+      expect(slot.playerCount).toBeLessThanOrEqual(6);
+    }
+  }
+});
+
+it("withNormalizedSeasonDisciplineSchedule gives the same save distinct schedules across seasons", () => {
+  const stateSeason1 = buildGameStateNeedingSchedule("season-1", ["season-1-matchday-1", "season-1-matchday-2", "season-1-matchday-3", "season-1-matchday-4"]);
+  const stateSeason2 = buildGameStateNeedingSchedule("season-2", ["season-2-matchday-1", "season-2-matchday-2", "season-2-matchday-3", "season-2-matchday-4"]);
+
+  const normalizedSeason1 = withNormalizedSeasonDisciplineSchedule(stateSeason1, "save-same-across-seasons");
+  const normalizedSeason2 = withNormalizedSeasonDisciplineSchedule(stateSeason2, "save-same-across-seasons");
+
+  expect(normalizedSignature(normalizedSeason1)).not.toBe(normalizedSignature(normalizedSeason2));
+});
+
+it("withNormalizedSeasonDisciplineSchedule falls back to the legacy constant seed when no saveId is passed", () => {
+  const stateNoSaveId = buildGameStateNeedingSchedule("season-9", ["season-9-matchday-1", "season-9-matchday-2", "season-9-matchday-3", "season-9-matchday-4"]);
+  const normalizedNoSaveId = withNormalizedSeasonDisciplineSchedule(stateNoSaveId);
+  const expected = getSeasonDisciplineSchedule(
+    buildGameStateNeedingSchedule("season-9", ["season-9-matchday-1", "season-9-matchday-2", "season-9-matchday-3", "season-9-matchday-4"]),
+  );
+
+  expect(normalizedSignature(normalizedNoSaveId)).toBe(
+    expected.map((entry) => `${entry.discipline1?.disciplineId}:${entry.discipline1?.playerCount}|${entry.discipline2?.disciplineId}:${entry.discipline2?.playerCount}`).join("||"),
+  );
+});
+
+it("does not rebuild an already-complete stored schedule even when a different saveId is passed (existing-save safety)", () => {
+  const matchdayIds = ["season-6-matchday-1", "season-6-matchday-2", "season-6-matchday-3", "season-6-matchday-4"];
+  const storedSchedule = buildSeasonSeededDisciplineSchedule({
+    saveId: "save-original-builder",
+    seasonId: "season-6",
+    disciplines,
+    matchdayIds,
+    matchdayCount: matchdayIds.length,
+  }).entries;
+
+  const gameStateWithCompleteSchedule = {
+    season: { id: "season-6", name: "Season 6", year: 6, currentMatchday: 1, matchdayIds },
+    seasonState: {
+      seasonId: "season-6",
+      schedule: [],
+      disciplineSchedule: storedSchedule,
+      standings: {},
+    },
+    matchdayState: { matchdayId: matchdayIds[0], status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+    disciplines,
+    teams: [],
+  } as unknown as GameState;
+
+  // Passing a saveId that never produced this stored schedule must NOT trigger a rebuild —
+  // the hasCompleteSeasonDisciplineSchedule fast-path must short-circuit and return the
+  // persisted schedule untouched so in-progress saves are never silently reshuffled.
+  const normalized = withNormalizedSeasonDisciplineSchedule(gameStateWithCompleteSchedule, "some-other-save-entirely");
+
+  expect(normalizedSignature(normalized)).toBe(
+    storedSchedule.map((entry) => `${entry.discipline1?.disciplineId}:${entry.discipline1?.playerCount}|${entry.discipline2?.disciplineId}:${entry.discipline2?.playerCount}`).join("||"),
+  );
 });

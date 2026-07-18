@@ -1145,6 +1145,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
       ),
     ),
     ),
+    saveId,
   );
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
@@ -1290,6 +1291,7 @@ function createPersistedSaveRecord(input: {
         }),
       ),
     ),
+    input.saveId,
   );
   const baselinePlayerIds = new Set([
     ...normalizedWithoutBaselines.rosters.map((entry) => entry.playerId),
@@ -1527,7 +1529,10 @@ export function createSaveRepository(): SaveRepository {
       return this.getSaveById(saveId);
     },
     createSaveFromSeed({ saveId, name, status, seedData }) {
-      const gameState = createGameStateFromSeed(seedData);
+      // scheduleSeedId ties the initial season discipline schedule to this save's unique
+      // saveId so every new save/season gets its own pairing + player-count rolls instead of
+      // reusing the default "local-game-state" seed for every save (see season-discipline-schedule.ts).
+      const gameState = createGameStateFromSeed(seedData, { scheduleSeedId: saveId });
       const persisted = createPersistedSaveRecord({
         saveId,
         name,

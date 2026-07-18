@@ -36,8 +36,13 @@ export function createSingleplayerGameState(): GameState {
   return withNormalizedLocalTeamSettings(createGameStateFromSeed(loadSeedData()));
 }
 
-export function createFreshSeasonOneGameState(): GameState {
-  return withNormalizedLocalTeamSettings(createGameStateFromSeed(loadFreshSeasonOneSeedData()));
+export function createFreshSeasonOneGameState(saveId?: string | null): GameState {
+  // Threading saveId here seeds the initial season-1 discipline schedule (pairings + 2..6
+  // player counts) per save instead of always reusing the "local-game-state" default — see
+  // lib/season/season-discipline-schedule.ts for the seed derivation.
+  return withNormalizedLocalTeamSettings(
+    createGameStateFromSeed(loadFreshSeasonOneSeedData(), saveId ? { scheduleSeedId: saveId } : undefined),
+  );
 }
 
 export function createFreshSeasonOneSaveGame(saveId: string): SaveGameState {

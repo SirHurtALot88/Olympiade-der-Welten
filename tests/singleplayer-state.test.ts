@@ -431,6 +431,41 @@ describe("singleplayer game state", () => {
     }
   }, 60000);
 
+  it("gives distinct fresh season one saves their own discipline schedule instead of a shared constant seed", () => {
+    const persistence = createPersistenceService();
+    persistence.bootstrapSingleplayerSave();
+
+    const saveOne = persistence.createFreshSeasonOneSave({
+      saveId: "fresh-season-1-unique-test-a",
+      name: "Unique Schedule Test A",
+      status: "archived",
+      activate: false,
+    });
+    const saveTwo = persistence.createFreshSeasonOneSave({
+      saveId: "fresh-season-1-unique-test-b",
+      name: "Unique Schedule Test B",
+      status: "archived",
+      activate: false,
+    });
+
+    const signature = (gameState: typeof saveOne.gameState) =>
+      (gameState.seasonState.disciplineSchedule ?? [])
+        .map((entry) => `${entry.discipline1?.disciplineId}:${entry.discipline1?.playerCount}|${entry.discipline2?.disciplineId}:${entry.discipline2?.playerCount}`)
+        .join("||");
+
+    expect(signature(saveOne.gameState)).not.toBe(signature(saveTwo.gameState));
+
+    for (const save of [saveOne, saveTwo]) {
+      for (const entry of save.gameState.seasonState.disciplineSchedule ?? []) {
+        for (const slot of [entry.discipline1, entry.discipline2]) {
+          if (!slot) continue;
+          expect(slot.playerCount).toBeGreaterThanOrEqual(2);
+          expect(slot.playerCount).toBeLessThanOrEqual(6);
+        }
+      }
+    }
+  }, 60000);
+
   it("creates inactive fresh season one audit saves without changing the active save", () => {
     const persistence = createPersistenceService();
     const active = persistence.bootstrapSingleplayerSave().save;

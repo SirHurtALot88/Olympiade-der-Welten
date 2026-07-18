@@ -322,7 +322,7 @@ function loadSqliteOptions(save: PersistedSaveGame, persistence: ReturnType<type
   const contract = buildLineupDisciplineContract(save.gameState.disciplines);
   const lineups = save.gameState.seasonState.lineupDrafts ?? [];
   const totalLineupSides = contract.length;
-  const disciplineSchedule = getSeasonDisciplineSchedule(save.gameState);
+  const disciplineSchedule = getSeasonDisciplineSchedule(save.gameState, { saveId: save.saveId });
   const disciplineScheduleByMatchdayId = new Map(disciplineSchedule.map((entry) => [entry.matchdayId, entry] as const));
   const controlSettingsMap = buildTeamControlSettingsMap(save.gameState.teams, save.gameState.seasonState.teamControlSettings);
   const totalTeams = save.gameState.teams.length;

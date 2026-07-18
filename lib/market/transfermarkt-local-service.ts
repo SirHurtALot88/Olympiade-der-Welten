@@ -1888,6 +1888,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             gameState,
             scoutingLevel: playerScoutingLevel,
             topDisciplines: topDisciplineScores,
+            saveId: save.saveId,
           });
 
     return {

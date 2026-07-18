@@ -156,7 +156,7 @@ function buildTeamStatus(gameState: GameState, teamId: string, seasonId: string)
 }
 
 function buildLocalFatigueMap(gameState: GameState, params: LegacyLineupKeyParams) {
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameState);
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameState, params.saveId);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   if (!season) {
     return null;
@@ -255,7 +255,7 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     return cached;
   }
 
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers);
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers, params.saveId);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
   const scheduleEntry =
@@ -387,7 +387,7 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
 
 function buildContextFromGameState(gameState: GameState, params: LegacyLineupKeyParams): LegacyLineupContextLoadResult {
   const sharedBase = getSharedLineupContextBase(gameState, params);
-  const normalizedGameState = sharedBase?.normalizedGameState ?? withNormalizedSeasonDisciplineSchedule(gameState);
+  const normalizedGameState = sharedBase?.normalizedGameState ?? withNormalizedSeasonDisciplineSchedule(gameState, params.saveId);
   const season = sharedBase?.season ?? null;
   const matchday = sharedBase?.matchday ?? null;
   const team = sharedBase?.teamById.get(params.teamId) ?? normalizedGameState.teams.find((entry) => entry.teamId === params.teamId) ?? null;
@@ -974,7 +974,7 @@ export function saveLocalLegacyFormCardPlan(
 } {
   const { persistence: resolvedPersistence, save } = resolveLocalSave(input.saveId, persistence);
   const effectiveSaveId = save.saveId;
-  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState);
+  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState, effectiveSaveId);
   const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
     (entry) => entry.seasonId === input.seasonId && entry.matchdayId === input.matchdayId,
   );

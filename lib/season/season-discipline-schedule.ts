@@ -323,13 +323,13 @@ function buildResolvedSeasonDisciplineSchedule(
 export function getSeasonDisciplineScheduleEntry(
   gameState: GameState,
   matchdayId: string,
-  options?: { saveId?: string },
+  options?: { saveId?: string | null },
 ) {
   const schedule = getSeasonDisciplineSchedule(gameState, options);
   return schedule.find((entry) => entry.matchdayId === matchdayId) ?? null;
 }
 
-export function getSeasonDisciplineSchedule(gameState: GameState, options?: { saveId?: string }) {
+export function getSeasonDisciplineSchedule(gameState: GameState, options?: { saveId?: string | null }) {
   const saveId = options?.saveId ?? "normalized-local-save";
   const stored = gameState.seasonState.disciplineSchedule ?? [];
   if (
@@ -374,8 +374,8 @@ export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {
   return playerCountByDisciplineId;
 }
 
-export function withNormalizedSeasonDisciplineSchedule(gameState: GameState): GameState {
-  const normalizedSchedule = getSeasonDisciplineSchedule(gameState);
+export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, saveId?: string | null): GameState {
+  const normalizedSchedule = getSeasonDisciplineSchedule(gameState, { saveId });
   const normalizedMatchdayIds = normalizedSchedule.map((entry) => entry.matchdayId);
   const fallbackMatchdayId =
     normalizedMatchdayIds[Math.max(0, Math.min(gameState.season.currentMatchday - 1, normalizedMatchdayIds.length - 1))] ??
