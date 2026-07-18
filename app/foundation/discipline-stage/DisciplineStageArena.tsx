@@ -16,6 +16,7 @@ import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday
 import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/DisciplineStageEndScreen";
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
+import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 
 export type DisciplineStageArenaProps = {
   gameState: GameState;
@@ -272,6 +273,51 @@ export default function DisciplineStageArena({
     [mode, seed, disciplineId],
   );
 
+  // Top-Spieler (links): aus der Engine-Preview oder — im Test/Modell-Modus —
+  // die besten Netto-Werte über alle Teams.
+  const topPlayers = useMemo(() => {
+    const rows: DisciplineStageTopPlayer[] = [];
+    const ids: (string | null)[] = [];
+    if (useEngine && engineDiscipline) {
+      [...engineDiscipline.topPlayers]
+        .sort((a, b) => a.rankInDiscipline - b.rankInDiscipline)
+        .slice(0, 12)
+        .forEach((pp, i) => {
+          const meta = teamMetaById.get(pp.teamId);
+          rows.push({
+            rank: pp.rankInDiscipline ?? i + 1,
+            name: pp.playerName,
+            teamCode: meta?.code ?? pp.teamId,
+            logoUrl: meta?.logoUrl ?? null,
+            portraitUrl: portraitById.get(pp.playerId) ?? null,
+            score: pp.finalPlayerScore,
+            points: pp.pointsAwarded,
+            isMvp: Boolean(pp.isMvpCandidate),
+            isOwn: pp.teamId === ownTeamId,
+          });
+          ids.push(pp.playerId);
+        });
+    } else {
+      const flat = model.teams.flatMap((t) => t.slots.map((s) => ({ s, t })));
+      flat.sort((a, b) => b.s.net - a.s.net);
+      flat.slice(0, 12).forEach(({ s, t }, i) => {
+        rows.push({
+          rank: i + 1,
+          name: s.playerName,
+          teamCode: t.shortCode,
+          logoUrl: t.logoUrl,
+          portraitUrl: s.portraitUrl,
+          score: s.net,
+          points: null,
+          isMvp: s.base >= 80,
+          isOwn: t.isOwn,
+        });
+        ids.push(s.playerId);
+      });
+    }
+    return { rows, ids };
+  }, [useEngine, engineDiscipline, model, teamMetaById, portraitById, ownTeamId]);
+
   const ownShortCode = useMemo(() => {
     const own = (gameState?.teams ?? []).find((t) => t.teamId === ownTeamId);
     return own?.shortCode ?? model.teams.find((t) => t.isOwn)?.shortCode ?? null;
@@ -501,14 +547,19 @@ export default function DisciplineStageArena({
       </div>
 
       {scene ? (
-        <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
-          <iframe
-            ref={iframeRef}
-            key={scene}
-            src={`/discipline-scenes/${scene}.html`}
-            title={`Arena — ${model.disciplineName}`}
-            style={{ width: "100%", height: "min(960px, calc(100vh - 240px))", minHeight: 560, border: 0, display: "block" }}
-          />
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "0 0 340px", minWidth: 280, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
+            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} />
+          </div>
+          <div style={{ flex: "1 1 640px", minWidth: 0, maxWidth: 1240, borderRadius: 14, overflow: "hidden", border: "1px solid var(--nl-line)", background: "var(--nl-bg)" }}>
+            <iframe
+              ref={iframeRef}
+              key={scene}
+              src={`/discipline-scenes/${scene}.html`}
+              title={`Arena — ${model.disciplineName}`}
+              style={{ width: "100%", height: "calc(100vh - 180px)", maxHeight: 860, minHeight: 500, border: 0, display: "block" }}
+            />
+          </div>
         </div>
       ) : (
         <div style={{ padding: 40, textAlign: "center", color: "var(--nl-mut)", border: "1px dashed var(--nl-line)", borderRadius: 14 }}>
