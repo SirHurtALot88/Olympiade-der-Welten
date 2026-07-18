@@ -22,7 +22,6 @@ import {
 } from "@/lib/training/training-levelup-service";
 import {
   getCombinedAttributeTrainingMultiplier,
-  getPotentialGapXpFactor,
 } from "@/lib/foundation/player-potential-display-service";
 import {
   getAttributeHeadroom,
@@ -133,7 +132,10 @@ export type OrganicRegressionBreakdown = {
 };
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.28;
+// 0,28 → 0,30: flacher Standard-Verlust leicht angehoben (+0,02/Attr × 12 ≈ +0,24 Verlust/Spieler/Saison),
+// damit der gap-getriebene Beschleuniger den Liga-Ø-Netto nicht über die Zieldecke drückt — der Peak-
+// Korridor (Talente) bleibt im Band, aber der Durchschnittsspieler sinkt zurück auf ~0,25 (Ziel −0,4…0,4).
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.3;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
 export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0102;
 /**
@@ -314,25 +316,40 @@ export function getMarktwertForRegression(player: Player) {
   return value > 1000 ? value / 1000 : value;
 }
 
+// Gap-getriebener Entwicklungs-BESCHLEUNIGER (ersetzt das frühere MAX-PO-Band). Die Entwicklungs-
+// GESCHWINDIGKEIT hängt an der LÜCKE (Potenzial − aktuelle Stärke), NICHT am maximalen Potenzial:
+// ein Spieler mit CA 15 / PO 66 (Lücke 51) entwickelt sich schneller als CA 50 / PO 75 (Lücke 25).
+// Das behebt die frühere Inversion, bei der ein niedriges PO-Band (0,72/0,92) den großen-Lücke-Talenten
+// die Entwicklung ausbremste, obwohl sie den meisten Headroom haben.
+//
+// WICHTIG (User-Vorgabe): NUR Beschleuniger, NIE Bremse — der Rückgabewert ist ≥ 1,0. Das Abbremsen nahe
+// der Potenzialgrenze übernimmt AUSSCHLIESSLICH das Erreichen der MAX-Attribute (die per-Attribut-Headroom-
+// Drossel getAttributeGrowthMultiplier + der Ceiling-Clamp weiter unten), damit es KEINE doppelte Bremse gibt.
+//  - gapAccel: bleibt bis zur neutralen Lücke (GAP_NEUTRAL) bei 1,0 → typische Spieler unverändert, Liga-Ø
+//    stabil; darüber linear mit der Lücke, gedeckelt bei GAP_ACCEL_CAP.
+//  - poSteep: bei GLEICHER Lücke pusht ein höheres Potenzial zusätzlich ("je höher das PO desto mehr", ab
+//    PO 70), ebenfalls nur nach oben.
+export const ORGANIC_GAP_ACCEL_NEUTRAL = Number(process.env.OLY_ORGANIC_GAP_ACCEL_NEUTRAL ?? 10) || 10;
+export const ORGANIC_GAP_ACCEL_SLOPE = Number(process.env.OLY_ORGANIC_GAP_ACCEL_SLOPE ?? 0.03) || 0.03;
+export const ORGANIC_GAP_ACCEL_CAP = Number(process.env.OLY_ORGANIC_GAP_ACCEL_CAP ?? 2.6) || 2.6;
+export const ORGANIC_PO_STEEP_DIVISOR = Number(process.env.OLY_ORGANIC_PO_STEEP_DIVISOR ?? 110) || 110;
+
 function getPotentialTrainingMultiplierFromRecord(gameState: GameState, player: Player) {
   const record = resolvePlayerPotentialRecordFromGameState({ gameState, playerId: player.id });
-  const potential = record?.hiddenPotentialScore ?? null;
+  const potential =
+    record?.hiddenPotentialScore ??
+    (isFiniteNumber(player.potential) && player.potential > 0 ? player.potential : null);
   if (potential == null) return 1;
-  // Monotonic non-decreasing in potential: high-potential players (80+) share an elevated
-  // development plateau so genuine talents grow visibly, while mid/low potential develops
-  // slowly (and sub-58 nets below 1.0 so the league median stays roughly flat). This band
-  // structure is what widens peak-P90 vs the median instead of lifting the whole league.
-  // Selektiver Hochpotenzial-Entwicklungs-Buff: NUR die oberen Bänder (>=72) werden angehoben
-  // (~1,5x auf der Spitze, abklingend), damit ein starker Verbesserer netto ~13-15 Setpoints
-  // (≈2M MW) pro Saison erreicht, OHNE einen ligaweiten Buff (Liga-Ø bleibt am Boden, weil
-  // <=58 unverändert < 1,0 bleibt). Es findet KEIN Eingriff nahe der Potenzialgrenze statt:
-  // der Potenzial-Cap-Clamp bleibt intakt und deckelt Wachstum knapp unter dem Ceiling.
-  if (potential >= 94) return 3.2;
-  if (potential >= 88) return 2.8;
-  if (potential >= 80) return 2.2;
-  if (potential >= 72) return 1.55;
-  if (potential >= 58) return 0.92;
-  return 0.72;
+  const currentAbility = isFiniteNumber(player.rating) ? player.rating : potential;
+  const gap = Math.max(0, potential - currentAbility);
+  // Reiner Beschleuniger: 1,0 bis zur neutralen Lücke, danach linear mit der Lücke, gedeckelt. Nie < 1,0.
+  const gapAccel = Math.min(
+    ORGANIC_GAP_ACCEL_CAP,
+    1 + ORGANIC_GAP_ACCEL_SLOPE * Math.max(0, gap - ORGANIC_GAP_ACCEL_NEUTRAL),
+  );
+  // Höheres Potenzial pusht bei gleicher Lücke zusätzlich (ab PO 70) — auch das nur nach oben (≥ 1,0).
+  const poSteep = 1 + Math.max(0, potential - 70) / ORGANIC_PO_STEEP_DIVISOR;
+  return roundValue(gapAccel * poSteep, 3);
 }
 
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {
@@ -522,9 +539,6 @@ function buildPerformanceDeltas(gameState: GameState, playerId: string) {
   };
 }
 
-function getPotentialGapTrainingFactor(gapStars: number) {
-  return getPotentialGapXpFactor(gapStars);
-}
 
 function buildOrganicRegressionBreakdown(input: {
   marktwertBase: number;
@@ -750,9 +764,8 @@ export function buildOrganicSeasonProgression(input: {
   });
   const axisStars = buildPlayerAxisStarProfile({ gameState: input.gameState, player: input.player });
   const axisPoStars = potentialRecord?.hiddenPotentialCeilingByAxis ?? null;
-  const potentialGapFactor = getPotentialGapTrainingFactor(starSnapshot.potentialGap);
-  // talent_builder ONLY: an additive lift on the potential band for high-potential players. The GLOBAL
-  // bands (getPotentialTrainingMultiplierFromRecord) stay untouched so the league median / MW economy
+  // talent_builder ONLY: an additive lift on the gap accelerator for high-potential players. The GLOBAL
+  // accelerator (getPotentialTrainingMultiplierFromRecord) stays untouched so the league median / MW economy
   // does not tip — only this GM's own high-potential talents develop faster.
   const talentBuilderPotentialFactor =
     playerGmArchetype === "talent_builder" && potentialRating != null
@@ -765,7 +778,7 @@ export function buildOrganicSeasonProgression(input: {
             : 1
       : 1;
   const potentialTrainingMultiplier =
-    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor * talentBuilderPotentialFactor;
+    getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * talentBuilderPotentialFactor;
   const baseTrainingBudget =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
       ? input.accumulatedBaseTrainingBudget
