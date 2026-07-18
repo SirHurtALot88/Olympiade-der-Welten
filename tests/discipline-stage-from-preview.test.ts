@@ -285,3 +285,49 @@ describe("Robustheit gegen leere / null-Felder", () => {
     expect(stageTeamNetTotal(team)).toBeCloseTo(5, 1);
   });
 });
+
+describe("saubere Verteilung: jeder Spieler traegt seine volle finalPlayerScore, Team-Effekte beschriftet obendrauf", () => {
+  // Team mit echten Team-Level-Modifikatoren: score = Σ finalPlayerScore + Form + Team-Power.
+  const TEAM_MODS = new Set(["Form", "Intensität", "Team-Power", "Team-PPs", "Team"]);
+  const base = makeTeam({
+    teamId: "tx",
+    teamName: "Xi",
+    rank: 1,
+    score: 0,
+    teamPoints: 12,
+    entries: [
+      { playerId: "x0", playerName: "X0", baseValue: 20, fatigueAdjustedValue: 18, finalPlayerScore: 18 }, // Moral/Fatigue -2
+      { playerId: "x1", playerName: "X1", baseValue: 15, captainBonus: 4, finalPlayerScore: 21 }, // Captain +4, Moral +2
+      { playerId: "x2", playerName: "X2", baseValue: 12, mutatorBonus: 6, finalPlayerScore: 18 }, // Mutator +6
+    ],
+  });
+  const sumFinal = 18 + 21 + 18; // 57
+  const team = {
+    ...base,
+    formModifier: 4,
+    teamPowerModifier: 9,
+    score: sumFinal + 4 + 9, // 70
+    finalPreviewScore: sumFinal + 4 + 9,
+  };
+  const [mapped] = buildDisciplineStageTeamsFromPreview(makePreview([team]), new Map(), new Map());
+
+  function individualNet(player: (typeof mapped.players)[number]): number {
+    return round1(player.val + player.mods.filter((m) => !TEAM_MODS.has(m.k)).reduce((s, m) => s + m.sign * m.amt, 0));
+  }
+
+  it("jeder Spieler-Netto (ohne Team-Mods) == echte finalPlayerScore", () => {
+    expect(individualNet(mapped.players[0])).toBeCloseTo(18, 1);
+    expect(individualNet(mapped.players[1])).toBeCloseTo(21, 1);
+    expect(individualNet(mapped.players[2])).toBeCloseTo(18, 1);
+  });
+
+  it("Team-Effekte sind beschriftet (Form / Team-Power) und liegen auf den Spielern", () => {
+    const labels = new Set(mapped.players.flatMap((p) => p.mods.map((m) => m.k)));
+    expect(labels.has("Form")).toBe(true);
+    expect(labels.has("Team-Power")).toBe(true);
+  });
+
+  it("Gesamt-Netto trifft exakt den Engine-Score (nichts liegt neben den Spielern)", () => {
+    expect(stageTeamNetTotal(mapped)).toBeCloseTo(70, 1);
+  });
+});

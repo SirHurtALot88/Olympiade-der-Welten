@@ -63,6 +63,15 @@ export function buildDisciplineStageTeamsFromPreview(
       if (entry.mutatorBonus) {
         mods.push({ k: "Mutator", sign: entry.mutatorBonus < 0 ? -1 : 1, amt: round1(Math.abs(entry.mutatorBonus)) });
       }
+      // Rest je Spieler, damit das Netto EXAKT die echte Engine-Contribution
+      // trifft (Moral u.a. per-Spieler-Effekte, die nicht als eigenes Feld
+      // vorliegen) — so trägt jeder Spieler seine volle individuelle Leistung.
+      if (entry.finalPlayerScore != null) {
+        const rest = round1(entry.finalPlayerScore - (base + modSum(mods)));
+        if (Math.abs(rest) >= 0.05) {
+          mods.push({ k: "Moral", sign: rest < 0 ? -1 : 1, amt: Math.abs(rest) });
+        }
+      }
 
       return {
         val: base,
