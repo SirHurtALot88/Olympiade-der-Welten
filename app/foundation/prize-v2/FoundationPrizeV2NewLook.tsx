@@ -187,6 +187,20 @@ export default function FoundationPrizeV2NewLook({
     [sortedTableRows],
   );
 
+  // Preisgeld ist eine reine Funktion des Tabellenrangs (Rang → Preisgeld).
+  // Damit lässt sich für jedes Team auch das Preisgeld an seinem STARTPLATZ
+  // nachschlagen — als Vergleich zum Preisgeld am aktuellen Platz. Quelle sind
+  // die realen Feed-Items (alle 32 Ränge belegt), also deckt die Map 1–32 ab.
+  const prizeByRank = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of distributionItems) {
+      if (item.rank != null && item.prizeMoney != null && Number.isFinite(item.prizeMoney)) {
+        map.set(item.rank, item.prizeMoney);
+      }
+    }
+    return map;
+  }, [distributionItems]);
+
   const championLogo = seasonEndChampionRow ? getTeamLogoModel(seasonEndChampionRow.team) : null;
 
   // Champion-/Saisonende-Reveal (D3): überspringbarer Feier-Banner.
@@ -644,7 +658,12 @@ export default function FoundationPrizeV2NewLook({
                 <th className="nl-prize-th-rank">Rang</th>
                 <th className="nl-prize-th-team">Team</th>
                 <th>Cash vorher</th>
-                <th className="nl-prize-th-money">Preisgeld</th>
+                <th className="nl-prize-th-money" title="Preisgeld, das dieses Team an seinem Startplatz bekäme">
+                  Preisgeld · Start
+                </th>
+                <th className="nl-prize-th-money" title="Preisgeld am aktuellen Saisonstand-Platz">
+                  Preisgeld · Aktuell
+                </th>
                 <th>Bonus/Malus</th>
                 <th>Cash danach</th>
                 <th>Hinweise</th>
@@ -655,6 +674,9 @@ export default function FoundationPrizeV2NewLook({
                 const team = teamsById.get(row.teamId) ?? null;
                 const logo = team ? getTeamLogoModel(team) : null;
                 const medalKind = row.rank === 1 ? "gold" : row.rank === 2 ? "silver" : row.rank === 3 ? "bronze" : null;
+                const startRank = row.rankChangePrize?.startRank ?? null;
+                const startPrizeMoney =
+                  startRank != null && Number.isFinite(startRank) ? prizeByRank.get(startRank) ?? null : null;
                 return (
                   <tr
                     key={row.teamId}
@@ -704,7 +726,36 @@ export default function FoundationPrizeV2NewLook({
                     </td>
                     <td>{row.currentCash != null ? formatNlMoney(row.currentCash) : "—"}</td>
                     <td className="nl-prize-td-money">
-                      <span className="nl-prize-money-value">{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</span>
+                      <span className="nl-prize-money-head">
+                        <span className="nl-prize-money-value">
+                          {startPrizeMoney != null ? formatNlMoney(startPrizeMoney) : "—"}
+                        </span>
+                        {startRank != null ? (
+                          <span className="nl-prize-money-rank" title={`Startplatz #${startRank}`}>
+                            #{startRank}
+                          </span>
+                        ) : null}
+                      </span>
+                      {startPrizeMoney != null && Number.isFinite(startPrizeMoney) ? (
+                        <NlProgressBar
+                          value={startPrizeMoney}
+                          max={maxPrizeMoney > 0 ? maxPrizeMoney : 1}
+                          tone="neutral"
+                          showValue={false}
+                          className="nl-prize-money-bar"
+                          title={`Preisgeld am Startplatz #${startRank ?? "—"}, relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
+                        />
+                      ) : null}
+                    </td>
+                    <td className="nl-prize-td-money">
+                      <span className="nl-prize-money-head">
+                        <span className="nl-prize-money-value">{row.prizeMoney != null ? formatNlMoney(row.prizeMoney) : "—"}</span>
+                        {row.rank != null ? (
+                          <span className="nl-prize-money-rank" title={`Aktueller Platz #${row.rank}`}>
+                            #{row.rank}
+                          </span>
+                        ) : null}
+                      </span>
                       {row.prizeMoney != null && Number.isFinite(row.prizeMoney) ? (
                         <NlProgressBar
                           value={row.prizeMoney}
@@ -712,7 +763,7 @@ export default function FoundationPrizeV2NewLook({
                           tone="accent"
                           showValue={false}
                           className="nl-prize-money-bar"
-                          title={`Preisgeld relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
+                          title={`Preisgeld am aktuellen Platz #${row.rank ?? "—"}, relativ zur Top-Auszahlung (${formatNlMoney(maxPrizeMoney)})`}
                         />
                       ) : null}
                     </td>

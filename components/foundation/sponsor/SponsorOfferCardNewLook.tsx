@@ -342,10 +342,16 @@ export function SponsorOfferCardNewLook({
                   ) : null}
                 </div>
                 <ul className="nl-sponsor-rank-ladder" data-testid="sponsor-rank-tier-list">
-                  {tierRows.map((row, index) => {
-                    const isReached = currentTierIndex >= 0 && index <= currentTierIndex;
-                    const isCurrent = index === currentTierIndex;
-                    return (
+                  {/* #? Meister (höchste Stufe) oben anzeigen — die Leiter wird von
+                      stark→schwach gerendert, während rankAt-Index/Balkenbreite an der
+                      Tier-Stärke (Meister = voller Balken) hängen bleiben. */}
+                  {tierRows
+                    .map((row, tierIndex) => ({ row, tierIndex }))
+                    .reverse()
+                    .map(({ row, tierIndex }) => {
+                      const isReached = currentTierIndex >= 0 && tierIndex <= currentTierIndex;
+                      const isCurrent = tierIndex === currentTierIndex;
+                      return (
                       <li
                         key={row.label}
                         className={`nl-sponsor-rank-rung${isReached ? " is-reached" : ""}${isCurrent ? " is-current" : ""}`}
@@ -353,7 +359,7 @@ export function SponsorOfferCardNewLook({
                         <span
                           className="nl-sponsor-rank-rung-bar"
                           aria-hidden="true"
-                          style={{ width: `${Math.round(((index + 1) / tierRows.length) * 100)}%` }}
+                          style={{ width: `${Math.round(((tierIndex + 1) / tierRows.length) * 100)}%` }}
                         />
                         <span className="nl-sponsor-rank-rung-label">
                           {row.label}
@@ -361,8 +367,8 @@ export function SponsorOfferCardNewLook({
                         </span>
                         <span className="nl-sponsor-rank-rung-payout nl-tnum">{formatCash(row.absolutePayout)}</span>
                       </li>
-                    );
-                  })}
+                      );
+                    })}
                 </ul>
                 {/* Feed 2: Performance zahlt einen konkaven Bonus fürs Übertreffen des Erwartungsrangs
                     (teamQualityRankAtSign). Die Rang-Leiter oben ist der Basis-Fall; ein Aufstieg über die

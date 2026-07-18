@@ -45747,6 +45747,21 @@ button.foundation-team-portrait-card {
   font-weight: 700;
 }
 
+/* Preisgeld-Zelle: Betrag + zugehöriger Rang (#Start bzw. #Aktuell) in einer Zeile. */
+.is-new-look .nl-prize-money-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-prize-money-rank {
+  flex: 0 0 auto;
+  font-size: var(--nl-fs-xs);
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
 .is-new-look .nl-prize-money-bar .nl-progress-track {
   height: 5px;
 }
