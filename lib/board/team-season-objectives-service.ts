@@ -1902,7 +1902,10 @@ function buildAiBias(input: {
 
   return {
     teamId: input.teamId,
-    pressure: input.board.pressure,
+    // V2: exponiere die *gedämpfte* Wahrnehmungs-Pressure (Kapitän- und Dispositions-Dämpfung),
+    // damit die vier AI-Panik-Gates dieselbe gefühlte Pressure sehen wie die Aggressions-Skalare
+    // oben (~:1889). Fällt unter V1 auf die rohe Pressure zurück. Ziele bleiben unberührt.
+    pressure: input.board.perceivedPressure ?? input.board.pressure,
     transferAggression: roundValue((sellAggression + buyAggression) / 2, 2),
     buyAggression: roundValue(buyAggression, 2),
     sellAggression: roundValue(sellAggression, 2),
