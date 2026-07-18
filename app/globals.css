@@ -695,10 +695,7 @@ a {
 }
 
 .foundation-shell.app-shell {
-  /* Standard nutzt jetzt bis 2560px, damit 32"/4K-Monitore die Breite (inkl.
-     Navigationsleiste) ausnutzen statt große Ränder zu lassen. "Cinema" bleibt
-     die volle Viewport-Breite. */
-  width: min(2560px, calc(100vw - 24px));
+  width: min(1880px, calc(100vw - 24px));
 }
 
 .foundation-loading-shell {

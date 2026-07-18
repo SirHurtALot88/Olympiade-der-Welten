@@ -17,6 +17,12 @@ import DisciplineStageEndScreen from "@/app/foundation/discipline-stage/Discipli
 import DisciplineStageStandingsDelta from "@/app/foundation/discipline-stage/DisciplineStageStandingsDelta";
 import DisciplineStageHighlights from "@/app/foundation/discipline-stage/DisciplineStageHighlights";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
+import DisciplineStageNativeArena from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
+
+// Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
+const NATIVE_PRIMITIVE: Record<string, "track"> = {
+  staffel: "track",
+};
 
 export type DisciplineStageArenaProps = {
   gameState: GameState;
@@ -178,10 +184,13 @@ export default function DisciplineStageArena({
   const [mode, setMode] = useState<"real" | "random">("real");
   const [seed, setSeed] = useState<number>(1);
   const [ready, setReady] = useState<boolean>(false);
+  const [nativeBeta, setNativeBeta] = useState<boolean>(true);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const scene = SCENE_BY_DISCIPLINE[disciplineId];
+  const hasNative = Boolean(NATIVE_PRIMITIVE[disciplineId]);
+  const showNative = hasNative && nativeBeta;
 
   const model = useMemo(
     () => buildDisciplineStageModel(gameState, disciplineId, ownTeamId),
@@ -474,14 +483,26 @@ export default function DisciplineStageArena({
             🎲 Random-Test
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "olyStageQuickSim" }, window.location.origin)}
-          title="Disziplin sofort komplett durchrechnen (ohne Animation) — Endstand + Podium"
-          style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
-        >
-          ⏩ Quick-Sim
-        </button>
+        {!showNative ? (
+          <button
+            type="button"
+            onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: "olyStageQuickSim" }, window.location.origin)}
+            title="Disziplin sofort komplett durchrechnen (ohne Animation) — Endstand + Podium"
+            style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: "1px solid var(--nl-line)", background: "transparent", color: "inherit", borderRadius: 10, cursor: "pointer" }}
+          >
+            ⏩ Quick-Sim
+          </button>
+        ) : null}
+        {hasNative ? (
+          <button
+            type="button"
+            onClick={() => setNativeBeta((v) => !v)}
+            title="Nativer Renderer (scharf, integriert) vs. eingebettete iframe-Arena"
+            style={{ padding: "8px 14px", fontWeight: 800, fontSize: 13, border: `1px solid ${showNative ? "var(--nl-good)" : "var(--nl-line)"}`, background: showNative ? "color-mix(in srgb, var(--nl-good) 14%, transparent)" : "transparent", color: showNative ? "var(--nl-good)" : "inherit", borderRadius: 10, cursor: "pointer" }}
+          >
+            {showNative ? "✓ Nativ (Beta)" : "Nativ (Beta)"}
+          </button>
+        ) : null}
         {mode === "real" ? (
           <span
             title={useEngine ? "Werte kommen 1:1 aus der Matchday-Resolve-Engine (arena-identisch)" : "Vereinfachte Ansicht: für diese Disziplin/diesen Spieltag liegt keine Engine-Aufstellung vor"}
@@ -546,7 +567,27 @@ export default function DisciplineStageArena({
         ) : null}
       </div>
 
-      {scene ? (
+      {showNative ? (
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: "0 0 300px", minWidth: 260, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
+            <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} />
+          </div>
+          <div style={{ flex: "1 1 640px", minWidth: 0 }}>
+            <DisciplineStageNativeArena
+              key={`${disciplineId}-${mode}-${seed}`}
+              slots={payload.slots}
+              teams={payload.teams.map((t) => ({
+                code: t.code,
+                name: t.name,
+                logoUrl: t.logoUrl,
+                isOwn: t.code === payload.mineCode,
+                players: t.players.map((p) => ({ val: p.val, name: p.name, portraitUrl: p.portraitUrl, mods: p.mods })),
+              }))}
+              onOpenPlayer={onOpenPlayer}
+            />
+          </div>
+        </div>
+      ) : scene ? (
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: "0 0 340px", minWidth: 280, maxHeight: "calc(100vh - 180px)", overflowY: "auto" }}>
             <DisciplineStageTopPlayers players={topPlayers.rows} playerIdByRow={topPlayers.ids} onOpenPlayer={onOpenPlayer} />
